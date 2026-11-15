@@ -52,6 +52,7 @@ ns.AddEnglish({
     ["Nom"] = "Name",
     ["Zone"] = "Zone",
     ["Rang"] = "Rank",
+    ["Classe"] = "Class",
     ["Où est la guilde : %s"] = "Where the guild is: %s",
     ["Clic : chuchoter · clic droit ou Alt-clic : inviter"] = "Click: whisper · right-click or Alt-click: invite",
     ["Note : %s"] = "Note: %s",
@@ -146,8 +147,10 @@ local function Share(force)
     local lvl = UnitLevel("player") or 0
     -- "P" for the copies before 1.0.0-beta.25, "S" with the week and the season
     pcall(SendRaw, PREFIX, table.concat({ "P", p.kb, p.week, p.wk, hk, lvl, ver }, "|"), "GUILD")
-    pcall(SendRaw, PREFIX, table.concat({ "S", Week(), week, Season(), season, hk, p.kb, p.week, lvl, ver }, "|"), "GUILD")
-    Board()[Me()] = { wk = Week(), w = week, sk = Season(), s = season, hk = hk, kb = p.kb, week = p.week, lvl = lvl, ver = ver, t = time() }
+    local spec = WP.Weights and WP.Weights.Spec and WP.Weights.Spec()
+    local specKey = spec and spec[1] or ""
+    pcall(SendRaw, PREFIX, table.concat({ "S", Week(), week, Season(), season, hk, p.kb, p.week, lvl, ver, specKey }, "|"), "GUILD")
+    Board()[Me()] = { wk = Week(), w = week, sk = Season(), s = season, hk = hk, kb = p.kb, week = p.week, lvl = lvl, ver = ver, spec = specKey, t = time() }
 end
 
 local askedAt = 0
@@ -163,8 +166,9 @@ local function OnMessage(msg, sender)
     elseif kind == "S" then
         local wk, w, sk, s, hk, kb, owk, lvl, ver = msg:match("^S|([%d%-]+)|(%d+)|([%d%-]+)|(%d+)|(%d+)|(%d+)|(%d+)|(%d+)|([^|]*)")
         if wk then
+            local spec = msg:match("^S|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|(%a*)")
             Board()[sender] = { wk = wk, w = tonumber(w), sk = sk, s = tonumber(s), hk = tonumber(hk), kb = tonumber(kb),
-                week = tonumber(owk), lvl = tonumber(lvl), ver = ver, t = time() }
+                week = tonumber(owk), lvl = tonumber(lvl), ver = ver, spec = spec ~= "" and spec or nil, t = time() }
             if WP.RefreshGuild then WP.RefreshGuild() end
         end
     elseif kind == "P" then
@@ -257,7 +261,9 @@ local function Roster(onlineOnly, filter, sort)
             if hit and (isOnline or not onlineOnly) then
                 local y, m, d, h = 0, 0, 0, 0
                 if not isOnline and GetGuildRosterLastOnline then y, m, d, h = GetGuildRosterLastOnline(i) end
+                local b = WLWritsDB.guild and WLWritsDB.guild[short]
                 out[#out + 1] = { name = short, rank = rank, level = level or 0, zone = zone, online = isOnline and true or false,
+                    spec = b and b.spec,
                     class = class, note = note, rankIndex = select(3, GetGuildRosterInfo(i)) or 99,
                     away = ((y or 0) * 365 + (m or 0) * 30 + (d or 0)) * 24 + (h or 0) }
             end
@@ -267,6 +273,10 @@ local function Roster(onlineOnly, filter, sort)
     table.sort(out, function(a, b)
         if a.online ~= b.online then return a.online end
         if sort == "name" then return a.name < b.name end
+        if sort == "class" then
+            if (a.class or "") ~= (b.class or "") then return (a.class or "") < (b.class or "") end
+            if (a.spec or "") ~= (b.spec or "") then return (a.spec or "") < (b.spec or "") end
+        end
         if sort == "zone" then
             local za, zb = a.online and (a.zone or "") or "", b.online and (b.zone or "") or ""
             if za ~= zb then return za < zb end
@@ -318,6 +328,13 @@ local function Professions(name)
     return table.concat(t, ", ")
 end
 
+local function SpecName(class, key)
+    local list = key and WP.Weights and WP.Weights.SPECS and WP.Weights.SPECS[class]
+    for _, sp in ipairs(list or {}) do
+        if sp[1] == key then return (root.lang == "en") and sp[3] or sp[2] end
+    end
+end
+
 local function Whisper(name)
     if ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. name .. " ")
     elseif ChatFrameUtil and ChatFrameUtil.OpenChat then ChatFrameUtil.OpenChat("/w " .. name .. " ") end
@@ -335,7 +352,7 @@ local function MemberRow(parent)
     r.hl = S.Solid(r, "BORDER", { 1, 1, 1 }, 0); r.hl:SetAllPoints()
     r.dot = S.Solid(r, "ARTWORK", C.ready); r.dot:SetSize(6, 6); r.dot:SetPoint("LEFT", 8, 0)
     r.lvl = S.Text(r, 12, C.dim, true); r.lvl:SetPoint("LEFT", 22, 0); r.lvl:SetWidth(24); r.lvl:SetJustifyH("RIGHT")
-    r.name = S.Text(r, 14, C.text, true); r.name:SetPoint("LEFT", 54, 0); r.name:SetWidth(150); r.name:SetJustifyH("LEFT")
+    r.name = S.Text(r, 14, C.text, true); r.name:SetPoint("LEFT", 54, 0); r.name:SetWidth(160); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
     r.logo = r:CreateTexture(nil, "OVERLAY"); r.logo:SetSize(14, 14); r.logo:SetTexture(S.LOGO); r.logo:SetPoint("LEFT", 54, 0)
     r.where = S.Text(r, 12, C.dim); r.where:SetPoint("LEFT", 216, 0); r.where:SetWidth(190); r.where:SetJustifyH("LEFT")
     r.rank = S.Text(r, 12, C.muted); r.rank:SetPoint("RIGHT", -10, 0); r.rank:SetWidth(110); r.rank:SetJustifyH("RIGHT")
@@ -394,7 +411,9 @@ local function RenderMembers()
         r.ver = board[m.name] and board[m.name].ver
         r.logo:SetShown(r.addon)
         r.name:ClearAllPoints(); r.name:SetPoint("LEFT", r.addon and 72 or 54, 0)
-        r.name:SetText(m.name); r.name:SetTextColor(col[1], col[2], col[3], m.online and 1 or 0.55)
+        local sp = SpecName(m.class, m.spec)
+        r.name:SetText(m.name .. (sp and ("  " .. S.Hex(C.muted) .. sp .. "|r") or ""))
+        r.name:SetTextColor(col[1], col[2], col[3], m.online and 1 or 0.55)
         r.lvl:SetText(m.level)
         r.dot:SetColorTexture(m.online and C.ready[1] or 0.3, m.online and C.ready[2] or 0.32, m.online and C.ready[3] or 0.35, 1)
         r.where:SetText(m.online and (m.zone or "") or Ago(m.away))
@@ -473,7 +492,7 @@ local function Build()
     local onlyText = S.Text(m, 13, C.text); onlyText:SetPoint("RIGHT", only, "LEFT", -8, 0); onlyText:SetText(L("En ligne seulement"))
     ui.search = SearchBox(m, 230)
     ui.search:SetPoint("TOPLEFT", PAD, -42)
-    local sort = S.Segmented(m, { { "level", L("Niveau") }, { "name", L("Nom") }, { "zone", L("Zone") }, { "rank", L("Rang") } },
+    local sort = S.Segmented(m, { { "level", L("Niveau") }, { "name", L("Nom") }, { "class", L("Classe") }, { "zone", L("Zone") }, { "rank", L("Rang") } },
         function() return WLWritsDB.guildSort or "level" end, function(v) WLWritsDB.guildSort = v; WP.RefreshGuild() end, 28)
     sort:SetPoint("TOPRIGHT", -PAD, -42)
     ui.zones = S.Text(m, 12, C.dim); ui.zones:SetPoint("TOPLEFT", PAD, -80); ui.zones:SetPoint("RIGHT", -PAD, 0)

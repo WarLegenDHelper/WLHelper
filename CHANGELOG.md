@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.26] — 2026-11-15
+
+### Ajouté / Added
+- **Guilde : la spé de chacun** (pour les membres qui ont WL Helper : celle que juge leur module Améliorations) à côté du nom, et le **tri par classe**, puis par spé, en plus du niveau, du nom, de la zone et du rang.
+  *Guild: each member's spec (members with WL Helper) next to the name, and sorting by class then spec.*
+
 ## [1.0.0-beta.25] — 2026-11-15
 
 ### Modifié / Changed

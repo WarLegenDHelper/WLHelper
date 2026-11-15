@@ -97,7 +97,7 @@ In game, `/wlh idea` gives you the link already filled with your version.
 - **The folder is named `WLHelper`** since 1.0.0-beta.4 (it was `DungeonGuide`). If you installed an older
   version by hand, delete the `DungeonGuide` folder. If it is still there, the addon turns
   it off and tells you.
-- **Versions**: `1.0.0-beta.25` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
+- **Versions**: `1.0.0-beta.26` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
 
 ## Credits and license
 
