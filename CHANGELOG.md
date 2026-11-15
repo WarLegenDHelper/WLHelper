@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.19] — 2026-11-15
+
+### Ajouté / Added
+- **Guilde** (nouveau module, `/wl guild`, carte sur l'accueil) : toute la guilde, en ligne d'abord, avec la couleur de classe, le niveau, la zone (ou depuis quand le membre n'est pas venu), le rang, et le logo WL sur ceux qui ont l'addon. Onglet **Classement PvP** : les victimes tuées de ta main en monde ouvert (pas en champ de bataille ni en arène), cette semaine et depuis toujours, avec les victoires honorables quand le jeu les donne. Chaque copie de l'addon compte pour son joueur et le partage à la guilde.
+  *Guild module: the whole roster and an open-world PvP kill ranking (week / all time), counted by each member's addon.*
+
 ## [1.0.0-beta.18] — 2026-11-15
 
 ### Modifié / Changed

@@ -55,6 +55,10 @@ Have the guild or one crafter make an item, like retail crafting orders.
 - Who provides each reagent, fee, tip, duration; the crafter accepts or declines with a reason.
 - Inbox check of what the crafter received, mail filled for you.
 
+### Guild
+The whole guild (online first, class, level, zone, rank) and a PvP ranking for the week and all time:
+enemy players you killed in the open world, counted by each member's addon.
+
 ### Upgrades
 A green arrow and the gain on bag items better than what you wear, and a line in every item tooltip.
 WL Helper's own stat weights, per class and spec (from your talents, or picked in the settings).
@@ -74,6 +78,7 @@ One command, `/wl`, with the same words in every language.
 | `/wl trade` | The Trading Post (`/wl trade gps`, `scan`, `reset`) |
 | `/wl bags` | Bag cleaner |
 | `/wl orders` | Crafting orders |
+| `/wl guild` | The guild and the PvP ranking |
 | `/wl gps` | Stop or restart guidance |
 | `/wl options` | Settings |
 | `/wl setup` | Welcome screen: modules and clicks |
@@ -92,7 +97,7 @@ In game, `/wl idea` gives you the link already filled with your version.
 - **The folder is named `WLHelper`** since 1.0.0-beta.4 (it was `DungeonGuide`). If you installed an older
   version by hand, delete the `DungeonGuide` folder. If it is still there, the addon turns
   it off and tells you.
-- **Versions**: `1.0.0-beta.18` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
+- **Versions**: `1.0.0-beta.19` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
 
 ## Credits and license
 

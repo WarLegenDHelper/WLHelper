@@ -56,6 +56,10 @@ Faire fabriquer un objet par la guilde ou par un artisan, comme les commandes d'
 - Qui fournit chaque composant, commission, pourboire, durée ; l'artisan accepte ou refuse avec une raison.
 - Vérification dans la boîte aux lettres de ce que l'artisan a reçu, courrier rempli pour toi.
 
+### Guilde
+Toute la guilde (en ligne d'abord, classe, niveau, zone, rang) et un classement PvP de la semaine et de toujours :
+les victimes tuées de ta main en monde ouvert, comptées par l'addon de chaque membre.
+
 ### Améliorations
 Une flèche verte et le gain sur les objets de tes sacs meilleurs que ce que tu portes, et une ligne dans chaque infobulle.
 Les poids de stats sont ceux de WL Helper, par classe et par spé (détectée par tes talents, ou choisie dans les réglages).
@@ -75,6 +79,7 @@ Une seule commande, `/wl`, et les mêmes mots en français et en anglais.
 | `/wl trade` | Le Comptoir (`/wl trade gps`, `scan`, `reset`) |
 | `/wl bags` | Nettoyeur de sacs |
 | `/wl orders` | Commandes d'artisanat |
+| `/wl guild` | La guilde et le classement PvP |
 | `/wl gps` | Arrête ou relance le guidage |
 | `/wl options` | Réglages |
 | `/wl setup` | Écran de bienvenue : modules et clics |
@@ -93,7 +98,7 @@ En jeu, `/wl idea` te donne le lien déjà rempli avec ta version.
 - **Le dossier s'appelle `WLHelper`** depuis la 1.0.0-beta.4 (avant : `DungeonGuide`). Si tu avais installé une
   ancienne version à la main, supprime le dossier `DungeonGuide`. S'il traîne encore, l'addon le
   désactive tout seul et te le dit.
-- **Versions** : `1.0.0-beta.18` veut dire bêta de la 1.0. Le détail de chaque version est dans le
+- **Versions** : `1.0.0-beta.19` veut dire bêta de la 1.0. Le détail de chaque version est dans le
   [CHANGELOG](CHANGELOG.md).
 
 ## Crédits et licence

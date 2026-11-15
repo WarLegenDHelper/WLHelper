@@ -169,6 +169,10 @@ local function Build()
         Close(); if WP.ToggleOrders then WP.ToggleOrders() end
     end)
     y = y - CARD_H - 10
+    cards.guild = Card(win, y, "Interface\\Icons\\INV_BannerPVP_01", C.brandSoft or C.info, function()
+        Close(); if WP.ToggleGuild then WP.ToggleGuild() end
+    end)
+    y = y - CARD_H - 10
 
     win.afterCards = y
 
@@ -221,7 +225,7 @@ local function Build()
     end
     win.Layout(false, false)
 
-    cards.dungeons.key, cards.writs.key, cards.bags.key, cards.orders.key = "dungeons", "writs", "bags", "orders"
+    cards.dungeons.key, cards.writs.key, cards.bags.key, cards.orders.key, cards.guild.key = "dungeons", "writs", "bags", "orders", "guild"
     win:SetScript("OnShow", function() WP.RefreshHome() end)
     local ev = CreateFrame("Frame", nil, win)
     ev:RegisterEvent("QUEST_LOG_UPDATE"); ev:RegisterEvent("BAG_UPDATE_DELAYED"); ev:RegisterEvent("UPDATE_FACTION")
@@ -305,6 +309,21 @@ function WP.RefreshHome()
         oc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
     end
 
+    -- guild: who is on, and where you stand in this week's PvP ranking
+    local gc = cards.guild
+    gc.title:SetText(L("Guilde")); gc.tag:SetText(""); gc.bar:Hide(); gc.action:Hide(); gc.chev:Show(); gc:Narrow(false)
+    if IsInGuild and IsInGuild() and WP.GuildRoster then
+        local _, online = WP.GuildRoster(true)
+        gc.tag:SetText(GetGuildInfo and GetGuildInfo("player") or "")
+        gc.line1:SetText(string.format(L("%d en ligne"), online))
+        local pos
+        for i, e in ipairs(WP.GuildRanking and WP.GuildRanking(true) or {}) do if e.name == UnitName("player") then pos = i end end
+        gc.line2:SetText(pos and string.format(L("Tu es %de du classement de la semaine"), pos) or L("Classement PvP"))
+    else
+        gc.line1:SetText(L("Pas de guilde.")); gc.line2:SetText("")
+    end
+    gc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
+
     -- switched-off modules: dimmed, "off", one button to turn them back on
     local hints = {}
     for _, m in ipairs(WP.MODULES) do hints[m.key] = m.hint end
@@ -387,6 +406,7 @@ function WP.MinimapMenu(owner)
             { L("Comptoir"), function() WP.Open() end, "writs" },
             { L("Sacs"), function() if WP.Cleaner then WP.Cleaner.Toggle() end end, "bags" },
             { L("Commandes"), function() if WP.ToggleOrders then WP.ToggleOrders() end end, "orders" },
+            { L("Guilde"), function() if WP.ToggleGuild then WP.ToggleGuild() end end, "guild" },
             false,
             { L("Arrêter le GPS"), function() WP.StopGPS() end, "gps" },
             { L("Réglages"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage() end end },

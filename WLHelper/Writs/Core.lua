@@ -42,7 +42,7 @@ local DEFAULTS = {
     gpsOpts = { provider = "auto", teleports = true, autoFlight = false, scale = 1, alpha = 0.6, hideCombat = false },
     -- Comptoir comforts
     comfort = { autoTurnIn = true, autoAccept = true, reminder = true, tooltip = true, autoCrates = true },
-    modules = { dungeons = true, writs = true, bags = true, orders = true, upgrades = true },   -- Settings > General > Modules       -- rescan the shopping list when the auction house opens
+    modules = { dungeons = true, writs = true, bags = true, orders = true, upgrades = true, guild = true },   -- Settings > General > Modules       -- rescan the shopping list when the auction house opens
     tiers = { Journeyman = true, Expert = true, Artisan = true },
     hideHigh = true,         -- hide turn-in spots in zones above your level
     hideUnknown = false,     -- hide writs whose turn-in spot is unknown
@@ -849,6 +849,7 @@ WP.MODULES = {
     { key = "writs", label = "Comptoir", hint = "Craftsman's Writs, liste d'achat, remise auto" },
     { key = "bags", label = "Sacs", hint = "Nettoyeur des objets de quête inutiles" },
     { key = "orders", label = "Commandes", hint = "Faire fabriquer par la guilde, accepter des commandes" },
+    { key = "guild", label = "Guilde", hint = "Voir toute la guilde et le classement PvP" },
     { key = "upgrades", label = "Améliorations", hint = "Flèche verte sur les objets meilleurs que les tiens" },
 }
 function WP.ModuleOn(key)
@@ -891,6 +892,8 @@ function WP.SetModule(key, on)
         end
     elseif key == "bags" then
         if not on and WP.Cleaner and WP.Cleaner.Hide then WP.Cleaner.Hide() end
+    elseif key == "guild" then
+        if not on and WP.HideGuild then WP.HideGuild() end
     elseif key == "upgrades" then
         if WP.RefreshUpgrades then WP.RefreshUpgrades() end
     end
