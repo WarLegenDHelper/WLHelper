@@ -751,12 +751,17 @@ function WP.OnGPSChanged()
     end
 end
 
+function WP.HideWindow() if frame then frame:Hide() end end
+
 function WP.Open()
+    if WP.ModuleOff("writs") then return end
     if not frame then Build() end
     frame:Show(); frame:Raise()
 end
 
 function WP.Toggle()
+    if frame and frame:IsShown() then frame:Hide(); return end
+    if WP.ModuleOff("writs") then return end
     if not frame then Build() end
     frame:SetShown(not frame:IsShown())
 end

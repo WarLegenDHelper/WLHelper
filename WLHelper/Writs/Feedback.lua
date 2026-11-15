@@ -20,7 +20,7 @@ ns.AddEnglish({
     ["Lien copié dans la zone : Ctrl+C"] = "Link selected: Ctrl+C",
 })
 
-local REPO = "https://github.com/NEM3S15/WLHelper/issues/new"
+local REPO = "https://github.com/WarLegenDHelper/WLHelper/issues/new"
 local FORMS = {
     idea = { template = "idea.yml", label = "Proposer une idée" },
     bug  = { template = "bug.yml",  label = "Signaler un bug" },

@@ -550,6 +550,7 @@ function WP.GoNext()
 end
 
 function WP.ToggleGPS()
+    if not WLWritsCharDB.gps and WP.ModuleOff("writs") then return end
     local db = WLWritsCharDB
     db.gps = not db.gps
     if db.gps then WP.GoNext() else GPS.Stop("writs") end
@@ -574,7 +575,8 @@ end
 -- running, else the Comptoir's tour starts.
 function WP.StopOrStartGPS()
     if GPS.Active() then WP.StopGPS(); return end
-    if root.GuideStatus and root.GuideStatus() and WLDTDB and WLDTDB.arrow == false and root.ToggleArrow then
+    local guideOn = not root.GuideOn or root.GuideOn()
+    if guideOn and root.GuideStatus and root.GuideStatus() and WLDTDB and WLDTDB.arrow == false and root.ToggleArrow then
         root.ToggleArrow()
         if root.Render then root.Render() end
     else

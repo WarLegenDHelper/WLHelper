@@ -19,6 +19,7 @@ local me
 
 local lastSent, pending = "", false
 function ns.SyncSend(force)
+  if ns.GuideOn and not ns.GuideOn() then return end
   local ch = Channel()
   if not (ch and Send) then return end
   local log = ns.LogEntries()

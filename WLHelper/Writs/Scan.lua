@@ -233,7 +233,7 @@ f:SetScript("OnEvent", function(_, event)
         S.SkipBatch()
     elseif event == "AUCTION_HOUSE_SHOW" then
         -- Last-minute prices: rescan the shopping list as the auction house opens.
-        if WLWritsDB and WLWritsDB.autoRescan and WP.ShoppingIDs then
+        if WLWritsDB and WLWritsDB.autoRescan and WP.ShoppingIDs and WP.ModuleOn("writs") then
             -- After Blizzard's own favourites search has had its turn.
             C_Timer.After(4, function()
                 local ids = WP.ShoppingIDs()

@@ -41,7 +41,8 @@ local DEFAULTS = {
     -- GPS: provider "auto" (Zygor when its travel system is on, else ours) | "wl" | "zygor"
     gpsOpts = { provider = "auto", teleports = true, autoFlight = false, scale = 1, alpha = 0.6, hideCombat = false },
     -- Comptoir comforts
-    comfort = { autoTurnIn = true, autoAccept = true, reminder = true, tooltip = true },       -- rescan the shopping list when the auction house opens
+    comfort = { autoTurnIn = true, autoAccept = true, reminder = true, tooltip = true },
+    modules = { dungeons = true, writs = true, bags = true },   -- Settings > General > Modules       -- rescan the shopping list when the auction house opens
     tiers = { Journeyman = true, Expert = true, Artisan = true },
     hideHigh = true,         -- hide turn-in spots in zones above your level
     hideUnknown = false,     -- hide writs whose turn-in spot is unknown
@@ -634,6 +635,7 @@ local function Busy()
 end
 
 local function OnUseItem(bag, slot)
+    if not WP.ModuleOn("writs") then return end
     local id = C_Container and C_Container.GetContainerItemID and safe(C_Container.GetContainerItemID, bag, slot)
         or (GetContainerItemID and safe(GetContainerItemID, bag, slot))
     if id and POUCH[id] and not Busy() then
@@ -729,6 +731,7 @@ f:RegisterEvent("LOOT_OPENED")
 f:RegisterEvent("LOOT_CLOSED")
 f:RegisterEvent("PLAYER_REGEN_ENABLED")
 f:SetScript("OnEvent", function(_, event, a1)
+    if event ~= "ADDON_LOADED" and not WP.ModuleOn("writs") then return end
     if event == "ADDON_LOADED" then
         if a1 ~= ADDON then return end
         WLWritsDB = WLWritsDB or {}
@@ -795,8 +798,64 @@ local function Help()
     }) do print(line) end
 end
 
+-- ---------------------------------------------------------------- modules on / off
+-- A module switched off listens to nothing and opens no window; switching it back on is immediate.
+-- The GPS has no switch: the other modules use it.
+WP.MODULES = {
+    { key = "dungeons", label = "Donjons", hint = "Guide des quêtes de donjon, route, flèche" },
+    { key = "writs", label = "Comptoir", hint = "Craftsman's Writs, liste d'achat, remise auto" },
+    { key = "bags", label = "Sacs", hint = "Nettoyeur des objets de quête inutiles" },
+}
+function WP.ModuleOn(key)
+    local m = WLWritsDB and WLWritsDB.modules
+    return not m or m[key] ~= false
+end
+function WP.ModuleLabel(key)
+    for _, m in ipairs(WP.MODULES) do if m.key == key then return L(m.label) end end
+    return key
+end
+-- Says a module is off (and where to turn it on); true when it is off.
+function WP.ModuleOff(key)
+    if WP.ModuleOn(key) then return false end
+    WP.Print(string.format(L("le module %s est éteint : Réglages › Général › Modules."), WP.ModuleLabel(key)))
+    return true
+end
+function WP.SetModule(key, on)
+    WLWritsDB.modules = WLWritsDB.modules or {}
+    WLWritsDB.modules[key] = on and true or false
+    local G = WP.GPS
+    if key == "dungeons" then
+        if not on then
+            if root.frame and root.frame:IsShown() then root.frame:Hide() end
+            if root.HidePicker then root.HidePicker() end
+            if root.ClearPoints then root.ClearPoints() end   -- map points, TomTom and the arrow
+            if G then G.Stop("dungeon") end
+            if root.UpdateActionBar then root.UpdateActionBar() end
+        elseif root.frame then
+            -- back right away, as it was before
+            if WLDTDB and not WLDTDB.hidden then root.frame:Show() end
+            root.frame.sig = nil
+            if root.Refresh then root.Refresh(true) end
+            if root.UpdateActionBar then root.UpdateActionBar() end
+        end
+    elseif key == "writs" then
+        if not on then
+            if WP.HideWindow then WP.HideWindow() end
+            if WLWritsCharDB then WLWritsCharDB.gps = false end
+            if G then G.Stop("writs") end
+        end
+    elseif key == "bags" then
+        if not on and WP.Cleaner and WP.Cleaner.Hide then WP.Cleaner.Hide() end
+    end
+    if WP.RefreshHome then WP.RefreshHome() end
+    if WP.SyncOptions then WP.SyncOptions() end
+end
+
+-- /comptoir: the Trading Post's own words need the module; options, clean, idea work anyway
+local WRIT_COMMANDS = { [""] = true, gps = true, stop = true, scan = true, reset = true }
 function WP.Command(msg)
     local cmd = (msg or ""):lower():match("^%s*(%S*)")
+    if WRIT_COMMANDS[cmd] and WP.ModuleOff("writs") then return end
     if cmd == "" then
         if WP.Toggle then WP.Toggle() end
     elseif cmd == "gps" then

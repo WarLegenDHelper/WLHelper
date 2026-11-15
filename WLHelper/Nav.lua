@@ -35,8 +35,15 @@ local function Add(m, x, y, label, first)
 end
 
 -- pts = { {m,x,y,label}, ... } ; sans TomTom un seul point (n° idx)
+-- Everything the guide put on the map, and its arrow (the module being switched off).
+function ns.ClearPoints()
+  Clear()
+  ns.SetArrow(nil)
+end
+
 function ns.SetPoints(pts, quiet, idx)
   Clear()
+  if ns.GuideOn and not ns.GuideOn() then ns.SetArrow(nil); return end
   if #pts == 0 then
     if not quiet then ns.Print(L.NOPOINT) end
     ns.SetArrow(nil)

@@ -67,6 +67,7 @@ f:RegisterEvent("GOSSIP_SHOW")
 f:RegisterEvent("QUEST_GREETING")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", function(_, event, a1, a2)
+    if not WP.ModuleOn("writs") then return end
     Index()
     if IsShiftKeyDown() and event ~= "PLAYER_ENTERING_WORLD" then return end   -- Shift: do it by hand
     if event == "QUEST_DETAIL" then
@@ -110,7 +111,7 @@ end)
 -- ---------------------------------------------------------------- envelope tooltip
 
 local function AddLines(tooltip, itemID)
-    if not On("tooltip") or not itemID then return end
+    if not On("tooltip") or not itemID or not WP.ModuleOn("writs") then return end
     Index()
     local w = byItem[itemID]
     if not w then return end

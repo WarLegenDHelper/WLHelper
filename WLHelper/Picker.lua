@@ -240,12 +240,20 @@ Render = function()
 end
 ns.RenderPicker = function() if p and p:IsShown() then Render() end end
 
+local function GuideOff()
+  local WP = ns.Writs and ns.Writs.WP
+  return WP and WP.ModuleOff and WP.ModuleOff("dungeons")
+end
+
 function ns.TogglePicker()
+  if p and p:IsShown() then p:Hide(); return end
+  if GuideOff() then return end
   if not p then Build() end
   if p:IsShown() then p:Hide() else Render(); p:Show(); p:Raise() end
 end
 -- Opens the picker (buttons that say "pick dungeons" never close it).
 function ns.ShowPicker()
+  if GuideOff() then return end
   if not p then Build() end
   Render(); p:Show(); p:Raise()
 end

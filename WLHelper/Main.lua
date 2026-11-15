@@ -96,7 +96,14 @@ for _, e in ipairs({ "PLAYER_LOGIN", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "PLA
   "PLAYER_LEVEL_UP", "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA" }) do ev:RegisterEvent(e) end
 pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED")
 local pending
+-- the dungeon guide can be switched off (Settings > General > Modules)
+local function GuideOn()
+  local WP = ns.Writs and ns.Writs.WP
+  return not (WP and WP.ModuleOn) or WP.ModuleOn("dungeons")
+end
+ns.GuideOn = GuideOn
 ev:SetScript("OnEvent", function(_, e)
+  if e ~= "PLAYER_LOGIN" and not GuideOn() then return end
   if e == "PLAYER_LOGIN" then
     DB()
     ns.BuildMain(); ns.BuildNav(); ns.ApplyLooks()
@@ -104,8 +111,8 @@ ev:SetScript("OnEvent", function(_, e)
       ns.Assemble(false)
       local f = ns.frame
       if WLDTDB.view then f.view = WLDTDB.view end
-      if not WLDTDB.hidden then f:Show() end
-      ns.Refresh(true)
+      if not WLDTDB.hidden and GuideOn() then f:Show() end
+      if GuideOn() then ns.Refresh(true) end
     end)
     local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
     ns.VERSION = meta and meta(ADDON, "Version") or "?"
@@ -152,9 +159,10 @@ SLASH_WLDUNGEONTOOL3 = "/wldt"
 SLASH_WLDUNGEONTOOL4 = "/zfg"
 SlashCmdList.WLDUNGEONTOOL = function(msg)
   if not ns.frame then return end
-  msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+  -- « réglages », « idée » typed with accents: accents out before lower(), which may touch UTF-8 bytes
+  msg = (msg or ""):gsub("é", "e"):gsub("É", "e"):gsub("è", "e"):gsub("È", "e")
+  msg = msg:lower():gsub("^%s+", ""):gsub("%s+$", "")
   local cmd, arg = msg:match("^(%S*)%s*(.*)$")
-  cmd = cmd:gsub("é", "e"):gsub("É", "e"):gsub("è", "e"):gsub("È", "e")   -- « réglages », « idée » typed with accents
   local WP = ns.Writs and ns.Writs.WP
   -- one root, French and English words; the old ones (clean, writs, comptoir, dj) still work
   if cmd == "" or cmd == "home" or cmd == "accueil" then if WP and WP.ToggleHome then WP.ToggleHome() else ns.ToggleMain() end

@@ -118,11 +118,18 @@ local function Card(parent, y, icon, tint, onClick)
     c.fill = S.Solid(c.bar, "ARTWORK", C.brand)
     c.fill:SetPoint("TOPLEFT"); c.fill:SetPoint("BOTTOMLEFT")
 
-    c.action = S.Button(c, "", 86, 30, "primary", onClick)
+    -- a switched-off module: the card turns it back on
+    local function Click()
+        if c.off then return end   -- a switched-off card: only its button acts
+        onClick()
+    end
+    c.action = S.Button(c, "", 86, 30, "primary", function()
+        if c.off then WP.SetModule(c.key, true) else onClick() end
+    end)
     c.action:SetPoint("RIGHT", -12, 0)
     c.chev = S.Text(c, 18, C.muted, true)
     c.chev:SetPoint("RIGHT", -14, 0); c.chev:SetText(">")
-    c:SetScript("OnClick", onClick)
+    c:SetScript("OnClick", Click)
     -- with a button on the right, the text stops before it
     function c:Narrow(on)
         local r = on and -110 or -40
@@ -183,6 +190,7 @@ local function Build()
     ver:SetPoint("TOP", 0, y); ver:SetText("v" .. Version() .. " · /wl")
     win:SetHeight(-y + 12 + 14)
 
+    cards.dungeons.key, cards.writs.key, cards.bags.key = "dungeons", "writs", "bags"
     win:SetScript("OnShow", function() WP.RefreshHome() end)
     local ev = CreateFrame("Frame", nil, win)
     ev:RegisterEvent("QUEST_LOG_UPDATE"); ev:RegisterEvent("BAG_UPDATE_DELAYED"); ev:RegisterEvent("UPDATE_FACTION")
@@ -251,6 +259,22 @@ function WP.RefreshHome()
     b.line1:SetText(n > 0 and string.format(L("%d objets de quête qui ne servent plus"), n) or L("Rien à jeter"))
     SetActive(b, false)
 
+    -- switched-off modules: dimmed, "off", one button to turn them back on
+    local hints = {}
+    for _, m in ipairs(WP.MODULES) do hints[m.key] = m.hint end
+    for key, card in pairs(cards) do
+        card.off = not WP.ModuleOn(key)
+        -- dim the card's content, never its button
+        local a = card.off and 0.45 or 1
+        card.icon:SetAlpha(a); card.title:SetAlpha(a); card.tag:SetAlpha(a); card.line1:SetAlpha(a); card.line2:SetAlpha(a)
+        if card.off then
+            card.tag:SetText(L("éteint")); card.line1:SetText(L(hints[key] or ""))
+            card.line2:SetText(""); card.bar:Hide(); card.chev:Hide()
+            card.action.label:SetText(L("Allumer")); card.action:Show(); card:Narrow(true)
+            SetActive(card, false)
+        end
+    end
+
     -- GPS
     local g = win.gps
     if WP.GPS.Active() then
@@ -280,14 +304,17 @@ function WP.MinimapTooltip(owner)
     tt:SetOwner(owner, "ANCHOR_LEFT")
     tt:AddLine("|T" .. S.LOGO .. ":16:16|t WL Helper", 1, 1, 1)
     local label, cur, total, finished = DungeonState()
-    tt:AddDoubleLine(L("Donjons"), label and (label .. ", " .. (finished and L("terminé") or string.format(L("%d / %d"), cur, total))) or L("aucun"),
+    tt:AddDoubleLine(L("Donjons"), not WP.ModuleOn("dungeons") and L("éteint") or label and (label .. ", " .. (finished and L("terminé") or string.format(L("%d / %d"), cur, total))) or L("aucun"),
         C.dim[1], C.dim[2], C.dim[3], C.text[1], C.text[2], C.text[3])
     local need, _, ready = WritState()
-    if need then
+    if not WP.ModuleOn("writs") then
+        tt:AddDoubleLine(L("Comptoir"), L("éteint"), C.dim[1], C.dim[2], C.dim[3], C.dim[1], C.dim[2], C.dim[3])
+    elseif need then
         local col = ready > 0 and C.ready or C.text
         tt:AddDoubleLine(L("Comptoir"), string.format(L("%d prêts"), ready), C.dim[1], C.dim[2], C.dim[3], col[1], col[2], col[3])
     end
-    tt:AddDoubleLine(L("Sacs"), string.format(L("%d à jeter"), BagCount()), C.dim[1], C.dim[2], C.dim[3], C.text[1], C.text[2], C.text[3])
+    tt:AddDoubleLine(L("Sacs"), WP.ModuleOn("bags") and string.format(L("%d à jeter"), BagCount()) or L("éteint"),
+        C.dim[1], C.dim[2], C.dim[3], C.text[1], C.text[2], C.text[3])
     tt:AddLine(" ")
     tt:AddLine(L("Clic : accueil · Clic droit : menu"), C.warn[1], C.warn[2], C.warn[3])
     tt:AddLine(L("Glisser pour déplacer"), C.dim[1], C.dim[2], C.dim[3])
@@ -305,9 +332,9 @@ function WP.MinimapMenu(owner)
         S.Border(menu, C.border)
         tinsert(UISpecialFrames, "WLHelperMinimapMenu")
         local items = {
-            { L("Donjons"), function() if DungeonState() then root.ShowGuide() else root.ShowPicker() end end },
-            { L("Comptoir"), function() WP.Open() end },
-            { L("Sacs"), function() if WP.Cleaner then WP.Cleaner.Toggle() end end },
+            { L("Donjons"), function() if DungeonState() then root.ShowGuide() else root.ShowPicker() end end, "dungeons" },
+            { L("Comptoir"), function() WP.Open() end, "writs" },
+            { L("Sacs"), function() if WP.Cleaner then WP.Cleaner.Toggle() end end, "bags" },
             false,
             { L("Arrêter le GPS"), function() WP.StopGPS() end, "gps" },
             { L("Réglages"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage() end end },
@@ -338,6 +365,10 @@ function WP.MinimapMenu(owner)
     if menu:IsShown() then menu:Hide(); return end
     menu.owner = owner; menu.away = 0
     menu.buttons.gps:SetEnabled(WP.GPS.Active())
+    for _, k in ipairs({ "dungeons", "writs", "bags" }) do
+        local b = menu.buttons[k]
+        if b then b.label:SetAlpha(WP.ModuleOn(k) and 1 or 0.45) end
+    end
     menu:ClearAllPoints()
     menu:SetPoint("TOPRIGHT", owner, "BOTTOMLEFT", 4, 4)
     GameTooltip:Hide()

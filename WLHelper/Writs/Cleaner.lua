@@ -523,6 +523,7 @@ ev:RegisterEvent("BAG_UPDATE_DELAYED")
 ev:RegisterEvent("QUEST_LOG_UPDATE")
 ev:RegisterEvent("QUEST_TURNED_IN")
 ev:SetScript("OnEvent", function()
+    if not WP.ModuleOn("bags") then return end
     dirty = true
     if win and win:IsShown() and not pending then
         pending = true
@@ -534,11 +535,15 @@ end)
 
 WP.Cleaner = {
     Toggle = function()
+        if win and win:IsShown() then win:Hide(); return end
+        if WP.ModuleOff("bags") then return end
         if not win then Build() end
-        if win:IsShown() then win:Hide() else win:Show() end
+        win:Show()
     end,
+    Hide = function() if win then win:Hide() end end,
     -- How many items the window offers (for the home page and the minimap tooltip).
     Count = function()
+        if not WP.ModuleOn("bags") then return 0 end
         if dirty then Scan() end
         local n = 0
         for _, e in ipairs(entries) do if not e.manual then n = n + 1 end end

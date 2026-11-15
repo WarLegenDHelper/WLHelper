@@ -6,6 +6,24 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.5] — 2026-11-15
+
+### Ajouté / Added
+- **Chercher dans les réglages** : une barre en haut des réglages (aussi Ctrl+F). Les résultats arrivent pendant que tu tapes, rangés par page ; les pages sans résultat s'estompent. ↑ ↓ et Entrée pour choisir ; le réglage choisi s'ouvre et clignote. Ça trouve en français et en anglais, avec ou sans accents, et par mots-clés (« arrow » trouve la flèche).
+  *Search the settings (also Ctrl+F): live results grouped by page, keyboard navigation, the picked setting opens and flashes; French and English, accents optional, keywords.*
+- **Modules** : Réglages › Général › Modules permet d'éteindre les Donjons, le Comptoir ou les Sacs. Un module éteint n'écoute plus rien et n'ouvre plus de fenêtre ; sur l'accueil il devient une carte grise avec « Allumer ». Le rallumer est immédiat, sans /reload. Le GPS reste toujours actif.
+  *Modules: turn the Dungeons, Trading Post or Bags module off; an off module does nothing and shows a dimmed "Turn on" card on the home page; turning it back on is immediate.*
+
+### Modifié / Changed
+- Le dépôt a déménagé : **github.com/WarLegenDHelper/WLHelper**, avec le logo War Legend. L'ancienne adresse redirige.
+  *The repository moved to github.com/WarLegenDHelper/WLHelper; the old address redirects.*
+
+### Corrigé / Fixed
+- `/wl réglages` et `/wl idée` tapés avec les accents.
+  *Commands typed with French accents.*
+- Relecture Fable 5.2 : la recherche ne recouvre plus une page ouverte depuis la barre de gauche ; en combat, la fenêtre des réglages ne bloque plus le clavier ; un module éteint ne laisse plus de flèche, de points sur la carte, de scan à l'HV ni de tournée ; rallumer les Donjons réaffiche le guide tout de suite ; `/comptoir options` marche même Comptoir éteint.
+  *Review fixes: search vs. page, no keyboard capture in combat, a switched-off module leaves nothing running, Dungeons come back at once.*
+
 ## [1.0.0-beta.4] — 2026-11-15
 
 ### Modifié / Changed
@@ -127,7 +145,8 @@ Première version de WL Helper (bêta). WL Dungeon Guide devient **WL Helper**.
 WL Dungeon Guide jusqu'à la 3.3 : guide des quêtes de donjon Horde pas à pas (versions partagées
 à la main, avant ce dépôt).
 
-[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.4...HEAD
+[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.5...HEAD
+[1.0.0-beta.5]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.4...v1.0.0-beta.5
 [1.0.0-beta.4]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.3...v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.2...v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.1...v1.0.0-beta.2

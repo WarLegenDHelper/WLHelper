@@ -15,6 +15,21 @@ ns.AddEnglish({
     ["Options"] = "Options",
     ["Général"] = "General", ["Donjons"] = "Dungeons", ["Comptoir"] = "Trading Post", ["GPS"] = "GPS",
     ["Sacs"] = "Bags", ["À propos"] = "About",
+    ["Chercher un réglage"] = "Search settings",
+    ["Effacer la recherche"] = "Clear search",
+    ["Aucun réglage ne correspond à « %s »."] = "No setting matches \"%s\".",
+    ["%d réglages · flèches haut / bas pour choisir, Entrée pour ouvrir"] = "%d settings · up / down arrows to choose, Enter to open",
+    ["1 réglage · Entrée pour l'ouvrir"] = "1 setting · Enter to open it",
+    ["Ce module est éteint : Général › Modules pour le rallumer."] = "This module is off: General › Modules to turn it back on.",
+    ["Modules"] = "Modules",
+    ["Guide des quêtes de donjon, route, flèche"] = "Dungeon quest guide, route, arrow",
+    ["Craftsman's Writs, liste d'achat, remise auto"] = "Craftsman's Writs, shopping list, auto turn-in",
+    ["Nettoyeur des objets de quête inutiles"] = "Cleaner for quest items you no longer need",
+    ["Le GPS reste toujours actif : les autres modules s'en servent. Rallumer un module est immédiat, sans /reload."] =
+        "The GPS always stays on: the other modules use it. Turning a module back on is immediate, no /reload.",
+    ["le module %s est éteint : Réglages › Général › Modules."] = "the %s module is off: Settings › General › Modules.",
+    ["éteint"] = "off",
+    ["Allumer"] = "Turn on",
     ["Zones où je vais"] = "Zones I go to",
     ["Un writ précis : clic droit dessus dans « Tous les writs »."] = "A single writ: right-click it in \"All writs\".",
     ["Formulaire GitHub prérempli"] = "Prefilled GitHub form",
@@ -105,6 +120,7 @@ end
 
 -- The dungeon guide's arrow: root.ToggleArrow flips WLDTDB.arrow (and stops the arrow when off).
 local function SetGuideArrow(on)
+    if ns.WP and ns.WP.ModuleOff and ns.WP.ModuleOff("dungeons") then return end
     if (Guide().arrow ~= false) == on then return end
     if root.ToggleArrow then root.ToggleArrow() else Guide().arrow = on end
     if root.Render then root.Render() end
@@ -169,6 +185,49 @@ local function NewPage(parent)
     return p
 end
 
+-- ---------------------------------------------------------------- search index
+-- Every row registers its page, section, label and hint while the pages are built. Text is matched
+-- lower-cased and without accents, in both languages (the French key and its English text), plus a
+-- few keywords, so "arrow", "fleche" and "flèche" all find the arrow settings.
+local INDEX = {}
+local BuildSearch   -- defined after ShowPage; builds the search box into the nav
+
+local FOLD = { ["à"] = "a", ["â"] = "a", ["ä"] = "a", ["é"] = "e", ["è"] = "e", ["ê"] = "e", ["ë"] = "e",
+    ["î"] = "i", ["ï"] = "i", ["ô"] = "o", ["ö"] = "o", ["ù"] = "u", ["û"] = "u", ["ü"] = "u", ["ç"] = "c",
+    ["œ"] = "oe", ["À"] = "a", ["Â"] = "a", ["É"] = "e", ["È"] = "e", ["Ê"] = "e", ["Ë"] = "e", ["Î"] = "i", ["Ï"] = "i",
+    ["Ô"] = "o", ["Ù"] = "u", ["Û"] = "u", ["Ç"] = "c", ["Œ"] = "oe", ["’"] = "'" }
+-- Accents first, then lower case: lower() may touch the bytes of a UTF-8 letter on some systems.
+local function Fold(t)
+    t = (t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    t = t:gsub("[\195\197\226][\128-\191]+", function(ch) return FOLD[ch] or ch end)
+    return (t:lower())
+end
+
+-- The other language of a text: French keys map to English in ns.EN; English needs the reverse.
+local reverse
+local function OtherLanguage(t)
+    if not t or not ns.EN then return "" end
+    if ns.EN[t] then return ns.EN[t] end
+    if not reverse then reverse = {}; for k, v in pairs(ns.EN) do reverse[v] = k end end
+    return reverse[t] or ""
+end
+
+-- Words people type for things the labels say differently.
+local KEYWORDS = {
+    arrow = "fleche pointeur", fleche = "arrow pointeur", flight = "vol taxi", vol = "flight taxi",
+    teleport = "teleportation portail mage", zygor = "guide pointeur", tooltip = "infobulle",
+    infobulle = "tooltip", writ = "enveloppe", minimap = "carte bouton", langue = "language english francais",
+    language = "langue", sac = "bags clean nettoyeur", bags = "sacs nettoyeur", reglage = "settings options",
+}
+
+local function Register(p, row, label, hint)
+    local section = p.section or ""
+    local text = table.concat({ label or "", OtherLanguage(label), hint or "", OtherLanguage(hint),
+        section, OtherLanguage(section), p.pageLabel or "", OtherLanguage(p.pageLabel) }, " ")
+    INDEX[#INDEX + 1] = { page = p.key, pageLabel = p.pageLabel, section = section, label = label, hint = hint,
+        row = row, y = -select(5, row:GetPoint(1)), labelFold = Fold(label .. " " .. OtherLanguage(label)), all = Fold(text) }
+end
+
 -- The last row of a section has no divider under it.
 local function CloseSection(p)
     if p.lastRow then p.lastRow.divider:Hide(); p.lastRow = nil end
@@ -181,6 +240,7 @@ local function Section(p, text)
     local fs = S.Section(p, text)
     fs:SetPoint("TOPLEFT", PAD_X, p.y)
     p.y = p.y - 18
+    p.section = text
 end
 
 -- One dim line (or a few, wrapped) under the cursor.
@@ -218,6 +278,7 @@ local function Row(p, label, hint)
     p.y = p.y - ROW_H
     p.lastRow = row
     p.first = false
+    Register(p, row, label, hint)
     return row
 end
 
@@ -263,6 +324,13 @@ local Rebuild   -- defined with the window: rebuilds every page after a language
 local BUILD = {}
 
 function BUILD.general(p)
+    Section(p, L("Modules"))
+    for _, m in ipairs(ns.WP.MODULES) do
+        SwitchRow(p, L(m.label), function() return ns.WP.ModuleOn(m.key) end,
+            function(v) ns.WP.SetModule(m.key, v) end, L(m.hint))
+    end
+    Note(p, L("Le GPS reste toujours actif : les autres modules s'en servent. Rallumer un module est immédiat, sans /reload."), 6)
+
     Section(p, L("Langue"))
     local row = Row(p, L("Langue"))
     Place(p, row, S.Segmented(row, {
@@ -416,7 +484,7 @@ local function Version()
     return ok and v or "?"
 end
 
-local GITHUB = "https://github.com/NEM3S15/WLHelper"
+local GITHUB = "https://github.com/WarLegenDHelper/WLHelper"
 local TITLE = "WaR " .. S.Hex(C.danger) .. "LegenD|r Helper"
 
 -- Selectable, read-only text: an EditBox that puts its text back if typed into.
@@ -493,6 +561,7 @@ local win, body, current
 
 -- Builds the nav and every page into a fresh body frame (again after a language change).
 local function BuildBody()
+    for i = #INDEX, 1, -1 do INDEX[i] = nil end
     body = CreateFrame("Frame", nil, win)
     body:SetPoint("TOPLEFT", 1, -39)
     body:SetPoint("BOTTOMRIGHT", -1, 1)
@@ -509,8 +578,8 @@ local function BuildBody()
     for i, def in ipairs(PAGES) do
         local b = CreateFrame("Button", nil, nav)
         b:SetHeight(38)
-        b:SetPoint("TOPLEFT", 0, -10 - (i - 1) * 38)
-        b:SetPoint("TOPRIGHT", 0, -10 - (i - 1) * 38)
+        b:SetPoint("TOPLEFT", 0, -54 - (i - 1) * 38)
+        b:SetPoint("TOPRIGHT", 0, -54 - (i - 1) * 38)
         b.bg = S.Solid(b, "BACKGROUND", C.card)
         b.bg:SetAllPoints()
         b.hover = S.Solid(b, "BACKGROUND", C.hover)
@@ -528,11 +597,21 @@ local function BuildBody()
         body.tabs[i] = b
 
         local p = NewPage(content)
+        p.key, p.pageLabel = def.key, L(def.label)
+        b.count = S.Text(b, 12, C.brandSoft or C.brand, true)
+        b.count:SetPoint("RIGHT", -12, 0)
+        local mod = def.key == "dungeons" and "dungeons" or def.key == "comptoir" and "writs" or def.key == "bags" and "bags"
+        if mod then
+            local off = Note(p, L("Ce module est éteint : Général › Modules pour le rallumer."))
+            off:SetTextColor(C.warn[1], C.warn[2], C.warn[3])
+            p.controls[#p.controls + 1] = { Sync = function() off:SetShown(not ns.WP.ModuleOn(mod)) end }
+        end
         BUILD[def.key](p)
         CloseSection(p)
         p:SetHeight(-p.y + PAD_TOP)
         body.pages[def.key] = p
     end
+    BuildSearch(nav, content)
 end
 
 -- Selected page: card background, 3 px brand bar, bright semi-bold label.
@@ -559,14 +638,21 @@ Rebuild = function()
     body:Hide()
     body:SetParent(nil)   -- the old frames stay orphaned; a language change is rare
     BuildBody()
-    win.subtitle:SetText(L("Options"))
+    win.subtitle:SetText(L("Réglages"))
     current = nil
     ns.WP.ShowOptionsPage(keep or "general")
 end
 
 -- Shows the window on a page (builds it the first time).
-local function ShowPage(key)
+local ShowPage
+ShowPage = function(key)
     if not body or not body.pages[key] then key = "general" end
+    -- a page opened from the nav (or the window reopened) ends the search
+    if body.results then body.results:Hide() end
+    if body.searchBox and (body.searchBox:GetText() or "") ~= "" then
+        body.searchSilent = true; body.searchBox:SetText(""); body.searchSilent = false
+        if body.ClearSearch then body.ClearSearch() end
+    end
     current = key
     for k, p in pairs(body.pages) do p:SetShown(k == key) end
     -- OnShow re-syncs the controls even when the page was already visible.
@@ -576,7 +662,252 @@ local function ShowPage(key)
     PaintNav()
 end
 
+-- ---------------------------------------------------------------- search
+local RESULT_H, HEAD_H = 44, 28
+
+BuildSearch = function(nav, content)
+    local box = CreateFrame("EditBox", nil, nav)
+    box:SetPoint("TOPLEFT", 10, -10); box:SetPoint("TOPRIGHT", -10, -10); box:SetHeight(32)
+    box:SetAutoFocus(false)
+    local probe = S.Text(nav, 14, C.text)
+    local font, size, flags = probe:GetFont()
+    probe:Hide()
+    if font then box:SetFont(font, size or 14, flags or "") else box:SetFontObject(ChatFontNormal) end
+    box:SetTextColor(C.text[1], C.text[2], C.text[3])
+    box:SetTextInsets(28, 22, 0, 0)
+    S.Solid(box, "BACKGROUND", C.card):SetAllPoints()
+    local border = S.Border(box, C.border)
+    local glass = box:CreateTexture(nil, "ARTWORK")
+    glass:SetSize(14, 14); glass:SetPoint("LEFT", 8, 0); glass:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+    local hint = S.Text(box, 13, C.muted)
+    hint:SetPoint("LEFT", 28, 0); hint:SetText(L("Chercher un réglage"))
+    local clear = CreateFrame("Button", nil, box)
+    clear:SetSize(20, 20); clear:SetPoint("RIGHT", -2, 0)
+    local x = S.Text(clear, 15, C.dim); x:SetPoint("CENTER"); x:SetText("×")
+    clear:SetScript("OnClick", function() box:SetText(""); box:ClearFocus() end)
+    clear:Hide()
+    body.searchBox = box
+    ns.WP.searchBox = box   -- for a key binding, and the offline tests
+
+    -- results, in place of the page
+    local sf = CreateFrame("ScrollFrame", nil, content)
+    sf:SetAllPoints(); sf:Hide()
+    body.results = sf
+    local list = CreateFrame("Frame", nil, sf)
+    list:SetSize(CONTENT_W, 10)
+    sf:SetScrollChild(list)
+    sf:EnableMouseWheel(true)
+    sf:SetScript("OnMouseWheel", function(self, delta)
+        local max = math.max(0, list:GetHeight() - self:GetHeight())
+        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * 40)))
+    end)
+    local summary = S.Text(list, 13, C.dim)
+    summary:SetPoint("TOPLEFT", PAD_X, -PAD_TOP); summary:SetPoint("RIGHT", -PAD_X, 0); summary:SetJustifyH("LEFT")
+    local empty = S.Button(list, L("Effacer la recherche"), 170, 30, "secondary", function() box:SetText("") end)
+    local heads, rows, shown, sel = {}, {}, {}, 1
+
+    local function Head(i)
+        local h = heads[i]
+        if not h then h = S.Text(list, 12, C.dim, true); heads[i] = h end
+        h:Show(); return h
+    end
+    local Pick
+    local function ResultRow(i)
+        local r = rows[i]
+        if r then r:Show(); return r end
+        r = CreateFrame("Button", nil, list)
+        r:SetHeight(RESULT_H)
+        r.bg = S.Solid(r, "BACKGROUND", C.brandBg or C.card, 1); r.bg:SetAllPoints(); r.bg:Hide()
+        r.bar = S.Solid(r, "ARTWORK", C.brand); r.bar:SetPoint("TOPLEFT"); r.bar:SetPoint("BOTTOMLEFT"); r.bar:SetWidth(3); r.bar:Hide()
+        S.Solid(r, "HIGHLIGHT", { 1, 1, 1 }, 0.04):SetAllPoints()
+        r.label = S.Text(r, 15, C.text); r.label:SetPoint("TOPLEFT", 14, -6); r.label:SetPoint("RIGHT", -8, 0); r.label:SetJustifyH("LEFT")
+        r.trail = S.Text(r, 13, C.dim); r.trail:SetPoint("TOPLEFT", r.label, "BOTTOMLEFT", 0, -3); r.trail:SetPoint("RIGHT", -8, 0); r.trail:SetJustifyH("LEFT")
+        r:SetScript("OnClick", function(self) Pick(self.entry) end)
+        rows[i] = r
+        return r
+    end
+
+    local function Paint()
+        for i, r in ipairs(rows) do
+            local on = i == sel and r:IsShown()
+            r.bg:SetShown(on); r.bar:SetShown(on)
+        end
+    end
+
+    -- the found words in the brand colour, in the label as shown
+    local function Mark(text, words)
+        local out = text
+        for _, w in ipairs(words) do
+            local i, j = Fold(out):find(w, 1, true)
+            if i and Fold(out) == out:lower() then
+                out = out:sub(1, i - 1) .. S.Hex(C.brandSoft or C.brand) .. out:sub(i, j) .. "|r" .. out:sub(j + 1)
+            end
+        end
+        return out
+    end
+
+    local function NavCounts(counts, searching)
+        for _, b in ipairs(body.tabs) do
+            local n = counts and counts[b.key] or 0
+            b.count:SetText(searching and n > 0 and tostring(n) or "")
+            b:SetAlpha((searching and n == 0) and 0.35 or 1)
+        end
+    end
+
+    local function Update()
+        local q = Fold(box:GetText() or "")
+        hint:SetShown(q == ""); clear:SetShown(q ~= "")
+        border(q ~= "" and C.brand or C.border)
+        if #q < 2 then
+            local was = sf:IsShown()
+            sf:Hide(); NavCounts(nil, false)
+            local page = body.pages[current]
+            if was and page and not page:IsShown() then page:Show() end
+            return
+        end
+        local words = {}
+        for w in q:gmatch("%S+") do words[#words + 1] = w end
+        -- every word must be found (or one of its keywords); a hit in the label ranks first
+        local hits, counts = {}, {}
+        for _, e in ipairs(INDEX) do
+            local ok, score = true, 0
+            for _, w in ipairs(words) do
+                local alt = KEYWORDS[w]
+                local found = e.all:find(w, 1, true)
+                if not found and alt then
+                    for a in alt:gmatch("%S+") do if e.all:find(a, 1, true) then found = true; break end end
+                end
+                if not found then ok = false; break end
+                if e.labelFold:find(w, 1, true) then score = score + 2 else score = score + 1 end
+            end
+            if ok then hits[#hits + 1] = { e = e, score = score }; counts[e.page] = (counts[e.page] or 0) + 1 end
+        end
+        -- grouped by page, in the nav's order; best first inside a page
+        local order = {}
+        for i, t in ipairs(body.tabs) do order[t.key] = i end
+        table.sort(hits, function(a, b)
+            if a.e.page ~= b.e.page then return (order[a.e.page] or 99) < (order[b.e.page] or 99) end
+            if a.score ~= b.score then return a.score > b.score end
+            return (a.e.label or "") < (b.e.label or "")
+        end)
+        for _, p in pairs(body.pages) do p:Hide() end
+        sf:Show(); sf:SetVerticalScroll(0)
+        NavCounts(counts, true)
+        for _, h in ipairs(heads) do h:Hide() end
+        for _, r in ipairs(rows) do r:Hide(); r.entry = nil end
+        wipe(shown)
+        local y = -PAD_TOP
+        summary:SetText(#hits == 0 and string.format(L("Aucun réglage ne correspond à « %s »."), box:GetText())
+            or #hits == 1 and L("1 réglage · Entrée pour l'ouvrir")
+            or string.format(L("%d réglages · flèches haut / bas pour choisir, Entrée pour ouvrir"), #hits))
+        y = y - 26
+        empty:ClearAllPoints(); empty:SetPoint("TOPLEFT", PAD_X, y); empty:SetShown(#hits == 0)
+        local page, hi, ri = nil, 0, 0
+        for _, h in ipairs(hits) do
+            local e = h.e
+            if e.page ~= page then
+                page = e.page
+                hi = hi + 1
+                local head = Head(hi)
+                head:ClearAllPoints(); head:SetPoint("TOPLEFT", PAD_X, y - 8)
+                head:SetText((root.Upper and root.Upper(e.pageLabel or "") or (e.pageLabel or ""):upper()) .. " · " .. (counts[page] or 0))
+                y = y - HEAD_H
+            end
+            ri = ri + 1
+            local r = ResultRow(ri)
+            r.entry = e
+            r:ClearAllPoints(); r:SetPoint("TOPLEFT", PAD_X - 3, y); r:SetPoint("RIGHT", list, "RIGHT", -PAD_X, 0)
+            r.label:SetText(Mark(e.label or "", words))
+            local trail = (e.pageLabel or "") .. (e.section ~= "" and (" › " .. e.section) or "")
+            if e.hint and e.hint ~= "" then trail = trail .. " · " .. e.hint end
+            r.trail:SetText(trail)
+            shown[#shown + 1] = r
+            y = y - RESULT_H
+        end
+        list:SetHeight(-y + PAD_TOP)
+        sel = 1
+        Paint()
+    end
+
+    -- opens the page, scrolls the row into view and makes it flash
+    local flashGen = 0
+    Pick = function(e)
+        if not e then return end
+        sf:Hide()
+        ShowPage(e.page)   -- clears the box quietly
+        box:ClearFocus()
+        local p = body.pages[e.page]
+        local view = p.sf:GetHeight() or 400
+        local max = math.max(0, p:GetHeight() - view)
+        p.sf:SetVerticalScroll(math.max(0, math.min(max, (e.y or 0) - view / 3)))
+        local row = e.row
+        if not row.flash then row.flash = S.Solid(row, "BACKGROUND", C.brand, 0); row.flash:SetAllPoints() end
+        flashGen = flashGen + 1
+        local gen, t = flashGen, 0
+        row.flash:SetAlpha(0.18)
+        row:SetScript("OnUpdate", function(self, dt)
+            t = t + dt
+            if gen ~= flashGen or t >= 1.5 then self.flash:SetAlpha(0); self:SetScript("OnUpdate", nil); return end
+            self.flash:SetAlpha(0.18 * (1 - t / 1.5))
+        end)
+    end
+
+    box:SetScript("OnTextChanged", function() if not body.searchSilent then Update() end end)
+    body.ClearSearch = function()
+        hint:Show(); clear:Hide(); border(C.border); NavCounts(nil, false)
+    end
+    box:SetScript("OnEditFocusGained", function() border(C.brand) end)
+    box:SetScript("OnEditFocusLost", function() if (box:GetText() or "") == "" then border(C.border) end end)
+    box:SetScript("OnEscapePressed", function(self)
+        if (self:GetText() or "") ~= "" then self:SetText("") else self:ClearFocus() end
+    end)
+    box:SetScript("OnEnterPressed", function(self)
+        local r = shown[sel]
+        if r and r.entry then Pick(r.entry) else self:ClearFocus() end
+    end)
+    box:SetScript("OnArrowPressed", function(_, key)
+        if #shown == 0 then return end
+        if key == "UP" then sel = math.max(1, sel - 1) elseif key == "DOWN" then sel = math.min(#shown, sel + 1) end
+        Paint()
+        -- keep the selection in view
+        local r = shown[sel]
+        local top = -select(5, r:GetPoint(1))
+        local view = sf:GetHeight() or 400
+        local cur = sf:GetVerticalScroll()
+        if top < cur then sf:SetVerticalScroll(math.max(0, top - HEAD_H))
+        elseif top + RESULT_H > cur + view then sf:SetVerticalScroll(top + RESULT_H - view) end
+    end)
+
+    -- Ctrl+F while the window is open: into the box (other keys go on to the game)
+    -- Ctrl+F listens only out of combat, with every other key passed on to the game
+    local function ArmKeys()
+        if InCombatLockdown() then win:EnableKeyboard(false); return end
+        win:SetPropagateKeyboardInput(true)
+        win:EnableKeyboard(true)
+    end
+    ArmKeys()
+    win:SetScript("OnKeyDown", function(_, key)
+        if key == "F" and IsControlKeyDown() then box:SetFocus() end
+    end)
+    if not win.keysEvents then
+        win.keysEvents = CreateFrame("Frame", nil, win)
+        win.keysEvents:RegisterEvent("PLAYER_REGEN_ENABLED")
+        win.keysEvents:RegisterEvent("PLAYER_REGEN_DISABLED")
+    end
+    win.keysEvents:SetScript("OnEvent", function(_, e)
+        if e == "PLAYER_REGEN_DISABLED" then win:EnableKeyboard(false) else ArmKeys() end
+    end)
+end
+
 ns.WP = ns.WP or {}
+
+-- After a module is switched elsewhere (the home card), the open page shows it.
+function ns.WP.SyncOptions()
+    if win and win:IsShown() and body and body.pages[current] then
+        local onShow = body.pages[current]:GetScript("OnShow")
+        if onShow then onShow(body.pages[current]) end
+    end
+end
 
 function ns.WP.ShowOptionsPage(key)
     if not win then BuildWindow() end

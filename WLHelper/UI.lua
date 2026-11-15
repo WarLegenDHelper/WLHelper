@@ -134,6 +134,7 @@ local Render
 -- Without TomTom, a second press goes to the step's next point.
 function ns.PlacePoints()
   if not f then return end
+  if ns.GuideOn and not ns.GuideOn() then return end
   local log, st = ns.LogEntries(), Steps()[f.view]; if not st then return end
   local pts = StepPoints(log, st, false)
   if #pts == 0 then pts = StepPoints(log, st, true) end
@@ -152,6 +153,7 @@ local function onoff(v) return " : " .. (v and L.ON or L.OFF) end
 
 
 function ns.GoTo(i)
+  if ns.GuideOn and not ns.GuideOn() then return end
   local n = #Steps()
   if n == 0 then return end
   f.view = math.max(1, math.min(n, i))
@@ -1039,6 +1041,7 @@ ns.Render = function() if f and f:IsShown() then Render() end end
 -- =====================================================================
 function ns.Refresh(silent)
   if not f then return end
+  if ns.GuideOn and not ns.GuideOn() then return end
   local steps = Steps()
   if #steps == 0 then Render() return end
   local log = ns.LogEntries()
@@ -1287,8 +1290,14 @@ function ns.ShowGuide()
   if f and not f:IsShown() then ns.ToggleMain() end
 end
 
+local function GuideOff()
+  local WP = ns.Writs and ns.Writs.WP
+  return WP and WP.ModuleOff and WP.ModuleOff("dungeons")
+end
+
 function ns.ToggleMain()
   if not f then return end
+  if not f:IsShown() and GuideOff() then return end
   f:SetShown(not f:IsShown()); WLDTDB.hidden = not f:IsShown()
   if WLDTDB.hidden then ns.SetArrow(nil) else f.sig = nil; ns.Refresh() end
   if ns.UpdateActionBar then ns.UpdateActionBar() end
