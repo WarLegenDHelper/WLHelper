@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.37] — 2026-11-15
+
+### Ajouté / Added
+- **WL Helper Gear**, un sous-addon livré dans le même téléchargement : le moteur de calcul de Geared Forever (de Nathan, GPLv3, crédité), amélioré pour WL Helper. Il tient compte de ton vrai toucher (plafond), des talents que tu as vraiment pris et de l'enchantement de l'objet que tu portes. Les flèches et le % des Améliorations l'utilisent en premier ; Geared Forever n'est plus nécessaire.
+  *WL Helper Gear sub-addon: Geared Forever's engine (by Nathan, GPLv3, credited) with real hit, talents and enchants; used first by Upgrades.*
+
 ## [1.0.0-beta.36] — 2026-11-15
 
 ### Ajouté / Added

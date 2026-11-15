@@ -35,3 +35,7 @@ Fonctionne avec (optionnel, lu en direct, rien n'est copié) :
 - Auctionator (son API publique : prix, recherche, liste d'achat), TradeSkillMaster (TSM_API),
   Mastercraft (recettes connues, pour la mention « craft »), TomTom, Zygor Guides (sa flèche peut
   guider à la place de la nôtre, option GPS), EllesmereUI (police, page d'options en plugin).
+
+Module Améliorations :
+- WLHelper_Gear (addon séparé livré à côté, GPLv3) : moteur de Geared Forever de Nathan, repris et modifié
+  (voir WLHelper_Gear/NOTICE.md). WL Helper ne contient pas ce code : il appelle seulement son API.

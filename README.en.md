@@ -107,4 +107,9 @@ RestedXP Guides, Naowh Forever, ForeverDungeonJournal, Wowhead, TradeSkillMaster
 only). Logo: War Legend Raid Tool.
 
 License [CC BY-NC-SA 4.0](LICENSE): non-commercial use, same license for modified versions.
+
+Exception: the [`WLHelper_Gear`](WLHelper_Gear) folder (gear scoring) is a modified version of
+**Geared Forever** by Nathan, licensed under the **GNU GPL v3** ([`LICENSE.txt`](WLHelper_Gear/LICENSE.txt),
+[`NOTICE.md`](WLHelper_Gear/NOTICE.md)). It is a separate addon shipped in the same zip; WL Helper
+contains none of its code and only calls its API.
 Author: Alandir (WarLegend).

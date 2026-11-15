@@ -18,3 +18,8 @@ Full legal code: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
 
 Third-party data and adapted material keep their own licenses and credits; see
 DungeonGuide/CREDITS.txt (LibForeverData: CC BY 4.0; RestedXP Guides: CC BY-NC-SA 4.0).
+
+Exception: the WLHelper_Gear folder is a modified version of Geared Forever by Nathan and
+is licensed under the GNU GPL v3 (WLHelper_Gear/LICENSE.txt, NOTICE.md); it is a separate
+program shipped alongside WL Helper (mere aggregation). This CC BY-NC-SA licence does not
+apply to it.

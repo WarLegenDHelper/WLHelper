@@ -109,4 +109,9 @@ LibForeverData, RestedXP Guides, Naowh Forever, ForeverDungeonJournal, Wowhead, 
 (coordonnées seulement). Logo : War Legend Raid Tool.
 
 Licence [CC BY-NC-SA 4.0](LICENSE) : usage non commercial, même licence pour les versions modifiées.
+
+Exception : le dossier [`WLHelper_Gear`](WLHelper_Gear) (notation de l'équipement) est une version
+modifiée de **Geared Forever** de Nathan, sous licence **GNU GPL v3** ([`LICENSE.txt`](WLHelper_Gear/LICENSE.txt),
+[`NOTICE.md`](WLHelper_Gear/NOTICE.md)). C'est un addon séparé, livré dans le même zip ; WL Helper ne
+contient pas son code et appelle seulement son API.
 Auteur : Alandir (WarLegend).

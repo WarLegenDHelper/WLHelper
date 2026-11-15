@@ -47,7 +47,9 @@ local function Loaded(name)
     local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
     return f and f(name) and true or false
 end
-local function UseGF() return WLWritsDB.upgradeSource ~= "wl" and Loaded("GearedForever") end
+-- WL Helper Gear (our sub-addon, Geared Forever's engine, GPLv3) is asked first through its API
+local function Gear() return Loaded("WLHelper_Gear") and WLHelperGear and WLHelperGear.Compare and WLHelperGear or nil end
+local function UseGF() return WLWritsDB.upgradeSource ~= "wl" and (Gear() ~= nil or Loaded("GearedForever")) end
 -- Hides Geared Forever's block in item tooltips while our line shows the same % (an option, on by
 -- default); puts it back when the option or our line is off.
 function WP.ApplyGFTip()
@@ -64,6 +66,11 @@ end
 WP.UpgradeUsesGF = UseGF
 local gfTip
 local function GFSpec()
+    local G = Gear()
+    if G and G.Spec then
+        local ok, _, _, name = pcall(G.Spec)
+        if ok and type(name) == "string" and name ~= "" then return name end
+    end
     local _, token = UnitClass("player")
     local key = GearedForeverDB and GearedForeverDB.specs and GearedForeverDB.specs[token]
     if type(key) ~= "string" or key == "" then return nil end
@@ -74,6 +81,21 @@ end
 -- "empty" for an empty slot, "equipped", or nil when it wrote nothing yet (item not loaded)
 local GF_DOWN = "GearedForever\\Media\\ArrowDown"
 local function GFVerdict(link)
+    local G = Gear()
+    if G then
+        local ok, res = pcall(G.Compare, link)
+        if not ok then return false end
+        if not res then return nil end                  -- not cached yet: retried later
+        if res.canUse ~= true or res.blocked then return false end
+        if res.equipped then return "equipped" end
+        if res.empty then
+            -- an empty off hand: a main-hand result is in res.other
+            if res.other and res.other.pct then return res.other.pct end
+            return 1000
+        end
+        if res.unknown then return nil end
+        return res.pct or false
+    end
     if not gfTip then gfTip = CreateFrame("GameTooltip", "WLHelperGFTip", nil, "GameTooltipTemplate") end
     gfTip:SetOwner(WorldFrame, "ANCHOR_NONE")
     gfTip:ClearLines()
