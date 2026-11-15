@@ -254,7 +254,7 @@ end
 local function RenderToday()
     local name, reaction, inStanding, size, total = WP.Reputation()
     if not name then
-        today.hero:SetText(L("Comptoir"))
+        today.hero:SetText(L("Writs & Favor"))
         today.standing:SetText("")
         today.message:SetText(L("Faction introuvable : ouvre l'onglet Réputation une fois (touche U)."))
         today.barFill:SetWidth(0.01); today.barPending:SetWidth(0.01)
@@ -717,7 +717,7 @@ end
 
 local function Build()
     local db = WLWritsDB
-    frame = S.Window("WLHelperComptoir", W, H, L("Comptoir"), nil, db, "point")
+    frame = S.Window("WLHelperComptoir", W, H, L("Writs & Favor"), nil, db, "point")
     local opts = S.IconButton(frame.header, "Interface\\Buttons\\UI-OptionsButton", 28, { L("Options du Comptoir") }, function()
         if WP.OpenOptions then WP.OpenOptions("comptoir") end
     end)

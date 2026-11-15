@@ -29,11 +29,79 @@ WP.UpgradesActive = Active
 local cache = {}
 local NO = { up = false }
 
+-- ---------------------------------------------------------------- Geared Forever, when installed
+-- Its ranking is finer than our weights (per level range, per spec): when it is installed, its own
+-- verdict is read live from the item's tooltip (nothing of it is copied: it writes its lines in a
+-- hidden tooltip as on any tooltip, and the line of your spec carries its green "up" arrow).
+-- Settings > Upgrades > Calculation: "auto" (Geared Forever when installed) or WL Helper's weights.
+local GF_ARROW = "GearedForever\\Media\\ArrowUp"
+local function Loaded(name)
+    local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+    return f and f(name) and true or false
+end
+local function UseGF() return WLWritsDB.upgradeSource ~= "wl" and Loaded("GearedForever") end
+WP.UpgradeUsesGF = UseGF
+local gfTip
+local function GFSpec()
+    local _, token = UnitClass("player")
+    local key = GearedForeverDB and GearedForeverDB.specs and GearedForeverDB.specs[token]
+    if type(key) ~= "string" or key == "" then return nil end
+    return key:sub(1, 1):upper() .. key:sub(2)
+end
+-- true + "+24%" / false / nil when Geared Forever wrote nothing yet (item not loaded)
+local function GFRead(link)
+    if not gfTip then gfTip = CreateFrame("GameTooltip", "WLHelperGFTip", nil, "GameTooltipTemplate") end
+    gfTip:SetOwner(WorldFrame, "ANCHOR_NONE")
+    gfTip:ClearLines()
+    if not pcall(gfTip.SetHyperlink, gfTip, link) then gfTip:Hide(); return false end
+    local want = GFSpec()
+    local saw, best = false, nil
+    for i = 1, gfTip:NumLines() do
+        local left = _G["WLHelperGFTipTextLeft" .. i]
+        local right = _G["WLHelperGFTipTextRight" .. i]
+        local l = left and left:GetText()
+        if l and l:find("^Geared Forever") then saw = true
+        elseif saw and l and (not want or l == want) then
+            local r = right and right:GetText()
+            if r and r:find(GF_ARROW, 1, true) then
+                local plain = r:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+                for chunk in plain:gmatch("[^,]+") do
+                    if chunk:find(GF_ARROW, 1, true) then
+                        local n = tonumber(chunk:match("(%d+)%%"))
+                        if chunk:find("empty slot", 1, true) then n = 1000 end
+                        if n and (not best or n > best) then best = n end
+                    end
+                end
+                best = best or 1
+            end
+        end
+    end
+    gfTip:Hide()
+    if best then return true, best >= 1000 and L("vide") or ("+" .. best .. "%"), best end
+    if saw then return false end
+    return nil
+end
+local tries, retryQueued = {}, false
+
 -- { up = true/false, text = "+24%" }
 local function Check(link)
     if type(link) ~= "string" or not Active() then return NO end
     local c = cache[link]
     if c then return c end
+    if UseGF() then
+        local up, text, n = GFRead(link)
+        if up == nil then
+            tries[link] = (tries[link] or 0) + 1
+            if tries[link] <= 5 and not retryQueued then
+                retryQueued = true
+                C_Timer.After(1, function() retryQueued = false; cache = {}; if WP.RefreshUpgrades then WP.RefreshUpgrades() end end)
+            end
+            return NO
+        end
+        local r = (up and (n or 0) >= (WLWritsDB.upgradeMin or 1)) and { up = true, text = text } or NO
+        cache[link] = r
+        return r
+    end
     local can = W.CanWear(link)
     if can == nil then return NO end   -- item not loaded yet: not cached, asked again later
     local gain = can and W.Gain(link)
@@ -49,7 +117,7 @@ local function IsUpgrade(link) return Check(link).up end
 
 -- ---------------------------------------------------------------- tooltip line
 local function TooltipLine(tip, link)
-    if not (Active() and link) or WLWritsDB.upgradeTip == false then return end
+    if not (Active() and link) or WLWritsDB.upgradeTip == false or UseGF() then return end
     local can = W.CanWear(link)
     if not can then return end
     local spec = W.SpecName()
@@ -195,6 +263,7 @@ end
 local queued = false
 local function Refresh()
     cache = {}
+    tries = {}
     W.Reset()
     if baganator and Baganator.API.RequestItemButtonsRefresh then pcall(Baganator.API.RequestItemButtonsRefresh) end
     walked = 0

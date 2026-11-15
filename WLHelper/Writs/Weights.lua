@@ -205,6 +205,13 @@ local function SchoolDamage(link)
         for i = 2, scan:NumLines() do
             local fs = _G["WLHelperWeightsTipTextLeft" .. i]
             local t = fs and fs:GetText()
+            -- the weapon's speed is on the right of its damage line
+            local rs = _G["WLHelperWeightsTipTextRight" .. i]
+            local rt = rs and rs:GetText()
+            if rt then
+                local sp = rt:lower():match("(%d+[%.,]%d+)")
+                if sp and (rt:lower():find("speed", 1, true) or rt:lower():find("vitesse", 1, true)) then c.speed = tonumber((sp:gsub(",", "."))) end
+            end
             if t then
                 t = t:lower()
                 -- "increases damage done by frost spells and effects by up to 24"
@@ -213,6 +220,10 @@ local function SchoolDamage(link)
                 if not w then w, n = t:match("sorts et effets d[e']%s*(%S+) de (%d+)") end
                 local school = w and SCHOOL_WORD[w]
                 if school then c[school] = (c[school] or 0) + tonumber(n) end
+                -- "Speed 2.70" / "Vitesse 2,70": the weapon's speed
+                local sp = t:match("^speed%s+(%d+[%.,]%d+)") or t:match("^vitesse%s+(%d+[%.,]%d+)")
+                    or t:match("%s+speed%s+(%d+[%.,]%d+)") or t:match("%s+vitesse%s+(%d+[%.,]%d+)")
+                if sp then c.speed = tonumber((sp:gsub(",", "."))) end
             end
         end
     end
@@ -281,6 +292,14 @@ function W.Score(link, slot, spec)
     if dps and w.DPS then
         local f = (slot == 17 and 0.5) or 1
         if slot == 18 and Class() ~= "HUNTER" and not (spec[4] == CASTER or w.SP) then f = 0.3 end
+        -- the speed, for melee: a slow main hand hits harder with each special attack (Sinister
+        -- Strike, Mortal Strike, Seal of Command, Windfury), a fast off hand lands more hits and
+        -- poisons; in Classic special attacks use the weapon's own swing, not a normalized one
+        local speed = SchoolDamage(link).speed
+        if speed and w.DPS >= 4 and Class() ~= "HUNTER" then
+            if slot == 16 then f = f * math.max(0.8, math.min(1.3, 1 + 0.15 * (speed - 2.4)))
+            elseif slot == 17 then f = f * math.max(0.8, math.min(1.3, 1 + 0.2 * (1.9 - speed))) end
+        end
         s = s + W.WeightOf(spec, "DPS") * dps * f
     end
     scoreCache[key] = s
@@ -298,10 +317,10 @@ function W.Gain(link)
     if not can then return nil end
     local _, _, equipLoc = Info(link)
     local slots = SLOTS[equipLoc]
-    local new = W.Score(link, slots[1], spec)
-    if new <= 0 then return nil end
+    if equipLoc == "INVTYPE_WEAPON" and DUAL[Class()] and UnitLevel("player") >= DUAL[Class()] then slots = { 16, 17 } end
     local bestGain, bestSlot
     for _, slot in ipairs(slots) do
+        local new = W.Score(link, slot, spec)
         local cur = Equipped(slot)
         local old
         if equipLoc == "INVTYPE_2HWEAPON" then
@@ -311,7 +330,8 @@ function W.Gain(link)
         end
         if cur and cur == link then return nil end
         local g
-        if not cur and old == 0 then g = "empty"
+        if new <= 0 then g = nil
+        elseif not cur and old == 0 then g = "empty"
         elseif old > 0 then g = (new - old) / old * 100 end
         if g == "empty" then return "empty", slot end
         if g and (not bestGain or g > bestGain) then bestGain, bestSlot = g, slot end

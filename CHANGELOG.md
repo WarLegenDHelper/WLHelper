@@ -6,6 +6,19 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.27] — 2026-11-15
+
+### Ajouté / Added
+- **Événements** (nouveau module, `/wlh events`, carte sur l'accueil) : le calendrier et le LFG de la guilde. Un membre propose un donjon ou un raid (jour, heure, places tank / soins / DPS, note) ; les autres s'inscrivent avec un rôle ou se désinscrivent ; rappel 15 min avant ; l'organisateur invite tous les inscrits en un clic. Onglet **Groupe maintenant** : « je cherche un groupe » avec ton rôle et pour quoi, et la liste de ceux qui cherchent (clic : chuchoter, clic droit ou Alt-clic : inviter).
+  *Events: the guild's own calendar and LFG.*
+- **Améliorations** a sa carte sur l'accueil (spé, nombre d'objets meilleurs dans tes sacs). **Calcul** : quand Geared Forever est installé, son verdict est lu directement (réglable) ; sinon les poids de WL Helper.
+  *Upgrades: home card; Geared Forever's verdict is read when it is installed.*
+
+### Modifié / Changed
+- Noms : « Comptoir / Trading Post » devient **Writs & Favor** ; le guide s'appelle **Quêtes de donjon**.
+- Armes : la vitesse compte (main droite lente, main gauche rapide pour les classes à deux armes), et une arme à une main est comparée aux deux mains.
+  *Weapon speed counts (slow main hand, fast off hand); one-hand weapons are compared in both hands.*
+
 ## [1.0.0-beta.26] — 2026-11-15
 
 ### Ajouté / Added

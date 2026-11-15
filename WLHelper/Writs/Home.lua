@@ -51,7 +51,7 @@ ns.AddEnglish({
     ["Clic droit : le remettre dans le plan"] = "Right-click: back in the plan",
 })
 
-local W, PAD, CARD_H = 400, 14, 78
+local W, PAD, CARD_H = 400, 14, 66
 
 local function Guide() return root end
 local function Version()
@@ -98,14 +98,14 @@ local function Card(parent, y, icon, tint, onClick)
     local hl = S.Solid(c, "HIGHLIGHT", { 1, 1, 1 }, 0.04); hl:SetAllPoints()
 
     local box = CreateFrame("Frame", nil, c)
-    box:SetSize(46, 46); box:SetPoint("LEFT", 14, 0)
+    box:SetSize(42, 42); box:SetPoint("LEFT", 14, 0)
     S.Solid(box, "BACKGROUND", { tint[1] * 0.25, tint[2] * 0.25, tint[3] * 0.25 }):SetAllPoints()
     S.Border(box, { tint[1] * 0.55, tint[2] * 0.55, tint[3] * 0.55 })
     c.icon = box:CreateTexture(nil, "ARTWORK")
     c.icon:SetPoint("TOPLEFT", 3, -3); c.icon:SetPoint("BOTTOMRIGHT", -3, 3)
     c.icon:SetTexture(icon); c.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-    c.title = S.Text(c, 18, C.text, true)
+    c.title = S.Text(c, 17, C.text, true)
     c.title:SetPoint("TOPLEFT", box, "TOPRIGHT", 12, 1)
     c.tag = S.Text(c, 13, C.dim)
     c.tag:SetPoint("BOTTOMLEFT", c.title, "BOTTOMRIGHT", 8, 1)
@@ -173,6 +173,14 @@ local function Build()
         Close(); if WP.ToggleGuild then WP.ToggleGuild() end
     end)
     y = y - CARD_H - 10
+    cards.events = Card(win, y, "Interface\\Icons\\Ability_Warrior_BattleShout", C.warn, function()
+        Close(); if WP.ToggleEvents then WP.ToggleEvents() end
+    end)
+    y = y - CARD_H - 10
+    cards.upgrades = Card(win, y, "Interface\\Icons\\INV_Chest_Cloth_17", C.ready, function()
+        Close(); if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end
+    end)
+    y = y - CARD_H - 10
 
     win.afterCards = y
 
@@ -226,6 +234,7 @@ local function Build()
     win.Layout(false, false)
 
     cards.dungeons.key, cards.writs.key, cards.bags.key, cards.orders.key, cards.guild.key = "dungeons", "writs", "bags", "orders", "guild"
+    cards.events.key, cards.upgrades.key = "events", "upgrades"
     win:SetScript("OnShow", function() WP.RefreshHome() end)
     local ev = CreateFrame("Frame", nil, win)
     pcall(ev.RegisterEvent, ev, "QUEST_LOG_UPDATE"); pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED"); pcall(ev.RegisterEvent, ev, "UPDATE_FACTION")
@@ -244,7 +253,7 @@ function WP.RefreshHome()
 
     -- dungeons
     local d = cards.dungeons
-    d.title:SetText(L("Donjons"))
+    d.title:SetText(L("Quêtes de donjon"))
     local label, cur, total, finished, nextStep = DungeonState()
     d.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
     if label and not finished then
@@ -273,7 +282,7 @@ function WP.RefreshHome()
 
     -- Trading Post
     local c = cards.writs
-    c.title:SetText(L("Comptoir")); c.tag:SetText(L("Craftsman's Writs")); c.bar:Hide(); c.action:Hide(); c.chev:Show(); c:Narrow(false)
+    c.title:SetText(L("Writs & Favor")); c.tag:SetText(L("Craftsman's Writs")); c.bar:Hide(); c.action:Hide(); c.chev:Show(); c:Narrow(false)
     local need, goal, ready, bag = WritState()
     if need then
         local favor = WP.FavorNow and WP.FavorNow()
@@ -324,6 +333,42 @@ function WP.RefreshHome()
     end
     gc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
 
+    -- events: the next one, and who looks for a group now
+    local ec = cards.events
+    ec.title:SetText(L("Événements")); ec.tag:SetText(""); ec.bar:Hide(); ec.action:Hide(); ec.chev:Show(); ec:Narrow(false)
+    if WP.EventList then
+        local list = WP.EventList()
+        local nextE
+        for _, e in ipairs(list) do if e.status == "open" and e.when >= time() - 1800 then nextE = e; break end end
+        ec.tag:SetText(#list > 0 and string.format(L("%d événements à venir"), #list) or "")
+        ec.line1:SetText(nextE and string.format(L("Prochain : %s, %s"), nextE.title, WP.EventWhen(nextE.when)) or L("Rien de prévu"))
+        local n = #WP.LFGList()
+        ec.line2:SetText(n > 0 and string.format(L("%d cherchent un groupe"), n) or "")
+    end
+    ec.line2:SetTextColor(C.ready[1], C.ready[2], C.ready[3])
+
+    -- upgrades: the spec judged, and how many bag items are better than what you wear
+    local uc = cards.upgrades
+    uc.title:SetText(L("Améliorations")); uc.tag:SetText(""); uc.bar:Hide(); uc.action:Hide(); uc.chev:Show(); uc:Narrow(false)
+    local Wt = WP.Weights
+    if Wt then
+        local _, bracket = Wt.Bracket()
+        uc.tag:SetText(Wt.SpecName() .. " · " .. string.format(L("niv. %s"), bracket))
+        local n = 0
+        local GetLink = C_Container and C_Container.GetContainerItemLink
+        if GetLink and WP.UpgradeCheck then
+            for bag = 0, NUM_BAG_SLOTS or 4 do
+                for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do
+                    local link = GetLink(bag, slot)
+                    if link and WP.UpgradeCheck(link).up then n = n + 1 end
+                end
+            end
+        end
+        uc.line1:SetText(n > 0 and string.format(L("%d objets meilleurs que les tiens dans tes sacs"), n) or L("Rien de mieux dans tes sacs"))
+        uc.line2:SetText(L("Spé, seuil et poids dans les réglages"))
+        uc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
+    end
+
     -- switched-off modules: dimmed, "off", one button to turn them back on
     local hints = {}
     for _, m in ipairs(WP.MODULES) do hints[m.key] = m.hint end
@@ -369,14 +414,14 @@ function WP.MinimapTooltip(owner)
     tt:SetOwner(owner, "ANCHOR_LEFT")
     tt:AddLine("WaR |cffce1918LegenD|r Helper", 1, 1, 1)
     local label, cur, total, finished = DungeonState()
-    tt:AddDoubleLine(L("Donjons"), not WP.ModuleOn("dungeons") and L("éteint") or label and (label .. ", " .. (finished and L("terminé") or string.format(L("%d / %d"), cur, total))) or L("aucun"),
+    tt:AddDoubleLine(L("Quêtes de donjon"), not WP.ModuleOn("dungeons") and L("éteint") or label and (label .. ", " .. (finished and L("terminé") or string.format(L("%d / %d"), cur, total))) or L("aucun"),
         C.dim[1], C.dim[2], C.dim[3], C.text[1], C.text[2], C.text[3])
     local need, _, ready = WritState()
     if not WP.ModuleOn("writs") then
-        tt:AddDoubleLine(L("Comptoir"), L("éteint"), C.dim[1], C.dim[2], C.dim[3], C.dim[1], C.dim[2], C.dim[3])
+        tt:AddDoubleLine(L("Writs & Favor"), L("éteint"), C.dim[1], C.dim[2], C.dim[3], C.dim[1], C.dim[2], C.dim[3])
     elseif need then
         local col = ready > 0 and C.ready or C.text
-        tt:AddDoubleLine(L("Comptoir"), string.format(L("%d prêts"), ready), C.dim[1], C.dim[2], C.dim[3], col[1], col[2], col[3])
+        tt:AddDoubleLine(L("Writs & Favor"), string.format(L("%d prêts"), ready), C.dim[1], C.dim[2], C.dim[3], col[1], col[2], col[3])
     end
     tt:AddDoubleLine(L("Sacs"), WP.ModuleOn("bags") and string.format(L("%d à jeter"), BagCount()) or L("éteint"),
         C.dim[1], C.dim[2], C.dim[3], C.text[1], C.text[2], C.text[3])
@@ -402,11 +447,13 @@ function WP.MinimapMenu(owner)
         S.Border(menu, C.border)
         tinsert(UISpecialFrames, "WLHelperMinimapMenu")
         local items = {
-            { L("Donjons"), function() if DungeonState() then root.ShowGuide() else root.ShowPicker() end end, "dungeons" },
-            { L("Comptoir"), function() WP.Open() end, "writs" },
+            { L("Quêtes de donjon"), function() if DungeonState() then root.ShowGuide() else root.ShowPicker() end end, "dungeons" },
+            { L("Writs & Favor"), function() WP.Open() end, "writs" },
             { L("Sacs"), function() if WP.Cleaner then WP.Cleaner.Toggle() end end, "bags" },
             { L("Commandes"), function() if WP.ToggleOrders then WP.ToggleOrders() end end, "orders" },
             { L("Guilde"), function() if WP.ToggleGuild then WP.ToggleGuild() end end, "guild" },
+            { L("Événements"), function() if WP.ToggleEvents then WP.ToggleEvents() end end, "events" },
+            { L("Améliorations"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end end, "upgrades" },
             false,
             { L("Arrêter le GPS"), function() WP.StopGPS() end, "gps" },
             { L("Réglages"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage() end end },

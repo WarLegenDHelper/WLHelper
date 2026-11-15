@@ -13,7 +13,7 @@ local C = S.C
 ns.AddEnglish({
     -- window and pages
     ["Options"] = "Options",
-    ["Général"] = "General", ["Donjons"] = "Dungeons", ["Comptoir"] = "Trading Post", ["GPS"] = "GPS",
+    ["Général"] = "General", ["Donjons"] = "Dungeons", ["Writs & Favor"] = "Writs & Favor", ["GPS"] = "GPS",
     ["Sacs"] = "Bags", ["À propos"] = "About",
     ["Rendre les caisses automatiquement"] = "Hand in crates automatically",
     ["Dokimi / Marcy Baker"] = "Dokimi / Marcy Baker",
@@ -94,8 +94,12 @@ ns.AddEnglish({
         "Sources and thanks: see CREDITS.txt in the addon's folder.",
     ["GitHub"] = "GitHub", ["Clique puis Ctrl+C pour copier"] = "Click, then Ctrl+C to copy",
     ["Commandes du chat"] = "Chat commands",
+    ["Quêtes de donjon"] = "Dungeon quests",
     ["Améliorations"] = "Upgrades",
     ["Spé"] = "Spec",
+    ["Calcul"] = "Calculation",
+    ["Geared Forever si installé"] = "Geared Forever if installed",
+    ["Geared Forever classe plus finement (par tranche de niveaux et par spé) : quand il est installé, son verdict est lu directement"] = "Geared Forever ranks more finely (per level range and spec): when it is installed, its verdict is read directly",
     ["Affichage"] = "Display",
     ["Flèche à partir de"] = "Arrow from",
     ["Le gain minimum pour montrer la flèche dans les sacs"] = "The smallest gain that shows the arrow in your bags",
@@ -342,7 +346,7 @@ end
 local PAGES = {
     { key = "general",  label = "Général" },
     { key = "dungeons", label = "Donjons" },
-    { key = "comptoir", label = "Comptoir" },
+    { key = "comptoir", label = "Writs & Favor" },
     { key = "gps",      label = "GPS" },
     { key = "bags",     label = "Sacs" },
     { key = "upgrades", label = "Améliorations" },
@@ -555,6 +559,12 @@ function BUILD.upgrades(p)
         return WLWritsDB.upgradeSpec, class
     end
     local function Refresh() if ns.WP.RefreshUpgrades then ns.WP.RefreshUpgrades() end end
+    Section(p, L("Calcul"))
+    local crow = Row(p, L("Calcul"), L("Geared Forever classe plus finement (par tranche de niveaux et par spé) : quand il est installé, son verdict est lu directement"))
+    Place(p, crow, S.Segmented(crow, { { "auto", L("Geared Forever si installé") }, { "wl", "WL Helper" } },
+        function() return WLWritsDB.upgradeSource == "wl" and "wl" or "auto" end,
+        function(v) WLWritsDB.upgradeSource = v; Refresh() end))
+    CloseSection(p)
     Section(p, L("Spé"))
     local srow = Row(p, L("Spé jugée"), L("Auto : l'arbre de talents où tu as le plus de points"))
     Place(p, srow, S.Segmented(srow, Wt.SpecChoices(),
@@ -1099,7 +1109,7 @@ local function RegisterEllesmere()
                     toggle(L("Bouton de la minimap"), function() return not Guide().hideMinimap end, SetMinimap)
                     toggle(L("Flèche des donjons"), function() return Guide().arrow ~= false end, SetGuideArrow)
 
-                    _, h = W:SectionHeader(parent, L("Comptoir"), y); y = y - h
+                    _, h = W:SectionHeader(parent, L("Writs & Favor"), y); y = y - h
                     toggle(L("Rendre les writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"))
                     toggle(L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
 

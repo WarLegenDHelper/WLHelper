@@ -80,6 +80,7 @@ Une seule commande, `/wlh` (aussi `/wl` si WaR LegenD RaidTool n'est pas install
 | `/wlh bags` | Nettoyeur de sacs |
 | `/wlh orders` | Commandes d'artisanat |
 | `/wlh guild` | La guilde et le classement PvP |
+| `/wlh events` | Événements de la guilde : donjons, raids, groupes du moment |
 | `/wlh gps` | Arrête ou relance le guidage |
 | `/wlh options` | Réglages |
 | `/wlh setup` | Écran de bienvenue : modules et clics |
@@ -98,7 +99,7 @@ En jeu, `/wlh idea` te donne le lien déjà rempli avec ta version.
 - **Le dossier s'appelle `WLHelper`** depuis la 1.0.0-beta.4 (avant : `DungeonGuide`). Si tu avais installé une
   ancienne version à la main, supprime le dossier `DungeonGuide`. S'il traîne encore, l'addon le
   désactive tout seul et te le dit.
-- **Versions** : `1.0.0-beta.26` veut dire bêta de la 1.0. Le détail de chaque version est dans le
+- **Versions** : `1.0.0-beta.27` veut dire bêta de la 1.0. Le détail de chaque version est dans le
   [CHANGELOG](CHANGELOG.md).
 
 ## Crédits et licence
