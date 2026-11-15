@@ -304,6 +304,34 @@ function S.Tabs(parent, list, get, set, badge)
     return bar
 end
 
+-- "‹ Accueil": a drawn arrow (no special character: every font shows it) and the word, framed.
+-- Used by every window's header, the dungeon guide and the picker.
+function S.HomeButton(parent, onClick)
+    local C = S.C
+    local b = CreateFrame("Button", nil, parent)
+    b:SetHeight(24)
+    local fill = S.Solid(b, "BACKGROUND", { 1, 1, 1 }, 0); fill:SetAllPoints()
+    local border = S.Border(b, { 0.227, 0.243, 0.267 })
+    local arrow = b:CreateTexture(nil, "ARTWORK")
+    arrow:SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up")
+    arrow:SetSize(20, 20); arrow:SetPoint("LEFT", 2, 0)
+    local label = S.Text(b, 12, C.dim, true)
+    label:SetPoint("LEFT", arrow, "RIGHT", 0, 0)
+    label:SetText(ns.L and ns.L("Accueil") or "Home")
+    b:SetWidth(math.max(70, label:GetStringWidth() + 32))
+    b:SetScript("OnEnter", function(self)
+        fill:SetColorTexture(1, 1, 1, 0.06); border(C.dim); label:SetTextColor(1, 1, 1)
+        S.Tip(self, { ns.L and ns.L("Retour à l'accueil") or "Back to home" })
+    end)
+    b:SetScript("OnLeave", function()
+        fill:SetColorTexture(1, 1, 1, 0); border({ 0.227, 0.243, 0.267 }); label:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
+        S.HideTip()
+    end)
+    b:SetScript("OnClick", onClick)
+    b.label = label
+    return b
+end
+
 -- A window with WL Helper's header: logo, title, subtitle, close; moves with the header, saved
 -- position under db[posKey], Escape closes it.
 function S.Window(name, width, height, title, subtitle, db, posKey)
@@ -342,17 +370,13 @@ function S.Window(name, width, height, title, subtitle, db, posKey)
     end
     local function HomeTip(self) S.Tip(self, { ns.L and ns.L("Retour à l'accueil") or "Home" }) end
     if not NO_BACK[name or ""] then
-        local back = CreateFrame("Button", nil, h)
-        back:SetSize(26, 32); back:SetPoint("LEFT", 4, 0)
-        local chev = S.Text(back, 22, C.dim, true); chev:SetPoint("CENTER", 0, 1); chev:SetText("‹")
-        back:SetScript("OnEnter", function(self) chev:SetTextColor(1, 1, 1); HomeTip(self) end)
-        back:SetScript("OnLeave", function() chev:SetTextColor(C.dim[1], C.dim[2], C.dim[3]); S.HideTip() end)
-        back:SetScript("OnClick", GoHome)
-        f.back = back
-        logoX = 30
+        f.back = S.HomeButton(h, GoHome)
+        f.back:SetPoint("LEFT", 6, 0)
+        logoX = nil
     end
     local logo = h:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(20, 20); logo:SetPoint("LEFT", logoX, 0); logo:SetTexture(S.LOGO)
+    logo:SetSize(20, 20); logo:SetTexture(S.LOGO)
+    if logoX then logo:SetPoint("LEFT", logoX, 0) else logo:SetPoint("LEFT", f.back, "RIGHT", 10, 0) end
     if not NO_BACK[name or ""] then
         local lb = CreateFrame("Button", nil, h)
         lb:SetAllPoints(logo)

@@ -225,10 +225,10 @@ function WP.ApplyClicks()
 end
 
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("PLAYER_LOGIN")
-ev:RegisterEvent("PLAYER_REGEN_ENABLED")
-ev:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-ev:RegisterEvent("SPELLS_CHANGED")
+pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
+pcall(ev.RegisterEvent, ev, "PLAYER_REGEN_ENABLED")
+pcall(ev.RegisterEvent, ev, "PLAYER_EQUIPMENT_CHANGED")
+pcall(ev.RegisterEvent, ev, "SPELLS_CHANGED")
 ev:SetScript("OnEvent", function(self, e, a1)
     if e == "PLAYER_LOGIN" then
         WP.ApplyClicks()

@@ -176,6 +176,51 @@ local function Stats(link)
     return ok and type(t) == "table" and t or {}
 end
 
+-- ---------------------------------------------------------------- one school's spell damage
+-- "+24 Frost spell damage" is not among the stats the client gives addons: it is read from the
+-- item's "Equip:" lines (English and French clients), once per item.
+local SCHOOL_WORD = {
+    frost = "frost", givre = "frost", fire = "fire", feu = "fire", arcane = "arcane", arcanes = "arcane",
+    shadow = "shadow", ombre = "shadow", nature = "nature", holy = "holy", ["sacré"] = "holy",
+}
+-- the share of a spec's spell damage that each school is worth
+local SCHOOL_SHARE = {
+    MAGE = { arcane = { arcane = 1, frost = 0.3, fire = 0.3 }, fire = { fire = 1, arcane = 0.2 }, frost = { frost = 1, arcane = 0.2 } },
+    WARLOCK = { aff = { shadow = 1, fire = 0.2 }, demo = { shadow = 1, fire = 0.3 }, destro = { shadow = 0.8, fire = 0.6 } },
+    PRIEST = { shadow = { shadow = 1 }, disc = { holy = 0.3 }, holy = { holy = 0.5 } },
+    SHAMAN = { ele = { nature = 1, fire = 0.35, frost = 0.2 }, enh = { nature = 0.3, fire = 0.2 } },
+    DRUID = { balance = { nature = 0.7, arcane = 0.5 } },
+    PALADIN = { holy = { holy = 0.3 }, ret = { holy = 0.3 } },
+}
+local schoolCache = {}
+local scan
+local function SchoolDamage(link)
+    local c = schoolCache[link]
+    if c then return c end
+    c = {}
+    if not scan then scan = CreateFrame("GameTooltip", "WLHelperWeightsTip", nil, "GameTooltipTemplate") end
+    scan:SetOwner(WorldFrame, "ANCHOR_NONE")
+    scan:ClearLines()
+    if pcall(scan.SetHyperlink, scan, link) then
+        for i = 2, scan:NumLines() do
+            local fs = _G["WLHelperWeightsTipTextLeft" .. i]
+            local t = fs and fs:GetText()
+            if t then
+                t = t:lower()
+                -- "increases damage done by frost spells and effects by up to 24"
+                local w, n = t:match("damage done by (%a+) spells and effects by up to (%d+)")
+                -- "augmente les dégâts infligés par les sorts et effets de givre de 24 au maximum"
+                if not w then w, n = t:match("sorts et effets d[e']%s*(%S+) de (%d+)") end
+                local school = w and SCHOOL_WORD[w]
+                if school then c[school] = (c[school] or 0) + tonumber(n) end
+            end
+        end
+    end
+    scan:Hide()
+    schoolCache[link] = c
+    return c
+end
+
 -- the item's score in a slot for a spec
 function W.Score(link, slot, spec)
     spec = spec or W.Spec()
@@ -187,6 +232,13 @@ function W.Score(link, slot, spec)
     for k, v in pairs(Stats(link)) do
         local code = KEYS[k]
         if code and code ~= "DPS" and w[code] and type(v) == "number" then s = s + w[code] * v end
+    end
+    -- one school's spell damage, worth the spec's spell damage times the school's share
+    local shares = SCHOOL_SHARE[Class()] and SCHOOL_SHARE[Class()][spec[1]]
+    if shares and w.SP then
+        for school, n in pairs(SchoolDamage(link)) do
+            if shares[school] then s = s + w.SP * shares[school] * n end
+        end
     end
     -- weapon damage per second: main hand and ranged in full, off hand half
     local dps = Stats(link).ITEM_MOD_DAMAGE_PER_SECOND_SHORT
@@ -231,4 +283,4 @@ function W.Gain(link)
     return bestGain, bestSlot
 end
 
-function W.Reset() wipe(scoreCache) end
+function W.Reset() wipe(scoreCache); wipe(schoolCache) end

@@ -260,9 +260,9 @@ local function Learn()
 end
 
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("PLAYER_ENTERING_WORLD")
-ev:RegisterEvent("BAG_UPDATE_DELAYED")
-ev:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
+pcall(ev.RegisterEvent, ev, "PLAYER_ENTERING_WORLD")
+pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED")
+pcall(ev.RegisterEvent, ev, "CURRENCY_DISPLAY_UPDATE")
 ev:SetScript("OnEvent", function(_, e)
     if not WP.ModuleOn("writs") or not WLWritsDB then return end
     if e == "PLAYER_ENTERING_WORLD" then

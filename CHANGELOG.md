@@ -6,6 +6,26 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.24] — 2026-11-15
+
+### Corrigé / Fixed
+- **« WLHelper a été bloqué » au chargement** : le module Guilde s'abonnait au journal de combat, fermé aux addons sur ce client. Le classement PvP compte maintenant les victoires honorables du jeu gagnées en monde ouvert.
+  *"WLHelper has been blocked" at login: the Guild module no longer uses the combat log; the PvP ranking counts the game's honorable kills in the open world.*
+- **Commandes : personne ne voyait les artisans.** Un événement inconnu de ce client (TRADE_SKILL_UPDATE) arrêtait tout le module, et les recettes étaient lues avec l'ancienne interface des métiers. Le module lit maintenant les métiers comme ce client les donne. Tous les événements de l'addon sont désormais demandés sans risque : un événement inconnu ne peut plus arrêter un module.
+  *Orders: crafters never showed (an unknown event stopped the module; recipes are now read with the modern profession API).*
+- **Nettoyeur de sacs** : ce client refuse qu'un addon détruise un objet. L'objet coché est mis sur ton curseur ; un clic dans le monde ouvre la confirmation du jeu.
+  *Bag cleaner: the ticked item goes on your cursor; the game's own box destroys it.*
+- **Améliorations** : les dégâts d'une école de magie (« +24 aux sorts de Givre ») comptent selon ta spé. Une Frostweave Tunic n'est plus vue comme bien pire qu'une Robe of Power.
+  *Upgrades: one school's spell damage counts for your spec.*
+- **Textes invisibles** chez certains joueurs : la police du jeu est utilisée par défaut ; celle d'EllesmereUI se choisit dans Réglages › Général.
+- **GPS** : plus de flèches en double (losange jaune du jeu, TomTom, Naowh) quand la flèche de WL Helper est allumée, et plus de fond gris sous la flèche.
+- Guide : les noms complets (« Zul'Farrak », plus « ZF »), l'étape en premier sur la ligne de progression, la zone plus répétée dans le titre de l'étape, une épingle de carte pour aller au point.
+- La macro DG_Cible va dans les macros de compte quand celles du personnage sont pleines.
+- Ton nom n'apparaît plus deux fois dans le classement de guilde.
+
+### Ajouté / Added
+- **Bouton « Accueil »** dans l'en-tête de chaque fenêtre, guide des donjons et sélecteur compris.
+
 ## [1.0.0-beta.23] — 2026-11-15
 
 ### Ajouté / Added

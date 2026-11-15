@@ -125,9 +125,9 @@ function WP.LadderBusy() return current ~= nil or #queue > 0 end
 function WP.LadderLeft() return #queue + (current and 1 or 0) end
 
 local f = CreateFrame("Frame")
-f:RegisterEvent("COMMODITY_SEARCH_RESULTS_UPDATED")
-f:RegisterEvent("ITEM_SEARCH_RESULTS_UPDATED")
-f:RegisterEvent("AUCTION_HOUSE_CLOSED")
+pcall(f.RegisterEvent, f, "COMMODITY_SEARCH_RESULTS_UPDATED")
+pcall(f.RegisterEvent, f, "ITEM_SEARCH_RESULTS_UPDATED")
+pcall(f.RegisterEvent, f, "AUCTION_HOUSE_CLOSED")
 f:SetScript("OnEvent", function(_, e, a1)
     if e == "AUCTION_HOUSE_CLOSED" then queue = {}; current = nil; return end
     if not current then return end

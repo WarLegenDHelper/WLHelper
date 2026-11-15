@@ -166,8 +166,10 @@ end
 ns.FontWorks = FontWorks
 
 function ns.ApplyLooks()
-  -- The accent stays War Legend red; EllesmereUI only lends its fonts, when its files are there.
-  if ns.IsLoaded("EllesmereUI") then
+  -- The accent stays War Legend red. The font is the game's own unless you pick EllesmereUI's in the
+  -- settings (WLWritsDB.font = "eui"): on some installs its font left short labels blank.
+  T.font, T.bold = STANDARD_TEXT_FONT, STANDARD_TEXT_FONT
+  if ns.IsLoaded("EllesmereUI") and WLWritsDB and WLWritsDB.font == "eui" then
     local medium, bold = EUI .. "FiraSans Medium.ttf", EUI .. "FiraSans Bold.ttf"
     if FontWorks(medium) and FontWorks(bold) then T.font, T.bold = medium, bold
     else T.font, T.bold = STANDARD_TEXT_FONT, STANDARD_TEXT_FONT end

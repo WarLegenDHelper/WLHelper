@@ -71,12 +71,12 @@ end
 local function CrateQuest(id) return id and CRATE_QUESTS[id] or false end
 
 local f = CreateFrame("Frame")
-f:RegisterEvent("QUEST_DETAIL")
-f:RegisterEvent("QUEST_PROGRESS")
-f:RegisterEvent("QUEST_COMPLETE")
-f:RegisterEvent("GOSSIP_SHOW")
-f:RegisterEvent("QUEST_GREETING")
-f:RegisterEvent("PLAYER_ENTERING_WORLD")
+pcall(f.RegisterEvent, f, "QUEST_DETAIL")
+pcall(f.RegisterEvent, f, "QUEST_PROGRESS")
+pcall(f.RegisterEvent, f, "QUEST_COMPLETE")
+pcall(f.RegisterEvent, f, "GOSSIP_SHOW")
+pcall(f.RegisterEvent, f, "QUEST_GREETING")
+pcall(f.RegisterEvent, f, "PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", function(_, event, a1, a2)
     if not WP.ModuleOn("writs") then return end
     Index()

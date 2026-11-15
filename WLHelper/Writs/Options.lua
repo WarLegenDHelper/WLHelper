@@ -94,6 +94,9 @@ ns.AddEnglish({
         "Sources and thanks: see CREDITS.txt in the addon's folder.",
     ["GitHub"] = "GitHub", ["Clique puis Ctrl+C pour copier"] = "Click, then Ctrl+C to copy",
     ["Commandes du chat"] = "Chat commands",
+    ["Police"] = "Font",
+    ["Du jeu"] = "The game's",
+    ["Celle d'EllesmereUI peut laisser des textes vides sur certaines installations"] = "EllesmereUI's may leave some texts blank on some installs",
     ["Spé jugée"] = "Spec judged",
     ["Auto : l'arbre de talents où tu as le plus de points"] = "Auto: the talent tree with the most points",
     ["Auto"] = "Auto",
@@ -376,6 +379,16 @@ function BUILD.general(p)
     end))
     CloseSection(p)
     Note(p, L("Auto suit la langue du client.\nLes fenêtres déjà ouvertes changent après un /reload."), 8)
+
+    -- the font: the game's own (sure to show everywhere) or EllesmereUI's when it is installed
+    if root.IsLoaded and root.IsLoaded("EllesmereUI") then
+        Section(p, L("Police"))
+        local frow = Row(p, L("Police"), L("Celle d'EllesmereUI peut laisser des textes vides sur certaines installations"))
+        Place(p, frow, S.Segmented(frow, { { "game", L("Du jeu") }, { "eui", "EllesmereUI" } },
+            function() return WLWritsDB.font == "eui" and "eui" or "game" end,
+            function(v) WLWritsDB.font = v; if root.ApplyLooks then root.ApplyLooks() end end))
+        CloseSection(p)
+    end
 
     Section(p, L("Fenêtres"))
     SwitchRow(p, L("Bouton de la minimap"), function() return not Guide().hideMinimap end, SetMinimap)
@@ -935,8 +948,8 @@ BuildSearch = function(nav, content)
     end)
     if not win.keysEvents then
         win.keysEvents = CreateFrame("Frame", nil, win)
-        win.keysEvents:RegisterEvent("PLAYER_REGEN_ENABLED")
-        win.keysEvents:RegisterEvent("PLAYER_REGEN_DISABLED")
+        pcall(win.keysEvents.RegisterEvent, win.keysEvents, "PLAYER_REGEN_ENABLED")
+        pcall(win.keysEvents.RegisterEvent, win.keysEvents, "PLAYER_REGEN_DISABLED")
     end
     win.keysEvents:SetScript("OnEvent", function(_, e)
         if e == "PLAYER_REGEN_DISABLED" then win:EnableKeyboard(false) else ArmKeys() end
@@ -1068,7 +1081,7 @@ end
 -- ---------------------------------------------------------------- login
 
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("PLAYER_LOGIN")
+pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
 ev:SetScript("OnEvent", function(self)
     self:UnregisterEvent("PLAYER_LOGIN")
     -- Main.lua shows the guide two seconds after login unless WLDTDB.hidden: clearing it here

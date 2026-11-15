@@ -104,10 +104,10 @@ function ns.PartyLine(qid)
 end
 
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("CHAT_MSG_ADDON")
-ev:RegisterEvent("GROUP_ROSTER_UPDATE")
-ev:RegisterEvent("QUEST_LOG_UPDATE")
-ev:RegisterEvent("PLAYER_ENTERING_WORLD")
+pcall(ev.RegisterEvent, ev, "CHAT_MSG_ADDON")
+pcall(ev.RegisterEvent, ev, "GROUP_ROSTER_UPDATE")
+pcall(ev.RegisterEvent, ev, "QUEST_LOG_UPDATE")
+pcall(ev.RegisterEvent, ev, "PLAYER_ENTERING_WORLD")
 local wasGrouped = false
 ev:SetScript("OnEvent", function(_, e, ...)
   if e == "CHAT_MSG_ADDON" then OnMessage(...) return end

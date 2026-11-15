@@ -93,7 +93,8 @@ local function ZoneName(m)
   return info and info.name or ""
 end
 
-local function StepTitle(st)
+-- noZone: the card already shows the zone in its "Outside: Mulgore" chip
+local function StepTitle(st, noZone)
   if st.gate then return L.GATE_T:format(ns.DName(st.gate)) end
   if st.split then
     local pr = st.parts and st.parts > 1 and ("  (" .. st.part .. "/" .. st.parts .. ")") or ""
@@ -116,7 +117,7 @@ local function StepTitle(st)
   local zone = st.loc and ZoneName(st.loc.m) or ""
   local who = table.concat(names, ", ")
   if #who > 60 then who = who:sub(1, 57) .. "..." end
-  if zone ~= "" then return zone .. " : " .. who end
+  if zone ~= "" and not noZone then return zone .. " : " .. who end
   return who
 end
 ns.StepTitle = StepTitle
@@ -384,6 +385,16 @@ local function Build()
   -- the logo is the way home (WL Helper's home page)
   f.homeBtn = CreateFrame("Button", nil, h)
   f.homeBtn:SetSize(24, 24); f.homeBtn:SetPoint("LEFT", 4, 0)
+  -- "‹ Accueil", the same button as in every WL Helper window
+  local SW = ns.Writs and ns.Writs.S
+  if SW and SW.HomeButton then
+    f.homeLabel = SW.HomeButton(h, function()
+      local WP = ns.Writs and ns.Writs.WP
+      if WP and WP.OpenHome then WP.OpenHome() end
+    end)
+    f.homeLabel:SetPoint("LEFT", 6, 0)
+    f.homeBtn:ClearAllPoints(); f.homeBtn:SetPoint("LEFT", f.homeLabel, "RIGHT", 6, 0)
+  end
   f.homeBtn:SetScript("OnClick", function()
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.OpenHome then WP.OpenHome() end
@@ -408,6 +419,8 @@ local function Build()
   local gear = f.gearBtn:CreateTexture(nil, "ARTWORK"); gear:SetSize(14, 14); gear:SetPoint("CENTER")
   gear:SetTexture("Interface\\Buttons\\UI-OptionsButton"); gear:SetVertexColor(0.8, 0.82, 0.85)
   f.pickBtn = Button(h, 64, 20, L.PICK, function() ns.TogglePicker() end, function() return { L.TT_HPICK } end)
+  -- the route's full names stop before the header buttons ("..." when too long)
+  h.sub:SetPoint("RIGHT", f.pickBtn, "LEFT", -8, 0)
   f.pickBtn:SetPoint("RIGHT", f.gearBtn, "LEFT", -4, 0)
   h.sub:SetPoint("RIGHT", f.pickBtn, "LEFT", -8, 0)
 
@@ -760,7 +773,8 @@ Render = function()
   for k = 1, #steps do if IsStepDone(log, k) then n = n + 1 end end
   f.bar:SetValue(total > 0 and n / total or 0)
   f.bar:SetStatusBarColor(T.accent[1], T.accent[2], T.accent[3])
-  f.progLabel:SetText((ns.route.label or "") .. "   ·   " .. L.STEP:format(i, total))
+  -- the step first: with long full names, only the names get cut
+  f.progLabel:SetText(L.STEP:format(i, total) .. "   ·   " .. (ns.route.label or ""))
   f.progPct:SetText(("%d %%"):format(total > 0 and math.floor(n / total * 100 + 0.5) or 0))
 
   if f.mini then
@@ -815,7 +829,7 @@ Render = function()
   end
   card.model:SetShown(hasModel); card.modelBg:SetShown(hasModel)
   card.title:SetWidth(hasModel and (W - 2 * PAD - 40 - 84) or (W - 2 * PAD - 40))
-  card.title:SetText(StepTitle(st))
+  card.title:SetText(StepTitle(st, not st.gate and not st.ins))
   local y = 10 + card.zone:GetStringHeight() + 6 + 19 + 8 + card.title:GetStringHeight()
   if hasModel then y = math.max(y, 26 + 76 + 4) end
 
@@ -919,8 +933,11 @@ Render = function()
       local isActive = nd.loc and ns.active[ns.PKey(nd.loc.m, nd.loc.x, nd.loc.y)] and not ok
       row.wpOn:SetShown(isActive and true or false); row.wpBar:SetShown(isActive and true or false)
       if nd.loc then
-        row.gb.icon:SetTexture(ns.IsLoaded("EllesmereUI") and "Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-directions.png" or "Interface\\Minimap\\MiniMap-QuestArrow")
-        if isActive then row.gb.icon:SetVertexColor(T.accent[1], T.accent[2], T.accent[3]) else row.gb.icon:SetVertexColor(0.85, 0.87, 0.9) end
+        -- a map pin, like a point on a phone map; the game's own drawing, the old arrow if it has none
+        if not (row.gb.icon.SetAtlas and pcall(row.gb.icon.SetAtlas, row.gb.icon, "Waypoint-MapPin-ChatIcon") and row.gb.icon:GetAtlas()) then
+          row.gb.icon:SetTexture("Interface\\Minimap\\MiniMap-QuestArrow")
+        end
+        if isActive then row.gb.icon:SetVertexColor(1, 1, 1) else row.gb.icon:SetVertexColor(0.75, 0.77, 0.8) end
       end
       local x = -4
       for _, b in ipairs({ row.gb }) do
@@ -1120,13 +1137,19 @@ function ns.UpdateMacro()
   if idx and idx > 0 then
     pcall(EditMacro, idx, MACRO, nil, body)
   else
-    local _, nChar = GetNumMacros()
+    -- a character macro, or an account one when the character's are full
+    local nAcc, nChar = GetNumMacros()
     local maxChar = MAX_CHARACTER_MACROS or 18
+    local maxAcc = MAX_ACCOUNT_MACROS or 120
+    local perChar = true
     if nChar and nChar >= maxChar then
-      if not macroWarned then macroWarned = true; ns.Print(L.MACRO_FULL) end
-      return
+      if nAcc and nAcc < maxAcc then perChar = false
+      else
+        if not macroWarned then macroWarned = true; ns.Print(L.MACRO_FULL) end
+        return
+      end
     end
-    local ok = pcall(CreateMacro, MACRO, "INV_Misc_QuestionMark", body, true)
+    local ok = pcall(CreateMacro, MACRO, "INV_Misc_QuestionMark", body, perChar)
     if ok then ns.Print(L.MACRO_MADE:format(MACRO)) end
   end
 end

@@ -228,7 +228,7 @@ local function Build()
     cards.dungeons.key, cards.writs.key, cards.bags.key, cards.orders.key, cards.guild.key = "dungeons", "writs", "bags", "orders", "guild"
     win:SetScript("OnShow", function() WP.RefreshHome() end)
     local ev = CreateFrame("Frame", nil, win)
-    ev:RegisterEvent("QUEST_LOG_UPDATE"); ev:RegisterEvent("BAG_UPDATE_DELAYED"); ev:RegisterEvent("UPDATE_FACTION")
+    pcall(ev.RegisterEvent, ev, "QUEST_LOG_UPDATE"); pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED"); pcall(ev.RegisterEvent, ev, "UPDATE_FACTION")
     local queued = false
     ev:SetScript("OnEvent", function()
         if not win:IsShown() or queued then return end

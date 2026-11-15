@@ -116,7 +116,7 @@ function WP.ShowWelcome()
 end
 
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("PLAYER_LOGIN")
+pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
 ev:SetScript("OnEvent", function()
     if WLWritsDB and not WLWritsDB.welcomed then
         C_Timer.After(4, function() if not WLWritsDB.welcomed then WP.ShowWelcome() end end)

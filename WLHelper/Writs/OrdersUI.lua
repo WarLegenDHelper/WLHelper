@@ -501,7 +501,7 @@ if SendMail then
     end)
 end
 local mf = CreateFrame("Frame")
-mf:RegisterEvent("MAIL_SHOW"); mf:RegisterEvent("MAIL_CLOSED"); mf:RegisterEvent("MAIL_SEND_SUCCESS"); mf:RegisterEvent("MAIL_FAILED")
+pcall(mf.RegisterEvent, mf, "MAIL_SHOW"); pcall(mf.RegisterEvent, mf, "MAIL_CLOSED"); pcall(mf.RegisterEvent, mf, "MAIL_SEND_SUCCESS"); pcall(mf.RegisterEvent, mf, "MAIL_FAILED")
 mf:SetScript("OnEvent", function(_, e)
     if e == "MAIL_SEND_SUCCESS" and sending then
         -- the mail of an order left: note it (reagents sent, or the order delivered)

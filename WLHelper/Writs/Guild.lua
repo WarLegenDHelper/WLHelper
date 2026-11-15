@@ -27,8 +27,8 @@ ns.AddEnglish({
     ["victimes"] = "kills",
     ["VH"] = "HK",
     ["Toi : %d cette semaine · %d au total"] = "You: %d this week · %d in total",
-    ["Victimes tuées de ta main en monde ouvert (pas en champ de bataille ni en arène), comptées par WL Helper. Seuls les membres qui ont l'addon apparaissent."] =
-        "Enemy players you landed the killing blow on in the open world (not in battlegrounds or arenas), counted by WL Helper. Only members who have the addon appear.",
+    ["Victoires honorables en monde ouvert (pas en champ de bataille ni en arène), comptées par WL Helper depuis son installation. Seuls les membres qui ont l'addon apparaissent."] =
+        "Honorable kills in the open world (not in battlegrounds or arenas), counted by WL Helper since it was installed. Only members who have the addon appear.",
     ["Personne n'a encore de victime cette semaine."] = "Nobody has a kill this week yet.",
     ["Personne n'a encore de victime."] = "Nobody has a kill yet.",
     ["a WL Helper"] = "has WL Helper",
@@ -37,7 +37,7 @@ ns.AddEnglish({
     ["Voir toute la guilde et le classement PvP"] = "See the whole guild and the PvP ranking",
     ["%d en ligne"] = "%d online",
     ["Tu es %de du classement de la semaine"] = "You are #%d in this week's ranking",
-    ["Victime en monde ouvert : %s (%d cette semaine)"] = "Open-world kill: %s (%d this week)",
+    ["Victoire honorable en monde ouvert (%d cette semaine)"] = "Open-world honorable kill (%d this week)",
 })
 
 local PREFIX = "WLHgld"
@@ -47,7 +47,8 @@ local SendRaw = (CI and CI.SendAddonMessage) or SendAddonMessage
 if Register then pcall(Register, PREFIX) end
 
 local function Me() return (UnitName("player")) end
-local function Short(n) return n and (n:gsub("%-.*$", "")) end
+-- "Name-Realm" or "Name Realm": the name alone
+local function Short(n) return n and (n:gsub("[%- ].*$", "")) end
 local function Week() return date("%Y-%W") end
 local function On() return WP.ModuleOn("guild") end
 
@@ -111,22 +112,24 @@ local function OnMessage(msg, sender)
 end
 
 -- ---------------------------------------------------------------- counting kills
-local band = bit and bit.band
-local HOSTILE = COMBATLOG_OBJECT_REACTION_HOSTILE or 0x40
+-- The combat log is closed to addons on this client: the count follows the game's own honorable
+-- kills instead. Each time it goes up outside a battleground or an arena, the difference counts as
+-- open-world kills (this week and in total).
 local function InWorld()
     local _, kind = IsInInstance()
     return kind ~= "pvp" and kind ~= "arena"
 end
-local function OnCombatLog()
-    local _, sub, _, src, _, _, _, dst, dstName, dstFlags = CombatLogGetCurrentEventInfo()
-    if sub ~= "PARTY_KILL" or src ~= UnitGUID("player") then return end
-    if type(dst) ~= "string" or not dst:find("^Player%-") then return end
-    if band and dstFlags and band(dstFlags, HOSTILE) == 0 then return end
-    if not InWorld() then return end
+local function CheckHonor()
+    local hk = LifetimeHK()
+    if hk <= 0 then return end
     local p = Mine()
-    p.kb, p.week = (p.kb or 0) + 1, (p.week or 0) + 1
+    if not p.lastHK or hk < p.lastHK then p.lastHK = hk; return end   -- first look: the starting point
+    local gained = hk - p.lastHK
+    p.lastHK = hk
+    if gained <= 0 or not InWorld() then return end
+    p.kb, p.week = (p.kb or 0) + gained, (p.week or 0) + gained
     if WLWritsDB.guildToast ~= false then
-        WP.Print(string.format(L("Victime en monde ouvert : %s (%d cette semaine)"), Short(dstName) or "?", p.week))
+        WP.Print(string.format(L("Victoire honorable en monde ouvert (%d cette semaine)"), p.week))
     end
     Share()
     if WP.RefreshGuild then WP.RefreshGuild() end
@@ -302,7 +305,7 @@ local function Build()
     seg:SetPoint("TOPRIGHT", -PAD, -6)
     local note = S.Text(p, 12, C.muted); note:SetPoint("BOTTOMLEFT", PAD, 12); note:SetPoint("RIGHT", -PAD, 0)
     note:SetJustifyH("LEFT"); note:SetWordWrap(true)
-    note:SetText(L("Victimes tuées de ta main en monde ouvert (pas en champ de bataille ni en arène), comptées par WL Helper. Seuls les membres qui ont l'addon apparaissent."))
+    note:SetText(L("Victoires honorables en monde ouvert (pas en champ de bataille ni en arène), comptées par WL Helper depuis son installation. Seuls les membres qui ont l'addon apparaissent."))
     ui.rank = List(p, -44, 60, RankRow)
     ui.none = S.Text(ui.rank.content, 13, C.dim); ui.none:SetPoint("TOPLEFT", 2, -8)
     win:SetScript("OnShow", function()
@@ -333,16 +336,19 @@ function WP.HideGuild() if win then win:Hide() end end
 
 -- ---------------------------------------------------------------- events
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("PLAYER_LOGIN")
-ev:RegisterEvent("CHAT_MSG_ADDON")
-ev:RegisterEvent("GUILD_ROSTER_UPDATE")
+pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
+pcall(ev.RegisterEvent, ev, "CHAT_MSG_ADDON")
+pcall(ev.RegisterEvent, ev, "GUILD_ROSTER_UPDATE")
 ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
     if not WLWritsDB then return end
     if e == "PLAYER_LOGIN" then
-        pcall(self.RegisterEvent, self, "COMBAT_LOG_EVENT_UNFILTERED")
+        for _, h in ipairs({ "PLAYER_PVP_KILLS_CHANGED", "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA" }) do
+            pcall(self.RegisterEvent, self, h)
+        end
+        C_Timer.After(5, CheckHonor)
         C_Timer.After(25, function() Share(true) end)
-    elseif e == "COMBAT_LOG_EVENT_UNFILTERED" then
-        if On() then OnCombatLog() end
+    elseif e == "PLAYER_PVP_KILLS_CHANGED" or e == "PLAYER_REGEN_ENABLED" or e == "ZONE_CHANGED_NEW_AREA" then
+        if On() then C_Timer.After(1, CheckHonor) end
     elseif e == "GUILD_ROSTER_UPDATE" then
         WP.RefreshGuild()
     elseif prefix == PREFIX and channel == "GUILD" and type(msg) == "string" and sender then

@@ -170,7 +170,7 @@ end
 if ContainerFrame_Update then hooksecurefunc("ContainerFrame_Update", function() PaintBlizzard() end) end
 
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("PLAYER_LOGIN")
+pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
 for _, e in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "CHARACTER_POINTS_CHANGED", "GET_ITEM_INFO_RECEIVED", "BAG_UPDATE_DELAYED" }) do
     pcall(ev.RegisterEvent, ev, e)
 end

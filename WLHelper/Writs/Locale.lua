@@ -201,6 +201,7 @@ local EN = {
     ["rendu"] = "done",
     ["nouveaux writs dans %d h"] = "new writs in %d h",
     ["Retour à l'accueil"] = "Back to home",
+    ["Accueil"] = "Home",
     ["Achète %d writs dans l'onglet Achats."] = "Buy %d writs in the Shopping tab.",
     ["rép"] = "rep",
     ["· tu le fabriques"] = "· you craft it",

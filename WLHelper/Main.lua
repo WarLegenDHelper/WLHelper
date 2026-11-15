@@ -13,7 +13,8 @@ end
 
 local function Label(sel)
   local names = {}
-  for _, k in ipairs(ns.ORDER) do if sel[k] then table.insert(names, ns.D[k].short or ns.DName(k)) end end
+  -- full names: "Zul'Farrak", not "ZF"
+  for _, k in ipairs(ns.ORDER) do if sel[k] then table.insert(names, ns.DName(k)) end end
   return table.concat(names, " + ")
 end
 
@@ -93,7 +94,7 @@ end
 -- =====================================================================
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_LOGIN", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE",
-  "PLAYER_LEVEL_UP", "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA" }) do ev:RegisterEvent(e) end
+  "PLAYER_LEVEL_UP", "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA" }) do pcall(ev.RegisterEvent, ev, e) end
 pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED")
 local pending
 -- the dungeon guide can be switched off (Settings > General > Modules)

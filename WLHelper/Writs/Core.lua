@@ -39,7 +39,7 @@ local DEFAULTS = {
     usePouchMeasured = true,
     autoRescan = true,
     -- GPS: provider "auto" (Zygor when its travel system is on, else ours) | "wl" | "zygor"
-    gpsOpts = { provider = "auto", teleports = true, autoFlight = false, scale = 1, alpha = 0.6, hideCombat = false },
+    gpsOpts = { provider = "auto", teleports = true, autoFlight = false, scale = 1, alpha = 0, hideCombat = false },
     -- Comptoir comforts
     comfort = { autoTurnIn = true, autoAccept = true, reminder = true, tooltip = true, autoCrates = true },
     modules = { dungeons = true, writs = true, bags = true, orders = true, upgrades = true, guild = true },   -- Settings > General > Modules       -- rescan the shopping list when the auction house opens
@@ -775,8 +775,8 @@ ns.AddEnglish({
     [" en combat"] = " in combat",
 })
 local blocked = CreateFrame("Frame")
-blocked:RegisterEvent("ADDON_ACTION_BLOCKED")
-blocked:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+pcall(blocked.RegisterEvent, blocked, "ADDON_ACTION_BLOCKED")
+pcall(blocked.RegisterEvent, blocked, "ADDON_ACTION_FORBIDDEN")
 local blockedSaid = {}
 blocked:SetScript("OnEvent", function(_, _, addon, func)
     if addon ~= ADDON then return end
@@ -785,23 +785,24 @@ blocked:SetScript("OnEvent", function(_, _, addon, func)
     if WLWritsDB then
         WLWritsDB.lastBlocked = { func = tostring(func), combat = combat, t = time(), ver = meta and meta(ADDON, "Version") or "?" }
     end
-    if blockedSaid[func] then return end
-    blockedSaid[func] = true
+    local key = tostring(func)
+    if blockedSaid[key] then return end
+    blockedSaid[key] = true
     WP.Print(string.format(L("le jeu a bloqué « %s »%s. Signale-le avec /wl idea (bug) : la fonction est déjà dans le formulaire."),
         tostring(func), combat and L(" en combat") or ""))
 end)
 
 local f = CreateFrame("Frame")
-f:RegisterEvent("ADDON_LOADED")
-f:RegisterEvent("QUEST_TURNED_IN")
-f:RegisterEvent("QUEST_ACCEPTED")
-f:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-f:RegisterEvent("QUEST_LOG_UPDATE")
-f:RegisterEvent("BAG_UPDATE_DELAYED")
-f:RegisterEvent("UPDATE_FACTION")
-f:RegisterEvent("LOOT_OPENED")
-f:RegisterEvent("LOOT_CLOSED")
-f:RegisterEvent("PLAYER_REGEN_ENABLED")
+pcall(f.RegisterEvent, f, "ADDON_LOADED")
+pcall(f.RegisterEvent, f, "QUEST_TURNED_IN")
+pcall(f.RegisterEvent, f, "QUEST_ACCEPTED")
+pcall(f.RegisterEvent, f, "ZONE_CHANGED_NEW_AREA")
+pcall(f.RegisterEvent, f, "QUEST_LOG_UPDATE")
+pcall(f.RegisterEvent, f, "BAG_UPDATE_DELAYED")
+pcall(f.RegisterEvent, f, "UPDATE_FACTION")
+pcall(f.RegisterEvent, f, "LOOT_OPENED")
+pcall(f.RegisterEvent, f, "LOOT_CLOSED")
+pcall(f.RegisterEvent, f, "PLAYER_REGEN_ENABLED")
 f:SetScript("OnEvent", function(_, event, a1)
     if event ~= "ADDON_LOADED" and not WP.ModuleOn("writs") then return end
     if event == "ADDON_LOADED" then

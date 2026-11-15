@@ -303,7 +303,7 @@ end
 
 -- After combat: the teleport button catches up with what the arrow shows now.
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("PLAYER_REGEN_ENABLED")
+pcall(ev.RegisterEvent, ev, "PLAYER_REGEN_ENABLED")
 ev:SetScript("OnEvent", function()
     if teleport then SetTeleport(WantedTeleport()) end
 end)
@@ -311,8 +311,14 @@ end)
 -- Size and background opacity from the options.
 function GPS.ApplyLook()
     if not arrow then return end
+    -- the grey box under the arrow is off by default since 1.0.0-beta.24: the old default (0.6) goes once
+    local o = WLWritsDB and WLWritsDB.gpsOpts
+    if o and not o.alphaV2 then
+        if o.alpha == 0.6 then o.alpha = 0 end
+        o.alphaV2 = true
+    end
     arrow:SetScale(Opt("scale", 1))
-    arrow.bg:SetAlpha(Opt("alpha", 0.6))
+    arrow.bg:SetAlpha(Opt("alpha", 0))
     PlaceTeleport()
 end
 

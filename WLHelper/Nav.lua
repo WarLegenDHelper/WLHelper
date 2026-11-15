@@ -18,18 +18,21 @@ local function Clear()
 end
 
 local function Add(m, x, y, label, first)
+  -- With WL Helper's own arrow on, the point is only a point (map, minimap): no second arrow from
+  -- TomTom, Naowh Forever or the game's yellow world marker on top of ours.
+  local ownArrow = WLDTDB and WLDTDB.arrow ~= false
   if ns.HasTomTom() then
     local ok, h = pcall(TomTom.AddWaypoint, TomTom, m, x / 100, y / 100,
-      { title = label, persistent = false, minimap = true, world = true, from = ADDON })
+      { title = label, persistent = false, minimap = true, world = not ownArrow, crazy = not ownArrow, from = ADDON })
     if ok and h then table.insert(handles, h) end
     return true
   end
   if not first then return end
   local NF = _G.NaowhForever
-  if NF and NF.PlaceWaypoint and pcall(NF.PlaceWaypoint, label, m, x, y, nil) then return true end
+  if not ownArrow and NF and NF.PlaceWaypoint and pcall(NF.PlaceWaypoint, label, m, x, y, nil) then return true end
   if C_Map and C_Map.SetUserWaypoint and UiMapPoint and (not C_Map.CanSetUserWaypointOnMap or C_Map.CanSetUserWaypointOnMap(m)) then
     C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(m, x / 100, y / 100))
-    if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then C_SuperTrack.SetSuperTrackedUserWaypoint(true) end
+    if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then C_SuperTrack.SetSuperTrackedUserWaypoint(not ownArrow) end
     return true
   end
 end

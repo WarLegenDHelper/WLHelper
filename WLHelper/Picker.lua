@@ -202,16 +202,15 @@ local function Build()
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.OpenHome then WP.OpenHome() end
   end
-  local back = CreateFrame("Button", nil, h); back:SetSize(24, 30); back:SetPoint("LEFT", 4, 0)
-  back.t = Text(back, 22, T.dim, true); back.t:SetPoint("CENTER", 0, 1); back.t:SetText("‹")
-  back:SetScript("OnClick", GoHome)
-  back:SetScript("OnEnter", function(self) back.t:SetTextColor(1, 1, 1); ns.ShowTip(self, { L.BACK_HOME }) end)
-  back:SetScript("OnLeave", function() back.t:SetTextColor(unpack(T.dim)); ns.HideTip() end)
-  h.logo = h:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(26, 26); h.logo:SetPoint("LEFT", 28, -1)
+  local SW = ns.Writs and ns.Writs.S
+  local back = SW and SW.HomeButton and SW.HomeButton(h, GoHome)
+  if back then back:SetPoint("LEFT", 6, 0) end
+  h.logo = h:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(26, 26)
+  if back then h.logo:SetPoint("LEFT", back, "RIGHT", 6, -1) else h.logo:SetPoint("LEFT", 6, -1) end
   h.logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64")
   local lb = CreateFrame("Button", nil, h); lb:SetAllPoints(h.logo); lb:SetScript("OnClick", GoHome)
   lb:SetScript("OnEnter", function(self) ns.ShowTip(self, { L.BACK_HOME }) end); lb:SetScript("OnLeave", ns.HideTip)
-  h.title = Text(h, 14, T.text, true); h.title:SetPoint("LEFT", 58, 0); h.title:SetText(L.TITLE)
+  h.title = Text(h, 14, T.text, true); h.title:SetPoint("LEFT", h.logo, "RIGHT", 6, 1); h.title:SetText(L.TITLE)
   p.tabs = {}
   local prevTab
   for _, t in ipairs({ { "dg", L.TAB_DG }, { "raid", L.TAB_RAID }, { "cls", L.TAB_CLS } }) do

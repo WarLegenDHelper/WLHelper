@@ -593,12 +593,12 @@ end
 
 local writOfQuest   -- quest ID -> writ, built on the first turn-in
 local f = CreateFrame("Frame")
-f:RegisterEvent("PLAYER_LOGIN")
-f:RegisterEvent("QUEST_TURNED_IN")
-f:RegisterEvent("TAXIMAP_OPENED")
-f:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-f:RegisterEvent("PLAYER_CONTROL_GAINED")
-f:RegisterEvent("LOADING_SCREEN_DISABLED")
+pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
+pcall(f.RegisterEvent, f, "QUEST_TURNED_IN")
+pcall(f.RegisterEvent, f, "TAXIMAP_OPENED")
+pcall(f.RegisterEvent, f, "ZONE_CHANGED_NEW_AREA")
+pcall(f.RegisterEvent, f, "PLAYER_CONTROL_GAINED")
+pcall(f.RegisterEvent, f, "LOADING_SCREEN_DISABLED")
 f:SetScript("OnEvent", function(_, event, a1)
     if event == "PLAYER_LOGIN" then
         -- A tour does not survive a reload: start it again from the button.

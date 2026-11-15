@@ -52,7 +52,8 @@ local function safe(f, ...)
 end
 
 local function Me() return (UnitName("player")) end
-local function Short(n) return n and (n:gsub("%-.*$", "")) end
+-- "Name-Realm" or "Name Realm": the name alone
+local function Short(n) return n and (n:gsub("[%- ].*$", "")) end
 
 -- ---------------------------------------------------------------- storage
 local function DB()
@@ -130,10 +131,41 @@ end
 local function LinkID(link) return link and tonumber(link:match("item:(%d+)")) end
 
 -- Reads the open profession window (trade skills; enchanting's craft window too).
+-- The modern profession API (C_TradeSkillUI, what this client uses): every learned recipe with what
+-- it makes (item ID, or the recipe's spell as a negative number for an enchant) and its reagents.
+local function ReadModern(recipes)
+    local T = C_TradeSkillUI
+    if (T.IsTradeSkillLinked and T.IsTradeSkillLinked()) or (T.IsTradeSkillGuild and T.IsTradeSkillGuild()) then return end
+    local base = T.GetBaseProfessionInfo and T.GetBaseProfessionInfo()
+    local prof = base and base.professionName
+    if not prof or prof == "" then return end
+    for _, id in ipairs(T.GetAllRecipeIDs() or {}) do
+        local info = T.GetRecipeInfo(id)
+        if info and info.learned then
+            local sch = T.GetRecipeSchematic and T.GetRecipeSchematic(id, false)
+            local reagents = {}
+            for _, slot in ipairs(sch and sch.reagentSlotSchematics or {}) do
+                local basic = not Enum.CraftingReagentType or slot.reagentType == Enum.CraftingReagentType.Basic
+                local r = slot.reagents and slot.reagents[1]
+                if basic and r and r.itemID then reagents[#reagents + 1] = { r.itemID, slot.quantityRequired or 1 } end
+            end
+            local out = sch and sch.outputItemID
+            recipes[(out and out > 0) and out or -id] = Encode(reagents)
+        end
+    end
+    return prof, base.skillLevel, base.maxSkillLevel
+end
+
 local function ReadProfession()
     local prof, rank, max
     local recipes = {}
-    if GetTradeSkillLine and GetNumTradeSkills and (GetNumTradeSkills() or 0) > 0 then
+    if C_TradeSkillUI and C_TradeSkillUI.GetAllRecipeIDs then
+        local ok, p, r, m = pcall(ReadModern, recipes)
+        if ok then prof, rank, max = p, r, m end
+    end
+    if prof then
+        -- read by the modern API
+    elseif GetTradeSkillLine and GetNumTradeSkills and (GetNumTradeSkills() or 0) > 0 then
         prof, rank, max = GetTradeSkillLine()
         for i = 1, GetNumTradeSkills() do
             local name, kind = GetTradeSkillInfo(i)
@@ -663,14 +695,16 @@ function O.Notify(o)
 end
 
 local f = CreateFrame("Frame")
-f:RegisterEvent("PLAYER_LOGIN")
-f:RegisterEvent("CHAT_MSG_ADDON")
-f:RegisterEvent("TRADE_SKILL_SHOW")
-f:RegisterEvent("TRADE_SKILL_UPDATE")
+pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
+pcall(f.RegisterEvent, f, "CHAT_MSG_ADDON")
+pcall(f.RegisterEvent, f, "TRADE_SKILL_SHOW")
+pcall(f.RegisterEvent, f, "TRADE_SKILL_UPDATE")
+pcall(f.RegisterEvent, f, "TRADE_SKILL_LIST_UPDATE")
+pcall(f.RegisterEvent, f, "TRADE_SKILL_DATA_SOURCE_CHANGED")
 pcall(f.RegisterEvent, f, "CRAFT_SHOW")
 pcall(f.RegisterEvent, f, "CRAFT_UPDATE")
-f:RegisterEvent("MAIL_INBOX_UPDATE")
-f:RegisterEvent("MAIL_CLOSED")
+pcall(f.RegisterEvent, f, "MAIL_INBOX_UPDATE")
+pcall(f.RegisterEvent, f, "MAIL_CLOSED")
 f:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
     if not WLWritsDB then return end
     if e == "PLAYER_LOGIN" then
@@ -680,7 +714,8 @@ f:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
             Guild("S|")   -- ask the others to resend their running orders
             O.AskRecipes()
         end)
-    elseif e == "TRADE_SKILL_SHOW" or e == "TRADE_SKILL_UPDATE" or e == "CRAFT_SHOW" or e == "CRAFT_UPDATE" then
+    elseif e == "TRADE_SKILL_SHOW" or e == "TRADE_SKILL_UPDATE" or e == "TRADE_SKILL_LIST_UPDATE" or e == "TRADE_SKILL_DATA_SOURCE_CHANGED"
+        or e == "CRAFT_SHOW" or e == "CRAFT_UPDATE" then
         QueueRead()
     elseif e == "MAIL_INBOX_UPDATE" then
         inboxReady = true

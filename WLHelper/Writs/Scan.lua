@@ -221,11 +221,11 @@ end
 -- ---------------------------------------------------------------- events
 
 local f = CreateFrame("Frame")
-f:RegisterEvent("AUCTION_HOUSE_BROWSE_RESULTS_UPDATED")
-f:RegisterEvent("AUCTION_HOUSE_BROWSE_RESULTS_ADDED")
-f:RegisterEvent("AUCTION_HOUSE_BROWSE_FAILURE")
-f:RegisterEvent("AUCTION_HOUSE_SHOW")
-f:RegisterEvent("AUCTION_HOUSE_CLOSED")
+pcall(f.RegisterEvent, f, "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED")
+pcall(f.RegisterEvent, f, "AUCTION_HOUSE_BROWSE_RESULTS_ADDED")
+pcall(f.RegisterEvent, f, "AUCTION_HOUSE_BROWSE_FAILURE")
+pcall(f.RegisterEvent, f, "AUCTION_HOUSE_SHOW")
+pcall(f.RegisterEvent, f, "AUCTION_HOUSE_CLOSED")
 f:SetScript("OnEvent", function(_, event)
     if event == "AUCTION_HOUSE_CLOSED" then
         S.Stop()

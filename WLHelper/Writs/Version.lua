@@ -81,9 +81,9 @@ local function Seen(version, channel)
 end
 
 local f = CreateFrame("Frame")
-f:RegisterEvent("PLAYER_LOGIN")
-f:RegisterEvent("GROUP_JOINED")
-f:RegisterEvent("CHAT_MSG_ADDON")
+pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
+pcall(f.RegisterEvent, f, "GROUP_JOINED")
+pcall(f.RegisterEvent, f, "CHAT_MSG_ADDON")
 f:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
     if e == "PLAYER_LOGIN" then
         -- the version you updated to is no longer "newer": forget it

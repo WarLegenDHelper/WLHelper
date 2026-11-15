@@ -28,6 +28,7 @@ ns.AddEnglish({
     ["impossible en combat."] = "not possible in combat.",
     ["%d pile(s) détruite(s)."] = "%d stack(s) destroyed.",
     ["%s détruit."] = "%s destroyed.",
+    ["%s est sur ton curseur : clique dans le monde (hors des fenêtres), puis confirme pour le détruire."] = "%s is on your cursor: click in the world (outside any window), then confirm to destroy it.",
     ["Coche ce que tu veux détruire"] = "Tick what you want to destroy",
     ["Détruire le suivant (%d cochés)"] = "Destroy the next one (%d ticked)",
     ["À garder : invoque Gahz'rilla au gong de Zul'Farrak (quête « Gahz'rilla »)"] =
@@ -365,8 +366,8 @@ end
 
 -- ---------------------------------------------------------------- destroy
 
--- Runs only from the confirm button's OnClick (a hardware event): one PickupContainerItem +
--- DeleteCursorItem per stack, each stack re-read first so a moved or swapped slot is never hit.
+-- Runs only from the button's OnClick: picks up one checked stack (re-read first so a moved or
+-- swapped slot is never hit); the game's own confirmation destroys it.
 local Refresh
 local function Destroy()
     if InCombatLockdown() then WP.Print(L("impossible en combat.")); return end
@@ -385,15 +386,16 @@ local function Destroy()
             for _, s in ipairs(e.slots) do
                 local info = safe(C_Container.GetContainerItemInfo, s[1], s[2])
                 if n == 0 and info and info.itemID == e.id and not info.isLocked and (info.quality or 0) < MANUAL_QUALITY then
+                    -- this client refuses DeleteCursorItem() to addons: the stack goes on your cursor
+                    -- and the game's own "Destroy?" box finishes it when you click in the world
                     C_Container.PickupContainerItem(s[1], s[2])
                     local kind, cid = GetCursorInfo()
-                    if kind == "item" and cid == e.id then DeleteCursorItem(); n = 1; name = e.name end
-                    ClearCursor()
+                    if kind == "item" and cid == e.id then n = 1; name = e.name else ClearCursor() end
                 end
             end
         end
     end
-    if name then WP.Print(string.format(L("%s détruit."), name)) end
+    if name then WP.Print(string.format(L("%s est sur ton curseur : clique dans le monde (hors des fenêtres), puis confirme pour le détruire."), name)) end
     dirty = true
     C_Timer.After(0.3, function() if Refresh then Refresh(true) end end)
 end
@@ -573,9 +575,9 @@ end
 
 local pending = false
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("BAG_UPDATE_DELAYED")
-ev:RegisterEvent("QUEST_LOG_UPDATE")
-ev:RegisterEvent("QUEST_TURNED_IN")
+pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED")
+pcall(ev.RegisterEvent, ev, "QUEST_LOG_UPDATE")
+pcall(ev.RegisterEvent, ev, "QUEST_TURNED_IN")
 ev:SetScript("OnEvent", function()
     if not WP.ModuleOn("bags") then return end
     dirty = true
