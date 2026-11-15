@@ -1,0 +1,87 @@
+<p align="center">
+  <img src="docs/logo.png" width="96" height="96" alt="War Legend">
+</p>
+
+<h1 align="center">WL Helper</h1>
+
+<p align="center">
+  Dungeon quest guide, Craftsman's Writs planner and built-in GPS for <b>World of Warcraft: Forever</b>.<br>
+  English and French, following your game client's language.
+</p>
+
+<p align="center">
+  <a href="https://github.com/NEM3S15/WLHelper/releases/latest"><img alt="Latest version" src="https://img.shields.io/github/v/release/NEM3S15/WLHelper?label=version&color=CE1918"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-555"></a>
+  <a href="README.md"><img alt="Français" src="https://img.shields.io/badge/lire%20en-fran%C3%A7ais-555"></a>
+</p>
+
+---
+
+## Install
+
+**With WowUp**: *Get Addons* → *Install from URL* → paste `https://github.com/NEM3S15/WLHelper` → *Import*.
+Updates then arrive by themselves.
+
+**Manually**: download the zip of the [latest version](https://github.com/NEM3S15/WLHelper/releases/latest) and
+unzip it into `World of Warcraft\_forever_\Interface\AddOns`. The `DungeonGuide` folder must sit directly in `AddOns`.
+
+## What it does
+
+### Dungeons
+Every Horde dungeon quest, step by step.
+- Pick one or several dungeons; the addon plans a single route from where you stand, prerequisites included.
+- A ready check before you go in, map points, buttons to target, mark and use the quest item.
+- Quest sharing with your group, and the progress of group members who also run the addon.
+- Long chains too: keys and attunements, Dead Man's Plea, the Valthalak amulet, Quel'Serrar.
+
+### Comptoir
+Craftsman's Writs and the trade company reputation (Durotar Supply and Logistics, Azeroth Commerce Authority).
+- The cheapest writs for your next standing, with auction house prices (built-in scan, or Auctionator / TSM).
+- The shopping list, today's state (ready, envelope to open, item missing) and a GPS tour to the turn-in NPCs.
+- Auto accept and turn-in of writs, a login reminder, an envelope tooltip.
+
+### GPS
+The fastest way to the NPC or the dungeon.
+- Mount, known flight paths, zeppelins, boats and mage teleports.
+- An arrow with the current step, plus "Fly → …" and "Cast the teleport" buttons.
+- If you have Zygor, its arrow can guide instead (option).
+
+### Bags
+The cleaner finds quest items you no longer need and deletes them in one click.
+Items a later quest may need are flagged and left unchecked.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/wl` | Open or close the dungeon guide |
+| `/wl pick` | Pick dungeons |
+| `/comptoir` | Open or close the Comptoir |
+| `/comptoir gps` | Start or stop the GPS tour of ready writs |
+| `/comptoir scan` | Scan the shopping list prices (auction house open) |
+| `/wl clean` | Bag cleaner |
+| `/wl options` | Options (also `/wlo`) |
+| `/wl idea` | Suggest an idea or report a bug |
+| `/wl help` | Every command |
+
+Minimap button: click for the guide, right-click to pick dungeons, Shift-click for the Comptoir.
+
+## An idea, a bug?
+
+Open an [issue](https://github.com/NEM3S15/WLHelper/issues/new/choose): idea, bug or wrong quest data.
+In game, `/wl idea` gives you the link already filled with your version.
+
+## Good to know
+
+- **The folder is named `DungeonGuide`**, the addon's original name. It stays that way so your settings and
+  progress are kept on every update.
+- **Versions**: `1.0.0-beta.2` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
+
+## Credits and license
+
+Data and ideas from other projects, all listed in [`CREDITS.txt`](DungeonGuide/CREDITS.txt): LibForeverData,
+RestedXP Guides, Naowh Forever, ForeverDungeonJournal, Wowhead, TradeSkillMaster, wow.gg, Zygor (coordinates
+only). Logo: War Legend Raid Tool.
+
+License [CC BY-NC-SA 4.0](LICENSE): non-commercial use, same license for modified versions.
+Author: Alandir (WarLegend).

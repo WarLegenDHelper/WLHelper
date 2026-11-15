@@ -49,22 +49,29 @@ end
 local buf = {}
 local function OnMessage(prefix, msg, channel, sender)
   if prefix ~= PREFIX or not msg then return end
+  -- only your group's members, on the group's channels
+  if channel ~= "PARTY" and channel ~= "RAID" and channel ~= "INSTANCE_CHAT" then return end
   local who = Short(sender)
+  if who and not ((UnitInParty and UnitInParty(who)) or (UnitInRaid and UnitInRaid(who))) then return end
   me = me or UnitName("player")
   if not who or who == me then return end
   if msg == "HELLO" then lastSent = ""; Schedule(); return end
   local i, n, body = msg:match("^(%d+)/(%d+):(.*)$")
   if not i then return end
   i, n = tonumber(i), tonumber(n)
+  if not i or not n or n > 20 or i > n then return end
   if i == 1 then buf[who] = {} end
-  buf[who] = buf[who] or {}
+  if not buf[who] then return end   -- the first part was missed: wait for the next full message
   for tok in body:gmatch("[^,]+") do
     local id, star = tok:match("^(%d+)(%*?)$")
     if id then buf[who][tonumber(id)] = (star == "*") and "ready" or "on" end
   end
   if i == n then
     ns.party[who] = buf[who]; buf[who] = nil
-    if ns.Render then ns.Render() end
+    if ns.Render and not ns.syncRenderQueued then
+      ns.syncRenderQueued = true
+      C_Timer.After(0.5, function() ns.syncRenderQueued = false; ns.Render() end)
+    end
   end
 end
 

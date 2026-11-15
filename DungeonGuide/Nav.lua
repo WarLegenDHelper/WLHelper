@@ -75,13 +75,15 @@ function ns.SetArrow(p)
   end
 end
 
-local function BuildArrow() end
 
 function ns.ToggleArrow()
   WLDTDB.arrow = not (WLDTDB.arrow ~= false)
   if WLDTDB.arrow == false then
     local G = GPS()
     if G then G.Stop("dungeon") end
+  elseif ns.frame then
+    ns.frame.sig = nil   -- the guide points its current step again
+    ns.Refresh()
   end
 end
 
@@ -127,6 +129,5 @@ local function BuildMinimap()
 end
 
 function ns.BuildNav()
-  BuildArrow()
   BuildMinimap()
 end

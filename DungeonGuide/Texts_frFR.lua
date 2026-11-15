@@ -378,3 +378,7 @@ T["Caer Darrow, the island in Darrowmere Lake, Western Plaguelands: the crypt do
 T["Western Plaguelands"]="Western Plaguelands"
 T["Northern rim of Un'Goro Crater, on the hill right above Marshal's Refuge: climb the stairs to the titan temple"]="Bord nord d'Un'Goro Crater, sur la colline juste au-dessus de Marshal's Refuge : monte l'escalier jusqu'au temple titan"
 T["Un'Goro Crater"]="Un'Goro Crater"
+T["The Ember of Emberseer drops from Pyroguard Emberseer in Upper Blackrock Spire; the Incendicite from Lord Incendius in Blackrock Depths."]="L'Ember of Emberseer tombe sur Pyroguard Emberseer dans le Pic Rochenoire supérieur ; l'Incendicite sur Lord Incendius dans les Profondeurs de Rochenoire."
+T["Alchemy, or bought from an alchemist"]="Alchimie, ou à acheter à un alchimiste"
+T["Dropped by Onyxia (Onyxia's Lair raid)"]="Tombe sur Onyxia (raid du Repaire d'Onyxia)"
+T["Dropped by Broodlord Lashlayer (Blackwing Lair raid)"]="Tombe sur Broodlord Lashlayer (raid du Repaire de l'Aile noire)"

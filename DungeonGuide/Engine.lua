@@ -12,7 +12,11 @@ function ns.IsDone(id)
 end
 local IsDone = ns.IsDone
 
+-- The quest log read once per frame: a refresh asks for it several times in a row.
+local logCache, logTime
 function ns.LogEntries()
+  local t = GetTime and GetTime()
+  if logCache and t and t == logTime then return logCache end
   local list = {}
   if GetQuestLogTitle then
     local n = (GetNumQuestLogEntries and GetNumQuestLogEntries()) or 0
@@ -31,6 +35,7 @@ function ns.LogEntries()
       end
     end
   end
+  logCache, logTime = list, t
   return list
 end
 
@@ -132,16 +137,21 @@ end
 --  Positions (coordonnées monde via l'API de carte)
 -- =====================================================================
 local worldCache = {}
-function ns.World(m, x, y)
+local function WorldRaw(m, x, y)
+  if C_Map and C_Map.GetWorldPosFromMapPos and CreateVector2D then
+    local ok, cont, pos = pcall(C_Map.GetWorldPosFromMapPos, m, CreateVector2D(x / 100, y / 100))
+    if ok and cont and pos then return { cont, pos.x, pos.y } end
+  end
+  return false
+end
+-- Fixed points (quest givers, entrances) are kept; `live` positions (the player's) are not.
+function ns.World(m, x, y, live)
   if not (m and x and y) then return nil end
+  if live then return WorldRaw(m, x, y) or nil end
   local k = m .. ":" .. x .. ":" .. y
   local c = worldCache[k]
   if c ~= nil then return c or nil end
-  local res = false
-  if C_Map and C_Map.GetWorldPosFromMapPos and CreateVector2D then
-    local ok, cont, pos = pcall(C_Map.GetWorldPosFromMapPos, m, CreateVector2D(x / 100, y / 100))
-    if ok and cont and pos then res = { cont, pos.x, pos.y } end
-  end
+  local res = WorldRaw(m, x, y)
   worldCache[k] = res
   return res or nil
 end
@@ -155,15 +165,14 @@ function ns.PlayerWorld()
   local px, py = p.x or (p.GetXY and p:GetXY()), p.y
   if p.GetXY then px, py = p:GetXY() end
   if not px then return nil end
-  return ns.World(m, px * 100, py * 100), m, px * 100, py * 100
+  return ns.World(m, px * 100, py * 100, true), m, px * 100, py * 100
 end
 
 local function Dist(a, b)
   if not a or not b then return 0 end
-  if a[1] ~= b[1] then return 6000 + math.sqrt(a[2] ^ 2 + b[2] ^ 2) * 0 end
+  if a[1] ~= b[1] then return 6000 end   -- other continent: far, whatever the spot
   return math.sqrt((a[2] - b[2]) ^ 2 + (a[3] - b[3]) ^ 2)
 end
-ns.Dist = Dist
 
 -- =====================================================================
 --  Nœuds de la route
@@ -182,7 +191,11 @@ local function MakeNodes(sel, cls)
   local function qnodes(qid, dkey, isPre)
     local q = ns.Q[qid]
     if not q then return nil end
+    -- anyd : la quête se fait dans n'importe lequel de ses donjons (q.ds) ; on prend celui de la sélection
     local home = q.d or dkey
+    if q.anyd and q.ds then
+      for _, k in ipairs(q.ds) do if k == dkey then home = dkey; break end end
+    end
     local inDg = q.od or home   -- donjon où se font les objectifs (un prérequis peut être dans un autre donjon)
     local A, T
     -- prendre

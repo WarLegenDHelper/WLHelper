@@ -1,109 +1,26 @@
--- Writs/UI.lua: the Writs window of WL Helper, drawn in EllesmereUI's look (dark warm panel, faint white
--- borders, accent colour, Expressway) and falling back to plain colours when EUI is not loaded.
+-- Writs/UI.lua: the Comptoir window (400×600) with three tabs:
+--   Aujourd'hui    reputation, then the writs to hand in now grouped by zone, one primary action
+--                  (the GPS tour);
+--   Achats         what to buy for today's plan, grouped by turn-in place, a click opens the
+--                  auction house's buy page;
+--   Tous les writs every writ, cheapest first, then those for later and those done today.
+-- Built from Style.lua's widgets; frames are pooled and filled again on each refresh.
 local ADDON, root = ...
--- The Writs module of WL Helper keeps its own table inside the addon's namespace.
 root.Writs = root.Writs or {}
 local ns = root.Writs
 local WP = ns.WP
 local L = ns.L
+local S = ns.S
+local C = S.C
 
--- ---------------------------------------------------------------- style
+local W, H, PAD = 400, 600, 14
+local frame, tabs, pages = nil, nil, {}
+local data, plan, shop, shopTotal = {}, {}, {}, 0
+local need, pending, readyRep = nil, 0, 0
 
-local EUI_FONT = "Interface\\AddOns\\EllesmereUI\\media\\fonts\\Expressway.TTF"
-local BG = { 0.069, 0.058, 0.047, 0.97 }
-local ROW_ODD, ROW_EVEN = 0.10, 0.20
-local BORDER_A = 0.05
+-- ---------------------------------------------------------------- shared bits
 
-local function Accent()
-    local g = EllesmereUI and EllesmereUI.ELLESMERE_GREEN
-    if type(g) == "table" and g.r then return g.r, g.g, g.b end
-    return 12 / 255, 210 / 255, 157 / 255
-end
-
-local function FontPath()
-    if EllesmereUI and EllesmereUI.GetFontPath then
-        local ok, p = pcall(EllesmereUI.GetFontPath)
-        if ok and type(p) == "string" then return p end
-    end
-    return EUI_FONT
-end
-
-local fontStrings = {}
-local function Text(parent, size, layer)
-    local fs = parent:CreateFontString(nil, layer or "OVERLAY")
-    if not fs:SetFont(FontPath(), size, "") then fs:SetFont(STANDARD_TEXT_FONT, size, "") end
-    fs:SetShadowOffset(1, -1)
-    fs:SetShadowColor(0, 0, 0, 0.8)
-    fs:SetJustifyH("LEFT")
-    fs:SetWordWrap(false)
-    fontStrings[#fontStrings + 1] = fs
-    return fs
-end
-
-local function Solid(parent, layer, r, g, b, a)
-    local t = parent:CreateTexture(nil, layer or "BACKGROUND")
-    t:SetColorTexture(r, g, b, a)
-    return t
-end
-
--- One-pixel border on all four sides.
-local function Border(frame, r, g, b, a)
-    local edges = {}
-    for i, p in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" }, { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
-        local t = Solid(frame, "BORDER", r, g, b, a)
-        t:SetPoint(p[1]); t:SetPoint(p[2])
-        if i <= 2 then t:SetHeight(1) else t:SetWidth(1) end
-        edges[i] = t
-    end
-    function edges:SetColor(r2, g2, b2, a2) for _, t in ipairs(self) do t:SetColorTexture(r2, g2, b2, a2) end end
-    return edges
-end
-
--- Flat EUI-style button: dark fill, accent outline, label brightens on hover.
-local function Button(parent, label, width, onClick)
-    local r, g, b = Accent()
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(width, 22)
-    Solid(btn, "BACKGROUND", 0.077, 0.068, 0.058, 0.92):SetAllPoints()
-    local brd = Border(btn, r, g, b, 0.45)
-    local lbl = Text(btn, 12)
-    lbl:SetPoint("CENTER")
-    lbl:SetJustifyH("CENTER")
-    lbl:SetText(label)
-    lbl:SetTextColor(r, g, b, 0.85)
-    btn.label = lbl
-    btn:SetScript("OnEnter", function() lbl:SetTextColor(r, g, b, 1); brd:SetColor(r, g, b, 1) end)
-    btn:SetScript("OnLeave", function() lbl:SetTextColor(r, g, b, 0.85); brd:SetColor(r, g, b, 0.45) end)
-    btn:SetScript("OnClick", onClick)
-    return btn
-end
-
--- Toggle chip bound to a getter and a setter.
-local function Chip(parent, label, get, set)
-    local r, g, b = Accent()
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetHeight(20)
-    local fill = Solid(btn, "BACKGROUND", r, g, b, 0)
-    fill:SetAllPoints()
-    local brd = Border(btn, 1, 1, 1, 0.12)
-    local lbl = Text(btn, 11)
-    lbl:SetPoint("CENTER")
-    lbl:SetJustifyH("CENTER")
-    lbl:SetText(label)
-    btn:SetWidth(lbl:GetStringWidth() + 18)
-    function btn:Update()
-        local on = get()
-        fill:SetColorTexture(r, g, b, on and 0.22 or 0)
-        brd:SetColor(on and r or 1, on and g or 1, on and b or 1, on and 0.7 or 0.12)
-        lbl:SetTextColor(1, 1, 1, on and 0.95 or 0.45)
-    end
-    btn:SetScript("OnClick", function() set(not get()); btn:Update(); WP.Refresh() end)
-    btn:Update()
-    return btn
-end
-
--- ---------------------------------------------------------------- Mastercraft: what you can craft
-
+-- Items the player can craft (Mastercraft's saved recipes), cached until the next refresh.
 local craftable
 local function Craftable(itemID)
     if craftable == nil then
@@ -124,616 +41,705 @@ local function Craftable(itemID)
     return craftable[itemID]
 end
 
--- ---------------------------------------------------------------- window
+local function SetColor(fs, c, a) fs:SetTextColor(c[1], c[2], c[3], a or 1) end
 
-local COLUMNS = {
-    { key = "state",  title = "État",       width = 78 },
-    { key = "name",   title = "Objet demandé", width = 228 },
-    { key = "zone",   title = "Remise",     width = 178 },
-    { key = "rep",    title = "Rép",        width = 40, right = true },
-    { key = "writ",   title = "Writ",       width = 64, right = true },
-    { key = "item",   title = "Objet",      width = 64, right = true },
-    { key = "net",    title = "Net",        width = 64, right = true },
-    { key = "per100", title = "/100 rép",   width = 66, right = true },
-}
-local ROW_H, ROWS = 20, 18
-local WIDTH = 24
-for _, c in ipairs(COLUMNS) do WIDTH = WIDTH + c.width end
-
-local STATE_TEXT = {
-    done  = { "Rendu", 0.55, 0.55, 0.55 },
-    ready = { "Prêt", 0.35, 0.95, 0.45 },
-    log   = { "Objet manquant", 1, 0.82, 0.25 },
-    bag   = { "Dans le sac", 0.45, 0.75, 1 },
-    buy   = { "", 1, 1, 1 },
-}
-
-local frame, rowsUI, header, repBar, repText, summary, pouchText, sourceText
-local offset, data, visible = 0, {}, {}
-
-local function PriceColor(src, age)
-    if src == "Scan" then return 0.55, 1, 0.8 end
-    if src == "Absent" then return 1, 0.4, 0.35 end
-    if src == "Auctionator" then
-        -- No age means Auctionator's price is older than it keeps track of: treat it as stale.
-        if not age or age >= 2 then return 0.85, 0.85, 0.6 end
-        return 1, 1, 1
-    elseif src == "TSM" then return 0.8, 0.9, 1 end
-    return 0.6, 0.6, 0.6
-end
-
-local function Per100Color(v)
-    if not v then return 0.6, 0.6, 0.6 end
-    if v <= 8000 then return 0.35, 0.95, 0.45 end
-    if v <= 12000 then return 1, 0.82, 0.25 end
-    return 1, 0.4, 0.35
-end
-
-local function SortValue(r, key)
-    local w = r.w
-    if key == "state" then
-        local order = { ready = 1, log = 2, bag = 3, buy = 4, done = 5 }
-        return (r.inPlan and 0 or order[r.state] or 9)
-    elseif key == "name" then return WP.ItemName(w.item, w.itemName)
-    elseif key == "zone" then return r.zone or "~"
-    elseif key == "rep" then return -w.rep
-    elseif key == "writ" then return r.writPrice or math.huge
-    elseif key == "item" then return r.itemPrice or math.huge
-    elseif key == "net" then return r.net or math.huge
-    end
-    return r.per100 or math.huge
-end
-
-local function Sort()
-    local key, desc = WLWritsDB.sort, WLWritsDB.sortDesc
-    table.sort(visible, function(a, b)
-        local va, vb = SortValue(a, key), SortValue(b, key)
-        if va == vb then return (a.per100 or math.huge) < (b.per100 or math.huge) end
-        if type(va) ~= type(vb) then va, vb = tostring(va), tostring(vb) end
-        if desc then return va > vb end
-        return va < vb
+-- A scrollable content area: content:SetHeight() decides how far it scrolls.
+local function Scroller(parent)
+    local sf = CreateFrame("ScrollFrame", nil, parent)
+    local content = CreateFrame("Frame", nil, sf)
+    content:SetSize(W - 2 * PAD, 10)
+    sf:SetScrollChild(content)
+    sf:EnableMouseWheel(true)
+    sf:SetScript("OnMouseWheel", function(self, delta)
+        local max = math.max(0, content:GetHeight() - self:GetHeight())
+        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * 40)))
     end)
+    sf.content = content
+    return sf
 end
 
-local function Tooltip(row)
-    local r = row.data
-    if not r then return end
-    local w = r.w
-    GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-    GameTooltip:SetText(WP.ItemName(w.writ, w.writName), 1, 1, 1)
-    GameTooltip:AddLine(string.format(L("%s · %d de réputation · %s"), WP.Tier(w.tier), w.rep, w.prof or ""), 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(" ")
-    local function priceLine(label, p, src, age, own, qty)
-        if own then GameTooltip:AddDoubleLine(label, L("possédé"), 1, 1, 1, 0.5, 0.9, 0.5); return end
-        if src == "Absent" then GameTooltip:AddDoubleLine(label, L("pas en vente (scan)"), 1, 1, 1, 1, 0.4, 0.35); return end
-        local extra = src == "Scan" and string.format(L("scan, %d en vente"), qty or 0) or L(src or "")
-        if age and src ~= "Scan" then extra = extra .. string.format(L(", vu il y a %d j"), age) end
-        GameTooltip:AddDoubleLine(label, WP.Money(p) .. "  |cff888888(" .. extra .. ")|r", 1, 1, 1, PriceColor(src, age))
+-- Pools of frames: Get(i) returns the i-th, creating it with make() when needed; HideFrom(i) hides the rest.
+local function Pool(make)
+    local p = { items = {} }
+    function p.Get(i)
+        local f = p.items[i]
+        if not f then f = make(); p.items[i] = f end
+        f:Show()
+        return f
     end
-    priceLine(L("Writ"), r.writPrice, r.writSrc, r.writAge, r.ownWrit, r.writQty)
-    local itemLabel = WP.ItemName(w.item, w.itemName) .. ((w.count or 1) > 1 and (" x" .. w.count) or "")
-    priceLine(itemLabel, r.itemPrice, r.itemSrc, r.itemAge, r.ownItem or r.state == "ready", r.itemQty)
-    if w.npcName then GameTooltip:AddLine(string.format(L("À rendre à %s"), w.npcName), 1, 0.82, 0.25) end
-    local pouch, _, measured = WP.PouchValue(w.tier)
-    GameTooltip:AddDoubleLine(measured and L("Coin Pouch (mesurée)") or L("Coin Pouch (estimée)"), "-" .. WP.Money(pouch), 1, 1, 1, 0.35, 0.95, 0.45)
-    if r.net then GameTooltip:AddDoubleLine(L("Coût net"), WP.Money(r.net), 1, 1, 1, Per100Color(r.per100)) end
-    if Craftable(w.item) then GameTooltip:AddLine(L("Tu sais fabriquer cet objet (Mastercraft)."), 0.5, 0.9, 1) end
-    GameTooltip:AddLine(" ")
-    if w.map then
-        GameTooltip:AddLine(string.format(L("Remise : %s %.1f, %.1f"), r.zone, w.x, w.y), 1, 0.82, 0.25)
-        if r.tooHigh then GameTooltip:AddLine(string.format(L("Zone prévue pour le niveau %d+"), r.zoneMin), 1, 0.4, 0.35) end
+    function p.HideFrom(i) for j = i, #p.items do p.items[j]:Hide() end end
+    return p
+end
+
+local ICON_CHECK = "Interface\\RaidFrame\\ReadyCheck-Ready"
+local ICON_MAIL = "Interface\\Icons\\INV_Letter_15"
+local ICON_WARN = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew"
+
+-- ---------------------------------------------------------------- Aujourd'hui
+
+local today = {}
+
+-- "Open the envelope" buttons. Using an item is protected, so they are secure buttons; to keep the
+-- Comptoir window an ordinary frame (it may open, close and redraw in combat), they are parented and
+-- anchored to UIParent and laid over their row out of combat. Combat hides them; the row then reads
+-- "Ouvrir l'enveloppe" as plain text until combat ends.
+local envelopes, envRows = {}, {}
+local function EnvelopeButton(i)
+    local b = envelopes[i]
+    if b then return b end
+    b = CreateFrame("Button", "WLHelperEnvelope" .. i, UIParent, "SecureActionButtonTemplate")
+    b:SetSize(132, 24)
+    b:RegisterForClicks("AnyUp")
+    b:SetAttribute("type", "item")
+    S.Solid(b, "BACKGROUND", C.card):SetAllPoints()
+    S.Border(b, C.warn, 0.45)
+    b.label = S.Text(b, 12, C.warn)
+    b.label:SetPoint("CENTER")
+    b.label:SetText(L("Ouvrir l'enveloppe"))
+    b:Hide()
+    envelopes[i] = b
+    return b
+end
+
+local function HideEnvelopes()
+    if InCombatLockdown() then return end
+    for _, b in ipairs(envelopes) do b:Hide() end
+end
+
+-- Lays a button over each envelope row that is visible in the scrolled list. Out of combat only.
+local function PlaceEnvelopes()
+    if InCombatLockdown() then return end
+    local n = 0
+    local sc = today.scroll
+    local top, bottom = sc and sc:GetTop(), sc and sc:GetBottom()
+    if frame and frame:IsShown() and today.page and today.page:IsShown() and top and bottom then
+        local ratio = sc:GetEffectiveScale() / UIParent:GetEffectiveScale()
+        for _, row in ipairs(envRows) do
+            local rt, rb, rr = row:GetTop(), row:GetBottom(), row:GetRight()
+            if row:IsVisible() and row.envItem and rt and rb and rr and rb >= bottom - 1 and rt <= top + 1 then
+                n = n + 1
+                local b = EnvelopeButton(n)
+                b:SetScale(ratio)
+                b:SetFrameStrata(frame:GetFrameStrata())
+                b:SetFrameLevel(frame:GetFrameLevel() + 50)
+                b:SetAttribute("item", "item:" .. row.envItem)
+                b:ClearAllPoints()
+                b:SetPoint("RIGHT", UIParent, "BOTTOMLEFT", rr - 6, (rt + rb) / 2)
+                b:Show()
+            end
+        end
+    end
+    for i = n + 1, #envelopes do envelopes[i]:Hide() end
+end
+
+local function MakeZoneCard(parent)
+    local c = CreateFrame("Frame", nil, parent)
+    c:SetWidth(W - 2 * PAD)
+    S.Solid(c, "BACKGROUND", C.card):SetAllPoints()
+    S.Border(c, C.border)
+    c.name = S.Text(c, 15, C.text, true)
+    c.name:SetPoint("TOPLEFT", 12, -12)
+    c.level = CreateFrame("Frame", nil, c)
+    c.level:SetSize(40, 16)
+    c.level:SetPoint("LEFT", c.name, "RIGHT", 8, 0)
+    c.levelBorder = S.Border(c.level, C.dim, 0.5)
+    c.levelText = S.Text(c.level, 11, C.dim)
+    c.levelText:SetPoint("CENTER")
+    c.go = S.Button(c, L("Y aller"), 70, 28, "secondary", function() if c.first then WP.TravelTo(c.first) end end)
+    c.go:SetPoint("TOPRIGHT", -6, -6)
+    c.eta = S.Text(c, 13, C.dim)
+    c.eta:SetPoint("RIGHT", c.go, "LEFT", -8, 0)
+    c.rows = Pool(function()
+        local r = CreateFrame("Button", nil, c)
+        r:SetSize(W - 2 * PAD - 2, 34)
+        local line = S.Solid(r, "BORDER", C.divider)
+        line:SetPoint("TOPLEFT"); line:SetPoint("TOPRIGHT"); line:SetHeight(1)
+        S.Solid(r, "HIGHLIGHT", C.hover):SetAllPoints()
+        r.status = r:CreateTexture(nil, "ARTWORK")
+        r.status:SetSize(14, 14); r.status:SetPoint("LEFT", 12, 0)
+        r.icon = r:CreateTexture(nil, "ARTWORK")
+        r.icon:SetSize(18, 18); r.icon:SetPoint("LEFT", r.status, "RIGHT", 8, 0)
+        r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        r.name = S.Text(r, 14, C.text)
+        r.name:SetPoint("LEFT", r.icon, "RIGHT", 8, 0)
+        r.name:SetWidth(200)
+        r.right = S.Text(r, 13, C.dim)
+        r.right:SetPoint("RIGHT", -10, 0)
+        r.right:SetJustifyH("RIGHT")
+        envRows[#envRows + 1] = r
+        r:SetScript("OnClick", function(self) if self.writ then WP.TravelTo(self.writ) end end)
+        r:SetScript("OnEnter", function(self) if self.tip then S.Tip(self, self.tip) end end)
+        r:SetScript("OnLeave", S.HideTip)
+        return r
+    end)
+    return c
+end
+
+local function BuildToday(p)
+    today.hero = S.Text(p, 22, C.text, true)
+    today.hero:SetPoint("TOPLEFT", PAD, -14)
+    today.standing = S.Text(p, 13, C.dim)
+    today.standing:SetPoint("TOPRIGHT", -PAD, -20)
+    today.standing:SetJustifyH("RIGHT")
+    local bar = CreateFrame("Frame", nil, p)
+    bar:SetPoint("TOPLEFT", PAD, -46); bar:SetPoint("TOPRIGHT", -PAD, -46); bar:SetHeight(6)
+    S.Solid(bar, "BACKGROUND", C.divider):SetAllPoints()
+    today.barFill = S.Solid(bar, "ARTWORK", C.brand)
+    today.barFill:SetPoint("TOPLEFT"); today.barFill:SetPoint("BOTTOMLEFT")
+    today.barPending = S.Solid(bar, "ARTWORK", { 0.42, 0.114, 0.106 })
+    today.barPending:SetPoint("TOPLEFT", today.barFill, "TOPRIGHT"); today.barPending:SetPoint("BOTTOMLEFT", today.barFill, "BOTTOMRIGHT")
+    today.bar = bar
+    today.message = S.Text(p, 13, C.dim)
+    today.message:SetPoint("TOPLEFT", PAD, -60)
+    today.message:SetPoint("TOPRIGHT", -PAD, -60)
+    today.message:SetWordWrap(true)
+    today.message:SetJustifyH("LEFT")
+
+    today.label = S.Text(p, 13, C.dim)
+    today.label:SetPoint("TOPLEFT", PAD, -94)
+    today.label:SetText(L("À rendre maintenant"))
+    today.reset = S.Text(p, 13, C.dim)
+    today.reset:SetPoint("TOPRIGHT", -PAD, -94)
+    today.reset:SetJustifyH("RIGHT")
+
+    local sc = Scroller(p)
+    sc:SetPoint("TOPLEFT", PAD, -116); sc:SetPoint("BOTTOMRIGHT", -PAD, 62)
+    sc:HookScript("OnVerticalScroll", PlaceEnvelopes)
+    today.scroll = sc
+    today.page = p
+    today.cards = Pool(function() return MakeZoneCard(sc.content) end)
+    today.later = CreateFrame("Button", nil, sc.content)
+    today.later:SetSize(W - 2 * PAD, 30)
+    today.laterText = S.Text(today.later, 13, C.dim)
+    today.laterText:SetPoint("LEFT", 2, 0)
+    today.later:SetScript("OnClick", function() WP.ShowTab("all") end)
+    today.empty = S.Text(sc.content, 14, C.dim)
+    today.empty:SetPoint("TOPLEFT", 2, -8)
+    today.empty:SetWidth(W - 2 * PAD - 4)
+    today.empty:SetWordWrap(true)
+
+    local foot = CreateFrame("Frame", nil, p)
+    foot:SetPoint("BOTTOMLEFT"); foot:SetPoint("BOTTOMRIGHT"); foot:SetHeight(60)
+    local line = S.Solid(foot, "BORDER", C.divider)
+    line:SetPoint("TOPLEFT"); line:SetPoint("TOPRIGHT"); line:SetHeight(1)
+    today.tour = S.Button(foot, L("Lancer la tournée GPS"), W - 2 * PAD - 44, 36, "primary", function() WP.ToggleGPS() end)
+    today.tour:SetPoint("LEFT", PAD, 0)
+    today.scan = S.Button(foot, "", 36, 36, "secondary", function()
+        if WP.Scan.Busy() then WP.Scan.Stop() else WP.Scan.Start(WP.ShoppingIDs()) end
+    end, function()
+        return WP.AuctionHouseOpen() and { L("Scanner les prix de la liste d'achat") } or { L("Ouvre l'hôtel des ventes pour scanner") }
+    end)
+    today.scan:SetPoint("LEFT", today.tour, "RIGHT", 8, 0)
+    local ic = today.scan:CreateTexture(nil, "ARTWORK")
+    ic:SetSize(16, 16); ic:SetPoint("CENTER"); ic:SetTexture("Interface\\Buttons\\UI-RefreshButton")
+    today.scanIcon = ic
+end
+
+-- Minutes the GPS needs to reach each zone's first writ, for the cards: one search for all of them.
+local function MinutesTo(order)
+    local out = {}
+    local G = WP.GPS
+    if not (G and G.CostsTo and G.Point) then return out end
+    local dests, idx = {}, {}
+    for i, z in ipairs(order) do
+        local w = z.rows[1].w
+        local p = G.Point(w.map, w.x, w.y, { kind = "dest" })
+        if p then dests[#dests + 1] = p; idx[#dests] = i end
+    end
+    if #dests == 0 then return out end
+    for j, t in pairs(G.CostsTo(dests)) do out[idx[j]] = math.max(1, math.floor(t / 60 + 0.5)) end
+    return out
+end
+
+local function RenderToday()
+    local name, reaction, inStanding, size, total = WP.Reputation()
+    if not name then
+        today.hero:SetText(L("Comptoir"))
+        today.standing:SetText("")
+        today.message:SetText(L("Faction introuvable : ouvre l'onglet Réputation une fois (touche U)."))
+        today.barFill:SetWidth(0.01); today.barPending:SetWidth(0.01)
     else
-        GameTooltip:AddLine(L("Lieu de remise inconnu : ouvre l'enveloppe pour voir la quête."), 1, 0.4, 0.35)
-    end
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(L("Clic : GPS jusqu'au PNJ"), 0.6, 0.6, 0.6)
-    GameTooltip:AddLine(L("Maj-clic : chercher writ + objet à l'HV (Auctionator)"), 0.6, 0.6, 0.6)
-    GameTooltip:Show()
-end
-
-local function DrawRows()
-    if not frame then return end
-    local n = #visible
-    offset = math.max(0, math.min(offset, n - ROWS))
-    local ar, ag, ab = Accent()
-    for i = 1, ROWS do
-        local row = rowsUI[i]
-        local r = visible[i + offset]
-        row.data = r
-        if not r then
-            row:Hide()
+        local _, goal = WP.RepNeeded()
+        local barW = today.bar:GetWidth() > 0 and today.bar:GetWidth() or (W - 2 * PAD)
+        local frac = (size and size > 0) and (inStanding / size) or 0
+        today.barFill:SetWidth(math.max(0.01, barW * frac))
+        local pend = (size and size > 0) and math.min(1 - frac, pending / size) or 0
+        today.barPending:SetWidth(math.max(0.01, barW * pend))
+        today.standing:SetText(string.format("%s / %s", BreakUpLargeNumbers and BreakUpLargeNumbers(inStanding) or inStanding, BreakUpLargeNumbers and BreakUpLargeNumbers(size) or size))
+        if not need or need <= 0 then
+            today.hero:SetText(string.format(L("%s atteint"), WP.Reaction(reaction)))
+            today.message:SetText(L("Choisis un objectif plus haut dans les options du Comptoir."))
         else
-            row:Show()
+            today.hero:SetText(string.format(L("%s dans %d rép"), WP.Reaction(goal), need))
+            local ready = 0
+            for _, r in ipairs(data) do if r.state == "ready" and r.w.map and not r.tooHigh then ready = ready + 1 end end
+            if pending >= need then
+                today.message:SetText(string.format(L("Rends tes %d writs et c'est bon."), ready))
+            elseif #plan > 0 then
+                today.message:SetText(string.format(L("Rends les %d writs prêts, achète-en %d de plus."), ready, #plan))
+            else
+                today.message:SetText(L("Aucun writ abordable aujourd'hui : reviens après le reset."))
+            end
+        end
+    end
+    local secs = WP.SecondsToReset()
+    today.reset:SetText(string.format(L("reset dans %d h"), math.floor(secs / 3600)))
+
+    -- Cards: writs you hold, by zone, closest first is not known cheaply: biggest first.
+    local zones, order, later = {}, {}, 0
+    for _, r in ipairs(data) do
+        local held = r.state == "ready" or r.state == "bag" or r.state == "log"
+        if held and r.w.map and not r.tooHigh then
+            local z = zones[r.w.map]
+            if not z then z = { map = r.w.map, name = r.zone, rows = {}, rep = 0 }; zones[r.w.map] = z; order[#order + 1] = z end
+            z.rows[#z.rows + 1] = r
+            z.rep = z.rep + r.w.rep
+        elseif held then
+            later = later + 1
+        end
+    end
+    table.sort(order, function(a, b) if a.rep ~= b.rep then return a.rep > b.rep end return a.name < b.name end)
+    local y = 0
+    local minutes = MinutesTo(order)
+    for i, z in ipairs(order) do
+        local c = today.cards.Get(i)
+        c:ClearAllPoints(); c:SetPoint("TOPLEFT", 0, -y)
+        c.name:SetText(z.name)
+        local lo = WP.ZoneMin(z.map)
+        if lo then
+            c.levelText:SetText(lo .. "-" .. (lo + 10))
+            local col = S.LevelColor(lo + 5)
+            SetColor(c.levelText, col); c.levelBorder(col, 0.5)
+            c.level:SetWidth(c.levelText:GetStringWidth() + 10); c.level:Show()
+        else
+            c.level:Hide()
+        end
+        c.first = z.rows[1].w
+        local mins = minutes[i]
+        c.eta:SetText(mins and string.format(L("~%d min"), mins) or "")
+        local ry = 40
+        for j, r in ipairs(z.rows) do
+            local row = c.rows.Get(j)
+            row:ClearAllPoints(); row:SetPoint("TOPLEFT", 1, -ry)
             local w = r.w
-            local c = row.cells
-            local st = STATE_TEXT[r.state]
-            if r.inPlan then
-                c.state:SetText(L("> À acheter")); c.state:SetTextColor(ar, ag, ab)
+            row.writ = w
+            row.icon:SetTexture(S.ItemIcon(w.item))
+            row.name:SetText(WP.ItemName(w.item, w.itemName) .. ((w.count or 1) > 1 and (" ×" .. w.count) or ""))
+            SetColor(row.name, S.QualityColor(w.item))
+            row.envItem = nil
+            if r.state == "ready" then
+                row.status:SetTexture(ICON_CHECK); row.status:SetVertexColor(1, 1, 1)
+                row.right:SetText(string.format("%.0f, %.0f", w.x, w.y)); SetColor(row.right, C.dim)
+            elseif r.state == "bag" then
+                row.status:SetTexture(ICON_MAIL); row.status:SetVertexColor(1, 1, 1)
+                row.envItem = w.writ   -- PlaceEnvelopes lays the secure button over this text
+                row.right:SetText(L("Ouvrir l'enveloppe")); SetColor(row.right, C.warn)
             else
-                c.state:SetText(st[1] ~= "" and L(st[1]) or ""); c.state:SetTextColor(st[2], st[3], st[4])
+                row.status:SetTexture(ICON_WARN); row.status:SetVertexColor(1, 1, 1)
+                row.right:SetText(L("objet manquant")); SetColor(row.right, C.warn)
             end
-            local tierTag = ({ Journeyman = "|cff9d9d9dC|r", Expert = "|cff1eff00E|r", Artisan = "|cff0070ddA|r" })[w.tier]
-            local craft = Craftable(w.item) and " |cff80c0ff(craft)|r" or ""
-            c.name:SetText(tierTag .. "  " .. WP.ItemName(w.item, w.itemName) .. craft)
-            if w.map then
-                c.zone:SetText(string.format("%s  |cff888888%.0f, %.0f|r", r.zone, w.x, w.y))
-                if r.tooHigh then c.zone:SetTextColor(1, 0.45, 0.4) else c.zone:SetTextColor(1, 1, 1, 0.85) end
-            else
-                c.zone:SetText("?"); c.zone:SetTextColor(0.6, 0.6, 0.6)
-            end
-            c.rep:SetText(w.rep)
-            if r.ownWrit then c.writ:SetText(L("possédé")); c.writ:SetTextColor(0.5, 0.9, 0.5)
-            else c.writ:SetText(WP.Money(r.writPrice)); c.writ:SetTextColor(PriceColor(r.writSrc, r.writAge)) end
-            if r.ownItem or r.state == "ready" then c.item:SetText(L("possédé")); c.item:SetTextColor(0.5, 0.9, 0.5)
-            else c.item:SetText(WP.Money(r.itemPrice)); c.item:SetTextColor(PriceColor(r.itemSrc, r.itemAge)) end
-            c.net:SetText(r.net and WP.Money(r.net) or "?")
-            c.per100:SetText(r.per100 and WP.Money(math.floor(r.per100)) or "?")
-            c.per100:SetTextColor(Per100Color(r.per100))
-            row.hl:SetShown(r.inPlan == true)
-            if r.state == "done" then row:SetAlpha(0.55) else row:SetAlpha(1) end
+            row.tip = { WP.ItemName(w.writ, w.writName), string.format(L("%d rép · %s %.0f, %.0f"), w.rep, z.name, w.x, w.y),
+                w.npcName and string.format(L("À rendre à %s"), w.npcName) or nil, { L("Clic : GPS jusqu'au PNJ"), 0.6, 0.6, 0.6 } }
+            ry = ry + 34
         end
+        c.rows.HideFrom(#z.rows + 1)
+        c:SetHeight(ry + 1)
+        y = y + ry + 1 + 10
     end
-    local thumbSpace = ROWS * ROW_H - 30
-    if n > ROWS then
-        frame.thumb:Show()
-        frame.thumb:SetPoint("TOP", frame.track, "TOP", 0, -math.floor(thumbSpace * offset / (n - ROWS)))
-    else
-        frame.thumb:Hide()
+    today.cards.HideFrom(#order + 1)
+    today.empty:SetShown(#order == 0)
+    if #order == 0 then
+        today.empty:SetText(#plan > 0 and L("Aucun writ en main. Achète ceux de l'onglet Achats, puis ouvre les enveloppes.")
+            or L("Tout est rendu pour aujourd'hui."))
+        y = 40
     end
-    frame.count:SetText(string.format(L("%d writs affichés"), n))
+    today.later:ClearAllPoints(); today.later:SetPoint("TOPLEFT", 0, -y)
+    today.later:SetShown(later > 0)
+    today.laterText:SetText(string.format(L("> Plus tard : %d writs dans des zones trop hautes"), later))
+    if later > 0 then y = y + 32 end
+    today.scroll.content:SetHeight(math.max(y, 10))
+
+    today.tour.label:SetText(WLWritsCharDB.gps and L("Arrêter la tournée GPS") or L("Lancer la tournée GPS"))
+    local done, tot = WP.Scan.Progress()
+    if done then today.scan:Enable() elseif WP.AuctionHouseOpen() then today.scan:Enable() else today.scan:Disable() end
+    today.scanIcon:SetDesaturated(not today.scan:IsEnabled())
 end
 
--- ---------------------------------------------------------------- shopping list panel
+-- ---------------------------------------------------------------- Achats
 
-local SHOP_ROWS = 20
-local shop, shopList = nil, {}
+local buy = {}
 
-local function DrawShop(total)
-    if not shop or not shop:IsShown() then return end
-    local left, done = 0, 0
-    for _, e in ipairs(shopList) do if e.done then done = done + 1 else left = left + 1 end end
-    for i = 1, SHOP_ROWS do
-        local row, e = shop.rows[i], shopList[i]
-        row.data = e
-        if not e then row:Hide() else
-            row:Show()
-            local qty = e.need > 1 and string.format(" x%d", e.need) or ""
-            if e.done then
-                row.mark:SetText("|cff59f273OK|r")
-                row.name:SetText("|cff808080" .. e.name .. qty .. "|r")
-                row.price:SetText("|cff808080" .. L("acheté") .. "|r")
-            else
-                row.mark:SetText(e.have > 0 and string.format("|cffffd200%d/%d|r", e.have, e.need) or "|cff808080--|r")
-                row.name:SetText(e.name .. qty)
-                local left = e.need - e.have
-                local short = e.listed and e.listed < left
-                if e.src == "Absent" then
-                    row.price:SetText(L("absent"))
-                elseif short then
-                    row.price:SetText(string.format(L("%d en vente"), e.listed))
-                elseif e.src == "Scan" then
-                    row.price:SetText(WP.Money(e.price))
-                else
-                    row.price:SetText(e.maxPrice and (L("max ") .. WP.Money(e.maxPrice)) or "?")
-                end
-                if short then row.price:SetTextColor(1, 0.4, 0.35) else row.price:SetTextColor(PriceColor(e.src)) end
-            end
-        end
-    end
-    if #shopList == 0 then
-        shop.empty:SetText(L("Rien à acheter : ton plan est couvert."))
-    elseif #shopList > SHOP_ROWS then
-        shop.empty:SetText(string.format(L("+%d autres"), #shopList - SHOP_ROWS))
-    else
-        shop.empty:SetText("")
-    end
-    shop.total:SetText(string.format(L("Reste %d objets ~ %s   ·   %d achetés"), left, WP.Money(total or 0), done))
-end
-
-local function BuildShop()
-    local ar, ag, ab = Accent()
-    shop = CreateFrame("Frame", nil, frame)
-    shop:SetPoint("TOPLEFT", frame, "TOPRIGHT", 4, 0)
-    shop:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 4, 0)
-    shop:SetWidth(320)
-    shop:EnableMouse(true)
-    Solid(shop, "BACKGROUND", BG[1], BG[2], BG[3], BG[4]):SetAllPoints()
-    Border(shop, 1, 1, 1, 0.08)
-    local top = Solid(shop, "ARTWORK", ar, ag, ab, 0.9)
-    top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(2)
-    local title = Text(shop, 16)
-    title:SetPoint("TOPLEFT", 12, -12)
-    title:SetText(L("Liste d'achat"))
-    title:SetTextColor(ar, ag, ab)
-    local hint = Text(shop, 10)
-    hint:SetPoint("TOPLEFT", 12, -34)
-    hint:SetPoint("TOPRIGHT", -12, -34)
-    hint:SetWordWrap(true)
-    hint:SetText(L("Clic : acheter à l'HV · Maj-clic : Auctionator · se coche une fois dans tes sacs"))
-    hint:SetTextColor(1, 1, 1, 0.41)
-    shop.rows = {}
-    for i = 1, SHOP_ROWS do
-        local row = CreateFrame("Button", nil, shop)
-        row:SetPoint("TOPLEFT", 8, -52 - (i - 1) * ROW_H)
-        row:SetPoint("RIGHT", shop, "RIGHT", -8, 0)
-        row:SetHeight(ROW_H)
-        Solid(row, "BACKGROUND", 0, 0, 0, (i % 2 == 1) and ROW_ODD or ROW_EVEN):SetAllPoints()
-        Solid(row, "HIGHLIGHT", 1, 1, 1, 0.06):SetAllPoints()
-        row.mark = Text(row, 11)
-        row.mark:SetPoint("LEFT", 4, 0)
-        row.mark:SetWidth(34)
-        row.name = Text(row, 12)
-        row.name:SetPoint("LEFT", 40, 0)
-        row.name:SetWidth(180)
-        row.price = Text(row, 11)
-        row.price:SetPoint("RIGHT", -4, 0)
-        row.price:SetWidth(80)
-        row.price:SetJustifyH("RIGHT")
-        row:SetScript("OnClick", function(self)
-            local e = self.data
+local function BuildShop(p)
+    buy.total = S.Text(p, 22, C.text, true)
+    buy.total:SetPoint("TOPLEFT", PAD, -14)
+    buy.sub = S.Text(p, 13, C.dim)
+    buy.sub:SetPoint("TOPLEFT", PAD, -42)
+    buy.sub:SetPoint("TOPRIGHT", -PAD, -42)
+    buy.sub:SetWordWrap(true)
+    local sc = Scroller(p)
+    sc:SetPoint("TOPLEFT", PAD, -70); sc:SetPoint("BOTTOMRIGHT", -PAD, 62)
+    buy.scroll = sc
+    buy.heads = Pool(function()
+        local t = S.Text(sc.content, 13, C.dim)
+        t:SetWidth(W - 2 * PAD)
+        return t
+    end)
+    buy.rows = Pool(function()
+        local r = CreateFrame("Button", nil, sc.content)
+        r:SetSize(W - 2 * PAD, 38)
+        r:RegisterForClicks("LeftButtonUp")
+        S.Solid(r, "BACKGROUND", C.card):SetAllPoints()
+        S.Border(r, C.border)
+        S.Solid(r, "HIGHLIGHT", C.hover):SetAllPoints()
+        r.icon = r:CreateTexture(nil, "ARTWORK")
+        r.icon:SetSize(18, 18); r.icon:SetPoint("LEFT", 12, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        r.name = S.Text(r, 14, C.text)
+        r.name:SetPoint("LEFT", r.icon, "RIGHT", 10, 0)
+        r.name:SetWidth(230)
+        r.price = S.Text(r, 13, C.text)
+        r.price:SetPoint("RIGHT", -12, 0)
+        r.price:SetJustifyH("RIGHT")
+        r:SetScript("OnClick", function(self)
+            local e = self.entry
             if not e then return end
             if IsShiftKeyDown() then WP.SearchList({ e }) else WP.Scan.OpenToBuy(e.id, math.max(1, e.need - e.have)) end
         end)
-        row:SetScript("OnEnter", function(self)
-            local e = self.data
+        r:SetScript("OnEnter", function(self)
+            local e = self.entry
             if not e then return end
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(e.name, 1, 1, 1)
-            GameTooltip:AddDoubleLine(L("Dans tes sacs"), string.format("%d / %d", e.have, e.need), 1, 1, 1, 1, 1, 1)
-            if e.price then GameTooltip:AddDoubleLine(L("Prix attendu"), WP.Money(e.price) .. " (" .. L(e.src or "?") .. ")", 1, 1, 1, 1, 1, 1) end
-            if e.listed then GameTooltip:AddDoubleLine(L("En vente (dernier scan)"), tostring(e.listed), 1, 1, 1, 1, 1, 1) end
-            if e.maxPrice then GameTooltip:AddDoubleLine(L("Plafond de recherche"), WP.Money(e.maxPrice), 1, 1, 1, 1, 0.82, 0.25) end
-            GameTooltip:AddLine(" ")
-            for _, why in ipairs(e.why) do
-                GameTooltip:AddLine(why == "writ" and L("Le writ lui-même") or (L("Pour ") .. why), 0.7, 0.7, 0.7)
-            end
-            GameTooltip:Show()
+            local lines = { e.name, string.format(L("Dans tes sacs : %d / %d"), e.have, e.need) }
+            if e.listed then lines[#lines + 1] = string.format(L("En vente (dernier scan) : %d"), e.listed) end
+            if e.maxPrice then lines[#lines + 1] = string.format(L("Plafond de recherche : %s"), S.Money(e.maxPrice)) end
+            lines[#lines + 1] = { L("Clic : acheter à l'HV · Maj-clic : Auctionator"), 0.6, 0.6, 0.6 }
+            S.Tip(self, lines)
         end)
-        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        shop.rows[i] = row
-    end
-    shop.empty = Text(shop, 11)
-    shop.empty:SetPoint("TOPLEFT", 12, -52 - SHOP_ROWS * ROW_H - 4)
-    shop.empty:SetTextColor(1, 1, 1, 0.53)
-    shop.total = Text(shop, 12)
-    shop.total:SetPoint("BOTTOMLEFT", 12, 44)
-    shop.total:SetPoint("BOTTOMRIGHT", -12, 44)
-    shop.rescan = Button(shop, L("Rescanner la liste"), 142, function()
+        r:SetScript("OnLeave", S.HideTip)
+        return r
+    end)
+    buy.empty = S.Text(sc.content, 14, C.dim)
+    buy.empty:SetPoint("TOPLEFT", 2, -8)
+    buy.empty:SetWidth(W - 2 * PAD - 4)
+    buy.empty:SetWordWrap(true)
+
+    local foot = CreateFrame("Frame", nil, p)
+    foot:SetPoint("BOTTOMLEFT"); foot:SetPoint("BOTTOMRIGHT"); foot:SetHeight(60)
+    local line = S.Solid(foot, "BORDER", C.divider)
+    line:SetPoint("TOPLEFT"); line:SetPoint("TOPRIGHT"); line:SetHeight(1)
+    buy.rescan = S.Button(foot, L("Rescanner"), 110, 32, "secondary", function()
         if WP.Scan.Busy() then WP.Scan.Stop(); return end
         local ids = {}
-        for _, e in ipairs(shopList) do if not e.done then ids[#ids + 1] = e.id end end
+        for _, e in ipairs(shop) do if not e.done then ids[#ids + 1] = e.id end end
         WP.Scan.Start(ids)
     end)
-    shop.rescan:SetPoint("BOTTOMLEFT", 12, 12)
-    if Auctionator and Auctionator.API then
-        local save = Button(shop, L("Liste Auctionator"), 142, function() WP.SaveAuctionatorList(shopList) end)
-        save:SetPoint("BOTTOMRIGHT", -12, 12)
+    buy.rescan:SetPoint("LEFT", PAD, 0)
+    buy.age = S.Text(foot, 13, C.dim)
+    buy.age:SetPoint("LEFT", buy.rescan, "RIGHT", 10, 0)
+    buy.auct = S.Button(foot, L("Liste Auctionator"), 120, 32, "ghost", function() WP.SaveAuctionatorList(shop) end)
+    buy.auct:SetPoint("RIGHT", -PAD, 0)
+end
+
+local function RenderShop()
+    local left, rep = 0, 0
+    for _, e in ipairs(shop) do if not e.done then left = left + 1 end end
+    for _, r in ipairs(plan) do rep = rep + r.w.rep end
+    if left == 0 then
+        buy.total:SetText(L("Rien à acheter"))
+        buy.sub:SetText(#data > 0 and L("Tes writs suffisent pour l'objectif.") or "")
+    else
+        buy.total:SetText(S.Money(shopTotal))
+        buy.sub:SetText(string.format(L("pour %d writs, +%d rép. Clique un objet pour l'acheter à l'HV."), #plan, rep))
     end
+    -- groups: one per turn-in zone, in the order the list gives
+    local groups, order = {}, {}
+    for _, e in ipairs(shop) do
+        local key = e.zone or "?"
+        if not groups[key] then groups[key] = {}; order[#order + 1] = key end
+        table.insert(groups[key], e)
+    end
+    local y, hi, ri = 0, 0, 0
+    for _, key in ipairs(order) do
+        hi = hi + 1
+        local h = buy.heads.Get(hi)
+        h:ClearAllPoints(); h:SetPoint("TOPLEFT", 2, -y)
+        h:SetText(string.format(L("%s, à rendre là-bas"), key))
+        y = y + 22
+        for idx, e in ipairs(groups[key]) do
+            ri = ri + 1
+            local r = buy.rows.Get(ri)
+            r.entry = e
+            r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -(y - (idx > 1 and 1 or 0)))
+            r.icon:SetTexture(S.ItemIcon(e.id))
+            local qty = (e.need > 1) and (" ×" .. e.need) or ""
+            r.name:SetText((e.isWrit and L("Enveloppe : ") or "") .. e.name .. qty)
+            SetColor(r.name, e.isWrit and C.text or S.QualityColor(e.id))
+            local leftN = e.need - e.have
+            if e.done then
+                r:SetAlpha(0.4); r.price:SetText(L("dans tes sacs")); SetColor(r.price, C.dim)
+            else
+                r:SetAlpha(1)
+                if e.src == "Absent" then r.price:SetText(L("absent")); SetColor(r.price, C.danger)
+                elseif e.listed and e.listed < leftN then r.price:SetText(string.format(L("%s, %d seul"), S.Money(e.price), e.listed)); SetColor(r.price, C.warn)
+                else r.price:SetText(e.price and S.Money(e.price) or "?"); SetColor(r.price, C.text) end
+            end
+            y = y + 37
+        end
+        y = y + 12
+    end
+    buy.heads.HideFrom(hi + 1)
+    buy.rows.HideFrom(ri + 1)
+    buy.empty:SetShown(#shop == 0)
+    buy.empty:SetText(L("Ton plan du jour est couvert."))
+    buy.scroll.content:SetHeight(math.max(y, 10))
+
+    local done, tot = WP.Scan.Progress()
+    buy.rescan.label:SetText(done and string.format(L("Scan %d/%d"), done, tot) or L("Rescanner"))
+    if done or WP.AuctionHouseOpen() then buy.rescan:Enable() else buy.rescan:Disable() end
+    local newest
+    for _, e in ipairs(shop) do
+        local _, _, ago = WP.Scan.Get(e.id)
+        if ago and (not newest or ago < newest) then newest = ago end
+    end
+    buy.age:SetText(newest and string.format(L("prix d'il y a %d min"), math.floor(newest / 60)) or (WP.AuctionHouseOpen() and "" or L("ouvre l'HV pour scanner")))
+    buy.auct:SetShown(Auctionator and Auctionator.API and #shop > 0 and true or false)
+end
+
+-- ---------------------------------------------------------------- Tous les writs
+
+local all = { search = "", rank = "all", open = {} }
+
+local function BuildAll(p)
+    local box = CreateFrame("EditBox", nil, p)
+    box:SetPoint("TOPLEFT", PAD, -12); box:SetPoint("TOPRIGHT", -PAD, -12); box:SetHeight(30)
+    box:SetAutoFocus(false)
+    box:SetFontObject(ChatFontNormal)
+    box:SetTextInsets(28, 8, 0, 0)
+    S.Solid(box, "BACKGROUND", C.card):SetAllPoints()
+    S.Border(box, C.border)
+    local glass = box:CreateTexture(nil, "ARTWORK")
+    glass:SetSize(14, 14); glass:SetPoint("LEFT", 9, 0); glass:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+    box.hint = S.Text(box, 13, C.muted)
+    box.hint:SetPoint("LEFT", 28, 0)
+    box.hint:SetText(L("Objet ou zone"))
+    box:SetScript("OnTextChanged", function(self)
+        all.search = (self:GetText() or ""):lower()
+        self.hint:SetShown(all.search == "")
+        WP.RefreshSoon(0.2)
+    end)
+    box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+
+    local rank = S.Text(p, 13, C.dim)
+    rank:SetPoint("TOPLEFT", PAD, -54)
+    rank:SetText(L("Rang"))
+    all.seg = S.Segmented(p, { { "all", L("Tous") }, { "Journeyman", WP.Tier("Journeyman") }, { "Expert", WP.Tier("Expert") }, { "Artisan", WP.Tier("Artisan") } },
+        function() return all.rank end, function(v) all.rank = v; WP.Refresh() end, 26)
+    all.seg:SetPoint("LEFT", rank, "RIGHT", 10, 0)
+
+    local sc = Scroller(p)
+    sc:SetPoint("TOPLEFT", PAD, -84); sc:SetPoint("BOTTOMRIGHT", -PAD, 8)
+    all.scroll = sc
+    all.heads = Pool(function()
+        local b = CreateFrame("Button", nil, sc.content)
+        b:SetSize(W - 2 * PAD, 30)
+        b.text = S.Text(b, 13, C.dim)
+        b.text:SetPoint("LEFT", 2, 0)
+        b:SetScript("OnClick", function(self) if self.key then all.open[self.key] = not all.open[self.key]; WP.Refresh() end end)
+        return b
+    end)
+    all.rows = Pool(function()
+        local r = CreateFrame("Button", nil, sc.content)
+        r:SetSize(W - 2 * PAD, 46)
+        S.Solid(r, "HIGHLIGHT", C.hover):SetAllPoints()
+        r.icon = r:CreateTexture(nil, "ARTWORK")
+        r.icon:SetSize(20, 20); r.icon:SetPoint("LEFT", 4, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        r.name = S.Text(r, 14, C.text)
+        r.name:SetPoint("TOPLEFT", 34, -7)
+        r.name:SetWidth(260)
+        r.sub = S.Text(r, 12, C.dim)
+        r.sub:SetPoint("TOPLEFT", 34, -26)
+        r.sub:SetWidth(260)
+        r.cost = S.Text(r, 13, C.text)
+        r.cost:SetPoint("RIGHT", -6, 0)
+        r.cost:SetJustifyH("RIGHT")
+        r:SetScript("OnClick", function(self)
+            local x = self.row
+            if not x then return end
+            if IsShiftKeyDown() then WP.Search({ x }) else WP.TravelTo(x.w) end
+        end)
+        r:SetScript("OnEnter", function(self)
+            local x = self.row
+            if not x then return end
+            local w = x.w
+            S.Tip(self, { WP.ItemName(w.writ, w.writName),
+                string.format(L("Enveloppe %s · objet %s · Coin Pouch -%s"), x.ownWrit and L("possédée") or S.Money(x.writPrice),
+                    (x.ownItem or x.state == "ready") and L("possédé") or S.Money(x.itemPrice and x.itemPrice * (w.count or 1)), S.Money((WP.PouchValue(w.tier)))),
+                w.npcName and string.format(L("À rendre à %s"), w.npcName) or nil,
+                { L("Clic : GPS · Maj-clic : chercher à l'HV"), 0.6, 0.6, 0.6 } })
+        end)
+        r:SetScript("OnLeave", S.HideTip)
+        return r
+    end)
+end
+
+local function Matches(r)
+    if all.rank ~= "all" and r.w.tier ~= all.rank then return false end
+    if all.search == "" then return true end
+    local s = all.search
+    local nm = WP.ItemName(r.w.item, r.w.itemName):lower()
+    return nm:find(s, 1, true) or (r.zone or ""):lower():find(s, 1, true)
+end
+
+local function RenderAll()
+    all.seg:Update()
+    local todo, later, done = {}, {}, {}
+    for _, r in ipairs(data) do
+        if Matches(r) then
+            if r.state == "done" then done[#done + 1] = r
+            elseif r.tooHigh or not r.w.map then later[#later + 1] = r
+            else todo[#todo + 1] = r end
+        end
+    end
+    local function byCost(a, b) return (a.per100 or math.huge) < (b.per100 or math.huge) end
+    table.sort(todo, byCost); table.sort(later, byCost)
+    local y, hi, ri = 0, 0, 0
+    local function head(text, key)
+        hi = hi + 1
+        local h = all.heads.Get(hi)
+        h.key = key
+        h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -y)
+        h.text:SetText(text)
+        y = y + 30
+    end
+    local function row(r)
+        ri = ri + 1
+        local b = all.rows.Get(ri)
+        b.row = r
+        b:ClearAllPoints(); b:SetPoint("TOPLEFT", 0, -y)
+        local w = r.w
+        b.icon:SetTexture(S.ItemIcon(w.item))
+        local craft = Craftable(w.item) and (" " .. S.Hex(C.info) .. L("· tu le fabriques") .. "|r") or ""
+        b.name:SetText(WP.ItemName(w.item, w.itemName) .. ((w.count or 1) > 1 and (" ×" .. w.count) or "") .. craft)
+        SetColor(b.name, S.QualityColor(w.item))
+        local where = w.map and string.format("%s %.0f, %.0f", r.zone, w.x, w.y) or L("lieu inconnu")
+        if r.tooHigh and r.zoneMin then where = where .. string.format(L(", niv. %d+"), r.zoneMin) end
+        b.sub:SetText(string.format("%s · %s, %d %s", where, WP.Tier(w.tier), w.rep, L("rép")))
+        if r.state == "done" then b.cost:SetText(L("rendu")); SetColor(b.cost, C.dim)
+        elseif r.state == "ready" then b.cost:SetText(L("prêt")); SetColor(b.cost, C.ready)
+        elseif r.net then
+            local per = r.net
+            b.cost:SetText(per < 0 and ("+" .. S.Money(-per)) or S.Money(per))
+            SetColor(b.cost, per < 0 and C.ready or C.text)
+        else b.cost:SetText("?"); SetColor(b.cost, C.dim) end
+        b:SetAlpha(r.state == "done" and 0.5 or 1)
+        y = y + 46
+    end
+    head(L("À faire, le moins cher d'abord"))
+    for _, r in ipairs(todo) do row(r) end
+    if #later > 0 then
+        head(string.format("%s %s : %d", all.open.later and "v" or ">", L("Plus tard, zones trop hautes ou lieu inconnu"), #later), "later")
+        if all.open.later then for _, r in ipairs(later) do row(r) end end
+    end
+    if #done > 0 then
+        head(string.format("%s %s : %d", all.open.done and "v" or ">", L("Rendus aujourd'hui"), #done), "done")
+        if all.open.done then for _, r in ipairs(done) do row(r) end end
+    end
+    all.heads.HideFrom(hi + 1)
+    all.rows.HideFrom(ri + 1)
+    all.scroll.content:SetHeight(math.max(y, 10))
+end
+
+-- ---------------------------------------------------------------- window
+
+local current = "today"
+
+function WP.ShowTab(key)
+    current = key
+    for k, p in pairs(pages) do p:SetShown(k == key) end
+    tabs:Update()
+    WP.Refresh()
+end
+
+local function Build()
     local db = WLWritsDB
-    shop.auto = Chip(shop, L("Rescan à l'ouverture de l'HV"), function() return db.autoRescan end, function(v) db.autoRescan = v end)
-    shop.auto:SetPoint("BOTTOMLEFT", 12, 72)
-    shop:SetShown(WLWritsDB.showShop ~= false)
+    frame = S.Window("WLHelperComptoir", W, H, L("Comptoir"), nil, db, "point")
+    local opts = S.IconButton(frame.header, "Interface\\Buttons\\UI-OptionsButton", 28, { L("Options du Comptoir") }, function()
+        if WP.OpenOptions then WP.OpenOptions("comptoir") end
+    end)
+    opts:SetPoint("RIGHT", frame.close, "LEFT", 0, 0)
+    tabs = S.Tabs(frame, { { "today", L("Aujourd'hui") }, { "shop", L("Achats") }, { "all", L("Tous les writs") } },
+        function() return current end, WP.ShowTab, function(key)
+            if key ~= "shop" then return nil end
+            local n = 0
+            for _, e in ipairs(shop) do if not e.done then n = n + 1 end end
+            return n
+        end)
+    tabs:SetPoint("TOPLEFT", 1, -39); tabs:SetPoint("TOPRIGHT", -1, -39)
+    for _, key in ipairs({ "today", "shop", "all" }) do
+        local p = CreateFrame("Frame", nil, frame)
+        p:SetPoint("TOPLEFT", 0, -76); p:SetPoint("BOTTOMRIGHT")
+        pages[key] = p
+    end
+    BuildToday(pages.today)
+    BuildShop(pages.shop)
+    BuildAll(pages.all)
+    frame:SetScript("OnShow", function() WP.Refresh() end)
+    frame:HookScript("OnHide", HideEnvelopes)
+    -- the envelope buttons follow the window: off while it moves, laid again where it lands
+    frame.header:HookScript("OnDragStart", HideEnvelopes)
+    frame.header:HookScript("OnDragStop", PlaceEnvelopes)
+    local ev = CreateFrame("Frame")
+    ev:RegisterEvent("PLAYER_REGEN_DISABLED")
+    ev:RegisterEvent("PLAYER_REGEN_ENABLED")
+    ev:SetScript("OnEvent", function(_, e)
+        if e == "PLAYER_REGEN_DISABLED" then HideEnvelopes() else PlaceEnvelopes() end
+    end)
+    -- At the auction house the prices move while you scan: a light refresh every few seconds.
+    frame:SetScript("OnUpdate", function(self, dt)
+        self.acc = (self.acc or 0) + dt
+        if self.acc < 5 then return end
+        self.acc = 0
+        if WP.AuctionHouseOpen() and not InCombatLockdown() then WP.Refresh() end
+    end)
+    WP.ShowTab("today")
 end
 
 function WP.Refresh()
     if not frame or not frame:IsShown() then return end
     craftable = nil
+    local name = WP.Reputation()
+    frame.subtitle:SetText(name or "")
     data = WP.Rows()
     for _, r in ipairs(data) do r.inPlan = nil end
-    local plan, need, pending, readyRep, zones = WP.Plan(data)
-    local shopTotal
-    shopList, shopTotal = WP.ShoppingList(data)
-    DrawShop(shopTotal)
-    visible = {}
-    for _, r in ipairs(data) do if r.show then visible[#visible + 1] = r end end
-    Sort()
-
-    -- reputation
-    local name, reaction, inStanding, size = WP.Reputation()
-    local ar, ag, ab = Accent()
-    if name then
-        repBar:SetMinMaxValues(0, math.max(size or 1, 1))
-        repBar:SetValue(inStanding or 0)
-        repBar:SetStatusBarColor(ar, ag, ab, 0.85)
-        local goalTxt = ""
-        if need then
-            local _, goalReaction = WP.RepNeeded()
-            goalTxt = string.format(L("   ·   %s dans %d de réputation"), WP.Reaction(goalReaction), need)
-        end
-        repText:SetText(string.format("%s : %s %d / %d%s", name, WP.Reaction(reaction), inStanding or 0, size or 0, goalTxt))
-    else
-        repBar:SetMinMaxValues(0, 1); repBar:SetValue(0)
-        repText:SetText(L("Faction introuvable : ouvre l'onglet Réputation une fois (touche U)."))
-    end
-
-    -- summary
-    local cost = 0
-    for _, r in ipairs(plan) do cost = cost + (r.net or 0) end
-    local resetH = math.floor(WP.SecondsToReset() / 3600)
-    local resetM = math.floor((WP.SecondsToReset() % 3600) / 60)
-    local s = string.format(L("Prêts : |cff59f273%d rép|r   ·   Déjà possédés : %d rép"), readyRep or 0, pending or 0)
-    if need and need > 0 then
-        if (pending or 0) >= need then
-            s = s .. L("   ·   |cff59f273Rien à acheter : ce que tu as suffit|r")
-        else
-            s = s .. string.format(L("   ·   Plan : |cffffd200%d writs|r pour %s net"), #plan, WP.Money(cost))
-        end
-    end
-    if zones and #zones > 0 then
-        frame.route:SetText(L("Zones à visiter : ") .. table.concat(zones, "  ·  "))
-    else
-        frame.route:SetText("")
-    end
-    s = s .. string.format(L("   ·   Reset dans %d h %02d"), resetH, resetM)
-    summary:SetText(s)
-
-    -- One value per writ tier once measured; the others still use the estimate.
-    local parts, any = {}, false
-    for _, t in ipairs(WP.TIERS) do
-        local v, n, measured = WP.PouchValue(t)
-        any = any or measured
-        parts[#parts + 1] = string.format("%s %s%s", WP.Tier(t), WP.Money(v), measured and string.format(" (%d)", n) or "?")
-    end
-    pouchText:SetText(L("Coin Pouch : ") .. table.concat(parts, "  ·  ")
-        .. (any and "" or L("   (? = estimation, ouvre une bourse pour mesurer)")))
-
-    local hasA = Auctionator and Auctionator.API and Auctionator.API.v1 and true
-    local hasT = TSM_API and true
-    sourceText:SetText(string.format(L("Prix : scan%s%s, sinon instantané TSM du %s   ·   turquoise = scan, blanc = Auctionator récent, jaune pâle = 2 j+, gris = instantané, rouge = pas en vente"),
-        hasA and " / Auctionator" or "", hasT and " / TSM" or "", ns.SNAPSHOT_DATE))
-
-    for _, c in ipairs(header) do
-        local arrow = ""
-        if WLWritsDB.sort == c.key then arrow = WLWritsDB.sortDesc and " v" or " ^" end
-        c.label:SetText(L(c.title) .. arrow)
-    end
-    frame.chips:Update()
-    DrawRows()
+    plan, need, pending, readyRep = WP.Plan(data)
+    pending = pending or 0
+    shop, shopTotal = WP.ShoppingList(data)
+    tabs:Update()
+    if current == "today" then RenderToday()
+    elseif current == "shop" then RenderShop()
+    else RenderAll() end
+    -- once the new layout has its sizes
+    C_Timer.After(0, PlaceEnvelopes)
 end
 
--- Scan progress on the two scan buttons.
+local queued = false
+function WP.RefreshSoon(delay)
+    if not frame or not frame:IsShown() or queued or InCombatLockdown() then return end
+    queued = true
+    C_Timer.After(delay or 1, function() queued = false; if not InCombatLockdown() then WP.Refresh() end end)
+end
+
 function WP.OnScanProgress()
-    if not frame then return end
-    local done, total = WP.Scan.Progress()
-    local text = done and string.format(L("Scan %d/%d (arrêter)"), done, total)
-    frame.scan.label:SetText(text or L("Scanner les prix (HV)"))
-    if shop and shop.rescan then shop.rescan.label:SetText(text or L("Rescanner la liste")) end
-    if not done then WP.RefreshSoon() end
+    if frame and frame:IsShown() then WP.RefreshSoon(0.3) end
 end
 
-local pending
-function WP.RefreshSoon()
-    if not frame or not frame:IsShown() or pending or InCombatLockdown() then return end
-    pending = true
-    C_Timer.After(1, function() pending = false; if not InCombatLockdown() then WP.Refresh() end end)
+function WP.OnGPSChanged()
+    if frame and frame:IsShown() and current == "today" then
+        today.tour.label:SetText(WLWritsCharDB.gps and L("Arrêter la tournée GPS") or L("Lancer la tournée GPS"))
+    end
 end
-
-local function Build()
-    local ar, ag, ab = Accent()
-    frame = CreateFrame("Frame", "WLWritsFrame", UIParent)
-    frame:SetSize(WIDTH, 220 + ROWS * ROW_H)
-    frame:SetFrameStrata("HIGH")
-    frame:SetClampedToScreen(true)
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local p, _, rp, x, y = self:GetPoint()
-        WLWritsDB.point = { p, rp, x, y }
-    end)
-    local pt = WLWritsDB.point
-    if pt then frame:SetPoint(pt[1], UIParent, pt[2], pt[3], pt[4]) else frame:SetPoint("CENTER") end
-    tinsert(UISpecialFrames, "WLWritsFrame")
-    Solid(frame, "BACKGROUND", BG[1], BG[2], BG[3], BG[4]):SetAllPoints()
-    Border(frame, 1, 1, 1, 0.08)
-    local topLine = Solid(frame, "ARTWORK", ar, ag, ab, 0.9)
-    topLine:SetPoint("TOPLEFT"); topLine:SetPoint("TOPRIGHT"); topLine:SetHeight(2)
-
-    local title = Text(frame, 18)
-    title:SetPoint("TOPLEFT", 14, -12)
-    title:SetText(WP.NAME .. " - Writs")
-    title:SetTextColor(ar, ag, ab)
-    local sub = Text(frame, 11)
-    sub:SetPoint("LEFT", title, "RIGHT", 10, -1)
-    sub:SetText(L("Réputation des comptoirs"))
-    sub:SetTextColor(1, 1, 1, 0.41)
-
-    local close = CreateFrame("Button", nil, frame)
-    close:SetSize(20, 20)
-    close:SetPoint("TOPRIGHT", -8, -8)
-    local x = Text(close, 16)
-    x:SetPoint("CENTER"); x:SetText("x"); x:SetTextColor(1, 1, 1, 0.53)
-    close:SetScript("OnEnter", function() x:SetTextColor(1, 1, 1, 1) end)
-    close:SetScript("OnLeave", function() x:SetTextColor(1, 1, 1, 0.53) end)
-    close:SetScript("OnClick", function() frame:Hide() end)
-
-    -- reputation bar
-    repBar = CreateFrame("StatusBar", nil, frame)
-    repBar:SetPoint("TOPLEFT", 14, -40)
-    repBar:SetPoint("TOPRIGHT", -14, -40)
-    repBar:SetHeight(18)
-    repBar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-    Solid(repBar, "BACKGROUND", 0, 0, 0, 0.35):SetAllPoints()
-    Border(repBar, 1, 1, 1, BORDER_A * 2)
-    repText = Text(repBar, 12)
-    repText:SetPoint("CENTER")
-    repText:SetJustifyH("CENTER")
-
-    summary = Text(frame, 12)
-    summary:SetPoint("TOPLEFT", 14, -66)
-    summary:SetPoint("TOPRIGHT", -14, -66)
-    summary:SetTextColor(1, 1, 1, 0.85)
-
-    -- filters
-    local db = WLWritsDB
-    local chips = CreateFrame("Frame", nil, frame)
-    chips:SetPoint("TOPLEFT", 14, -86)
-    chips:SetSize(WIDTH - 28, 20)
-    frame.chips = chips
-    local list = {}
-    local function add(label, get, set)
-        local c = Chip(chips, label, get, set)
-        if #list == 0 then c:SetPoint("LEFT") else c:SetPoint("LEFT", list[#list], "RIGHT", 6, 0) end
-        list[#list + 1] = c
-    end
-    for _, t in ipairs(WP.TIERS) do
-        add(WP.Tier(t), function() return db.tiers[t] end, function(v) db.tiers[t] = v end)
-    end
-    add(L("Masquer zones trop hautes"), function() return db.hideHigh end, function(v) db.hideHigh = v end)
-    add(L("Masquer lieu inconnu"), function() return db.hideUnknown end, function(v) db.hideUnknown = v end)
-    add(L("Masquer rendus aujourd'hui"), function() return db.hideDone end, function(v) db.hideDone = v end)
-    local GOALS = { 0, 5, 6, 7 }
-    local function goalText(g)
-        if not g or g == 0 then return L("Objectif : rang suivant") end
-        return string.format(L("Objectif : %s"), WP.Reaction(g))
-    end
-    local goal = Button(chips, goalText(db.goal), 150, nil)
-    goal:SetHeight(20)
-    goal:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -36, -10)
-    goal:SetScript("OnClick", function(self)
-        local i = 1
-        for k, v in ipairs(GOALS) do if v == (db.goal or 0) then i = k end end
-        db.goal = GOALS[i % #GOALS + 1]
-        self.label:SetText(goalText(db.goal))
-        WP.Refresh()
-    end)
-    -- GPS tour: the built-in GPS to the nearest writ ready to hand in, then the next after each one.
-    frame.gps = Button(chips, "", 120, function() WP.ToggleGPS() end)
-    frame.gps:SetHeight(20)
-    frame.gps:SetPoint("RIGHT", goal, "LEFT", -6, 0)
-    function WP.OnGPSChanged()
-        frame.gps.label:SetText(WLWritsCharDB.gps and L("GPS : arrêter") or L("GPS tournée"))
-    end
-    WP.OnGPSChanged()
-    function chips:Update() for _, c in ipairs(list) do c:Update() end end
-
-    -- table header
-    header = {}
-    local hx = 12
-    local headBg = Solid(frame, "ARTWORK", 1, 1, 1, 0.04)
-    headBg:SetPoint("TOPLEFT", 10, -112)
-    headBg:SetPoint("TOPRIGHT", -10, -112)
-    headBg:SetHeight(20)
-    for _, col in ipairs(COLUMNS) do
-        local h = CreateFrame("Button", nil, frame)
-        h:SetPoint("TOPLEFT", hx, -112)
-        h:SetSize(col.width, 20)
-        local lbl = Text(h, 11)
-        lbl:SetAllPoints()
-        lbl:SetJustifyH(col.right and "RIGHT" or "LEFT")
-        lbl:SetTextColor(1, 1, 1, 0.53)
-        h.label, h.title, h.key = lbl, col.title, col.key
-        h:SetScript("OnClick", function()
-            if db.sort == col.key then db.sortDesc = not db.sortDesc else db.sort, db.sortDesc = col.key, false end
-            WP.Refresh()
-        end)
-        header[#header + 1] = h
-        hx = hx + col.width
-    end
-
-    -- rows
-    rowsUI = {}
-    for i = 1, ROWS do
-        local row = CreateFrame("Button", nil, frame)
-        row:SetPoint("TOPLEFT", 10, -132 - (i - 1) * ROW_H)
-        row:SetPoint("RIGHT", frame, "RIGHT", -18, 0)
-        row:SetHeight(ROW_H)
-        row:RegisterForClicks("LeftButtonUp")
-        Solid(row, "BACKGROUND", 0, 0, 0, (i % 2 == 1) and ROW_ODD or ROW_EVEN):SetAllPoints()
-        row.hl = Solid(row, "BORDER", ar, ag, ab, 0.10)
-        row.hl:SetAllPoints()
-        local hover = Solid(row, "HIGHLIGHT", 1, 1, 1, 0.06)
-        hover:SetAllPoints()
-        row.cells = {}
-        local cx = 2
-        for _, col in ipairs(COLUMNS) do
-            local fs = Text(row, 12)
-            fs:SetPoint("LEFT", cx, 0)
-            fs:SetWidth(col.width - 6)
-            fs:SetJustifyH(col.right and "RIGHT" or "LEFT")
-            row.cells[col.key] = fs
-            cx = cx + col.width
-        end
-        row:SetScript("OnEnter", Tooltip)
-        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        row:SetScript("OnClick", function(self)
-            if not self.data then return end
-            if IsShiftKeyDown() then WP.Search({ self.data }) else WP.TravelTo(self.data.w) end
-        end)
-        rowsUI[i] = row
-    end
-    frame:EnableMouseWheel(true)
-    frame:SetScript("OnMouseWheel", function(_, delta)
-        offset = offset - delta * 3
-        DrawRows()
-    end)
-
-    -- scroll indicator
-    frame.track = Solid(frame, "ARTWORK", 1, 1, 1, 0.04)
-    frame.track:SetPoint("TOPRIGHT", -10, -132)
-    frame.track:SetSize(4, ROWS * ROW_H)
-    frame.thumb = Solid(frame, "OVERLAY", ar, ag, ab, 0.6)
-    frame.thumb:SetSize(4, 30)
-
-    -- footer
-    local footerY = -132 - ROWS * ROW_H - 8
-    -- The addon's own scan: every shown writ and item not owned yet.
-    frame.scan = Button(frame, L("Scanner les prix (HV)"), 170, function()
-        if WP.Scan.Busy() then WP.Scan.Stop(); return end
-        local ids = {}
-        for _, r in ipairs(visible) do
-            if r.state ~= "done" then
-                if not r.ownWrit then ids[#ids + 1] = r.w.writ end
-                if not r.ownItem and r.state ~= "ready" then ids[#ids + 1] = r.w.item end
-            end
-        end
-        WP.Scan.Start(ids)
-    end)
-    frame.scan:SetPoint("TOPLEFT", 14, footerY)
-    local shopBtn = Button(frame, L("Liste d'achat"), 110, function()
-        WLWritsDB.showShop = not shop:IsShown()
-        shop:SetShown(WLWritsDB.showShop)
-        WP.Refresh()
-    end)
-    shopBtn:SetPoint("LEFT", frame.scan, "RIGHT", 6, 0)
-    refresh = shopBtn
-    frame.count = Text(frame, 11)
-    frame.count:SetPoint("LEFT", refresh, "RIGHT", 12, 0)
-    frame.count:SetTextColor(1, 1, 1, 0.41)
-    pouchText = Text(frame, 11)
-    pouchText:SetPoint("TOPLEFT", 14, footerY - 48)
-    pouchText:SetPoint("TOPRIGHT", -14, footerY - 48)
-    pouchText:SetJustifyH("LEFT")
-    pouchText:SetTextColor(1, 1, 1, 0.53)
-    frame.route = Text(frame, 12)
-    frame.route:SetPoint("TOPLEFT", 14, footerY - 30)
-    frame.route:SetPoint("TOPRIGHT", -14, footerY - 30)
-    frame.route:SetTextColor(ar, ag, ab)
-    sourceText = Text(frame, 10)
-    sourceText:SetPoint("TOPLEFT", 14, footerY - 64)
-    sourceText:SetPoint("TOPRIGHT", -14, footerY - 64)
-    sourceText:SetTextColor(1, 1, 1, 0.41)
-
-    BuildShop()
-    frame:SetScript("OnShow", function() WP.Refresh() end)
-    -- While the auction house is open, prices change as Auctionator scans: refresh every few seconds.
-    local elapsed = 0
-    frame:SetScript("OnUpdate", function(_, dt)
-        elapsed = elapsed + dt
-        if elapsed < 3 then return end
-        elapsed = 0
-        if WP.AuctionHouseOpen() and not InCombatLockdown() then
-            WP.Refresh()
-        end
-    end)
-    frame:Hide()
-end
-
-ns.Style = { Text = Text, Solid = Solid, Border = Border, Button = Button, Accent = Accent }
 
 function WP.Toggle()
     if not frame then Build() end
     frame:SetShown(not frame:IsShown())
 end
+

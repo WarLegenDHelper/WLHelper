@@ -3,7 +3,7 @@ local _, ns = ...
 
 local S = {
   fr = {
-    WRITS = "Writs", TT_HWRITS = "Craftsman's Writs : writs les moins chers, liste d'achat, GPS jusqu'aux PNJ.", MM_TT4 = "Maj-clic : les writs",
+    WRITS = "Comptoir", TT_HWRITS = "Comptoir (Craftsman's Writs) : writs les moins chers, liste d'achat, GPS jusqu'aux PNJ. /comptoir", MM_TT4 = "Maj-clic : le Comptoir",
     TITLE = "WL HELPER",
     LOADED = "chargé. /wl ou le bouton de la minimap (Maj-clic : writs).",
     PICK = "Choisir", LIST = "Étapes", PREV = "<  Précédente", NEXT = "Suivante  >", CURRENT = "Étape en cours",
@@ -67,11 +67,11 @@ local S = {
     LANG = "Langue : français.", BONUS = "BONUS", UNKNOWN_LOC = "lieu à confirmer",
     PRE = "Prérequis", MAIN = "Quête de donjon", DETAILS = "Détails", HIDE = "Masquer",
     MM_TT1 = "Clic gauche : ouvrir / fermer le guide", MM_TT2 = "Clic droit : choisir les donjons", MM_TT3 = "Glisser : déplacer le bouton",
-    HELP = "/wl [pick | list | share | next | prev | recalc | arrow | macro | all | minimap | lang fr|en | reset]  ·  /wl writs [gps | stop | scan | reset]  ·  /wl gps",
+    HELP = "/wl [pick | list | share | next | prev | recalc | arrow | macro | all | minimap | lang fr|en | reset]  ·  /wl comptoir [gps | stop | scan | reset]  ·  /wl gps  ·  /wl options  ·  /wl clean",
     RESET = "Progression manuelle et route remises à zéro.", SKIP = "Sauter",
   },
   en = {
-    WRITS = "Writs", TT_HWRITS = "Craftsman's Writs: cheapest writs, shopping list, GPS to the turn-in NPCs.", MM_TT4 = "Shift-click: the writs",
+    WRITS = "Comptoir", TT_HWRITS = "Comptoir (Craftsman's Writs): cheapest writs, shopping list, GPS to the turn-in NPCs. /comptoir", MM_TT4 = "Shift-click: the Comptoir",
     TITLE = "WL HELPER",
     LOADED = "loaded. /wl or the minimap button (Shift-click: writs).",
     PICK = "Choose", LIST = "Steps", PREV = "<  Previous", NEXT = "Next  >", CURRENT = "Current step",
@@ -135,7 +135,7 @@ local S = {
     LANG = "Language: English.", BONUS = "BONUS", UNKNOWN_LOC = "place to confirm",
     PRE = "Prerequisite", MAIN = "Dungeon quest", DETAILS = "Details", HIDE = "Hide",
     MM_TT1 = "Left click: open / close the guide", MM_TT2 = "Right click: pick dungeons", MM_TT3 = "Drag: move the button",
-    HELP = "/wl [pick | list | share | next | prev | recalc | arrow | macro | all | minimap | lang fr|en | reset]  ·  /wl writs [gps | stop | scan | reset]  ·  /wl gps",
+    HELP = "/wl [pick | list | share | next | prev | recalc | arrow | macro | all | minimap | lang fr|en | reset]  ·  /wl comptoir [gps | stop | scan | reset]  ·  /wl gps  ·  /wl options  ·  /wl clean",
     RESET = "Manual progress and route reset.", SKIP = "Skip",
   },
 }

@@ -25,7 +25,13 @@ Module Writs (Craftsman's Writs) - données :
 - Naowh Forever : la façon de lire les points de vol (C_TaxiMap) et de convertir les positions
   monde (C_Map.GetWorldPosFromMapPos) a servi de modèle.
 
+Identité visuelle :
+- Logo War Legend (crâne pixel, Media/Logo64.tga) et rouge #CE1918 : repris de War Legend Raid Tool,
+  l'addon de la guilde War Legend.
+- Icônes de la flèche (wyverne/griffon, sort de téléportation, prêt) : icônes du jeu ; l'idée de
+  montrer le moyen de transport plutôt qu'une flèche vient de RestedXP Guides et Zygor (rien copié).
+
 Fonctionne avec (optionnel, lu en direct, rien n'est copié) :
 - Auctionator (son API publique : prix, recherche, liste d'achat), TradeSkillMaster (TSM_API),
-  Mastercraft (recettes connues, pour la mention « craft »), TomTom, EllesmereUI (couleur d'accent
-  et police, pour le style).
+  Mastercraft (recettes connues, pour la mention « craft »), TomTom, Zygor Guides (sa flèche peut
+  guider à la place de la nôtre, option GPS), EllesmereUI (police, page d'options en plugin).

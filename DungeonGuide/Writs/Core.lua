@@ -30,7 +30,6 @@ local ZONE_NAME = {
     [1442] = "Stonetalon Mountains", [1443] = "Desolace", [1444] = "Feralas", [1445] = "Dustwallow Marsh",
     [1446] = "Tanaris", [1448] = "Felwood", [1449] = "Un'Goro Crater", [1450] = "Moonglade", [1452] = "Winterspring",
 }
-WP.TIERS = { "Journeyman", "Expert", "Artisan" }
 -- French names; read them through WP.Tier and WP.Reaction, which translate at the time of use.
 WP.TIER_FR = { Journeyman = "Compagnon", Expert = "Expert", Artisan = "Artisan" }
 function WP.Tier(t) return L(WP.TIER_FR[t] or t) end
@@ -38,7 +37,11 @@ function WP.Tier(t) return L(WP.TIER_FR[t] or t) end
 local DEFAULTS = {
     pouch = 10000,           -- what a Coin Pouch is worth, in copper, until one is measured
     usePouchMeasured = true,
-    autoRescan = true,       -- rescan the shopping list when the auction house opens
+    autoRescan = true,
+    -- GPS: provider "auto" (Zygor when its travel system is on, else ours) | "wl" | "zygor"
+    gpsOpts = { provider = "auto", teleports = true, autoFlight = false, scale = 1, alpha = 0.6, hideCombat = false },
+    -- Comptoir comforts
+    comfort = { autoTurnIn = true, autoAccept = true, reminder = true, tooltip = true },       -- rescan the shopping list when the auction house opens
     tiers = { Journeyman = true, Expert = true, Artisan = true },
     hideHigh = true,         -- hide turn-in spots in zones above your level
     hideUnknown = false,     -- hide writs whose turn-in spot is unknown
@@ -69,17 +72,6 @@ local function safe(f, ...)
     if ok then return a, b, c end
 end
 
-function WP.Money(c)
-    if not c then return "?" end
-    local neg = c < 0
-    c = math.abs(c)
-    local s
-    if c >= 10000 then s = string.format(L("%.2f po"), c / 10000)
-    elseif c >= 100 then s = string.format(L("%d pa"), math.floor(c / 100 + 0.5))
-    else s = string.format(L("%d pc"), c) end
-    return neg and ("-" .. s) or s
-end
-
 local GetItemCountFn = (C_Item and C_Item.GetItemCount) or GetItemCount
 local function BagCount(id)
     return safe(GetItemCountFn, id) or 0
@@ -94,10 +86,15 @@ function WP.ItemName(id, fallback)
     return fallback or ("item:" .. id)
 end
 
+local zoneNames = {}   -- a zone's name never changes: asked once
 function WP.ZoneName(map)
     if not map then return "?" end
+    local n = zoneNames[map]
+    if n then return n end
     local info = safe(C_Map and C_Map.GetMapInfo, map)
-    return (info and info.name) or ZONE_NAME[map] or tostring(map)
+    n = (info and info.name) or ZONE_NAME[map]
+    if n then zoneNames[map] = n end
+    return n or tostring(map)
 end
 
 function WP.ZoneMin(map) return map and ZONE_MIN[map] end
@@ -189,9 +186,17 @@ local function QuestComplete(q, index)
     return false
 end
 
+-- WP.Rows asks for 150 writs in a row: the day index is read once per second at most.
+local todayCache, todayAt = nil, -1
+local function TodayFast()
+    local t = GetTime()
+    if t - todayAt >= 1 then todayCache, todayAt = WP.Today(), t end
+    return todayCache
+end
+
 local function DoneToday(q)
     if not q then return false end
-    if WLWritsCharDB.turnedIn[q] == WP.Today() then return true end
+    if WLWritsCharDB.turnedIn[q] == TodayFast() then return true end
     local f = (C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted) or IsQuestFlaggedCompleted
     return safe(f, q) == true
 end
@@ -431,11 +436,11 @@ WP.AuctionHouseOpen = AuctionHouseOpen
 -- with the count still to buy, the expected unit price and a ceiling 25% above it.
 function WP.ShoppingList(rows)
     local byID, list = {}, {}
-    local function add(id, name, price, src, age, why, group, order, count)
+    local function add(id, name, price, src, age, why, group, order, count, zone, map)
         local e = byID[id]
         if not e then
             e = { id = id, name = WP.ItemName(id, name), need = 0, price = price, src = src, age = age, why = {},
-                  group = group, order = order }
+                  group = group, order = order, zone = zone, map = map, isWrit = why == "writ" }
             byID[id] = e
             list[#list + 1] = e
         end
@@ -447,11 +452,11 @@ function WP.ShoppingList(rows)
         local onRoute = w.map and not r.tooHigh
         if r.inPlan then
             local group = (r.zone or "") .. WP.ItemName(w.item, w.itemName)
-            if not r.ownWrit then add(w.writ, w.writName, r.writPrice, r.writSrc, r.writAge, "writ", group, 1) end
-            if not r.ownItem then add(w.item, w.itemName, r.itemPrice, r.itemSrc, r.itemAge, WP.ItemName(w.writ, w.writName), group, 2, w.count) end
+            if not r.ownWrit then add(w.writ, w.writName, r.writPrice, r.writSrc, r.writAge, "writ", group, 1, 1, r.zone, w.map) end
+            if not r.ownItem then add(w.item, w.itemName, r.itemPrice, r.itemSrc, r.itemAge, WP.ItemName(w.writ, w.writName), group, 2, (w.count or 1) - (r.haveItems or 0), r.zone, w.map) end
         elseif (r.state == "log" or r.state == "bag") and onRoute and not r.ownItem then
             add(w.item, w.itemName, r.itemPrice, r.itemSrc, r.itemAge, WP.ItemName(w.writ, w.writName),
-                " " .. WP.ItemName(w.item, w.itemName), 2, w.count)
+                " " .. WP.ItemName(w.item, w.itemName), 2, (w.count or 1) - (r.haveItems or 0), r.zone, w.map)
         end
     end
     local total = 0
@@ -656,13 +661,16 @@ end
 -- Learns where a writ is handed in from the quest's own map marker: only for a completed writ
 -- (its marker is then the turn-in), and only on the zone map you are standing in, never from a
 -- routing step such as a zeppelin or a zone exit.
+local learnPending = false
+local unmapped = {}   -- writs with no known turn-in spot, filled at load
 local function LearnSpots()
+    if #unmapped == 0 then return end
     local GetQuestsOnMap = C_QuestLog and C_QuestLog.GetQuestsOnMap
     local here = safe(C_Map and C_Map.GetBestMapForUnit, "player")
     if not (GetQuestsOnMap and here and IsZoneMap(here)) then return end
     local wanted = {}
-    for _, w in ipairs(ns.WRITS) do
-        if not w.map and w.quest and QuestLogIndex(w.quest) and QuestComplete(w.quest) then wanted[w.quest] = w end
+    for _, w in ipairs(unmapped) do
+        if not w.map and QuestLogIndex(w.quest) and QuestComplete(w.quest) then wanted[w.quest] = w end
     end
     if not next(wanted) then return end
     local learned = false
@@ -676,12 +684,19 @@ local function LearnSpots()
             learned = true
         end
     end
-    if learned and WP.RefreshSoon then WP.RefreshSoon() end
+    if learned then
+        for i = #unmapped, 1, -1 do if unmapped[i].map then table.remove(unmapped, i) end end
+        if WP.RefreshSoon then WP.RefreshSoon() end
+    end
+end
+local function LearnSoon(delay)
+    if learnPending or #unmapped == 0 then return end
+    learnPending = true
+    C_Timer.After(delay, function() learnPending = false; LearnSpots() end)
 end
 
 -- ---- events
 
-local learnPending = false
 local REFRESH_EVENTS = { QUEST_LOG_UPDATE = true, BAG_UPDATE_DELAYED = true, UPDATE_FACTION = true }
 
 function WP.Print(msg) print("|cffffd200" .. WP.NAME .. "|r: " .. tostring(msg)) end
@@ -710,6 +725,7 @@ f:SetScript("OnEvent", function(_, event, a1)
             if w.quest then questToWrit[w.quest] = w end
             local spot = w.quest and WLWritsDB.spots[w.quest]
             if not w.map and type(spot) == "table" then ApplySpot(w, spot) end
+            if not w.map and w.quest then unmapped[#unmapped + 1] = w end
         end
     elseif event == "QUEST_TURNED_IN" then
         if questToWrit[a1] then
@@ -726,7 +742,7 @@ f:SetScript("OnEvent", function(_, event, a1)
     elseif event == "LOOT_CLOSED" then
         if opening then C_Timer.After(0.5, FinishPouch) end
     elseif event == "QUEST_ACCEPTED" or event == "ZONE_CHANGED_NEW_AREA" then
-        C_Timer.After(1, LearnSpots)
+        LearnSoon(1)
     elseif event == "BAG_UPDATE_DELAYED" and turnIn then
         if GetTime() - turnIn.t > 5 then turnIn = nil
         else
@@ -740,26 +756,26 @@ f:SetScript("OnEvent", function(_, event, a1)
         end
         if WP.RefreshSoon then WP.RefreshSoon() end
     elseif event == "PLAYER_REGEN_ENABLED" or REFRESH_EVENTS[event] then
-        if event == "QUEST_LOG_UPDATE" and not learnPending then
-            learnPending = true
-            C_Timer.After(2, function() learnPending = false; LearnSpots() end)
-        end
+        if event == "QUEST_LOG_UPDATE" then LearnSoon(2) end
         if WP.RefreshSoon then WP.RefreshSoon() end
     end
 end)
 
 -- Not /ledger: Merchant's Favor Ledger (CurseForge) already uses it.
--- /writs, also reached as /wl writs. The language is WL Helper's (/wl lang).
-SLASH_WLWRITS1 = "/writs"
+-- /comptoir (also /writs, /wl comptoir). The language is WL Helper's (/wl lang).
+SLASH_WLWRITS1 = "/comptoir"
+SLASH_WLWRITS2 = "/writs"   -- old name, kept
 
 local function Help()
     WP.Print(L("commandes :"))
     for _, line in ipairs({
-        L("  /writs : ouvre ou ferme la fenêtre"),
-        L("  /writs gps : lance ou arrête la tournée GPS (writs prêts à rendre)"),
-        L("  /writs stop : arrête le GPS"),
-        L("  /writs scan : scanne la liste d'achat à l'HV"),
-        L("  /writs reset : oublie les bourses mesurées et la faction"),
+        L("  /comptoir : ouvre ou ferme la fenêtre"),
+        L("  /comptoir gps : lance ou arrête la tournée GPS (writs prêts à rendre)"),
+        L("  /comptoir stop : arrête le GPS"),
+        L("  /comptoir scan : scanne la liste d'achat à l'HV"),
+        L("  /comptoir reset : oublie les bourses mesurées et la faction"),
+        L("  /comptoir clean : objets de quête inutiles dans tes sacs"),
+        L("  /comptoir options : les options de WL Helper"),
     }) do print(line) end
 end
 
@@ -775,6 +791,12 @@ function WP.Command(msg)
         if WP.OnGPSChanged then WP.OnGPSChanged() end
     elseif cmd == "scan" then
         WP.Scan.Start(WP.ShoppingIDs())
+    elseif (cmd == "idee" or cmd == "idea" or cmd == "bug") and WP.Feedback then
+        WP.Feedback(cmd == "bug" and "bug" or "idea")
+    elseif cmd == "clean" then
+        if WP.Cleaner then WP.Cleaner.Toggle() end
+    elseif cmd == "options" or cmd == "opt" then
+        if WP.OpenOptions then WP.OpenOptions("comptoir") end
     elseif cmd == "reset" then
         local db = WLWritsDB
         db.pouchSamples, db.pouchById, db.pouchOfTier = {}, {}, {}

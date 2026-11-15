@@ -2,7 +2,7 @@
 local ADDON, ns = ...
 
 local T = {
-  accent = { 0.047, 0.824, 0.616 },
+  accent = { 0.808, 0.098, 0.094 },   -- WaR LegenD red #CE1918
   bg     = { 0.055, 0.058, 0.066, 0.97 },
   header = { 0.030, 0.032, 0.038, 0.98 },
   card   = { 0.085, 0.090, 0.100, 0.92 },
@@ -148,10 +148,7 @@ function ns.ClassInfo(cls)
 end
 
 function ns.ApplyLooks()
-  if ns.skin then
-    local ok, r, g, b = pcall(ns.skin.GetAccentColor)
-    if ok and r then T.accent = { r, g, b } end
-  end
+  -- The accent stays War Legend red; EllesmereUI only lends its fonts.
   if ns.IsLoaded("EllesmereUI") then T.font, T.bold = EUI .. "FiraSans Medium.ttf", EUI .. "FiraSans Bold.ttf" end
   for _, fs in ipairs(fonts) do SetFont(fs) end
   for _, t in ipairs(accents) do t:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], t._accentAlpha) end

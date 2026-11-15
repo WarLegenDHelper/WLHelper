@@ -1,0 +1,27 @@
+name: "Donnée de quête fausse / Wrong quest data"
+description: "Une étape, une position, un PNJ ou une pré-quête qui ne colle pas / A step, spot, NPC or prerequisite that is wrong"
+title: "[Donnée] "
+labels: ["données"]
+body:
+  - type: input
+    id: quest
+    attributes:
+      label: "Quête et donjon / Quest and dungeon"
+      placeholder: "The Restless Souls, Stratholme"
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: "Ce qui est faux / What is wrong"
+      description: "Et la bonne info si tu l'as (position /way, nom du PNJ, lien Wowhead) / And the right info if you have it"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: "Version"
+  - type: input
+    id: context
+    attributes:
+      label: "Client et personnage / Client and character"

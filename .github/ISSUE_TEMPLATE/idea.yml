@@ -1,0 +1,22 @@
+name: "Idée / Idea"
+description: "Proposer une fonctionnalité ou une amélioration / Suggest a feature or an improvement"
+title: "[Idée] "
+labels: ["idée"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: "Ton idée / Your idea"
+      description: "Ce que tu voudrais, et dans quelle situation ça t'aiderait / What you would like, and when it would help"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: "Version"
+      description: "Remplie par /wl idee / Filled by /wl idea"
+  - type: input
+    id: context
+    attributes:
+      label: "Client et personnage / Client and character"
+      description: "Rempli par /wl idee / Filled by /wl idea"

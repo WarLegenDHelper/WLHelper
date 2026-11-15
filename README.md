@@ -1,69 +1,89 @@
-# WL Helper (bêta / beta)
+<p align="center">
+  <img src="docs/logo.png" width="96" height="96" alt="War Legend">
+</p>
 
-Addon pour **World of Warcraft: Forever** (client 1.60.1). FR / EN.
-*Addon for **World of Warcraft: Forever** (client 1.60.1). French / English — English below.*
+<h1 align="center">WL Helper</h1>
 
-## Français
+<p align="center">
+  Guide des quêtes de donjon, Comptoir des writs et GPS intégré pour <b>World of Warcraft: Forever</b>.<br>
+  Français et anglais, selon la langue de ton client.
+</p>
 
-**Guide de donjons**
-- Toutes les quêtes de donjon Horde, pas à pas : choix des donjons, route sur plusieurs donjons depuis ta position, check-list avant d'entrer.
-- Points de passage, boutons cibler / marquer et objet de quête, partage des quêtes au groupe.
+<p align="center">
+  <a href="https://github.com/NEM3S15/WLHelper/releases/latest"><img alt="Dernière version" src="https://img.shields.io/github/v/release/NEM3S15/WLHelper?label=version&color=CE1918"></a>
+  <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-CC%20BY--NC--SA%204.0-555"></a>
+  <a href="README.en.md"><img alt="English" src="https://img.shields.io/badge/read%20in-English-555"></a>
+</p>
 
-**Craftsman's Writs** (réputation des comptoirs : Durotar Supply and Logistics / Azeroth Commerce Authority)
-- Les writs que tu peux faire, avec leur prix : scan de l'hôtel des ventes intégré, ou Auctionator / TSM s'ils sont là.
-- État du jour (rendu, prêt, objet manquant), plan d'achat pour le rang suivant, liste d'achat avec rescan au moment d'acheter.
-- Valeur des Coin Pouch mesurée quand tu les ouvres, writs réservés à l'autre faction masqués.
+---
 
-**GPS intégré**
-- Le chemin le plus rapide jusqu'au PNJ ou au donjon : monture, points de vol connus, zeppelins, bateaux, téléportations de mage.
-- Une flèche à l'écran avec l'étape en cours ; boutons « Prendre le vol » et « Lancer la téléportation ».
-- Ouvre une carte de vol une fois pour que le GPS apprenne tes points de vol.
+## Installer
 
-**Commandes**
+**Avec WowUp** : *Get Addons* → *Install from URL* → colle `https://github.com/NEM3S15/WLHelper` → *Import*.
+Les mises à jour arrivent ensuite d'elles-mêmes.
+
+**À la main** : télécharge le zip de la [dernière version](https://github.com/NEM3S15/WLHelper/releases/latest) et
+décompresse-le dans `World of Warcraft\_forever_\Interface\AddOns`. Le dossier `DungeonGuide` doit se trouver
+directement dans `AddOns`.
+
+## Ce que fait l'addon
+
+### Donjons
+Toutes les quêtes de donjon Horde, étape par étape.
+- Tu choisis un ou plusieurs donjons ; l'addon calcule une seule route depuis ta position, pré-quêtes comprises.
+- Check-list avant d'entrer, points sur la carte, boutons pour cibler, marquer et utiliser l'objet de quête.
+- Partage des quêtes au groupe, et suivi de l'avancée des membres qui ont l'addon.
+- Les chaînes longues aussi : clés et accès, Dead Man's Plea, amulette de Valthalak, Quel'Serrar.
+
+### Comptoir
+Les Craftsman's Writs et la réputation des comptoirs (Durotar Supply and Logistics, Azeroth Commerce Authority).
+- Les writs les moins chers pour ton prochain rang, avec les prix de l'hôtel des ventes (scan intégré, ou Auctionator / TSM).
+- La liste d'achat, l'état du jour (prêt, enveloppe à ouvrir, objet manquant) et une tournée GPS jusqu'aux PNJ.
+- Acceptation et remise automatiques des writs, rappel à la connexion, infobulle sur les enveloppes.
+
+### GPS
+Le chemin le plus rapide jusqu'au PNJ ou au donjon.
+- Monture, points de vol connus, zeppelins, bateaux et téléportations de mage.
+- Une flèche avec l'étape en cours, et des boutons « Vol → … » et « Lancer la téléportation ».
+- Si Zygor est installé, sa flèche peut guider à la place (option).
+
+### Sacs
+Le nettoyeur repère les objets de quête qui ne servent plus et les détruit en un clic.
+Ceux qui peuvent servir à une quête suivante sont signalés et ne sont pas cochés.
+
+## Commandes
 
 | Commande | Effet |
 |---|---|
-| `/wl` | ouvre ou ferme le guide de donjons (`/dg` marche aussi) |
-| `/wl pick` | choisir les donjons |
-| `/wl writs` | panneau des writs (`/writs`) |
-| `/wl writs gps` | tournée GPS des writs prêts à rendre |
-| `/wl writs scan` | scanne la liste d'achat (HV ouvert) |
-| `/wl lang fr` / `en` | langue |
-| `/wl help` | toutes les commandes |
+| `/wl` | Ouvre ou ferme le guide des donjons |
+| `/wl pick` | Choisir les donjons |
+| `/comptoir` | Ouvre ou ferme le Comptoir |
+| `/comptoir gps` | Lance ou arrête la tournée GPS des writs prêts |
+| `/comptoir scan` | Scanne les prix de la liste d'achat (hôtel des ventes ouvert) |
+| `/wl clean` | Nettoyeur de sacs |
+| `/wl options` | Options (aussi `/wlo`) |
+| `/wl idee` | Proposer une idée ou signaler un bug |
+| `/wl help` | Toutes les commandes |
 
-Bouton de la minimap : clic = guide, clic droit = donjons, Maj-clic = writs.
+Bouton de la minimap : clic pour le guide, clic droit pour choisir les donjons, Maj-clic pour le Comptoir.
 
-## English
+## Une idée, un bug ?
 
-**Dungeon guide**: every Horde dungeon quest step by step — dungeon picker, multi-dungeon route from where you stand, ready check, waypoints, target/mark and quest item buttons, quest sharing.
+Ouvre un [ticket](https://github.com/NEM3S15/WLHelper/issues/new/choose) : idée, bug ou donnée de quête fausse.
+En jeu, `/wl idee` te donne le lien déjà rempli avec ta version.
 
-**Craftsman's Writs** (trade company reputation): writ prices from the built-in auction house scan (or Auctionator / TSM), today's state, a buying plan to the next standing, a shopping list rescanned when you buy, measured Coin Pouch values, other-faction writs hidden.
+## Bon à savoir
 
-**Built-in GPS**: fastest way to the NPC or the dungeon using your mount, known flight paths, zeppelins, boats and mage teleports, with an on-screen arrow and "take flight" / "cast teleport" buttons. Open a flight map once so it learns your flight paths.
+- **Le dossier s'appelle `DungeonGuide`**, le nom d'origine de l'addon. Il reste ainsi pour que tes réglages
+  et ta progression soient gardés à chaque mise à jour.
+- **Versions** : `1.0.0-beta.2` veut dire bêta de la 1.0. Le détail de chaque version est dans le
+  [CHANGELOG](CHANGELOG.md).
 
-Commands: `/wl`, `/wl pick`, `/wl writs`, `/wl writs gps`, `/wl writs scan`, `/wl lang fr|en`, `/wl help`. Minimap button: click = guide, right-click = dungeons, Shift-click = writs.
+## Crédits et licence
 
-## Installation
+Données et idées reprises d'autres projets, tous cités dans [`CREDITS.txt`](DungeonGuide/CREDITS.txt) :
+LibForeverData, RestedXP Guides, Naowh Forever, ForeverDungeonJournal, Wowhead, TradeSkillMaster, wow.gg, Zygor
+(coordonnées seulement). Logo : War Legend Raid Tool.
 
-**WowUp**: *Get Addons* → *Install from URL* → colle / paste `https://github.com/NEM3S15/WLHelper` → *Import*. Les mises à jour arrivent ensuite toutes seules / updates then come automatically.
-
-**À la main / manually**: télécharge le zip de la dernière [release](https://github.com/NEM3S15/WLHelper/releases/latest) et décompresse-le dans `World of Warcraft\_forever_\Interface\AddOns` (le dossier `DungeonGuide` doit se retrouver directement dans `AddOns`).
-
-## Versions
-
-Numéros [SemVer](https://semver.org/lang/fr/) : `MAJEUR.MINEUR.CORRECTIF`, avec `-beta.N` tant que c'est en test.
-- **CORRECTIF** (1.0.**1**) : corrections, données mises à jour.
-- **MINEUR** (1.**1**.0) : nouvelles fonctions, rien ne casse.
-- **MAJEUR** (**2**.0.0) : un changement qui casse quelque chose (réglages remis à zéro, commande retirée…).
-
-Le numéro vient d'un seul endroit, le `## Version` de `DungeonGuide/DungeonGuide.toc` ; chaque version a son
-tag `vX.Y.Z`, sa release GitHub avec le zip, et son entrée dans le [CHANGELOG](CHANGELOG.md). En jeu : `/wl help`.
-*SemVer numbers; the toc's version is the only source; each version has its `vX.Y.Z` tag, a GitHub release with the zip and a CHANGELOG entry.*
-
-## Crédits / Credits
-
-Voir / see [`DungeonGuide/CREDITS.txt`](DungeonGuide/CREDITS.txt): LibForeverData (CC BY 4.0), RestedXP Guides (CC BY-NC-SA 4.0), Naowh Forever, ForeverDungeonJournal, Wowhead (via Waylaid Crate and Writs Helper), TradeSkillMaster, wow.gg, Zygor (coordinates only).
-
-## Licence / License
-
-[CC BY-NC-SA 4.0](LICENSE) — gratuit, non commercial, mêmes conditions de partage (imposé par les parties reprises de RestedXP). *Free, non-commercial, share-alike (required by the parts adapted from RestedXP).*
+Licence [CC BY-NC-SA 4.0](LICENSE) : usage non commercial, même licence pour les versions modifiées.
+Auteur : Alandir (WarLegend).

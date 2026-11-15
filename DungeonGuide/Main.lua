@@ -111,12 +111,17 @@ ev:SetScript("OnEvent", function(_, e)
     ns.VERSION = meta and meta(ADDON, "Version") or "?"
     ns.Print("v" .. ns.VERSION .. " " .. L.LOADED)
   elseif e == "PLAYER_REGEN_ENABLED" then
-    if ns.frame then ns.Refresh() end
+    if ns.frame and ns.frame:IsShown() then ns.Refresh()
+    else
+      -- the macro and the action bar wait for the end of combat even with the guide closed
+      if ns.MacroPending and ns.MacroPending() then ns.UpdateMacro() end
+      if ns.ActionBarPending and ns.ActionBarPending() then ns.UpdateActionBar() end
+    end
   elseif e == "PLAYER_ENTERING_WORLD" then
     if ns.frame then
       C_Timer.After(1, function()
         if not WLDTDB.hidden and not ns.frame:IsShown() then ns.frame:Show() end
-        ns.Refresh()
+        if ns.frame:IsShown() then ns.Refresh() end
       end)
     end
   elseif ns.frame and not pending then
@@ -130,7 +135,7 @@ ev:SetScript("OnEvent", function(_, e)
 end)
 
 -- =====================================================================
---  Commandes : /wl (et /dg, /dguide, /wldt, /zfg pour l'habitude) ; /wl writs ... pour les writs
+--  Commandes : /wl (et /dg, /dguide, /wldt, /zfg pour l'habitude) ; /wl comptoir ... pour le Comptoir (writs)
 -- =====================================================================
 SLASH_WLDUNGEONTOOL1 = "/wl"
 SLASH_WLDUNGEONTOOL5 = "/dg"
@@ -141,8 +146,12 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   if not ns.frame then return end
   msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
   local cmd, arg = msg:match("^(%S*)%s*(.*)$")
-  if cmd == "writs" or cmd == "writ" then if ns.Writs and ns.Writs.WP then ns.Writs.WP.Command(arg) end
+  if cmd == "comptoir" or cmd == "c" or cmd == "writs" or cmd == "writ" then if ns.Writs and ns.Writs.WP then ns.Writs.WP.Command(arg) end
   elseif cmd == "gps" then if ns.Writs and ns.Writs.WP then ns.Writs.WP.ToggleGPS() end
+  elseif cmd == "options" or cmd == "opt" then if ns.Writs and ns.Writs.WP and ns.Writs.WP.OpenOptions then ns.Writs.WP.OpenOptions() end
+  elseif cmd == "idee" or cmd == "idea" or cmd == "bug" then
+    if ns.Writs and ns.Writs.WP and ns.Writs.WP.Feedback then ns.Writs.WP.Feedback(cmd == "bug" and "bug" or "idea") end
+  elseif cmd == "clean" then if ns.Writs and ns.Writs.WP and ns.Writs.WP.Cleaner then ns.Writs.WP.Cleaner.Toggle() end
   elseif cmd == "pick" or cmd == "dj" or cmd == "donjons" then ns.TogglePicker()
   elseif cmd == "share" then ns.ShareQuests()
   elseif cmd == "next" then ns.GoTo((ns.frame.view or 1) + 1)

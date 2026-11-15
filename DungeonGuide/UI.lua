@@ -357,7 +357,7 @@ local function Build()
   end)
   h.mark = Tex(h, "ARTWORK", T.accent); h.mark:SetSize(3, 15); h.mark:SetPoint("LEFT", 10, 0); ns.Accent(h.mark); h.mark:Hide()
   h.logo = h:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(22, 22); h.logo:SetPoint("LEFT", 4, -1)
-  h.logo:SetTexture("Interface\\TargetingFrame\\UI-PVP-Horde"); h.logo:SetTexCoord(0.08, 0.58, 0.03, 0.6)
+  h.logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64")
   h.title = Text(h, 13, T.text, true); h.title:SetPoint("LEFT", 28, 0); h.title:SetText(L.TITLE)
   f.header = h
   local close = Button(h, 22, 20, "x", function() f:Hide(); WLDTDB.hidden = true; ns.SetArrow(nil); if ns.UpdateActionBar then ns.UpdateActionBar() end end, function() return { L.TT_HCLOSE } end)
@@ -748,7 +748,11 @@ Render = function()
 
   local hasModel = false
   if st.bossModel and card.model.SetDisplayInfo then
-    hasModel = pcall(card.model.SetDisplayInfo, card.model, st.bossModel)
+    if card.modelShown == st.bossModel then hasModel = true
+    else
+      hasModel = pcall(card.model.SetDisplayInfo, card.model, st.bossModel)
+      card.modelShown = hasModel and st.bossModel or nil
+    end
     if hasModel and card.model.SetPortraitZoom then pcall(card.model.SetPortraitZoom, card.model, 0.85) end
   end
   card.model:SetShown(hasModel); card.modelBg:SetShown(hasModel)
@@ -968,7 +972,7 @@ Render = function()
   ns.UpdateActionBar()
   if f.lastShown ~= i then f.lastShown = i; card.fade:Stop(); card.fade:Play() end
 end
-ns.Render = function() if f then Render() end end
+ns.Render = function() if f and f:IsShown() then Render() end end
 
 -- =====================================================================
 --  Suivi de l'étape en cours
@@ -1211,6 +1215,6 @@ function ns.ActionBarPending() return abPending end
 function ns.ToggleMain()
   if not f then return end
   f:SetShown(not f:IsShown()); WLDTDB.hidden = not f:IsShown()
-  if WLDTDB.hidden then ns.SetArrow(nil) end
+  if WLDTDB.hidden then ns.SetArrow(nil) else f.sig = nil; ns.Refresh() end
   if ns.UpdateActionBar then ns.UpdateActionBar() end
 end

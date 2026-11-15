@@ -107,7 +107,7 @@ local KEYS = {
   ScarletMonasteryArmory    = { { item = 7146, name = "The Scarlet Key", boss = 6487, bossn = "Arcanist Doan", src = "ScarletMonasteryLibrary" } },
   ScarletMonasteryCathedral = { { item = 7146, name = "The Scarlet Key", boss = 6487, bossn = "Arcanist Doan", src = "ScarletMonasteryLibrary" } },
   Scholomance               = { { item = 13704, name = "Skeleton Key", quest = 5511 } },
-  UpperBlackrockSpire       = { { item = 12344, name = "Seal of Ascension", quest = 4742 } },
+  UpperBlackrockSpire       = { { item = 12344, name = "Seal of Ascension", quest = 4743 } },
   OnyxiasLair               = { { item = 16309, name = "Drakefire Amulet", quest = 6602 } },
   DireMaulWest              = { { item = 18249, name = "Crescent Key", boss = 14354, bossn = "Pusillin", src = "DireMaulEast", opt = "doors" } },
   DireMaulNorth             = { { item = 18249, name = "Crescent Key", boss = 14354, bossn = "Pusillin", src = "DireMaulEast", opt = "doors" } },
@@ -421,3 +421,26 @@ ns.STEP_TIPS = {
   },
 }
 for _, t in pairs(ns.STEP_TIPS) do for _, v in pairs(t) do ns.TR[v[1]] = v[2] end end
+
+-- Quêtes au choix (Lord Valthalak) : quatre versions par étape, une seule se fait (LibForeverData : prérequis « any »).
+-- Une version faite (ou dans le journal) vaut pour les quatre, pour que les chaînes en ligne droite restent justes.
+ns.ANYOF = { { 8962, 8963, 8964, 8965 }, { 8966, 8967, 8968, 8969 }, { 8985, 8986, 8987, 8988 }, { 8989, 8990, 8991, 8992 } }
+do
+  local grp = {}
+  for _, g in ipairs(ns.ANYOF) do for _, id in ipairs(g) do grp[id] = g end end
+  local isDone3 = ns.IsDone
+  ns.IsDone = function(id)
+    if isDone3(id) then return true end
+    local g = grp[id]
+    if g then for _, o in ipairs(g) do if o ~= id and isDone3(o) then return true end end end
+    return false
+  end
+  local log3 = ns.LogEntries
+  ns.LogEntries = function()
+    local list = log3()
+    for id, g in pairs(grp) do
+      if not list[id] then for _, o in ipairs(g) do if list[o] then list[id] = list[o]; break end end end
+    end
+    return list
+  end
+end

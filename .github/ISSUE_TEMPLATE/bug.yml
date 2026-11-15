@@ -1,0 +1,33 @@
+name: "Bug"
+description: "Quelque chose ne marche pas / Something doesn't work"
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: "Ce qui se passe / What happens"
+      description: "Et ce que tu attendais / And what you expected"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Pour le reproduire / How to reproduce"
+      placeholder: "1. /comptoir\n2. ..."
+  - type: textarea
+    id: error
+    attributes:
+      label: "Message d'erreur / Error message"
+      description: "Si le jeu en affiche un (BugSack, /console scriptErrors 1) / If the game shows one"
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: "Version"
+      description: "Remplie par /wl bug / Filled by /wl bug"
+  - type: input
+    id: context
+    attributes:
+      label: "Client et personnage / Client and character"
+      description: "Rempli par /wl bug / Filled by /wl bug"
