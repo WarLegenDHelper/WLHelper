@@ -40,6 +40,9 @@ ns.AddEnglish({
     ["Clic : acheter les caisses à l'HV"] = "Click: buy the crates at the AH",
     ["%d Favor · à remplir avec %d× %s chacune"] = "%d Favor · fill each with %d× %s",
     ["tu en as %d"] = "you have %d",
+    ["Rendre les caisses"] = "Turn crates in",
+    ["Dokimi, Inventory Intake : The Barrens, porte ouest de la Croisée (50, 29)"] = "Dokimi, Inventory Intake: The Barrens, west gate of the Crossroads (50, 29)",
+    ["Marcy Baker, Inventory Intake : Redridge, Three Corners (10, 71)"] = "Marcy Baker, Inventory Intake: Redridge, Three Corners (10, 71)",
     ["déjà là"] = "already have",
     ["Prix réels : %d objets restants"] = "Real prices: %d items left",
     ["Prix à jour · à l'instant"] = "Prices up to date · just now",
@@ -390,7 +393,19 @@ function WP.BuildFavor(p)
     end, function()
         return WP.AuctionHouseOpen() and { L("Scanner les prix (HV)") } or { L("Ouvre l'hôtel des ventes pour scanner") }
     end)
+    ui.scan:SetWidth(W - 2 * PAD - 128)
     ui.scan:SetPoint("LEFT", PAD, 0)
+    -- the Inventory Intake NPC who takes the filled crates (Supply Shipments)
+    ui.go = S.Button(foot, L("Rendre les caisses"), 120, 36, "secondary", function()
+        local horde = UnitFactionGroup("player") ~= "Alliance"
+        if WP.GPS and WP.GPS.GoPoint then
+            if horde then WP.GPS.GoPoint(1413, 50.13, 29.37, "Dokimi", "writs")
+            else WP.GPS.GoPoint(1433, 9.71, 70.86, "Marcy Baker", "writs") end
+        end
+    end, function() return { L("Rendre les caisses"), UnitFactionGroup("player") ~= "Alliance"
+        and L("Dokimi, Inventory Intake : The Barrens, porte ouest de la Croisée (50, 29)")
+        or L("Marcy Baker, Inventory Intake : Redridge, Three Corners (10, 71)") } end)
+    ui.go:SetPoint("RIGHT", -PAD, 0)
     ui.bar = CreateFrame("Frame", nil, foot)
     ui.bar:SetPoint("BOTTOMLEFT", ui.scan, "TOPLEFT", 0, 4); ui.bar:SetPoint("BOTTOMRIGHT", ui.scan, "TOPRIGHT", 0, 4)
     ui.bar:SetHeight(3)

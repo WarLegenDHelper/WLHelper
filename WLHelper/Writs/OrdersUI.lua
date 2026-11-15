@@ -1,0 +1,518 @@
+-- Writs/OrdersUI.lua: the Orders window (crafters of the guild, my orders, orders received) and the
+-- panel beside the mailbox that fills the mail for an order. Engine: Orders.lua.
+local ADDON, root = ...
+root.Writs = root.Writs or {}
+local ns = root.Writs
+local WP = ns.WP
+local L = ns.L
+local S = ns.S
+local C = S.C
+local O = WP.Orders
+
+ns.AddEnglish({
+    ["Artisans"] = "Crafters",
+    ["Mes commandes"] = "My orders",
+    ["Reçues"] = "Received",
+    ["Chercher un objet à faire fabriquer"] = "Search an item to have crafted",
+    ["%d artisans connus · %d en ligne"] = "%d crafters known · %d online",
+    ["en ligne"] = "online",
+    ["vu il y a %d j"] = "seen %d d ago",
+    ["hors ligne"] = "offline",
+    ["Commander"] = "Order",
+    ["Aucune recette connue pour l'instant : elles arrivent quand les membres qui ont WL Helper ouvrent leur fenêtre de métier."] =
+        "No recipe known yet: they arrive when members who have WL Helper open their profession window.",
+    ["Tape au moins 2 lettres."] = "Type at least 2 letters.",
+    ["Nouvelle commande"] = "New order",
+    ["Toute la guilde"] = "Whole guild",
+    ["Seulement %s"] = "Only %s",
+    ["je fournis"] = "I provide",
+    ["l'artisan fournit"] = "crafter provides",
+    ["Composants"] = "Reagents",
+    ["Clic : qui le fournit"] = "Click: who provides it",
+    ["Commission"] = "Commission",
+    ["Pourboire"] = "Tip",
+    ["Valable"] = "Valid for",
+    ["Payer d'avance"] = "Pay upfront",
+    ["Un mot pour l'artisan"] = "A word for the crafter",
+    ["Publier la commande"] = "Publish the order",
+    ["Rien ne part par la poste avant qu'un artisan ait accepté."] = "Nothing is mailed before a crafter accepts.",
+    ["po"] = "g",
+    ["Aucune commande."] = "No order.",
+    ["ouverte"] = "open", ["acceptée"] = "accepted", ["fabriquée"] = "crafted", ["livrée"] = "delivered",
+    ["refusée"] = "declined", ["annulée"] = "cancelled", ["expirée"] = "expired",
+    ["pour %s"] = "for %s", ["pour la guilde"] = "for the guild", ["par %s"] = "by %s",
+    ["expire dans %d h"] = "expires in %d h",
+    ["Accepter"] = "Accept", ["Refuser"] = "Decline", ["Annuler"] = "Cancel",
+    ["Fabriquée"] = "Crafted", ["Livrée"] = "Delivered", ["+ Pourboire"] = "+ Tip",
+    ["Reçu : %s"] = "Received: %s",
+    ["argent %s / %s"] = "money %s / %s",
+    ["tout est arrivé"] = "everything arrived",
+    ["Commandes à poster"] = "Orders to mail",
+    ["Envoyer à %s"] = "Send to %s",
+    ["Livrer à %s"] = "Deliver to %s",
+    ["Courrier prêt : clique sur Envoyer."] = "Mail ready: click Send.",
+    ["Manque : %s"] = "Missing: %s",
+    ["Raison du refus"] = "Reason",
+    ["%s fournit"] = "%s provides",
+    ["Tes recettes sont partagées avec la guilde"] = "Your recipes are shared with the guild",
+})
+
+local W, H, PAD = 400, 600, 14
+local win, tabs, pages, current = nil, nil, {}, "find"
+local ui = { find = {}, mine = {}, recv = {}, new = {} }
+
+local function Money(c) return S.Money(c or 0) end
+local function Name(id) return O.Name(id) end
+local STATUS = { open = "ouverte", accepted = "acceptée", crafted = "fabriquée", delivered = "livrée",
+    declined = "refusée", cancelled = "annulée", expired = "expirée" }
+local STATUS_COL = { open = C.warn, accepted = C.info, crafted = C.ready, delivered = C.dim, declined = C.danger, cancelled = C.dim, expired = C.dim }
+
+-- a scroll list of rows built with make(); Get(i) / HideFrom(i)
+local function List(parent, top, bottom, make)
+    local sf = CreateFrame("ScrollFrame", nil, parent)
+    sf:SetPoint("TOPLEFT", PAD, top); sf:SetPoint("BOTTOMRIGHT", -PAD, bottom)
+    local content = CreateFrame("Frame", nil, sf); content:SetSize(W - 2 * PAD, 10); sf:SetScrollChild(content)
+    sf:EnableMouseWheel(true)
+    sf:SetScript("OnMouseWheel", function(self, d)
+        local max = math.max(0, content:GetHeight() - self:GetHeight())
+        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - d * 40)))
+    end)
+    local l = { sf = sf, content = content, items = {} }
+    function l.Get(i) local f = l.items[i]; if not f then f = make(content); l.items[i] = f end; f:Show(); return f end
+    function l.HideFrom(i) for j = i, #l.items do l.items[j]:Hide() end end
+    return l
+end
+
+local function Box(parent, w, h, numeric, hint)
+    local eb = CreateFrame("EditBox", nil, parent)
+    eb:SetSize(w, h); eb:SetAutoFocus(false)
+    if numeric then eb:SetNumeric(true); eb:SetMaxLetters(6) end
+    local probe = S.Text(parent, 14, C.text)
+    local font, size, flags = probe:GetFont(); probe:Hide()
+    if font then eb:SetFont(font, size or 14, flags or "") else eb:SetFontObject(ChatFontNormal) end
+    eb:SetTextColor(C.text[1], C.text[2], C.text[3]); eb:SetTextInsets(8, 8, 0, 0)
+    S.Solid(eb, "BACKGROUND", C.card):SetAllPoints()
+    S.Border(eb, C.border)
+    if hint then
+        eb.hint = S.Text(eb, 13, C.muted); eb.hint:SetPoint("LEFT", 8, 0); eb.hint:SetText(hint)
+        eb:HookScript("OnTextChanged", function(self) self.hint:SetShown((self:GetText() or "") == "") end)
+    end
+    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    return eb
+end
+
+-- ---------------------------------------------------------------- page 1: crafters (search)
+local function BuildFind(p)
+    local f = ui.find
+    f.box = Box(p, W - 2 * PAD, 30, false, L("Chercher un objet à faire fabriquer"))
+    f.box:SetPoint("TOPLEFT", PAD, -12)
+    f.box:HookScript("OnTextChanged", function() WP.RefreshOrders() end)
+    f.info = S.Text(p, 12, C.dim); f.info:SetPoint("TOPLEFT", PAD, -48)
+    f.list = List(p, -68, 52, function(parent)
+        local r = CreateFrame("Frame", nil, parent)
+        r:SetSize(W - 2 * PAD, 40)
+        S.Solid(r, "BACKGROUND", C.card):SetAllPoints(); S.Border(r, C.border)
+        r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:SetSize(22, 22); r.icon:SetPoint("LEFT", 9, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        r.name = S.Text(r, 14, C.text); r.name:SetPoint("TOPLEFT", 40, -5); r.name:SetPoint("RIGHT", -96, 0); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
+        r.sub = S.Text(r, 12, C.dim); r.sub:SetPoint("BOTTOMLEFT", 40, 6); r.sub:SetPoint("RIGHT", -96, 0); r.sub:SetJustifyH("LEFT"); r.sub:SetWordWrap(false)
+        r.btn = S.Button(r, L("Commander"), 80, 26, "secondary", function() if r.item then WP.NewOrder(r.item, r.crafter) end end)
+        r.btn:SetPoint("RIGHT", -7, 0)
+        return r
+    end)
+    f.empty = S.Text(f.list.content, 13, C.dim); f.empty:SetPoint("TOPLEFT", 2, -8); f.empty:SetWidth(W - 2 * PAD - 4); f.empty:SetWordWrap(true)
+    -- sharing my recipes: on by default
+    local foot = CreateFrame("Frame", nil, p); foot:SetPoint("BOTTOMLEFT"); foot:SetPoint("BOTTOMRIGHT"); foot:SetHeight(48)
+    local fl = S.Solid(foot, "BORDER", C.divider); fl:SetPoint("TOPLEFT"); fl:SetPoint("TOPRIGHT"); fl:SetHeight(1)
+    local t = S.Text(foot, 13, C.dim); t:SetPoint("LEFT", PAD, 0); t:SetText(L("Tes recettes sont partagées avec la guilde"))
+    local sw = S.Switch(foot, function() return WLWritsDB.ordersShare ~= false end, function(v) WLWritsDB.ordersShare = v; if v then O.Announce() end end)
+    sw:SetPoint("RIGHT", -PAD, 0)
+end
+
+local function RenderFind()
+    local f = ui.find
+    local q = (f.box:GetText() or ""):lower()
+    local crafters, online = 0, 0
+    local on = O.OnlineGuild()
+    for name in pairs(O.DB().crafters) do crafters = crafters + 1; if on[name] then online = online + 1 end end
+    f.info:SetText(string.format(L("%d artisans connus · %d en ligne"), crafters, online))
+    local catalog = O.Catalog()
+    local rows = {}
+    if #q >= 2 then
+        for id, prof in pairs(catalog) do
+            local n = Name(id):lower()
+            if n:find(q, 1, true) then
+                for _, c in ipairs(O.Crafters(id)) do rows[#rows + 1] = { item = id, prof = prof, c = c } end
+            end
+        end
+    end
+    table.sort(rows, function(a, b)
+        if a.item ~= b.item then return Name(a.item) < Name(b.item) end
+        if a.c.online ~= b.c.online then return a.c.online end
+        return a.c.rank > b.c.rank
+    end)
+    local y = 0
+    for i, r in ipairs(rows) do
+        local row = f.list.Get(i)
+        row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y)
+        row.item, row.crafter = r.item, not r.c.me and r.c.name or nil
+        row.icon:SetTexture(S.ItemIcon(r.item))
+        row.name:SetText(Name(r.item)); local qc = S.QualityColor(r.item); row.name:SetTextColor(qc[1], qc[2], qc[3])
+        local where = r.c.online and S.Hex(C.ready) .. L("en ligne") .. "|r"
+            or (r.c.seen and string.format(L("vu il y a %d j"), math.floor((time() - r.c.seen) / 86400)) or L("hors ligne"))
+        row.sub:SetText(r.c.name .. " · " .. r.c.prof .. " " .. (r.c.rank or 0) .. " · " .. where)
+        row.btn:SetShown(not r.c.me)
+        y = y + 46
+        if i >= 60 then break end
+    end
+    f.list.HideFrom(math.min(#rows, 60) + 1)
+    f.empty:SetShown(#rows == 0)
+    f.empty:SetText(next(catalog) == nil and L("Aucune recette connue pour l'instant : elles arrivent quand les membres qui ont WL Helper ouvrent leur fenêtre de métier.")
+        or (#q < 2 and L("Tape au moins 2 lettres.") or ""))
+    f.list.content:SetHeight(math.max(10, y))
+end
+
+-- ---------------------------------------------------------------- page 2: a new order
+local draft
+local function BuildNew(p)
+    local n = ui.new
+    n.icon = p:CreateTexture(nil, "ARTWORK"); n.icon:SetSize(36, 36); n.icon:SetPoint("TOPLEFT", PAD, -12); n.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    n.name = S.Text(p, 17, C.text, true); n.name:SetPoint("TOPLEFT", n.icon, "TOPRIGHT", 10, -2); n.name:SetPoint("RIGHT", -100, 0); n.name:SetJustifyH("LEFT")
+    n.qtyBox = Box(p, 50, 28, true); n.qtyBox:SetPoint("TOPRIGHT", -PAD, -14)
+    n.qtyBox:HookScript("OnTextChanged", function(self, user) if user then draft.qty = math.max(1, tonumber(self:GetText() or "") or 1); WP.RefreshOrders() end end)
+    -- to the whole guild, or only to the crafter picked in the list
+    local half = (W - 2 * PAD - 8) / 2
+    n.toGuild = S.Button(p, L("Toute la guilde"), half, 28, "secondary", function() draft.to = nil; WP.RefreshOrders() end)
+    n.toGuild:SetPoint("TOPLEFT", PAD, -60)
+    n.toOne = S.Button(p, "", half, 28, "secondary", function() if draft.crafter then draft.to = draft.crafter; WP.RefreshOrders() end end)
+    n.toOne:SetPoint("LEFT", n.toGuild, "RIGHT", 8, 0)
+    n.rlabel = S.Section(p, L("Composants")); n.rlabel:SetPoint("TOPLEFT", PAD, -100)
+    n.rows = {}
+    for i = 1, 8 do
+        local r = CreateFrame("Button", nil, p)
+        r:SetSize(W - 2 * PAD, 30); r:SetPoint("TOPLEFT", PAD, -118 - (i - 1) * 32)
+        S.Solid(r, "BACKGROUND", C.card):SetAllPoints()
+        S.Solid(r, "HIGHLIGHT", { 1, 1, 1 }, 0.05):SetAllPoints()
+        r.name = S.Text(r, 13, C.text); r.name:SetPoint("LEFT", 8, 0); r.name:SetPoint("RIGHT", -150, 0); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
+        r.tag = S.Text(r, 12, C.ready); r.tag:SetPoint("RIGHT", -8, 0); r.tag:SetJustifyH("RIGHT")
+        r:SetScript("OnClick", function(self) if self.id then draft.crafterGives[self.id] = not draft.crafterGives[self.id]; WP.RefreshOrders() end end)
+        r:SetScript("OnEnter", function(self) S.Tip(self, { L("Clic : qui le fournit") }) end)
+        r:SetScript("OnLeave", S.HideTip)
+        n.rows[i] = r
+    end
+    local y0 = -118 - 8 * 32 - 6
+    local fl = S.Text(p, 13, C.dim); fl:SetPoint("TOPLEFT", PAD, y0); fl:SetText(L("Commission") .. " (" .. L("po") .. ")")
+    n.fee = Box(p, 80, 28, true); n.fee:SetPoint("TOPLEFT", PAD, y0 - 18)
+    n.fee:HookScript("OnTextChanged", function(self, user) if user then draft.fee = (tonumber(self:GetText() or "") or 0) * 10000 end end)
+    local tl = S.Text(p, 13, C.dim); tl:SetPoint("TOPLEFT", PAD + 96, y0); tl:SetText(L("Pourboire") .. " (" .. L("po") .. ")")
+    n.tip = Box(p, 80, 28, true); n.tip:SetPoint("TOPLEFT", PAD + 96, y0 - 18)
+    n.tip:HookScript("OnTextChanged", function(self, user) if user then draft.tip = (tonumber(self:GetText() or "") or 0) * 10000 end end)
+    local vl = S.Text(p, 13, C.dim); vl:SetPoint("TOPLEFT", PAD + 192, y0); vl:SetText(L("Valable"))
+    n.hours = S.Segmented(p, { { 12, "12 h" }, { 24, "24 h" }, { 72, "3 j" } }, function() return draft and draft.hours or 24 end,
+        function(v) draft.hours = v; WP.RefreshOrders() end, 28)
+    n.hours:SetPoint("TOPLEFT", PAD + 192, y0 - 18)
+    n.note = Box(p, W - 2 * PAD, 28, false, L("Un mot pour l'artisan")); n.note:SetPoint("TOPLEFT", PAD, y0 - 56)
+    n.note:SetMaxLetters(60)
+    n.payUp = S.Switch(p, function() return draft and draft.payUp end, function(v) draft.payUp = v end)
+    n.payUp:SetPoint("TOPRIGHT", -PAD, y0 - 92)
+    local pl = S.Text(p, 13, C.text); pl:SetPoint("RIGHT", n.payUp, "LEFT", -10, 0); pl:SetText(L("Payer d'avance"))
+    n.go = S.Button(p, L("Publier la commande"), W - 2 * PAD, 36, "primary", function()
+        local give, crafter = {}, {}
+        for _, r in ipairs(O.Reagents(draft.item)) do
+            if draft.crafterGives[r[1]] then crafter[#crafter + 1] = r[1] .. ":" .. r[2] else give[#give + 1] = r[1] .. ":" .. r[2] end
+        end
+        local fee = draft.fee or 0
+        O.Publish({ to = draft.to, item = draft.item, qty = draft.qty or 1, give = table.concat(give, ","), crafter = table.concat(crafter, ","),
+            fee = fee, tip = draft.tip or 0, paid = draft.payUp and (fee + (draft.tip or 0)) or 0, note = n.note:GetText() or "", hours = draft.hours or 24 })
+        WP.ShowOrdersTab("mine")
+    end)
+    n.go:SetPoint("BOTTOMLEFT", PAD, 30)
+    local hint = S.Text(p, 12, C.dim); hint:SetPoint("BOTTOM", 0, 12); hint:SetText(L("Rien ne part par la poste avant qu'un artisan ait accepté."))
+end
+
+local function RenderNew()
+    local n = ui.new
+    if not draft then return end
+    n.icon:SetTexture(S.ItemIcon(draft.item))
+    n.name:SetText(Name(draft.item))
+    if not n.qtyBox:HasFocus() then n.qtyBox:SetText(tostring(draft.qty or 1)) end
+    n.toOne.label:SetText(draft.crafter and string.format(L("Seulement %s"), draft.crafter) or "—")
+    n.toOne:SetEnabled(draft.crafter ~= nil)
+    local sel, dim = C.brandSoft or C.brand, C.dim
+    local g, o = draft.to and dim or sel, draft.to and sel or dim
+    n.toGuild.label:SetTextColor(g[1], g[2], g[3]); n.toOne.label:SetTextColor(o[1], o[2], o[3])
+    local reagents = O.Reagents(draft.item)
+    for i, r in ipairs(n.rows) do
+        local rg = reagents[i]
+        r:SetShown(rg ~= nil)
+        if rg then
+            r.id = rg[1]
+            local need = rg[2] * (draft.qty or 1)
+            local have = WP.OwnedCount and WP.OwnedCount(rg[1]) or 0
+            r.name:SetText(need .. "× " .. Name(rg[1]))
+            if draft.crafterGives[rg[1]] then
+                local p = WP.Price(rg[1])
+                r.tag:SetText(L("l'artisan fournit") .. (p and (" · ~" .. Money(p * need)) or "")); r.tag:SetTextColor(C.warn[1], C.warn[2], C.warn[3])
+            else
+                r.tag:SetText(L("je fournis") .. " · " .. have .. "/" .. need)
+                local c = have >= need and C.ready or C.danger
+                r.tag:SetTextColor(c[1], c[2], c[3])
+            end
+        end
+    end
+    n.hours:Update()
+    if n.payUp.Update then n.payUp:Update() end
+end
+
+function WP.NewOrder(item, crafter)
+    if WP.ModuleOff and WP.ModuleOff("orders") then return end
+    draft = { item = item, crafter = crafter, to = crafter, qty = 1, hours = 24, crafterGives = {}, fee = 0, tip = 0 }
+    if not win then WP.ShowOrdersTab("find") end
+    ui.new.fee:SetText(""); ui.new.tip:SetText(""); ui.new.note:SetText("")
+    WP.ShowOrdersTab("new")
+end
+
+-- ---------------------------------------------------------------- pages 3 and 4: my orders, received
+local function OrderCard(parent)
+    local c = CreateFrame("Frame", nil, parent)
+    c:SetWidth(W - 2 * PAD)
+    S.Solid(c, "BACKGROUND", C.card):SetAllPoints(); S.Border(c, C.border)
+    c.title = S.Text(c, 15, C.text, true); c.title:SetPoint("TOPLEFT", 10, -8); c.title:SetPoint("RIGHT", -100, 0); c.title:SetJustifyH("LEFT"); c.title:SetWordWrap(false)
+    c.fee = S.Text(c, 14, C.warn, true); c.fee:SetPoint("TOPRIGHT", -10, -8); c.fee:SetJustifyH("RIGHT")
+    c.who = S.Text(c, 12, C.dim); c.who:SetPoint("TOPLEFT", 10, -28); c.who:SetPoint("RIGHT", -10, 0); c.who:SetJustifyH("LEFT")
+    c.detail = S.Text(c, 12, C.text); c.detail:SetPoint("TOPLEFT", 10, -46); c.detail:SetPoint("RIGHT", -10, 0); c.detail:SetJustifyH("LEFT"); c.detail:SetWordWrap(true)
+    c.b1 = S.Button(c, "", 110, 26, "primary", function() if c.a1 then c.a1() end end)
+    c.b2 = S.Button(c, "", 110, 26, "secondary", function() if c.a2 then c.a2() end end)
+    c.b1:SetPoint("BOTTOMLEFT", 10, 8); c.b2:SetPoint("LEFT", c.b1, "RIGHT", 8, 0)
+    return c
+end
+
+local function Reagents(s, qty)
+    local t = {}
+    for _, r in ipairs(O.Decode(s)) do t[#t + 1] = (r[2] * (qty or 1)) .. "× " .. Name(r[1]) end
+    return table.concat(t, ", ")
+end
+
+local function PaintOrder(c, o, side)
+    c.title:SetText((o.qty or 1) .. "× " .. Name(o.item))
+    c.fee:SetText(Money((o.fee or 0) + (o.tip or 0)))
+    local col = STATUS_COL[o.status] or C.dim
+    local st = S.Hex(col) .. L(STATUS[o.status] or o.status) .. "|r"
+    local who
+    if side == "mine" then who = (o.to and string.format(L("pour %s"), o.to) or L("pour la guilde")) .. (o.by and (" · " .. string.format(L("par %s"), o.by)) or "")
+    else who = o.from .. " · " .. (o.to and string.format(L("pour %s"), o.to) or L("pour la guilde")) end
+    if o.status == "open" and o.expires then who = who .. " · " .. string.format(L("expire dans %d h"), math.max(0, math.floor((o.expires - time()) / 3600))) end
+    c.who:SetText(st .. " · " .. who)
+    local lines = {}
+    if o.give and o.give ~= "" then
+        local who = side == "mine" and L("je fournis") or string.format(L("%s fournit"), o.from)
+        lines[#lines + 1] = S.Hex(C.ready) .. who .. "|r " .. Reagents(o.give, o.qty)
+    end
+    if o.crafter and o.crafter ~= "" then lines[#lines + 1] = S.Hex(C.warn) .. L("l'artisan fournit") .. "|r " .. Reagents(o.crafter, o.qty) end
+    -- what reached the crafter (read in the crafter's mailbox)
+    if side == "recv" and o.status == "accepted" then
+        local got, money = O.Received(o)
+        local parts, all = {}, true
+        for _, g in ipairs(got) do
+            parts[#parts + 1] = math.min(g.have, g.need) .. "/" .. g.need .. " " .. Name(g.id)
+            if g.have < g.need then all = false end
+        end
+        local fee = (o.paid or 0)
+        if fee > 0 then parts[#parts + 1] = string.format(L("argent %s / %s"), Money(math.min(money, fee)), Money(fee)); if money < fee then all = false end end
+        if #parts > 0 then lines[#lines + 1] = string.format(L("Reçu : %s"), all and L("tout est arrivé") or table.concat(parts, ", ")) end
+    end
+    if o.reason then lines[#lines + 1] = S.Hex(C.danger) .. o.reason .. "|r" end
+    if o.note and o.note ~= "" then lines[#lines + 1] = "« " .. o.note .. " »" end
+    c.detail:SetText(table.concat(lines, "\n"))
+    -- buttons by side and status
+    c.a1, c.a2 = nil, nil
+    if side == "recv" and o.status == "open" then
+        c.b1.label:SetText(L("Accepter")); c.a1 = function() O.Accept(o) end
+        c.b2.label:SetText(L("Refuser")); c.a2 = function() WP.AskDecline(o) end
+    elseif side == "recv" and o.status == "accepted" then
+        c.b1.label:SetText(L("Fabriquée")); c.a1 = function() O.Crafted(o) end
+    elseif side == "recv" and o.status == "crafted" then
+        c.b1.label:SetText(L("Livrée")); c.a1 = function() O.Delivered(o) end
+    elseif side == "mine" and (o.status == "open" or o.status == "accepted") then
+        c.b2.label:SetText(L("Annuler")); c.a2 = function() O.Cancel(o) end
+    elseif side == "mine" and (o.status == "crafted" or o.status == "delivered") then
+        c.b2.label:SetText(L("+ Pourboire")); c.a2 = function() O.AddTip(o, 10000); WP.RefreshOrders() end
+    end
+    c.b1:SetShown(c.a1 ~= nil); c.b2:SetShown(c.a2 ~= nil)
+    if not c.a1 and c.a2 then c.b2:ClearAllPoints(); c.b2:SetPoint("BOTTOMLEFT", 10, 8)
+    else c.b2:ClearAllPoints(); c.b2:SetPoint("LEFT", c.b1, "RIGHT", 8, 0) end
+    local h = 54 + math.max(14, (c.detail:GetStringHeight() or 14)) + ((c.a1 or c.a2) and 40 or 8)
+    c:SetHeight(h)
+    return h
+end
+
+local function BuildOrders(p, key)
+    ui[key].list = List(p, -12, 8, OrderCard)
+    ui[key].empty = S.Text(ui[key].list.content, 13, C.dim); ui[key].empty:SetPoint("TOPLEFT", 2, -8); ui[key].empty:SetText(L("Aucune commande."))
+end
+local function RenderOrders(key, list)
+    local u = ui[key]
+    local y = 0
+    for i, o in ipairs(list) do
+        local c = u.list.Get(i)
+        c:ClearAllPoints(); c:SetPoint("TOPLEFT", 0, -y)
+        y = y + PaintOrder(c, o, key) + 10
+    end
+    u.list.HideFrom(#list + 1)
+    u.empty:SetShown(#list == 0)
+    u.list.content:SetHeight(math.max(10, y))
+end
+
+-- decline with a reason (a small menu of reasons)
+local declineMenu
+function WP.AskDecline(o)
+    if not declineMenu then
+        declineMenu = S.Window("WLHelperDecline", 300, 220, L("Raison du refus"), nil, nil, nil)
+        local y = -48
+        for _, r in ipairs({ "Commission trop basse", "Pas les composants", "Pas le temps", "Recharge en cours", "Autre" }) do
+            local b = S.Button(declineMenu, L(r), 272, 28, "secondary", function()
+                if declineMenu.order then O.Decline(declineMenu.order, L(r)) end
+                declineMenu:Hide()
+            end)
+            b:SetPoint("TOP", 0, y); y = y - 32
+        end
+    end
+    declineMenu.order = o
+    declineMenu:Show()
+end
+
+-- ---------------------------------------------------------------- the window
+local function Build()
+    win = S.Window("WLHelperOrders", W, H, L("Commandes"), nil, WLWritsDB, "ordersPos")
+    tabs = S.Tabs(win, { { "find", L("Artisans") }, { "mine", L("Mes commandes") }, { "recv", L("Reçues") } },
+        function() return current == "new" and "find" or current end, function(k) WP.ShowOrdersTab(k) end, function(k)
+            if k == "find" then return nil end
+            local mine, forMe = O.Lists()
+            local n = 0
+            if k == "recv" then for _, o in ipairs(forMe) do if o.status == "open" then n = n + 1 end end
+            else for _, o in ipairs(mine) do if o.status == "accepted" or o.status == "crafted" then n = n + 1 end end end
+            return n > 0 and n or nil
+        end)
+    tabs:SetPoint("TOPLEFT", 1, -39); tabs:SetPoint("TOPRIGHT", -1, -39)
+    for _, k in ipairs({ "find", "new", "mine", "recv" }) do
+        local p = CreateFrame("Frame", nil, win)
+        p:SetPoint("TOPLEFT", 0, -76); p:SetPoint("BOTTOMRIGHT")
+        p:Hide()
+        pages[k] = p
+    end
+    BuildFind(pages.find); BuildNew(pages.new); BuildOrders(pages.mine, "mine"); BuildOrders(pages.recv, "recv")
+    win:SetScript("OnShow", function() WP.RefreshOrders() end)
+end
+
+function WP.ShowOrdersTab(k)
+    if not win then Build() end
+    current = k
+    for key, p in pairs(pages) do p:SetShown(key == k) end
+    win:Show()
+    WP.RefreshOrders()
+end
+
+function WP.RefreshOrders()
+    if WP.RefreshMailPanel then WP.RefreshMailPanel() end
+    if not (win and win:IsShown()) then return end
+    tabs:Update()
+    if current == "find" then RenderFind()
+    elseif current == "new" then RenderNew()
+    else
+        local mine, forMe = O.Lists()
+        if current == "mine" then RenderOrders("mine", mine) else RenderOrders("recv", forMe) end
+    end
+end
+
+function WP.ToggleOrders()
+    if win and win:IsShown() then win:Hide(); return end
+    if WP.ModuleOff and WP.ModuleOff("orders") then return end
+    if not win then Build() end
+    WP.ShowOrdersTab(current == "new" and "find" or current)
+end
+
+-- ---------------------------------------------------------------- beside the mailbox
+local panel
+local function MailActions()
+    local me = UnitName("player")
+    local acts = {}
+    for _, o in pairs(O.DB().list) do
+        if o.from == me and o.status == "accepted" and ((o.give and o.give ~= "") or (o.paid or 0) > 0) and not o.sentGive then
+            acts[#acts + 1] = { o = o, kind = "give", label = string.format(L("Envoyer à %s"), o.by or "?") }
+        elseif o.by == me and o.status == "crafted" and (o.item or 0) > 0 then
+            acts[#acts + 1] = { o = o, kind = "deliver", label = string.format(L("Livrer à %s"), o.from) }
+        end
+    end
+    return acts
+end
+
+function WP.RefreshMailPanel()
+    if not (MailFrame and MailFrame:IsShown()) then if panel then panel:Hide() end; return end
+    local acts = MailActions()
+    if #acts == 0 then if panel then panel:Hide() end; return end
+    if not panel then
+        panel = CreateFrame("Frame", "WLHelperMailOrders", MailFrame)
+        panel:SetWidth(260); panel:SetPoint("TOPLEFT", MailFrame, "TOPRIGHT", 6, -20)
+        S.Solid(panel, "BACKGROUND", C.bg):SetAllPoints(); S.Border(panel, C.border)
+        panel.title = S.Text(panel, 14, C.text, true); panel.title:SetPoint("TOPLEFT", 10, -10); panel.title:SetText(L("Commandes à poster"))
+        panel.rows = {}
+    end
+    for i, a in ipairs(acts) do
+        local r = panel.rows[i]
+        if not r then
+            r = CreateFrame("Frame", nil, panel); r:SetSize(240, 52)
+            r.text = S.Text(r, 13, C.text); r.text:SetPoint("TOPLEFT", 0, 0); r.text:SetPoint("RIGHT", 0, 0); r.text:SetJustifyH("LEFT"); r.text:SetWordWrap(false)
+            r.btn = S.Button(r, "", 240, 26, "primary", function()
+                if MailFrameTab2 and not (SendMailFrame and SendMailFrame:IsShown()) then MailFrameTab2:Click() end
+                panel.pending = nil
+                local missing = O.FillMail(r.act.o, r.act.kind)
+                if not missing then return end
+                if #missing > 0 then
+                    local t = {}
+                    for _, m in ipairs(missing) do t[#t + 1] = m[2] .. "× " .. Name(m[1]) end
+                    WP.Print(string.format(L("Manque : %s"), table.concat(t, ", ")))
+                    return
+                end
+                -- noted once this very mail leaves (same recipient), see SendMail below
+                panel.pending = r.act
+                panel.pendingTo = (r.act.kind == "give" and (r.act.o.by or r.act.o.to) or r.act.o.from)
+                WP.Print(L("Courrier prêt : clique sur Envoyer."))
+            end)
+            r.btn:SetPoint("BOTTOMLEFT", 0, 0)
+            panel.rows[i] = r
+        end
+        r.act = a
+        r:SetPoint("TOPLEFT", 10, -34 - (i - 1) * 58)
+        r.text:SetText((a.o.qty or 1) .. "× " .. Name(a.o.item))
+        r.btn.label:SetText(a.label)
+        r:Show()
+    end
+    for i = #acts + 1, #panel.rows do panel.rows[i]:Hide() end
+    panel:SetHeight(44 + #acts * 58)
+    panel:Show()
+end
+
+-- the mail actually sent: only the one to the order's recipient counts
+local sending
+if SendMail then
+    hooksecurefunc("SendMail", function(to)
+        sending = panel and panel.pending and type(to) == "string"
+            and to:gsub("%-.*$", ""):lower() == (panel.pendingTo or ""):lower() and panel.pending or nil
+    end)
+end
+local mf = CreateFrame("Frame")
+mf:RegisterEvent("MAIL_SHOW"); mf:RegisterEvent("MAIL_CLOSED"); mf:RegisterEvent("MAIL_SEND_SUCCESS"); mf:RegisterEvent("MAIL_FAILED")
+mf:SetScript("OnEvent", function(_, e)
+    if e == "MAIL_SEND_SUCCESS" and sending then
+        -- the mail of an order left: note it (reagents sent, or the order delivered)
+        local a = sending; sending = nil
+        if panel then panel.pending = nil end
+        if a.kind == "give" then a.o.sentGive = true else O.Delivered(a.o) end
+    elseif e == "MAIL_FAILED" or e == "MAIL_CLOSED" then
+        sending = nil
+        if e == "MAIL_CLOSED" and panel then panel.pending = nil end
+    elseif e == "MAIL_SEND_SUCCESS" then
+        sending = nil
+    end
+    C_Timer.After(0.2, function() if WP.RefreshMailPanel then WP.RefreshMailPanel() end end)
+end)

@@ -47,8 +47,16 @@ The fastest way to the NPC or the dungeon.
 - If you have Zygor, its arrow can guide instead (option).
 
 ### Bags
-The cleaner finds quest items you no longer need and deletes them in one click.
-Items a later quest may need are flagged and left unchecked.
+The cleaner finds quest items you no longer need. It only deletes the ones it can prove useless
+(all their quests turned in); the others are listed only.
+
+### Orders
+Have the guild or one crafter make an item, like retail crafting orders.
+- Who provides each reagent, fee, tip, duration; the crafter accepts or declines with a reason.
+- Inbox check of what the crafter received, mail filled for you.
+
+### Clicks
+Alt-click to invite (chat, world, portraits) and Shift + right-click to shoot an enemy.
 
 ## Commands
 
@@ -60,6 +68,7 @@ Items a later quest may need are flagged and left unchecked.
 | `/wl trade` | Open or close the Trading Post |
 | `/wl gps` | Stop or restart guidance |
 | `/wl bags` | Bag cleaner |
+| `/wl orders` | Crafting orders |
 | `/wl options` | Settings (also `/wlo`) |
 | `/wl idea` | Suggest an idea or report a bug |
 | `/wl help` | Every command |
@@ -76,7 +85,7 @@ In game, `/wl idea` gives you the link already filled with your version.
 - **The folder is named `WLHelper`** since 1.0.0-beta.4 (it was `DungeonGuide`). If you installed an older
   version by hand, delete the `DungeonGuide` folder. If it is still there, the addon turns
   it off and tells you.
-- **Versions**: `1.0.0-beta.10` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
+- **Versions**: `1.0.0-beta.11` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
 
 ## Credits and license
 

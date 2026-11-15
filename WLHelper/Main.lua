@@ -169,6 +169,7 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "choisir" or cmd == "pick" or cmd == "dj" then ns.ShowPicker()
   elseif cmd == "trade" or cmd == "comptoir" or cmd == "c" or cmd == "writs" or cmd == "writ" then if WP then WP.Command(arg) end
   elseif cmd == "sacs" or cmd == "bags" or cmd == "clean" then if WP and WP.Cleaner then WP.Cleaner.Toggle() end
+  elseif cmd == "commandes" or cmd == "orders" or cmd == "cmd" then if WP and WP.ToggleOrders then WP.ToggleOrders() end
   elseif cmd == "gps" then if WP and WP.StopOrStartGPS then WP.StopOrStartGPS() end
   elseif cmd == "reglages" or cmd == "options" or cmd == "settings" or cmd == "opt" then if WP and WP.ShowOptionsPage then WP.ShowOptionsPage() end
   elseif cmd == "idee" or cmd == "idea" or cmd == "bug" then if WP and WP.Feedback then WP.Feedback(cmd == "bug" and "bug" or "idea") end

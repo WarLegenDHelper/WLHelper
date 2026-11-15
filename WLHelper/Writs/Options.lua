@@ -15,6 +15,15 @@ ns.AddEnglish({
     ["Options"] = "Options",
     ["Général"] = "General", ["Donjons"] = "Dungeons", ["Comptoir"] = "Trading Post", ["GPS"] = "GPS",
     ["Sacs"] = "Bags", ["À propos"] = "About",
+    ["Rendre les caisses automatiquement"] = "Hand in crates automatically",
+    ["Dokimi / Marcy Baker"] = "Dokimi / Marcy Baker",
+    ["Clics"] = "Clicks",
+    ["Alt-clic pour inviter (chat)"] = "Alt-click to invite (chat)",
+    ["Alt-clic pour inviter (monde, portraits)"] = "Alt-click to invite (world, portraits)",
+    ["Lien [Inviter] sur les demandes"] = "[Invite] link on requests",
+    ["Clic droit pour tirer"] = "Right-click to shoot",
+    ["Touche à tenir"] = "Key to hold",
+    ["Déjà fait par %s"] = "Already done by %s",
     ["Chercher un réglage"] = "Search settings",
     ["Effacer la recherche"] = "Clear search",
     ["Aucun réglage ne correspond à « %s »."] = "No setting matches \"%s\".",
@@ -25,6 +34,7 @@ ns.AddEnglish({
     ["Guide des quêtes de donjon, route, flèche"] = "Dungeon quest guide, route, arrow",
     ["Craftsman's Writs, liste d'achat, remise auto"] = "Craftsman's Writs, shopping list, auto turn-in",
     ["Nettoyeur des objets de quête inutiles"] = "Cleaner for quest items you no longer need",
+    ["Faire fabriquer par la guilde, accepter des commandes"] = "Have the guild craft for you, take orders",
     ["Le GPS reste toujours actif : les autres modules s'en servent.\nRallumer un module est immédiat, sans /reload."] =
         "The GPS always stays on: the other modules use it.\nTurning a module back on is immediate, no /reload.",
     ["le module %s est éteint : Réglages › Général › Modules."] = "the %s module is off: Settings › General › Modules.",
@@ -331,6 +341,21 @@ function BUILD.general(p)
     end
     Note(p, L("Le GPS reste toujours actif : les autres modules s'en servent.\nRallumer un module est immédiat, sans /reload."), 6)
 
+    if ns.WP.ClicksDB then
+    Section(p, L("Clics"))
+    local function Clicks() return ns.WP.ClicksDB() end
+    local function setClick(k) return function(v) Clicks()[k] = v; if ns.WP.ApplyClicks then ns.WP.ApplyClicks() end end end
+    local inviteBy = ns.WP.ClickOwner and ns.WP.ClickOwner("invite")
+    local shootBy = ns.WP.ClickOwner and ns.WP.ClickOwner("shoot")
+    SwitchRow(p, L("Alt-clic pour inviter (chat)"), function() return Clicks().chat end, setClick("chat"), inviteBy and string.format(L("Déjà fait par %s"), inviteBy))
+    SwitchRow(p, L("Alt-clic pour inviter (monde, portraits)"), function() return Clicks().world end, setClick("world"))
+    SwitchRow(p, L("Lien [Inviter] sur les demandes"), function() return Clicks().link end, setClick("link"))
+    SwitchRow(p, L("Clic droit pour tirer"), function() return Clicks().shoot end, setClick("shoot"), shootBy and string.format(L("Déjà fait par %s"), shootBy))
+    local mrow = Row(p, L("Touche à tenir"))
+    Place(p, mrow, S.Segmented(mrow, { { "SHIFT", "Maj" }, { "CTRL", "Ctrl" }, { "ALT", "Alt" } },
+        function() return Clicks().shootMod end, setClick("shootMod")))
+    end
+
     Section(p, L("Langue"))
     local row = Row(p, L("Langue"))
     Place(p, row, S.Segmented(row, {
@@ -379,6 +404,8 @@ end
 function BUILD.comptoir(p)
     Section(p, L("Automatismes"))
     SwitchRow(p, L("Rendre les writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"))
+    SwitchRow(p, L("Rendre les caisses automatiquement"), function() return Comfort().autoCrates ~= false end, SetComfort("autoCrates"),
+        L("Dokimi / Marcy Baker"))
     SwitchRow(p, L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
     SwitchRow(p, L("Rescanner la liste d'achat en ouvrant l'HV"), function() return Writs().autoRescan end,
         function(v) Writs().autoRescan = v; RefreshWrits() end)

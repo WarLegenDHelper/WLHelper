@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.11] — 2026-11-15
+
+### Ajouté / Added
+- **Commandes** (nouveau module, `/wl commandes`) : faire fabriquer un objet par la guilde ou par un artisan précis, comme les commandes d'artisanat de retail. Tu choisis qui fournit chaque composant, la commission, un pourboire et la durée ; l'artisan accepte ou refuse avec une raison, puis marque « fabriqué » et « livré ». L'addon lit la boîte aux lettres pour dire si l'artisan a bien reçu les composants et l'argent, et remplit le courrier pour toi (pièces jointes, argent ou contre-remboursement). Les recettes de chacun sont partagées dans la guilde quand il ouvre son métier (désactivable).
+  *Orders (new module): guild or one-crafter crafting orders like retail; accept/decline with a reason, fee and tip, who provides each reagent, inbox check of what the crafter received, mail filled for you.*
+- **Clics** (Réglages > Général) : Alt-clic sur un nom, un joueur ou un portrait pour l'inviter, lien [Inviter] sur les messages qui le demandent (repris d'Alt-Click Invite) ; Maj + clic droit sur un ennemi pour tirer (arme à distance, baguette ou lancer ; touche au choix). Si l'addon d'origine est encore chargé, la fonction reste chez lui.
+  *Clicks: Alt-click invite (from Alt-Click Invite) and modifier + right-click to shoot.*
+- **Caisses rendues automatiquement** chez Dokimi (Tarides) ou Marcy Baker (Les Carmines) ; Maj pour l'empêcher, interrupteur dans Réglages > Comptoir.
+  *Crates handed in automatically at the Inventory Intake.*
+- Favor : bouton « Rendre les caisses » qui lance le GPS jusqu'à ce PNJ.
+  *Favor: a "Turn crates in" button with GPS.*
+
 ## [1.0.0-beta.10] — 2026-11-15
 
 ### Modifié / Changed

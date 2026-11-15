@@ -41,8 +41,8 @@ local DEFAULTS = {
     -- GPS: provider "auto" (Zygor when its travel system is on, else ours) | "wl" | "zygor"
     gpsOpts = { provider = "auto", teleports = true, autoFlight = false, scale = 1, alpha = 0.6, hideCombat = false },
     -- Comptoir comforts
-    comfort = { autoTurnIn = true, autoAccept = true, reminder = true, tooltip = true },
-    modules = { dungeons = true, writs = true, bags = true },   -- Settings > General > Modules       -- rescan the shopping list when the auction house opens
+    comfort = { autoTurnIn = true, autoAccept = true, reminder = true, tooltip = true, autoCrates = true },
+    modules = { dungeons = true, writs = true, bags = true, orders = true },   -- Settings > General > Modules       -- rescan the shopping list when the auction house opens
     tiers = { Journeyman = true, Expert = true, Artisan = true },
     hideHigh = true,         -- hide turn-in spots in zones above your level
     hideUnknown = false,     -- hide writs whose turn-in spot is unknown
@@ -853,6 +853,7 @@ WP.MODULES = {
     { key = "dungeons", label = "Donjons", hint = "Guide des quêtes de donjon, route, flèche" },
     { key = "writs", label = "Comptoir", hint = "Craftsman's Writs, liste d'achat, remise auto" },
     { key = "bags", label = "Sacs", hint = "Nettoyeur des objets de quête inutiles" },
+    { key = "orders", label = "Commandes", hint = "Faire fabriquer par la guilde, accepter des commandes" },
 }
 function WP.ModuleOn(key)
     local m = WLWritsDB and WLWritsDB.modules

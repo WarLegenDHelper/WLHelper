@@ -36,6 +36,9 @@ ns.AddEnglish({
     ["%d à jeter"] = "%d to throw away",
     ["aucun"] = "none",
     ["Maintenant : "] = "Now: ",
+    ["%d commandes à accepter"] = "%d orders to accept",
+    ["Faire fabriquer par un artisan de la guilde"] = "Have a guild crafter make it",
+    ["%d de tes commandes en cours"] = "%d of your orders running",
     ["terminé"] = "done",
     ["Route terminée"] = "Route finished",
     ["Aucun donjon choisi"] = "No dungeon picked",
@@ -162,6 +165,10 @@ local function Build()
         Close(); if WP.Cleaner then WP.Cleaner.Toggle() end
     end)
     y = y - CARD_H - 10
+    cards.orders = Card(win, y, "Interface\\Icons\\INV_Misc_Note_01", C.ready, function()
+        Close(); if WP.ToggleOrders then WP.ToggleOrders() end
+    end)
+    y = y - CARD_H - 10
 
     win.afterCards = y
 
@@ -214,7 +221,7 @@ local function Build()
     end
     win.Layout(false, false)
 
-    cards.dungeons.key, cards.writs.key, cards.bags.key = "dungeons", "writs", "bags"
+    cards.dungeons.key, cards.writs.key, cards.bags.key, cards.orders.key = "dungeons", "writs", "bags", "orders"
     win:SetScript("OnShow", function() WP.RefreshHome() end)
     local ev = CreateFrame("Frame", nil, win)
     ev:RegisterEvent("QUEST_LOG_UPDATE"); ev:RegisterEvent("BAG_UPDATE_DELAYED"); ev:RegisterEvent("UPDATE_FACTION")
@@ -284,6 +291,19 @@ function WP.RefreshHome()
     local n = BagCount()
     b.line1:SetText(n > 0 and string.format(L("%d objets de quête qui ne servent plus"), n) or L("Rien à jeter"))
     SetActive(b, false)
+
+    -- orders: what waits for you
+    local oc = cards.orders
+    oc.title:SetText(L("Commandes")); oc.tag:SetText(""); oc.bar:Hide(); oc.action:Hide(); oc.chev:Show(); oc:Narrow(false)
+    if WP.Orders then
+        local mine, forMe = WP.Orders.Lists()
+        local open, running = 0, 0
+        for _, o in ipairs(forMe) do if o.status == "open" then open = open + 1 end end
+        for _, o in ipairs(mine) do if o.status == "open" or o.status == "accepted" or o.status == "crafted" then running = running + 1 end end
+        oc.line1:SetText(open > 0 and string.format(L("%d commandes à accepter"), open) or L("Faire fabriquer par un artisan de la guilde"))
+        oc.line2:SetText(running > 0 and string.format(L("%d de tes commandes en cours"), running) or "")
+        oc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
+    end
 
     -- switched-off modules: dimmed, "off", one button to turn them back on
     local hints = {}
@@ -366,6 +386,7 @@ function WP.MinimapMenu(owner)
             { L("Donjons"), function() if DungeonState() then root.ShowGuide() else root.ShowPicker() end end, "dungeons" },
             { L("Comptoir"), function() WP.Open() end, "writs" },
             { L("Sacs"), function() if WP.Cleaner then WP.Cleaner.Toggle() end end, "bags" },
+            { L("Commandes"), function() if WP.ToggleOrders then WP.ToggleOrders() end end, "orders" },
             false,
             { L("Arrêter le GPS"), function() WP.StopGPS() end, "gps" },
             { L("Réglages"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage() end end },
@@ -396,7 +417,7 @@ function WP.MinimapMenu(owner)
     if menu:IsShown() then menu:Hide(); return end
     menu.owner = owner; menu.away = 0
     menu.buttons.gps:SetEnabled(WP.GPS.Active())
-    for _, k in ipairs({ "dungeons", "writs", "bags" }) do
+    for _, k in ipairs({ "dungeons", "writs", "bags", "orders" }) do
         local b = menu.buttons[k]
         if b then b.label:SetAlpha(WP.ModuleOn(k) and 1 or 0.45) end
     end

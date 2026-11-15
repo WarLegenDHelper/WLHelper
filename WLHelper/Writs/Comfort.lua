@@ -59,6 +59,17 @@ end
 
 local reminded = false
 
+-- "A Sealed Crate": the quests that take a Supply Shipment at the Inventory Intake NPCs
+-- (Dokimi in the Barrens, Marcy Baker in Redridge), one per shipment.
+local CRATE_QUESTS = { [91899] = true, [91900] = true, [91901] = true, [91902] = true, [91903] = true, [91904] = true, [91905] = true }
+local CRATE_NPCS = { [256386] = true, [256390] = true }
+local function AtIntake()
+    local guid = UnitGUID and UnitGUID("npc")
+    local id = guid and tonumber(guid:match("%-(%d+)%-%x+$"))
+    return id and CRATE_NPCS[id] or false
+end
+local function CrateQuest(id) return id and CRATE_QUESTS[id] or false end
+
 local f = CreateFrame("Frame")
 f:RegisterEvent("QUEST_DETAIL")
 f:RegisterEvent("QUEST_PROGRESS")
@@ -70,13 +81,27 @@ f:SetScript("OnEvent", function(_, event, a1, a2)
     if not WP.ModuleOn("writs") then return end
     Index()
     if IsShiftKeyDown() and event ~= "PLAYER_ENTERING_WORLD" then return end   -- Shift: do it by hand
+    -- only the crate quest itself (by ID; by title at the Intake when the ID reads 0), never
+    -- another quest those NPCs may give
+    local qid = CurrentQuestID()
+    local crate = On("autoCrates") and (CrateQuest(qid)
+        or (qid == 0 and AtIntake() and GetTitleText and (GetTitleText() or ""):find("Sealed Crate", 1, true) ~= nil))
     if event == "QUEST_DETAIL" then
-        if On("autoAccept") and byQuest[CurrentQuestID()] then AcceptQuest() end
+        if (On("autoAccept") and byQuest[CurrentQuestID()]) or crate then AcceptQuest() end
     elseif event == "QUEST_PROGRESS" then
-        if On("autoTurnIn") and byQuest[CurrentQuestID()] and IsQuestCompletable and IsQuestCompletable() then CompleteQuest() end
+        if ((On("autoTurnIn") and byQuest[CurrentQuestID()]) or crate) and IsQuestCompletable and IsQuestCompletable() then CompleteQuest() end
     elseif event == "QUEST_COMPLETE" then
-        if On("autoTurnIn") and byQuest[CurrentQuestID()] and (GetNumQuestChoices() or 0) <= 1 then GetQuestReward(1) end
+        if ((On("autoTurnIn") and byQuest[CurrentQuestID()]) or crate) and (GetNumQuestChoices() or 0) <= 1 then GetQuestReward(1) end
     elseif event == "GOSSIP_SHOW" then
+        -- at the Inventory Intake: hand in a shipment (the quest is offered once per crate you hold)
+        if On("autoCrates") and AtIntake() and C_GossipInfo then
+            for _, q in ipairs(C_GossipInfo.GetActiveQuests and C_GossipInfo.GetActiveQuests() or {}) do
+                if q.isComplete and (CrateQuest(q.questID) or (q.title or ""):find("Sealed Crate", 1, true)) then C_GossipInfo.SelectActiveQuest(q.questID); return end
+            end
+            for _, q in ipairs(C_GossipInfo.GetAvailableQuests and C_GossipInfo.GetAvailableQuests() or {}) do
+                if CrateQuest(q.questID) or (q.title or ""):find("Sealed Crate", 1, true) then C_GossipInfo.SelectAvailableQuest(q.questID); return end
+            end
+        end
         if not On("autoTurnIn") then return end
         if C_GossipInfo and C_GossipInfo.GetActiveQuests then
             for _, q in ipairs(C_GossipInfo.GetActiveQuests() or {}) do

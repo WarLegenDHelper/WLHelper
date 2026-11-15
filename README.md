@@ -48,8 +48,16 @@ Le chemin le plus rapide jusqu'au PNJ ou au donjon.
 - Si Zygor est installé, sa flèche peut guider à la place (option).
 
 ### Sacs
-Le nettoyeur repère les objets de quête qui ne servent plus et les détruit en un clic.
-Ceux qui peuvent servir à une quête suivante sont signalés et ne sont pas cochés.
+Le nettoyeur repère les objets de quête qui ne servent plus. Il ne détruit que ceux qu'il peut prouver
+inutiles (toutes leurs quêtes rendues) ; les autres sont seulement listés.
+
+### Commandes
+Faire fabriquer un objet par la guilde ou par un artisan, comme les commandes d'artisanat de retail.
+- Qui fournit chaque composant, commission, pourboire, durée ; l'artisan accepte ou refuse avec une raison.
+- Vérification dans la boîte aux lettres de ce que l'artisan a reçu, courrier rempli pour toi.
+
+### Clics
+Alt-clic pour inviter (chat, monde, portraits) et Maj + clic droit pour tirer sur un ennemi.
 
 ## Commandes
 
@@ -61,6 +69,7 @@ Ceux qui peuvent servir à une quête suivante sont signalés et ne sont pas coc
 | `/wl comptoir` | Ouvre ou ferme le Comptoir (aussi `/comptoir`) |
 | `/wl gps` | Arrête ou relance le guidage |
 | `/wl sacs` | Nettoyeur de sacs |
+| `/wl commandes` | Commandes d'artisanat |
 | `/wl reglages` | Réglages (aussi `/wlo`) |
 | `/wl idee` | Proposer une idée ou signaler un bug |
 | `/wl aide` | Toutes les commandes |
@@ -77,7 +86,7 @@ En jeu, `/wl idee` te donne le lien déjà rempli avec ta version.
 - **Le dossier s'appelle `WLHelper`** depuis la 1.0.0-beta.4 (avant : `DungeonGuide`). Si tu avais installé une
   ancienne version à la main, supprime le dossier `DungeonGuide`. S'il traîne encore, l'addon le
   désactive tout seul et te le dit.
-- **Versions** : `1.0.0-beta.10` veut dire bêta de la 1.0. Le détail de chaque version est dans le
+- **Versions** : `1.0.0-beta.11` veut dire bêta de la 1.0. Le détail de chaque version est dans le
   [CHANGELOG](CHANGELOG.md).
 
 ## Crédits et licence
