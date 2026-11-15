@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.66] — 2026-11-15
+
+### Corrigé / Fixed
+- **Fenêtre des boss** : les portraits sont rognés et découpés en rond pour que leur bord gris ne dépasse plus ; plus d'icône décorative à côté du nom du donjon.
+  *Boss panel: portraits cropped round, no decorative header icon.*
+
 ## [1.0.0-beta.65] — 2026-11-15
 
 ### Corrigé / Fixed

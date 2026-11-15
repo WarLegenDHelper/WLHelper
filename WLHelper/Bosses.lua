@@ -1129,7 +1129,22 @@ local function Disc(parent, layer, r, g, b, a, sub)
 end
 
 -- the one face shown: the pooled portrait, the live unit portrait or the painted icon
+local function RoundFace(b, tex)
+  if not tex or tex == b.fb then return end
+  -- the game's portraits carry a grey rim, a bit off centre: crop it (each time: drawing a
+  -- portrait resets the coordinates) and cut the face round (once)
+  pcall(tex.SetTexCoord, tex, 0.07, 0.93, 0.07, 0.93)
+  if tex.wlRound then return end
+  tex.wlRound = true
+  if b.face.CreateMaskTexture and tex.AddMaskTexture then
+    local m = b.face:CreateMaskTexture()
+    m:SetTexture(MASK, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    m:SetPoint("TOPLEFT", b.face, "TOPLEFT", 1, -1); m:SetPoint("BOTTOMRIGHT", b.face, "BOTTOMRIGHT", -1, 1)
+    pcall(tex.AddMaskTexture, tex, m)
+  end
+end
 local function ShowFace(b, cur)
+  RoundFace(b, cur)
   b.fb:SetShown(cur == b.fb)
   b.live:SetShown(cur == b.live)
   if b.pooled and b.pooled.tex ~= cur then b.pooled.tex:Hide() end
@@ -1410,8 +1425,9 @@ local function Build()
   P:SetScript("OnLeave", ns.HideTip)
   local S = ns.S
   -- header: the dungeon (portal icon, name), then new run / attach / close on the right
-  P.icon = ns.Icon(P, "portal", 16, "ARTWORK", T.gold)
-  P.icon:SetPoint("TOPLEFT", PAD, -8)
+  -- no decorative icon: the dungeon name alone (an invisible 1 px anchor keeps the title's place code)
+  P.icon = P:CreateTexture(nil, "ARTWORK"); P.icon:SetSize(1, 16); P.icon:SetAlpha(0)
+  P.icon:SetPoint("TOPLEFT", PAD - 6, -8)
   P.title = ns.Text(P, ns.F.heading, T.gold, true)
   P.title:SetPoint("LEFT", P.icon, "RIGHT", 6, 0)
   P.title:SetWordWrap(false)
