@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.30] — 2026-11-15
+
+### Corrigé / Fixed
+- Améliorations : la ligne « WL Helper · spé : % » revient dans les infobulles avec Geared Forever installé, y compris le pourcentage négatif en rouge quand l'objet est moins bien (son chiffre, lu dans les deux sens).
+  *Upgrades: the tooltip line is back with Geared Forever installed, negative percent included.*
+
 ## [1.0.0-beta.29] — 2026-11-15
 
 ### Corrigé / Fixed

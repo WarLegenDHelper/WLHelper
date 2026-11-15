@@ -49,13 +49,16 @@ local function GFSpec()
     return key:sub(1, 1):upper() .. key:sub(2)
 end
 -- true + "+24%" / false / nil when Geared Forever wrote nothing yet (item not loaded)
-local function GFRead(link)
+-- Geared Forever's verdict for your spec's line: a signed percent (up arrow +, down arrow -),
+-- "empty" for an empty slot, "equipped", or nil when it wrote nothing yet (item not loaded)
+local GF_DOWN = "GearedForever\\Media\\ArrowDown"
+local function GFVerdict(link)
     if not gfTip then gfTip = CreateFrame("GameTooltip", "WLHelperGFTip", nil, "GameTooltipTemplate") end
     gfTip:SetOwner(WorldFrame, "ANCHOR_NONE")
     gfTip:ClearLines()
     if not pcall(gfTip.SetHyperlink, gfTip, link) then gfTip:Hide(); return false end
     local want = GFSpec()
-    local saw, best = false, nil
+    local saw, best, equipped = false, nil, false
     for i = 1, gfTip:NumLines() do
         local left = _G["WLHelperGFTipTextLeft" .. i]
         local right = _G["WLHelperGFTipTextRight" .. i]
@@ -63,23 +66,31 @@ local function GFRead(link)
         if l and l:find("^Geared Forever") then saw = true
         elseif saw and l and (not want or l == want) then
             local r = right and right:GetText()
-            if r and r:find(GF_ARROW, 1, true) then
+            if r then
                 local plain = r:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+                if plain:lower():find("equipped", 1, true) then equipped = true end
+                -- one-hand weapons can show both hands: keep the best
                 for chunk in plain:gmatch("[^,]+") do
-                    if chunk:find(GF_ARROW, 1, true) then
-                        local n = tonumber(chunk:match("(%d+)%%"))
-                        if chunk:find("empty slot", 1, true) then n = 1000 end
-                        if n and (not best or n > best) then best = n end
-                    end
+                    local n = tonumber(chunk:match("(%d+)%%"))
+                    if chunk:find("empty slot", 1, true) then n = 1000
+                    elseif n and chunk:find(GF_DOWN, 1, true) then n = -n
+                    elseif n and not chunk:find(GF_ARROW, 1, true) then n = nil end
+                    if n and (not best or n > best) then best = n end
                 end
-                best = best or 1
             end
         end
     end
     gfTip:Hide()
-    if best then return true, best >= 1000 and L("vide") or ("+" .. best .. "%"), best end
+    if best then return best end
+    if equipped then return "equipped" end
     if saw then return false end
     return nil
+end
+local function GFRead(link)
+    local v = GFVerdict(link)
+    if v == nil then return nil end
+    if type(v) == "number" and v > 0 then return true, v >= 1000 and L("vide") or ("+" .. v .. "%"), v end
+    return false
 end
 local tries, retryQueued = {}, false
 -- item IDs asked while not loaded yet: only their GET_ITEM_INFO_RECEIVED repaints the bags
@@ -131,7 +142,19 @@ local function IsUpgrade(link) return Check(link).up end
 
 -- ---------------------------------------------------------------- tooltip line
 local function TooltipLine(tip, link)
-    if not (Active() and link) or WLWritsDB.upgradeTip == false or UseGF() then return end
+    if not (Active() and link) or WLWritsDB.upgradeTip == false then return end
+    if UseGF() then
+        local v = GFVerdict(link)
+        local text, col
+        if v == "equipped" then text, col = L("équipé"), { 0.7, 0.7, 0.7 }
+        elseif type(v) == "number" and v >= 1000 then text, col = L("emplacement vide"), GREEN
+        elseif type(v) == "number" then
+            text = (v > 0 and "+" or "") .. v .. "%"
+            col = v > 0 and GREEN or (v < 0 and { 1, 0.35, 0.3 } or { 0.8, 0.8, 0.8 })
+        else return end
+        tip:AddDoubleLine("|cffce1918WL Helper|r · " .. (GFSpec() or W.SpecName()), text, 1, 1, 1, col[1], col[2], col[3])
+        return
+    end
     local can = W.CanWear(link)
     if not can then return end
     local spec = W.SpecName()
