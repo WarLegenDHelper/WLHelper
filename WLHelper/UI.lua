@@ -107,10 +107,124 @@ local function IsStepDone(log, i)
   if m == nil then m = IsStepDoneRaw(log, i) and true or false; doneMemo[i] = m end
   return m
 end
+-- A boss step: done once its boss died during this run and its quest lines are done (a quest item
+-- that did not drop, a talk or a loot after the kill keep it open; the tracker ticks the kill
+-- line meanwhile). Kept by hand afterwards, so leaving the dungeon does not undo it, but only
+-- after a kill seen in this session: kills read back from an old copy never stick. An optional
+-- boss (nothing for you there) is also done once a later boss of the same visit died: you went
+-- past it.
+local function BossStepDone(log, i, st)
+  if ns.BossStepKilled(st) then
+    if #st.acts > 0 and not StepAuto(log, st) then return false end
+    if not ns.BossRunLive or ns.BossRunLive() then SetManual(st, true) end
+    return true
+  end
+  local steps = Steps()
+  local later = false
+  for j = i + 1, #steps do
+    local s2 = steps[j]
+    if s2.ins ~= st.ins or s2.gate then break end
+    if s2.bossStep and ns.BossStepKilled(s2) then later = true break end
+  end
+  if later and ns.BossStepOptional(st, log) then return true end
+  return false
+end
+ns.BossStepDone = BossStepDone
+-- Out of a dungeon: its boss steps with nothing for you count as skipped.
+function ns.SkipOptionalBosses(dkey)
+  local log = ns.LogEntries()
+  for _, st in ipairs(Steps()) do
+    if st.bossStep and st.ins == dkey and not Manual(st) and ns.BossStepOptional(st, log) then SetManual(st, true) end
+  end
+end
+-- =====================================================================
+--  A boss step's lines: path, tactic (2-3 lines), loot for you
+-- =====================================================================
+local function Pick2(v) if type(v) ~= "table" then return v end return (ns.lang == "fr" and v[2]) or v[1] end
+-- "west from the entrance, up the ramp" (ns.BOSS_PATH, our own words) or nil
+function ns.BossPathText(dkey, en)
+  local t = ns.BOSS_PATH and ns.BOSS_PATH[dkey]
+  local v = t and en and t[en]
+  return v and Pick2(v) or nil
+end
+-- at most n sentences of a longer text, and about MAXTIP characters (cut at a word, "..."): a
+-- sentence ends at ".", "!" or "?" followed by a space and a capital, never after an abbreviation
+local ABBR = { Mr = true, Mrs = true, Dr = true, St = true, Mt = true, Lt = true, Sgt = true, Capt = true, Gen = true, Jr = true, Sr = true, vs = true, etc = true, ["e.g"] = true, ["i.e"] = true }
+local MAXTIP = 220
+local function Sentences(text, n)
+  local cut, k, pos = nil, 0, 1
+  while true do
+    local a, b = text:find("[%.!?]%s+", pos)
+    if not a then break end
+    local nextc = text:sub(b + 1, b + 1)
+    local word = text:sub(1, a - 1):match("([%a%.]+)$")
+    local isEnd = nextc:find("^[%u\195\197\"'(]") ~= nil
+      and not (text:sub(a, a) == "." and word and ABBR[word])
+    if isEnd then
+      k = k + 1
+      cut = a
+      if k >= n then break end
+    end
+    pos = b + 1
+  end
+  local out = (cut and k >= n) and text:sub(1, cut) or text
+  if #out > MAXTIP then
+    local s = out:sub(1, MAXTIP)
+    local sp = s:match("^.*()%s")
+    if sp and sp > MAXTIP / 2 then s = s:sub(1, sp - 1) end
+    -- never end inside a UTF-8 character
+    s = s:gsub("[\192-\255][\128-\191]*$", "")
+    out = s:gsub("[%s,;:]+$", "") .. "..."
+  end
+  return out
+end
+-- NaowhForever's tip for the boss (read live when it is loaded), else our own note
+-- (ns.BOSS_NOTES: { role, English, French } per line, "{Ability}" highlighted), else nil
+function ns.BossTacticText(st)
+  if not (st and st.bossStep) then return nil end
+  local tip = st.bossTip
+  local bo = ns.BossOrder and ns.BossOrder(st.ins)
+  local B = bo and bo.list and bo.list[st.bossIdx]
+  if B and B.en == st.bossEn and B.tip then tip = B.tip end
+  if type(tip) == "string" and tip ~= "" and not (issecretvalue and issecretvalue(tip)) then
+    return Hex(T.text) .. Sentences(tip, 3) .. "|r"
+  end
+  local notes = ns.BOSS_NOTES and ns.BOSS_NOTES[st.ins] and ns.BOSS_NOTES[st.ins][st.bossEn]
+  if not notes then return nil end
+  local ROLE = { tank = L.ROLE_TANK, heal = L.ROLE_HEAL, all = L.ROLE_ALL }
+  local lines = {}
+  for k, ln in ipairs(notes) do
+    if k > 3 then break end
+    local txt = (ns.lang == "fr" and ln[3]) or ln[2] or ""
+    txt = txt:gsub("{([^}]+)}", function(a) return Hex(T.warn) .. a .. "|r" .. Hex(T.text) end)
+    lines[#lines + 1] = Hex(T.muted) .. (ROLE[ln[1]] or L.ROLE_ALL) .. "|r  " .. Hex(T.text) .. txt .. "|r"
+  end
+  return #lines > 0 and table.concat(lines, "\n") or nil
+end
+local ARROW_UP = "|TInterface\\AddOns\\WLHelper\\Media\\Icons\\arrow_up:14:14:0:-1:128:128:0:128:0:128:76:208:122|t"
+-- the loot that matters: an upgrade (green arrow and its gain) or a quest item, 3 lines at most
+function ns.BossLootText(st)
+  local ok, list = pcall(ns.BossStepLoot, st)
+  if not (ok and type(list) == "table" and #list > 0) then return nil end
+  local lines = {}
+  for k, it in ipairs(list) do
+    if k > 3 then break end
+    local ic = it.icon and ("|T" .. tostring(it.icon) .. ":14:14:0:-1:64:64:5:59:5:59|t ") or ""
+    local name = it.link or it.name or "?"
+    if it.up then
+      lines[#lines + 1] = ic .. name .. "  " .. ARROW_UP .. Hex(T.ok) .. (it.text or "") .. "|r"
+    else
+      lines[#lines + 1] = ic .. name .. Hex(T.muted) .. "  ·  " .. L.LOOT_QUEST .. "|r"
+    end
+  end
+  return table.concat(lines, "\n")
+end
+
 IsStepDoneRaw = function(log, i)
   local st = Steps()[i]
   if not st then return false end
   if Manual(st) then return true end
+  if st.bossStep then return BossStepDone(log, i, st) end
   if st.gate then
     if InInstanceOf(st.gate) then SetManual(st, true) return true end
     local nxt = Steps()[i + 1]
@@ -326,6 +440,8 @@ local function StepTitle(st, noZone)
   if st.gate then return L.GATE_T:format(ns.DName(st.gate)) end
   if st.split then
     local pr = st.parts and st.parts > 1 and ("  (" .. st.part .. "/" .. st.parts .. ")") or ""
+    if st.bossStep then return L.BOSS_STEP_N:format(st.bossIdx, st.bossN or st.bossIdx, ns.BossStepName(st)) end
+    if st.way then return L.IN_WAY:format(st.wayName or "?") end
     if st.bossIdx == 0 then return L.IN_START .. pr end
     if st.bossIdx == 999 then return L.IN_TRASH .. pr end
     return L.BOSS_STEP:format(st.bossName or "?") .. pr
@@ -1633,7 +1749,7 @@ function ns.RenderInsideBand(k, log)
       if IsStepDone(log, i2) then doneIn = doneIn + 1
       else
         if not firstOpen then firstOpen = i2; openPos = nIn end
-        if not nextBoss and s2.split and s2.bossName and s2.bossIdx and s2.bossIdx >= 1 and s2.bossIdx <= 998 then nextBoss = s2.bossName end
+        if not nextBoss and s2.bossStep then nextBoss = ns.BossStepName(s2) end
       end
       for _, nd in ipairs(s2.acts) do
         if nd.q and nd.q > 0 and not qseen[nd.q] and (nd.kind == "a" or nd.kind == "c" or nd.kind == "t") then
@@ -1978,6 +2094,16 @@ Render = function()
     local used = (card.where:IsShown() and ((num(card.where:GetWidth()) or 0) + 6) or 0) + (card.clsChip:IsShown() and ((num(card.clsChip:GetWidth()) or 0) + 6) or 0)
     if used + (num(card.prePill:GetWidth()) or 0) > avail then card.prePill:Hide() end
   end
+  -- a boss with nothing for you: "Optional" (or "Rare"), it can be skipped
+  if st.bossStep and not done and (st.bossFlag == "rare" or ns.BossStepOptional(st, log)) then
+    local word = st.bossFlag == "rare" and L.BOSS_RARE_TAG or L.BOSS_OPT
+    card.prePill:Set(word, T.muted)
+    card.prePill.tip = { word, L.BOSS_OPT_TT }
+    local prev = card.clsChip:IsShown() and card.clsChip or (card.where:IsShown() and card.where or nil)
+    card.prePill:ClearAllPoints()
+    if prev then card.prePill:SetPoint("LEFT", prev, "RIGHT", 6, 0) else card.prePill:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -CI) end
+    card.prePill:Show()
+  end
   local y = CI + 18 + 8
   if chText and not chInPill then
     card.chapter:SetText(chText)
@@ -2074,7 +2200,15 @@ Render = function()
     local mine = tips and tips[(st.bossIdx == 0 and "*start") or (st.bossIdx == 999 and "*trash") or st.bossEn or ""]
     local tipLines = {}
     if mine then table.insert(tipLines, ns.T(mine[1])) end
-    if st.bossTip then table.insert(tipLines, Hex(T.muted) .. st.bossTip .. "|r") end
+    if st.bossStep then
+      -- the boss: where it stands, how to fight it (2-3 lines), what it drops for you
+      local path = ns.BossPathText and ns.BossPathText(st.ins, st.bossEn)
+      if path then table.insert(blocks, H1 .. L.H_PATH .. "|r\n" .. path) end
+      local tac = ns.BossTacticText and ns.BossTacticText(st)
+      if tac then table.insert(blocks, H1 .. L.H_TACTIC .. "|r\n" .. tac) end
+      local loot = ns.BossLootText and ns.BossLootText(st)
+      if loot then table.insert(blocks, H1 .. L.H_LOOT .. "|r\n" .. loot) end
+    elseif st.bossTip then table.insert(tipLines, Hex(T.muted) .. st.bossTip .. "|r") end
     if #tipLines > 0 then table.insert(blocks, H1 .. L.H_TIP .. "|r\n" .. table.concat(tipLines, "\n\n")) end
     if st.trash then
       local names, seen = {}, {}
@@ -2487,8 +2621,11 @@ function ns.UpdateActionBar()
     for _, n in ipairs(view) do if n.kind == "b" then grouped = true break end end
     if st.split then
       grouped = true
-      local cur = { names = {}, nseen = {}, num = (st.bossIdx and st.bossIdx > 0 and st.bossIdx < 999) and tostring(st.bossIdx) or "*" }
-      if st.bossEn then cur.nseen[st.bossEn] = true; table.insert(cur.names, st.bossEn) end
+      local cur = { names = {}, nseen = {}, num = st.bossStep and tostring(st.bossIdx) or "*" }
+      if st.bossStep and not ns.BossStepKilled(st) then
+        local bn = ns.BossStepName(st)
+        cur.nseen[bn] = true; table.insert(cur.names, bn)
+      end
       for _, n in ipairs(st.acts) do
         if not ns.NodeOK(log, n) then
           for _, t in ipairs(NodeTargets(n) or {}) do

@@ -22,7 +22,12 @@ local function StepKeys(steps)
   for i, st in ipairs(steps) do
     if st.gate then
       local nxt = steps[i + 1]
-      st.key = "g:" .. st.gate .. ":" .. (nxt and nxt.acts[1] and nxt.acts[1].key or i)
+      -- the next step's own key (a boss step's bkey: it may hold no quest line), never the index,
+      -- which moves on a replan
+      st.key = "g:" .. st.gate .. ":" .. ((nxt and (nxt.bkey or (nxt.acts[1] and nxt.acts[1].key))) or i)
+    elseif st.bkey then
+      -- a boss step keeps its key whatever quest lines it holds (its "done" survives a replan)
+      st.key = st.bkey
     else
       st.key = st.acts[1] and st.acts[1].key or ("s" .. i)
     end
@@ -182,6 +187,27 @@ local function GuideOn()
 end
 ns.GuideOn = GuideOn
 
+-- A boss died (Bosses.lua): its step completes, the guide moves on to the next boss.
+function ns.OnBossKilled()
+  if not (ns.route and GuideOn()) then return end
+  local f = ns.frame
+  if f and f:IsShown() then ns.Refresh() elseif ns.AfterRefresh then ns.AfterRefresh() end
+end
+-- The dungeon's NPC spawns are known (Bosses.lua): inside, the steps are placed again so the quest
+-- lines tied to no boss sit between the right bosses. Done steps keep their keys.
+local indexAfterCombat = false
+function ns.OnBossIndexReady()
+  if not (ns.route and ns.instIn and GuideOn()) then return end
+  -- in combat: placed again once it ends (the index is ready only once per session)
+  if InCombatLockdown and InCombatLockdown() then indexAfterCombat = true return end
+  indexAfterCombat = false
+  local f = ns.frame
+  local follow = f and (f.view == nil or f.view == f.auto)
+  ns.Assemble(false)
+  if f then f.auto, f.sig = nil, nil; if follow then f.view = nil end end
+  ns.Refresh(true)
+end
+
 -- The guide's dungeons that live in the instance you stand in (several wings can share one
 -- instance ID: Scarlet Monastery, Dire Maul, Stratholme). Class-quest cards are left out.
 function ns.InstanceKeys()
@@ -210,6 +236,8 @@ OnInstanceEntry = function()
     -- out of a route dungeon: the "inside" band goes away and the guide goes back to the current step
     local was = ns.instIn
     ns.instIn = nil
+    -- the bosses left behind with nothing for you count as skipped: the guide moves on
+    if was and ns.SkipOptionalBosses then ns.SkipOptionalBosses(was) end
     -- out of the instance: the replan that waited for it
     ReplanLater()
     local f = ns.frame
@@ -286,6 +314,7 @@ ev:SetScript("OnEvent", function(_, e)
   elseif e == "PLAYER_REGEN_ENABLED" then
     if ns.TargetPending() then ns.UpdateTargetButton() end
     ReplanLater()
+    if indexAfterCombat then pcall(ns.OnBossIndexReady) end
     if ns.frame and ns.frame:IsShown() then ns.Refresh()
     else
       -- the macro and the action bar wait for the end of combat even with the guide closed

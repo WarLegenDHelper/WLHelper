@@ -68,7 +68,8 @@ function TR.Action(n, st)
   else
     a.kind, a.text = "go", qn ~= "" and qn or "?"
   end
-  if st and st.split and st.bossName then a.sub = L.TR_BOSS:format(st.bossName) end
+  if st and st.bossStep then a.sub = L.TR_BOSS:format(ns.BossStepName(st))
+  elseif st and st.split and st.bossName then a.sub = L.TR_BOSS:format(st.bossName) end
   return a
 end
 
@@ -84,6 +85,12 @@ function TR.StepActions(i, st, log)
     return out
   end
   local acts = st.acts or {}
+  if st.bossStep then
+    -- the boss itself first: "Kill: Gahz'rilla", Boss 4 of 8
+    local killed = ns.BossStepKilled and ns.BossStepKilled(st) or false
+    out[#out + 1] = { kind = "boss", text = L.TR_KILL:format(ns.BossStepName(st)), st = st, i = i, done = killed and true or false,
+      sub = L.TR_BOSS_N:format(st.bossIdx, st.bossN or st.bossIdx) }
+  end
   if st.ins and not st.split and ns.StepView then
     local ok, v = pcall(ns.StepView, st, log)
     if ok and type(v) == "table" then acts = v end

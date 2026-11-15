@@ -164,6 +164,16 @@ ns.AddEnglish({
     ["Spé évaluée"] = "Rated spec",
     ["Auto"] = "Auto",
     ["Auto : l'arbre de talents où tu as le plus de points."] = "Auto: the talent tree with the most points.",
+    ["Spés à comparer"] = "Specs to compare",
+    ["Spé principale"] = "Main spec",
+    ["Celle de tes talents, ou celle choisie plus haut. Toujours sur la première ligne."] =
+        "The one from your talents, or the one picked above. Always on the first line.",
+    ["Comparer aussi : %s"] = "Also compare: %s",
+    ["Une ligne de plus dans les infobulles d'objet pour cette spé."] = "One more line in item tooltips for this spec.",
+    ["Flèche pour"] = "Arrow for",
+    ["Ma spé principale"] = "My main spec",
+    ["N'importe laquelle de mes spés"] = "Any of my specs",
+    ["Avec plusieurs spés, l'infobulle dit laquelle gagne."] = "With several specs, the tooltip says which one gains.",
     ["Affichage"] = "Display",
     ["Flèche à partir de"] = "Show the arrow from",
     ["Le gain minimum pour mettre la flèche sur un objet."] = "The smallest gain that puts the arrow on an item.",
@@ -851,6 +861,24 @@ function BUILD.upgrades(p)
     Choice(p, srow, Wt.SpecChoices(),
         function() local db, c = SpecDB(); return db[c] or "auto" end,
         function(v) local db, c = SpecDB(); db[c] = v; Refresh(); if Rebuild then C_Timer.After(0, Rebuild) end end)
+
+    -- dual or triple spec: the main spec always, the other specs of the class ticked here
+    Section(p, L("Spés à comparer"))
+    local mrow = Row(p, L("Spé principale"), L("Celle de tes talents, ou celle choisie plus haut. Toujours sur la première ligne."))
+    local mainName = ValueText(mrow, 200)
+    function mainName:Sync() self:SetText(Wt.SpecName()) end
+    mainName:Sync()
+    Place(p, mrow, mainName)
+    for _, spec in ipairs(Wt.OtherSpecs and Wt.OtherSpecs() or {}) do
+        local key = spec[1]
+        SwitchRow(p, string.format(L("Comparer aussi : %s"), Wt.SpecName(spec)),
+            function() return Wt.ExtraOn(key) end, function(v) Wt.SetExtra(key, v); Refresh() end,
+            L("Une ligne de plus dans les infobulles d'objet pour cette spé."))
+    end
+    local arow = Row(p, L("Flèche pour"), L("Avec plusieurs spés, l'infobulle dit laquelle gagne."))
+    Choice(p, arow, { { "main", L("Ma spé principale") }, { "any", L("N'importe laquelle de mes spés") } },
+        function() return WLWritsDB.upgradeArrowFor == "any" and "any" or "main" end,
+        function(v) WLWritsDB.upgradeArrowFor = (v == "any") and "any" or nil; Refresh() end)
 
     Section(p, L("Affichage"))
     local trow = Row(p, L("Flèche à partir de"), L("Le gain minimum pour mettre la flèche sur un objet."))

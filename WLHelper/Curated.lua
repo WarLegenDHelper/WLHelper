@@ -383,6 +383,69 @@ ns.GROUP_QUEST = { -- toute la quête se fait au même boss
 }
 
 -- =====================================================================
+--  Guide du donjon boss par boss (données et textes écrits pour l'addon)
+-- =====================================================================
+-- Une ligne de quête qu'aucun boss ne réclame : clé = id de quête, PNJ ou objectif ;
+-- valeur = "Boss" (à ce boss) ou "<Boss" (en route vers lui). Sinon : le boss le plus proche
+-- du PNJ d'après LibForeverData, sinon au début.
+ns.WALK_AT = {
+  ZulFarrak = { ["Tablet of Theka"] = "Theka the Martyr" },
+  Maraudon = { ["Celebras the Redeemed"] = "Celebras the Cursed" },
+}
+
+-- Où trouver le boss : une courte indication de chemin { anglais, français }.
+ns.BOSS_PATH = {
+  TheDeadmines = {
+    ["Rhahk'Zor"] = { "First big cave after the entrance tunnel, by the door to the mine.", "Première grande grotte après le tunnel d'entrée, près de la porte de la mine." },
+    ["Sneed's Shredder"] = { "Lumber mill, past the door Rhahk'Zor guarded.", "La scierie, après la porte que gardait Rhahk'Zor." },
+    ["Gilnid"] = { "The foundry, on the ledge along the molten channel.", "La fonderie, sur la corniche le long de la rigole de métal en fusion." },
+    ["Mr. Smite"] = { "Fire the cannon at the cove gate: Mr. Smite comes with the defenders.", "Tire au canon sur la porte de la crique : Mr. Smite arrive avec les défenseurs." },
+    ["Captain Greenskin"] = { "On the ship's deck.", "Sur le pont du navire." },
+    ["Edwin VanCleef"] = { "Captain's cabin at the top of the ship.", "La cabine du capitaine, en haut du navire." },
+    ["Cookie"] = { "In the ship's galley, below deck.", "Dans la cambuse du navire, sous le pont." },
+  },
+}
+
+-- Tactique courte quand le journal de Naowh n'est pas chargé : { rôle, anglais, français } par
+-- ligne (tank, heal, all), « {Capacité} » est mise en couleur. Trois lignes au plus.
+ns.BOSS_NOTES = {
+  TheDeadmines = {
+    ["Rhahk'Zor"] = { { "tank", "Hits hard but has no tricks: keep him facing away from the group.", "Frappe fort mais sans piège : garde-le dos au groupe." } },
+    ["Sneed's Shredder"] = { { "all", "When the Shredder breaks, Sneed jumps out: kill him too.", "Quand le Shredder casse, Sneed en sort : tue-le aussi." } },
+    ["Mr. Smite"] = { { "all", "{Smite Stomp} stuns everyone twice in the fight: heal through it.", "{Smite Stomp} étourdit tout le monde deux fois : soigne pendant." },
+      { "tank", "He swaps weapons after each stomp and hits harder.", "Il change d'arme après chaque piétinement et frappe plus fort." } },
+    ["Captain Greenskin"] = { { "all", "{Cleave}: only the tank stands in front.", "{Enchaînement} : seul le tank reste devant." } },
+    ["Edwin VanCleef"] = { { "all", "Calls two Blackguards at low health: kill VanCleef first.", "Appelle deux gardes noirs quand sa vie baisse : tue VanCleef en premier." } },
+    ["Cookie"] = { { "all", "He heals with his food: focus him down quickly.", "Il se soigne avec sa cuisine : tue-le vite." } },
+  },
+  ShadowfangKeep = {
+    ["Baron Silverlaine"] = { { "all", "{Veil of Shadow} (curse) cuts your heals: decurse it.", "{Voile d'ombre} (malédiction) réduit tes soins : décurse-le." } },
+    ["Commander Springvale"] = { { "all", "{Holy Light}: interrupt it.", "{Lumière sacrée} : interromps-la." } },
+    ["Odo the Blindwatcher"] = { { "all", "His howl fears the group: fight him away from other packs.", "Son hurlement apeure le groupe : combats-le loin des autres groupes." } },
+    ["Fenrus the Devourer"] = { { "heal", "{Toxic Saliva}: cure the poison.", "{Salive toxique} : guéris le poison." } },
+    ["Archmage Arugal"] = { { "all", "He teleports between ledges and casts {Void Bolt}: interrupt it.", "Il se téléporte de corniche en corniche et lance {Trait du Vide} : interromps-le." } },
+  },
+  WailingCaverns = {
+    ["Lady Anacondra"] = { { "all", "{Sleep}: dispel it; interrupt her {Lightning Bolt}.", "{Sommeil} : dissipe-le ; interromps son {Éclair}." } },
+    ["Lord Pythas"] = { { "all", "Interrupt his {Healing Touch}.", "Interromps son {Toucher guérisseur}." } },
+    ["Lord Serpentis"] = { { "all", "Interrupt his {Healing Touch}.", "Interromps son {Toucher guérisseur}." } },
+    ["Mutanus the Devourer"] = { { "heal", "{Naralex's Nightmare} puts a player to sleep: dispel it.", "{Cauchemar de Naralex} endort un joueur : dissipe-le." } },
+  },
+}
+
+-- Butin notable des boss (objets d'équipement, ids du jeu) : l'addon n'affiche que ceux que
+-- l'outil d'équipement de WL Helper juge meilleurs que les tiens.
+ns.BOSS_LOOT = {
+  TheDeadmines = {
+    ["Rhahk'Zor"] = { 872, 5187 },
+    ["Gilnid"] = { 5199 },
+    ["Mr. Smite"] = { 7230 },
+    ["Cookie"] = { 5197, 5198 },
+    ["Edwin VanCleef"] = { 5191, 5193, 10399 },
+  },
+}
+
+-- =====================================================================
 --  Conseils d'étape (rédigés pour l'addon, en anglais et en français)
 --  clé : nom anglais du boss, ou "*start" (sur le chemin) / "*trash" (à finir dans le donjon)
 -- =====================================================================

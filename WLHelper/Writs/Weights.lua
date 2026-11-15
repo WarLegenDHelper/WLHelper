@@ -172,6 +172,63 @@ function W.SpecNameFor(text)
     end
     return text
 end
+-- the key ("frost", "prot") of one of your class's specs written by another addon ("Frost",
+-- "Protection", "affli"), or nil
+function W.SpecKeyFor(text)
+    if type(text) ~= "string" or text == "" then return nil end
+    local function N(x) return (x:lower():gsub("[%s%-_]", "")) end
+    local norm = N(text)
+    local list = SPECS[Class()] or {}
+    for _, s in ipairs(list) do
+        if s[1] == norm or N(s[3]) == norm or N(s[2]) == norm then return s[1] end
+    end
+    -- a shortened or longer key ("affli" for "aff"): the start of the name
+    for _, s in ipairs(list) do
+        if #norm >= 3 and (N(s[3]):sub(1, #norm) == norm or norm:sub(1, #s[1]) == s[1]) then return s[1] end
+    end
+    return nil
+end
+-- ---------------------------------------------------------------- several specs (dual or triple spec)
+-- Settings > Upgrades > Specs to compare: the main spec (above) is always judged, first; the other
+-- specs of the class ticked there are judged too. Saved per class: WLWritsDB.upgradeExtra[class][key].
+function W.SpecByKey(key)
+    for _, s in ipairs(SPECS[Class()] or {}) do if s[1] == key then return s end end
+    return nil
+end
+local function ExtraDB(create)
+    if not WLWritsDB then return nil end
+    local class = Class()
+    if create then
+        WLWritsDB.upgradeExtra = WLWritsDB.upgradeExtra or {}
+        WLWritsDB.upgradeExtra[class] = WLWritsDB.upgradeExtra[class] or {}
+    end
+    return WLWritsDB.upgradeExtra and WLWritsDB.upgradeExtra[class]
+end
+function W.ExtraOn(key) local db = ExtraDB(); return db and db[key] == true or false end
+function W.SetExtra(key, on)
+    local db = ExtraDB(true)
+    if db then db[key] = on and true or nil end
+end
+-- the specs judged: { main, extra... } (class order for the extras, the main spec never twice)
+function W.CompareSpecs()
+    local main = W.Spec()
+    if not main then return {} end
+    local out = { main }
+    for _, s in ipairs(SPECS[Class()] or {}) do
+        if s ~= main and W.ExtraOn(s[1]) then out[#out + 1] = s end
+    end
+    return out
+end
+-- true when at least one extra spec is ticked (the tooltip then shows one line per spec)
+function W.MultiSpec() return #W.CompareSpecs() > 1 end
+-- the class's specs other than the main one: { spec, ... } (the settings' check list)
+function W.OtherSpecs()
+    local main = W.Spec()
+    local out = {}
+    for _, s in ipairs(SPECS[Class()] or {}) do if s ~= main then out[#out + 1] = s end end
+    return out
+end
+
 -- { { "auto", label }, { key, label }... } for a segmented choice
 function W.SpecChoices()
     local out = { { "auto", L("Auto") } }
@@ -383,9 +440,10 @@ end
 local function Equipped(slot) return GetInventoryItemLink("player", slot) end
 
 -- Gain of an item against what you wear: percent (number), or "empty" for an empty slot; nil when it
--- is not for you / not better. Second value: the slot compared.
-function W.Gain(link)
-    local spec = W.Spec()
+-- is not for you / not better. Second value: the slot compared. spec: one of W.SPECS (default: the
+-- main spec).
+function W.Gain(link, spec)
+    spec = spec or W.Spec()
     if not spec then return nil end
     local can = W.CanWear(link)
     if not can then return nil end

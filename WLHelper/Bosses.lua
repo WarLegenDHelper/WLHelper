@@ -108,14 +108,18 @@ local function ScanBatch(lib, n)
   return scanPos > #scanIds
 end
 
+local nearCache = {}
 local function Finish()
   building = false
   indexReady = true
   scanIds = nil
   for k in pairs(mobsCache) do mobsCache[k] = nil end
+  for k in pairs(nearCache) do nearCache[k] = nil end
   local list = onReady
   onReady = {}
   for _, fn in ipairs(list) do pcall(fn) end
+  -- the guide places the dungeon's NPCs between the right bosses once their spawns are known
+  if ns.OnBossIndexReady then pcall(ns.OnBossIndexReady) end
 end
 
 local function StartIndex(sync)
@@ -163,11 +167,21 @@ local function LocalName(id, en, journal)
   return en
 end
 
--- ---------------------------------------------------------------- kills (this visit)
+-- ---------------------------------------------------------------- kills (this run)
+-- One run = one copy of the instance: GetInstanceInfo's instance ID plus a run number. A new run
+-- starts when you enter another instance, when the instance was reset (the system message), when
+-- you come back more than 30 minutes after leaving (a logout inside counts as leaving), when you
+-- were last seen inside more than 30 minutes ago, 4 hours after the run began, or when a boss
+-- counted as killed stands alive out of combat (a copy reset by someone else). Leaving and coming
+-- back soon (a wipe, a corpse run, a /reload) keeps the run and its kills.
+-- WLDTDB.bossKills = { iid, run, t, left, reset, names = {}, ids = {}, enc = {}, objs = {} }
 local function Kills()
   local db = DB()
-  db.bossKills = db.bossKills or { names = {}, ids = {} }
-  return db.bossKills
+  local k = db.bossKills or {}
+  db.bossKills = k
+  k.names = k.names or {}; k.ids = k.ids or {}; k.enc = k.enc or {}
+  k.run = k.run or 0
+  return k
 end
 local function CurrentInstance()
   if not GetInstanceInfo then return nil end
@@ -175,6 +189,7 @@ local function CurrentInstance()
   if not ok or (kind ~= "party" and kind ~= "raid") then return nil end
   return num(id)
 end
+local function Now() return (GetServerTime and GetServerTime()) or (time and time()) or 0 end
 -- The kill objectives already finished when the visit starts ("qid:index"): a boss killed in an
 -- earlier lockout, its quest not turned in yet, is not "killed" in this fresh instance.
 local function KillSnapshot()
@@ -191,17 +206,72 @@ local function KillSnapshot()
   end
   return snap
 end
--- Entering an instance: a different one, or the same after 4 hours, starts a new visit.
-local function NewVisitCheck()
+-- the run in which a kill was seen during this session (kills read back from the saved
+-- variables alone may belong to a copy that is gone: the guide keeps nothing for good on them)
+local liveIid, liveRun
+local function NewRun(k, iid)
+  k.iid, k.names, k.ids, k.enc, k.encNpc = iid, {}, {}, {}, {}
+  k.run = (k.run or 0) + 1
+  k.start, k.reset, k.left = Now(), nil, nil
+  k.objs = KillSnapshot()
+end
+-- Inside an instance: a new run when it is another instance, or the same one reset or left long ago.
+-- Outside: remember when you left.
+-- entering: a loading screen into the instance (a stale "last seen inside" counts only then)
+local function NewVisitCheck(entering)
   local iid = CurrentInstance()
-  if not iid then return end
   local k = Kills()
-  local now = (GetServerTime and GetServerTime()) or (time and time()) or 0
-  if k.iid ~= iid or not k.t or now - k.t > 4 * 3600 then
-    k.iid, k.names, k.ids = iid, {}, {}
-    k.objs = KillSnapshot()
+  local now = Now()
+  if not iid then
+    if k.iid and not k.left then k.left = now end
+    return
   end
+  if k.iid ~= iid or k.reset or not k.start or now - k.start > 4 * 3600
+    or (k.left and now - k.left > 30 * 60)
+    or (entering and not k.left and k.t and now - k.t > 30 * 60) then
+    NewRun(k, iid)
+  end
+  k.left = nil
   k.t = now
+end
+ns.BossVisitCheck = NewVisitCheck
+-- still inside the run's copy: remember when (combat, logout), so a stale run is told apart
+local function Touch(leaving)
+  local iid = CurrentInstance()
+  local k = Kills()
+  if not (iid and k.iid == iid) then return end
+  k.t = Now()
+  if leaving then k.left = k.t end
+end
+ns.BossTouch = Touch
+-- Was a kill of the current run seen during this session? Only then does the guide keep a boss
+-- step done for good.
+function ns.BossRunLive()
+  local k = Kills()
+  return liveRun ~= nil and liveIid == k.iid and liveRun == k.run
+end
+-- The run you are in (or the last one): instance ID, run number.
+function ns.BossRun()
+  local k = Kills()
+  return k.iid, k.run
+end
+-- The instance was reset (the leader's reset, or a test): the next entry starts a new run.
+function ns.ResetBossRun()
+  local k = Kills()
+  k.reset = true
+  if CurrentInstance() then NewVisitCheck() end
+end
+
+-- Was this boss killed during the current run of its dungeon? names: English and local names,
+-- ids: NPC ids, enc: encounter IDs (any may be nil).
+function ns.BossKilled(dkey, names, ids, enc)
+  local d = dkey and ns.D and ns.D[dkey]
+  local k = Kills()
+  if not (d and d.inst and k.iid == d.inst) then return false end
+  for _, nm in ipairs(names or {}) do if nm and k.names[nm] then return true end end
+  for _, id in ipairs(ids or {}) do if id and k.ids[id] then return true end end
+  for _, e in ipairs(enc or {}) do if e and k.enc[e] then return true end end
+  return false
 end
 
 -- ---------------------------------------------------------------- data per dungeon
@@ -398,6 +468,9 @@ local function Dynamic(res)
     rec.killed = false
     if fresh and (k.names[rec.en] or (rec.name and k.names[rec.name])) then rec.killed = true end
     if fresh then for _, id in ipairs(rec.ids or {}) do if k.ids[id] then rec.killed = true end end end
+    if fresh and rec.journal and type(rec.journal.enc) == "table" then
+      for _, e in ipairs(rec.journal.enc) do if k.enc[e] then rec.killed = true end end
+    end
     for _, qid in ipairs(pool) do
       local q = ns.Q[qid]
       if q and q.o and not ns.IsDone(qid) then
@@ -407,7 +480,11 @@ local function Dynamic(res)
             local okD, v = pcall(ns.ObjDone, log, qid, o)
             if okD then done = v end
             -- finished now but not when the visit started: killed during this visit
-            if o.k == "kill" and done and log[qid] and fresh and k.objs and not k.objs[qid .. ":" .. oi] then rec.killed = true end
+            if o.k == "kill" and done and log[qid] and fresh and k.objs and not k.objs[qid .. ":" .. oi] then
+              rec.killed = true
+              -- the guide's boss step reads the run's kills: this one counts too
+              k.names[rec.en] = true
+            end
             if not done then
               table.insert(rec.quests, { qid = qid, kind = o.k == "item" and "item" or "kill", item = o.n })
             end
@@ -437,6 +514,121 @@ function ns.DungeonMobs(dkey, sync)
   for _, rec in ipairs(res.rares) do rec.name = LocalName(rec.id, rec.en, rec.journal) end
   Dynamic(res)
   return res
+end
+
+-- ---------------------------------------------------------------- the guide's walkthrough
+-- A boss's name as this client writes it (the strip's list when built, else the English name).
+function ns.BossLocalName(dkey, en)
+  local res = dkey and mobsCache[dkey]
+  if res then for _, r in ipairs(res.bosses) do if r.en == en then return LocalName(r.id, r.en, r.journal) end end end
+  return en
+end
+-- The NPC ids of a boss on the dungeon's map (LibForeverData, once the index is ready).
+function ns.BossNpcIds(dkey, en)
+  local res = dkey and mobsCache[dkey]
+  if res then for _, r in ipairs(res.bosses) do if r.en == en then return r.ids end end end
+  return nil
+end
+
+-- name -> spawn points of every NPC on the dungeon's map (LibForeverData, once the index is ready)
+local function MapSpawns(dkey)
+  if nearCache[dkey] ~= nil then return nearCache[dkey] end
+  local d = ns.D[dkey]
+  local lib = Lib()
+  if not (d and d.inst and lib and indexReady) then return nil end
+  local out = {}
+  for _, id in ipairs(index[d.inst] or {}) do
+    local ok, nm = pcall(lib.Name or function() return nil end, "npc", id)
+    if not (ok and nm) then
+      local okG, r = pcall(lib.Get, "npc", id)
+      nm = okG and type(r) == "table" and r.name or nil
+    end
+    if nm then
+      local l = out[nm] or {}
+      out[nm] = l
+      for _, p in ipairs(SpawnPts(lib, id)) do if p.map == d.inst then l[#l + 1] = p end end
+    end
+  end
+  nearCache[dkey] = out
+  return out
+end
+-- The boss (English name, from `bosses`, a list of names) standing nearest to an NPC of the
+-- dungeon: the guide puts that NPC's quest step on the way to this boss. nil when unknown.
+function ns.BossNear(dkey, npcName, bosses)
+  if not (dkey and npcName and bosses) then return nil end
+  local sp = MapSpawns(dkey)
+  local mine = sp and sp[(npcName:gsub(",.*$", ""))]
+  if not (mine and #mine > 0) then return nil end
+  local best, bestD
+  for _, en in ipairs(bosses) do
+    local pts = sp[en]
+    local dd = pts and MinDist(mine, pts)
+    if dd and (not bestD or dd < bestD) then best, bestD = en, dd end
+  end
+  return best
+end
+
+-- Quest items a boss drops that an open quest of your log still needs (LibForeverData, read live).
+-- A quest item drops only while you have its quest, so only the log's quests are looked at: their
+-- item objectives, then where each item drops. Nothing is scanned in bulk. Kept for one read of
+-- the quest log (ns.LogEntries gives the same table for one frame).
+-- -> npc id -> { { id, name, chance, qid } }
+local needMemo, needLog
+local function ItemCount(id)
+  local count = (C_Item and C_Item.GetItemCount) or GetItemCount
+  if not (count and id) then return 0 end
+  local ok, n = pcall(count, id)
+  return (ok and num(n)) or 0
+end
+local function QuestNeeds()
+  local lib = Lib()
+  local log = ns.LogEntries and ns.LogEntries() or {}
+  if not lib then return {} end
+  if needLog == log and needMemo then return needMemo end
+  local out = {}
+  local getQ = lib.Quest or function(id) return lib.Get("quest", id) end
+  for qid, e in pairs(log) do
+    if type(e) == "table" and not e.complete then
+      local okQ, q = pcall(getQ, qid)
+      for _, o in ipairs(okQ and type(q) == "table" and type(q.objectives) == "table" and q.objectives or {}) do
+        -- still needed: fewer in the bags than the objective asks for
+        if o.kind == "item" and num(o.target) and ItemCount(o.target) < (num(o.count) or 1) then
+          local okI, it = pcall(lib.Get, "item", o.target)
+          if okI and type(it) == "table" then
+            for _, src in ipairs(it.sources or {}) do
+              if src.kind == "npc" and src.id and (num(src.chance) or 100) >= 20 then
+                local l = out[src.id] or {}
+                out[src.id] = l
+                l[#l + 1] = { id = it.id or o.target, name = it.name, chance = num(src.chance), qid = qid }
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  needMemo, needLog = out, log
+  return out
+end
+ns.BossQuestNeeds = QuestNeeds
+
+-- What a boss drops that matters to you: our own list (ns.BOSS_LOOT, gear) and the quest items it
+-- drops for a quest of your log that still needs them.
+-- -> { { id, name, quest = true|nil, qid } } (nil names: ask the game)
+function ns.BossLoot(dkey, en, npcIds)
+  local out, seen = {}, {}
+  local mine = ns.BOSS_LOOT and ns.BOSS_LOOT[dkey] and ns.BOSS_LOOT[dkey][en]
+  for _, id in ipairs(mine or {}) do if not seen[id] then seen[id] = true; out[#out + 1] = { id = id } end end
+  local ids = npcIds or ns.BossNpcIds(dkey, en)
+  if ids then
+    local need = QuestNeeds()
+    for _, nid in ipairs(ids) do
+      for _, x in ipairs(need[nid] or {}) do
+        if not seen[x.id] then seen[x.id] = true; out[#out + 1] = { id = x.id, name = x.name, quest = true, qid = x.qid } end
+      end
+    end
+  end
+  return out
 end
 
 -- ---------------------------------------------------------------- the strip of heads
@@ -1090,7 +1282,7 @@ local function DungeonHere()
 end
 
 local function OnEntering()
-  NewVisitCheck()
+  NewVisitCheck(true)
   local dkey, iid = DungeonHere()
   if not iid then
     -- out of the dungeon: the strip opened for it goes away
@@ -1098,40 +1290,108 @@ local function OnEntering()
     for k in pairs(dismissed) do dismissed[k] = nil end
     return
   end
-  if Lib() then StartIndex(false) end
+  if Lib() then
+    StartIndex(false)
+    -- the dungeon's boss list (local names, NPC ids) is built even with the strip hidden: the
+    -- guide matches kills on it (a French ENCOUNTER_END name, a boss without encounter ID)
+    if dkey then
+      local function warm() pcall(ns.DungeonMobs, dkey) end
+      if indexReady then warm() else onReady[#onReady + 1] = warm end
+    end
+  end
   local guideOn = (not ns.GuideOn) or ns.GuideOn()
   if dkey and guideOn and DB().bossAuto ~= false and not dismissed[iid] then
     if not (P and P:IsShown() and P.dkey == dkey) then ns.ShowBosses(dkey, true) end
   end
 end
 
-local function MarkKilled(name, id)
+-- the guide follows a kill: its boss step completes (one refresh, a moment later)
+local guidePending = false
+local function GuideAfterKill()
+  if guidePending then return end
+  guidePending = true
+  local function go()
+    guidePending = false
+    if ns.OnBossKilled then pcall(ns.OnBossKilled) end
+  end
+  if C_Timer and C_Timer.After then C_Timer.After(0.3, go) else go() end
+end
+
+local function MarkKilled(name, id, enc, en)
   if not CurrentInstance() then return end
   NewVisitCheck()
   local k = Kills()
   local hit = false
   if name and name ~= "" then k.names[name] = true; hit = true end
+  if en and en ~= "" then k.names[en] = true; hit = true end
   if id then k.ids[id] = true; hit = true end
-  if hit then ns.RefreshBosses() end
+  if enc then k.enc[enc] = true; hit = true end
+  if hit then liveIid, liveRun = k.iid, k.run; ns.RefreshBosses(); GuideAfterKill() end
+end
+ns.BossMarkKilled = MarkKilled
+
+-- A boss counted as killed stands alive, attackable and out of combat: this is another copy of the
+-- instance (reset by the group leader, or entered again after a logout), a new run.
+local function AliveCheck(unit, rec, id)
+  -- (the caller saw it alive: UnitIsDead gave a plain false)
+  if InCombat() then return false end
+  local k = Kills()
+  local iid = CurrentInstance()
+  if not (iid and k.iid == iid) then return false end
+  if not ((id and k.ids[id]) or (rec.en and k.names[rec.en])) then return false end
+  local okA, atk = pcall(UnitCanAttack or function() return nil end, "player", unit)
+  if not (okA and bool(atk) == true) then return false end
+  local okC, fight = pcall(UnitAffectingCombat or function() return true end, unit)
+  if not (okC and bool(fight) == false) then return false end
+  NewRun(k, iid)
+  k.t = Now()
+  ns.RefreshBosses()
+  GuideAfterKill()
+  return true
 end
 
-local function TargetCheck()
-  if not (P and P:IsShown() and P.res) then return end
-  if not (UnitExists and UnitExists("target")) then return end
-  local id = NpcIdOf("target")
-  local okN, nm = pcall(UnitName, "target")
+-- The bosses a unit may be: the strip's heads when it shows, else the dungeon's boss list (the
+-- list built for the strip, or the walk order) -> list of { en, name, ids }
+local function Candidates()
+  if P and P:IsShown() and P.res then
+    local out = {}
+    for _, list in ipairs({ P.res.bosses, P.res.rares }) do for _, r in ipairs(list) do out[#out + 1] = r end end
+    return out, true
+  end
+  local dkey = DungeonHere()
+  if not dkey then return {}, false end
+  local res = mobsCache[dkey]
+  if res then
+    local out = {}
+    for _, r in ipairs(res.bosses) do out[#out + 1] = r end
+    for _, r in ipairs(res.rares) do out[#out + 1] = r end
+    return out, false
+  end
+  local out = {}
+  local bo = ns.BossOrder and ns.BossOrder(dkey)
+  for _, b in ipairs(bo and bo.list or {}) do out[#out + 1] = { en = b.en, name = b.name, ids = b.npc and { b.npc } or {} } end
+  return out, false
+end
+
+-- Your target (or the mob under the mouse) is one of the dungeon's bosses: learn its creature type,
+-- and a dead one counts as killed (the strip's head and the guide's boss step).
+local function TargetCheck(unit)
+  unit = unit or "target"
+  if not (UnitExists and UnitExists(unit)) then return end
+  local list, strip = Candidates()
+  if #list == 0 then return end
+  local id = NpcIdOf(unit)
+  local okN, nm = pcall(UnitName, unit)
   nm = okN and str(nm)
   local rec
-  for _, list in ipairs({ P.res.bosses, P.res.rares }) do
-    for _, r in ipairs(list) do
-      if (nm and (r.name == nm or r.en == nm)) then rec = r end
-      if id then for _, x in ipairs(r.ids or {}) do if x == id then rec = r end end end
-    end
+  for _, r in ipairs(list) do
+    if (nm and (r.name == nm or r.en == nm)) then rec = r end
+    if id then for _, x in ipairs(r.ids or {}) do if x == id then rec = r end end end
   end
   if not rec then return end
   -- learn its creature type for the painted icon
-  if UnitCreatureType then
-    local okT, ty = pcall(UnitCreatureType, "target")
+  if strip and UnitCreatureType then
+    local okT, ty = pcall(UnitCreatureType, unit)
     ty = okT and str(ty)
     if ty and TYPE_ICON[ty] then
       local db = DB()
@@ -1139,13 +1399,32 @@ local function TargetCheck()
       if db.bossType[rec.en] ~= ty then db.bossType[rec.en] = ty; pending.render = true end
     end
   end
-  local okD, dead = pcall(UnitIsDead or function() return false end, "target")
-  if okD and bool(dead) == true then MarkKilled(rec.en, id) end
+  local okD, dead = pcall(UnitIsDead or function() return false end, unit)
+  if okD and bool(dead) == false then AliveCheck(unit, rec, id) return end
+  if okD and bool(dead) == true then
+    local k = Kills()
+    -- already counted: nothing to do (a dead boss under the mouse fires this often)
+    if CurrentInstance() == k.iid and k.names[rec.en] then return end
+    MarkKilled(rec.name, id, nil, rec.en)
+  end
+end
+ns.BossTargetCheck = TargetCheck
+
+-- the game's "%s has been reset." as a pattern (nil when the client has no such string)
+local resetPat
+local function ResetPattern()
+  if resetPat == nil then
+    local g = _G.INSTANCE_RESET_SUCCESS
+    if type(g) == "string" and g:find("%s", 1, true) then
+      resetPat = "^" .. g:gsub("([%(%)%.%+%-%*%?%[%]%^%$])", "%%%1"):gsub("%%s", ".+") .. "$"
+    end
+  end
+  return resetPat or nil
 end
 
 local ev = CreateFrame("Frame")
-for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "ENCOUNTER_END", "BOSS_KILL",
-  "PLAYER_TARGET_CHANGED", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "NAME_PLATE_UNIT_ADDED", "UPDATE_MOUSEOVER_UNIT" }) do
+for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "ENCOUNTER_START", "ENCOUNTER_END", "BOSS_KILL", "PLAYER_LOGOUT",
+  "PLAYER_TARGET_CHANGED", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "NAME_PLATE_UNIT_ADDED", "UPDATE_MOUSEOVER_UNIT", "CHAT_MSG_SYSTEM" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
 -- the target's health only (a dead boss you look at counts as killed)
@@ -1156,23 +1435,52 @@ local questPending = false
 ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
   if e == "PLAYER_ENTERING_WORLD" then
     if C_Timer and C_Timer.After then C_Timer.After(2.5, OnEntering) else OnEntering() end
+  elseif e == "PLAYER_LOGOUT" then
+    -- a logout (or /reload) inside counts as leaving: back much later, it is another copy
+    Touch(true)
+  elseif e == "ENCOUNTER_START" then
+    -- encounterID, encounterName: the NPC ids of the boss frames, so its end matches the step even
+    -- when the encounter's name is in another language and the journal gives no encounter ID
+    local enc = num(a1)
+    if enc then
+      local k = Kills()
+      k.encNpc = k.encNpc or {}
+      local ids = {}
+      for b = 1, 5 do local id = NpcIdOf("boss" .. b); if id then ids[#ids + 1] = id end end
+      if #ids > 0 then k.encNpc[enc] = ids end
+    end
   elseif e == "PLAYER_REGEN_DISABLED" then
+    Touch()
     if P and P.wlMoving then P.wlMoving = nil; P:StopMovingOrSizing(); P.SavePos() end
   elseif e == "PLAYER_REGEN_ENABLED" then
+    Touch()
     if pending.hide then pending.hide = nil; if P then P:SetAlpha(1); P:Hide() end end
     if pending.show then local k, a = pending.show, pending.showAuto; pending.show, pending.showAuto = nil, nil; ns.ShowBosses(k, a) end
     if pending.render or pending.snap then pending.render, pending.snap = nil, nil; if P and P:IsShown() then Render() end end
     AlertAfterCombat()
   elseif e == "ENCOUNTER_END" then
     -- encounterID, encounterName, difficultyID, groupSize, success
-    if num(a5) == 1 then MarkKilled(str(a2)) end
+    if num(a5) == 1 then
+      local enc = num(a1)
+      local k = Kills()
+      local ids = enc and k.encNpc and k.encNpc[enc]
+      if ids then for _, id in ipairs(ids) do MarkKilled(nil, id) end end
+      MarkKilled(str(a2), nil, enc)
+    end
   elseif e == "BOSS_KILL" then
-    MarkKilled(str(a2))
+    -- encounterID, encounterName
+    MarkKilled(str(a2), nil, num(a1))
+  elseif e == "CHAT_MSG_SYSTEM" then
+    -- "Zul'Farrak has been reset.": the next entry is a new run
+    local msg = str(a1)
+    if msg and ResetPattern() and msg:match(ResetPattern()) then ns.ResetBossRun() end
   elseif e == "PLAYER_TARGET_CHANGED" then
+    Touch()
     SeenCheck("target")
-    TargetCheck()
+    TargetCheck("target")
   elseif e == "UPDATE_MOUSEOVER_UNIT" then
     SeenCheck("mouseover")
+    TargetCheck("mouseover")
   elseif e == "NAME_PLATE_UNIT_ADDED" then
     local unit = str(a1)
     if unit then
@@ -1180,7 +1488,7 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
       ns.RareAlert(unit)
     end
   elseif e == "UNIT_HEALTH" then
-    if a1 == "target" then TargetCheck() end
+    if a1 == "target" then TargetCheck("target") end
   elseif (e == "QUEST_LOG_UPDATE" or e == "QUEST_TURNED_IN") and P and P:IsShown() and not questPending then
     questPending = true
     local function go() questPending = false; ns.RefreshBosses() end

@@ -4,6 +4,8 @@
 -- The judge is WL Helper's own stat weights (Writs/Weights.lua): your class, your spec (the talent
 -- tree with the most points, or the one picked in Settings > Upgrades) and what you wear.
 -- Bags: the game's own and Baganator (corner widgets and its "upgrade" search).
+-- Several specs (Settings > Upgrades > Specs to compare): one tooltip line per spec ticked, the main
+-- spec first; the bag arrow follows the main spec, or any of them when the setting says so.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -24,6 +26,7 @@ ns.AddEnglish({
     ["Emplacement vide"] = "Empty slot",
     ["Équipable au niveau %d"] = "Equippable at level %d",
     ["Remplace"] = "Replaces",
+    ["Flèche verte pour : %s"] = "Green arrow for: %s",
 })
 
 local GREEN = T.ok        -- a gain
@@ -103,22 +106,26 @@ end
 -- Geared Forever's verdict for your spec's line: a signed percent (up arrow +, down arrow -),
 -- "empty" for an empty slot, "equipped", or nil when it wrote nothing yet (item not loaded)
 local GF_DOWN = "GearedForever\\Media\\ArrowDown"
+-- WL Helper Gear's Compare result read the same way: percent, 1000 (empty), "equipped", false, nil
+local function GearResult(res)
+    if not res then return nil end                      -- not cached yet: retried later
+    if res.canUse ~= true or res.blocked then return false end
+    if res.equipped then return "equipped" end
+    if res.empty then
+        -- an empty off hand: a main-hand result is in res.other
+        if res.other and res.other.pct then return res.other.pct end
+        return 1000
+    end
+    if res.unknown then return nil end
+    return res.pct or false
+end
 local function GFVerdict(link)
     local G = Gear()
     if G then
         SyncGearSpec(G)
         local ok, res = pcall(G.Compare, link)
         if not ok then return false end
-        if not res then return nil end                  -- not cached yet: retried later
-        if res.canUse ~= true or res.blocked then return false end
-        if res.equipped then return "equipped" end
-        if res.empty then
-            -- an empty off hand: a main-hand result is in res.other
-            if res.other and res.other.pct then return res.other.pct end
-            return 1000
-        end
-        if res.unknown then return nil end
-        return res.pct or false
+        return GearResult(res)
     end
     if not gfTip then gfTip = CreateFrame("GameTooltip", "WLHelperGFTip", nil, "GameTooltipTemplate") end
     gfTip:SetOwner(WorldFrame, "ANCHOR_NONE")
@@ -173,9 +180,20 @@ local function Pending(link)
     local id = tonumber(link:match("item:(%d+)"))
     if id then pending[id] = true end
 end
+-- an answer that is not there yet although the item is loaded (Gear cannot read what you wear yet):
+-- asked again in 1 s, at most 5 times per key, then false. Returns true once the tries are spent.
+local function Retry(key)
+    tries[key] = (tries[key] or 0) + 1
+    if tries[key] > 5 then return true end
+    if not retryQueued then
+        retryQueued = true
+        C_Timer.After(1, function() retryQueued = false; cache = {}; if WP.RefreshUpgrades then WP.RefreshUpgrades() end end)
+    end
+    return false
+end
 
--- { up = true/false, text = "+24%" }
-local function Check(link)
+-- { up = true/false, text = "+24%", n = gain } for the main spec
+local function CheckMain(link)
     if type(link) ~= "string" or not Active() then return NO end
     local c = cache[link]
     if c then return c end
@@ -189,15 +207,10 @@ local function Check(link)
         local up, text, n = GFRead(link)
         if up == nil then
             Pending(link)
-            tries[link] = (tries[link] or 0) + 1
-            if tries[link] > 5 then cache[link] = NO; return NO end
-            if not retryQueued then
-                retryQueued = true
-                C_Timer.After(1, function() retryQueued = false; cache = {}; if WP.RefreshUpgrades then WP.RefreshUpgrades() end end)
-            end
+            if Retry(link) then cache[link] = NO end
             return NO
         end
-        local r = (up and (n or 0) >= (WLWritsDB.upgradeMin or 1)) and { up = true, text = text } or NO
+        local r = (up and (n or 0) >= (WLWritsDB.upgradeMin or 1)) and { up = true, text = text, n = n } or NO
         cache[link] = r
         return r
     end
@@ -205,11 +218,137 @@ local function Check(link)
     if can == nil then Pending(link); return NO end   -- item not loaded yet: not cached, asked again later
     local gain = can and W.Gain(link)
     local r
-    if gain == "empty" then r = { up = true, text = L("vide") }
-    elseif type(gain) == "number" and gain >= (WLWritsDB.upgradeMin or 1) then r = { up = true, text = gain >= 999 and "+999%" or ("+" .. math.floor(gain + 0.5) .. "%") }
+    if gain == "empty" then r = { up = true, text = L("vide"), n = 1000 }
+    elseif type(gain) == "number" and gain >= (WLWritsDB.upgradeMin or 1) then r = { up = true, text = gain >= 999 and "+999%" or ("+" .. math.floor(gain + 0.5) .. "%"), n = gain }
     else r = NO end
     cache[link] = r
     return r
+end
+
+-- ---------------------------------------------------------------- several specs
+-- One verdict per spec: a percent (number), 1000 for an empty slot, "equipped", false (nothing to
+-- say: not for you, blocked) or nil (not loaded yet: asked again later). Cached per item link and
+-- spec; Refresh empties the cache (equipment, level and talent changes, settings).
+local specCache = {}
+local function Worn(link)
+    local equipLoc = select(9, ((C_Item and C_Item.GetItemInfo) or GetItemInfo)(link))
+    for _, s in ipairs(W.SLOTS[equipLoc or ""] or {}) do
+        if GetInventoryItemLink("player", s) == link then return true end
+    end
+    return false
+end
+-- WL Helper's weights for one spec
+local function WeightsVerdict(link, spec)
+    local can = W.CanWear(link)
+    if can == nil then return nil end
+    if not can then return false end
+    if Worn(link) then return "equipped" end
+    local gain = W.Gain(link, spec)
+    if gain == "empty" then return 1000 end
+    if type(gain) == "number" then return math.max(-999, math.min(999, gain)) end
+    return false
+end
+-- WL Helper Gear asked for another spec: SetSpec to it, Compare, then back to the main spec
+local function GearFor(G, link, spec)
+    local key = GEAR_KEY[spec[1]] or spec[1]
+    local ok, done = pcall(G.SetSpec, key)
+    local v
+    if ok and done ~= false then
+        G._wlSpec = key
+        local okC, res = pcall(G.Compare, link)
+        if okC then v = GearResult(res) else v = false end
+    else
+        v = WeightsVerdict(link, spec)                  -- a spec Gear does not know: our weights
+    end
+    G._wlSpec = nil
+    SyncGearSpec(G)
+    -- the main spec could not be set back: Gear's own choice rather than the other spec
+    if not G._wlSpec then pcall(G.SetSpec, nil) end
+    return v
+end
+local function SpecVerdict(link, spec, isMain)
+    local ck = link .. "|" .. spec[1]
+    local c = specCache[ck]
+    if c ~= nil then return c end
+    local v
+    if UseGF() then
+        local G = Gear()
+        if isMain then v = GFVerdict(link)
+        elseif G then v = GearFor(G, link, spec)
+        else v = WeightsVerdict(link, spec) end         -- Geared Forever alone judges the main spec only
+    else
+        v = WeightsVerdict(link, spec)
+    end
+    if v ~= nil then specCache[ck] = v end
+    return v
+end
+WP.UpgradeSpecVerdict = SpecVerdict
+local function IsGear(link)
+    local Instant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    if not Instant then return true end
+    local _, _, _, equipLoc = Instant(link)
+    return equipLoc and W.SLOTS[equipLoc] and true or false
+end
+-- The specs judged, main first: W.CompareSpecs reads the talents (a full C_Traits scan), so it is
+-- kept until Refresh (talents, spec settings) instead of being read again for every bag slot.
+-- With Geared Forever alone, the main line is Geared Forever's own spec: that spec is left out of
+-- the extras so it is never shown twice.
+local specsMemo, judgedMemo, judgedGF
+local function Judged()
+    if not specsMemo then specsMemo = W.CompareSpecs and W.CompareSpecs() or {}; judgedMemo = nil end
+    local gfKey = false
+    if UseGF() and not Gear() and W.SpecKeyFor then gfKey = W.SpecKeyFor(GFSpec()) or false end
+    if judgedMemo and judgedGF == gfKey then return judgedMemo end
+    local out = {}
+    for i, spec in ipairs(specsMemo) do
+        if i == 1 or spec[1] ~= gfKey then out[#out + 1] = spec end
+    end
+    judgedMemo, judgedGF = out, gfKey
+    return out
+end
+local function MultiSpec() return #Judged() > 1 end
+local function ArrowAny() return WLWritsDB.upgradeArrowFor == "any" and MultiSpec() end
+-- the specs (names) whose gain puts the arrow on the item, main first
+local function ArrowSpecs(link)
+    local out = {}
+    if not IsGear(link) then return out end
+    local min = WLWritsDB.upgradeMin or 1
+    for i, spec in ipairs(Judged()) do
+        local v = SpecVerdict(link, spec, i == 1)
+        if type(v) == "number" and v >= min then out[#out + 1] = W.SpecName(spec) end
+    end
+    return out
+end
+WP.UpgradeArrowSpecs = ArrowSpecs
+
+-- { up = true/false, text = "+24%" }: the main spec, or the best of your specs when the arrow is
+-- for any of them
+local function Check(link)
+    if type(link) ~= "string" or not Active() then return NO end
+    local key = "any|" .. link
+    local c = cache[key]
+    if c then return c end
+    local r = CheckMain(link)
+    if not ArrowAny() then return r end
+    if not IsGear(link) then cache[key] = NO; return NO end
+    local min = WLWritsDB.upgradeMin or 1
+    local best, waiting = r.up and r or nil, false
+    local specs = Judged()
+    for i = 2, #specs do
+        local v = SpecVerdict(link, specs[i], false)
+        if v == nil then
+            -- nothing yet for this spec: asked again in 1 s, false after 5 tries
+            local ck = link .. "|" .. specs[i][1]
+            if Retry(ck) then specCache[ck] = false else waiting = true end
+        elseif type(v) == "number" and v >= min and not (best and (best.n or 0) >= v) then
+            local text = v >= 1000 and L("vide") or (v >= 999 and "+999%" or ("+" .. math.floor(v + 0.5) .. "%"))
+            best = { up = true, text = text, n = v }
+        end
+    end
+    if waiting then Pending(link) end
+    local res = best or NO
+    if not waiting then cache[key] = res end
+    return res
 end
 WP.UpgradeCheck = Check
 local function IsUpgrade(link) return Check(link).up end
@@ -239,13 +378,59 @@ local function InsteadOf(tip, link)
 end
 
 -- the left half of the line: the addon's tag, then the spec judged
-local function Tag(spec)
-    local guess = W.SpecGuessed and W.SpecGuessed()
+local function Tag(spec, extra)
+    local guess = not extra and W.SpecGuessed and W.SpecGuessed()
     return ns.S.Hex(T.accent) .. "WL Helper|r · " .. (spec or "") .. (guess and (" " .. ns.S.Hex(T.warn) .. L("(spé à choisir)") .. "|r") or "")
+end
+
+-- the right half of a spec's line: text, colour, true for a percent
+local function VerdictText(v)
+    if v == "equipped" then return L("Déjà équipé"), GREY end
+    if type(v) == "number" and v >= 1000 then return L("Emplacement vide"), GREEN end
+    if type(v) == "number" then
+        local n = math.floor(v + 0.5)
+        return Percent(n), n >= 1 and GREEN or (n <= -1 and RED or GREY), true
+    end
+end
+-- one line per spec judged ("WL Helper · Protection  +6 %", "WL Helper · Fureur  -3 %"), main first
+local function MultiLines(tip, link)
+    if not IsGear(link) then return end
+    if not UseGF() then
+        -- only your level stops you (the same for every spec): the one line saying from which level
+        local can, why, lvl = W.CanWear(link)
+        if not can then
+            if why == "level" and lvl then
+                tip:AddDoubleLine(Tag(W.SpecName()), string.format(L("Équipable au niveau %d"), lvl), T.fg[1], T.fg[2], T.fg[3], T.warn[1], T.warn[2], T.warn[3])
+            end
+            return
+        end
+    end
+    local pct, shown = false, false
+    for i, spec in ipairs(Judged()) do
+        local v = SpecVerdict(link, spec, i == 1)
+        local name = W.SpecName(spec)
+        if i == 1 and UseGF() then name = W.SpecNameFor(GFSpec()) end
+        local text, col, isPct = VerdictText(v)
+        if text then
+            tip:AddDoubleLine(Tag(name, i > 1), text, T.fg[1], T.fg[2], T.fg[3], col[1], col[2], col[3])
+            shown = true
+            pct = pct or isPct
+        end
+        -- the item you wear: one line is enough
+        if i == 1 and v == "equipped" then return end
+    end
+    if shown and ArrowAny() then
+        local who = ArrowSpecs(link)
+        if #who > 0 then
+            tip:AddLine(string.format(L("Flèche verte pour : %s"), table.concat(who, ", ")), GREEN[1], GREEN[2], GREEN[3])
+        end
+    end
+    if pct then InsteadOf(tip, link) end
 end
 
 local function TooltipLine(tip, link)
     if not (Active() and link) or WLWritsDB.upgradeTip == false then return end
+    if MultiSpec() then return MultiLines(tip, link) end
     if UseGF() then
         local v = GFVerdict(link)
         local text, col
@@ -287,6 +472,7 @@ local function TooltipLine(tip, link)
     tip:AddDoubleLine(Tag(spec), text, T.fg[1], T.fg[2], T.fg[3], col[1], col[2], col[3])
     if pct then InsteadOf(tip, link) end
 end
+WP.UpgradeTooltipLine = TooltipLine
 if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
     TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tip)
         if tip ~= GameTooltip and tip ~= ItemRefTooltip then return end
@@ -491,6 +677,8 @@ end
 local queued = false
 local function Refresh()
     cache = {}
+    wipe(specCache)
+    specsMemo, judgedMemo = nil, nil
     W.Reset()
     if baganator and Baganator.API.RequestItemButtonsRefresh then pcall(Baganator.API.RequestItemButtonsRefresh) end
     walked = 0
@@ -511,6 +699,7 @@ end
 local ev = CreateFrame("Frame")
 pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
 for _, e in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "CHARACTER_POINTS_CHANGED", "GET_ITEM_INFO_RECEIVED", "BAG_UPDATE_DELAYED",
+        "PLAYER_TALENT_UPDATE", "TRAIT_CONFIG_UPDATED", "ACTIVE_TALENT_GROUP_CHANGED",
         "QUEST_COMPLETE", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_LOG_UPDATE" }) do
     pcall(ev.RegisterEvent, ev, e)
 end
@@ -522,6 +711,7 @@ ev:SetScript("OnEvent", function(_, e, ...)
                 WP.Print(string.format(L("Améliorations : ta spé n'a pas pu être lue dans tes talents, %s est supposée. Choisis-la dans Réglages, Améliorations, Spé jugée."), W.SpecName()))
             end
         end)
+        specsMemo, judgedMemo = nil, nil
         WP.ApplyGFTip()
         HookBaganator()
         if EUI_Bags and EUI_Bags.RefreshInventory then
@@ -549,5 +739,6 @@ ev:SetScript("OnEvent", function(_, e, ...)
     if e == "QUEST_COMPLETE" or e == "QUEST_DETAIL" or e == "QUEST_PROGRESS" or e == "QUEST_LOG_UPDATE" then QuestSoon(); return end
     -- what you wear, your level or your talents changed: Geared Forever may answer differently now
     wipe(tries)
+    specsMemo, judgedMemo = nil, nil
     Soon()
 end)

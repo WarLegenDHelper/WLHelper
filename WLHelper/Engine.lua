@@ -779,6 +779,10 @@ function ns.TargetMacroText(st, log)
   log = log or ns.LogEntries()
   if st == nil then local _; _, st = ns.CurrentStepIndex(log) end
   local names, seen = {}, {}
+  if st and st.bossStep and not ns.BossStepKilled(st) then
+    local nm = ns.BossStepName(st)
+    if nm and nm ~= "?" then seen[nm] = true; names[1] = nm end
+  end
   if st then
     for _, n in ipairs(st.acts or {}) do
       if not ns.NodeOK(log, n) then
@@ -879,25 +883,73 @@ local NKEY = { TheDeadmines = "Deadmines", TheStockade = "Stockade", HallofThane
   RuinsofLordaeron = "RuinsOfLordaeron", ExcavationSiteWetlands = "ExcavationSite", CityofDalaran = "Dalaran",
   TheDrownedCity = "DrownedCity", KroldokStronghold = "Kroldok", DireMaulEast = "DireMaul", DireMaulWest = "DireMaul",
   DireMaulNorth = "DireMaul", StratholmeLiving = "Stratholme", StratholmeUndead = "Stratholme" }
-local bossCache = {}
+-- keys that share one journal entry: only this key's wing (the journal's wing name), else the
+-- bosses our walk order (ns.WALK) lists for it
+local NWING = { DireMaulEast = "East", DireMaulWest = "West", DireMaulNorth = "North",
+  StratholmeLiving = "Main Gate", StratholmeUndead = "Service Entrance" }
+local bossCache, bossTried = {}, {}
 -- mots trop courants dans les noms de boss pour servir à les reconnaître
 local STOP = {}
 for w in ("Keeper Stone Lord Lady Master Chief Captain Commander General Princess Prince King Queen Doctor Sergeant Overlord Highlord Ancient Elder Shadow Guard Baron Baroness Magister Archmage Instructor Lorekeeper Grand Twilight Shade Avatar Spawn Hunter Mother Quartermaster Warchief Pyroguard Golem Emperor Ambassador Houndmaster Interrogator Bloodmage Scarlet Inquisitor Arcanist Death Speaker Earthcaller Blind Razorfen Spirestone Crystal Burning Viscous Crowd Mekgineer Fallen Unbound Tidemistress Overseer Slavecrusher Handler Bossman Shaman Deathsworn Gutchewer Shadowpriest Hydromancer Cannon Archivist Postmaster Magistrate Warder Pyromancer Phalanx Plugger Screwspigot Blackbreath Darkvire Thorncurse Treasure Remains"):gmatch("%S+") do STOP[w] = true end
 ns.BOSS_STOP = STOP
-function ns.BossOrder(dkey)
-  if bossCache[dkey] ~= nil then return bossCache[dkey] end
-  local out = false
+local function NaowhJournal()
   local N = _G.NaowhForever
-  local J = N and N.Journal
+  local J = type(N) == "table" and N.Journal
+  return (type(J) == "table" and J.Get) and J or nil
+end
+-- the walk order alone (ns.WALK, our own data) when the dungeon journal is not loaded
+local function WalkOnly(dkey)
+  local walk = ns.WALK and ns.WALK[dkey]
+  if not walk or #walk == 0 then return false end
+  local out = { list = {}, idx = {}, src = "walk" }
+  for i, en in ipairs(walk) do
+    out.list[i] = { en = en, name = en }
+    out.idx[en] = i
+    for tok in en:gmatch("[^%s,]+") do
+      tok = tok:gsub("'s$", "")
+      if #tok > 4 and not STOP[tok] then
+        local k = "#" .. tok
+        if out.idx[k] == nil then out.idx[k] = i elseif out.idx[k] ~= i then out.idx[k] = false end
+      end
+    end
+  end
+  return out
+end
+-- Forget the cached boss orders (the dungeon journal loaded later; tests).
+function ns.BossOrderReset() for k in pairs(bossCache) do bossCache[k] = nil end; for k in pairs(bossTried) do bossTried[k] = nil end end
+-- The dungeon's bosses in walking order: { list = { { en, name, tip, model, npc, enc, optional,
+-- rare } }, idx = { [en] = i, ["#token"] = i }, src = "naowh" | "walk" } or false.
+-- NaowhForever's journal is read live when it is loaded (names, tips, models, encounter IDs);
+-- without it, our own walk order (ns.WALK).
+function ns.BossOrder(dkey)
+  local J = NaowhJournal()
+  -- built before the journal was loaded: built again once it is
+  if bossCache[dkey] ~= nil and (bossTried[dkey] or not J) then return bossCache[dkey] end
+  local out = false
+  bossTried[dkey] = J and true or nil
   if J and J.Get then
     local ok, d = pcall(J.Get, NKEY[dkey] or dkey)
     if ok and d and d.wings then
       out = { list = {}, idx = {} }
+      -- a journal entry shared by several of our keys (Dire Maul, Stratholme): this key's wing only
+      local wingOnly, walkSet = NWING[dkey], nil
+      if wingOnly then
+        local found = false
+        for _, wing in ipairs(d.wings) do if wing.name == wingOnly then found = true end end
+        if not found then
+          -- the wing's name changed: our walk order says which bosses are this key's (none: the
+          -- walk order alone, below)
+          wingOnly, walkSet = nil, {}
+          for _, nm in ipairs(ns.WALK and ns.WALK[dkey] or {}) do walkSet[nm] = true end
+        end
+      end
       for _, wing in ipairs(d.wings) do
-        for _, b in ipairs(wing.bosses or {}) do
-          if b.npc and not b.trash and not b.chest then
+        for _, b in ipairs((not wingOnly or wing.name == wingOnly) and wing.bosses or {}) do
+          if b.npc and not b.trash and not b.chest and not (walkSet and not walkSet[b.english or b.name]) then
             local en = b.english or b.name
-            table.insert(out.list, { en = en, name = b.name or en, tip = J.Tip and J.Tip(b) or nil, model = b.model, npc = b.npc })
+            local okT, tip = pcall(J.Tip or function() return nil end, b)
+            table.insert(out.list, { en = en, name = b.name or en, tip = okT and type(tip) == "string" and tip or nil, model = b.model, npc = b.npc,
+              enc = type(b.encounters) == "table" and b.encounters or nil, optional = b.optional and true or nil, rare = b.rare and true or nil })
             out.idx[en] = #out.list
             for tok in en:gmatch("[^%s,]+") do
               tok = tok:gsub("'s$", "")
@@ -940,9 +992,10 @@ function ns.BossOrder(dkey)
         end
         out.idx = fresh
       end
-      if #out.list == 0 then out = false end
+      if #out.list == 0 then out = false else out.src = "naowh" end
     end
   end
+  if not out then out = WalkOnly(dkey) end
   bossCache[dkey] = out
   return out
 end
@@ -1081,9 +1134,39 @@ local function BossOf(bo, names)
   end
 end
 
-local function SplitOne(st)
+-- Where a quest line that no boss claims goes (ns.WALK_AT, our own data: "Boss" = at that boss,
+-- "<Boss" = on the way to it), else beside the boss LibForeverData puts nearest to its NPC.
+-- -> boss index (at it) or index - 0.5 (on the way to it), or nil
+local function PlaceHint(dkey, bo, n)
+  local at = ns.WALK_AT and ns.WALK_AT[dkey]
+  if at then
+    local o = n.oneObj
+    for _, k in ipairs({ n.q or false, n.npc or false, o and o.n or false }) do
+      local v = k and at[k]
+      if v then
+        local before = v:sub(1, 1) == "<"
+        local i = bo.idx[before and v:sub(2) or v]
+        if i then return before and (i - 0.5) or i end
+      end
+    end
+  end
+  if ns.BossNear and n.npc then
+    local names = {}
+    for _, b in ipairs(bo.list) do names[#names + 1] = b.en end
+    local ok, en = pcall(ns.BossNear, dkey, n.npc, names)
+    local i = ok and en and bo.idx[en]
+    if i then return i - 0.5 end
+  end
+  return nil
+end
+
+-- One step per boss in walking order (every boss of the dungeon on its first visit of the route),
+-- each holding the quest lines done at that boss; quest lines tied to no boss go "on the way"
+-- between the right bosses (or at the start), loot from every monster in a last step.
+-- full: list every boss (first visit of this dungeon in the route), else only those with quest lines.
+local function SplitOne(st, full, visit)
   local bo = ns.BossOrder(st.ins)
-  if not bo then return { st } end
+  if not bo or #bo.list == 0 then return { st } end
   local items, order = {}, 0
   for _, nd in ipairs(st.acts) do
     order = order + 1
@@ -1119,6 +1202,7 @@ local function SplitOne(st)
     if go == "*" then it.boss = 999 elseif go then it.boss = bossByName(go) or it.boss end
     local gq = ns.GROUP_QUEST and ns.GROUP_QUEST[n.q]
     if gq then it.boss = bossByName(gq) or it.boss end
+    if not it.boss then it.boss = PlaceHint(st.ins, bo, n) end
   end
   -- même PNJ / objet = même étape ; une prise sans boss emmène ses objectifs non rattachés
   local byNpc = {}
@@ -1139,7 +1223,7 @@ local function SplitOne(st)
     end
     if n.kind == "a" then aGroup[n.q] = it.boss end
   end
-  -- groupes : 0 = sur le chemin (PNJ / objets sans boss), 1..n = boss, 999 = dans tout le donjon
+  -- groupes : 0 = au début, i - 0.5 = en route vers le boss i, 1..n = boss, 999 = dans tout le donjon
   for _, it in ipairs(items) do
     if not it.boss then
       local n = it.node
@@ -1149,37 +1233,136 @@ local function SplitOne(st)
     end
   end
   table.sort(items, function(a, b) if a.boss ~= b.boss then return a.boss < b.boss end return a.ord < b.ord end)
-  local groups, cur = {}, nil
+  local groups, byBoss, cur = {}, {}, nil
   for _, it in ipairs(items) do
-    if not cur or cur.boss ~= it.boss then cur = { boss = it.boss, acts = {} }; table.insert(groups, cur) end
+    if not cur or cur.boss ~= it.boss then cur = { boss = it.boss, acts = {} }; table.insert(groups, cur); byBoss[it.boss] = cur end
     table.insert(cur.acts, it.node)
   end
-  if #groups <= 1 and (not groups[1] or groups[1].boss == 999 or groups[1].boss == 0) then return { st } end
+  -- every boss gets its step on the dungeon's first visit, quest lines or not
+  if full then
+    for i = 1, #bo.list do if not byBoss[i] then local g = { boss = i, acts = {} }; byBoss[i] = g; table.insert(groups, g) end end
+    table.sort(groups, function(a, b) return a.boss < b.boss end)
+  end
+  local anyBoss = false
+  for _, g in ipairs(groups) do if g.boss >= 0.5 and g.boss < 999 then anyBoss = true end end
+  if not anyBoss then return { st } end
   local trash = {}
   for _, g in ipairs(groups) do
     if g.boss == 999 then for _, n in ipairs(g.acts) do table.insert(trash, n) end end
   end
   local out = {}
   for k, g in ipairs(groups) do
-    local ns_ = { ins = st.ins, d = st.d, pos = st.pos, inner = st.inner, q = st.q, acts = g.acts, npcs = st.npcs,
+    local s2 = { ins = st.ins, d = st.d, pos = st.pos, inner = st.inner, q = st.q, acts = g.acts, npcs = st.npcs,
       split = true, part = k, parts = #groups, bossIdx = g.boss, trash = (g.boss ~= 999) and trash or nil,
-      phase = "inside", dk = st.ins or st.dk }
-    local B = bo.list[g.boss]
-    if B then ns_.bossName, ns_.bossEn, ns_.bossTip, ns_.bossModel, ns_.bossNpc = B.name, B.en, B.tip, B.model, B.npc end
-    if k == 1 then ns_.travel = st.travel end
-    table.insert(out, ns_)
+      phase = "inside", dk = st.ins or st.dk, bossN = #bo.list }
+    local whole = g.boss == math.floor(g.boss)
+    local B = whole and bo.list[g.boss]
+    if B then
+      s2.bossName, s2.bossEn, s2.bossTip, s2.bossModel, s2.bossNpc = B.name, B.en, B.tip, B.model, B.npc
+      s2.bossStep, s2.bossEnc, s2.bossFlag = true, B.enc, (B.rare and "rare") or (B.optional and "optional") or nil
+      -- one key per visit of the dungeon in the route (a second visit has its own steps), the
+      -- same across replans
+      s2.bkey = "b:" .. st.ins .. ":" .. B.en .. ((visit and visit > 1) and (":v" .. visit) or "")
+    elseif not whole and g.boss > 0 and g.boss < 999 then
+      -- on the way to the next boss
+      local nx = bo.list[math.ceil(g.boss)]
+      s2.way = true; s2.bossIdx = math.ceil(g.boss) - 0.5
+      if nx then s2.wayName, s2.wayEn = nx.name, nx.en end
+    end
+    if k == 1 then s2.travel = st.travel end
+    table.insert(out, s2)
   end
   return out
 end
 
 function ns.SplitInside(steps)
-  local out = {}
-  for _, st in ipairs(steps) do
+  local out, seen = {}, {}
+  for i, st in ipairs(steps) do
     if st.ins and not st.gate and not st.split then
-      for _, s2 in ipairs(SplitOne(st)) do table.insert(out, s2) end
+      -- a new visit unless the step before is inside the same dungeon
+      local prev = steps[i - 1]
+      local same = prev and prev.ins == st.ins and not prev.gate
+      local visit = same and (seen[st.ins] or 1) or ((seen[st.ins] or 0) + 1)
+      seen[st.ins] = visit
+      for _, s2 in ipairs(SplitOne(st, visit == 1 and not same, visit)) do table.insert(out, s2) end
     else table.insert(out, st) end
   end
   return out
+end
+
+-- =====================================================================
+--  Boss steps: killed during this run, optional, loot, the name a target macro looks for
+-- =====================================================================
+-- the boss's names (English, the journal's, this client's) and NPC ids
+function ns.BossStepNames(st)
+  local names = { st.bossEn, st.bossName }
+  if ns.BossLocalName then
+    local ok, nm = pcall(ns.BossLocalName, st.ins, st.bossEn)
+    if ok and nm then names[#names + 1] = nm end
+  end
+  local ids = {}
+  if st.bossNpc then ids[1] = st.bossNpc end
+  if ns.BossNpcIds then
+    local ok, l = pcall(ns.BossNpcIds, st.ins, st.bossEn)
+    if ok and type(l) == "table" then for _, x in ipairs(l) do ids[#ids + 1] = x end end
+  end
+  return names, ids
+end
+-- Was this step's boss killed during the current run of the dungeon?
+function ns.BossStepKilled(st)
+  if not (st and st.bossStep and ns.BossKilled) then return false end
+  local names, ids = ns.BossStepNames(st)
+  local ok, v = pcall(ns.BossKilled, st.ins, names, ids, st.bossEnc)
+  return ok and v == true
+end
+-- The boss's name as this client writes it
+function ns.BossStepName(st)
+  if not st then return "?" end
+  local nm = st.bossName
+  if nm == st.bossEn and ns.BossLocalName then
+    local ok, l = pcall(ns.BossLocalName, st.ins, st.bossEn)
+    if ok and l then nm = l end
+  end
+  return nm or st.bossEn or "?"
+end
+-- Loot of this boss that matters to you: { { id, name, link, icon, quest, up, text } }. Gear shows
+-- only when WL Helper's gear check calls it an upgrade; quest items always (unless a quest line
+-- of the step already names them).
+function ns.BossStepLoot(st)
+  local out = {}
+  if not (st and st.bossStep and ns.BossLoot) then return out end
+  local okL, list = pcall(ns.BossLoot, st.ins, st.bossEn, st.bossNpc and { st.bossNpc } or nil)
+  if not (okL and type(list) == "table") then return out end
+  local named = {}
+  for _, n in ipairs(st.acts or {}) do local o = n.oneObj; if o and o.n then named[o.n] = true end end
+  local WP = ns.Writs and ns.Writs.WP
+  for _, it in ipairs(list) do
+    local name, link, icon = it.name, nil, nil
+    if GetItemInfo and it.id then
+      local ok, n2, l2, _, _, _, _, _, _, _, tex = pcall(GetItemInfo, it.id)
+      if ok then
+        if type(n2) == "string" and not (issecretvalue and issecretvalue(n2)) then name = n2 end
+        if type(l2) == "string" and not (issecretvalue and issecretvalue(l2)) then link = l2 end
+        icon = tex
+      end
+    end
+    if it.quest then
+      if not (it.name and named[it.name]) then out[#out + 1] = { id = it.id, name = name or ("#" .. tostring(it.id)), link = link, icon = icon, quest = true } end
+    elseif link and WP and WP.UpgradeCheck then
+      local ok, r = pcall(WP.UpgradeCheck, link)
+      if ok and type(r) == "table" and r.up then
+        out[#out + 1] = { id = it.id, name = name, link = link, icon = icon, up = true, text = r.text }
+      end
+    end
+  end
+  return out
+end
+-- Optional: nothing for you at this boss (no open quest line, no upgrade, no quest item).
+function ns.BossStepOptional(st, log)
+  if not (st and st.bossStep) then return false end
+  log = log or ns.LogEntries()
+  for _, n in ipairs(st.acts or {}) do if not ns.NodeOK(log, n) then return false end end
+  return #ns.BossStepLoot(st) == 0
 end
 
 -- =====================================================================
