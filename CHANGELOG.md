@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.10] — 2026-11-15
+
+### Modifié / Changed
+- Favor : le bouton dit où en est le scan (« Scan 12 / 48 », « Prix réels : 3 objets restants », « Prix à jour · à l'instant », « Prix d'il y a 8 min · rescanner ») ; un composant que tu as déjà s'affiche « déjà là » au lieu de « 0 ».
+  *Favor: the scan button tells its state and how fresh prices are; owned materials read "already have".*
+
 ## [1.0.0-beta.9] — 2026-11-15
 
 ### Modifié / Changed
@@ -208,7 +214,8 @@ Première version de WL Helper (bêta). WL Dungeon Guide devient **WL Helper**.
 WL Dungeon Guide jusqu'à la 3.3 : guide des quêtes de donjon Horde pas à pas (versions partagées
 à la main, avant ce dépôt).
 
-[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.9...HEAD
+[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.10...HEAD
+[1.0.0-beta.10]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.9...v1.0.0-beta.10
 [1.0.0-beta.9]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.8...v1.0.0-beta.9
 [1.0.0-beta.8]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.7...v1.0.0-beta.8
 [1.0.0-beta.7]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.6...v1.0.0-beta.7

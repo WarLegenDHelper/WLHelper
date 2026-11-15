@@ -40,6 +40,11 @@ ns.AddEnglish({
     ["Clic : acheter les caisses à l'HV"] = "Click: buy the crates at the AH",
     ["%d Favor · à remplir avec %d× %s chacune"] = "%d Favor · fill each with %d× %s",
     ["tu en as %d"] = "you have %d",
+    ["déjà là"] = "already have",
+    ["Prix réels : %d objets restants"] = "Real prices: %d items left",
+    ["Prix à jour · à l'instant"] = "Prices up to date · just now",
+    ["Prix d'il y a %d min · rescanner"] = "Prices from %d min ago · rescan",
+    ["Prix d'il y a %d min · ouvre l'HV pour rescanner"] = "Prices from %d min ago · open the AH to rescan",
     ["%d Favor · un lot par caisse : %s"] = "%d Favor · one bundle per crate: %s",
     ["pour %d caisses"] = "for %d crates",
     ["Prix réels de l'HV, offre par offre."] = "Real AH prices, listing by listing.",
@@ -459,7 +464,7 @@ function WP.RenderFavor()
             r.per:SetText(rr.per and (S.Money(math.floor(rr.per)) .. L(" la Favor")) or "")
         end
         r.sub:SetText(sub)
-        r.cost:SetText(cost and S.Money(cost) or "?")
+        r.cost:SetText(cost and ((cost == 0 and e.mat) and L("déjà là") or S.Money(cost)) or "?")
         y = y + ROW + (e.mat and 10 or 4)
     end
     if #plan > 0 then
@@ -494,13 +499,31 @@ function WP.RenderFavor()
     ui.content:SetHeight(math.max(10, y))
     local busy = WP.Scan and WP.Scan.Busy()
     ui.scan:SetEnabled(busy or WP.AuctionHouseOpen())
+    -- what the button says: scanning, reading listings, or how fresh the prices are
     local done, tot = WP.Scan and WP.Scan.Progress()
+    local newest
+    for _, id in ipairs(WP.FavorScanIDs()) do
+        local _, _, ago = WP.Scan.Get(id)
+        if ago and (not newest or ago < newest) then newest = ago end
+    end
     if done and tot and tot > 0 then
         ui.scan.label:SetText(string.format(L("Scan %d / %d · clic pour arrêter"), done, tot))
         ui.bar:Show()
         ui.barFill:SetWidth(math.max(1, (W - 2 * PAD) * done / tot))
+    elseif WP.LadderBusy and WP.LadderBusy() then
+        ui.scan.label:SetText(string.format(L("Prix réels : %d objets restants"), WP.LadderLeft()))
+        ui.bar:Show()
+        ui.barFill:SetWidth((W - 2 * PAD) * 0.5)
+    elseif newest then
+        local mins = math.floor(newest / 60)
+        ui.scan.label:SetText(mins < 1 and L("Prix à jour · à l'instant") or string.format(L("Prix d'il y a %d min · rescanner"), mins))
+        ui.bar:Hide()
     else
         ui.scan.label:SetText(WP.AuctionHouseOpen() and L("Scanner les prix (HV)") or L("Ouvre l'hôtel des ventes pour scanner"))
         ui.bar:Hide()
+    end
+    if not WP.AuctionHouseOpen() and not (done and tot) then
+        ui.scan.label:SetText(newest and string.format(L("Prix d'il y a %d min · ouvre l'HV pour rescanner"), math.floor(newest / 60))
+            or L("Ouvre l'hôtel des ventes pour scanner"))
     end
 end
