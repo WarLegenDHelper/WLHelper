@@ -6,6 +6,22 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.14] — 2026-11-15
+
+### Ajouté / Added
+- **Améliorations** (nouveau module) : une flèche verte et le gain (« +24% ») sur les objets de tes sacs meilleurs que ce que tu portes, selon Geared Forever et la spé choisie dans /geared. Sacs du jeu et Baganator. Reprend Geared Arrows : s'il est encore installé, c'est lui qui s'en charge.
+  *Upgrades: a green arrow and the gain on bag items better than yours, judged by Geared Forever.*
+- **Journal du donjon** dans le menu « … » du guide : boss et butin du donjon de l'étape, dans Naowh Dungeon Journal ou Forever Dungeon Journal.
+  *Dungeon journal in the guide's "..." menu.*
+- **Alerte des monstres rares** dans les donjons : un message à l'écran et un son, une fois par monstre (Réglages › Donjons).
+  *Rare monster alert inside dungeons.*
+
+### Corrigé / Fixed
+- Quel'Serrar : les deux quêtes de Lydros sont dans le même donjon (Hache-Tripes Nord, par l'Athenaeum).
+  *Quel'Serrar: both Lydros quests in the same wing.*
+- Alt-clic sur un PNJ amical le cible de nouveau (l'invitation ne concerne que les joueurs).
+  *Alt-click on a friendly NPC targets it again.*
+
 ## [1.0.0-beta.13] — 2026-11-15
 
 ### Modifié / Changed

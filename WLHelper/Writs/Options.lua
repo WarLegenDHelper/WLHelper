@@ -95,6 +95,8 @@ ns.AddEnglish({
         "Sources and thanks: see CREDITS.txt in the addon's folder.",
     ["GitHub"] = "GitHub", ["Clique puis Ctrl+C pour copier"] = "Click, then Ctrl+C to copy",
     ["Commandes du chat"] = "Chat commands",
+    ["Alerte des monstres rares"] = "Rare monster alert",
+    ["Dans un donjon, un message et un son quand un monstre rare apparaît"] = "In a dungeon, a message and a sound when a rare monster shows up",
     ["/wl : ouvre ou ferme le guide des donjons"] = "/wl: open or close the dungeon guide",
     ["/comptoir ou /wl comptoir : fenêtre du Comptoir"] = "/comptoir or /wl trade: the Trading Post window",
     ["/wl gps : lance ou arrête la tournée GPS"] = "/wl gps: start or stop the GPS tour",
@@ -387,6 +389,8 @@ end
 function BUILD.dungeons(p)
     Section(p, L("Guide"))
     SwitchRow(p, L("Flèche des donjons"), function() return Guide().arrow ~= false end, SetGuideArrow)
+    SwitchRow(p, L("Alerte des monstres rares"), function() return Guide().rareAlert ~= false end, function(v) Guide().rareAlert = v end,
+        L("Dans un donjon, un message et un son quand un monstre rare apparaît"))
     SwitchRow(p, L("Guide automatique des points"), function() return Guide().autoWay and true or false end,
         function(v) Guide().autoWay = v; RefreshGuide() end)
     local row = Row(p, L("Toutes les quêtes ou seulement les utiles"))

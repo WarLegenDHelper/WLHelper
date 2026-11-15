@@ -107,12 +107,21 @@ inviteButton:SetAttribute("type", "macro")
 inviteButton:SetAttribute("macrotext", "/target [@mouseover,help,nodead]\n/invite\n/targetlasttarget")
 inviteButton:SetScript("PreClick", function(self, _, down)
     if InCombatLockdown() then return end   -- the secure macro invites
+    -- a friendly NPC: Alt + left-click keeps targeting it, as without the addon
+    if not UnitIsPlayer("mouseover") then
+        self:SetAttribute("macrotext", "/target [@mouseover]")
+        return
+    end
     self:SetAttribute("type", nil)
     if down ~= GetCVarBool("ActionButtonUseKeyDown") then return end
-    if not UnitIsPlayer("mouseover") or UnitIsUnit("mouseover", "player") then return end
+    if UnitIsUnit("mouseover", "player") then return end
     Invite(GetUnitName("mouseover", true))
 end)
-inviteButton:SetScript("PostClick", function(self) if not InCombatLockdown() then self:SetAttribute("type", "macro") end end)
+inviteButton:SetScript("PostClick", function(self)
+    if InCombatLockdown() then return end
+    self:SetAttribute("type", "macro")
+    self:SetAttribute("macrotext", "/target [@mouseover,help,nodead]\n/invite\n/targetlasttarget")
+end)
 local inviteDriver = CreateFrame("Frame", "WLHelperInviteDriver", UIParent, "SecureHandlerStateTemplate")
 inviteDriver:SetFrameRef("button", inviteButton)
 inviteDriver:SetAttribute("_onstate-invite", [[

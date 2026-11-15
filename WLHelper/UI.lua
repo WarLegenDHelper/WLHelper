@@ -520,6 +520,7 @@ local function Build()
   f.arrowBtn = Item(function() ns.ToggleArrow(); Render() end, function() return { L.M_ARROW, L.TT_FARROW } end)
   f.autoBtn = Item(function() WLDTDB.autoWay = not WLDTDB.autoWay; f.sig = nil; ns.Refresh() end, function() return { L.M_AUTO, L.TT_FAUTO } end)
   f.listBtn = Item(function() f.list:SetShown(not f.list:IsShown()); WLDTDB.list = f.list:IsShown(); Render() end, function() return { L.M_LIST, L.TT_HLIST } end)
+  f.journal = Item(function() if ns.OpenJournal then ns.OpenJournal() end end, function() return { L.M_JOURNAL, L.TT_JOURNAL } end)
   f:HookScript("OnHide", function() menu:Hide() end)
   -- closes once the mouse has been away from it (and its button) for a moment
   menu:SetScript("OnUpdate", function(self, dt)
@@ -1032,6 +1033,7 @@ Render = function()
   f.arrowBtn.label:SetText(L.M_ARROW .. onoff(WLDTDB.arrow ~= false))
   f.autoBtn.label:SetText(L.M_AUTO .. onoff(WLDTDB.autoWay))
   f.listBtn.label:SetText(L.M_LIST .. onoff(f.list:IsShown()))
+  f.journal.label:SetText(L.M_JOURNAL); f.journal:SetEnabled(ns.JournalAvailable and ns.JournalAvailable() or false)
 
   f:SetHeight(70 + hh + 12 + 56 + PAD)
   WLDTDB.view = i
