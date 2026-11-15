@@ -65,11 +65,25 @@ function WP.ApplyGFTip()
 end
 WP.UpgradeUsesGF = UseGF
 local gfTip
+-- WL Helper Gear is told the spec WL Helper sees (talent tabs read the way that works on this
+-- client, or your choice in Settings > Upgrades): its own talent scan can miss on Forever and
+-- would then fall back to the class's first spec (a frost mage judged as arcane).
+local GEAR_KEY = { aff = "affli" }
+local function SyncGearSpec(G)
+    local Wt = WP.Weights
+    local s = Wt and Wt.Spec and Wt.Spec()
+    if not (s and G.SetSpec) then return end
+    local key = GEAR_KEY[s[1]] or s[1]
+    if key ~= G._wlSpec then
+        local ok, done = pcall(G.SetSpec, key)
+        G._wlSpec = (ok and done ~= false) and key or nil
+    end
+end
 local function GFSpec()
     local G = Gear()
-    if G and G.Spec then
-        local ok, _, _, name = pcall(G.Spec)
-        if ok and type(name) == "string" and name ~= "" then return name end
+    if G then
+        local Wt = WP.Weights
+        if Wt and Wt.SpecName then return Wt.SpecName() end
     end
     local _, token = UnitClass("player")
     local key = GearedForeverDB and GearedForeverDB.specs and GearedForeverDB.specs[token]
@@ -83,6 +97,7 @@ local GF_DOWN = "GearedForever\\Media\\ArrowDown"
 local function GFVerdict(link)
     local G = Gear()
     if G then
+        SyncGearSpec(G)
         local ok, res = pcall(G.Compare, link)
         if not ok then return false end
         if not res then return nil end                  -- not cached yet: retried later

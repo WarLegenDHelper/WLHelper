@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.38] — 2026-11-15
+
+### Corrigé / Fixed
+- **Améliorations : mauvaise spé avec WL Helper Gear** (un mage Givre jugé Arcane, d'où des % faux comme +88 %). Le sous-addon reçoit maintenant la spé que voit WL Helper (tes talents, ou ton choix dans Réglages › Améliorations).
+  *Upgrades: WL Helper Gear now uses the spec WL Helper detects (a frost mage was judged as arcane).*
+
 ## [1.0.0-beta.37] — 2026-11-15
 
 ### Ajouté / Added
