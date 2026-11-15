@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.21] — 2026-11-15
+
+### Corrigé / Fixed
+- **Nettoyeur de sacs** : les explications ne sont plus coupées (« à détruire à… ») : plus courtes, fenêtre plus large, deux lignes si besoin. Le Marteau de Zul'Farrak et les autres objets à garder ne sont plus listés. Quand rien ne peut être coché, le bouton le dit (« Rien que l'addon puisse détruire ») et l'intro explique les objets grisés : les glisser hors du sac pour les détruire soi-même.
+  *Bag cleaner: no more cut-off texts; items to keep are no longer listed; clearer when nothing can be ticked.*
+
 ## [1.0.0-beta.20] — 2026-11-15
 
 ### Ajouté / Added

@@ -12,13 +12,15 @@ local WP = ns.WP
 local L = ns.L
 
 ns.AddEnglish({
+    ["Objet rare : à détruire toi-même"] = "Rare item: destroy it yourself",
+    ["Quête inconnue dans ton journal : à détruire toi-même"] = "Unknown quest in your log: destroy it yourself",
+    ["Pas lié à une quête rendue : à détruire toi-même si tu es sûr"] = "Not tied to a turned-in quest: destroy it yourself if you are sure",
+    ["Aucune quête de ton journal ne les demande. Cochés : l'addon les détruit. Grisés : glisse-les hors du sac pour les détruire toi-même."] = "No quest in your log asks for them. Ticked: the addon destroys them. Greyed: drag them out of your bag to destroy them yourself.",
+    ["Rien que l'addon puisse détruire"] = "Nothing the addon can destroy",
     ["Objets de quête inutiles"] = "Useless quest items",
-    ["Aucune quête de ton journal ne les demande.\nLes objets qui lancent une quête ne sont jamais proposés."] =
-        "No quest in your log needs them.\nItems that start a quest are never offered.",
     ["Quête rendue : %s"] = "Quest turned in: %s",
     ["Aucune quête ne le demande"] = "No quest asks for it",
     ["Peut servir à une quête suivante"] = "May be needed for a later quest",
-    ["Qualité rare ou plus : à détruire à la main"] = "Rare quality or better: destroy it by hand",
     ["Détruire les %d objets cochés"] = "Destroy the %d checked items",
     ["Détruire l'objet coché"] = "Destroy the checked item",
     ["Annuler"] = "Cancel",
@@ -28,10 +30,6 @@ ns.AddEnglish({
     ["%s détruit."] = "%s destroyed.",
     ["Coche ce que tu veux détruire"] = "Tick what you want to destroy",
     ["Détruire le suivant (%d cochés)"] = "Destroy the next one (%d ticked)",
-    ["Une quête de ton journal est inconnue des données : à détruire à la main"] =
-        "A quest in your log is unknown to the data: destroy it by hand",
-    ["Aucune quête rendue ne le relie : à détruire à la main si tu es sûr"] =
-        "No turned-in quest ties it: destroy it by hand if you are sure",
     ["À garder : invoque Gahz'rilla au gong de Zul'Farrak (quête « Gahz'rilla »)"] =
         "Keep it: summons Gahz'rilla at the gong in Zul'Farrak (quest \"Gahz'rilla\")",
     ["À garder : se change en Mallet of Zul'Farrak à l'autel de Hakkar"] =
@@ -45,7 +43,7 @@ local C = S.C
 
 local QUEST_CLASS = 12               -- Enum.ItemClass.Questitem
 local MANUAL_QUALITY = 3             -- rare and up: the game asks to type DELETE
-local ROW_H, PAD = 46, 14
+local ROW_H, PAD = 56, 14
 local COIN_POUCHES = { 284583, 284584, 284585, 284586 }
 local CHECK_TEX = "Interface\\Buttons\\UI-CheckBox-Check"
 
@@ -316,9 +314,9 @@ local function Scan()
                         if active then
                             e = nil                      -- a quest in your log uses it
                         elseif KEEP[id] then
-                            e.manual, e.keep, e.reason = true, true, L(KEEP[id])
+                            e = nil                      -- to keep (the Zul'Farrak mallet...): not listed
                         elseif e.quality >= MANUAL_QUALITY then
-                            e.manual, e.reason = true, L("Qualité rare ou plus : à détruire à la main")
+                            e.manual, e.reason = true, L("Objet rare : à détruire toi-même")
                         elseif usableCache[id] and not done then
                             -- it does something when used: maybe a summon, a key, a teleport
                             e.amber, e.reason = true, L("Objet utilisable : lis son infobulle avant de le jeter")
@@ -331,8 +329,8 @@ local function Scan()
                             -- whose item is destroyed, so this one is only listed, never destroyed here
                             e.manual = true
                             e.reason = unknownQuest
-                                and L("Une quête de ton journal est inconnue des données : à détruire à la main")
-                                or L("Aucune quête rendue ne le relie : à détruire à la main si tu es sûr")
+                                and L("Quête inconnue dans ton journal : à détruire toi-même")
+                                or L("Pas lié à une quête rendue : à détruire toi-même si tu es sûr")
                         end
                         if e then
                             if unsure and not e.manual then e.amber = true end
@@ -454,7 +452,9 @@ local function MakeRow(parent)
     row.name:SetJustifyH("LEFT")
     row.reason = S.Text(row, 13, C.dim)
     row.reason:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3); row.reason:SetPoint("RIGHT", -4, 0)
-    row.reason:SetJustifyH("LEFT")
+    row.reason:SetJustifyH("LEFT"); row.reason:SetJustifyV("TOP")
+    -- the reason may take two lines: never cut with "..."
+    row.reason:SetWordWrap(true); if row.reason.SetMaxLines then row.reason:SetMaxLines(2) end
 
     row:SetScript("OnEnter", function(self)
         hl:SetColorTexture(C.hover[1], C.hover[2], C.hover[3], 1)
@@ -514,14 +514,14 @@ local function CheckedCount()
 end
 
 local function Build()
-    win = S.Window("WLHelperCleaner", 400, 480, L("Objets de quête inutiles"), nil, WLWritsDB, "cleanerPos")
+    win = S.Window("WLHelperCleaner", 460, 500, L("Objets de quête inutiles"), nil, WLWritsDB, "cleanerPos")
 
     local intro = S.Text(win, 14, C.dim)
     intro:SetWordWrap(true)
     intro:SetJustifyH("LEFT"); intro:SetJustifyV("TOP")
     intro:SetPoint("TOPLEFT", PAD, -38 - PAD)
-    intro:SetWidth(400 - 2 * PAD)
-    intro:SetText(L("Aucune quête de ton journal ne les demande.\nLes objets qui lancent une quête ne sont jamais proposés."))
+    intro:SetWidth(460 - 2 * PAD)
+    intro:SetText(L("Aucune quête de ton journal ne les demande. Cochés : l'addon les détruit. Grisés : glisse-les hors du sac pour les détruire toi-même."))
 
     local footer = CreateFrame("Frame", nil, win)
     footer:SetPoint("BOTTOMLEFT", 1, 1); footer:SetPoint("BOTTOMRIGHT", -1, 1); footer:SetHeight(60)
@@ -531,7 +531,7 @@ local function Build()
     local cancelW = 90
     local cancel = S.Button(footer, L("Annuler"), cancelW, 36, "secondary", function() win:Hide() end)
     cancel:SetPoint("TOPRIGHT", -(PAD - 1), -12)
-    local destroy = S.Button(footer, "", 400 - 2 * PAD - 8 - cancelW, 36, "primary", Destroy)
+    local destroy = S.Button(footer, "", 460 - 2 * PAD - 8 - cancelW, 36, "primary", Destroy)
     destroy:SetPoint("TOPLEFT", PAD - 1, -12)
 
     function win.UpdateFooter()
@@ -539,6 +539,10 @@ local function Build()
         destroy.label:SetText(n == 0 and L("Coche ce que tu veux détruire") or n == 1 and L("Détruire l'objet coché")
             or string.format(L("Détruire le suivant (%d cochés)"), n))
         destroy:SetEnabled(n > 0)
+        -- only greyed items: nothing to tick, say it instead of "tick what you want"
+        local any = false
+        for _, e in ipairs(entries) do if not e.manual then any = true end end
+        if not any and #entries > 0 then destroy.label:SetText(L("Rien que l'addon puisse détruire")) end
         destroy.Paint(false)
     end
 
