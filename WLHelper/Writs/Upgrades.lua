@@ -364,7 +364,11 @@ local function Walk()
     walked = GetTime()
     local f = EnumerateFrames and EnumerateFrames()
     while f do
-        if not known[f] and f.GetObjectType and f:GetObjectType() == "ItemButton" and (f.GetBagID or f.UpdateNewItem or f.SetItemButtonTexture) then
+        -- forbidden frames (protected Blizzard or other addons' secure ones) are never touched
+        local okF, forbidden = pcall(function() return f.IsForbidden and f:IsForbidden() end)
+        local okT, ot = false, nil
+        if okF and not forbidden then okT, ot = pcall(f.GetObjectType, f) end
+        if not known[f] and okT and ot == "ItemButton" and (f.GetBagID or f.UpdateNewItem or f.SetItemButtonTexture) then
             -- Baganator's slots get its own corner widgets (below): not marked twice
             local ok, dn = pcall(f.GetDebugName, f)
             if not (ok and type(dn) == "string" and dn:find("Baganator", 1, true)) then known[f] = true end

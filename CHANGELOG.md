@@ -6,6 +6,13 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.57] — 2026-11-15
+
+### Corrigé / Fixed
+- **Erreur « forbidden object » (Upgrades.lua)** avec EllesmereUI : la recherche des boutons de sac ne touche plus les cadres protégés des autres addons.
+  *Upgrades: no more "forbidden object" error when scanning bag buttons.*
+- **Tu n'apparais plus dans « membres sans la quête »**, quelle que soit la forme de ton nom (avec ou sans royaume).
+
 ## [1.0.0-beta.56] — 2026-11-15
 
 ### Ajouté / Added

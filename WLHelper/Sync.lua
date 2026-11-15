@@ -232,7 +232,7 @@ local function OnMessage(prefix, msg, channel, sender)
   if channel ~= "PARTY" and channel ~= "RAID" and channel ~= "INSTANCE_CHAT" then return end
   local who = Short(sender)
   if not who or not InGroup(who) then return end
-  if who == Me() then return end
+  if type(who) == "string" and (who:match("^([^%-%s]+)") or who) == ((Me() or ""):match("^([^%-%s]+)") or Me()) then return end   -- our own message, whatever the name form
   if msg == "HELLO" then lastSent = ""; Schedule(); return end
   local want = msg:match("^W:(.*)$")
   if want then
@@ -420,9 +420,12 @@ function ns.HasHelper(who) return ns.party[who] ~= nil end
 -- « Bob, Ann (prête) · sans la quête : Jim » pour une quête donnée
 function ns.PartyLine(qid)
   local has, miss = {}, {}
-  local me = Me()
+  -- you are never "missing": names compared without the realm, however they were stored
+  -- ("Alandir", "Alandir-Sheeplover", "Alandir Sheeplover")
+  local function Base(n) return type(n) == "string" and (n:match("^([^%-%s]+)") or n) or n end
+  local me = Base(Me())
   for who, list in pairs(ns.party) do
-    if who ~= me then
+    if Base(who) ~= me then
       local s = list[qid] or (ns.partyPush[who] and ns.partyPush[who][qid])
       if s == "ready" then table.insert(has, "|cff59e67a" .. who .. "|r")
       elseif s == "on" then table.insert(has, who)
