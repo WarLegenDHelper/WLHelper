@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.55] — 2026-11-15
+
+### Modifié / Changed
+- **Accueil** : le bandeau du haut ne répète plus la prochaine étape du guide (la carte « Guide de quêtes » la montre déjà) ; il ne sert qu'à ce qui attend vraiment ailleurs (commande à répondre, Writs prêts, enveloppes, événement qui commence).
+  *Home: the top strip no longer repeats the quest guide's next step.*
+
 ## [1.0.0-beta.54] — 2026-11-15
 
 ### Modifié / Changed

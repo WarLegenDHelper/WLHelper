@@ -525,9 +525,7 @@ local function Refresh()
         t:Set("Interface\\Icons\\Ability_Warrior_BattleShout",
             mins > 0 and string.format(L("%s commence dans %d min."), nextE.title, mins) or string.format(L("%s a commencé."), nextE.title),
             L("Voir l'événement"), function() Close(); if WP.ToggleEvents then WP.ToggleEvents() end end)
-    elseif On("dungeons") and dLabel and not dFinished and nextStep and nextStep ~= "" then
-        t:Set("Interface\\Icons\\INV_Misc_Map_01", string.format(L("Prochaine étape : %s"), nextStep), L("Reprendre le guide"),
-            function() Close(); root.ShowGuide() end)
+    -- (the quest guide has its own card right below: no "next step" here, it would say it twice)
     elseif On("bags") and nBag > 0 then
         t:Set("Interface\\Icons\\INV_Misc_Bag_08", N(nBag, "1 objet de quête ne sert plus.", "%d objets de quête ne servent plus."), L("Nettoyer les sacs"),
             function() Close(); if WP.Cleaner then WP.Cleaner.Toggle() end end)
