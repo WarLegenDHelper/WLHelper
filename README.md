@@ -1,4 +1,4 @@
-# WL Helper
+# WL Helper (bêta / beta)
 
 Addon pour **World of Warcraft: Forever** (client 1.60.1). FR / EN.
 *Addon for **World of Warcraft: Forever** (client 1.60.1). French / English — English below.*
@@ -48,6 +48,17 @@ Commands: `/wl`, `/wl pick`, `/wl writs`, `/wl writs gps`, `/wl writs scan`, `/w
 **WowUp**: *Get Addons* → *Install from URL* → colle / paste `https://github.com/NEM3S15/WLHelper` → *Import*. Les mises à jour arrivent ensuite toutes seules / updates then come automatically.
 
 **À la main / manually**: télécharge le zip de la dernière [release](https://github.com/NEM3S15/WLHelper/releases/latest) et décompresse-le dans `World of Warcraft\_forever_\Interface\AddOns` (le dossier `DungeonGuide` doit se retrouver directement dans `AddOns`).
+
+## Versions
+
+Numéros [SemVer](https://semver.org/lang/fr/) : `MAJEUR.MINEUR.CORRECTIF`, avec `-beta.N` tant que c'est en test.
+- **CORRECTIF** (1.0.**1**) : corrections, données mises à jour.
+- **MINEUR** (1.**1**.0) : nouvelles fonctions, rien ne casse.
+- **MAJEUR** (**2**.0.0) : un changement qui casse quelque chose (réglages remis à zéro, commande retirée…).
+
+Le numéro vient d'un seul endroit, le `## Version` de `DungeonGuide/DungeonGuide.toc` ; chaque version a son
+tag `vX.Y.Z`, sa release GitHub avec le zip, et son entrée dans le [CHANGELOG](CHANGELOG.md). En jeu : `/wl help`.
+*SemVer numbers; the toc's version is the only source; each version has its `vX.Y.Z` tag, a GitHub release with the zip and a CHANGELOG entry.*
 
 ## Crédits / Credits
 

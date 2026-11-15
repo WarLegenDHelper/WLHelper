@@ -107,7 +107,9 @@ ev:SetScript("OnEvent", function(_, e)
       if not WLDTDB.hidden then f:Show() end
       ns.Refresh(true)
     end)
-    ns.Print(L.LOADED)
+    local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    ns.VERSION = meta and meta(ADDON, "Version") or "?"
+    ns.Print("v" .. ns.VERSION .. " " .. L.LOADED)
   elseif e == "PLAYER_REGEN_ENABLED" then
     if ns.frame then ns.Refresh() end
   elseif e == "PLAYER_ENTERING_WORLD" then
@@ -153,7 +155,7 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "all" or cmd == "tout" then WLDTDB.useful = (WLDTDB.useful == false); ns.Print(WLDTDB.useful and L.USEFUL_ON or L.USEFUL_OFF); ns.Recalc(); if ns.RenderPicker then ns.RenderPicker() end
   elseif cmd == "macro" then WLDTDB.macro = (WLDTDB.macro == false); ns.Print(WLDTDB.macro and L.MACRO_ON or L.MACRO_OFF); ns.UpdateMacro()
   elseif cmd == "reset" then WLDTDB.manual = {}; WLDTDB.order = nil; ns.Recalc(); ns.Print(L.RESET)
-  elseif cmd == "help" or cmd == "?" then ns.Print(L.HELP)
+  elseif cmd == "help" or cmd == "?" then ns.Print("WL Helper v" .. (ns.VERSION or "?")); ns.Print(L.HELP)
   else ns.ToggleMain() end
 end
 
