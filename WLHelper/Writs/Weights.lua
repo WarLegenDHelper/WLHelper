@@ -72,10 +72,63 @@ W.SPECS = SPECS
 local function Class() local _, c = UnitClass("player"); return c end
 local function French() return (root.lang == "fr") or (GetLocale and GetLocale() == "frFR" and root.lang ~= "en") end
 
+-- Points spent per talent tree through the modern talent system (Forever: C_ClassTalents +
+-- C_Traits, no GetTalentTabInfo). Several trees in the config: one per tab. A single tree: its
+-- nodes are split into three columns by their position, left to right like the old tabs.
+local function Num(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) and v or nil end
+local function TraitsPoints()
+    if not (C_ClassTalents and C_ClassTalents.GetActiveConfigID and C_Traits and C_Traits.GetConfigInfo
+        and C_Traits.GetTreeNodes and C_Traits.GetNodeInfo) then return nil end
+    local ok, cfg = pcall(C_ClassTalents.GetActiveConfigID)
+    if not ok or not Num(cfg) then return nil end
+    local okI, info = pcall(C_Traits.GetConfigInfo, cfg)
+    local trees = okI and type(info) == "table" and info.treeIDs
+    if type(trees) ~= "table" or #trees == 0 then return nil end
+    local function Nodes(tid)
+        local okN, nodes = pcall(C_Traits.GetTreeNodes, tid)
+        local out = {}
+        if okN and type(nodes) == "table" then
+            for _, nid in ipairs(nodes) do
+                local okD, ni = pcall(C_Traits.GetNodeInfo, cfg, nid)
+                if okD and type(ni) == "table" then
+                    local r = Num(ni.ranksPurchased) or Num(ni.currentRank) or 0
+                    out[#out + 1] = { r = r, x = Num(ni.posX) }
+                end
+            end
+        end
+        return out
+    end
+    local pts = {}
+    if #trees >= 2 then
+        for i, tid in ipairs(trees) do
+            local sum = 0
+            for _, n in ipairs(Nodes(tid)) do sum = sum + n.r end
+            pts[i] = sum
+        end
+        return pts
+    end
+    local nodes = Nodes(trees[1])
+    local lo, hi
+    for _, n in ipairs(nodes) do if n.x then lo = math.min(lo or n.x, n.x); hi = math.max(hi or n.x, n.x) end end
+    if not (lo and hi) or hi <= lo then return nil end
+    pts = { 0, 0, 0 }
+    for _, n in ipairs(nodes) do
+        if n.x and n.r > 0 then
+            local band = math.min(3, math.floor((n.x - lo) / (hi - lo + 1) * 3) + 1)
+            pts[band] = pts[band] + n.r
+        end
+    end
+    return pts
+end
+
 -- talent tab with the most points; the first damage spec before level 10
 local function TalentSpec(class)
     local best, bestPts = nil, 0
-    if GetTalentTabInfo then
+    local tp = TraitsPoints()
+    if tp then
+        for i = 1, 3 do if (tp[i] or 0) > bestPts then best, bestPts = i, tp[i] end end
+    end
+    if not best and GetTalentTabInfo then
         for i = 1, 3 do
             local r = { pcall(GetTalentTabInfo, i) }
             if r[1] then
@@ -84,7 +137,10 @@ local function TalentSpec(class)
             end
         end
     end
-    if best then return best end
+    if best then W.guessed = false; return best end
+    -- this client may not give the talent trees (Forever: no GetNumTalentTabs, and the modern
+    -- specialization answers 1 whatever the talents): a default, flagged so the player is asked
+    W.guessed = true
     local default = { WARRIOR = 1, PALADIN = 3, HUNTER = 2, ROGUE = 2, PRIEST = 3, SHAMAN = 2, MAGE = 3, WARLOCK = 1, DRUID = 2 }
     return default[class] or 1
 end
@@ -95,10 +151,12 @@ function W.Spec()
     if not list then return nil end
     local pick = WLWritsDB and WLWritsDB.upgradeSpec and WLWritsDB.upgradeSpec[class]
     if pick and pick ~= "auto" then
-        for _, s in ipairs(list) do if s[1] == pick then return s end end
+        for _, s in ipairs(list) do if s[1] == pick then W.guessed = false; return s end end
     end
     return list[TalentSpec(class)] or list[1]
 end
+-- true when the spec is a default (talents not readable and no choice made in the settings)
+function W.SpecGuessed() W.Spec(); return W.guessed == true end
 function W.SpecName(s)
     s = s or W.Spec()
     if not s then return "" end

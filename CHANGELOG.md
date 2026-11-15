@@ -6,6 +6,13 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.52] — 2026-11-15
+
+### Corrigé / Fixed
+- **Spé mal détectée** (un guerrier Protection vu en Armes, un mage Givre vu en Arcanes par hasard) : Forever range les talents dans le système moderne ; WL Helper y lit maintenant les points dépensés par arbre. Si la spé ne peut pas être lue, l'infobulle l'indique (« spé à choisir ») et un message dit où la régler, au lieu de supposer la première.
+  *Spec read from Forever's modern talent system; a guessed spec is now flagged.*
+- **Powering the Pylons** : la marche à suivre (Tamis à mana au dernier étage du temple, 8 de mana sur les orbes arcaniques, 4 de mana par pylône en 43, 35 et 73, 24).
+
 ## [1.0.0-beta.51] — 2026-11-15
 
 ### Corrigé / Fixed
