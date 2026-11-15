@@ -362,9 +362,9 @@ do
     if cut == nil then
       if Call(fs, "CanWordWrap") == true then cut = false
       else
-        local sw, w = Call(fs, "GetStringWidth"), Call(fs, "GetWidth")
-        if type(sw) ~= "number" or type(w) ~= "number" then return nil end
-        cut = w > 0 and sw > w + 0.5
+        local sw, w = ns.TextWidth(fs), Call(fs, "GetWidth")
+        if type(w) ~= "number" then return nil end
+        cut = w > 0 and sw > w + 1
       end
     end
     if cut then return true end

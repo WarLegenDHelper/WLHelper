@@ -427,10 +427,12 @@ end
 -- who to target for a line (Engine.lua, shared with the tracker and the target key)
 local NodeTargets = ns.NodeTargets
 
--- log (optional): each objective starts with its live count from the quest log ("3/5", green when done)
+-- log (optional): each objective starts with its live count from the quest log ("3/5", green when done).
+-- -> lines, live (true when the log gave at least one objective's state), sources (the
+-- "Drops from: ..." lines alone)
 local function ObjectiveLines(n, log)
-  local q = ns.Q[n.q]; if not q then return {} end
-  local lines = {}
+  local q = ns.Q[n.q]; if not q then return {}, false, {} end
+  local lines, live, srcLines = {}, false, {}
   local objs = q.o or {}
   if n.kind == "o" and n.obj then objs = { n.obj } end
   if n.oneObj then objs = { n.oneObj } end
@@ -438,6 +440,7 @@ local function ObjectiveLines(n, log)
     local s = (o.c and o.c > 1 and (o.c .. " x ") or "") .. (o.n or "")
     if log then
       local a, b, fin = ns.ObjCount(log, n.q, o)
+      if fin ~= nil then live = true end
       if a and b then
         s = Hex(fin and T.ok or T.fg) .. a .. "/" .. b .. "|r  " .. (o.n or "")
       end
@@ -450,11 +453,58 @@ local function ObjectiveLines(n, log)
       -- the sources on their own line under the objective, not glued after "0/1"
       if s ~= "" then table.insert(lines, s) end
       s = "    " .. Hex(T.muted) .. L.TT_DROPS:format(table.concat(srcs, " · ")) .. "|r"
+      srcLines[#srcLines + 1] = Hex(T.muted) .. L.TT_DROPS:format(table.concat(srcs, " · ")) .. "|r"
     end
     if s ~= "" then table.insert(lines, s) end
   end
-  return lines
+  return lines, live, srcLines
 end
+
+-- The objectives of a line as the player should read them: ours with their live count, else the
+-- game's own ones when the quest is in the log (our data can be thin: "Ancient Mana Crystal: 0/8"
+-- only comes from the game). -> lines (without "- "), true when they come from the game
+local function ObjectiveBlock(n, log, s)
+  local ours, live, srcs = ObjectiveLines(n, log)
+  if (s == "on" or s == "ready") and (#ours == 0 or not live) and ns.GameObjectives then
+    local game = ns.GameObjectives(n.q, log)
+    if #game > 0 then
+      -- a line about one objective keeps only that one: the game line naming it, else the one at
+      -- the same place in our list (frFR names never match ours); none -> our own single line
+      local one = n.oneObj or (n.kind == "o" and n.obj) or nil
+      if one then
+        local pick
+        local nm = type(one.n) == "string" and one.n:lower() or nil
+        if nm and nm ~= "" then
+          for _, g in ipairs(game) do
+            if type(g.text) == "string" and g.text:lower():find(nm, 1, true) then pick = g; break end
+          end
+        end
+        if not pick then
+          local qo = (ns.Q[n.q] or {}).o or {}
+          if #qo == #game then
+            for i, o in ipairs(qo) do
+              if o == one or (o.n and o.n == one.n) then pick = game[i]; break end
+            end
+          end
+        end
+        game = pick and { pick } or {}
+      end
+    end
+    if #game > 0 then
+      local out = {}
+      for _, g in ipairs(game) do out[#out + 1] = Hex(g.fin and T.ok or T.fg) .. g.text .. "|r" end
+      for _, sl in ipairs(srcs) do out[#out + 1] = { src = sl } end
+      return out, true
+    end
+  end
+  local out = {}
+  for _, l2 in ipairs(ours) do
+    -- a sources line stands on its own (no "- " before it)
+    if l2:sub(1, 4) == "    " then out[#out + 1] = { src = l2:sub(5) } else out[#out + 1] = l2 end
+  end
+  return out, false
+end
+ns.ObjectiveBlock = ObjectiveBlock
 
 -- the game's own icon for each kind of line (quest marks), HD icons for the rest
 local KICON = { a = "take", t = "turn", c = "boss", o = "map", h = "take" }
@@ -477,7 +527,7 @@ local function BuildList()
   local l = CreateFrame("Frame", nil, f)
   l.wlOwned = true
   l:SetWidth(LISTW)
-  -- its own height (its rows), top-aligned with the guide
+  -- its own height (its rows), top-aligned with the guide, on the side with more room (PlaceList)
   l:SetPoint("TOPRIGHT", f, "TOPLEFT", -4, 0); l:SetHeight(200)
   ns.Flat(l, T.bg, T.cardEdge)
   l.head = CreateFrame("Frame", nil, l)
@@ -538,6 +588,36 @@ local function BuildList()
   f.list = l
 end
 
+-- The step list opens on the side of the guide with more screen room: left or right. Asked again
+-- at every render and when the guide is dropped after a move.
+local function ListSide()
+  if not f then return "left" end
+  local fsc, usc = num(f:GetEffectiveScale()), num(UIParent:GetEffectiveScale())
+  local sc = (fsc and usc and fsc > 0 and usc > 0) and (fsc / usc) or 1
+  local l, r, sw = num(f:GetLeft()), num(f:GetRight()), num(UIParent:GetWidth())
+  if not (l and r and sw) or sw <= 0 then return f.listSide or "left" end
+  local leftRoom, rightRoom = l * sc, sw - r * sc
+  return (rightRoom > leftRoom) and "right" or "left"
+end
+ns.GuideListSide = ListSide
+local function PlaceList()
+  if not (f and f.list) then return end
+  local side = ListSide()
+  if side == f.listSide and f.list.placed then return end
+  f.listSide, f.list.placed = side, true
+  f.list:ClearAllPoints()
+  if side == "right" then f.list:SetPoint("TOPLEFT", f, "TOPRIGHT", 4, 0)
+  else f.list:SetPoint("TOPRIGHT", f, "TOPLEFT", -4, 0) end
+end
+ns.PlaceGuideList = PlaceList
+-- the "Steps" button's chevron points to where the list opens (or back, to close it)
+local function ListChevron()
+  local shown = f.list:IsShown()
+  local right = (f.listSide == "right")
+  if shown then return right and "chevron_left" or "chevron_right" end
+  return right and "chevron_right" or "chevron_left"
+end
+
 local function ListKindIcon(tex, st)
   if st.gate then ns.SetHDIcon(tex, "flag", T.muted)
   elseif st.split and st.bossIdx and st.bossIdx >= 1 and st.bossIdx <= 998 then Icon(tex, "boss")
@@ -573,6 +653,7 @@ end
 
 local function RenderList(log)
   local l = f.list
+  PlaceList()
   if not l:IsShown() then return end
   local steps = Steps()
   local entries, pos = ListEntries(log)
@@ -695,7 +776,11 @@ function ns.SetOne(n)
   Render()
 end
 
--- A quest line's tooltip: name, facts (muted), the state colours of the design system, the mouse line.
+-- A quest line's tooltip, in blocks and without repeats (design system 3.16):
+--   title + pill (Prerequisite / Dungeon quest); what to do and the quest's state; NPC and place
+--   ("Badlands 46.2, 13.8 · outside the dungeon"); Objective (live lines, "Drops from: ..." on its
+--   own line, the quest text in grey, our note, ForeverDungeonJournal's note); XP and money;
+--   the chain; the mouse line.
 function ns.RowTip(row)
   local n = row.node
   if not n then
@@ -704,40 +789,374 @@ function ns.RowTip(row)
     return
   end
   local q = ns.Q[n.q] or {}
-  local lines = { ns.QName(n.q) }
-  if GetLocale and GetLocale() == "frFR" and q.n then table.insert(lines, q.n)
-  elseif ns.lang == "fr" and q.nf then table.insert(lines, q.nf) end
+  local log = ns.LogEntries()
+  local s = ns.State(log, n.q)
+  local lines = {}
+  local function add(x) lines[#lines + 1] = x end
+  local function gap() if #lines > 0 and not (type(lines[#lines]) == "table" and lines[#lines].gap) then add({ gap = true }) end end
+  local mute, txt = T.muted, T.text
+  -- title and pill
+  local pill, pc
+  if n.pre or q.role == "pre" then pill, pc = L.PRE, T.info elseif q.d and n.kind ~= "i" then pill, pc = L.MAIN, T.gold end
+  add({ n.label or ns.QName(n.q), T.fg[1], T.fg[2], T.fg[3], right = pill, rc = pc })
+  local other = (GetLocale and GetLocale() == "frFR" and q.n) or (ns.lang == "fr" and q.nf) or nil
+  if other and other ~= (n.label or ns.QName(n.q)) then add(other) end
+  -- what to do, and where the quest stands
   local kc = KCOL[n.kind] or T.text
-  local kt = ({ a = L.TT_TAKE, c = L.TT_DO, o = L.TT_OUT, t = L.TT_TURN, h = L.TT_HAVE, i = L.TT_ITEM })[n.kind]
-  if kt then table.insert(lines, { kt, kc[1], kc[2], kc[3] }) end
-  if n.pre then
-    if n.ci and n.cn and n.forQ and n.forQ[1] then table.insert(lines, L.CH_BEFORE:format(n.ci, n.cn, ns.QName(n.forQ[1])))
-    else table.insert(lines, L.PRE) end
+  local kt = ({ a = L.TT_TAKE, c = L.TT_DO, o = L.TT_DO, t = L.TT_TURN, h = L.TT_HAVE, i = L.TT_ITEM })[n.kind]
+  if kt then
+    local st = (n.kind ~= "i" and SLABEL[s]) and (Hex(mute) .. "  ·  " .. L[SLABEL[s]] .. "|r") or ""
+    add(Hex(kc) .. kt .. "|r" .. st)
   end
-  table.insert(lines, n.ins and L.TT_INSIDE or L.TT_OUTSIDE)
   if q.c then
-    for tok in q.c:gmatch("[^,]+") do local cn, cc = ns.ClassInfo(tok); table.insert(lines, { L.CLASSQ:format(cn), cc[1], cc[2], cc[3] }) end
+    for tok in q.c:gmatch("[^,]+") do local cn, cc = ns.ClassInfo(tok); add({ L.CLASSQ:format(cn), cc[1], cc[2], cc[3] }) end
   end
-  if n.npc then table.insert(lines, n.npc) end
-  if n.loc then table.insert(lines, ("%s  %.1f, %.1f"):format(ZoneName(n.loc.m), n.loc.x, n.loc.y)) end
+  -- NPC and place, once
+  gap()
+  if n.npc then add({ n.npc, txt[1], txt[2], txt[3] }) end
+  local inout = n.ins and L.TT_IN_L or L.TT_OUT_L
+  if n.loc then
+    local zn = ZoneName(n.loc.m)
+    add(("%s%.1f, %.1f  ·  %s"):format(zn ~= "" and (zn .. "  ") or "", n.loc.x, n.loc.y, inout))
+  else
+    add(n.ins and L.TT_INSIDE or L.TT_OUTSIDE)
+  end
+  -- objective
+  local objs = ObjectiveBlock(n, log, s)
+  local reqs = {}
+  if #objs == 0 then
+    for _, r in ipairs(q.req or {}) do
+      reqs[#reqs + 1] = "- " .. r[1] .. (r[2] and r[2] > 1 and (" x" .. r[2]) or "") .. (r[3] and (L.COLON .. ns.T(r[3])) or "")
+    end
+  end
   local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
-  if obj then table.insert(lines, { obj, T.text[1], T.text[2], T.text[3] }) end
-  for _, s in ipairs(ObjectiveLines(n, ns.LogEntries())) do table.insert(lines, "- " .. s) end
-  if q.ne then table.insert(lines, ns.T(q.ne)) end
-  for _, r in ipairs(q.req or {}) do
-    if r[3] then table.insert(lines, r[1] .. L.COLON .. ns.T(r[3])) end
+  -- the game's own description, in grey under the objectives, when our data is thin (as the card)
+  local gdesc
+  if ns.GameQuestText and (s == "on" or s == "ready") then
+    local gd, gobj = ns.GameQuestText(n.q, log)
+    if not obj then obj = gobj end
+    if gd and not q.ne and not (q.o and #q.o > 0) then gdesc = gd end
   end
-  if q.si then table.insert(lines, q.si .. (q.sih and (L.COLON .. ns.T(q.sih)) or "")) end
-  if q.pi then table.insert(lines, q.pi .. (q.pih and (L.COLON .. ns.T(q.pih)) or "")) end
-  local rw = q.rw and q.rw ~= "" and q.rw or nil
-  if q.ri and q.ri[1] then rw = (rw and (rw .. " ; ") or "") .. table.concat(q.ri, q.rc and " / " or ", ") end
-  if rw then table.insert(lines, { L.TT_REWARD:format(rw), T.gold[1], T.gold[2], T.gold[3] }) end
-  if q.xp and q.xp > 0 then table.insert(lines, L.TT_XP:format(q.xp)) end
+  -- ForeverDungeonJournal's note only when we have none of our own (each said once)
+  local fdj = (not q.ne) and ns.FDJNote and ns.FDJNote(n.q) or nil
+  if #objs > 0 or #reqs > 0 or obj or gdesc or q.ne or fdj or q.si or q.pi then
+    gap()
+    add({ L.TT_OBJ_H, T.fg[1], T.fg[2], T.fg[3] })
+    for _, l2 in ipairs(objs) do
+      if type(l2) == "table" then add(l2.src) else add({ "- " .. l2, txt[1], txt[2], txt[3] }) end
+    end
+    for _, r in ipairs(reqs) do add({ r, txt[1], txt[2], txt[3] }) end
+    if obj then add(obj) end
+    if gdesc then add(gdesc) end
+    if q.ne then add({ ns.T(q.ne), txt[1], txt[2], txt[3] }) end
+    if q.si then add(q.si .. (q.sih and (L.COLON .. ns.T(q.sih)) or "")) end
+    if q.pi then add(q.pi .. (q.pih and (L.COLON .. ns.T(q.pih)) or "")) end
+    if fdj then add(L.FDJ_NOTE); add({ fdj, txt[1], txt[2], txt[3] }) end
+  end
+  -- XP and money, reward items
+  local money = q.rw and q.rw ~= "" and q.rw or nil
+  local xp = q.xp and q.xp > 0 and q.xp or nil
+  if xp or money or (q.ri and q.ri[1]) then
+    gap()
+    if xp and money then add(L.TT_XPMONEY:format(xp, money))
+    elseif xp then add(L.TT_XP:format(xp))
+    elseif money then add({ L.TT_REWARD:format(money), T.gold[1], T.gold[2], T.gold[3] }) end
+    if q.ri and q.ri[1] then add({ L.TT_REWARD:format(table.concat(q.ri, q.rc and " / " or ", ")), T.gold[1], T.gold[2], T.gold[3] }) end
+  end
+  -- the chain, what blocks it
+  local chain = {}
+  if n.pre and n.ci and n.cn and n.forQ and n.forQ[1] then chain[#chain + 1] = { L.CH_BEFORE:format(n.ci, n.cn, ns.QName(n.forQ[1])), T.info[1], T.info[2], T.info[3] } end
   local pb = n.kind == "a" and ns.PrereqProblem(n.q)
-  if pb then table.insert(lines, { L.BLOCKED:format(pb), T.bad[1], T.bad[2], T.bad[3] }) end
-  if q.conf then table.insert(lines, L.TT_CONFLICT) end
-  table.insert(lines, n.loc and L.TT_CLICK or (n.ins and L.TT_NOPOINT or L.TT_NOPOINT_UNK))
+  if pb then chain[#chain + 1] = { L.BLOCKED:format(pb), T.bad[1], T.bad[2], T.bad[3] } end
+  if q.conf then chain[#chain + 1] = L.TT_CONFLICT end
+  if #chain > 0 then gap(); for _, c in ipairs(chain) do add(c) end end
+  gap()
+  add(n.loc and L.TT_CLICK or (n.ins and L.TT_NOPOINT or L.TT_NOPOINT_UNK))
   ns.ShowTip(row, lines)
+end
+
+-- =====================================================================
+--  The step card's current action, then the other actions at the same NPC
+-- =====================================================================
+local FOCUS_KEY = { a = "FOCUS_A", t = "FOCUS_T", c = "FOCUS_C", o = "FOCUS_O", h = "FOCUS_H", i = "FOCUS_I" }
+local LINE_KEY = { a = "LINE_A", t = "LINE_T", c = "LINE_C", o = "LINE_O", h = "LINE_H", i = "LINE_I" }
+local NEXT_MAX = 16
+local FOCUS_X = 44
+
+local function NodeName(nd) return nd.label or ns.QName(nd.q) end
+local function NpcShort(nd) return nd.npc and (nd.npc:gsub(",.*$", "")) or nil end
+
+-- the current action of a step: its first unfinished line (else its last one: all done)
+local function FocusIndex(st, log)
+  for k, nd in ipairs(st.acts) do if not ns.NodeOK(log, nd) then return k end end
+  return #st.acts
+end
+ns.FocusIndex = FocusIndex
+
+-- What the arrow follows for an objective line: "game" when the game's own quest area is used
+-- (GamePOI, as StepPoints does), "log" when nothing places it, nil for a line with its own place.
+local function ArrowSource(nd)
+  if nd.kind ~= "o" then return nil end
+  if nd.loc and nd.loc.m then return GamePOI(nd.q, nd.loc.m) and "game" or nil end
+  if not nd.noLoc then return nil end
+  local here = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  for _, m in ipairs({ here or false, nd.mapHint or false }) do
+    if m and GamePOI(nd.q, m) then return "game" end
+  end
+  return "log"
+end
+ns.ArrowSource = ArrowSource
+
+local function MakeFocus(card)
+  local fo = CreateFrame("Button", nil, card)
+  fo.bg = Tex(fo, "BACKGROUND", { 1, 1, 1, 0.03 }); fo.bg:SetAllPoints()
+  fo.wpOn = Tex(fo, "BACKGROUND", T.selFill); fo.wpOn:SetAllPoints(); fo.wpOn:Hide()
+  fo.hl = Tex(fo, "HIGHLIGHT", T.hoverFill); fo.hl:SetAllPoints()
+  fo.press = Tex(fo, "ARTWORK", T.pressFill); fo.press:SetAllPoints(); fo.press:Hide()
+  fo.icon = fo:CreateTexture(nil, "ARTWORK"); fo.icon:SetSize(24, 24); fo.icon:SetPoint("TOPLEFT", 10, -10)
+  fo.head = Text(fo, ns.F.heading, T.fg)
+  fo.place = Text(fo, ns.F.meta, T.muted)
+  fo.body = Text(fo, ns.F.label, T.text); fo.body:SetSpacing(3)
+  fo.gtext = Text(fo, ns.F.meta, T.muted); fo.gtext:SetSpacing(2); fo.gtext:Hide()
+  -- the block's tooltip (RowTip) already says the name, the place and the game's description in
+  -- its own blocks: their cut labels are kept apart, not put first in the tooltip
+  fo.cutSink = {}
+  local gb
+  gb = LabelBtn(fo, "GPS", 24, "secondary", function(self) local n = self.row.node; if n and n.loc then ns.SetOne(n) end end,
+    function()
+      local n = gb and gb.row and gb.row.node
+      if not (n and n.loc) then return nil end
+      return { L.TT_GPS:format(n.npc or ns.QName(n.q), n.loc.x, n.loc.y), L.TT_GPS_CLICK }
+    end)
+  if gb.SetIcon then gb:SetIcon("pin") end
+  gb.row = fo
+  fo.gb = gb
+  fo:SetScript("OnClick", function(self) local n = self.node; if n and n.loc then ns.SetOne(n) end end)
+  fo:SetScript("OnMouseDown", function(self) if self.node and self.node.loc then self.press:Show() end end)
+  fo:SetScript("OnMouseUp", function(self) self.press:Hide() end)
+  fo:SetScript("OnEnter", function(self) ns.RowTip(self) end)
+  fo:SetScript("OnLeave", ns.HideTip)
+  fo:Hide()
+  card.focus = fo
+  -- "Then at Mordent Evenshade:" and one small line per other action
+  card.nextHdr = Text(card, ns.F.label, T.fg); card.nextHdr:Hide()
+  card.lines = {}
+  for k = 1, NEXT_MAX do
+    local ln = CreateFrame("Button", nil, card)
+    ln:SetHeight(22)
+    ln.hl = Tex(ln, "HIGHLIGHT", T.hoverFill); ln.hl:SetAllPoints()
+    ln.press = Tex(ln, "ARTWORK", T.pressFill); ln.press:SetAllPoints(); ln.press:Hide()
+    ln.icon = ln:CreateTexture(nil, "ARTWORK"); ln.icon:SetSize(14, 14); ln.icon:SetPoint("LEFT", 10, 0)
+    ln.text = Text(ln, ns.F.label, T.text); ln.text:SetPoint("LEFT", 32, 0); ln.text:SetPoint("RIGHT", -8, 0); ln.text:SetJustifyV("MIDDLE")
+    ns.ClampLabel(ln.text, nil, ln)
+    ln:SetScript("OnClick", function(self) local n = self.node; if n and n.loc then ns.SetOne(n) end end)
+    ln:SetScript("OnMouseDown", function(self) if self.node and self.node.loc then self.press:Show() end end)
+    ln:SetScript("OnMouseUp", function(self) self.press:Hide() end)
+    ln:SetScript("OnEnter", function(self) ns.RowTip(self) end)
+    ln:SetScript("OnLeave", ns.HideTip)
+    ln:Hide()
+    card.lines[k] = ln
+  end
+  card.doneIcon = ns.Icon(card, "check", 14, "ARTWORK", T.ok); card.doneIcon:Hide()
+  card.doneLine = Text(card, ns.F.meta, T.muted); card.doneLine:Hide()
+end
+
+local function HideFocus(card)
+  if not card.focus then return end
+  card.focus.node = nil; card.focus:Hide(); card.nextHdr:Hide(); card.doneLine:Hide(); card.doneIcon:Hide()
+  for _, ln in ipairs(card.lines) do ln.node = nil; ln:Hide() end
+end
+
+-- The detail lines of the current action, each said once: state and chain, what blocks it, the
+-- objectives (ours live, else the game's), the quest text, our note, ForeverDungeonJournal's note,
+-- where the arrow goes. -> list of lines, the game's description to show under them (or nil)
+local function FocusParts(card, nd, log, dkey)
+  local q = ns.Q[nd.q] or {}
+  local s = ns.State(log, nd.q)
+  local ok = ns.NodeOK(log, nd)
+  local tx, mt = Hex(T.text), Hex(T.muted)
+  local parts, tags = {}, {}
+  if nd.kind ~= "i" then tags[#tags + 1] = Hex(SCOL[s] or T.muted) .. L[SLABEL[s] or "S_NONE"] .. "|r" end
+  if nd.d and nd.d ~= dkey then tags[#tags + 1] = mt .. (ns.DName(nd.d) or nd.d) .. "|r" end
+  if nd.pre then
+    -- where you are in the chain, and what it leads to: "Step 3 of 9 before Agamaggan's Blood"
+    local lead = nd.forQ and nd.forQ[1]
+    local t = (nd.ci and nd.cn and lead) and L.CH_BEFORE:format(nd.ci, nd.cn, ns.QName(lead))
+      or (nd.ci and nd.cn) and L.CH_STEP:format(nd.ci, nd.cn) or L.PRE
+    tags[#tags + 1] = Hex(T.info) .. t .. "|r"
+  elseif nd.kind == "a" and not ok and ns.ChainState then
+    local cs = ns.ChainState(nd.q)
+    if cs.total == 0 then tags[#tags + 1] = mt .. L.CH_NONE .. "|r"
+    elseif cs.done >= cs.total then tags[#tags + 1] = Hex(T.ok) .. L.CH_ALLDONE .. "|r"
+    else tags[#tags + 1] = Hex(T.warn) .. L.ST_PRE:format(cs.done + 1, cs.total) .. "|r" end
+  end
+  if q.c and not card.clsChip:IsShown() then
+    local tok = q.c:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
+    tags[#tags + 1] = ns.ClassIconText(tok, 12) .. Hex(cc) .. L.CLASS_TAG:format(cn) .. "|r"
+  end
+  if #tags > 0 then parts[#parts + 1] = table.concat(tags, mt .. "  ·  |r") end
+  if ok then return parts, nil end
+  if nd.pre and nd.forQ and nd.forQ[1] then
+    local u = (#nd.forQ == 1) and L.CH_UNLOCKS:format(ns.QName(nd.forQ[1])) or L.CH_UNLOCKS_MORE:format(ns.QName(nd.forQ[1]), #nd.forQ - 1)
+    parts[#parts + 1] = tx .. u .. "|r"
+  end
+  if nd.kind == "a" and s == "none" then
+    local pb = ns.PrereqProblem(nd.q)
+    if pb then parts[#parts + 1] = Hex(T.bad) .. L.BLOCKED:format(pb) .. "|r" end
+  end
+  local inLog = (s == "on" or s == "ready")
+  local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
+  local desc
+  if inLog and ns.GameQuestText then
+    local gdesc, gobj = ns.GameQuestText(nd.q, log)
+    if not obj then obj = gobj end
+    -- our data is thin (no objectives, no note): the game's own description says where to go
+    if gdesc and not q.ne and not (q.o and #q.o > 0) then desc = gdesc end
+  end
+  if nd.kind == "h" then
+    local A = q.s and q.s.n or q.st
+    if A then parts[#parts + 1] = tx .. L.GIVER:format(A) .. "|r" end
+  elseif not (nd.kind == "t" and s == "ready") then
+    local objs = (nd.kind ~= "a") and ObjectiveBlock(nd, log, s) or {}
+    if obj then parts[#parts + 1] = tx .. obj .. "|r" end
+    for _, l2 in ipairs(objs) do
+      if type(l2) == "table" then parts[#parts + 1] = "    " .. l2.src else parts[#parts + 1] = tx .. "- " .. l2 .. "|r" end
+    end
+    if #objs == 0 and nd.kind ~= "a" then
+      for _, r2 in ipairs(q.req or {}) do
+        parts[#parts + 1] = "- " .. r2[1] .. (r2[2] and r2[2] > 1 and (" x" .. r2[2]) or "") .. (r2[3] and (L.COLON .. ns.T(r2[3])) or "")
+      end
+    end
+    if nd.kind == "a" and q.si then parts[#parts + 1] = q.si .. (q.sih and (L.COLON .. ns.T(q.sih)) or "") end
+    if q.ne then parts[#parts + 1] = tx .. ns.T(q.ne) .. "|r" end
+    if nd.extra then parts[#parts + 1] = nd.extra end
+    if nd.kind == "c" and ns.BossLines and not nd.oneObj then
+      for _, bl in ipairs(ns.BossLines(nd.q) or {}) do
+        parts[#parts + 1] = tx .. L.BOSS .. L.COLON .. bl[1] .. "|r" .. (bl[2] and ("  " .. bl[2]) or "")
+      end
+    end
+  end
+  -- ForeverDungeonJournal's note only when we have none of our own (each said once)
+  local fdj = (not q.ne) and ns.FDJNote and ns.FDJNote(nd.q) or nil
+  if fdj then parts[#parts + 1] = mt .. L.FDJ_NOTE .. "|r\n" .. tx .. fdj .. "|r" end
+  local src = ArrowSource(nd)
+  if src == "game" then parts[#parts + 1] = Hex(T.info) .. L.ARROW_GAME .. "|r"
+  elseif src == "log" then parts[#parts + 1] = Hex(T.warn) .. L.ARROW_LOG .. "|r" end
+  if nd.unknown then parts[#parts + 1] = L.TRAVEL_UNK end
+  if ns.PartyLine then
+    local pl = ns.PartyLine(nd.q)
+    if pl then parts[#parts + 1] = Hex(T.info) .. pl .. "|r" end
+  end
+  return parts, desc
+end
+ns.FocusParts = function(nd, log, dkey) return FocusParts(f.card, nd, log, dkey) end
+
+-- Draws the current action at y and the list of the others; returns the new y.
+local function RenderFocus(card, st, log, y, dkey)
+  local fo = card.focus
+  local rowW = CardW() - 8
+  local k = FocusIndex(st, log)
+  local nd = st.acts[k]
+  local ok = ns.NodeOK(log, nd)
+  fo.node = nd
+  -- hover feedback only when a click does something (a place to follow)
+  fo.hl:SetShown(nd.loc ~= nil)
+  fo.icon:SetVertexColor(1, 1, 1)
+  if ok then ns.SetHDIcon(fo.icon, "check", T.ok)
+  elseif not SetKindIcon(fo.icon, nd) then ns.SetHDIcon(fo.icon, "dot", T.muted) end
+  local key = FOCUS_KEY[nd.kind]
+  fo.head:SetText(key and L[key]:format(NodeName(nd)) or NodeName(nd))
+  local hc = ok and T.muted or T.fg
+  fo.head:SetTextColor(hc[1], hc[2], hc[3])
+  -- the GPS button at the top right; followed: the block is selected and the button says so
+  local x = -12
+  local isActive = nd.loc and ns.active[ns.PKey(nd.loc.m, nd.loc.x, nd.loc.y)] and not ok
+  fo.wpOn:SetShown(isActive and true or false)
+  if nd.loc then
+    fo.gb:SetText(isActive and (L.GPS_ON or "GPS") or "GPS")
+    fo.gb:ClearAllPoints(); fo.gb:SetPoint("TOPRIGHT", fo, "TOPRIGHT", x, -10); fo.gb:Show()
+    x = x - (num(fo.gb:GetWidth()) or 60) - 8
+  else fo.gb:Hide() end
+  local headW = math.max(80, rowW - FOCUS_X + x)
+  local bodyW = rowW - FOCUS_X - 12
+  local yy = 10
+  fo.head:ClearAllPoints(); fo.head:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -yy)
+  yy = yy + ns.FitText(fo.head, 3, headW, fo.cutSink)
+  -- NPC and place: "Mordent Evenshade  ·  Desolace 35.0, 46.4"
+  local place = {}
+  local npc = NpcShort(nd)
+  if npc then place[#place + 1] = npc end
+  if nd.loc and nd.loc.m then
+    local zn = ZoneName(nd.loc.m)
+    place[#place + 1] = ("%s%.1f, %.1f"):format(zn ~= "" and (zn .. " ") or "", nd.loc.x, nd.loc.y)
+  end
+  if #place > 0 then
+    fo.place:SetText(table.concat(place, "  ·  ")); fo.place:Show()
+    fo.place:ClearAllPoints(); fo.place:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -(yy + 3))
+    yy = yy + 3 + ns.FitText(fo.place, 2, headW, fo.cutSink)
+  else fo.place:Hide() end
+  -- under the GPS button at least
+  if nd.loc then yy = math.max(yy, 10 + 24) end
+  local parts, desc = FocusParts(card, nd, log, dkey)
+  local body = table.concat(parts, "\n")
+  if body ~= "" then
+    fo.body:SetText(body); fo.body:Show()
+    fo.body:ClearAllPoints(); fo.body:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -(yy + 8))
+    yy = yy + 8 + ns.FitText(fo.body, 0, bodyW, fo)
+  else fo.body:Hide() end
+  if desc then
+    fo.gtext:SetText(Hex(T.text) .. L.GAME_TEXT .. "|r\n" .. desc); fo.gtext:Show()
+    fo.gtext:ClearAllPoints(); fo.gtext:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -(yy + 8))
+    yy = yy + 8 + ns.FitText(fo.gtext, 8, bodyW, fo.cutSink)
+  else fo.gtext:Hide() end
+  local fh = math.max(44, math.ceil(yy + 12))
+  fo:SetWidth(rowW); fo:SetHeight(fh)
+  fo:ClearAllPoints(); fo:SetPoint("TOPLEFT", card, "TOPLEFT", 4, -y); fo:Show()
+  y = y + fh
+  -- the other actions of the step: open ones under "Then at <NPC>:", finished ones on one line
+  local others, done = {}, {}
+  for j, a in ipairs(st.acts) do
+    if j ~= k then
+      if ns.NodeOK(log, a) then done[#done + 1] = a else others[#others + 1] = a end
+    end
+  end
+  local TW = TextW()
+  if #others > 0 then
+    y = y + 10
+    card.nextHdr:SetText(npc and L.NEXT_AT:format(npc) or L.NEXT_PLAIN)
+    card.nextHdr:ClearAllPoints(); card.nextHdr:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.nextHdr:Show()
+    y = y + ns.FitText(card.nextHdr, 2, TW, card) + 4
+  else card.nextHdr:Hide() end
+  for j, ln in ipairs(card.lines) do
+    local a = others[j]
+    if a then
+      ln.node = a
+      ln.hl:SetShown(a.loc ~= nil)
+      ln.icon:SetVertexColor(1, 1, 1)
+      if not SetKindIcon(ln.icon, a) then ns.SetHDIcon(ln.icon, "dot", T.muted) end
+      local lk = LINE_KEY[a.kind]
+      local t = lk and L[lk]:format(NodeName(a)) or NodeName(a)
+      local an = NpcShort(a)
+      if an and an ~= npc then t = t .. Hex(T.muted) .. "  ·  " .. an .. "|r" end
+      ln.text:SetText(t)
+      ln:SetWidth(rowW)
+      ln:ClearAllPoints(); ln:SetPoint("TOPLEFT", card, "TOPLEFT", 4, -y); ln:Show()
+      y = y + 22
+    else ln.node = nil; ln:Hide() end
+  end
+  if #done > 0 then
+    local names = {}
+    for _, a in ipairs(done) do
+      local lk = LINE_KEY[a.kind]
+      names[#names + 1] = lk and L[lk]:format(NodeName(a)) or NodeName(a)
+    end
+    y = y + 8
+    card.doneIcon:ClearAllPoints(); card.doneIcon:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -(y + 1)); card.doneIcon:Show()
+    card.doneLine:SetText(L.DONE_HERE:format(table.concat(names, ", ")))
+    card.doneLine:ClearAllPoints(); card.doneLine:SetPoint("TOPLEFT", card, "TOPLEFT", CI + 20, -y); card.doneLine:Show()
+    y = y + ns.FitText(card.doneLine, 3, TW - 20, card)
+  else card.doneLine:Hide(); card.doneIcon:Hide() end
+  return y
 end
 
 -- =====================================================================
@@ -762,6 +1181,8 @@ local function Build()
   h:SetScript("OnDragStop", function()
     f:StopMovingOrSizing()
     ns.PinTopLeft()
+    PlaceList()
+    if f.listToggle and f.listToggle.SetIcon then f.listToggle:SetIcon(ListChevron()) end
     if ns.UpdateActionBar then ns.UpdateActionBar() end
   end)
   h.rule = ns.Rule(f, T.line); h.rule:SetPoint("TOPLEFT", 0, -HEADER); h.rule:SetPoint("TOPRIGHT", 0, -HEADER)
@@ -769,10 +1190,9 @@ local function Build()
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.OpenHome then WP.OpenHome() end
   end
-  -- "<" + logo: one control back to the home page (no separate house icon)
-  f.homeBtn = SW().BackLogo(h, GoHome)
-  f.homeBtn:SetPoint("TOPLEFT", 4, -6)
-  h.logo = f.homeBtn.logo
+  -- one HD "<" back to the home page (the guild logo stays on the Home window)
+  f.homeBtn = (SW().BackButton or SW().BackLogo)(h, GoHome)
+  f.homeBtn:SetPoint("TOPLEFT", 6, -8)
   h.title = Text(h, ns.F.title, T.fg); h.title:SetText(L.DUNGEONS)
   h.sub = Text(h, ns.F.meta, T.muted)
   ns.ClampLabel(h.title, nil, h); ns.ClampLabel(h.sub, nil, h)
@@ -791,28 +1211,34 @@ local function Build()
     if WP and WP.OpenOptions then WP.OpenOptions("dungeons") end
   end)
   f.gearBtn:SetPoint("RIGHT", f.miniBtn, "LEFT", -4, 0)
-  f.pickBtn = IconBtn(h, "portal", { L.TT_HPICK, L.TT_PICKBTN }, function() ns.TogglePicker() end)
-  f.pickBtn:SetPoint("RIGHT", f.gearBtn, "LEFT", -4, 0)
+  -- "Dungeons": a labelled button (an icon alone was not understood), small map + the word
+  f.pickBtn = LabelBtn(h, L.DUNGEONS_BTN, 24, "secondary", function() ns.TogglePicker() end, { L.TT_HPICK, L.TT_PICKBTN })
+  if f.pickBtn.SetPaintedIcon then f.pickBtn:SetPaintedIcon("Interface\\Icons\\INV_Misc_Map_01")
+  elseif f.pickBtn.SetIcon then f.pickBtn:SetIcon("portal") end
+  f.pickBtn:SetPoint("RIGHT", f.gearBtn, "LEFT", -6, 0)
+  local leftmost = f.pickBtn
   -- the overview of the guide's dungeon (Overview.lua): its quests, prerequisites and rewards
-  local nIcons = 4
   if ns.ShowOverview then
     f.ovBtn = IconBtn(h, "info", function()
       local dn = ns.DName(GuideDungeon())
       return { dn and L.OV_HDR_T:format(dn) or L.OV_T, L.OV_CLICK }
     end, function() ns.ShowOverview(GuideDungeon()) end)
     f.ovBtn:SetPoint("RIGHT", f.pickBtn, "LEFT", -4, 0)
-    nIcons = 5
+    leftmost = f.ovBtn
   end
-  -- title and subtitle stop before the header icons (full text in the header's tooltip)
+  -- title and subtitle: after the back button, and they stop 8 px before the header's buttons
+  -- (full text in the header's tooltip)
+  local TITLE_X = 6 + 28 + 6
   function f.LayoutTitle(hasSub)
     h.title:ClearAllPoints(); h.sub:ClearAllPoints()
-    local right = -(8 + nIcons * 28 + (nIcons - 1) * 4 + 8)
     if hasSub then
-      h.title:SetPoint("TOPLEFT", 76, -7); h.title:SetPoint("TOPRIGHT", right, -7)
+      -- the buttons are centred on the header: their top sits (44 - height) / 2 down
+      local topOff = (HEADER - (num(leftmost:GetHeight()) or 28)) / 2
+      h.title:SetPoint("TOPLEFT", TITLE_X, -7); h.title:SetPoint("TOPRIGHT", leftmost, "TOPLEFT", -8, topOff - 7)
       h.sub:SetPoint("TOPLEFT", h.title, "BOTTOMLEFT", 0, -2); h.sub:SetPoint("TOPRIGHT", h.title, "BOTTOMRIGHT", 0, -2)
       h.sub:Show()
     else
-      h.title:SetPoint("LEFT", h, "LEFT", 76, 0); h.title:SetPoint("RIGHT", h, "RIGHT", right, 0)
+      h.title:SetPoint("LEFT", h, "LEFT", TITLE_X, 0); h.title:SetPoint("RIGHT", leftmost, "LEFT", -8, 0)
       h.sub:Hide()
     end
   end
@@ -926,6 +1352,7 @@ local function Build()
   card.after = Text(card, ns.F.label, T.text); card.after:SetSpacing(3); card.after:Hide()
   card.rows = {}
   for r = 1, MAXROWS do card.rows[r] = MakeRow(card) end
+  MakeFocus(card)
   card.shareBtn = LabelBtn(card, L.SHARE_SHORT, 28, "secondary", DoShare, function() return { L.M_SHARE, L.TT_FSHARE } end)
   if card.shareBtn.SetIcon then card.shareBtn:SetIcon("group") end
   card.shareBtn:Hide()
@@ -1312,6 +1739,7 @@ local function HideStepParts(card)
   card.travel:Hide(); card.travelIcon:Hide(); card.readyBox:Hide(); card.after:Hide(); card.shareBtn:Hide()
   card.model:Hide(); card.modelBg:Hide()
   for _, row in ipairs(card.rows) do row.node = nil; row:Hide() end
+  HideFocus(card)
 end
 
 -- An empty or finished card: one centred block (icon, title, sentence); returns its height.
@@ -1369,7 +1797,10 @@ Render = function()
   else f.inBand:Hide() end
   f.prog:SetShown(hasRoute and not f.mini); f.bar:SetShown(hasRoute)
   f.listToggle:SetText(L.LIST)
-  if f.listToggle.SetIcon then f.listToggle:SetIcon(f.list:IsShown() and "chevron_right" or "chevron_left") end
+  -- the header's labels follow a live language switch too (S.Button's SetText refits the width)
+  if f.pickBtn then f.pickBtn:SetText(L.DUNGEONS_BTN) end
+  PlaceList()
+  if f.listToggle.SetIcon then f.listToggle:SetIcon(ListChevron()) end
 
   if not hasRoute then
     -- no route yet: what is missing, why, and the one action (centred under the block)
@@ -1638,9 +2069,13 @@ Render = function()
   else card.note:Hide() end
   y = y + 8
 
+  -- an ordinary step (one NPC or one place): the current action big and clear, the others as a
+  -- short list. Check-lists and steps inside a dungeon keep one row per line (bosses in order).
+  local focusMode = not st.gate and not st.ins and not st.split and #st.acts > 0
+  if focusMode then y = RenderFocus(card, st, log, y, dkey) else HideFocus(card) end
   local rowW = CardW() - 8
   local subW = rowW - ROW_NAME_X - 12
-  local view = ns.StepView(st, log)
+  local view = focusMode and {} or ns.StepView(st, log)
   local mt = Hex(T.muted)
   for r, row in ipairs(card.rows) do
     local nd = view[r]
@@ -1656,7 +2091,7 @@ Render = function()
       row.name:SetTextColor(nc[1], nc[2], nc[3])
       row.npc:SetText(nd.allOk and (Hex(T.ok) .. L.S_DONE .. "|r") or "")
       row.npc:ClearAllPoints(); row.npc:SetPoint("TOPRIGHT", row, "TOPRIGHT", -12, -12)
-      local npcW = math.min((num(row.npc:GetStringWidth()) or 0) + 2, 140)
+      local npcW = math.min(ns.TextWidth(row.npc) + 2, 140)
       row.npc:SetWidth(npcW)
       row.gb:Hide(); row.wpOn:Hide(); row.icon:Hide()
       if nd.bossIdx > 0 then Icon(row.kicon, "boss") else ns.SetHDIcon(row.kicon, "flag", T.muted) end
@@ -1704,7 +2139,7 @@ Render = function()
       -- the name keeps 120 px at least; the NPC (or state) gets what is left, up to 140 px, and
       -- goes to the start of the detail lines when less than 60 px would remain for it
       local room = rowW - ROW_NAME_X + x - 8
-      local npcW = math.min((num(row.npc:GetStringWidth()) or 0) + 2, 140, math.max(0, room - 120))
+      local npcW = math.min(ns.TextWidth(row.npc) + 2, 140, math.max(0, room - 120))
       local npcInSub = (right ~= "" and npcW < 60) and right or nil
       row.npc:SetShown(not npcInSub)
       if npcInSub then npcW = 0 end
@@ -2083,7 +2518,7 @@ function ns.UpdateActionBar()
       end
     end
   end
-  local labelW = abar.label:GetStringWidth() + 8
+  local labelW = ns.TextWidth(abar.label) + 8
   for k = 1, AB_N do
     local b, a = abar.btns[k], acts[k]
     b.action = a

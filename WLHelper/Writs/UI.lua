@@ -183,10 +183,7 @@ local function Height(fs, minH)
     h = ok and num(h) or 0
     return math.max(h, minH or 0)
 end
-local function Width(fs)
-    local ok, w = pcall(fs.GetStringWidth, fs)
-    return math.ceil(ok and num(w) or 0)
-end
+local function Width(fs) return root.TextWidth(fs) end
 local function Big(n) return BreakUpLargeNumbers and BreakUpLargeNumbers(n) or tostring(n) end
 
 -- ---------------------------------------------------------------- shared bits

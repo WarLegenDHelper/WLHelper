@@ -634,10 +634,7 @@ local pages, ui = {}, {}
 local draft = { day = 0, tank = 1, heal = 1, dps = 3 }
 
 local function Num(v) return type(v) == "number" and not (root.IsSecret and root.IsSecret(v)) and v or nil end
-local function TextW(fs)
-    local ok, w = pcall(fs.GetStringWidth, fs)
-    return math.ceil((ok and Num(w)) or 0)
-end
+local function TextW(fs) return root.TextWidth(fs) end
 local function Place(obj, x, y)
     obj:ClearAllPoints(); obj:SetPoint("TOPLEFT", x, -y)
 end
@@ -1048,7 +1045,7 @@ local function PickedTitle() return table.concat(PickedNames(), " + ") end
 
 -- "Maraudon, Zul'Farrak" on one line; the names that do not fit become "(+2)", never a cut name
 local function FitNames(fs, names, maxW)
-    local measure = fs.GetUnboundedStringWidth or fs.GetStringWidth
+    local measure = function(x) return root.TextWidth(x) end
     fs:SetWidth(maxW); fs:SetWordWrap(false)
     for i = #names, 1, -1 do
         local s = table.concat(names, ", ", 1, i)
@@ -1072,7 +1069,7 @@ end
 
 -- a card name on one line, never cut: 13 px, else 12, else 11 (then the full name is in the tooltip)
 local function FitCardName(fs, text, maxW)
-    local measure = fs.GetUnboundedStringWidth or fs.GetStringWidth
+    local measure = function(x) return root.TextWidth(x) end
     local canSize = root.SetFont and fs._size ~= nil
     for _, size in ipairs({ 13, 12, 11 }) do
         if canSize then fs._size = size; root.SetFont(fs) end

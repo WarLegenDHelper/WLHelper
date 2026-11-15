@@ -481,10 +481,7 @@ local function InviteName(name)
 end
 
 local function Num(v) return type(v) == "number" and not (root.IsSecret and root.IsSecret(v)) and v or nil end
-local function TextW(fs)
-    local ok, w = pcall(fs.GetStringWidth, fs)
-    return math.ceil((ok and Num(w)) or 0)
-end
+local function TextW(fs) return root.TextWidth(fs) end
 local function Place(obj, x, y)
     obj:ClearAllPoints(); obj:SetPoint("TOPLEFT", x, -y)
 end

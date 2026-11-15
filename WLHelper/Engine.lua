@@ -1181,3 +1181,114 @@ function ns.SplitInside(steps)
   end
   return out
 end
+
+-- =====================================================================
+--  What the game itself knows about a quest in the log (its objectives, its texts), and the
+--  note ForeverDungeonJournal keeps for it when that addon is loaded. Our data can be thin
+--  (no objectives, no place): these fill the card and the tooltip. Everything is guarded:
+--  secret values and missing functions give nothing, never an error.
+-- =====================================================================
+-- -> list of { text = "Ancient Mana Crystal: 0/8", fin = false } for a quest in the log, or {}
+function ns.GameObjectives(qid, log)
+  local out = {}
+  log = log or ns.LogEntries()
+  local e = qid and log and log[qid]
+  if not e then return out end
+  if CQL and CQL.GetQuestObjectives then
+    local ok, objs = pcall(CQL.GetQuestObjectives, qid)
+    if ok and type(objs) == "table" then
+      for _, x in ipairs(objs) do
+        if type(x) == "table" and plainStr(x.text) and x.text ~= "" then
+          local fin = x.finished
+          if issecretvalue and issecretvalue(fin) then fin = nil end
+          out[#out + 1] = { text = x.text, fin = fin and true or false }
+        end
+      end
+      if #out > 0 then return out end
+    end
+  end
+  if e.index and GetNumQuestLeaderBoards and GetQuestLogLeaderBoard then
+    local okN, n = pcall(GetNumQuestLeaderBoards, e.index)
+    if okN and plainNum(n) then
+      for j = 1, n do
+        local okT, text, _, finished = pcall(GetQuestLogLeaderBoard, j, e.index)
+        if okT and plainStr(text) and text ~= "" then
+          if issecretvalue and issecretvalue(finished) then finished = nil end
+          out[#out + 1] = { text = text, fin = finished and true or false }
+        end
+      end
+    end
+  end
+  return out
+end
+
+-- -> description, objective text of a quest in the log (the game's own words), or nil
+local textMemo = {}
+function ns.GameQuestText(qid, log)
+  log = log or ns.LogEntries()
+  local e = qid and log and log[qid]
+  if not (e and e.index) then return nil end
+  local m = textMemo[qid]
+  if m and m.index == e.index then return m.desc, m.obj end
+  local desc, obj
+  local get = GetQuestLogQuestText
+  if get then
+    -- newer clients take the log index; older ones read the selected entry: select it, read,
+    -- then give the selection back
+    -- a client that ignores the index returns the SELECTED entry's text: trust the indexed call
+    -- only when that entry is this quest (or when there is no way to select one)
+    local canSel = SelectQuestLogEntry and GetQuestLogSelection
+    local okC, cur
+    if GetQuestLogSelection then okC, cur = pcall(GetQuestLogSelection) end
+    if not canSel or (okC and plainNum(cur) and cur == e.index) then
+      local ok, d, o = pcall(get, e.index)
+      if ok and plainStr(d) and d ~= "" then desc, obj = d, o end
+    end
+    if not desc and canSel then
+      local okS, was = pcall(GetQuestLogSelection)
+      if pcall(SelectQuestLogEntry, e.index) then
+        local ok2, d2, o2 = pcall(get)
+        if ok2 and plainStr(d2) and d2 ~= "" then desc, obj = d2, o2 end
+        if okS and plainNum(was) then pcall(SelectQuestLogEntry, was) end
+      end
+    end
+  end
+  if not plainStr(obj) or obj == "" then obj = nil end
+  if desc then textMemo[qid] = { index = e.index, desc = desc, obj = obj } end
+  return desc, obj
+end
+
+-- The note ForeverDungeonJournal keeps for a quest (its dungeon quests and its prerequisite
+-- pages), read live from its tables when it is loaded. Its text is never copied into our data:
+-- the card shows it with a credit line. -> note text or nil
+local fdjIndex, fdjSrc
+function ns.FDJNote(qid)
+  if not qid then return nil end
+  if not (ns.IsLoaded and ns.IsLoaded("ForeverDungeonJournal")) then return nil end
+  local FDJ = _G.ForeverDungeonJournal_NS
+  if type(FDJ) ~= "table" then return nil end
+  local note
+  local det = type(FDJ.QUEST_PREREQ_DETAILS) == "table" and FDJ.QUEST_PREREQ_DETAILS[qid]
+  if type(det) == "table" and type(det.note) == "string" and det.note ~= "" then note = det.note end
+  if not note and type(FDJ.DB) == "table" then
+    if fdjSrc ~= FDJ.DB then
+      fdjSrc, fdjIndex = FDJ.DB, {}
+      for _, dg in pairs(FDJ.DB) do
+        if type(dg) == "table" and type(dg.quests) == "table" then
+          for _, qq in ipairs(dg.quests) do
+            if type(qq) == "table" and qq.id and type(qq.note) == "string" and qq.note ~= "" and not fdjIndex[qq.id] then
+              fdjIndex[qq.id] = qq.note
+            end
+          end
+        end
+      end
+    end
+    note = fdjIndex[qid]
+  end
+  if not note then return nil end
+  if type(FDJ.LocalizeQuestField) == "function" then
+    local ok, t = pcall(FDJ.LocalizeQuestField, qid, "note", note)
+    if ok and type(t) == "string" and t ~= "" then note = t end
+  end
+  return note
+end

@@ -355,9 +355,7 @@ function S.Button(parent, label, width, height, kind, onClick, tip)
 
     local labelSet = b.label.SetText
     local function Need()
-        local ok, sw = pcall(b.label.GetStringWidth, b.label)
-        sw = ok and num(sw) or 0
-        local w = math.ceil(sw) + 24
+        local w = root.TextWidth(b.label) + 24
         if b.icon:IsShown() then w = w + 16 + 6 end
         if b.chev:IsShown() then w = w + 10 + 4 end
         return w + (b.extraW or 0)
@@ -412,6 +410,7 @@ function S.Button(parent, label, width, height, kind, onClick, tip)
             local a = (k == "danger" or k == "warn") and 1 or (0.85 + 0.15 * hov)
             b.label:SetTextColor(text[1], text[2], text[3], a)
             local ic = b.flashing and T.ok or text
+            if b.painted then ic = { 1, 1, 1 } end
             b.icon:SetVertexColor(ic[1], ic[2], ic[3])
         end
     end
@@ -424,7 +423,14 @@ function S.Button(parent, label, width, height, kind, onClick, tip)
     function b:GetText() return self.label:GetText() end
     function b:SetKind(k) self.kind = (k == "info") and "secondary" or (k or "secondary"); Paint() end
     function b:SetIcon(name)
+        self.painted = nil
         if name then root.SetHDIcon(self.icon, name, T.fg); self.icon:Show() else self.icon:Hide() end
+        self:Fit(); Paint()
+    end
+    -- a painted game icon (a thing: a map, a dungeon) instead of an HD glyph, cropped, never tinted
+    function b:SetPaintedIcon(path)
+        self.painted = true
+        self.icon:SetTexture(path); self.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); self.icon:Show()
         self:Fit(); Paint()
     end
     function b:SetChevron(on)
@@ -688,8 +694,7 @@ function S.Segmented(parent, options, get, set, height)
     local function Layout()
         local x = 0
         for i, b in ipairs(buttons) do
-            local ok, sw = pcall(b.label.GetStringWidth, b.label)
-            local w = math.max(56, math.ceil((ok and num(sw)) or 0) + 32)
+            local w = math.max(56, root.TextWidth(b.label) + 32)
             b:SetWidth(w)
             b:ClearAllPoints(); b:SetPoint("LEFT", x, 0)
             x = x + w
@@ -778,8 +783,7 @@ function S.Counter(parent)
         self.text:SetText(n)
         if urgent then self.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1)
         else self.bg:SetColorTexture(1, 1, 1, 0.10) end
-        local ok, sw = pcall(self.text.GetStringWidth, self.text)
-        self:SetWidth(math.max(18, math.ceil((ok and num(sw)) or 0) + 8))
+        self:SetWidth(math.max(18, root.TextWidth(self.text) + 8))
         self:Show()
     end
     c:Hide()
@@ -863,8 +867,7 @@ function S.Tabs(parent, list, get, set, badge)
             local n, urgent = nil, nil
             if badge then n, urgent = badge(b.key) end
             if type(n) == "number" and n > 0 then b.badge:SetCount(n, urgent) else b.badge:Hide() end
-            local ok, sw = pcall(b.label.GetStringWidth, b.label)
-            sw = math.ceil((ok and num(sw)) or 0)
+            local sw = root.TextWidth(b.label)
             b.textW = sw
             local extra = b.badge:IsShown() and (b.badge:GetWidth() + 4) or 0
             natural[i] = sw
@@ -1130,8 +1133,7 @@ function S.ListRow(parent, opts)
         end
         if self.unit:IsShown() then
             self.unit:ClearAllPoints(); self.unit:SetPoint("TOPRIGHT", -right, -7)
-            local ok, uw = pcall(self.unit.GetStringWidth, self.unit)
-            right = right + math.ceil((ok and num(uw)) or 0) + 4
+            right = right + root.TextWidth(self.unit) + 4
         end
         if self.value:IsShown() then
             local vw = self.valueW or 64
@@ -1500,26 +1502,28 @@ S.FitWindow = root.FitWindow
 
 -- ---------------------------------------------------------------- window
 
--- The home button: the HD house, 28 x 28, no word next to it.
--- "<" + logo in one button (hover lights both, a click goes home)
-function S.BackLogo(parent, onClick)
+-- The back button of every window but Home: an HD chevron_left (18 px) in a 28 x 28 hit area,
+-- hover and press fills, tooltip "Accueil". The guild logo stays on the Home window only.
+-- (S.BackLogo is its older name: the logo is no longer part of it.)
+function S.BackButton(parent, onClick)
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(16 + 28 + 4, 32)
+    b:SetSize(28, 28)
     b.wlOwned = true
     b.hl = S.Solid(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
-    b.chev = b:CreateTexture(nil, "ARTWORK"); b.chev:SetSize(14, 14); b.chev:SetPoint("LEFT", 2, 0)
+    b.press = S.Solid(b, "BORDER", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
+    b.chev = b:CreateTexture(nil, "ARTWORK"); b.chev:SetSize(18, 18); b.chev:SetPoint("CENTER", 0, 0)
     root.SetHDIcon(b.chev, "chevron_left", T.muted)
-    b.logo = b:CreateTexture(nil, "ARTWORK"); b.logo:SetSize(28, 28); b.logo:SetPoint("LEFT", 16, 0); b.logo:SetTexture(S.LOGO)
     b:SetScript("OnEnter", function(self)
         self.hl:SetAlpha(1); self.chev:SetVertexColor(T.fg[1], T.fg[2], T.fg[3])
         S.Tip(self, { L("Accueil"), L("Clic : revenir à l'accueil") })
     end)
-    b:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); self.chev:SetVertexColor(T.muted[1], T.muted[2], T.muted[3]); S.HideTip() end)
-    b:SetScript("OnMouseDown", function(self) self.logo:SetPoint("LEFT", 17, -1) end)
-    b:SetScript("OnMouseUp", function(self) self.logo:SetPoint("LEFT", 16, 0) end)
+    b:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); self.press:Hide(); self.chev:SetVertexColor(T.muted[1], T.muted[2], T.muted[3]); S.HideTip() end)
+    b:SetScript("OnMouseDown", function(self) self.press:Show(); self.chev:SetPoint("CENTER", 0, -1) end)
+    b:SetScript("OnMouseUp", function(self) self.press:Hide(); self.chev:SetPoint("CENTER", 0, 0) end)
     b:SetScript("OnClick", function() if onClick then onClick() end end)
     return b
 end
+S.BackLogo = S.BackButton
 
 function S.HomeButton(parent, onClick)
     local b = S.IconButton(parent, "home", 28, { L("Accueil"), L("Clic : revenir à l'accueil") }, onClick)
@@ -1602,21 +1606,21 @@ function S.Window(name, width, height, title, subtitle, db, posKey, opts)
         if WP and WP.OpenHome then WP.OpenHome() end
     end
     local midY = -math.floor((HH - 28) / 2)
-    -- one control on the left: "<" and the WL logo together go back to the home page (the usual
-    -- back gesture, the logo stays the app's mark); the home page itself shows the logo alone
-    local logoX = 8
-    local logo
-    if not (NO_BACK[name or ""] or opts.noHome) then
-        f.back = S.BackLogo(h, GoHome)
-        f.back:SetPoint("TOPLEFT", 4, midY)
-        logo = f.back.logo
-        logoX = 4 + 16
-    else
-        logo = h:CreateTexture(nil, "ARTWORK")
+    -- the left of the header: on the Home window the guild logo (the app's mark), on every other
+    -- window one HD "<" back to Home; the Welcome window (the first contact) keeps the logo too;
+    -- small popups have neither. The title follows it.
+    local titleX = 16
+    if name == "WLHelperHome" or name == "WLHelperWelcome" or opts.logo then
+        local logo = h:CreateTexture(nil, "ARTWORK")
         logo:SetSize(28, 28); logo:SetTexture(S.LOGO)
-        logo:SetPoint("TOPLEFT", logoX, midY)
+        logo:SetPoint("TOPLEFT", 8, midY)
+        f.logo = logo
+        titleX = 8 + 28 + 8
+    elseif not (NO_BACK[name or ""] or opts.noHome) then
+        f.back = S.BackButton(h, GoHome)
+        f.back:SetPoint("TOPLEFT", 6, midY)
+        titleX = 6 + 28 + 6
     end
-    f.logo = logo
     f.title = S.Text(h, root.F.title, T.fg, true)
     f.title:SetJustifyH("LEFT")
     S.ClampLabel(f.title, nil, h)
@@ -1636,7 +1640,7 @@ function S.Window(name, width, height, title, subtitle, db, posKey, opts)
         local sub = f.subtitle:GetText()
         local hasSub = type(sub) == "string" and sub ~= ""
         f.title:ClearAllPoints(); f.subtitle:ClearAllPoints()
-        local x = logoX + 28 + 8
+        local x = titleX
         if hasSub then
             local top = math.max(3, math.floor((HH - 32) / 2))
             f.title:SetPoint("TOPLEFT", h, "TOPLEFT", x, -top)

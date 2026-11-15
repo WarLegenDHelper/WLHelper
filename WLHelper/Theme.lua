@@ -285,6 +285,61 @@ function ns.Text(parent, size, color, bold, flags)
   return fs
 end
 
+-- ns.TextWidth(fs [, text] [, onLate]): the width the words of `fs` need on ONE line, whatever
+-- width the FontString has right now. Measured on a hidden twin FontString with fs's own font
+-- (GetUnboundedStringWidth when the client has it): the FontString's own GetStringWidth is bounded
+-- by its current width and gave "In..." labels. `text` measures other words with fs's font.
+-- When the font lands late (the next frame), onLate(w) runs then with the new measure so the
+-- caller can size its widget again.
+local twin
+local function Twin()
+  if not twin and UIParent and UIParent.CreateFontString then
+    twin = UIParent:CreateFontString(nil, "OVERLAY"); twin:Hide()
+    ns._chipMeasure = twin
+  end
+  return twin
+end
+local function MeasureOn(m, getName)
+  local fn = m[getName]
+  if type(fn) ~= "function" then return nil end
+  local ok, w = pcall(fn, m)
+  if ok and type(w) == "number" and not secret(w) then return w end
+end
+function ns.TextWidth(fs, text, onLate)
+  if not fs then return 0 end
+  if text == nil then
+    local ok, t = pcall(fs.GetText, fs)
+    text = (ok and type(t) == "string" and not secret(t)) and t or ""
+  end
+  if type(text) ~= "string" or text == "" then return 0 end
+  local w
+  local m = Twin()
+  local okF, font, size, flags = pcall(fs.GetFont, fs)
+  if m and okF and type(font) == "string" and not secret(font) then
+    if pcall(m.SetFont, m, font, size, flags or "") then
+      pcall(m.SetText, m, text)
+      w = MeasureOn(m, "GetUnboundedStringWidth") or MeasureOn(m, "GetStringWidth")
+    end
+  end
+  if not w or w <= 0 then
+    -- no twin or no font yet: the FontString itself, unbounded when the client can
+    local okT, cur = pcall(fs.GetText, fs)
+    if not okT or secret(cur) then cur = nil end
+    local swap = cur ~= text
+    if swap then pcall(fs.SetText, fs, text) end
+    w = MeasureOn(fs, "GetUnboundedStringWidth") or MeasureOn(fs, "GetStringWidth") or 0
+    if swap then pcall(fs.SetText, fs, cur) end
+  end
+  w = math.ceil(w)
+  if onLate and C_Timer and C_Timer.After then
+    C_Timer.After(0, function()
+      local w2 = ns.TextWidth(fs, text)
+      if w2 ~= w and w2 > 0 then onLate(w2) end
+    end)
+  end
+  return w
+end
+
 -- Is this FontString cut by the engine ("...")? Secret or unknown values count as "not cut".
 function ns.IsCut(fs)
   if not fs then return false end
@@ -296,10 +351,10 @@ function ns.IsCut(fs)
     local ok, wrap = pcall(fs.CanWordWrap, fs)
     if ok and wrap == true then return false end
   end
-  local okS, sw = pcall(fs.GetStringWidth, fs)
+  local sw = ns.TextWidth(fs)
   local okW, w = pcall(fs.GetWidth, fs)
-  if not (okS and okW) or type(sw) ~= "number" or type(w) ~= "number" or secret(sw) or secret(w) then return false end
-  return w > 0 and sw > w + 0.5
+  if not okW or type(w) ~= "number" or secret(w) then return false end
+  return w > 0 and sw > w + 1
 end
 
 -- Labels that cannot grow (tabs, pills, titles, number columns): one line; when the engine cuts
@@ -436,7 +491,13 @@ function ns.ShowTip(owner, lines)
   end
   for _, l in ipairs(lines) do
     n = n + 1
-    if type(l) == "table" then GameTooltip:AddLine(l[1], l[2], l[3], l[4], true)
+    -- { gap = true }: a blank line between blocks; { text, r, g, b, right = "Pill", rc = colour }:
+    -- the text with a short word on the right (a pill in words)
+    if type(l) == "table" and l.gap then GameTooltip:AddLine(" ")
+    elseif type(l) == "table" and l.right and GameTooltip.AddDoubleLine then
+      local rc = l.rc or T.muted
+      GameTooltip:AddDoubleLine(l[1], l.right, l[2] or T.fg[1], l[3] or T.fg[2], l[4] or T.fg[3], rc[1], rc[2], rc[3])
+    elseif type(l) == "table" then GameTooltip:AddLine(l[1], l[2], l[3], l[4], true)
     elseif n == 1 then GameTooltip:AddLine(l, T.fg[1], T.fg[2], T.fg[3], true)
     elseif IsMouseLine(l) then GameTooltip:AddLine(l, (T.hint or T.muted)[1], (T.hint or T.muted)[2], (T.hint or T.muted)[3], true)
     else GameTooltip:AddLine(l, T.muted[1], T.muted[2], T.muted[3], true) end
@@ -514,9 +575,9 @@ function ns.Button(parent, w, h, label, onClick, tip)
   b.Paint = Paint
   function b:Fit()
     if self.iconOnly then return end
-    local ok, sw = pcall(self.label.GetStringWidth, self.label)
-    if ok and type(sw) == "number" and not secret(sw) and sw > 0 then
-      local need = math.ceil(sw) + 24
+    local sw = ns.TextWidth(self.label)
+    if sw > 0 then
+      local need = sw + 24
       if need > (self.minW or 0) then self:SetWidth(need) end
     end
   end
@@ -602,23 +663,7 @@ function ns.SetChip(c, label, col, maxW)
   -- measured again on the next frame once the font is final.
   c.text:SetWordWrap(false)
   local function Fit()
-    local m = ns._chipMeasure
-    if not m then m = UIParent:CreateFontString(nil, "OVERLAY"); m:Hide(); ns._chipMeasure = m end
-    local okF, font, size, flags = pcall(c.text.GetFont, c.text)
-    local w = 0
-    if okF and font then
-      pcall(m.SetFont, m, font, size, flags)
-      m:SetText(c.text:GetText() or "")
-      local getW = m.GetUnboundedStringWidth or m.GetStringWidth
-      local ok, mw = pcall(getW, m)
-      if ok and type(mw) == "number" and not secret(mw) then w = mw end
-    end
-    if w <= 0 then
-      local getW = c.text.GetUnboundedStringWidth or c.text.GetStringWidth
-      local ok, tw = pcall(getW, c.text)
-      if ok and type(tw) == "number" and not secret(tw) then w = tw end
-    end
-    w = math.ceil(w) + 2
+    local w = ns.TextWidth(c.text) + 2
     c.overflow = (maxW ~= nil and w + 12 > maxW) or nil
     local okP, _, _, _, left = pcall(c.text.GetPoint, c.text, 1)
     left = (okP and type(left) == "number" and left > 6) and left or 6

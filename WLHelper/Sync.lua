@@ -1,103 +1,433 @@
--- Synchronisation de groupe : chaque membre qui a Dungeon Guide envoie les quêtes de donjon
--- de son journal (et si elles sont prêtes). Le guide affiche qui a quoi avant d'entrer.
+-- Synchronisation de groupe : chaque membre qui a WL Helper envoie, sur le canal d'addon du groupe
+-- (jamais en chuchotement), l'état des quêtes de son journal et de celles des donjons choisis par le
+-- groupe : dans le journal, prête, rendue, à prendre, niveau trop bas, ou le maillon de chaîne qui
+-- manque. Les membres sans WL Helper sont remplis par les messages du jeu après un partage de quête
+-- (« X a déjà terminé cette quête », « X a accepté ta quête »...).
+-- ns.party[who][qid] = "on" | "ready" | "done" | "take" | "low" | "pre"; ns.partyPre[who][qid] = id
+-- of the missing link; ns.partyPush[who][qid] = what the game said after a share.
 local ADDON, ns = ...
 local PREFIX = "WLDT"
 ns.party = {}
+ns.partyPre = {}
+ns.partyKeys = {}    -- [who] = { dkey = true }: dungeons whose quests the member's last message covers
+ns.partyPush = {}
+ns.syncKeys = {}     -- dungeons the group asked about (my summary, the others' requests)
 
 local CI = C_ChatInfo
 local Register = (CI and CI.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-local Send = (CI and CI.SendAddonMessage) or SendAddonMessage
 if Register then pcall(Register, PREFIX) end
+-- the game's sender, looked up when sending (group channels only: never a whisper)
+local function SendFn() return (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage end
+local function Send(prefix, msg, ch)
+  if ch ~= "PARTY" and ch ~= "RAID" and ch ~= "INSTANCE_CHAT" then return end
+  local fn = SendFn()
+  if fn then return fn(prefix, msg, ch) end
+end
+
+local function secret(v) return issecretvalue ~= nil and issecretvalue(v) end
+local function Now() return (GetTime and GetTime()) or 0 end
 
 local function Channel()
   if IsInRaid and IsInRaid() then return "RAID" end
   if IsInGroup and IsInGroup() then return "PARTY" end
 end
 
-local function Short(name) return name and (name:gsub("%-.*$", "")) end
-local me
+local function Short(name) return type(name) == "string" and (name:gsub("%-.*$", "")) or nil end
+local function Me() return UnitName and UnitName("player") end
 
-local lastSent, pending = "", false
-function ns.SyncSend(force)
-  if ns.GuideOn and not ns.GuideOn() then return end
-  local ch = Channel()
-  if not (ch and Send) then return end
-  local log = ns.LogEntries()
-  local ids = {}
-  for id, e in pairs(log) do
-    if ns.Q[id] then table.insert(ids, id .. (e.complete and "*" or "")) end
+-- The other members of the group, in party / raid order: { { name, unit, class } }.
+function ns.GroupMembers()
+  local out = {}
+  local n = (GetNumGroupMembers and GetNumGroupMembers()) or 0
+  if n == 0 then return out end
+  local raid = IsInRaid and IsInRaid()
+  local me = Me()
+  local last = raid and n or math.min(4, n)
+  for k = 1, last do
+    local unit = (raid and "raid" or "party") .. k
+    local nm = UnitName and UnitName(unit)
+    if type(nm) == "string" and not secret(nm) then
+      nm = Short(nm)
+      if nm ~= me then
+        local _, cls = UnitClass and UnitClass(unit)
+        out[#out + 1] = { name = nm, unit = unit, class = (type(cls) == "string" and not secret(cls)) and cls or nil }
+      end
+    end
   end
-  table.sort(ids)
-  local payload = table.concat(ids, ",")
-  if payload == lastSent and not force then return end
-  lastSent = payload
-  -- messages de 240 caractères max : « n/total:liste »
+  return out
+end
+
+-- =====================================================================
+--  What I send: my quests, for my log and the group's dungeons
+-- =====================================================================
+-- token = quest id + code: o in the log, r ready, d turned in, t to take, l level too low,
+-- p<id> a prerequisite missing (the first link not turned in)
+local function Wanted()
+  local set, n = {}, 0
+  for k in pairs(WLDTDB and WLDTDB.sel or {}) do if ns.D[k] and not set[k] then set[k] = true; n = n + 1 end end
+  for k in pairs(ns.syncKeys) do if ns.D[k] and not set[k] and n < 12 then set[k] = true; n = n + 1 end end
+  return set
+end
+
+function ns.SyncTokens()
+  local log = ns.LogEntries()
+  local _, cls = UnitClass("player")
+  local lvl = UnitLevel and UnitLevel("player")
+  lvl = (type(lvl) == "number" and not secret(lvl)) and lvl or 1
+  local toks, seen = {}, {}
+  local function add(qid, code) if not seen[qid] then seen[qid] = true; toks[#toks + 1] = qid .. code end end
+  for id, e in pairs(log) do if ns.Q[id] and id > 0 then add(id, e.complete and "r" or "o") end end
+  local keys = Wanted()
+  local list = {}
+  for k in pairs(keys) do list[#list + 1] = k end
+  table.sort(list)
+  for _, k in ipairs(list) do
+    for _, qid in ipairs(ns.DungeonQuests(k, cls)) do
+      if qid > 0 and not seen[qid] then
+        local st = ns.State(log, qid)
+        if st == "done" then add(qid, "d")
+        elseif st == "ready" then add(qid, "r")
+        elseif st == "on" then add(qid, "o")
+        else
+          local pre = ns.QuestPreInfo and ns.QuestPreInfo(qid, log, cls)
+          local q = ns.Q[qid]
+          if pre and pre.nextPid and pre.nextPid > 0 then add(qid, "p" .. pre.nextPid)
+          elseif q and q.r and lvl < q.r then add(qid, "l")
+          else add(qid, "t") end
+        end
+      end
+    end
+  end
+  table.sort(toks)
+  return toks, list
+end
+
+-- Messages fit the addon message limit (255 bytes): "2|i/n|keys:tok,tok" cut at 230 bytes, the
+-- dungeon keys only in the first part.
+local LIMIT = 230
+function ns.SyncChunks(toks, keys)
   local chunks, cur = {}, ""
-  for _, s in ipairs(ids) do
-    if #cur + #s + 1 > 230 then table.insert(chunks, cur); cur = "" end
+  local head1 = table.concat(keys or {}, ",")
+  if #head1 > 120 then head1 = head1:sub(1, 120):gsub(",[^,]*$", "") end
+  local function room() return LIMIT - 12 - (#chunks == 0 and #head1 or 0) end
+  for _, s in ipairs(toks) do
+    if cur ~= "" and #cur + #s + 1 > room() then table.insert(chunks, cur); cur = "" end
     cur = (cur == "" and s) or (cur .. "," .. s)
   end
   table.insert(chunks, cur)
-  for i, c in ipairs(chunks) do pcall(Send, PREFIX, i .. "/" .. #chunks .. ":" .. c, ch) end
+  local out = {}
+  for i, c in ipairs(chunks) do out[i] = ("2|%d/%d|%s:%s"):format(i, #chunks, i == 1 and head1 or "", c) end
+  return out
 end
 
-local function Schedule()
+local lastSent, lastAt, pending = "", -100, false
+local MIN_GAP = 3
+local Schedule
+
+-- The tokens are rebuilt only when what they say can have changed: the quest log (ids and
+-- completion), the level, the dungeons asked about. A mob killed (QUEST_LOG_UPDATE) costs a
+-- signature, not a walk over every chain of up to 12 dungeons.
+local tokSig, tokCache, keyCache
+local function TokenSig()
+  local t = {}
+  for id, e in pairs(ns.LogEntries()) do t[#t + 1] = tostring(id) .. (e.complete and "r" or "o") end
+  table.sort(t)
+  local lvl = UnitLevel and UnitLevel("player")
+  lvl = (type(lvl) == "number" and not secret(lvl)) and lvl or 1
+  local keys = {}
+  for k in pairs(Wanted()) do keys[#keys + 1] = k end
+  table.sort(keys)
+  return table.concat(t, ",") .. "|" .. lvl .. "|" .. table.concat(keys, ",")
+end
+function ns.SyncDirty() tokSig = nil end
+
+-- the game's answer to a send: nil, true or 0 (Success) is sent; false or another code is not
+local function Sent(ok, res)
+  if not ok then return false end
+  if res == false then return false end
+  if type(res) == "number" and not secret(res) and res ~= 0 then return false end
+  return true
+end
+
+-- fromTimer == "retry": the call that waited out the gap, it sends
+function ns.SyncSend(force, fromTimer)
+  if ns.GuideOn and not ns.GuideOn() then return end
+  local ch = Channel()
+  if not (ch and SendFn()) then return end
+  local sig = TokenSig()
+  if sig ~= tokSig or not tokCache then tokSig = sig; tokCache, keyCache = ns.SyncTokens() end
+  local toks, keys = tokCache, keyCache
+  local payload = table.concat(keys, ",") .. ":" .. table.concat(toks, ",")
+  if payload == lastSent and not force then return end
+  -- throttled, the timers too: one full message every MIN_GAP seconds at most, the parts 0.2 s apart
+  local wait = MIN_GAP - (Now() - lastAt)
+  if wait > 0 and not force and fromTimer ~= "retry" then Schedule(wait, true); return end
+  lastSent, lastAt = payload, Now()
+  local failed = false
+  -- a part the game did not send: the receiver never completes the message, send it all again
+  local function again()
+    if failed then return end
+    failed = true
+    lastSent = ""
+    Schedule(MIN_GAP, true)
+  end
+  for i, msg in ipairs(ns.SyncChunks(toks, keys)) do
+    local function go()
+      if failed then return end
+      local c = Channel()
+      if not c then return end
+      if not Sent(pcall(Send, PREFIX, msg, c)) then again() end
+    end
+    if i == 1 or not (C_Timer and C_Timer.After) then go() else C_Timer.After((i - 1) * 0.2, go) end
+  end
+end
+
+-- retry: the call comes after the gap and sends
+Schedule = function(delay, retry)
   if pending then return end
   pending = true
-  C_Timer.After(2, function() pending = false; ns.SyncSend() end)
+  local fn = function() pending = false; ns.SyncSend(false, retry and "retry" or true) end
+  if C_Timer and C_Timer.After then C_Timer.After(delay or 2, fn) else fn() end
 end
 
+-- My summary is open on these dungeons: ask the group for their quests (and send mine).
+local lastAsk, lastAskAt = "", -100
+function ns.SyncAsk(keys)
+  local ch = Channel()
+  if not ch then return end
+  local list = {}
+  for _, k in ipairs(keys or {}) do if ns.D[k] and #list < 8 then list[#list + 1] = k; ns.syncKeys[k] = true end end
+  if #list == 0 then return end
+  local s = table.concat(list, ",")
+  if s ~= lastAsk or Now() - lastAskAt > 30 then
+    lastAsk, lastAskAt = s, Now()
+    pcall(Send, PREFIX, "W:" .. s:sub(1, 240), ch)
+  end
+  Schedule(0.5)
+end
+
+-- =====================================================================
+--  What I receive
+-- =====================================================================
+local CODES = { o = "on", r = "ready", d = "done", t = "take", l = "low", p = "pre" }
+local function Changed()
+  if ns.syncRenderQueued then return end
+  ns.syncRenderQueued = true
+  local fn = function()
+    ns.syncRenderQueued = false
+    if ns.Render then pcall(ns.Render) end
+    if ns.RenderOverview then ns.RenderOverview() end
+  end
+  if C_Timer and C_Timer.After then C_Timer.After(0.5, fn) else fn() end
+end
+ns.SyncChanged = Changed
+
 local buf = {}
+local function InGroup(who)
+  return (UnitInParty and UnitInParty(who)) or (UnitInRaid and UnitInRaid(who))
+end
 local function OnMessage(prefix, msg, channel, sender)
-  if prefix ~= PREFIX or not msg then return end
+  if prefix ~= PREFIX or type(msg) ~= "string" or secret(msg) or secret(sender) then return end
   -- only your group's members, on the group's channels
   if channel ~= "PARTY" and channel ~= "RAID" and channel ~= "INSTANCE_CHAT" then return end
   local who = Short(sender)
-  if who and not ((UnitInParty and UnitInParty(who)) or (UnitInRaid and UnitInRaid(who))) then return end
-  me = me or UnitName("player")
-  if not who or who == me then return end
+  if not who or not InGroup(who) then return end
+  if who == Me() then return end
   if msg == "HELLO" then lastSent = ""; Schedule(); return end
-  local i, n, body = msg:match("^(%d+)/(%d+):(.*)$")
+  local want = msg:match("^W:(.*)$")
+  if want then
+    local n = 0
+    for k in want:gmatch("[^,]+") do if ns.D[k] and n < 8 then ns.syncKeys[k] = true; n = n + 1 end end
+    lastSent = ""; Schedule(1)
+    return
+  end
+  local v2 = msg:sub(1, 2) == "2|"
+  local i, n, keys, body
+  if v2 then i, n, keys, body = msg:match("^2|(%d+)/(%d+)|([^:]*):(.*)$")
+  else i, n, body = msg:match("^(%d+)/(%d+):(.*)$") end
   if not i then return end
   i, n = tonumber(i), tonumber(n)
-  if not i or not n or n > 20 or i > n then return end
-  if i == 1 then buf[who] = {} end
-  if not buf[who] then return end   -- the first part was missed: wait for the next full message
-  for tok in body:gmatch("[^,]+") do
-    local id, star = tok:match("^(%d+)(%*?)$")
-    if id then buf[who][tonumber(id)] = (star == "*") and "ready" or "on" end
+  if not i or not n or n > 20 or i > n or i < 1 then return end
+  if i == 1 then
+    buf[who] = { st = {}, pre = {}, keys = {}, v = v2 and 2 or 1 }
+    for k in (keys or ""):gmatch("[^,]+") do buf[who].keys[k] = true end
   end
-  if i == n then
-    ns.party[who] = buf[who]; buf[who] = nil
-    if ns.Render and not ns.syncRenderQueued then
-      ns.syncRenderQueued = true
-      C_Timer.After(0.5, function() ns.syncRenderQueued = false; ns.Render() end)
+  local b = buf[who]
+  if not b then return end   -- the first part was missed: wait for the next full message
+  for tok in body:gmatch("[^,]+") do
+    if v2 then
+      local id, code, pid = tok:match("^(%d+)(%a)(%d*)$")
+      id = tonumber(id)
+      if id and CODES[code] then
+        b.st[id] = CODES[code]
+        if code == "p" then b.pre[id] = tonumber(pid) end
+      end
+    else
+      local id, star = tok:match("^(%d+)(%*?)$")
+      if id then b.st[tonumber(id)] = (star == "*") and "ready" or "on" end
     end
   end
-end
-
-local function Prune()
-  local keep = {}
-  local n = (GetNumGroupMembers and GetNumGroupMembers()) or 0
-  local unit = (IsInRaid and IsInRaid()) and "raid" or "party"
-  for k = 1, n do
-    local nm = UnitName(unit .. k)
-    if nm then keep[Short(nm)] = true end
+  if i == n then
+    ns.party[who], ns.partyPre[who], ns.partyKeys[who] = b.st, b.pre, b.keys
+    buf[who] = nil
+    Changed()
   end
-  for who in pairs(ns.party) do if not keep[who] then ns.party[who] = nil end end
+end
+ns.SyncReceive = OnMessage
+
+-- =====================================================================
+--  Quest sharing and the game's answers (members without WL Helper)
+-- =====================================================================
+-- the game's sentences, with English fallbacks: "%s" is the member's name. The 4th field: the
+-- answer waits for the member's click (accepted, declined, the dialog timed out); the others come
+-- back at once.
+local PUSH = {
+  { "ERR_QUEST_PUSH_ACCEPTED_S", "on", "%s has accepted your quest.", true },
+  { "ERR_QUEST_PUSH_ONQUEST_S", "on", "%s is already on that quest." },
+  { "ERR_QUEST_PUSH_ALREADY_DONE_S", "done", "%s has completed that quest." },
+  { "ERR_QUEST_PUSH_INVALID_S", "invalid", "%s is not eligible for that quest." },
+  { "ERR_QUEST_PUSH_INVALID_TO_RECIPIENT_S", "invalid", nil },
+  { "ERR_QUEST_PUSH_DECLINED_S", "declined", "%s has declined your quest.", true },
+  { "ERR_QUEST_PUSH_LOG_FULL_S", "full", "%s's quest log is full." },
+  { "ERR_QUEST_PUSH_BUSY_S", "busy", "%s is busy." },
+  { "ERR_QUEST_PUSH_TOO_FAR_S", "far", "%s is too far away to receive your quest." },
+  { "ERR_QUEST_PUSH_NOT_IN_PARTY_S", "busy", nil },
+  { "ERR_QUEST_PUSH_NOT_ALLOWED_S", "invalid", nil },
+  { "ERR_QUEST_PUSH_TIMER_EXPIRED_S", "busy", nil, true },
+  { "ERR_QUEST_PUSH_NOT_DAILY_S", "invalid", nil },
+}
+local patterns
+local function Patterns()
+  if patterns then return patterns end
+  patterns = {}
+  for _, p in ipairs(PUSH) do
+    local fmt = _G[p[1]]
+    if type(fmt) ~= "string" then fmt = p[3] end
+    if type(fmt) == "string" and fmt:find("%%s") then
+      local pat = fmt:gsub("%%%d?%$?s", "\1"):gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"):gsub("\1", "(.+)")
+      patterns[#patterns + 1] = { "^" .. pat .. "$", p[2], p[4] }
+    end
+  end
+  return patterns
 end
 
--- « Bob ✓, Ann (en cours) · sans la quête : Jim » pour une quête donnée
+-- The game's answer does not name the quest. Each member keeps the shares still waiting for
+-- their answer, oldest first (ns.pushQ[who] = { { qid, t } }): an answer that comes at once is for
+-- the newest share, one that waits for the member's click (accepted, declined) for the oldest.
+-- "Share all" sends one quest every 1.5 s, often before the member has clicked.
+local QUICK, SLOW = 10, 60   -- seconds an answer can still come
+ns.pushLast = nil
+ns.pushQ = {}
+local function Take(who, slow)
+  local q = ns.pushQ[who]
+  if not q then return nil end
+  local now = Now()
+  for i = #q, 1, -1 do if now - q[i].t > SLOW then table.remove(q, i) end end
+  local pick = slow and 1 or #q
+  if not q[pick] then return nil end
+  if not slow and now - q[pick].t > QUICK then return nil end
+  return table.remove(q, pick).qid
+end
+function ns.OnPushAnswer(text)
+  if type(text) ~= "string" or secret(text) then return false end
+  for _, p in ipairs(Patterns()) do
+    local who = text:match(p[1])
+    if who then
+      who = Short(who:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+      if not who then return false end
+      local qid = Take(who, p[3])
+      -- a member who was not in the group list at the share: the quest pushed last
+      if not qid and not ns.pushQ[who] then
+        local last = ns.pushLast
+        if last and Now() - last.t <= (p[3] and SLOW or QUICK) then qid = last.qid end
+      end
+      if not qid then return false end
+      ns.partyPush[who] = ns.partyPush[who] or {}
+      ns.partyPush[who][qid] = p[2]
+      Changed()
+      return true
+    end
+  end
+  return false
+end
+
+-- Shares one quest of my log with the group (guarded: in a group, in the log, shareable).
+function ns.PushQuest(qid)
+  if not (IsInGroup and IsInGroup()) then return false end
+  local e = ns.LogEntries()[qid]
+  if not e then return false end
+  local q = ns.Q[qid]
+  if q and q.sh == false then return false end
+  if ns.Pushable and not ns.Pushable(qid, e) then return false end
+  if SelectQuestLogEntry and e.index then pcall(SelectQuestLogEntry, e.index)
+  elseif C_QuestLog and C_QuestLog.SetSelectedQuest then pcall(C_QuestLog.SetSelectedQuest, qid) end
+  local push = QuestLogPushQuest or (C_QuestLog and C_QuestLog.PushQuest)
+  if not push then return false end
+  local ok = pcall(push)
+  if not ok then return false end
+  local now = Now()
+  ns.pushLast = { qid = qid, t = now }
+  -- members without data: "sent", until the game answers
+  for _, m in ipairs(ns.GroupMembers()) do
+    local q = ns.pushQ[m.name] or {}
+    ns.pushQ[m.name] = q
+    q[#q + 1] = { qid = qid, t = now }
+    while #q > 12 do table.remove(q, 1) end
+    local pp = ns.partyPush[m.name] or {}
+    ns.partyPush[m.name] = pp
+    if not (ns.party[m.name] and ns.party[m.name][qid]) then pp[qid] = pp[qid] or "sent" end
+  end
+  Changed()
+  return true
+end
+
+-- Shares a list of quests, one every 1.5 s (the game answers each one before the next).
+ns.pushBusy = false
+function ns.PushQuests(list, onDone)
+  if ns.pushBusy or not list or #list == 0 then return 0 end
+  ns.pushBusy = true
+  local n = #list
+  local function step(i)
+    if i > n then ns.pushBusy = false; if onDone then onDone() end; return end
+    ns.PushQuest(list[i])
+    if C_Timer and C_Timer.After and i < n then C_Timer.After(1.5, function() step(i + 1) end) else step(i + 1) end
+  end
+  step(1)
+  return n
+end
+
+-- A member's state for a quest: state, missing link id, source ("sync", "push" or nil).
+-- state: on, ready, done, take, low, pre (sync); invalid, declined, full, busy, far, sent (push);
+-- "na" (WL Helper says the quest is not for this member), "unknown".
+function ns.MemberQuest(who, qid, dkey)
+  local list = ns.party[who]
+  local s = list and list[qid]
+  local push = ns.partyPush[who] and ns.partyPush[who][qid]
+  if s then
+    -- a share that was just accepted is newer than the last message
+    if push == "on" and (s == "take" or s == "pre" or s == "low") then return "on", nil, "push" end
+    return s, ns.partyPre[who] and ns.partyPre[who][qid], "sync"
+  end
+  if push then return push, nil, "push" end
+  if list and dkey and ns.partyKeys[who] and ns.partyKeys[who][dkey] then return "na", nil, "sync" end
+  return "unknown"
+end
+function ns.HasHelper(who) return ns.party[who] ~= nil end
+
+-- =====================================================================
+--  One line for the guide: who has the quest
+-- =====================================================================
+-- « Bob, Ann (prête) · sans la quête : Jim » pour une quête donnée
 function ns.PartyLine(qid)
   local has, miss = {}, {}
-  local me = UnitName and UnitName("player")
+  local me = Me()
   for who, list in pairs(ns.party) do
-   if who ~= me then
-    local s = list[qid]
-    if s == "ready" then table.insert(has, "|cff59e67a" .. who .. "|r")
-    elseif s == "on" then table.insert(has, who)
-    else table.insert(miss, "|cffff9933" .. who .. "|r") end
-   end
+    if who ~= me then
+      local s = list[qid] or (ns.partyPush[who] and ns.partyPush[who][qid])
+      if s == "ready" then table.insert(has, "|cff59e67a" .. who .. "|r")
+      elseif s == "on" then table.insert(has, who)
+      elseif s ~= "done" and s ~= "na" then table.insert(miss, "|cffff9933" .. who .. "|r") end
+    end
   end
   if #has == 0 and #miss == 0 then return nil end
   local t = {}
@@ -106,20 +436,34 @@ function ns.PartyLine(qid)
   return table.concat(t, "  ·  ")
 end
 
+local function Prune()
+  local keep = {}
+  for _, m in ipairs(ns.GroupMembers()) do keep[m.name] = true end
+  for _, t in ipairs({ ns.party, ns.partyPre, ns.partyKeys, ns.partyPush, ns.pushQ }) do
+    for who in pairs(t) do if not keep[who] then t[who] = nil end end
+  end
+end
+
 local ev = CreateFrame("Frame")
-pcall(ev.RegisterEvent, ev, "CHAT_MSG_ADDON")
-pcall(ev.RegisterEvent, ev, "GROUP_ROSTER_UPDATE")
-pcall(ev.RegisterEvent, ev, "QUEST_LOG_UPDATE")
-pcall(ev.RegisterEvent, ev, "PLAYER_ENTERING_WORLD")
+ns.SyncFrame = ev
+for _, e in ipairs({ "CHAT_MSG_ADDON", "CHAT_MSG_SYSTEM", "GROUP_ROSTER_UPDATE", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN",
+  "PLAYER_LEVEL_UP", "PLAYER_ENTERING_WORLD" }) do pcall(ev.RegisterEvent, ev, e) end
 local wasGrouped = false
 ev:SetScript("OnEvent", function(_, e, ...)
   if e == "CHAT_MSG_ADDON" then OnMessage(...) return end
+  if e == "CHAT_MSG_SYSTEM" then ns.OnPushAnswer((...)) return end
   local ch = Channel()
   if e == "GROUP_ROSTER_UPDATE" then
     Prune()
-    if ch and not wasGrouped and Send then pcall(Send, PREFIX, "HELLO", ch); lastSent = "" end
+    if ch and not wasGrouped then pcall(Send, PREFIX, "HELLO", ch); lastSent = "" end
     wasGrouped = ch ~= nil
-    if not ch then wipe(ns.party) end
+    if not ch then
+      for _, t in ipairs({ ns.party, ns.partyPre, ns.partyKeys, ns.partyPush, ns.pushQ, ns.syncKeys }) do wipe(t) end
+    end
+    -- the summary and the guide follow, once per burst of roster events
+    Changed()
   end
+  -- what the tokens say can change without the log's ids or completion changing
+  if e == "QUEST_TURNED_IN" or e == "PLAYER_LEVEL_UP" or e == "PLAYER_ENTERING_WORLD" then tokSig = nil end
   if ch then Schedule() end
 end)

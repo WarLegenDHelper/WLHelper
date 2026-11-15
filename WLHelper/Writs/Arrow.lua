@@ -149,23 +149,22 @@ local function Layout(self)
     if (self.big.cur or "") ~= "" then
         self.big:Show(); self.unit:Show(); self.state:Hide()
         -- measure the whole number (a width left from a shorter one used to cut it as "4...")
-        self.big:SetWidth(TEXT_W - 24)
-        local getW = self.big.GetUnboundedStringWidth or self.big.GetStringWidth
-        local okW, w = pcall(getW, self.big)
-        w = (okW and type(w) == "number" and not (root.IsSecret and root.IsSecret(w))) and w or 0
-        self.big:SetWidth(math.min(TEXT_W - 24, math.ceil(w) + 4))
-        -- the font may land a frame later: measure again then
+        -- the font may land a frame later: TextWidth measures again then
+        local big = self.big
+        -- one late re-measure at a time (the distance changes several times a second), and it
+        -- measures the text shown THEN, not the one captured now
+        local w = root.TextWidth(big)
         if not self.bigRefit and C_Timer and C_Timer.After then
             self.bigRefit = true
+            local hud = self
             C_Timer.After(0, function()
-                self.bigRefit = nil
-                self.big:SetWidth(TEXT_W - 24)
-                local ok2, w2 = pcall(getW, self.big)
-                if ok2 and type(w2) == "number" and not (root.IsSecret and root.IsSecret(w2)) and w2 > 0 then
-                    self.big:SetWidth(math.min(TEXT_W - 24, math.ceil(w2) + 4))
-                end
+                hud.bigRefit = nil
+                if not big:IsShown() then return end
+                local w2 = root.TextWidth(big)
+                if w2 and w2 > 0 then big:SetWidth(math.min(TEXT_W - 24, w2 + 4)) end
             end)
         end
+        big:SetWidth(math.min(TEXT_W - 24, (w > 0 and w or (TEXT_W - 28)) + 4))
         local okB, bigH = pcall(self.big.GetStringHeight, self.big)
         topH = (okB and type(bigH) == "number" and not (root.IsSecret and root.IsSecret(bigH))) and bigH or 0
         if topH < S.F.hero then topH = S.F.hero + 2 end

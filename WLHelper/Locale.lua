@@ -226,6 +226,15 @@ local S = {
     BOSS_ATTACH_CLICK = "Clic : remettre le panneau sous le guide", BOSS_DRAG = "Glisser : déplacer le panneau", BOSS_SHOW = "Afficher",
     BOSS_HIDE = "Masquer", BOSS_FOR = "Pour « %s »", BOSS_FOR_ITEM = "%s pour « %s »", BOSS_BAND_SHOW = "Voir les boss",
     BOSS_BAND_HIDE = "Masquer les boss", BOSS_MENU_HIDE = "Clic : masquer les boss et les rares",
+    -- the step card: one current action, then the other actions at the same NPC
+    FOCUS_A = "Prendre « %s »", FOCUS_T = "Rendre « %s »", FOCUS_C = "Faire « %s »", FOCUS_O = "Faire « %s »",
+    FOCUS_H = "Avoir « %s » dans ton journal", FOCUS_I = "Obtenir : %s",
+    LINE_A = "Prendre %s", LINE_T = "Rendre %s", LINE_C = "Faire %s", LINE_O = "Faire %s", LINE_H = "Avoir %s", LINE_I = "Obtenir %s",
+    NEXT_AT = "Ensuite chez %s :", NEXT_PLAIN = "Ensuite :", DONE_HERE = "Déjà fait ici : %s",
+    ARROW_GAME = "La flèche suit la zone de quête du jeu", ARROW_LOG = "Lieu exact inconnu : suis ton journal de quêtes",
+    FDJ_NOTE = "Note de ForeverDungeonJournal", GAME_TEXT = "Texte de la quête", TT_OBJ_H = "Objectif",
+    TT_OUT_L = "hors du donjon", TT_IN_L = "dans le donjon", TT_XPMONEY = "XP : %s  ·  %s",
+    DUNGEONS_BTN = "Donjons", TT_LINE_CLICK = "Clic : guider vers ce point",
   },
   en = {
     COLON = ": ", WRITS = "Writs and Favor", TT_HWRITS = "Writs and Merchant's Favor: the cheapest Writs, the shopping list and the GPS to the NPCs.", MM_TT4 = "Shift-click: open the Writs window",
@@ -422,6 +431,15 @@ local S = {
     BOSS_ATTACH = "Attach under the guide", BOSS_ATTACH_CLICK = "Click: put the panel back under the guide", BOSS_DRAG = "Drag: move the panel",
     BOSS_SHOW = "Show", BOSS_HIDE = "Hide", BOSS_FOR = "For \"%s\"", BOSS_FOR_ITEM = "%s for \"%s\"", BOSS_BAND_SHOW = "Show bosses",
     BOSS_BAND_HIDE = "Hide bosses", BOSS_MENU_HIDE = "Click: hide the bosses and rares",
+    -- the step card: one current action, then the other actions at the same NPC
+    FOCUS_A = "Accept \"%s\"", FOCUS_T = "Turn in \"%s\"", FOCUS_C = "Do \"%s\"", FOCUS_O = "Do \"%s\"",
+    FOCUS_H = "Have \"%s\" in your log", FOCUS_I = "Get %s",
+    LINE_A = "Accept %s", LINE_T = "Turn in %s", LINE_C = "Do %s", LINE_O = "Do %s", LINE_H = "Have %s", LINE_I = "Get %s",
+    NEXT_AT = "Then at %s:", NEXT_PLAIN = "Then:", DONE_HERE = "Already done here: %s",
+    ARROW_GAME = "The arrow follows the game's quest area", ARROW_LOG = "Exact place unknown: follow your quest log",
+    FDJ_NOTE = "ForeverDungeonJournal note", GAME_TEXT = "Quest text", TT_OBJ_H = "Objective",
+    TT_OUT_L = "outside the dungeon", TT_IN_L = "inside the dungeon", TT_XPMONEY = "XP: %s  ·  %s",
+    DUNGEONS_BTN = "Dungeons", TT_LINE_CLICK = "Click: guide me to this point",
   },
 }
 

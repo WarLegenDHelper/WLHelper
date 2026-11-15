@@ -518,8 +518,7 @@ local function Choice(p, row, options, get, set)
     if d and d:IsShown() then
         local longest = 0
         for _, b in ipairs(seg.buttons or {}) do
-            local ok, sw = pcall(b.label.GetStringWidth, b.label)
-            longest = math.max(longest, (ok and num(sw)) or 0)
+            longest = math.max(longest, root.TextWidth(b.label))
         end
         -- the button's own measure (label + 24, chevron and its gap + 12): the longest choice fits
         d:SetWidth(math.max(120, math.min(CHOICE_MAX, math.ceil(longest) + 24 + 12)))
@@ -567,8 +566,7 @@ local function ValueText(row, maxW)
     S.ClampLabel(fs, nil, row)
     row:EnableMouse(true)
     function fs:Fit()
-        local ok, sw = pcall(self.GetStringWidth, self)
-        self:SetWidth(math.max(24, math.min(maxW or 220, math.ceil((ok and num(sw)) or 0) + 2)))
+        self:SetWidth(math.max(24, math.min(maxW or 220, root.TextWidth(self) + 2)))
     end
     local set = fs.SetText
     fs.SetText = function(self, t) set(self, t); self.wlFull = t; self:Fit() end

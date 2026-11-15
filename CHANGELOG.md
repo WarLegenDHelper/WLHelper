@@ -6,6 +6,22 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.56] — 2026-11-15
+
+### Ajouté / Added
+- **Résumé du donjon** au lancement d'une route : une case par quête avec l'XP de la quête, l'XP de toute sa chaîne, l'argent, les objets en récompense et les pastilles Élite, Chaîne, Autre donjon, Niveau trop haut ; le total de ta sélection se met à jour en direct ; « Lancer la route » construit le guide avec ce que tu as coché.
+  *Dungeon summary: tick quests and chains with their XP, rewards and warnings.*
+- **Vue groupe** dans le résumé : qui a chaque quête, qui l'a finie, qui doit la prendre, quel prérequis manque ; « Partager » par quête et « Tout partager ».
+  *Group view: who has what, missing prerequisites, share buttons.*
+
+### Modifié / Changed
+- **Carte d'étape** : une seule action en grand (icône, verbe, quête, PNJ et lieu, objectifs, position dans la chaîne), puis « Ensuite chez <PNJ> » en petit. Fini les longues descriptions répétées.
+  *Step card: one current action, the rest in a short list.*
+- **Objectifs et texte du jeu** affichés pour les quêtes de ton journal (« Ancient Mana Crystal : 0/8 »), note de ForeverDungeonJournal quand il est activé, et d'où vient la flèche (« La flèche suit la zone de quête du jeu »).
+- **Infobulle d'étape** réorganisée en blocs, sans doublons ; **panneau Étapes** ouvert du côté où il y a de la place.
+- **En-têtes** : logo seulement sur l'accueil ; ailleurs une flèche retour. Le bouton « Donjons » remplace l'icône incomprise.
+- **Texte coupé** : une seule mesure de texte fiable partout.
+
 ## [1.0.0-beta.55] — 2026-11-15
 
 ### Modifié / Changed

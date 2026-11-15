@@ -802,8 +802,8 @@ local function CatHead(parent, sub)
         S.HDIcon(self.chev, folded and "chevron_right" or "chevron_down", C.muted)
         self.label:SetText(text or "")
         self.count:SetText(n or ""); self.count:SetShown(n ~= nil)
-        local ok, w = pcall(self.label.GetStringWidth, self.label)
-        self.label:SetWidth(math.max(40, math.min(math.ceil((ok and num(w)) or 100) + 1, CW - indent - 18 - 48)))
+        local w = root.TextWidth(self.label)
+        self.label:SetWidth(math.max(40, math.min((w > 0 and w or 100) + 1, CW - indent - 18 - 48)))
     end
     return b
 end
@@ -900,8 +900,8 @@ local function BuildFind(p)
     f.conline:SetPoint("RIGHT", 0, 0)
     ol.label = S.Text(ol, F.label, C.text); ol.label:SetPoint("RIGHT", f.conline, "LEFT", -8, 0); ol.label:SetText(L("En ligne seulement"))
     S.ClampLabel(ol.label, nil, ol)
-    local okW, lw = pcall(ol.label.GetStringWidth, ol.label)
-    ol:SetWidth(40 + 8 + math.ceil((okW and num(lw)) or 100))
+    local lw = root.TextWidth(ol.label, nil, function(w2) ol:SetWidth(40 + 8 + w2) end)
+    ol:SetWidth(40 + 8 + (lw > 0 and lw or 100))
     f.conline:AttachRow(ol)
     f.cicon = Painted(h, 32); f.cicon:SetPoint("TOPLEFT", 0, -36)
     f.ctitle = S.Text(h, F.heading, C.fg); f.ctitle:SetPoint("TOPLEFT", f.cicon, "TOPRIGHT", 8, 0)
@@ -1730,8 +1730,8 @@ local function BuildAsk(p)
     local dk = Choice(c, 100, 36)
     dk.label = S.Text(dk, F.label, C.muted); dk.label:SetPoint("CENTER"); dk.label:SetText(L("Je ne sais pas"))
     S.ClampLabel(dk.label, nil, dk)
-    local okW, dw = pcall(dk.label.GetStringWidth, dk.label)
-    dk:SetWidth(math.max(64, math.ceil((okW and num(dw)) or 80) + 24))
+    local dw = root.TextWidth(dk.label, nil, function(w2) dk:SetWidth(math.max(64, w2 + 24)) end)
+    dk:SetWidth(math.max(64, (dw > 0 and dw or 80) + 24))
     dk.tip = { L("Je ne sais pas"), L("Tous les artisans de la guilde seront prévenus"), L("Clic : prévenir tous les artisans") }
     dk:SetScript("OnClick", function() askState.prof, askState.picked = "", true; WP.RefreshOrders() end)
     a.dunno = dk
@@ -1938,8 +1938,8 @@ local function OrderCard(parent)
         local pw = self.pill:IsShown() and (num(self.pill:GetWidth()) or 60) or 0
         local feeW = 0
         if self.fee:IsShown() then
-            local ok, sw = pcall(self.fee.GetStringWidth, self.fee)
-            feeW = math.min(120, math.ceil((ok and num(sw)) or 60) + 1)
+            local sw = root.TextWidth(self.fee)
+            feeW = math.min(120, (sw > 0 and sw or 60) + 1)
             self.fee:SetWidth(feeW)
             self.fee:ClearAllPoints(); self.fee:SetPoint("TOPRIGHT", -(pad + pw + (pw > 0 and 8 or 0)), -(pad + 2))
         end

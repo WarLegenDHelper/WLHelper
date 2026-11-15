@@ -205,8 +205,10 @@ local function MakeCard(parent)
     PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
     Render()
   end)
+  -- double-click: this dungeon alone, through its summary (the route's first screen)
   c:SetScript("OnDoubleClick", function(self)
-    wipe(Selected()); Selected()[self.dkey] = true; ns.StartGuide()
+    wipe(Selected()); Selected()[self.dkey] = true
+    if ns.ShowSummary then Render(); ns.ShowSummary({ self.dkey }) else ns.StartGuide() end
   end)
   c:SetScript("OnMouseDown", function(self) self.press:Show() end)
   c:SetScript("OnMouseUp", function(self) self.press:Hide() end)
@@ -265,10 +267,9 @@ local function Build()
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.OpenHome then WP.OpenHome() end
   end
-  p.back = S.HomeButton(h, GoHome); p.back:SetPoint("TOPLEFT", 8, -8)
-  h.logo = h:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(28, 28); h.logo:SetPoint("TOPLEFT", 40, -8)
-  h.logo:SetTexture(ns.LOGO or ("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64"))
-  h.title = Text(h, ns.F.title, T.fg); h.title:SetPoint("LEFT", h, "LEFT", 76, 0); h.title:SetPoint("RIGHT", h, "RIGHT", -48, 0)
+  -- back chevron only (the logo stays on the home page)
+  p.back = (S.BackButton or S.HomeButton)(h, GoHome); p.back:SetPoint("TOPLEFT", 6, -8)
+  h.title = Text(h, ns.F.title, T.fg); h.title:SetPoint("LEFT", h, "LEFT", 40, 0); h.title:SetPoint("RIGHT", h, "RIGHT", -48, 0)
   h.title:SetJustifyV("MIDDLE"); h.title:SetText(L.PICK_T)
   ns.ClampLabel(h.title, nil, h)
   local close = S.CloseButton(h, 28, function() p:Hide() end)
@@ -295,7 +296,12 @@ local function Build()
 
   -- footer: what is picked, then clear and the one main action
   p.foot = CreateFrame("Frame", nil, p); p.foot:SetHeight(32)
-  p.go = S.Button(p.foot, L.PICK_GO, 0, 32, "primary", function() ns.StartGuide() end)
+  -- the main action opens the route's summary first: tick the quests seeing XP, rewards and
+  -- chains, then start the route from there
+  p.go = S.Button(p.foot, L.PICK_GO, 0, 32, "primary", function()
+    if ns.ShowSummary and ns.ShowSummary() then return end
+    ns.StartGuide()
+  end, function() return { p.go:GetText(), L.SUM_PICK_GO_TT } end)
   p.go:SetPoint("RIGHT", 0, 0)
   p.go:SetDisabledReason(L.PICK_GO_WHY)
   p.none = S.Button(p.foot, L.PICK_NONE, 0, 28, "secondary", function() wipe(Selected()); Render() end)
@@ -508,8 +514,15 @@ local function BuildQuests()
     -- the name wraps to 2 lines; the row grows with it
     row.txt = Text(row, ns.F.label, T.fg); row.txt:SetPoint("LEFT", 60, 0); row.txt:SetWidth(QTXT_W); row.txt:SetJustifyV("MIDDLE")
     row:SetScript("OnClick", function(self)
+      -- ticked by hand: the summary's level default no longer applies to it (OffPick first: it
+      -- keeps the older unticks as hand-made before this one is added)
+      local pick = ns.OffPick and ns.OffPick() or WLDTDB.offPick or {}
+      WLDTDB.offPick = pick
+      WLDTDB.off = WLDTDB.off or {}
       WLDTDB.off[self.qid] = not WLDTDB.off[self.qid] or nil
+      pick[self.qid] = true
       ns.OpenQuests(qp.dkey, true)
+      if ns.RenderOverview then ns.RenderOverview() end
     end)
     row:SetScript("OnMouseDown", function(self) self.press:Show() end)
     row:SetScript("OnMouseUp", function(self) self.press:Hide() end)
