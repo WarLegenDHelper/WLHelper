@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.61] — 2026-11-15
+
+### Modifié / Changed
+- **Le petit suivi est désactivé par défaut** : le guide et son bouton « – » (mode réduit) suffisent. Pour le retrouver : `/wlh suivi`.
+  *The small tracker is now opt-in (/wlh suivi).*
+
 ## [1.0.0-beta.60] — 2026-11-15
 
 ### Corrigé / Fixed

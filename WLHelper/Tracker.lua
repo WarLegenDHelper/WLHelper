@@ -388,7 +388,9 @@ local function Build()
 end
 
 local function Wanted()
-  if not WLDTDB or WLDTDB.tracker == false then return false end
+  -- off unless asked for (/wlh suivi or Settings): the guide window and its "-" mini mode are the
+  -- usual way; two small views of the same step confused players
+  if not WLDTDB or WLDTDB.tracker ~= true then return false end
   if ns.GuideOn and not ns.GuideOn() then return false end
   -- one view at a time: the small tracker while you play, the big guide window when you open it
   if ns.frame and ns.frame:IsShown() then return false end
@@ -492,7 +494,7 @@ function TR.Refresh()
   f:Show()
 end
 
-function TR.IsOn() return not (WLDTDB and WLDTDB.tracker == false) end
+function TR.IsOn() return WLDTDB ~= nil and WLDTDB.tracker == true end
 
 function TR.SetShown(on)
   if not WLDTDB then return end
