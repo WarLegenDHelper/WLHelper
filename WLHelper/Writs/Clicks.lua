@@ -1,4 +1,5 @@
--- Writs/Clicks.lua: two click helpers, each a switch in Settings > General > Clicks.
+-- Writs/Clicks.lua: two click helpers, each a switch in Settings > General > Clicks, all off by
+-- default (the welcome screen offers them).
 --   Alt-click invite (from Alandir's own Alt-Click Invite): Alt + left-click a player's name in chat,
 --     a friendly player in the world or a portrait to invite them; an [Invite] link on messages
 --     that ask for one ("inv", "invite"...).
@@ -28,7 +29,13 @@ end
 local function DB()
     WLWritsDB.clicks = WLWritsDB.clicks or {}
     local d = WLWritsDB.clicks
-    for _, k in ipairs({ "chat", "world", "link", "shoot" }) do if d[k] == nil then d[k] = true end end
+    -- off until you turn them on (welcome screen or Settings): they change what a click does.
+    -- v1: the betas 11-15 had them on by default; they go off once, the welcome screen asks.
+    if not d.v then
+        for _, k in ipairs({ "chat", "world", "link", "shoot" }) do d[k] = false end
+        d.v = 1
+    end
+    for _, k in ipairs({ "chat", "world", "link", "shoot" }) do if d[k] == nil then d[k] = false end end
     d.shootMod = d.shootMod or "SHIFT"
     if type(d.words) ~= "table" or #d.words == 0 then d.words = { "inv", "invite", "invit", "invi" } end
     return d

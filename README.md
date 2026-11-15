@@ -73,6 +73,7 @@ Alt-clic pour inviter (chat, monde, portraits) et Maj + clic droit pour tirer su
 | `/wl gps` | Arrête ou relance le guidage |
 | `/wl sacs` | Nettoyeur de sacs |
 | `/wl commandes` | Commandes d'artisanat |
+| `/wl bienvenue` | Écran de bienvenue : modules et clics |
 | `/wl reglages` | Réglages (aussi `/wlo`) |
 | `/wl idee` | Proposer une idée ou signaler un bug |
 | `/wl aide` | Toutes les commandes |
@@ -89,7 +90,7 @@ En jeu, `/wl idee` te donne le lien déjà rempli avec ta version.
 - **Le dossier s'appelle `WLHelper`** depuis la 1.0.0-beta.4 (avant : `DungeonGuide`). Si tu avais installé une
   ancienne version à la main, supprime le dossier `DungeonGuide`. S'il traîne encore, l'addon le
   désactive tout seul et te le dit.
-- **Versions** : `1.0.0-beta.15` veut dire bêta de la 1.0. Le détail de chaque version est dans le
+- **Versions** : `1.0.0-beta.16` veut dire bêta de la 1.0. Le détail de chaque version est dans le
   [CHANGELOG](CHANGELOG.md).
 
 ## Crédits et licence

@@ -72,6 +72,7 @@ Alt-click to invite (chat, world, portraits) and Shift + right-click to shoot an
 | `/wl gps` | Stop or restart guidance |
 | `/wl bags` | Bag cleaner |
 | `/wl orders` | Crafting orders |
+| `/wl welcome` | Welcome screen: modules and clicks |
 | `/wl options` | Settings (also `/wlo`) |
 | `/wl idea` | Suggest an idea or report a bug |
 | `/wl help` | Every command |
@@ -88,7 +89,7 @@ In game, `/wl idea` gives you the link already filled with your version.
 - **The folder is named `WLHelper`** since 1.0.0-beta.4 (it was `DungeonGuide`). If you installed an older
   version by hand, delete the `DungeonGuide` folder. If it is still there, the addon turns
   it off and tells you.
-- **Versions**: `1.0.0-beta.15` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
+- **Versions**: `1.0.0-beta.16` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
 
 ## Credits and license
 

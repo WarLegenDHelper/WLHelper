@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.16] — 2026-11-15
+
+### Ajouté / Added
+- **Écran de bienvenue** à la première connexion : chaque module avec son interrupteur, les clics et le bouton de la minimap. `/wl bienvenue` le rouvre.
+  *Welcome screen at first login: modules, clicks, minimap button. /wl welcome reopens it.*
+
+### Modifié / Changed
+- **Les clics sont désactivés par défaut** (Alt-clic pour inviter, touche + clic droit pour tirer) : ils changent ce que fait un clic, chacun choisit. Ceux qui avaient une bêta précédente les retrouvent éteints et l'écran de bienvenue leur propose.
+  *Clicks are off by default; the welcome screen offers them.*
+- Chasseur : le clic droit seul reste l'attaque au corps-à-corps ; avec la touche, Tir automatique démarre sans jamais s'arrêter sur un second clic (weaving).
+  *Hunters: right-click alone stays melee; with the key, Auto Shot never toggles off (weaving).*
+
 ## [1.0.0-beta.15] — 2026-11-15
 
 ### Modifié / Changed
