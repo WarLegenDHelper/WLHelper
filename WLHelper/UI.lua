@@ -1997,7 +1997,7 @@ local function BuildActionBar()
       if a.item then
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         if GameTooltip.SetItemByID then GameTooltip:SetItemByID(a.item) end
-        GameTooltip:AddLine(L.TT_USE, T.accentSoft[1], T.accentSoft[2], T.accentSoft[3]); GameTooltip:Show()
+        GameTooltip:AddLine(L.TT_USE, (T.hint or T.muted)[1], (T.hint or T.muted)[2], (T.hint or T.muted)[3]); GameTooltip:Show()
       else
         ns.ShowTip(self, { L.TT_TARGET, L.TT_TARGET2:format(table.concat(a.names, " / ")), L.TT_RAID, L.TT_TARGET_CLICK })
       end

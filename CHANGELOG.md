@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.54] — 2026-11-15
+
+### Modifié / Changed
+- **Infobulles** : les lignes « Clic : … » sont en gris-bleu discret au lieu du rouge, qui faisait penser à une alerte.
+  *Click hints in tooltips are a calm grey-blue instead of red.*
+
 ## [1.0.0-beta.53] — 2026-11-15
 
 ### Ajouté / Added

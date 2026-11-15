@@ -23,6 +23,7 @@ local T = {
   accentHover = { 0.878, 0.188, 0.180 },    -- #E0302E
   accentPress = { 0.659, 0.078, 0.071 },    -- #A81412
   accentSoft  = { 0.910, 0.376, 0.353 },    -- #E8605A links, selected text
+  hint        = { 0.659, 0.733, 0.835 },    -- #A8BBD5 "Click: ..." lines in tooltips (calm, not an alert)
   -- semantic
   ok   = { 0.298, 0.816, 0.478 },           -- #4CD07A
   warn = { 0.984, 0.573, 0.235 },           -- #FB923C
@@ -437,7 +438,7 @@ function ns.ShowTip(owner, lines)
     n = n + 1
     if type(l) == "table" then GameTooltip:AddLine(l[1], l[2], l[3], l[4], true)
     elseif n == 1 then GameTooltip:AddLine(l, T.fg[1], T.fg[2], T.fg[3], true)
-    elseif IsMouseLine(l) then GameTooltip:AddLine(l, T.accentSoft[1], T.accentSoft[2], T.accentSoft[3], true)
+    elseif IsMouseLine(l) then GameTooltip:AddLine(l, (T.hint or T.muted)[1], (T.hint or T.muted)[2], (T.hint or T.muted)[3], true)
     else GameTooltip:AddLine(l, T.muted[1], T.muted[2], T.muted[3], true) end
   end
   local enabled = true
