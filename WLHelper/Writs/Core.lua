@@ -767,6 +767,30 @@ local REFRESH_EVENTS = { QUEST_LOG_UPDATE = true, BAG_UPDATE_DELAYED = true, UPD
 
 function WP.Print(msg) if root.Print then root.Print(msg) else print("WL Helper " .. tostring(msg)) end end   -- one chat prefix for the whole addon
 
+-- When the game blocks something WL Helper did, say which function (the game's own popup does not)
+-- and keep it for the bug form (/wl idea, Writs/Feedback.lua).
+ns.AddEnglish({
+    ["le jeu a bloqué « %s »%s. Signale-le avec /wl idea (bug) : la fonction est déjà dans le formulaire."] =
+        "the game blocked \"%s\"%s. Report it with /wl idea (bug): the function is already in the form.",
+    [" en combat"] = " in combat",
+})
+local blocked = CreateFrame("Frame")
+blocked:RegisterEvent("ADDON_ACTION_BLOCKED")
+blocked:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+local blockedSaid = {}
+blocked:SetScript("OnEvent", function(_, _, addon, func)
+    if addon ~= ADDON then return end
+    local combat = InCombatLockdown and InCombatLockdown() or false
+    local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    if WLWritsDB then
+        WLWritsDB.lastBlocked = { func = tostring(func), combat = combat, t = time(), ver = meta and meta(ADDON, "Version") or "?" }
+    end
+    if blockedSaid[func] then return end
+    blockedSaid[func] = true
+    WP.Print(string.format(L("le jeu a bloqué « %s »%s. Signale-le avec /wl idea (bug) : la fonction est déjà dans le formulaire."),
+        tostring(func), combat and L(" en combat") or ""))
+end)
+
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
 f:RegisterEvent("QUEST_TURNED_IN")

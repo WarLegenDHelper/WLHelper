@@ -6,6 +6,15 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.23] — 2026-11-15
+
+### Ajouté / Added
+- **« WL Helper a été bloqué »** : quand le jeu bloque une action de l'addon, une ligne dans le chat dit laquelle (le message du jeu ne le dit pas), et le formulaire de bug de `/wl idea` la contient déjà.
+  *When the game blocks an action, the chat says which function, and the bug form already includes it.*
+
+### Modifié / Changed
+- La ligne d'amélioration dans les infobulles ne redessine plus l'infobulle elle-même (moins de risque de gêner l'interface du jeu).
+
 ## [1.0.0-beta.22] — 2026-11-15
 
 ### Corrigé / Fixed

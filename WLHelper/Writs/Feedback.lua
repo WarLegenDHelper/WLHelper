@@ -56,6 +56,11 @@ local function Context(kind)
         table.sort(sel)
         if #sel > 0 then parts[#parts + 1] = "donjons " .. table.concat(sel, ", ") end
     end
+    -- the last action the game blocked (Writs/Core.lua), for a bug report
+    local b = WLWritsDB and WLWritsDB.lastBlocked
+    if kind == "bug" and b then
+        parts[#parts + 1] = "bloqué " .. tostring(b.func) .. (b.combat and " (combat)" or "") .. " v" .. tostring(b.ver)
+    end
     return table.concat(parts, " · ")
 end
 

@@ -66,8 +66,8 @@ local function TooltipLine(tip, link)
         text = (n >= 0 and "+" or "") .. n .. "%"
         col = n >= 1 and GREEN or (n <= -1 and { 1, 0.35, 0.3 } or { 0.8, 0.8, 0.8 })
     else return end
+    -- no tip:Show() here: the game resizes the tooltip itself; calling it from an addon can taint it
     tip:AddDoubleLine("|cffce1918WL Helper|r · " .. spec, text, 1, 1, 1, col[1], col[2], col[3])
-    tip:Show()
 end
 if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
     TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tip)
