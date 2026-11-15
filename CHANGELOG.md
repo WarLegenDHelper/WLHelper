@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.43] — 2026-11-15
+
+### Corrigé / Fixed
+- **Badges encore coupés** (« In... ») : leur largeur est mesurée avec la police exacte, puis remesurée une fois la police chargée.
+  *Pills measured with their exact font: no more "In...".*
+
 ## [1.0.0-beta.42] — 2026-11-15
 
 ### Modifié / Changed

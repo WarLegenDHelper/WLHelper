@@ -595,21 +595,36 @@ function ns.SetChip(c, label, col, maxW)
   c.text:SetTextColor(col[1], col[2], col[3])
   c.bg:SetColorTexture(col[1], col[2], col[3], 0.16)
   c.border(col, 0.50)
-  -- the words set the width (never a fixed text width: a font applied a moment later would cut
-  -- them as "In progr..."); measured again on the next frame once the font is final
-  c.text:SetWidth(0); c.text:SetWordWrap(false)
+  -- The words set the width. They are measured on a hidden twin FontString with the same font
+  -- (a font applied a moment later, or a width the client keeps, used to cut them as "In...");
+  -- measured again on the next frame once the font is final.
+  c.text:SetWordWrap(false)
   local function Fit()
-    local getW = c.text.GetUnboundedStringWidth or c.text.GetStringWidth
-    local ok, w = pcall(getW, c.text)
-    if not ok or type(w) ~= "number" or secret(w) then w = 0 end
-    w = math.ceil(w)
+    local m = ns._chipMeasure
+    if not m then m = UIParent:CreateFontString(nil, "OVERLAY"); m:Hide(); ns._chipMeasure = m end
+    local okF, font, size, flags = pcall(c.text.GetFont, c.text)
+    local w = 0
+    if okF and font then
+      pcall(m.SetFont, m, font, size, flags)
+      m:SetText(c.text:GetText() or "")
+      local getW = m.GetUnboundedStringWidth or m.GetStringWidth
+      local ok, mw = pcall(getW, m)
+      if ok and type(mw) == "number" and not secret(mw) then w = mw end
+    end
+    if w <= 0 then
+      local getW = c.text.GetUnboundedStringWidth or c.text.GetStringWidth
+      local ok, tw = pcall(getW, c.text)
+      if ok and type(tw) == "number" and not secret(tw) then w = tw end
+    end
+    w = math.ceil(w) + 2
     c.overflow = (maxW ~= nil and w + 12 > maxW) or nil
     local okP, _, _, _, left = pcall(c.text.GetPoint, c.text, 1)
     left = (okP and type(left) == "number" and left > 6) and left or 6
-    c:SetWidth(w + left + 6 + 2)
+    c.text:SetWidth(w)
+    c:SetWidth(w + left + 6)
   end
   Fit(); c:Show()
-  if C_Timer and C_Timer.After then C_Timer.After(0, Fit) end
+  if C_Timer and C_Timer.After then C_Timer.After(0, Fit); C_Timer.After(0.5, Fit) end
 end
 
 -- icône officielle de classe en texte (|T...|t), pour les puces et les lignes
