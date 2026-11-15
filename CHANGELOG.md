@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.12] — 2026-11-15
+
+### Corrigé / Fixed
+- La fenêtre des donjons ne s'ouvre plus toute seule à la connexion ni après un /reload : `/wl`, l'accueil ou la minimap l'ouvrent.
+  *The dungeon window no longer opens by itself at login or after /reload.*
+
 ## [1.0.0-beta.11] — 2026-11-15
 
 ### Ajouté / Added

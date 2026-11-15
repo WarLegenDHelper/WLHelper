@@ -567,6 +567,8 @@ local function Build()
   f:SetScript("OnShow", function() ns.Refresh() end)
   f.mini = WLDTDB.mini
   f.list:SetShown(WLDTDB.list and true or false)
+  -- a new frame is visible: closed until /wl, the home page or the minimap opens it
+  f:Hide()
   ns.frame = f
   if WLDTDB.size then ns.Relayout(WLDTDB.size[1], WLDTDB.size[2]) end
 end
