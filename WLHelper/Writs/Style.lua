@@ -801,7 +801,6 @@ function S.Pill(parent, text, color, icon)
         self.text:SetPoint("LEFT", iconName and 20 or 6, 0)
         root.SetChip(self, t, col, self.maxW and (self.maxW - (iconName and 14 or 0)) or nil)
         if neutral then self.bg:SetColorTexture(1, 1, 1, 0.10); self.border({ 1, 1, 1 }, 0.20) end
-        if iconName then self:SetWidth(self:GetWidth() + 14) end
     end
     if text then p:Set(text, color, icon) else p:Hide() end
     return p
@@ -1502,6 +1501,26 @@ S.FitWindow = root.FitWindow
 -- ---------------------------------------------------------------- window
 
 -- The home button: the HD house, 28 x 28, no word next to it.
+-- "<" + logo in one button (hover lights both, a click goes home)
+function S.BackLogo(parent, onClick)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(16 + 28 + 4, 32)
+    b.wlOwned = true
+    b.hl = S.Solid(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
+    b.chev = b:CreateTexture(nil, "ARTWORK"); b.chev:SetSize(14, 14); b.chev:SetPoint("LEFT", 2, 0)
+    root.SetHDIcon(b.chev, "chevron_left", T.muted)
+    b.logo = b:CreateTexture(nil, "ARTWORK"); b.logo:SetSize(28, 28); b.logo:SetPoint("LEFT", 16, 0); b.logo:SetTexture(S.LOGO)
+    b:SetScript("OnEnter", function(self)
+        self.hl:SetAlpha(1); self.chev:SetVertexColor(T.fg[1], T.fg[2], T.fg[3])
+        S.Tip(self, { L("Accueil"), L("Clic : revenir à l'accueil") })
+    end)
+    b:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); self.chev:SetVertexColor(T.muted[1], T.muted[2], T.muted[3]); S.HideTip() end)
+    b:SetScript("OnMouseDown", function(self) self.logo:SetPoint("LEFT", 17, -1) end)
+    b:SetScript("OnMouseUp", function(self) self.logo:SetPoint("LEFT", 16, 0) end)
+    b:SetScript("OnClick", function() if onClick then onClick() end end)
+    return b
+end
+
 function S.HomeButton(parent, onClick)
     local b = S.IconButton(parent, "home", 28, { L("Accueil"), L("Clic : revenir à l'accueil") }, onClick)
     return b
@@ -1583,15 +1602,20 @@ function S.Window(name, width, height, title, subtitle, db, posKey, opts)
         if WP and WP.OpenHome then WP.OpenHome() end
     end
     local midY = -math.floor((HH - 28) / 2)
+    -- one control on the left: "<" and the WL logo together go back to the home page (the usual
+    -- back gesture, the logo stays the app's mark); the home page itself shows the logo alone
     local logoX = 8
+    local logo
     if not (NO_BACK[name or ""] or opts.noHome) then
-        f.back = S.HomeButton(h, GoHome)
-        f.back:SetPoint("TOPLEFT", 8, midY)
-        logoX = 40
+        f.back = S.BackLogo(h, GoHome)
+        f.back:SetPoint("TOPLEFT", 4, midY)
+        logo = f.back.logo
+        logoX = 4 + 16
+    else
+        logo = h:CreateTexture(nil, "ARTWORK")
+        logo:SetSize(28, 28); logo:SetTexture(S.LOGO)
+        logo:SetPoint("TOPLEFT", logoX, midY)
     end
-    local logo = h:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(28, 28); logo:SetTexture(S.LOGO)
-    logo:SetPoint("TOPLEFT", logoX, midY)
     f.logo = logo
     f.title = S.Text(h, root.F.title, T.fg, true)
     f.title:SetJustifyH("LEFT")

@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.42] — 2026-11-15
+
+### Modifié / Changed
+- **En-tête des fenêtres** : un seul bouton « ‹ + logo » pour revenir à l'accueil, à la place de la maison et du logo côte à côte.
+  *Window header: one "< + logo" back button instead of a house icon next to the logo.*
+
+### Corrigé / Fixed
+- **Badges coupés** (« In progr... ») : ils prennent la largeur de leurs mots.
+  *Pills are no longer cut.*
+
 ## [1.0.0-beta.41] — 2026-11-15
 
 ### Corrigé / Fixed

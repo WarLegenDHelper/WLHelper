@@ -659,10 +659,10 @@ local function Build()
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.OpenHome then WP.OpenHome() end
   end
-  f.homeBtn = IconBtn(h, "home", { L.HOME, L.TT_HOME }, GoHome)
-  f.homeBtn:SetPoint("TOPLEFT", 8, -8)
-  h.logo = h:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(28, 28); h.logo:SetPoint("TOPLEFT", 40, -8)
-  h.logo:SetTexture(ns.LOGO or ("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64"))
+  -- "<" + logo: one control back to the home page (no separate house icon)
+  f.homeBtn = SW().BackLogo(h, GoHome)
+  f.homeBtn:SetPoint("TOPLEFT", 4, -6)
+  h.logo = f.homeBtn.logo
   h.title = Text(h, ns.F.title, T.fg); h.title:SetText(L.DUNGEONS)
   h.sub = Text(h, ns.F.meta, T.muted)
   ns.ClampLabel(h.title, nil, h); ns.ClampLabel(h.sub, nil, h)

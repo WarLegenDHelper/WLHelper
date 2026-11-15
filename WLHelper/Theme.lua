@@ -595,12 +595,21 @@ function ns.SetChip(c, label, col, maxW)
   c.text:SetTextColor(col[1], col[2], col[3])
   c.bg:SetColorTexture(col[1], col[2], col[3], 0.16)
   c.border(col, 0.50)
-  local ok, w = pcall(c.text.GetStringWidth, c.text)
-  if not ok or type(w) ~= "number" or secret(w) then w = 0 end
-  w = math.ceil(w)
-  c.overflow = (maxW ~= nil and w + 12 > maxW) or nil
-  c.text:SetWidth(w + 1)
-  c:SetWidth(w + 12); c:Show()
+  -- the words set the width (never a fixed text width: a font applied a moment later would cut
+  -- them as "In progr..."); measured again on the next frame once the font is final
+  c.text:SetWidth(0); c.text:SetWordWrap(false)
+  local function Fit()
+    local getW = c.text.GetUnboundedStringWidth or c.text.GetStringWidth
+    local ok, w = pcall(getW, c.text)
+    if not ok or type(w) ~= "number" or secret(w) then w = 0 end
+    w = math.ceil(w)
+    c.overflow = (maxW ~= nil and w + 12 > maxW) or nil
+    local okP, _, _, _, left = pcall(c.text.GetPoint, c.text, 1)
+    left = (okP and type(left) == "number" and left > 6) and left or 6
+    c:SetWidth(w + left + 6 + 2)
+  end
+  Fit(); c:Show()
+  if C_Timer and C_Timer.After then C_Timer.After(0, Fit) end
 end
 
 -- icône officielle de classe en texte (|T...|t), pour les puces et les lignes
