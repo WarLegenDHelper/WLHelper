@@ -6,6 +6,24 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.69] — 2026-11-15
+
+### Ajouté / Added
+- **Recherche dans le choix des donjons** : tape un nom de donjon (ou ZF, BRD, SM), une zone, une quête ou la personne qui la donne ; la recherche couvre tous les onglets et tous les niveaux, sans tenir compte des accents.
+  *Search box in the dungeon picker: dungeon, short name, zone, quest or quest giver, across every tab and level.*
+- **Guide d'un donjon déjà fini** : quand toutes ses quêtes sont rendues, le résumé propose « Me guider dans le donjon » : trajet jusqu'à l'entrée, puis boss par boss (tactiques, butin) jusqu'au dernier. Une route de quêtes s'arrête toujours une fois les quêtes finies.
+  *Guide me through the dungeon even when every quest is turned in: entrance, then boss by boss.*
+- **Objets en récompense dans le résumé** : jusqu'à 4 icônes par quête, avec la flèche verte et le pourcentage d'amélioration calculés au niveau de la quête ; le meilleur choix est entouré en or ; le total dit « 3 objets dont 2 améliorations ».
+  *Reward items in the summary with upgrade arrows and the best choice ringed in gold.*
+- **Clic droit simple = baguette** : pour les mages, prêtres et démonistes (ou toute classe avec une baguette), un clic droit seul sur un ennemi lance Tir. Proposé à l'accueil quand tu actives le tir, réglable dans Réglages › Général › Clics.
+  *Plain right-click = wand, offered to wand classes, in Settings too.*
+
+### Corrigé / Fixed
+- **Zul'Farrak** : Theka le Martyr passe avant Antu'sul dans la visite boss par boss.
+  *Zul'Farrak: Theka the Martyr now comes before Antu'sul.*
+- **Fenêtre des boss** : un boss mort ou hors de vue ne remplace plus son portrait par un rond blanc.
+  *Boss panel: no more white disc portraits from dead or unseen bosses.*
+
 ## [1.0.0-beta.68] — 2026-11-15
 
 ### Ajouté / Added

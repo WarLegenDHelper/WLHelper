@@ -126,7 +126,8 @@ local function BossStepDone(log, i, st)
     if s2.ins ~= st.ins or s2.gate then break end
     if s2.bossStep and ns.BossStepKilled(s2) then later = true break end
   end
-  if later and ns.BossStepOptional(st, log) then return true end
+  -- a run with no quest: a boss you went past is behind you too (no quest line waits there)
+  if later and (st.run or ns.BossStepOptional(st, log)) then return true end
   return false
 end
 ns.BossStepDone = BossStepDone
@@ -1768,9 +1769,10 @@ function ns.RenderInsideBand(k, log)
     short = Hex(T.ok) .. L.INB_DONE_S .. "|r"
     tip[#tip + 1] = { L.INB_DONE, T.ok[1], T.ok[2], T.ok[3] }
   else
-    short = L.INB_STEP_S:format(viewPos or openPos or 1, nIn) .. "  ·  " .. L.INB_Q_S:format(qD, qT)
+    -- a run with no quest: no "Quests 0/0"
+    short = L.INB_STEP_S:format(viewPos or openPos or 1, nIn) .. (qT > 0 and ("  ·  " .. L.INB_Q_S:format(qD, qT)) or "")
     tip[#tip + 1] = L.INB_STEP:format(viewPos or openPos or 1, nIn)
-    tip[#tip + 1] = L.INB_Q:format(qD, qT)
+    if qT > 0 then tip[#tip + 1] = L.INB_Q:format(qD, qT) end
     if nextBoss then tip[#tip + 1] = L.INB_BOSS:format(nextBoss) end
   end
   tip[#tip + 1] = L.INB_TT
@@ -2179,6 +2181,8 @@ Render = function()
     -- the quests counter over the rows (the footer button's tooltip says what the check-list
     -- checks), then key / entrance / group under them
     note = H1 .. L.CL_QUESTS:format(clTotal - clMiss, clTotal) .. "|r"
+    -- a run with no quest: nothing to check, only the way in (and no quest to share)
+    if st.run and clTotal == 0 then note = L.RUN_GATE_N end
     local parts = {}
     local kl = ns.KeyLines and ns.KeyLines(st.gate) or {}
     if #kl > 0 then
@@ -2190,7 +2194,7 @@ Render = function()
     local d = ns.D[st.gate]
     if d and d.ed then table.insert(parts, H1 .. L.CL_ENTRY .. "|r\n" .. ns.T(d.ed)) end
     -- in a group: the header, then the share button; alone: why sharing waits
-    if not grouped then table.insert(parts, H1 .. L.CL_GROUP .. "|r\n" .. L.GATE_N) end
+    if not grouped and not (st.run and clTotal == 0) then table.insert(parts, H1 .. L.CL_GROUP .. "|r\n" .. L.GATE_N) end
     after = table.concat(parts, "\n\n")
   end
   if st.split then

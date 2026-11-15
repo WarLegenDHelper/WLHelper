@@ -955,8 +955,84 @@ local function SpeedBonus(sec, speed)
     return m
 end
 
+-- WL Helper change (v4): rewards by quest, for WLHelperGear.QuestRewards. QuestData.lua is
+-- freed once parsed (below), so the lists are kept first, built the first time they are
+-- needed (the first QuestRewards call or Parse, whichever comes first): one compact string
+-- per quest ("60,3070,6076"), from the quest's own reward list (ns.quests[id][11], every
+-- item in the quest's order) plus ns.itemQuests inverted (an item it misses). About 1,200
+-- strings. A quest's list becomes a table only when asked for, then is cached.
+local questRewardStr, questRewardNames, questRewardAsked = nil, nil, {}
+
+local function KeepQuestRewards()
+    if questRewardStr then return end
+    if not (ns.itemQuests or ns.quests) then return end
+    local lists, base = {}, {}
+    for qid, q in pairs(ns.quests or {}) do
+        local rw = type(q) == "table" and q[11]
+        if type(rw) == "table" and #rw > 0 then
+            local t = {}
+            for i, id in ipairs(rw) do t[i] = id end
+            lists[qid], base[qid] = t, #t
+        end
+    end
+    for itemID, quests in pairs(ns.itemQuests or {}) do
+        for _, qid in ipairs(quests) do
+            local t = lists[qid]
+            if not t then t = {} lists[qid], base[qid] = t, 0 end
+            local has = false
+            for _, id in ipairs(t) do if id == itemID then has = true break end end
+            if not has then t[#t + 1] = itemID end
+        end
+    end
+    questRewardStr = {}
+    for qid, t in pairs(lists) do
+        -- the items added from ns.itemQuests come in table order: sorted, so the list is stable
+        local n = base[qid] or 0
+        if #t > n + 1 then
+            local tail = {}
+            for i = n + 1, #t do tail[#tail + 1] = t[i] end
+            table.sort(tail)
+            for i, id in ipairs(tail) do t[n + i] = id end
+        end
+        questRewardStr[qid] = table.concat(t, ",")
+    end
+    -- names of the reward items that are not in Data.lua (about 150)
+    questRewardNames = {}
+    for id, name in pairs(ns.rewardNames or {}) do questRewardNames[id] = name end
+end
+
+-- { itemID, ... } for a quest (a new table each call), or nil when no reward is known.
+local function QuestRewards(qid)
+    qid = tonumber(qid)
+    if not qid then return nil end
+    local list = questRewardAsked[qid]
+    if list == nil then
+        KeepQuestRewards()
+        local s = questRewardStr and questRewardStr[qid]
+        list = false
+        if s then
+            list = {}
+            for id in s:gmatch("%d+") do list[#list + 1] = tonumber(id) end
+        end
+        questRewardAsked[qid] = list
+    end
+    if not list then return nil end
+    local out = {}
+    for i, id in ipairs(list) do out[i] = id end
+    return out
+end
+
+-- The English name of a reward item (Data.lua or QuestData.lua), or nil.
+local function RewardName(id)
+    local item = ns.byId and ns.byId[id]
+    if item and item.name then return item.name end
+    return questRewardNames and questRewardNames[id] or nil
+end
+
 function ns.Parse()
     if ns.items then return end
+    -- WL Helper change (v4): keep the rewards by quest before QuestData.lua is freed.
+    KeepQuestRewards()
     local items = {}
     for i, line in ipairs(ns.raw) do
         local f = { strsplit(";", line, 42) }
@@ -1874,6 +1950,7 @@ ns.engine = {
         wornSets = nil
     end,
     ReadPlayer = ReadPlayer, Parse = ns.Parse, Rank = ns.Rank,
+    QuestRewards = QuestRewards, RewardName = RewardName,   -- WL Helper change (v4)
     PlayerClassToken = function() ReadPlayer() return playerClassToken end,
     PlayerRace = function() ReadPlayer() return playerRace end,
     SetHitOverride = function(t) hitOverride = t end,

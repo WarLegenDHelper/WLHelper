@@ -50,7 +50,7 @@ Changes:
 3. **Source data**: `SourceData.lua` (drop, vendor and recipe lists) is not shipped; the
    source category of an item comes from `Data.lua`'s source text and `QuestData.lua`.
    `QuestData.lua` is used only to tell which faction a quest reward belongs to, then
-   freed from memory.
+   freed from memory (its rewards by quest are kept first, see change 34).
 4. **Talents read in game** (marked "WL Helper change:"): the spec is picked from the
    talent tree with the most points (overridable). The talent effects Geared Forever
    counts for every player of a spec (Precision, Ice Shards, Elemental Fury, Careful Aim,
@@ -150,6 +150,20 @@ and `Api.lua`. `SetOptions({ neutral = true })` turns them off as well.
     between sessions.
 33. **Speed**: a tooltip not loaded yet is not scanned again for 1 second, and the worn set
     items are read once per frame instead of once per `Compare` section.
+
+### Quest rewards, version 4 (2026-11-15)
+
+Also made by WaR LegenD on **2026-11-15**, marked "WL Helper change (v4)" in `Engine.lua`
+and `Api.lua`. Scores are not affected.
+
+34. **Rewards by quest**: new `WLHelperGear.QuestRewards(questID)` returns the items a quest
+    gives, `{ itemID, ... }`, plus their English names (`Data.lua` or `QuestData.lua`), so
+    WL Helper's dungeon summary can show the reward items and compare them. The list is the
+    quest's own reward list from `QuestData.lua` (`ns.quests[id]` rewards) followed by
+    `ns.itemQuests` inverted for the gear items that list misses. It is built once, on the
+    first `QuestRewards` call or the first parse (before `QuestData.lua` is freed), as one
+    compact string per quest (about 1,200); a quest's table is made only when asked for.
+    The data does not say which rewards are a choice: WL Helper uses its own data for that.
 
 With no talent data, no hit on the character and no enchant, and with
 `SetOptions({ neutral = true })`, the scores are the same as Geared Forever 1.1's.

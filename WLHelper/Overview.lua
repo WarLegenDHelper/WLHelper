@@ -3,7 +3,9 @@
 -- En haut : l'image du donjon (nom, niveaux, taille du groupe), l'entrée (GPS) et la clé sur deux
 -- lignes courtes, puis le total de ta sélection, qui suit tes coches. Puis « Quêtes à faire » : une
 -- ligne par quête (case à cocher, nom dans la couleur de difficulté, « Niv. 45 · 7 800 XP · 65 pa »,
--- des pastilles seulement quand elles disent quelque chose, la chaîne qui se déplie). Les quêtes
+-- des pastilles seulement quand elles disent quelque chose, la chaîne qui se déplie, jusqu'à 4
+-- objets en récompense : icône 30 px bordée de sa qualité, flèche verte et « +12 % » sous l'icône
+-- quand WL Helper Gear y voit une amélioration, le meilleur des choix cerclé d'or). Les quêtes
 -- déjà rendues sont repliées en bas (« Déjà rendues (10) »). En groupe : une colonne d'icônes par
 -- membre dont l'état est connu (WL Helper, ou la réponse du jeu à un partage) ; les autres sur une
 -- seule ligne. En bas : « Lancer la route » (premier écran), « Mettre à jour la route » (la route
@@ -38,6 +40,10 @@ local STR = {
     SUM_ALLDONE_T = "Toutes les quêtes sont rendues : %s", SUM_ALLDONE_TN = "Tu as déjà rendu toutes les quêtes de ces donjons",
     SUM_ALLDONE_NOTE = "%s : toutes les quêtes sont déjà rendues.",
     SUM_OTHER_DG = "Choisir un autre donjon",
+    SUM_RUN = "Me guider dans le donjon", SUM_RUN_N = "Me guider dans les donjons",
+    SUM_RUN_TT = "Clic : ouvrir le guide, de l'entrée jusqu'au dernier boss, un boss après l'autre",
+    SUM_RUN_SUB = "Le guide peut quand même te mener de l'entrée au dernier boss.",
+    SUM_RUN_SUB_N = "Le guide peut quand même te mener dans chaque donjon, de boss en boss.",
     SUM_BACK_PICK = "Retour au choix", SUM_BACK_PICK_TT = "Clic : revenir au choix des donjons sans lancer la route",
     SUM_GO_HERE = "Lancer la route ici", SUM_GO_CONFIRM = "Remplacer la route ?",
     SUM_GO_HERE_TT = "Clic : remplacer la route en cours par ce donjon seul, avec les quêtes cochées (les étapes cochées à la main sont perdues ; un 2e clic confirme)",
@@ -65,6 +71,10 @@ local STR = {
     SUM_G_WAIT_TT = "%s a WL Helper : sa réponse n'est pas encore arrivée.",
     SUM_OTHER_SHORT = "Autre donjon", SUM_RW_MORE = "Autres récompenses",
     SUM_PICK_GO_TT = "Clic : voir le résumé des quêtes (XP, récompenses, chaînes, groupe) avant de lancer la route",
+    SUM_IT1 = "%d objet", SUM_IT = "%d objets",
+    SUM_IT_UP1 = "%s dont %d amélioration", SUM_IT_UP = "%s dont %d améliorations",
+    SUM_UP_PCT = "+%d\194\160%%", SUM_UP_EMPTY = "vide", SUM_UP_EMPTY_TT = "Tu n'as rien à cet emplacement.",
+    SUM_BEST = "Ton meilleur choix", SUM_BEST_TT = "Le meilleur choix pour ta spécialisation parmi les récompenses au choix.",
   },
   en = {
     SUM_T = "Summary", SUM_ROUTE_T = "Route summary", SUM_DG1 = "%d dungeon", SUM_DG = "%d dungeons",
@@ -86,6 +96,10 @@ local STR = {
     SUM_ALLDONE_T = "Every quest turned in: %s", SUM_ALLDONE_TN = "You already turned in every quest of these dungeons",
     SUM_ALLDONE_NOTE = "%s: every quest is already turned in.",
     SUM_OTHER_DG = "Pick another dungeon",
+    SUM_RUN = "Guide me through the dungeon", SUM_RUN_N = "Guide me through the dungeons",
+    SUM_RUN_TT = "Click: open the guide, from the entrance to the last boss, one boss at a time",
+    SUM_RUN_SUB = "The guide can still lead you from the entrance to the last boss.",
+    SUM_RUN_SUB_N = "The guide can still lead you through each dungeon, boss by boss.",
     SUM_BACK_PICK = "Back to the picker", SUM_BACK_PICK_TT = "Click: go back to the dungeon picker without starting the route",
     SUM_GO_HERE = "Start the route here", SUM_GO_CONFIRM = "Replace the route?",
     SUM_GO_HERE_TT = "Click: replace the running route with this dungeon only and the ticked quests (steps marked done by hand are lost; a 2nd click confirms)",
@@ -113,6 +127,10 @@ local STR = {
     SUM_G_WAIT_TT = "%s has WL Helper: their reply has not arrived yet.",
     SUM_OTHER_SHORT = "Other dungeon", SUM_RW_MORE = "More rewards",
     SUM_PICK_GO_TT = "Click: see the quests' summary (XP, rewards, chains, group) before starting the route",
+    SUM_IT1 = "%d item", SUM_IT = "%d items",
+    SUM_IT_UP1 = "%s including %d upgrade", SUM_IT_UP = "%s including %d upgrades",
+    SUM_UP_PCT = "+%d%%", SUM_UP_EMPTY = "empty", SUM_UP_EMPTY_TT = "You wear nothing in this slot.",
+    SUM_BEST = "Your best pick", SUM_BEST_TT = "The best of the rewards to choose from for your spec.",
   },
 }
 do
@@ -134,7 +152,9 @@ local HERO_H, HERO_H_MULTI = 96, 72
 local ROW_GAP = 4
 local TX = 32                   -- text column of a row (after the check box)
 local CELLW, MAXCOLS = 64, 4    -- group columns (one icon each)
-local MAX_REWARDS = 8
+local MAX_REWARDS = 4            -- reward icons per row (the last one is "+N" when there are more)
+local RW_SIZE, RW_STEP = 30, 40   -- a reward icon, and icon + gap (the "+12 %" under it fits the gap)
+local RW_LABEL = 14               -- the line under an icon: arrow and gain
 local HIGH_GAP = 5              -- a chain more than 5 levels above the player is unticked by default
 
 local function SW()
@@ -270,8 +290,30 @@ end
 
 local function ObjText(q) return (ns.lang == "fr" and q.of) or ns.T(q.oe) end
 
--- Rewards: item ids read live from LibForeverData when it is loaded; else the item names of the data.
+-- WL Helper Gear (the gear scoring addon), when it is loaded: its quest rewards and its comparison.
+local function Gear()
+  local G = _G.WLHelperGear
+  return (type(G) == "table" and type(G.Compare) == "function") and G or nil
+end
+
+-- Rewards: item ids read live from LibForeverData when it is loaded (it says which are a choice).
+-- Else our data's item names (q.ri, all a choice when q.rc) merged with WL Helper Gear's item ids
+-- (QuestieDB): a name Gear gives for one of its ids (English, like ours) takes that id; Gear's
+-- other ids follow. Gear does not say which rewards are a choice: q.rc does for every one.
 local rewardCache = {}
+local function GearRewards(qid)
+  local G = Gear()
+  if not (G and type(G.QuestRewards) == "function" and qid > 0) then return nil end
+  local ok, ids, names = pcall(G.QuestRewards, qid)
+  if ok and type(ids) == "table" and #ids > 0 then return ids, type(names) == "table" and names or {} end
+  return nil
+end
+local function CachedName(id)
+  if not GetItemInfo then return nil end
+  local ok, n = pcall(GetItemInfo, id)
+  return ok and type(n) == "string" and not secret(n) and n or nil
+end
+local function Loose(s) return (s:lower():gsub("[%p%s]", "")) end
 local function Rewards(qid, q)
   if rewardCache[qid] then return rewardCache[qid] end
   local out = {}
@@ -286,7 +328,46 @@ local function Rewards(qid, q)
       end
     end
   end
-  if #out == 0 and q.ri then for _, n in ipairs(q.ri) do out[#out + 1] = { name = n, choice = q.rc } end end
+  if #out == 0 then
+    local ids, names = GearRewards(qid)
+    ids, names = ids or {}, names or {}
+    local ri = q.ri or {}
+    -- by the exact name (any case), then loosely (no punctuation, no spaces): Gear's English name
+    -- and the client's cached name both count
+    local byName, byLoose, used = {}, {}, {}
+    for _, id in ipairs(ids) do
+      for _, n in ipairs({ names[id], CachedName(id) }) do
+        if type(n) == "string" then
+          byName[n:lower()] = byName[n:lower()] or id
+          local lo = Loose(n)
+          if lo ~= "" then byLoose[lo] = byLoose[lo] or id end
+        end
+      end
+    end
+    local choice = q.rc == true
+    local unmatched = 0
+    for i, n in ipairs(ri) do
+      local id = byName[n:lower()]
+      if id and used[id] then id = nil end
+      if not id then id = byLoose[Loose(n)]; if id and used[id] then id = nil end end
+      if id then used[id] = true else unmatched = unmatched + 1 end
+      out[i] = { id = id, name = n, choice = choice }
+    end
+    -- as many names as ids: a name still unmatched takes the id at its place
+    if unmatched > 0 and #ri == #ids then
+      for i, rw in ipairs(out) do
+        local id = ids[i]
+        if not rw.id and not used[id] then rw.id = id; used[id] = true; unmatched = unmatched - 1 end
+      end
+    end
+    -- Gear's other ids follow, unless a name is still unmatched and Gear has no more ids than our
+    -- names (that id is most likely the same item under another name: it would show twice)
+    if unmatched == 0 or #ids > #ri then
+      for _, id in ipairs(ids) do
+        if not used[id] then used[id] = true; out[#out + 1] = { id = id, name = names[id], choice = choice } end
+      end
+    end
+  end
   rewardCache[qid] = out
   return out
 end
@@ -297,27 +378,164 @@ local function ItemCount(qid, q)
   return n + (choice and 1 or 0)
 end
 
+-- Per render (wiped by Render): the item facts and the comparisons, read once even when the totals
+-- and the rows both ask. pendingItems: ids whose data has not come yet (GET_ITEM_INFO_RECEIVED for
+-- one of them renders again); pendingName: a reward known by name only, or an item you wear, is
+-- not cached yet (any item arriving renders again).
+-- requestedItems / failedItems (kept for the session): an id is asked for at most once, and one
+-- the server does not know (GET_ITEM_INFO_RECEIVED with success false) is never asked again nor
+-- waited for, so an unknown id cannot make the summary render over and over.
+local infoCache, upCache, bestCache = {}, {}, {}
+local pendingItems, pendingName = {}, false
+local requestedItems, failedItems = {}, {}
+local function ResetRenderCaches()
+  wipe(infoCache); wipe(upCache); wipe(bestCache)
+end
+
+-- icon, link, quality of a reward (the question mark until the item is cached)
 local function ItemInfo(rw)
   local key = rw.id or rw.name
-  local icon, link
+  local c = key and infoCache[key]
+  if c then return c[1], c[2], c[3] end
+  local icon, link, quality
   if rw.id then
     local ok, ic = pcall(function() return (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(rw.id)) or (GetItemIcon and GetItemIcon(rw.id)) end)
     if ok then icon = ic end
-    if not icon and C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, rw.id) end
   end
   if GetItemInfo and key then
-    local ok, _, l, _, _, _, _, _, _, _, tex = pcall(GetItemInfo, key)
-    if ok then link = l; icon = icon or tex end
+    local ok, _, l, qu, _, _, _, _, _, _, tex = pcall(GetItemInfo, key)
+    if ok then link = type(l) == "string" and not secret(l) and l or nil; quality = num(qu); icon = icon or tex end
   end
-  return icon or "Interface\\Icons\\INV_Misc_QuestionMark", link
+  if not quality and rw.id and C_Item and C_Item.GetItemQualityByID then
+    local ok, qu = pcall(C_Item.GetItemQualityByID, rw.id)
+    if ok then quality = num(qu) end
+  end
+  if not link then
+    if rw.id then
+      if not failedItems[rw.id] then
+        pendingItems[rw.id] = true
+        if not requestedItems[rw.id] then
+          requestedItems[rw.id] = true
+          if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, rw.id) end
+        end
+      end
+    else pendingName = true end
+  end
+  icon = icon or "Interface\\Icons\\INV_Misc_QuestionMark"
+  if key then infoCache[key] = { icon, link, quality } end
+  return icon, link, quality
 end
 
+-- The quality colour of an item's border (common and poor keep the card edge).
+local function QualityColor(quality)
+  if not quality or quality < 2 then return nil end
+  if GetItemQualityColor then
+    local ok, r, g, b = pcall(GetItemQualityColor, quality)
+    if ok and num(r) and num(g) and num(b) then return { r, g, b, 1 } end
+  end
+  local c = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
+  if type(c) == "table" and c.r then return { c.r, c.g, c.b, 1 } end
+  return nil
+end
+
+-- The gear check of the Writs module (no WL Helper Gear): { up, text }.
 local function Upgrade(link)
   local WP = ns.Writs and ns.Writs.WP
   if not (link and WP and WP.UpgradeCheck) then return nil end
   local ok, r = pcall(WP.UpgradeCheck, link)
   if ok and type(r) == "table" and r.up then return r.text or "" end
   return nil
+end
+
+local function UpMin()
+  local m = WLWritsDB and num(WLWritsDB.upgradeMin)
+  return m and m > 0 and m or 1
+end
+
+-- Is a reward an upgrade for your spec? { up, pct, empty, text, rank, score }: rank orders the
+-- choices (higher is better; nil when the item is not for you or can't be read), score is the
+-- item's score for your spec when there is no comparison. WLHelperGear.Compare first (percent
+-- against what you wear), else the Writs gear check.
+-- The level a quest's rewards are judged at: the quest's level (else its required level) when it
+-- is above yours, since you only get its items once you reach it.
+local function RewardLevel(q)
+  local ql = q and (num(q.l) or num(q.r)) or nil
+  return math.max(Level(), ql or 0)
+end
+
+-- The gain shown under the icon is capped (a 3-digit gain would run into the next icon); the
+-- tooltip keeps the exact figure.
+local LABEL_MAX = 99
+local NOUP = {}
+local function UpInfo(rw, lvl)
+  local _, link = ItemInfo(rw)
+  local what = link or rw.id
+  if not what then return NOUP end
+  lvl = lvl or Level()
+  local key = tostring(what) .. "@" .. lvl
+  local c = upCache[key]
+  if c then return c end
+  local res = {}
+  local G = Gear()
+  if G then
+    local ok, r = pcall(G.Compare, what, lvl)
+    if ok and type(r) == "table" then
+      if r.unknown then pendingName = true end   -- what you wear is not read yet: any item may be it
+      local usable = r.canUse == true and not r.blocked and not r.unscored and not r.unknown and not r.equipped
+      local pct = num(r.pct)
+      if usable and r.empty then res.up, res.empty, res.rank = true, true, math.huge
+      elseif usable and pct then
+        res.rank = num(r.pctExact) or pct
+        if pct >= UpMin() then res.up, res.pct = true, pct end
+      end
+    end
+    -- a choice still needs a rank when the comparison has none: the item's score for your spec
+    if res.rank == nil and rw.choice and type(G.Score) == "function" then
+      local ok2, sc, d = pcall(G.Score, what, lvl)
+      if ok2 and num(sc) and sc > 0 and type(d) == "table" and d.canUse == true then res.score = sc end
+    end
+  elseif link then
+    local t = Upgrade(link)
+    if t then res.up, res.text = true, t end
+  end
+  if res.up and not res.text then
+    if res.empty then res.text = L.SUM_UP_EMPTY
+    else
+      local p = math.floor(res.pct + 0.5)
+      res.text = L.SUM_UP_PCT:format(p)
+      if p > LABEL_MAX then res.short = L.SUM_UP_PCT:format(LABEL_MAX) end
+    end
+  end
+  upCache[key] = res
+  return res
+end
+
+-- The best of a quest's rewards to choose from for you (its index in the list), or nil: the best
+-- comparison, else the best score; nil with fewer than two choices or nothing for you.
+local function BestChoice(qid, list, lvl)
+  local c = bestCache[qid]
+  if c ~= nil then return c or nil end
+  local n, best, bestRank, bestScore = 0, nil, nil, nil
+  for i, rw in ipairs(list) do
+    if rw.choice then
+      n = n + 1
+      local u = UpInfo(rw, lvl)
+      if u.rank and (not bestRank or u.rank > bestRank) then best, bestRank = i, u.rank
+      elseif not bestRank and u.score and (not bestScore or u.score > bestScore) then best, bestScore = i, u.score end
+    end
+  end
+  if n < 2 then best = nil end
+  bestCache[qid] = best or false
+  return best
+end
+
+-- How many of a quest's items are upgrades (one at most for the rewards to choose from).
+local function UpCount(qid, q)
+  local n, choiceUp, lvl = 0, false, RewardLevel(q)
+  for _, rw in ipairs(Rewards(qid, q)) do
+    if UpInfo(rw, lvl).up then if rw.choice then choiceUp = true else n = n + 1 end end
+  end
+  return n + (choiceUp and 1 or 0)
 end
 
 -- XP and money of one quest: the data first, LibForeverData (live) when the data has none.
@@ -530,6 +748,16 @@ local function RouteElsewhere()
   return false
 end
 
+-- The running route walks these dungeons through (WLDTDB.run) and still has a step to do.
+local function RunGoing(keys)
+  local any = false
+  for _, k in ipairs(keys) do if WLDTDB.run and WLDTDB.run[k] then any = true end end
+  if not any or not ns.route or not ns.IsStepDone then return false end
+  local log = ns.LogEntries and ns.LogEntries() or {}
+  for i = 1, #ns.route.steps do if not ns.IsStepDone(log, i) then return true end end
+  return false
+end
+
 local function RouteHas(qid)
   local _, cls = UnitClass("player")
   for k in pairs(WLDTDB.sel or {}) do
@@ -613,21 +841,31 @@ end
 -- =====================================================================
 local function MakeReward(parent)
   local b = CreateFrame("Button", nil, parent)
-  b:SetSize(20, 20)
+  b:SetSize(RW_SIZE, RW_SIZE)
   b.wlOwned = true
   b.tex = b:CreateTexture(nil, "ARTWORK"); b.tex:SetPoint("TOPLEFT", 1, -1); b.tex:SetPoint("BOTTOMRIGHT", -1, 1)
   b.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  ns.Outline(b, T.cardEdge)
-  b.up = ns.Icon(b, "arrow_up", 12, "OVERLAY", T.ok); b.up:SetPoint("BOTTOMRIGHT", 4, -4); b.up:Hide()
+  -- 1 px border in the item's quality colour (card edge for common items)
+  b.edge = ns.Outline(b, T.cardEdge)
+  -- the best of the rewards to choose from: a gold ring 2 px outside the icon and a star
+  b.ring = CreateFrame("Frame", nil, b); b.ring:SetPoint("TOPLEFT", -2, 2); b.ring:SetPoint("BOTTOMRIGHT", 2, -2)
+  ns.Outline(b.ring, T.gold); b.ring:Hide()
+  b.star = ns.Icon(b, "star", 12, "OVERLAY", T.gold); b.star:SetPoint("TOPLEFT", -4, 4); b.star:Hide()
+  -- an upgrade: the green arrow and the gain under the icon ("+12 %")
+  b.pct = ns.Text(b, ns.F.foot, T.ok); b.pct:SetPoint("TOP", b, "BOTTOM", 6, -2); b.pct:Hide()
+  if b.pct.SetWordWrap then b.pct:SetWordWrap(false) end
+  b.up = ns.Icon(b, "arrow_up", 10, "OVERLAY", T.ok); b.up:SetPoint("RIGHT", b.pct, "LEFT", -1, 0); b.up:Hide()
   b:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:ClearLines()
     local shown = false
-    if self.link and GameTooltip.SetHyperlink then shown = pcall(GameTooltip.SetHyperlink, GameTooltip, self.link)
-    elseif self.id and GameTooltip.SetItemByID then shown = pcall(GameTooltip.SetItemByID, GameTooltip, self.id) end
+    if self.id and GameTooltip.SetItemByID then shown = pcall(GameTooltip.SetItemByID, GameTooltip, self.id)
+    elseif self.link and GameTooltip.SetHyperlink then shown = pcall(GameTooltip.SetHyperlink, GameTooltip, self.link) end
     if not shown then GameTooltip:AddLine(self.name or "?", T.fg[1], T.fg[2], T.fg[3], true) end
     if self.choice then GameTooltip:AddLine(L.OV_CHOICE, T.muted[1], T.muted[2], T.muted[3], true) end
+    if self.best then GameTooltip:AddLine(L.SUM_BEST, T.gold[1], T.gold[2], T.gold[3], true) end
     if self.upText then GameTooltip:AddLine(L.OV_UPGRADE .. (self.upText ~= "" and (" " .. self.upText) or ""), T.ok[1], T.ok[2], T.ok[3], true) end
+    if self.upEmpty then GameTooltip:AddLine(L.SUM_UP_EMPTY_TT, T.muted[1], T.muted[2], T.muted[3], true) end
     if self.link then GameTooltip:AddLine(L.TT_SHIFT_LINK, (T.hint or T.muted)[1], (T.hint or T.muted)[2], (T.hint or T.muted)[3], true) end
     GameTooltip:Show()
   end)
@@ -636,6 +874,23 @@ local function MakeReward(parent)
     if self.link and HandleModifiedItemClick then pcall(HandleModifiedItemClick, self.link) end
   end)
   return b
+end
+
+-- One reward icon: the item, its quality border, the upgrade (arrow and gain), the best choice.
+-- Returns true when it shows a line under the icon.
+local function FillReward(b, rw, best, lvl)
+  local icon, link, quality = ItemInfo(rw)
+  local u = UpInfo(rw, lvl)
+  b.id, b.name, b.link, b.choice, b.best = rw.id, rw.name, link, rw.choice, best
+  b.tex:SetTexture(icon)
+  b.quality = quality
+  b.edge(QualityColor(quality) or T.cardEdge)
+  b.ring:SetShown(best == true); b.star:SetShown(best == true)
+  b.upText, b.upEmpty = u.up and (u.text or "") or nil, u.empty == true
+  if u.up then
+    b.pct:SetText(u.short or u.text or ""); b.pct:Show(); b.up:Show()
+  else b.pct:Hide(); b.up:Hide() end
+  return u.up == true
 end
 
 -- A group cell: one HD icon (two checks when ready); the member, the state and the detail in the tooltip.
@@ -822,7 +1077,7 @@ local function MakeRow(parent)
   end, function() GoPoint(r.point) end)
   -- "+N": the rewards that do not fit beside the actions, listed in its tooltip
   r.more = CreateFrame("Frame", nil, r)
-  r.more:SetSize(20, 20); r.more:EnableMouse(true); r.more:Hide()
+  r.more:SetSize(RW_SIZE, RW_SIZE); r.more:EnableMouse(true); r.more:Hide()
   r.more.hl = ns.Tex(r.more, "BACKGROUND", T.hoverFill); r.more.hl:SetAllPoints(); r.more.hl:Hide()
   ns.Outline(r.more, T.cardEdge)
   r.more.text = ns.Text(r.more, ns.F.meta, T.muted); r.more.text:SetPoint("CENTER")
@@ -955,7 +1210,7 @@ local function FillRow(r, qid, dkey, inf, ctx)
     y = y + 6 + th + 2
   else r.chain:Hide() end
 
-  -- the actions at the right (GPS, share), then as many reward icons (20 px) as the room left
+  -- the actions at the right (GPS, share), then up to 4 reward icons (30 px) as the room left
   -- holds; the others behind a "+N" marker
   r.shareId = ctx.grouped and ShareTarget(qid, pre, log) or nil
   r.share:SetShown(r.shareId ~= nil)
@@ -971,20 +1226,17 @@ local function FillRow(r, qid, dkey, inf, ctx)
     r.share:ClearAllPoints(); r.share:SetPoint("TOPRIGHT", r, "TOPLEFT", rightX, -actY); rightX = rightX - sw - 4
   end
   local list = Rewards(qid, q)
-  local slots = math.max(1, math.min(MAX_REWARDS, math.floor((rightX - TX + 4) / 24)))
+  local slots = math.max(1, math.min(MAX_REWARDS, math.floor((rightX - TX + RW_STEP - RW_SIZE) / RW_STEP)))
   local showN = #list
   if showN > slots then showN = slots - 1 end
-  local n = 0
+  local rwLvl = RewardLevel(q)
+  local bestI = BestChoice(qid, list, rwLvl)
+  local n, labels = 0, false
   for i = 1, showN do
-    local rw = list[i]
     n = n + 1
     local b = r.rewards[n] or MakeReward(r); r.rewards[n] = b
-    local icon, link = ItemInfo(rw)
-    b.id, b.name, b.link, b.choice = rw.id, rw.name, link, rw.choice
-    b.tex:SetTexture(icon)
-    b.upText = Upgrade(link)
-    b.up:SetShown(b.upText ~= nil)
-    b:ClearAllPoints(); b:SetPoint("TOPLEFT", TX + (n - 1) * 24, -actY - 2)
+    if FillReward(b, list[i], bestI == i, rwLvl) then labels = true end
+    b:ClearAllPoints(); b:SetPoint("TOPLEFT", TX + (n - 1) * RW_STEP, -actY)
     b:Show()
   end
   for i = n + 1, #r.rewards do r.rewards[i]:Hide() end
@@ -995,14 +1247,20 @@ local function FillRow(r, qid, dkey, inf, ctx)
     for i = showN + 1, #list do
       local rw = list[i]
       local nm = rw.name
-      if not nm and rw.id and GetItemInfo then local ok, v = pcall(GetItemInfo, rw.id); if ok and type(v) == "string" then nm = v end end
-      names[#names + 1] = "- " .. (nm or "?")
+      if rw.id then nm = CachedName(rw.id) or nm end
+      local u = UpInfo(rw, rwLvl)
+      local line = "- " .. (nm or "?")
+      if bestI == i then line = line .. " (" .. L.SUM_BEST .. ")" end
+      if u.up then line = { line .. " " .. (u.text or ""), T.ok[1], T.ok[2], T.ok[3] } end
+      names[#names + 1] = line
     end
     r.more.tip = names
-    r.more:ClearAllPoints(); r.more:SetPoint("TOPLEFT", TX + showN * 24, -actY - 2)
+    r.more:ClearAllPoints(); r.more:SetPoint("TOPLEFT", TX + showN * RW_STEP, -actY)
     r.more:Show()
   else r.more:Hide() end
-  if #list > 0 or r.point or r.shareId then y = y + 6 + 24 end
+  r.rwLabels = labels
+  if #list > 0 then y = y + 6 + math.max(24, RW_SIZE + (labels and RW_LABEL or 0))
+  elseif r.point or r.shareId then y = y + 6 + 24 end
 
   -- the unfolded chain: one line per link (and the quest itself), where it happens
   local li = 0
@@ -1179,29 +1437,37 @@ local function Build()
   f.extra = ns.Text(c, ns.F.meta, T.muted)
   f.empty = S.EmptyState(c, "portal", L.OV_EMPTY_T, L.OV_EMPTY)
   f.empty:Hide()
-  -- every quest turned in: the fact, and the way to another dungeon
-  f.allDone = S.EmptyState(c, "check", "", nil, L.SUM_OTHER_DG, OpenPicker, "primary")
+  -- every quest turned in: the fact, and the way to another dungeon (secondary: the bar's
+  -- "Guide me through the dungeon" is the one primary)
+  f.allDone = S.EmptyState(c, "check", "", nil, L.SUM_OTHER_DG, OpenPicker, "secondary")
   f.allDone:Hide()
 
   -- pinned at the bottom: share all (in a group), close, the route button (the one primary)
   f.bar = CreateFrame("Frame", nil, f)
   f.bar:SetHeight(32)
-  f.goBtn = S.Button(f.bar, L.SUM_GO, 0, 32, "primary", function()
+  -- starts the route on these dungeons, or goes back to it when it already runs on them.
+  -- mode: the button's ("start", "update", "back"); run: walk them through with no quest
+  local function Go(mode, run)
     local keys = f.keys
     if not keys or #keys == 0 then return end
     -- the route of these dungeons already runs: back to it (the ticks already replanned it);
     -- starting again would forget the steps marked done by hand
-    if f.mode ~= "start" then
+    if mode ~= "start" then
       f:Hide()
       if ns.ShowGuide then ns.ShowGuide() end
       return
     end
     WLDTDB.sel = WLDTDB.sel or {}
     wipe(WLDTDB.sel)
-    for _, k in ipairs(keys) do WLDTDB.sel[k] = true end
+    local runs = run and {} or nil
+    for _, k in ipairs(keys) do
+      WLDTDB.sel[k] = true
+      if runs and ns.Runnable(k) then runs[k] = true end
+    end
     f:Hide()
-    ns.StartGuide()
-  end, function()
+    ns.StartGuide(runs)
+  end
+  f.goBtn = S.Button(f.bar, L.SUM_GO, 0, 32, "primary", function() Go(f.mode) end, function()
     if f.mode == "update" then return { L.SUM_UPDATE, L.SUM_UPDATE_TT } end
     if f.mode == "back" then return { L.SUM_BACK, L.SUM_BACK_TT } end
     if f.replaces then return { L.SUM_GO_HERE, L.SUM_GO_HERE_TT } end
@@ -1209,6 +1475,15 @@ local function Build()
   end)
   f.goBtn:SetPoint("RIGHT", 0, 0)
   f.goBtn:SetDisabledReason(L.SUM_GO_WHY)
+  -- no quest left to do: the dungeon's walkthrough all the same (the engine then makes the route
+  -- go to the entrance, then from boss to boss); it takes the route button's place
+  f.runBtn = S.Button(f.bar, L.SUM_RUN, 0, 32, "primary", function() Go(f.runMode, true) end, function()
+    if f.runMode ~= "start" then return { L.SUM_BACK, L.SUM_BACK_TT } end
+    if f.runReplaces then return { L.SUM_GO_HERE, L.SUM_GO_HERE_TT } end
+    return { f.runLabel or L.SUM_RUN, L.SUM_RUN_TT }
+  end)
+  f.runBtn:SetPoint("RIGHT", 0, 0)
+  f.runBtn:Hide()
   -- opened from the picker (which hides itself): the way back to it; else close
   f.closeBtn = S.Button(f.bar, L.SUM_CLOSE, 0, 28, "secondary", function()
     if f.backPick then OpenPicker() else f:Hide() end
@@ -1229,12 +1504,22 @@ local function Build()
 
   -- the summary follows the quest log, the level and the bags while it is open
   local ev = CreateFrame("Frame", nil, f)
+  f.events = ev
   for _, e in ipairs({ "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "PLAYER_LEVEL_UP", "BAG_UPDATE_DELAYED", "GET_ITEM_INFO_RECEIVED", "GROUP_ROSTER_UPDATE" }) do
     pcall(ev.RegisterEvent, ev, e)
   end
   local queued = false
-  ev:SetScript("OnEvent", function(_, e)
-    if e == "GET_ITEM_INFO_RECEIVED" then wipe(rewardCache) end
+  ev:SetScript("OnEvent", function(_, e, a1, a2)
+    if e == "GET_ITEM_INFO_RECEIVED" then
+      -- only an item the summary waits for (an id it shows, or any while a name is not cached);
+      -- the many items arriving at once make one render (the 0.3 s queue below). An item the
+      -- server does not know (success false) is remembered and renders nothing.
+      local id = num(a1)
+      if id and a2 == false then failedItems[id] = true; pendingItems[id] = nil; return end
+      if not (pendingName or (id and pendingItems[id]) or not id) then return end
+      if id then pendingItems[id] = nil end
+      wipe(rewardCache)
+    end
     if queued or not f:IsShown() then return end
     queued = true
     local fn = function() queued = false; if f:IsShown() then Render() end end
@@ -1264,6 +1549,8 @@ end
 Render = function()
   if not (f and f.keys and #f.keys > 0) then return end
   local S = SW()
+  ResetRenderCaches()
+  pendingName = false
   local keys = {}
   for _, k in ipairs(f.keys) do if ns.D[k] then keys[#keys + 1] = k end end
   if #keys == 0 then f:Hide(); return end
@@ -1287,7 +1574,7 @@ Render = function()
   -- every quest's facts first: the defaults, then the totals over the ticked ones
   local per, sel, seen = {}, {}, {}
   local routeChanged = false
-  local tq, txp, tmoney, titems = 0, 0, 0, 0
+  local tq, txp, tmoney, titems, tup = 0, 0, 0, 0, 0
   local nQuests, nTodo = 0, 0
   local shareList, shareSeen = {}, {}
   local function count(id)
@@ -1297,7 +1584,7 @@ Render = function()
     tq = tq + 1
     txp = txp + QuestXP(id)
     tmoney = tmoney + QuestMoney(id)
-    if q then titems = titems + ItemCount(id, q) end
+    if q then titems = titems + ItemCount(id, q); tup = tup + UpCount(id, q) end
   end
   for _, dkey in ipairs(keys) do
     local todo, done = {}, {}
@@ -1334,9 +1621,14 @@ Render = function()
     per[dkey] = { todo = todo, done = done }
   end
   f.shareList = shareList
-  f.totalsInfo = { quests = tq, xp = txp, money = tmoney, items = titems }
+  f.totalsInfo = { quests = tq, xp = txp, money = tmoney, items = titems, upgrades = tup }
   local allDone = nQuests > 0 and nTodo == 0
   f.allDoneNow = allDone
+  -- nothing left to do but a dungeon to walk through (a class-quest card is no place to run)
+  local runnable = false
+  if nTodo == 0 then
+    for _, k in ipairs(keys) do if ns.Runnable(k) then runnable = true end end
+  end
   -- a default changed (a level up) for a dungeon of the running route: the route follows, once
   if routeChanged and ns.route and ns.frame and ns.frame:IsShown() and ns.Recalc and C_Timer and C_Timer.After then
     C_Timer.After(0, function() pcall(ns.Recalc) end)
@@ -1347,12 +1639,18 @@ Render = function()
   local totalsShown, noHelperShown, allDoneShown, extraShown = false, false, false, false
   local noHelperText, extraText
 
-  -- "Your selection: 7 quests · 38,900 XP · 3g 20s", then the members without WL Helper, once
+  -- "Your selection: 7 quests · 38,900 XP · 3g 20s · 4 items including 2 upgrades", then the members without WL Helper, once
   local function TotalsBlock()
     if tq > 0 then
       local parts = { ns.Plural(tq, "SUM_Q1", "SUM_Q", tq) }
       if txp > 0 then parts[#parts + 1] = L.SUM_XP:format(Big(txp)) end
       if tmoney > 0 then parts[#parts + 1] = Money(tmoney) end
+      -- "4 objets dont 2 améliorations" (one per quest at most for rewards to choose from)
+      if titems > 0 then
+        local it = ns.Plural(titems, "SUM_IT1", "SUM_IT", titems)
+        if tup > 0 then it = ns.Plural(tup, "SUM_IT_UP1", "SUM_IT_UP", it, tup) end
+        parts[#parts + 1] = it
+      end
       f.totals:SetText(L.SUM_SEL:format(table.concat(parts, " · ")))
       f.totals:SetTextColor(T.fg[1], T.fg[2], T.fg[3])
     else
@@ -1385,7 +1683,7 @@ Render = function()
   local function AllDoneBlock(title)
     f.allDone:ClearAllPoints(); f.allDone:SetPoint("TOP", c, "TOP", 0, -(y + 12))
     f.allDone:SetWrapWidth(CW)
-    local eh = f.allDone:Set("check", title, nil, L.SUM_OTHER_DG, OpenPicker, "primary")
+    local eh = f.allDone:Set("check", title, runnable and (#keys > 1 and L.SUM_RUN_SUB_N or L.SUM_RUN_SUB) or nil, L.SUM_OTHER_DG, OpenPicker, "secondary")
     f.allDone:Show(); allDoneShown = true
     y = y + 12 + (num(eh) or 80) + 12
   end
@@ -1614,8 +1912,28 @@ Render = function()
   if f.goBtn.SetIcon then f.goBtn:SetIcon(mode == "update" and "refresh" or mode == "back" and "chevron_left" or "pin") end
   SetOn(f.goBtn, mode ~= "start" or #sel > 0)
   f.goBtn:SetShown(nTodo > 0)
+  -- nothing to do: "Guide me through the dungeon" (or back to that route when it runs)
+  f.runLabel = #keys > 1 and L.SUM_RUN_N or L.SUM_RUN
+  f.runBtn:SetShown(runnable)
+  if runnable then
+    -- back to the route only while it is an unfinished run of these dungeons: a finished one
+    -- (or their finished quest route) starts afresh, without asking (nothing would be lost)
+    local onThese = RouteRuns(keys)
+    local runMode = "start"
+    if onThese and not f.first and RunGoing(keys) then runMode = "back" end
+    f.runMode = runMode
+    f.runReplaces = runMode == "start" and not onThese and not f.fromPicker and RouteElsewhere() or nil
+    f.runBtn:SetConfirm(f.runReplaces and L.SUM_GO_CONFIRM or nil)
+    if not f.runReplaces and f.runBtn.armed then f.runBtn:Disarm() end
+    if not f.runBtn.armed then
+      f.runBtn:SetText(runMode ~= "start" and L.SUM_BACK or (f.runReplaces and L.SUM_GO_HERE) or f.runLabel)
+    end
+    if f.runBtn.SetIcon then f.runBtn:SetIcon(runMode ~= "start" and "chevron_left" or "pin") end
+  end
   f.closeBtn:ClearAllPoints()
-  if nTodo > 0 then f.closeBtn:SetPoint("RIGHT", f.goBtn, "LEFT", -8, 0) else f.closeBtn:SetPoint("RIGHT", f.bar, "RIGHT", 0, 0) end
+  if nTodo > 0 then f.closeBtn:SetPoint("RIGHT", f.goBtn, "LEFT", -8, 0)
+  elseif runnable then f.closeBtn:SetPoint("RIGHT", f.runBtn, "LEFT", -8, 0)
+  else f.closeBtn:SetPoint("RIGHT", f.bar, "RIGHT", 0, 0) end
   f.shareAll:SetShown(ctx.grouped and nTodo > 0)
   if f.shareAll:IsShown() then
     if not ns.pushBusy then f.shareAll:SetText(L.SUM_SHARE_ALL) end

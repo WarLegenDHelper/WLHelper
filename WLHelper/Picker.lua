@@ -149,6 +149,47 @@ end
 local function TabOf(d) return d.cq and "cls" or d.raid and "raid" or "dg" end
 local function CurTab() return WLDTDB.tab or "dg" end
 
+-- Search: lower case, accents dropped, so "zul farrak", "Mossmeld" or "geme" all find something.
+local FOLD = { ["à"]="a", ["â"]="a", ["ä"]="a", ["á"]="a", ["ç"]="c", ["é"]="e", ["è"]="e", ["ê"]="e", ["ë"]="e",
+  ["î"]="i", ["ï"]="i", ["í"]="i", ["ô"]="o", ["ö"]="o", ["ó"]="o", ["ù"]="u", ["û"]="u", ["ü"]="u", ["ú"]="u",
+  ["ÿ"]="y", ["œ"]="oe", ["æ"]="ae", ["’"]="'", ["É"]="e", ["È"]="e", ["Ê"]="e", ["À"]="a", ["Ç"]="c", ["Î"]="i", ["Ô"]="o" }
+local function Fold(t)
+  t = tostring(t or "")
+  t = t:gsub("[\194-\244][\128-\191]+", function(c) return FOLD[c] or c end)
+  t = t:gsub("[A-Z]", string.lower)   -- ASCII only: a locale-aware lower() can break UTF-8
+  return (t:gsub("[%s%-_:,%.']+", " "))
+end
+local function Query() return p and p.query and Fold(p.query):match("^%s*(.-)%s*$") or "" end
+-- what a dungeon answers to: its names (both languages), short name, zone, quests and who gives them
+local hay = {}
+local function Haystack(k)
+  if hay[k] then return hay[k] end
+  local d = ns.D[k] or {}
+  local parts = { k, d.n, d.nf, d.short, d.loc, ns.DName(k) }
+  for _, qid in ipairs(d.q or {}) do
+    local q = ns.Q[qid]
+    if q then parts[#parts + 1] = q.n; parts[#parts + 1] = q.nf; parts[#parts + 1] = q.s and q.s.n end
+  end
+  local _, cls = UnitClass("player")
+  for _, qid in ipairs(ns.DungeonQuests and (select(2, pcall(ns.DungeonQuests, k, cls))) or {}) do
+    local q = ns.Q[qid]
+    if q then parts[#parts + 1] = q.n; parts[#parts + 1] = q.nf; parts[#parts + 1] = q.s and q.s.n end
+  end
+  local out = {}
+  for _, v in pairs(parts) do if v then out[#out + 1] = Fold(v) end end
+  hay[k] = " " .. table.concat(out, " | ") .. " "
+  return hay[k]
+end
+local function Matches(k, query)
+  local h = Haystack(k)
+  for word in query:gmatch("%S+") do
+    if not h:find(word, 1, true) then return false end
+  end
+  return true
+end
+ns.PickerMatches = function(k, text) return Matches(k, Fold(text)) end
+ns.PickerFold = Fold
+
 -- icône de classe officielle (atlas des cercles de classe)
 local function SetClassIcon(tex, cls)
   local c = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[cls]
@@ -293,6 +334,17 @@ local function Build()
     function() return WLDTDB.pickAll and true or false end,
     function(v) WLDTDB.pickAll = v and true or false; Render() end, 24)
   p.filter:SetPoint("RIGHT", -PAD, 0)
+  -- search over every tab, whatever the level filter
+  p.search = S.Input(p.tabBar, 168, { search = true, placeholder = L.PICK_SEARCH, onChange = function(t)
+    p.query = t
+    if p.sa then p.sa:ScrollTo(0, true) end
+    Render()
+  end, onEnter = function() end })
+  p.search:SetHeight(24)
+  p.search:SetPoint("RIGHT", p.filter, "LEFT", -8, 0)
+  p.search:SetScript("OnEscapePressed", function(self)
+    if (self:GetText() or "") ~= "" then self:SetText(""); p.query = ""; Render() else self:ClearFocus() end
+  end)
   p.hint = Text(p, ns.F.label, T.muted)
   p.hint:SetPoint("TOPLEFT", PAD, -(HEADER + 1 + 32 + 12))
 
@@ -338,12 +390,16 @@ Render = function()
   -- Sections, in this order: to do at your level, later (too high), below, done, coming soon,
   -- then (All) no quest. "My level" shows the first, done and coming soon; "All" every section.
   local tab = CurTab()
+  local query = Query()
+  local searching = query ~= ""
   local secs = { todo = {}, later = {}, below = {}, done = {}, noq = {}, upcoming = {} }
   local list = {}
   local tooHigh = function(d) return d.lvl and d.lvl[1] and UnitLevel("player") < d.lvl[1] - 4 end
   for _, k in ipairs(ns.ORDER) do
     local d = ns.D[k]
-    if TabOf(d) == tab and (tab ~= "cls" or ClassMatch(d)) then
+    local inTab = searching and (not d.cq or ClassMatch(d)) and Matches(k, query)
+      or (not searching and TabOf(d) == tab and (tab ~= "cls" or ClassMatch(d)))
+    if inTab then
       local n, done = Counts(k)
       local sec
       if n == 0 then sec = (d.up and time() < d.up) and "upcoming" or (tab == "raid" and "todo" or "noq")
@@ -351,14 +407,15 @@ Render = function()
       elseif tooHigh(d) then sec = "later"
       elseif not LevelOK(d) then sec = "below"
       else sec = "todo" end
-      local show = WLDTDB.pickAll or sec == "todo" or sec == "done" or sec == "upcoming"
+      local show = searching or WLDTDB.pickAll or sec == "todo" or sec == "done" or sec == "upcoming"
       if show then table.insert(secs[sec], k); table.insert(list, k) end
     end
   end
   p.tabBar:Update()
   p.filter:Update()
   local contentW = PW - 2 * PAD
-  p.hint:SetText(tab == "cls" and L.PICK_HINT_CLS or tab == "raid" and L.PICK_HINT_RAID or L.PICK_HINT)
+  if searching then p.hint:SetText(L.PICK_HINT_SEARCH:format(p.query))
+  else p.hint:SetText(tab == "cls" and L.PICK_HINT_CLS or tab == "raid" and L.PICK_HINT_RAID or L.PICK_HINT) end
   local hintH = ns.FitText(p.hint, 0, contentW, p)
   local top = HEADER + 1 + 32 + 12 + hintH + 12
   local function byLevel(a, b)
@@ -441,7 +498,8 @@ Render = function()
   end
   for j = i + 1, #p.cards do p.cards[j]:Hide() end
   if #list == 0 then
-    local eh = (tab == "cls") and p.empty:Set(L.PICK_EMPTY_CLS_T, L.PICK_EMPTY_CLS) or p.empty:Set(L.PICK_EMPTY_T, L.PICK_EMPTY)
+    local eh = searching and p.empty:Set(L.PICK_EMPTY_SEARCH_T:format(p.query), L.PICK_EMPTY_SEARCH)
+      or (tab == "cls") and p.empty:Set(L.PICK_EMPTY_CLS_T, L.PICK_EMPTY_CLS) or p.empty:Set(L.PICK_EMPTY_T, L.PICK_EMPTY)
     p.empty:Show()
     y = 24 + eh + 24
   else p.empty:Hide() end

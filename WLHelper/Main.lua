@@ -24,10 +24,14 @@ local function StepKeys(steps)
       local nxt = steps[i + 1]
       -- the next step's own key (a boss step's bkey: it may hold no quest line), never the index,
       -- which moves on a replan
-      st.key = "g:" .. st.gate .. ":" .. ((nxt and (nxt.bkey or (nxt.acts[1] and nxt.acts[1].key))) or i)
+      st.key = "g:" .. st.gate .. ":" .. ((nxt and (nxt.bkey or (nxt.acts[1] and nxt.acts[1].key)
+        or (nxt.run and nxt.ins and ("r:" .. nxt.ins)))) or i)
     elseif st.bkey then
       -- a boss step keeps its key whatever quest lines it holds (its "done" survives a replan)
       st.key = st.bkey
+    elseif st.run and #st.acts == 0 then
+      -- a run in a dungeon with no boss list: one step, the same key across replans
+      st.key = "r:" .. st.ins
     else
       st.key = st.acts[1] and st.acts[1].key or ("s" .. i)
     end
@@ -40,6 +44,8 @@ function ns.Assemble(recalc, order, byKey)
   if ns.EnsureClassCards then ns.EnsureClassCards() end
   local db = WLDTDB
   local any = next(db.sel) ~= nil
+  -- a run choice lasts only while its dungeon stays picked
+  for k in pairs(db.run or {}) do if not db.sel[k] then db.run[k] = nil end end
   if not any then ns.route = nil; return end
   if not order then order, byKey = ns.BuildRoute(db.sel, ns.PlayerWorld()) end
   if not recalc and db.order and #db.order > 0 then
@@ -84,8 +90,12 @@ function ns.Assemble(recalc, order, byKey)
   ns.route = { steps = steps, sel = db.sel, label = Label(db.sel) }
 end
 
-function ns.StartGuide()
+-- run: the picked dungeons to walk through with no quest (the summary's "Guide me through the
+-- dungeon"); any other start forgets it, so a plain quest route never grows a dungeon clear.
+function ns.StartGuide(run)
   WLDTDB.manual = {}
+  WLDTDB.run = {}
+  for k in pairs(run or {}) do if WLDTDB.sel and WLDTDB.sel[k] then WLDTDB.run[k] = true end end
   ns.Assemble(true)
   ns.HidePicker()
   local f = ns.frame

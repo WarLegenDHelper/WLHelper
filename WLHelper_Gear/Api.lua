@@ -78,6 +78,15 @@
 --       58+ or dungeon caps (5% / 6%); raidAuto = true: automatic (60 once raids open).
 --   WLHelperGear.Options() -> { neutral, raid }
 --
+--   WLHelperGear.QuestRewards(questID) -> { itemID, ... }, names or nil   WL Helper change (v4)
+--       The items a quest gives (QuestieDB, WoW Forever data set), in the quest's order:
+--       its reward list, then the gear items from ns.itemQuests that list misses. A new
+--       table each call; nil when the quest has no known reward. The data does not say
+--       which rewards are a choice. names = { [itemID] = "English name" } (Data.lua or
+--       QuestData.lua names, to match a caller's own English reward names).
+--       Built once, on the first call or the first scoring call: one compact string per
+--       quest (QuestData.lua is freed after that); a quest's table is made when asked for.
+--
 -- Compare result, v2 fields: notes = { "effect counted: extra attacks ...", "set bonus (2)
 -- ...: +20.1", "breaks set bonus ...", "proc not counted", "your enchant counted: Crusader" },
 -- unscored = true when the item you wear has an effect with no value (pct is then nil),
@@ -331,6 +340,16 @@ function API.SetOptions(t) E.SetOptions(t) end
 function API.Options()
     local o = E.Options()
     return { neutral = o.neutral, raid = o.raid }
+end
+
+-- WL Helper change (v4): the items a quest gives, and their English names.
+function API.QuestRewards(questID)
+    local list = E.QuestRewards(questID)
+    if not list then return nil end
+    E.Parse()   -- Data.lua names (QuestRewards has kept the lists before QuestData.lua is freed)
+    local names = {}
+    for _, id in ipairs(list) do names[id] = E.RewardName(id) end
+    return list, names
 end
 
 local SECTION_BY_NAME = {}

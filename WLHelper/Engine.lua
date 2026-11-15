@@ -572,6 +572,13 @@ end
 -- =====================================================================
 --  Route : glouton « plus proche voisin » qui respecte les dépendances
 -- =====================================================================
+-- A dungeon the guide can walk you through with no quest: open now, a dungeon (a class-quest card
+-- is no place, a raid is not a dungeon run).
+function ns.Runnable(dkey)
+  local d = ns.D[dkey]
+  return d ~= nil and not d.cq and not d.raid and not (d.up and time() < d.up)
+end
+
 function ns.BuildRoute(sel, startPos)
   local _, cls = UnitClass("player")
   local nodes, byKey = MakeNodes(sel, cls)
@@ -580,6 +587,22 @@ function ns.BuildRoute(sel, startPos)
   local done = {}
   for _, n in ipairs(nodes) do
     if ns.NodeOK(log, n) then done[n] = true end
+  end
+  -- a dungeon the player asked to be guided through ("Guide me through the dungeon", WLDTDB.run)
+  -- with no quest left for them still gets its walkthrough: one "run" node inside it, which
+  -- MakeSteps turns into the entrance step and SplitInside into one step per boss. Only on that
+  -- explicit choice: a quest route whose last quest is turned in must end, not turn into a clear.
+  -- Quest state never completes it: the boss steps complete on their kills.
+  for dkey in pairs(sel) do
+    local left = false
+    for _, qid in ipairs(ns.D[dkey] and ns.DungeonQuests(dkey, cls) or {}) do
+      local q = ns.Q[qid]
+      if not q.extra and not ns.IsDone(qid) then left = true break end
+    end
+    if WLDTDB.run and WLDTDB.run[dkey] and ns.Runnable(dkey) and not left and not byKey["r:" .. dkey] then
+      local n = { kind = "r", key = "r:" .. dkey, ins = dkey, d = dkey, dk = dkey, phase = "inside", deps = {} }
+      byKey[n.key] = n; table.insert(nodes, n)
+    end
   end
   local gate = PreEntry(nodes)
   local lvl = UnitLevel("player") or 1
@@ -694,6 +717,8 @@ function ns.MakeSteps(order)
       local visit = steps[i + 1]
       local seen = {}
       for _, n in ipairs(visit and visit.acts or {}) do
+        -- a run with no quest: the step still leads to the entrance and waits until you are in
+        if n.kind == "r" then st.run = true end
         if (n.kind == "c" or n.kind == "t") and not seen[n.q] then
           local hasOutsideA = true
           for _, n2 in ipairs(visit.acts) do if n2.kind == "a" and n2.q == n.q then hasOutsideA = false end end
@@ -714,7 +739,7 @@ function ns.MakeSteps(order)
   -- une étape « prêt ? » sans rien à vérifier n'apporte rien : on la retire
   for i = #steps, 1, -1 do
     local st = steps[i]
-    if st.gate and #st.acts == 0 then
+    if st.gate and #st.acts == 0 and not st.run then
       table.remove(steps, i)
       if steps[i] then steps[i].checks = nil end
     end
@@ -1164,14 +1189,29 @@ end
 -- each holding the quest lines done at that boss; quest lines tied to no boss go "on the way"
 -- between the right bosses (or at the start), loot from every monster in a last step.
 -- full: list every boss (first visit of this dungeon in the route), else only those with quest lines.
+-- A dungeon with no boss list: the step stays whole; a run keeps no run node in it (it holds no
+-- quest line), so it is one "inside" step you mark done yourself.
+local function Whole(st)
+  local acts, run = {}, false
+  for _, nd in ipairs(st.acts) do if nd.kind == "r" then run = true else acts[#acts + 1] = nd end end
+  if run then st.acts = acts; st.run = true; st.inner = true end
+  return { st }
+end
+
 local function SplitOne(st, full, visit)
   local bo = ns.BossOrder(st.ins)
-  if not bo or #bo.list == 0 then return { st } end
+  if not bo or #bo.list == 0 then return Whole(st) end
   local items, order = {}, 0
+  local run = false
+  -- a run lists every boss whatever the visit (a later visit would otherwise list none)
+  for _, nd in ipairs(st.acts) do if nd.kind == "r" then full = true break end end
   for _, nd in ipairs(st.acts) do
     order = order + 1
     local q = ns.Q[nd.q] or {}
-    if nd.kind == "c" and q.o and #q.o > 0 then
+    if nd.kind == "r" then
+      -- the run node holds no quest line: it only asks for every boss (full below)
+      run = true
+    elseif nd.kind == "c" and q.o and #q.o > 0 then
       local first = true
       for oi, o in ipairs(q.o) do
         if not (o.w and not o.ins and not o.outer) then
@@ -1245,7 +1285,7 @@ local function SplitOne(st, full, visit)
   end
   local anyBoss = false
   for _, g in ipairs(groups) do if g.boss >= 0.5 and g.boss < 999 then anyBoss = true end end
-  if not anyBoss then return { st } end
+  if not anyBoss then return Whole(st) end
   local trash = {}
   for _, g in ipairs(groups) do
     if g.boss == 999 then for _, n in ipairs(g.acts) do table.insert(trash, n) end end
@@ -1254,7 +1294,7 @@ local function SplitOne(st, full, visit)
   for k, g in ipairs(groups) do
     local s2 = { ins = st.ins, d = st.d, pos = st.pos, inner = st.inner, q = st.q, acts = g.acts, npcs = st.npcs,
       split = true, part = k, parts = #groups, bossIdx = g.boss, trash = (g.boss ~= 999) and trash or nil,
-      phase = "inside", dk = st.ins or st.dk, bossN = #bo.list }
+      phase = "inside", dk = st.ins or st.dk, bossN = #bo.list, run = run or nil }
     local whole = g.boss == math.floor(g.boss)
     local B = whole and bo.list[g.boss]
     if B then
@@ -1360,6 +1400,8 @@ end
 -- Optional: nothing for you at this boss (no open quest line, no upgrade, no quest item).
 function ns.BossStepOptional(st, log)
   if not (st and st.bossStep) then return false end
+  -- a run with no quest: the bosses are the point, only the ones the data calls optional are
+  if st.run then return st.bossFlag == "optional" end
   log = log or ns.LogEntries()
   for _, n in ipairs(st.acts or {}) do if not ns.NodeOK(log, n) then return false end end
   return #ns.BossStepLoot(st) == 0

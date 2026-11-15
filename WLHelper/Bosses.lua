@@ -1307,6 +1307,11 @@ end
 -- loaded: no black square).
 local function LiveFace(unit, rec)
   if not (P and P:IsShown() and rec and unit and SetPortraitTexture) then return end
+  -- a corpse or a unit out of sight draws a blank white disc: only a living, visible one
+  local okV, vis = pcall(UnitIsVisible, unit)
+  local okD, dead = pcall(UnitIsDead, unit)
+  local function plain(v) return not (issecretvalue and issecretvalue(v)) end
+  if (okV and plain(vis) and vis == false) or (okD and plain(dead) and dead == true) then return end
   for _, b in ipairs(P.heads) do
     local real = (b.pooled ~= nil and b.cur == b.pooled.tex) or (b.cur == b.live and b.directDid ~= nil)
     if b:IsShown() and b.rec and b.rec.en == rec.en and not real and b.liveFor ~= rec.en then

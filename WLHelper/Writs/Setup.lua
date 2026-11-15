@@ -680,7 +680,12 @@ STEPS.comfort = {
                     return string.format(L("%s + clic droit sur un ennemi : tu le prends pour cible et tu tires (arc, fusil, arbalète, baguette ou arme de jet)."), key)
                 end,
                 function() return d.shoot end,
-                function(v) d.shoot = v; apply(); if win and win.Relayout then win.Relayout() end end, shootTaken)
+                function(v)
+                    d.shoot = v
+                    -- mages, priests and warlocks: the wand line below switches on with it, once
+                    if v and WP.OfferWand then WP.OfferWand() end
+                    apply(); if win and win.Relayout then win.Relayout() end
+                end, shootTaken)
             rows[#rows + 1] = f.shoot
             if not shootTaken and WP.ShootKeys then
                 f.key = Row(f, L("Touche à maintenir"), L("Avec « Aucune », le clic droit seul tire."), function(row)
@@ -692,6 +697,17 @@ STEPS.comfort = {
                     return seg
                 end)
                 rows[#rows + 1] = f.key
+                -- wand classes (and anyone with a wand): right-click alone shoots the wand
+                if WP.WandOption then
+                    f.wand = SwitchRow(f, L("Clic droit simple = baguette"),
+                        L("Avec une baguette, un clic droit seul sur un ennemi lance Tir au lieu de ton attaque au corps-à-corps. Maintenu sur un ennemi, il ne tourne plus la caméra."),
+                        function() return d.wandRight end,
+                        function(v)
+                            if WP.OfferWand then WP.OfferWand() end   -- your own choice wins from now on
+                            d.wandRight = v and true or false; apply()
+                        end)
+                    rows[#rows + 1] = f.wand
+                end
             end
             f.group = Group(f, rows)
             f.banner = S.Banner(f, "info", "")
@@ -709,7 +725,7 @@ STEPS.comfort = {
         f.mmGroup = Group(f, { f.mmRow })
     end,
     Enter = function(f)
-        for _, r in ipairs({ f.invite, f.shoot, f.mmRow }) do if r and r.sw then r.sw:Update() end end
+        for _, r in ipairs({ f.invite, f.shoot, f.wand, f.mmRow }) do if r and r.sw then r.sw:Update() end end
         if f.key and f.key.control.Update then f.key.control:Update() end
     end,
     Layout = function(f)
@@ -724,6 +740,9 @@ STEPS.comfort = {
         if d then
             local shootOn = d.shoot and not f.shootTaken
             if f.key then f.key.wlHidden = not shootOn end
+            -- the wand line: shooting on, a key held (with "None" right-click already shoots), and a
+            -- wand class or a wand in the ranged slot
+            if f.wand then f.wand.wlHidden = not (shootOn and d.shootMod ~= "NONE" and WP.WandOption()) end
             if f.allTaken then
                 f.group:Hide()
                 f.taken:SetText(L("Ces raccourcis sont déjà gérés par un autre de tes addons."))

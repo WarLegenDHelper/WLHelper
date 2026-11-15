@@ -666,6 +666,14 @@ function BUILD.general(p)
             shootBy and taken or L("Sur un ennemi, lance ton tir à distance : arc, fusil, arbalète, arme de jet ou baguette."))
         local mrow = Row(p, L("Touche pour tirer"), L("Garde-la enfoncée, puis fais un clic droit sur l'ennemi. Avec « Aucune », le clic droit seul tire."))
         Choice(p, mrow, ns.WP.ShootKeys(), function() return Clicks().shootMod end, setClick("shootMod"))
+        -- wand users: a plain right-click on an enemy can shoot too (OfferWand first, so the
+        -- welcome step never overrides the choice made here)
+        if ns.WP.WandOption and ns.WP.WandOption() then
+            SwitchRow(p, L("Clic droit simple = baguette"), function() return Clicks().wandRight end, function(v)
+                if ns.WP.OfferWand then ns.WP.OfferWand() end
+                setClick("wandRight")(v)
+            end, L("Sans touche, un clic droit sur un ennemi lance ta baguette au lieu du corps-à-corps. La touche choisie tire toujours. Maintenu sur un ennemi, il ne tourne plus la caméra."))
+        end
     end
 
     Section(p, L("Langue"))
