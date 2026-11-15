@@ -153,6 +153,16 @@ function ns.Useful(q)
   return true
 end
 
+-- A quest that is only a walk to someone ("Speak with...", "Locate...", "Report to..."): nothing to
+-- do between taking it and handing it in, so no objective step
+local TALK = { "^speak with", "^talk to", "^report to", "^locate ", "^find ", "^seek out", "^return to", "^bring .* to ", "^deliver",
+  "^parle", "^rends%-toi", "^trouve", "^rapporte", "^retourne" }
+function ns.TalkQuest(q)
+  local t = (q.oe or ""):lower()
+  for _, p in ipairs(TALK) do if t:find(p) then return true end end
+  return false
+end
+
 -- the player's faction and race: a quest of the other faction, or kept for other races, is never offered
 local function FactionOK(fa)
   if not fa or fa == "" or fa == "Both" then return true end
@@ -342,6 +352,12 @@ local function MakeNodes(sel, cls)
         table.insert(outs, add({ kind = "o", q = qid, sub = i, oi = i, unknown = true, npc = r[1], obj = o, oneObj = o,
           noLoc = true, mapHint = q.s and not q.s.i and q.s.m or nil, d = home, pre = isPre, deps = { A } }))
       end
+    elseif real == 0 and not inside and (isPre or q.noin) and q.oe and not ns.TalkQuest(q) then
+      -- nothing but the quest's text ("Acquire the Mana Sieve ... collect Ancient Mana Crystals"):
+      -- one "do the objectives" step that ends when the game says the quest is complete
+      real = 1
+      table.insert(outs, add({ kind = "o", q = qid, sub = 1, unknown = true, npc = ns.QName(qid), obj = { k = "text", n = q.oe, unk = true },
+        noLoc = true, mapHint = q.s and not q.s.i and q.s.m or nil, d = home, pre = isPre, deps = { A } }))
     end
     -- quête de donjon sans objectif connu (quêtes Forever récentes) : objectifs dans le donjon
     if not isPre and not q.noin and real == 0 and (q.o == nil or #q.o > 0 or q.ne) then inside = true; outer = false end

@@ -447,7 +447,9 @@ local function ObjectiveLines(n, log)
       for _, x in ipairs(o.src) do
         table.insert(srcs, x[1] .. ((x[2] and x[2] > 0 and x[2] < 100) and (" " .. math.floor(x[2] + 0.5) .. " %") or ""))
       end
-      s = s .. "  " .. Hex(T.muted) .. "(" .. L.TT_DROPS:format(table.concat(srcs, ", ")) .. ")|r"
+      -- the sources on their own line under the objective, not glued after "0/1"
+      if s ~= "" then table.insert(lines, s) end
+      s = "    " .. Hex(T.muted) .. L.TT_DROPS:format(table.concat(srcs, " · ")) .. "|r"
     end
     if s ~= "" then table.insert(lines, s) end
   end
@@ -1719,7 +1721,11 @@ Render = function()
       local tags = {}
       if nd.d and nd.d ~= dkey then table.insert(tags, mt .. ns.DName(nd.d) .. "|r") end
       if nd.pre then
-        table.insert(tags, mt .. ((nd.ci and nd.cn) and L.CH_STEP:format(nd.ci, nd.cn) or L.PRE) .. "|r")
+        -- where you are in the chain, and what it leads to: "Step 3 of 9 before Agamaggan's Blood"
+        local lead = nd.forQ and nd.forQ[1]
+        local txt = (nd.ci and nd.cn and lead) and L.CH_BEFORE:format(nd.ci, nd.cn, ns.QName(lead))
+          or (nd.ci and nd.cn) and L.CH_STEP:format(nd.ci, nd.cn) or L.PRE
+        table.insert(tags, "|cff8fb7ff" .. txt .. "|r")
       elseif (nd.kind == "a" or nd.kind == "h") and not ok and ns.ChainState then
         -- a dungeon quest to take: does it have prerequisites, and are they done?
         local cs = ns.ChainState(nd.q)

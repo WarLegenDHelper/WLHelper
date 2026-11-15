@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.49] — 2026-11-15
+
+### Corrigé / Fixed
+- **Chaînes : on voit où on en est.** Chaque étape d'un prérequis dit « Étape 3 sur 9 avant « Agamaggan's Blood » ».
+  *Chain steps say where you are and what they lead to.*
+- **Plus de rendu juste après la prise** pour les quêtes dont nos données n'ont que le texte (ex. Powering the Pylons) : une étape « objectifs » s'intercale et se coche quand le jeu dit la quête terminée. Les quêtes « va parler à… » n'en ont pas.
+- **Sources de butin sur leur propre ligne** sous l'objectif (« Tombe sur : … »).
+
 ## [1.0.0-beta.48] — 2026-11-15
 
 ### Ajouté / Added
