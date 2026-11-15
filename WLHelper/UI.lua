@@ -74,7 +74,14 @@ function ns.Print(msg) print("|cffce1918WL|r " .. tostring(msg)) end
 -- =====================================================================
 local function Steps() return ns.route and ns.route.steps or {} end
 local function Manual(st) return WLDTDB.manual[st.key] end
-local function SetManual(st, v) WLDTDB.manual[st.key] = v or nil end
+local doneMemo, doneGen, doneLog, doneSteps = {}, nil, nil, nil
+local function SetManual(st, v) WLDTDB.manual[st.key] = v or nil; doneGen = nil end
+-- the tracker's shift-click marks a step done (or undone) by hand
+function ns.SetStepManual(i, v)
+  local st = Steps()[i]; if not st then return end
+  SetManual(st, v)
+  if f and f:IsShown() then ns.Refresh() elseif ns.AfterRefresh then ns.AfterRefresh() end
+end
 
 local function InInstanceOf(dkey)
   local d = ns.D[dkey]
@@ -89,7 +96,18 @@ local function StepAuto(log, st)
   return true
 end
 
+local IsStepDoneRaw
 local function IsStepDone(log, i)
+  -- kept for the length of one refresh pass (ns.PassGen): a refresh asks for every step many times
+  local g = ns.PassGen and ns.PassGen()
+  if not g then return IsStepDoneRaw(log, i) end
+  local steps = Steps()
+  if doneGen ~= g or doneLog ~= log or doneSteps ~= steps then doneMemo, doneGen, doneLog, doneSteps = {}, g, log, steps end
+  local m = doneMemo[i]
+  if m == nil then m = IsStepDoneRaw(log, i) and true or false; doneMemo[i] = m end
+  return m
+end
+IsStepDoneRaw = function(log, i)
   local st = Steps()[i]
   if not st then return false end
   if Manual(st) then return true end
@@ -125,6 +143,71 @@ local function InsideKey()
 end
 ns.InsideKey = InsideKey
 
+-- The dungeon the guide is about right now: the one you stand in, else the step on screen's.
+local function GuideDungeon()
+  local k = InsideKey()
+  if k then return k end
+  local st = f and Steps()[f.view or f.auto or 1]
+  if not st then return nil end
+  return (ns.StepDungeon and ns.StepDungeon(st)) or st.ins or st.d or st.gate
+end
+ns.GuideDungeon = GuideDungeon
+
+-- How many of the route's quests in your log can be shared now (0 outside a group). Asked of the
+-- game at most every quarter second: a render can run several times in a row.
+local shareN, shareAt = 0, -10
+local function ShareN()
+  if not (IsInGroup and IsInGroup()) or not ns.ShareCount then return 0 end
+  local now = (GetTime and GetTime()) or 0
+  if now - shareAt > 0.25 or now < shareAt then
+    shareAt = now
+    local ok, n = pcall(ns.ShareCount)
+    shareN = (ok and type(n) == "number") and n or 0
+  end
+  return shareN
+end
+local function ShareLabel(n)
+  if n and n > 0 then return ns.Plural(n, "SHARE_N1", "SHARE_N", n) end
+  return L.SHARE_SHORT
+end
+-- every share button (footer, inside band, Actions menu): the count in the label, greyed at 0
+local function SetShareButton(b, n, withLabel)
+  if not b then return end
+  if withLabel then b:SetText(ShareLabel(n)) end
+  if n > 0 then b:Enable() else b:Disable() end
+  b.disabledReason = (IsInGroup and IsInGroup()) and L.NOSHARE or L.NOGROUP_TIP
+end
+local function DoShare()
+  ns.ShareQuests(); shareAt = -10
+  if C_Timer and C_Timer.After and ns.Render then C_Timer.After(1, ns.Render) end
+end
+
+-- Chapters of the route: before / inside / after each dungeon (Engine.lua sets the phases).
+-- -> key, phase, dungeon of a step (nil when the engine has no phases)
+local PH_S = { before = "PH_BEFORE_S", inside = "PH_INSIDE_S", after = "PH_AFTER_S" }
+local PH_F = { before = "PH_BEFORE", inside = "PH_INSIDE", after = "PH_AFTER" }
+local function StepChapter(st)
+  if not (st and ns.StepPhase) then return nil end
+  local ph = ns.StepPhase(st)
+  local dk = ns.StepDungeon and ns.StepDungeon(st)
+  if not (ph and PH_S[ph] and dk and ns.D[dk]) then return nil end
+  return ph .. "@" .. dk, ph, dk
+end
+-- done / total steps per chapter, counted over the whole route (the same count as ns.PhaseProgress)
+local function ChapterCounts(log)
+  local out = {}
+  for i, st in ipairs(Steps()) do
+    local key = StepChapter(st)
+    if key then
+      local c = out[key] or { done = 0, total = 0 }
+      out[key] = c
+      c.total = c.total + 1
+      if IsStepDone(log, i) then c.done = c.done + 1 end
+    end
+  end
+  return out
+end
+
 -- What a check-list still misses: quests not in the log, and whether a needed key is missing.
 local function ReadyState(log, st)
   local miss, total = 0, 0
@@ -154,42 +237,12 @@ local function ReadyTarget()
   return ahead or first
 end
 
--- Live progress of one objective ("3/5"), from the quest log; nil when unknown.
-local function plainNum(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) end
-local function LiveCount(log, qid, oi, oname, nobj)
-  local e = log and log[qid]
-  if not e then return nil end
-  local CQL = C_QuestLog
-  if CQL and CQL.GetQuestObjectives then
-    local ok, objs = pcall(CQL.GetQuestObjectives, qid)
-    if ok and type(objs) == "table" then
-      local pick
-      if oname then for _, o in ipairs(objs) do if type(o) == "table" and type(o.text) == "string" and o.text:find(oname, 1, true) then pick = o break end end end
-      -- by position only when the game lists as many objectives as the data (French client: other names)
-      if not pick and oi and nobj == #objs then pick = objs[oi] end
-      if type(pick) == "table" and plainNum(pick.numFulfilled) and plainNum(pick.numRequired) and pick.numRequired > 0 then
-        return pick.numFulfilled, pick.numRequired, pick.finished and true or false
-      end
-    end
-  end
-  if e.index and GetNumQuestLeaderBoards and GetQuestLogLeaderBoard then
-    local okN, n = pcall(GetNumQuestLeaderBoards, e.index)
-    if not okN or not plainNum(n) then return nil end
-    local function read(j)
-      local okT, text, _, finished = pcall(GetQuestLogLeaderBoard, j, e.index)
-      if not okT or type(text) ~= "string" then return nil end
-      local a, b = text:match("(%d+)%s*/%s*(%d+)")
-      if a then return tonumber(a), tonumber(b), finished and true or false end
-    end
-    if oname then
-      for j = 1, n do
-        local okT, text = pcall(GetQuestLogLeaderBoard, j, e.index)
-        if okT and type(text) == "string" and text:find(oname, 1, true) then return read(j) end
-      end
-    end
-    if oi and nobj == n then return read(oi) end
-  end
-  return nil
+-- Live progress of one objective ("3/5"), from the quest log; nil when unknown. The card, the
+-- overview, the tracker and the route all read ns.ObjCount (Engine.lua).
+local function LiveCount(log, qid, oi)
+  local q = ns.Q[qid]
+  local o = q and q.o and q.o[oi]
+  if o then return ns.ObjCount(log, qid, o) end
 end
 ns.LiveCount = LiveCount
 
@@ -237,6 +290,19 @@ local function StepPoints(log, st, all)
       end
       local k = ns.PKey(n.loc.m, x, y)
       if not seen[k] then seen[k] = true; table.insert(pts, { n.loc.m, x, y, n.npc or ns.QName(n.q) }) end
+    elseif n.noLoc and n.kind == "o" and (all or not ns.NodeOK(log, n)) then
+      -- an objective with no place in our data: the game's own quest area, on the map you stand
+      -- in first, then on the quest giver's map
+      local here = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+      for _, m in ipairs({ here or false, n.mapHint or false }) do
+        local gx, gy
+        if m then gx, gy = GamePOI(n.q, m) end
+        if gx then
+          local k = ns.PKey(m, gx, gy)
+          if not seen[k] then seen[k] = true; table.insert(pts, { m, gx, gy, n.npc or ns.QName(n.q) }) end
+          break
+        end
+      end
     end
   end
   if #pts == 0 and st.ins then
@@ -358,30 +424,8 @@ function ns.GoTo(i)
   Render()
 end
 
-local function NodeTargets(n)
-  if n.tgt then return n.tgt end
-  if n.kind == "b" then return n.targets end
-  if n.kind == "i" then return nil end
-  local q = ns.Q[n.q]
-  if n.kind == "a" or n.kind == "t" or n.kind == "h" then
-    if n.npc and not n.ins then return { (n.npc:gsub(" %(.*%)", ""):gsub(",.*$", "")) } end
-    if n.kind == "t" and n.ins and n.npc then return { n.npc } end
-    return nil
-  end
-  local out, seen = {}, {}
-  local objs = q and q.o or {}
-  if n.kind == "o" and n.obj then objs = { n.obj } end
-  if n.oneObj then objs = { n.oneObj } end
-  for _, o in ipairs(objs) do
-    if n.kind == "c" and o.w and not o.ins and not o.outer then
-      -- objectif fait dehors : pas de cible dans le donjon
-    else
-    for _, t in ipairs(o.t or {}) do if not seen[t] then seen[t] = true; table.insert(out, t) end end
-    for _, s in ipairs(o.src or {}) do if s[1] and not seen[s[1]] and #out < 4 then seen[s[1]] = true; table.insert(out, s[1]) end end
-    end
-  end
-  return out[1] and out or nil
-end
+-- who to target for a line (Engine.lua, shared with the tracker and the target key)
+local NodeTargets = ns.NodeTargets
 
 -- log (optional): each objective starts with its live count from the quest log ("3/5", green when done)
 local function ObjectiveLines(n, log)
@@ -390,12 +434,10 @@ local function ObjectiveLines(n, log)
   local objs = q.o or {}
   if n.kind == "o" and n.obj then objs = { n.obj } end
   if n.oneObj then objs = { n.oneObj } end
-  local pos = {}
-  for k, o in ipairs(q.o or {}) do pos[o] = k end
   for _, o in ipairs(objs) do
     local s = (o.c and o.c > 1 and (o.c .. " x ") or "") .. (o.n or "")
     if log then
-      local a, b, fin = LiveCount(log, n.q, pos[o], o.n, #(q.o or {}))
+      local a, b, fin = ns.ObjCount(log, n.q, o)
       if a and b then
         s = Hex(fin and T.ok or T.fg) .. a .. "/" .. b .. "|r  " .. (o.n or "")
       end
@@ -456,10 +498,19 @@ local function BuildList()
     row.num = Text(row, ns.F.meta, T.muted); row.num:SetPoint("LEFT", 22, 0); row.num:SetWidth(24); row.num:SetJustifyH("RIGHT"); row.num:SetJustifyV("MIDDLE")
     row.kind = row:CreateTexture(nil, "ARTWORK"); row.kind:SetSize(16, 16); row.kind:SetPoint("LEFT", 52, 0)
     row.txt = Text(row, ns.F.label, T.text); row.txt:SetPoint("LEFT", 76, 0); row.txt:SetPoint("RIGHT", -8, 0); row.txt:SetJustifyV("MIDDLE")
-    row:SetScript("OnClick", function(self) ns.GoTo(self.i) end)
+    -- a chapter header (before / inside / after a dungeon): its name, its progress, a divider
+    row.hdr = Text(row, ns.F.body, T.fg); row.hdr:SetPoint("BOTTOMLEFT", 8, 6); row.hdr:SetPoint("RIGHT", -52, 0)
+    row.hdrN = Text(row, ns.F.meta, T.muted); row.hdrN:SetPoint("BOTTOMRIGHT", -8, 7); row.hdrN:SetWidth(44); row.hdrN:SetJustifyH("RIGHT")
+    row.rule = ns.Rule(row, T.divider); row.rule:SetPoint("BOTTOMLEFT", 4, 0); row.rule:SetPoint("BOTTOMRIGHT", -4, 0)
+    row.hdr:Hide(); row.hdrN:Hide(); row.rule:Hide()
+    row:SetScript("OnClick", function(self) ns.GoTo(self.i or self.go) end)
     row:SetScript("OnMouseDown", function(self) self.press:Show() end)
     row:SetScript("OnMouseUp", function(self) self.press:Hide() end)
     row:SetScript("OnEnter", function(self)
+      if self.chapter then
+        ns.ShowTip(self, { self.chapter, self.chapterState, L.TT_CHAPTER_CLICK })
+        return
+      end
       local st = Steps()[self.i]; if not st then return end
       local lines = { StepTitle(st) }
       if self.state then table.insert(lines, self.state) end
@@ -469,6 +520,7 @@ local function BuildList()
     row:SetScript("OnLeave", ns.HideTip)
     -- one line: a long step name shows in full in the row's tooltip
     ns.ClampLabel(row.txt, nil, row)
+    ns.ClampLabel(row.hdr, nil, row)
     l.rows[r] = row
   end
   -- more steps than rows: how many are above / below (the wheel scrolls)
@@ -477,7 +529,7 @@ local function BuildList()
   ns.ClampLabel(l.hint, nil, l)
   l:EnableMouseWheel(true)
   l:SetScript("OnMouseWheel", function(self, delta)
-    local max = math.max(0, #Steps() - (self.visible or 1))
+    local max = math.max(0, (self.nEntries or #Steps()) - (self.visible or 1))
     self.offset = math.max(0, math.min(max, self.offset - delta * 3))
     Render()
   end)
@@ -495,35 +547,87 @@ local function ListKindIcon(tex, st)
   end
 end
 
+-- The list's entries: a chapter header each time the chapter changes (before / inside / after a
+-- dungeon, with its progress), then its steps. -> entries, position of each step in entries
+local function ListEntries(log)
+  local steps = Steps()
+  local counts = ChapterCounts(log)
+  local out, pos, last = {}, {}, nil
+  for i, st in ipairs(steps) do
+    local key, ph, dk = StepChapter(st)
+    if key and key ~= last then
+      out[#out + 1] = { key = key, ph = ph, dk = dk, first = i, c = counts[key] }
+    end
+    last = key
+    -- the header leads to the chapter's first open step (else its first step)
+    local hdr = out[#out]
+    if key and hdr and hdr.key == key and not hdr.go and not IsStepDone(log, i) then hdr.go = i end
+    out[#out + 1] = { i = i }
+    pos[i] = #out
+  end
+  for _, e in ipairs(out) do if e.key and not e.go then e.go = e.first end end
+  return out, pos
+end
+
 local function RenderList(log)
   local l = f.list
   if not l:IsShown() then return end
   local steps = Steps()
-  -- as many rows as steps, up to what the screen holds (at least 10); the wheel scrolls the rest
+  local entries, pos = ListEntries(log)
+  l.nEntries = #entries
+  -- as many rows as entries, up to what the screen holds (at least 10); the wheel scrolls the rest
   local avail = math.max(10, math.floor((ScreenCap() - (HEADER + 1 + 4) - 8 - 20) / LISTH))
-  l.visible = math.max(1, math.min(avail, LISTROWS, #steps))
-  local max = math.max(0, #steps - l.visible)
+  l.visible = math.max(1, math.min(avail, LISTROWS, #entries))
+  local max = math.max(0, #entries - l.visible)
   -- the step on screen stays in the list when it changes (done steps above stay reachable with the wheel)
   if f.view ~= l.lastView then
     l.lastView = f.view
-    local v = math.min(f.view or 1, #steps)
-    if v <= l.offset then l.offset = math.max(0, v - 2)
+    local v = pos[math.min(f.view or 1, #steps)] or 1
+    if v <= l.offset then l.offset = math.max(0, v - 3)
     elseif v > l.offset + l.visible then l.offset = v - l.visible + 1 end
   end
   if l.offset > max then l.offset = max end
   if l.offset < 0 then l.offset = 0 end
-  if #steps > l.visible then
-    l.hint:SetText(L.LIST_MORE:format(l.offset, math.max(0, #steps - l.offset - l.visible))); l.hint:Show()
+  if #entries > l.visible then
+    -- steps (not headers) above and below the rows on screen
+    local above, below = 0, 0
+    for k, e in ipairs(entries) do
+      if e.i then
+        if k <= l.offset then above = above + 1 elseif k > l.offset + l.visible then below = below + 1 end
+      end
+    end
+    l.hint:SetText(L.LIST_MORE:format(above, below)); l.hint:Show()
   else l.hint:Hide() end
   local doneCount = 0
   for k = 1, #steps do if IsStepDone(log, k) then doneCount = doneCount + 1 end end
   l.title:SetText(L.STEPS_N:format(doneCount, #steps))
   l:SetHeight(HEADER + 1 + 4 + l.visible * LISTH + (l.hint:IsShown() and 20 or 0) + 8)
+  local viewKey = StepChapter(steps[f.view or 0])
   for r, row in ipairs(l.rows) do
-    local i = l.offset + r
-    local st = steps[i]
-    if st and r <= l.visible then
-      row.i = i; row:Show()
+    local e = entries[l.offset + r]
+    if e and r <= l.visible and e.key then
+      -- chapter header: "Before the dungeon: Zul'Farrak" and "3/18" (green once all done)
+      row.i = nil; row.go = e.go; row:Show()
+      local name = L[PH_S[e.ph]] .. L.COLON .. (ns.DName(e.dk) or e.dk)
+      local c = e.c or { done = 0, total = 0 }
+      local all = c.total > 0 and c.done == c.total
+      row.chapter = name
+      row.chapterState = L.CH_PROGRESS:format(c.done, c.total)
+      row.hdr:SetText(name); row.hdr:Show()
+      local hc = (e.key == viewKey) and T.fg or T.text
+      row.hdr:SetTextColor(hc[1], hc[2], hc[3])
+      row.hdrN:SetText(c.done .. "/" .. c.total); row.hdrN:Show()
+      local nc = all and T.ok or T.muted
+      row.hdrN:SetTextColor(nc[1], nc[2], nc[3])
+      row.rule:Show()
+      row.check:Hide(); row.num:Hide(); row.kind:Hide(); row.txt:Hide(); row.sel:Hide()
+      row.state = nil
+    elseif e and r <= l.visible then
+      local i = e.i
+      local st = steps[i]
+      row.i = i; row.go = nil; row.chapter = nil; row:Show()
+      row.hdr:Hide(); row.hdrN:Hide(); row.rule:Hide()
+      row.num:Show(); row.kind:Show(); row.txt:Show()
       local done = IsStepDone(log, i)
       local cur = (i == f.auto)
       row.num:SetText(i)
@@ -540,6 +644,7 @@ local function RenderList(log)
       row.txt:SetTextColor(tc[1], tc[2], tc[3])
       row.state = done and L.B_DONE or (cur and L.B_CUR) or ((f.auto and i < f.auto) and L.B_LATE) or L.B_NEXT
     else
+      row.i = nil; row.go = nil; row.chapter = nil
       row:Hide()
     end
   end
@@ -603,7 +708,10 @@ function ns.RowTip(row)
   local kc = KCOL[n.kind] or T.text
   local kt = ({ a = L.TT_TAKE, c = L.TT_DO, o = L.TT_OUT, t = L.TT_TURN, h = L.TT_HAVE, i = L.TT_ITEM })[n.kind]
   if kt then table.insert(lines, { kt, kc[1], kc[2], kc[3] }) end
-  if n.pre then table.insert(lines, L.PRE) end
+  if n.pre then
+    if n.ci and n.cn and n.forQ and n.forQ[1] then table.insert(lines, L.CH_BEFORE:format(n.ci, n.cn, ns.QName(n.forQ[1])))
+    else table.insert(lines, L.PRE) end
+  end
   table.insert(lines, n.ins and L.TT_INSIDE or L.TT_OUTSIDE)
   if q.c then
     for tok in q.c:gmatch("[^,]+") do local cn, cc = ns.ClassInfo(tok); table.insert(lines, { L.CLASSQ:format(cn), cc[1], cc[2], cc[3] }) end
@@ -683,10 +791,20 @@ local function Build()
   f.gearBtn:SetPoint("RIGHT", f.miniBtn, "LEFT", -4, 0)
   f.pickBtn = IconBtn(h, "portal", { L.TT_HPICK, L.TT_PICKBTN }, function() ns.TogglePicker() end)
   f.pickBtn:SetPoint("RIGHT", f.gearBtn, "LEFT", -4, 0)
-  -- title and subtitle stop before the four header icons (full text in the header's tooltip)
+  -- the overview of the guide's dungeon (Overview.lua): its quests, prerequisites and rewards
+  local nIcons = 4
+  if ns.ShowOverview then
+    f.ovBtn = IconBtn(h, "info", function()
+      local dn = ns.DName(GuideDungeon())
+      return { dn and L.OV_HDR_T:format(dn) or L.OV_T, L.OV_CLICK }
+    end, function() ns.ShowOverview(GuideDungeon()) end)
+    f.ovBtn:SetPoint("RIGHT", f.pickBtn, "LEFT", -4, 0)
+    nIcons = 5
+  end
+  -- title and subtitle stop before the header icons (full text in the header's tooltip)
   function f.LayoutTitle(hasSub)
     h.title:ClearAllPoints(); h.sub:ClearAllPoints()
-    local right = -(8 + 4 * 28 + 3 * 4 + 8)
+    local right = -(8 + nIcons * 28 + (nIcons - 1) * 4 + 8)
     if hasSub then
       h.title:SetPoint("TOPLEFT", 76, -7); h.title:SetPoint("TOPRIGHT", right, -7)
       h.sub:SetPoint("TOPLEFT", h.title, "BOTTOMLEFT", 0, -2); h.sub:SetPoint("TOPRIGHT", h.title, "BOTTOMRIGHT", 0, -2)
@@ -743,6 +861,18 @@ local function Build()
   band:SetScript("OnClick", function(self) if self.go then ns.GoTo(self.go) end end)
   band:SetScript("OnEnter", function(self) self.chev:SetVertexColor(T.fg[1], T.fg[2], T.fg[3]); ns.ShowTip(self, { self.title:GetText() or "", L.INB_TT, L.INB_BACK }) end)
   band:SetScript("OnLeave", function(self) self.chev:SetVertexColor(T.muted[1], T.muted[2], T.muted[3]); ns.HideTip() end)
+  -- under the band's lines: share the quests (in a group) and the bosses and rares panel
+  band.shareBtn = LabelBtn(band, L.SHARE_SHORT, 24, "secondary", DoShare, function() return { L.M_SHARE, L.TT_FSHARE } end)
+  if band.shareBtn.SetIcon then band.shareBtn:SetIcon("group") end
+  band.shareBtn:Hide()
+  if ns.ToggleBosses then
+    band.bossBtn = LabelBtn(band, L.BOSS_BAND_SHOW, 24, "secondary", function()
+      ns.ToggleBosses(ns.instIn or InsideKey())
+      if f.inBand.bossBtn then f.inBand.bossBtn:SetText((ns.BossesShown and ns.BossesShown()) and L.BOSS_BAND_HIDE or L.BOSS_BAND_SHOW) end
+    end, function() return { L.BOSS_TITLE, (ns.BossesShown and ns.BossesShown()) and L.BOSS_MENU_HIDE or L.BOSS_MENU_CLICK } end)
+    if band.bossBtn.SetIcon then band.bossBtn:SetIcon("skull") end
+    band.bossBtn:Hide()
+  end
   band:Hide()
   f.inBand = band
 
@@ -763,6 +893,14 @@ local function Build()
   card.clsChip = Pill(card)
   card.badgePill = Pill(card)
   card.badge = card.badgePill.text
+  -- a prerequisite step: "Prerequisite 2 of 4" (its tooltip: before which quest)
+  card.prePill = Pill(card)
+  card.prePill:EnableMouse(true)
+  card.prePill:SetScript("OnEnter", function(self) if self.tip then ns.ShowTip(self, self.tip) end end)
+  card.prePill:SetScript("OnLeave", ns.HideTip)
+  card.prePill:Hide()
+  -- the chapter the step belongs to: "Before the dungeon: Zul'Farrak 3/18"
+  card.chapter = Text(card, ns.F.meta, T.muted); card.chapter:Hide()
   card.zone = card.where.text   -- older name
   -- 3D portrait of the boss (the dungeon journal's model)
   card.modelBg = card:CreateTexture(nil, "BACKGROUND"); card.modelBg:SetColorTexture(0, 0, 0, 0.35)
@@ -786,7 +924,7 @@ local function Build()
   card.after = Text(card, ns.F.label, T.text); card.after:SetSpacing(3); card.after:Hide()
   card.rows = {}
   for r = 1, MAXROWS do card.rows[r] = MakeRow(card) end
-  card.shareBtn = LabelBtn(card, L.SHARE_SHORT, 28, "secondary", function() ns.ShareQuests() end, function() return { L.M_SHARE, L.TT_FSHARE } end)
+  card.shareBtn = LabelBtn(card, L.SHARE_SHORT, 28, "secondary", DoShare, function() return { L.M_SHARE, L.TT_FSHARE } end)
   if card.shareBtn.SetIcon then card.shareBtn:SetIcon("group") end
   card.shareBtn:Hide()
 
@@ -795,6 +933,10 @@ local function Build()
   foot:SetHeight(FOOT_H)
   f.foot = foot
   f.go = LabelBtn(foot, L.GO, 32, "primary", function(self) if self.action then self.action() end end)
+  -- in a group: "Share 3 quests" beside the big button, greyed when none can be shared
+  f.shareFoot = LabelBtn(foot, L.SHARE_SHORT, 32, "secondary", DoShare, function() return { L.M_SHARE, L.TT_FSHARE } end)
+  if f.shareFoot.SetIcon then f.shareFoot:SetIcon("group") end
+  f.shareFoot:Hide()
   f.prev = IconBtn(foot, "chevron_left", { L.B_PREV, L.TT_PREV_CLICK }, function() ns.GoTo(f.view - 1) end)
   f.prev.edge = ns.Outline(f.prev, T.btnEdge)
   f.prev:SetPoint("BOTTOMLEFT")
@@ -845,7 +987,7 @@ local function Build()
     menu:SetHeight(8 + #items * 24)
     return b
   end
-  f.share = Item(ns.ShareQuests, function() return { L.M_SHARE, L.TT_FSHARE } end)
+  f.share = Item(DoShare, function() return { L.M_SHARE, L.TT_FSHARE } end)
   f.share.disabledReason = L.NOGROUP_TIP
   f.recalc = Item(function() ns.Recalc() end, function() return { L.M_RECALC, L.RECALC_TT } end)
   f.way = Item(function() ns.PlacePoints() end, function() return { L.M_POINTS, L.TT_FPOINTS } end)
@@ -858,6 +1000,15 @@ local function Build()
   f.listBtn = Item(function() f.list:SetShown(not f.list:IsShown()); WLDTDB.list = f.list:IsShown(); Render() end, function() return { L.M_LIST, L.TT_HLIST } end)
   f.journal = Item(function() if ns.OpenJournal then ns.OpenJournal() end end, function() return { L.M_JOURNAL, L.TT_JOURNAL } end)
   f.journal.disabledReason = L.NOJOURNAL_TIP
+  -- the bosses and rares panel of the guide's dungeon (Bosses.lua)
+  f.bossItem = Item(function()
+    if ns.ToggleBosses then ns.ToggleBosses(ns.instIn or GuideDungeon()) end
+  end, function() return { L.BOSS_TITLE, (ns.BossesShown and ns.BossesShown()) and L.BOSS_MENU_HIDE or L.BOSS_MENU_CLICK } end)
+  -- the small tracker window (Tracker.lua): a toggle, checked when on
+  f.trackerItem = Item(function()
+    local TR = _G.WLHelperTracker
+    if TR and TR.Toggle then TR.Toggle() end
+  end, function() return { L.TR_TITLE, L.TR_MENU_TT, L.TR_MENU_CLICK } end)
   f:HookScript("OnHide", function() menu:Hide() end)
   -- closes once the mouse has been away from it (and its button) for a moment
   menu:SetScript("OnUpdate", function(self, dt)
@@ -919,6 +1070,8 @@ local function Build()
   if WLDTDB.size then WLDTDB.size[2] = nil; ns.Relayout(WLDTDB.size[1]) end
   -- Escape closes the guide like every window (OnHide above remembers it)
   tinsert(UISpecialFrames, "WLDTFrame")
+  -- the bosses and rares panel hangs under the guide (by position only: the guide stays unprotected)
+  if ns.AttachBosses then ns.AttachBosses(f) end
 end
 ns.BuildMain = Build
 
@@ -1061,7 +1214,22 @@ function ns.RenderInsideBand(k, log)
   local tw = (W - 2 * PAD) - 56 - 36
   local th = ns.FitText(band.title, 2, tw, band)
   local sh = ns.FitText(band.sub, 0, tw, band)
-  local h = math.max(56, math.ceil(10 + th + 3 + sh + 10))
+  local h = math.ceil(10 + th + 3 + sh)
+  -- a row of buttons under the lines: share (in a group), the bosses and rares panel
+  local x, any = 56, false
+  local inGroup = IsInGroup and IsInGroup()
+  if inGroup then
+    SetShareButton(band.shareBtn, ShareN(), true)
+    band.shareBtn:ClearAllPoints(); band.shareBtn:SetPoint("TOPLEFT", band, "TOPLEFT", x, -(h + 8)); band.shareBtn:Show()
+    x = x + (num(band.shareBtn:GetWidth()) or 120) + 8; any = true
+  else band.shareBtn:Hide() end
+  if band.bossBtn then
+    band.bossBtn:SetText((ns.BossesShown and ns.BossesShown()) and L.BOSS_BAND_HIDE or L.BOSS_BAND_SHOW)
+    band.bossBtn:ClearAllPoints(); band.bossBtn:SetPoint("TOPLEFT", band, "TOPLEFT", x, -(h + 8)); band.bossBtn:Show()
+    any = true
+  end
+  if any then h = h + 8 + 24 end
+  h = math.max(56, h + 10)
   band:SetHeight(h)
   return h
 end
@@ -1098,10 +1266,17 @@ end
 local function LayoutFoot(full, centred)
   local CW = W - 2 * PAD
   f.go:ClearAllPoints()
+  -- in a group, with a route: "Share 3 quests" on the big button's line, on its right
+  local share = full and not centred and IsInGroup and IsInGroup()
+  if share then
+    SetShareButton(f.shareFoot, ShareN(), true)
+    f.shareFoot:ClearAllPoints(); f.shareFoot:SetPoint("TOPRIGHT", f.foot, "TOPRIGHT", 0, 0); f.shareFoot:Show()
+  else f.shareFoot:Hide() end
   if centred then
     f.go:SetPoint("TOP", f.foot, "TOP", 0, 0); f.go:SetWidth(0)
   else
-    f.go:SetPoint("TOPLEFT", f.foot, "TOPLEFT", 0, 0); f.go:SetWidth(CW)
+    f.go:SetPoint("TOPLEFT", f.foot, "TOPLEFT", 0, 0)
+    f.go:SetWidth(share and math.max(120, CW - (num(f.shareFoot:GetWidth()) or 150) - 8) or CW)
   end
   for _, b in ipairs({ f.prev, f.next, f.readyBtn, f.moreBtn }) do b:SetShown(full) end
   if full then
@@ -1129,7 +1304,7 @@ local function FitGuide(TOP, contentH, footH)
 end
 
 local function HideStepParts(card)
-  card.where:Hide(); card.clsChip:Hide(); card.badgePill:Hide()
+  card.where:Hide(); card.clsChip:Hide(); card.badgePill:Hide(); card.prePill:Hide(); card.chapter:Hide()
   card.travel:Hide(); card.travelIcon:Hide(); card.readyBox:Hide(); card.after:Hide(); card.shareBtn:Hide()
   card.model:Hide(); card.modelBg:Hide()
   for _, row in ipairs(card.rows) do row.node = nil; row:Hide() end
@@ -1290,6 +1465,14 @@ Render = function()
   -- room for the pills: the text width minus the state pill
   local avail = TW - (num(card.badgePill:GetWidth()) or 60) - 8
   local dn = ns.DName(dkey) or ""
+  -- the chapter: "Before the dungeon: Zul'Farrak 3/18" (a line over the title; inside, the pill)
+  local chKey, chPh, chDk = StepChapter(st)
+  local chText
+  if chKey then
+    local c = ChapterCounts(log)[chKey] or { done = 0, total = 0 }
+    chText = L[PH_F[chPh]]:format(ns.DName(chDk) or chDk, c.done, c.total)
+  end
+  local chInPill = false
   card.where:Show()
   if st.gate then
     -- the title already says "Before entering X": the pill gives the entrance's zone, or nothing
@@ -1298,7 +1481,11 @@ Render = function()
   elseif st.ins then
     local allOuter = true
     for _, nd in ipairs(st.acts) do if nd.kind ~= "c" or nd.outer == false then allOuter = false end end
-    if allOuter then card.where:Set(L.OUTER:format(dn), T.fg) else card.where:Set(L.IN_DUNGEON:format(dn), T.info, "portal") end
+    if allOuter then card.where:Set(L.OUTER:format(dn), T.fg)
+    elseif chText and chPh == "inside" then
+      local c = ChapterCounts(log)[chKey] or { done = 0, total = 0 }
+      card.where:Set(L.PH_INSIDE_P:format(c.done, c.total), T.info, "portal"); chInPill = true
+    else card.where:Set(L.IN_DUNGEON:format(dn), T.info, "portal") end
   else
     card.where:Set(L.OUT:format((st.loc and ZoneName(st.loc.m)) or ""), T.fg)
   end
@@ -1314,7 +1501,28 @@ Render = function()
     -- no room on the line: the class goes into the rows' detail lines instead (never cut)
     if (num(card.where:GetWidth()) or 0) + 6 + (num(card.clsChip:GetWidth()) or 0) > avail then card.clsChip:Hide() end
   end
+  -- a prerequisite step: "Prerequisite 2 of 4" after the other pills (dropped when the line is full:
+  -- the rows' detail lines say it too)
+  card.prePill:Hide(); card.prePill.tip = nil
+  local preNode
+  for _, nd in ipairs(st.acts) do if nd.pre and nd.ci and nd.cn then preNode = nd break end end
+  if preNode and not st.gate then
+    card.prePill:Set(L.CH_STEP:format(preNode.ci, preNode.cn), T.fg)
+    local mainQ = preNode.forQ and preNode.forQ[1]
+    card.prePill.tip = { L.CH_STEP:format(preNode.ci, preNode.cn), mainQ and L.CH_BEFORE:format(preNode.ci, preNode.cn, ns.QName(mainQ)) or L.PRE }
+    local prev = card.clsChip:IsShown() and card.clsChip or (card.where:IsShown() and card.where or nil)
+    card.prePill:ClearAllPoints()
+    if prev then card.prePill:SetPoint("LEFT", prev, "RIGHT", 6, 0) else card.prePill:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -CI) end
+    local used = (card.where:IsShown() and ((num(card.where:GetWidth()) or 0) + 6) or 0) + (card.clsChip:IsShown() and ((num(card.clsChip:GetWidth()) or 0) + 6) or 0)
+    if used + (num(card.prePill:GetWidth()) or 0) > avail then card.prePill:Hide() end
+  end
   local y = CI + 18 + 8
+  if chText and not chInPill then
+    card.chapter:SetText(chText)
+    card.chapter:ClearAllPoints(); card.chapter:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y)
+    card.chapter:Show()
+    y = y + ns.FitText(card.chapter, 2, TW, card) + 4
+  else card.chapter:Hide() end
 
   card.model:SetShown(hasModel); card.modelBg:SetShown(hasModel)
   if hasModel then card.modelBg:ClearAllPoints(); card.modelBg:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CI, -y) end
@@ -1375,7 +1583,9 @@ Render = function()
   card.shareBtn:Hide()
   local note, after
   -- grouped at a gate: the "Group" block under the rows ends with the share button
-  local shareAfter = st.gate and IsInGroup() and true or false
+  -- (in a group the footer's share button does it: the card keeps the group line only when alone)
+  local shareAfter = false
+  local grouped = IsInGroup and IsInGroup() and true or false
   local H1 = Hex(T.fg)
   if st.gate then
     -- the quests counter over the rows (the footer button's tooltip says what the check-list
@@ -1392,7 +1602,7 @@ Render = function()
     local d = ns.D[st.gate]
     if d and d.ed then table.insert(parts, H1 .. L.CL_ENTRY .. "|r\n" .. ns.T(d.ed)) end
     -- in a group: the header, then the share button; alone: why sharing waits
-    table.insert(parts, H1 .. L.CL_GROUP .. "|r" .. (shareAfter and "" or ("\n" .. L.GATE_N)))
+    if not grouped then table.insert(parts, H1 .. L.CL_GROUP .. "|r\n" .. L.GATE_N) end
     after = table.concat(parts, "\n\n")
   end
   if st.split then
@@ -1508,13 +1718,26 @@ Render = function()
       local parts = {}
       local tags = {}
       if nd.d and nd.d ~= dkey then table.insert(tags, mt .. ns.DName(nd.d) .. "|r") end
-      if nd.pre then table.insert(tags, mt .. L.PRE .. "|r") end
+      if nd.pre then
+        table.insert(tags, mt .. ((nd.ci and nd.cn) and L.CH_STEP:format(nd.ci, nd.cn) or L.PRE) .. "|r")
+      elseif (nd.kind == "a" or nd.kind == "h") and not ok and ns.ChainState then
+        -- a dungeon quest to take: does it have prerequisites, and are they done?
+        local cs = ns.ChainState(nd.q)
+        if cs.total == 0 then table.insert(tags, mt .. L.CH_NONE .. "|r")
+        elseif cs.done >= cs.total then table.insert(tags, Hex(T.ok) .. L.CH_ALLDONE .. "|r")
+        else table.insert(tags, Hex(T.warn) .. L.ST_PRE:format(cs.done + 1, cs.total) .. "|r") end
+      end
       -- the class, unless the card's "Class quest" pill already says it
       if q.c and not card.clsChip:IsShown() then
         local tok = q.c:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
         table.insert(tags, ns.ClassIconText(tok, 12) .. Hex(cc) .. L.CLASS_TAG:format(cn) .. "|r")
       end
       if #tags > 0 then table.insert(parts, table.concat(tags, mt .. "  ·  |r")) end
+      -- a prerequisite: the dungeon quest it opens ("Unlocks: Troll Temper")
+      if nd.pre and nd.forQ and nd.forQ[1] and not ok then
+        local u = (#nd.forQ == 1) and L.CH_UNLOCKS:format(ns.QName(nd.forQ[1])) or L.CH_UNLOCKS_MORE:format(ns.QName(nd.forQ[1]), #nd.forQ - 1)
+        table.insert(parts, Hex(T.text) .. u .. "|r")
+      end
       local tx = Hex(T.text)
       if not ok then
         if nd.kind == "a" and s == "none" then
@@ -1616,7 +1839,7 @@ Render = function()
   end
   f.way:SetEnabled(np > 0)
   f.way.label:SetText(cycling and L.NEXTPOINT or L.M_POINTS)
-  f.share.label:SetText(L.M_SHARE); f.share:SetEnabled(IsInGroup() and true or false)
+  f.share.label:SetText(L.M_SHARE); SetShareButton(f.share, ShareN(), false)
   f.recalc.label:SetText(L.M_RECALC)
   f.done:SetEnabled(true)
   f.done.label:SetText(Manual(st) and L.M_UNSKIP or L.M_SKIP)
@@ -1624,6 +1847,14 @@ Render = function()
   f.autoBtn.label:SetText(L.M_AUTO); f.autoBtn:SetOn(WLDTDB.autoWay)
   f.listBtn.label:SetText(L.M_LIST); f.listBtn:SetOn(f.list:IsShown())
   f.journal.label:SetText(L.M_JOURNAL); f.journal:SetEnabled(ns.JournalAvailable and ns.JournalAvailable() or false)
+  f.bossItem.label:SetText(L.BOSS_TITLE)
+  f.bossItem:SetEnabled((ns.ToggleBosses and (ns.instIn or GuideDungeon())) and true or false)
+  f.bossItem:SetOn(ns.BossesShown and ns.BossesShown())
+  f.bossItem.disabledReason = L.BOSS_MENU_NONE
+  local TR = _G.WLHelperTracker
+  f.trackerItem.label:SetText(L.TR_TITLE)
+  f.trackerItem:SetEnabled((TR and TR.Toggle) and true or false)
+  f.trackerItem:SetOn(TR and TR.IsOn and TR.IsOn())
 
   FitGuide(TOP, y, LayoutFoot(true, false))
   WLDTDB.view = i
@@ -1637,6 +1868,16 @@ ns.Render = function() if f and f:IsShown() then Render() end end
 -- =====================================================================
 --  Suivi de l'étape en cours
 -- =====================================================================
+-- "Next step: ..." with the quest sound (Refresh on an advance, Replan when the current step changed)
+function ns.AnnounceStep(i)
+  local st = Steps()[i]
+  if not st then return end
+  PlaySound(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE or 878)
+  local t = StepTitle(st)
+  if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper" .. L.COLON .. t, T.fg[1], T.fg[2], T.fg[3]) end
+  ns.Print(L.NEXT_STEP:format(t))
+end
+
 function ns.Refresh(silent)
   if not f then return end
   if ns.GuideOn and not ns.GuideOn() then return end
@@ -1653,12 +1894,7 @@ function ns.Refresh(silent)
     local was = f.auto
     f.auto = auto
     if follow then f.view = auto; ScrollTop() end
-    if was and auto > was and not silent and not fin then
-      PlaySound(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE or 878)
-      local t = StepTitle(steps[auto])
-      if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper" .. L.COLON .. t, T.fg[1], T.fg[2], T.fg[3]) end
-      ns.Print(L.NEXT_STEP:format(t))
-    end
+    if was and auto > was and not silent and not fin then ns.AnnounceStep(auto) end
   end
   if fin and not f.wasFin and not silent then
     ns.ClearPoints(); f.sig = nil
@@ -1689,32 +1925,9 @@ function ns.UpdateMacro()
   macroPending = false
   local steps = Steps()
   local log = ns.LogEntries()
+  -- the same text as the target key binding (Engine.lua); false, not nil: no step means no target
   local st = f and f.auto and steps[f.auto]
-  local names, seen = {}, {}
-  if st then
-    for _, n in ipairs(st.acts) do
-      if not ns.NodeOK(log, n) then
-        for _, nm in ipairs(NodeTargets(n) or {}) do
-          if not seen[nm] then seen[nm] = true; table.insert(names, nm) end
-        end
-      end
-    end
-  end
-  local tail = "/run if UnitExists'target'and GetRaidTargetIndex'target'~=8 then SetRaidTarget('target',8)end"
-  local body
-  if #names > 0 then
-    local m = { "/cleartarget" }
-    local len = #m[1] + #tail + 2
-    for _, nm in ipairs(names) do
-      local line = "/targetexact " .. nm
-      if len + #line + 1 > 255 then break end
-      table.insert(m, line); len = len + #line + 1
-    end
-    table.insert(m, tail)
-    body = table.concat(m, "\n")
-  else
-    body = "/run print('|cffce1918WL|r " .. L.MACRO_NONE:gsub("'", "\\'") .. "')"
-  end
+  local body = ns.TargetMacroText(st or false, log)
   if body == macroBody and GetMacroIndexByName(MACRO) > 0 then return end
   macroBody = body
   local idx = GetMacroIndexByName(MACRO)
@@ -1790,8 +2003,8 @@ end
 
 function ns.UpdateActionBar()
   if not f then return end
-  if not abar then BuildActionBar() end
   if InCombatLockdown() then abPending = true return end
+  if not abar then BuildActionBar() end
   abPending = false
   local steps = Steps()
   local st = steps[f.view or 0]

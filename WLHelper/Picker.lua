@@ -97,6 +97,21 @@ local function Counts(dkey)
   return #qs, done
 end
 
+-- Quests of a dungeon, not turned in yet, that still wait on a prerequisite (Overview.lua's helper).
+local function PreCount(dkey)
+  if not ns.QuestPreInfo then return 0 end
+  local _, cls = UnitClass("player")
+  local log = ns.LogEntries()
+  local n = 0
+  for _, qid in ipairs(ns.DungeonQuests(dkey, cls)) do
+    if not ns.IsDone(qid) then
+      local pre = ns.QuestPreInfo(qid, log, cls)
+      if pre.done < pre.total then n = n + 1 end
+    end
+  end
+  return n
+end
+
 local function LevelOK(d)
   local lv = UnitLevel("player")
   local lo, hi = d.lvl and d.lvl[1] or 1, d.lvl and d.lvl[2] or 60
@@ -165,8 +180,12 @@ local function MakeCard(parent)
   c.selEdge = ns.Outline(c, T.accent, 0, "OVERLAY")
   -- text drawn over a picture keeps a shadow
   c.wlWorld = true
-  -- the name has the whole top line; the check of a finished dungeon sits at the card's right edge
-  c.doneMark = ns.Icon(c, "check", 14, "OVERLAY", T.ok); c.doneMark:SetPoint("TOPRIGHT", -12, -12)
+  -- the overview button at the card's top-right corner; the check of a finished dungeon left of it
+  c.ov = S.IconButton(c, "info", 24, function() return { L.OV_T, L.OV_CLICK } end,
+    function() if ns.ShowOverview then ns.ShowOverview(c.dkey) end end)
+  c.ov:SetPoint("TOPRIGHT", -6, -6)
+  c.ov:SetFrameLevel((c:GetFrameLevel() or 1) + 3)
+  c.doneMark = ns.Icon(c, "check", 14, "OVERLAY", T.ok); c.doneMark:SetPoint("RIGHT", c.ov, "LEFT", -2, 0)
   c.name = Text(c, ns.F.heading, T.fg, false, "SHADOW"); c.name:SetPoint("TOPLEFT", 12, -10)
   c.name:SetJustifyH("LEFT")
   c.cicon = c:CreateTexture(nil, "OVERLAY"); c.cicon:SetSize(20, 20); c.cicon:SetPoint("TOPLEFT", 12, -42)
@@ -178,7 +197,10 @@ local function MakeCard(parent)
   c.bigIcon = c:CreateTexture(nil, "ARTWORK", nil, 1); c.bigIcon:SetSize(40, 40); c.bigIcon:SetPoint("CENTER", 0, -2); c.bigIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.bigIcon:Hide()
   c.dicon = c:CreateTexture(nil, "OVERLAY"); c.dicon:Hide()
   c:SetScript("OnClick", function(self, btn)
-    if btn == "RightButton" then ns.OpenQuests(self.dkey) return end
+    if btn == "RightButton" then
+      if ns.ShowOverview then ns.ShowOverview(self.dkey) else ns.OpenQuests(self.dkey) end
+      return
+    end
     Selected()[self.dkey] = not Selected()[self.dkey] or nil
     PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
     Render()
@@ -197,7 +219,7 @@ local function MakeCard(parent)
     if d.ed then table.insert(lines, ns.T(d.ed)) end
     for _, k in ipairs(ns.KeyLines and ns.KeyLines(self.dkey) or {}) do table.insert(lines, k[1]) end
     table.insert(lines, L.PICK_CLICK)
-    table.insert(lines, L.PICK_RCLICK)
+    table.insert(lines, ns.ShowOverview and L.OV_RCLICK or L.PICK_RCLICK)
     table.insert(lines, L.PICK_DCLICK)
     ns.ShowTip(self, lines)
   end)
@@ -351,7 +373,7 @@ Render = function()
         local n, done = Counts(k)
         local finished = n > 0 and done >= n
         -- the name wraps to 2 lines over the whole width (less the check); the band follows it
-        local nameH = ns.FitText(c.name, 2, CW - 24 - (finished and 18 or 0), c)
+        local nameH = ns.FitText(c.name, 2, CW - 12 - 36 - (finished and 16 or 0), c)
         if nameH < 14 then nameH = 17 end
         local topH = 10 + nameH + 8
         c.topBand:SetHeight(topH)
@@ -366,8 +388,11 @@ Render = function()
         end
         if soon and not dateTop then table.insert(parts, L.PICK_OPENS:format(date(L.PICK_DATE, d.up))) end
         c.lvl:SetText(table.concat(parts, "  ·  "))
-        c.info:SetText(n > 0 and ns.Plural(n, "PICK_QN1", "PICK_QN", done, n)
-          or (dateTop and (L.PICK_SOON .. " · " .. date(L.PICK_DATE, d.up))) or L.PICK_NOQ)
+        local qline = n > 0 and ns.Plural(n, "PICK_QN1", "PICK_QN", done, n)
+        -- how many of the quests left need earlier quests ("5 quests · 2 with prerequisites")
+        local npre = (n > done) and PreCount(k) or 0
+        if qline and npre > 0 then qline = qline .. " · " .. ns.Plural(npre, "OV_CARD_PRE1", "OV_CARD_PRE", npre) end
+        c.info:SetText(qline or (dateTop and (L.PICK_SOON .. " · " .. date(L.PICK_DATE, d.up))) or L.PICK_NOQ)
         c.bar:SetWidth(math.max(1, (CW - 2) * (n > 0 and done / n or 0)))
         c.bar:SetShown(n > 0 and done > 0)
         c.doneMark:SetShown(finished)
@@ -445,6 +470,8 @@ function ns.HidePicker() if p then p:Hide() end end
 --  Choix des quêtes d'un donjon : une liste à cocher (cases dessinées, coche HD)
 -- =====================================================================
 local QROWS, QH, QW = 22, 28, 420
+local QSTATUS = 130                       -- the status column ("Prerequisites done" at 11 px fits)
+local QTXT_W = (QW - 16) - 60 - 8 - QSTATUS - 8   -- the quest name: from x 60 to the status column
 local function BuildQuests()
   local S = SW()
   qp = CreateFrame("Frame", "WLDTQuestPicker", UIParent)
@@ -474,7 +501,12 @@ local function BuildQuests()
     row.boxEdge = ns.Outline(row.boxF, T.btnEdge)
     row.tick = ns.Icon(row.boxF, "check", 12, "ARTWORK", T.fg); row.tick:SetPoint("CENTER")
     row.lvl = Text(row, ns.F.meta, T.muted); row.lvl:SetPoint("LEFT", 32, 0); row.lvl:SetWidth(24); row.lvl:SetJustifyV("MIDDLE")
-    row.txt = Text(row, ns.F.label, T.fg); row.txt:SetPoint("LEFT", 60, 0); row.txt:SetPoint("RIGHT", -8, 0); row.txt:SetJustifyV("MIDDLE")
+    -- the prerequisite status, right-aligned in a fixed column: none, N, done, level needed
+    row.status = Text(row, ns.F.meta, T.muted); row.status:SetPoint("RIGHT", -8, 0); row.status:SetWidth(QSTATUS)
+    row.status:SetJustifyH("RIGHT"); row.status:SetJustifyV("MIDDLE")
+    ns.ClampLabel(row.status, nil, row)
+    -- the name wraps to 2 lines; the row grows with it
+    row.txt = Text(row, ns.F.label, T.fg); row.txt:SetPoint("LEFT", 60, 0); row.txt:SetWidth(QTXT_W); row.txt:SetJustifyV("MIDDLE")
     row:SetScript("OnClick", function(self)
       WLDTDB.off[self.qid] = not WLDTDB.off[self.qid] or nil
       ns.OpenQuests(qp.dkey, true)
@@ -486,14 +518,30 @@ local function BuildQuests()
       local lines = { ns.QName(self.qid) }
       local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
       if obj then table.insert(lines, obj) end
-      if q.p and #q.p > 0 then table.insert(lines, L.PRE .. L.COLON .. #q.p) end
+      -- the chain in order, one line per quest: done (check), in the log (dot), to do (faint dot)
+      local pre = ns.QuestPreInfo and ns.QuestPreInfo(self.qid)
+      if pre and pre.total > 0 then
+        local S = SW()
+        table.insert(lines, { L.OV_CHAIN_TT, T.fg[1], T.fg[2], T.fg[3] })
+        for i, pid in ipairs(pre.chain) do
+          local s = pre.states[i]
+          local mark = s == "done" and S.IconMarkup("check", 12, T.ok) or S.IconMarkup("dot", 12, s ~= "none" and T.info or T.faint)
+          local pq = ns.Q[pid] or {}
+          local txt = mark .. " " .. ns.QName(pid) .. (pq.l and (" · " .. L.PICK_LV1:format(pq.l)) or "")
+          if i == 1 and pq.s and pq.s.m and C_Map and C_Map.GetMapInfo then
+            local ok, mi = pcall(C_Map.GetMapInfo, pq.s.m)
+            if ok and type(mi) == "table" and mi.name then txt = txt .. " · " .. mi.name end
+          end
+          local c = s == "done" and T.muted or T.text
+          table.insert(lines, { txt, c[1], c[2], c[3] })
+        end
+      elseif q.p and #q.p > 0 then table.insert(lines, L.PRE .. L.COLON .. #q.p) end
       if q.ne then table.insert(lines, ns.T(q.ne)) end
       if WLDTDB.off[self.qid] then table.insert(lines, L.PICK_QOFF) end
       table.insert(lines, L.PICK_QCLICK)
       ns.ShowTip(self, lines)
     end)
     row:SetScript("OnLeave", ns.HideTip)
-    ns.ClampLabel(row.txt, nil, row)
     qp.rows[r] = row
   end
   tinsert(UISpecialFrames, "WLDTQuestPicker")
@@ -509,7 +557,8 @@ function ns.OpenQuests(dkey, keep)
   local hintH = ns.FitText(qp.hint, 0, QW - 2 * PAD, qp)
   local top = HEADER + 1 + 12 + hintH + 8
   local qs = ns.DungeonQuests(dkey, cls)
-  local shown = 0
+  local log = ns.LogEntries()
+  local shown, y = 0, 0
   for r, row in ipairs(qp.rows) do
     local qid = qs[r]
     if qid then
@@ -520,17 +569,32 @@ function ns.OpenQuests(dkey, keep)
       if q.c then local cn, cc = ns.ClassInfo(q.c:match("^[^,]+")); tag = "  " .. Hex(cc) .. cn .. "|r" end
       if ns.IsDone(qid) then tag = tag .. "  " .. Hex(T.ok) .. L.S_DONE .. "|r" end
       row.txt:SetText(ns.QName(qid) .. tag)
+      -- status cell: level needed (warn), no prerequisite, prerequisites done (ok), N prerequisites
+      local stx, scol = "", T.muted
+      local pre = ns.QuestPreInfo and ns.QuestPreInfo(qid, log, cls)
+      local need = q.r
+      if pre and pre.nextPid and ns.Q[pre.nextPid] then need = ns.Q[pre.nextPid].r end
+      if not ns.IsDone(qid) and need and UnitLevel("player") < need then stx, scol = L.ST_LOW:format(need), T.warn
+      elseif pre and pre.total == 0 then stx = L.CH_NONE
+      elseif pre and pre.done >= pre.total then stx, scol = L.CH_ALLDONE, T.ok
+      elseif pre then stx = ns.Plural(pre.total, "CH_COUNT1", "CH_COUNT", pre.total) end
+      row.status:SetText(stx); row.status.wlFull = stx
+      row.status:SetTextColor(scol[1], scol[2], scol[3])
       local on = not WLDTDB.off[qid]
       row.tick:SetShown(on)
       row.boxEdge(on and T.accent or T.btnEdge)
       local tc = on and T.fg or T.muted
       row.txt:SetTextColor(tc[1], tc[2], tc[3])
+      local th = ns.FitText(row.txt, 2, QTXT_W, row)
+      local rh = math.max(QH, math.ceil(th) + 12)
+      row:SetHeight(rh)
       row:ClearAllPoints()
-      row:SetPoint("TOPLEFT", 8, -(top + (r - 1) * QH)); row:SetPoint("TOPRIGHT", -8, -(top + (r - 1) * QH))
+      row:SetPoint("TOPLEFT", 8, -(top + y)); row:SetPoint("TOPRIGHT", -8, -(top + y))
       row:Show()
       shown = shown + 1
+      y = y + rh
     else row:Hide() end
   end
-  qp:SetHeight(top + math.max(1, shown) * QH + 12)
+  qp:SetHeight(top + math.max(QH, y) + 12)
   qp:Show(); qp:Raise()
 end

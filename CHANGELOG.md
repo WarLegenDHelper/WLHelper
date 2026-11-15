@@ -6,6 +6,22 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.48] — 2026-11-15
+
+### Ajouté / Added
+- **Suivi compact** à l'écran (façon RXP) : le chapitre en cours (« Avant le donjon : Uldaman 3/7 »), l'action à faire avec son icône (prendre, rendre, tuer, ramasser, utiliser, aller…), les barres de progression des objectifs et les 2 actions suivantes. Clic : ouvre le guide sur l'étape ; Maj-clic : marquer faite ; déplaçable, repliable. `/wlh suivi`.
+  *Compact on-screen tracker with the chapter, the current action, objective bars and the next two actions.*
+- **Trois chapitres par donjon** : Avant le donjon, Dans le donjon, Après le donjon, avec leur progression.
+- **Vue d'ensemble du donjon** (depuis le choix des donjons et le guide) : image, niveaux, entrée avec GPS, clé, quêtes classées avant / dans / après, prérequis faits ou non, chaînes, niveau requis, et un interrupteur par quête pour la garder ou la retirer de la route.
+  *Dungeon overview with prerequisites, chains and a per-quest switch.*
+- **Boss et rares du donjon** (lus en direct dans LibForeverData) avec un bouton « Cibler et marquer ».
+- **Partager les quêtes (n)** bien visible en groupe ; **raccourci clavier** « Cibler et marquer la cible de l'étape » (Échap › Options › Raccourcis › AddOns).
+
+### Corrigé / Fixed
+- **Objectifs suivis un par un** : l'étape passe à l'objectif suivant dès qu'un objectif est rempli.
+- **Rendu placé avant les objectifs** (ex. Fragments of the Pylons) quand nos données ne connaissaient pas le lieu des objectifs : une étape d'objectifs est ajoutée, et la flèche suit la zone de quête du jeu.
+  *A turn-in no longer comes before objectives whose place we did not know.*
+
 ## [1.0.0-beta.47] — 2026-11-15
 
 ### Corrigé / Fixed

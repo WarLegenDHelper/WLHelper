@@ -5,4 +5,5 @@
   <Binding name="WLDT_PREV" category="ADDONS">WLDT_Binding("prev")</Binding>
   <Binding name="WLDT_POINTS" category="ADDONS">WLDT_Binding("points")</Binding>
   <Binding name="WLDT_ARROW" category="ADDONS">WLDT_Binding("arrow")</Binding>
+  <Binding name="WLDT_TARGET" category="ADDONS">WLDT_Binding("target")</Binding>
 </Bindings>

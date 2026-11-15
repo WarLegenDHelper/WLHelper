@@ -29,6 +29,7 @@ local T = {
   bad  = { 0.973, 0.443, 0.443 },           -- #F87171
   gold = { 0.902, 0.800, 0.502 },           -- #E6CC80
   info = { 0.478, 0.722, 0.961 },           -- #7AB8F5
+  silver = { 0.800, 0.820, 0.860 },         -- #CCD1DB rare mobs (frame and icon)
   -- alpha layers (white or black over bg)
   cardFill     = { 1, 1, 1, 0.030 },
   cardEdge     = { 0, 0, 0, 0.70 },

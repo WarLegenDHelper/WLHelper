@@ -15,6 +15,9 @@ local function CurrentDungeonKey()
   if inside then return inside end
   local steps = ns.route and ns.route.steps
   local st = steps and f and steps[f.view or f.auto or 1]
+  -- the step's dungeon (Engine.lua knows it for every step, gates and prerequisites included)
+  local sk = st and ns.StepDungeon and ns.StepDungeon(st)
+  if sk and ns.D and ns.D[sk] then return sk end
   if st and st.d then return st.d end
   -- inside an instance with no route: by the instance's map ID
   local _, kind, _, _, _, _, _, instanceID = GetInstanceInfo()

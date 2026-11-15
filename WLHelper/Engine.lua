@@ -66,8 +66,38 @@ function ns.NodeOK(log, n)
   local s = State(log, n.q)
   if s == "done" then return true end
   if n.kind == "a" or n.kind == "h" then return s ~= "none" end
-  if n.kind == "c" or n.kind == "o" then return s == "ready" end
+  if n.kind == "c" then
+    -- done once its own objectives are done (the same ones the step view shows: not those done
+    -- outside, which have their own "o" nodes), not only when the whole quest is ready
+    if s ~= "on" then return s == "ready" end
+    local q = ns.Q[n.q]
+    local any
+    for _, o in ipairs(q and q.o or {}) do
+      if not (o.w and not o.ins and not o.outer) then
+        any = true
+        if not ns.ObjDone(log, n.q, o) then return false end
+      end
+    end
+    return any and true or false
+  end
+  if n.kind == "o" then return s == "ready" end
   return false
+end
+
+-- One refresh pass (the guide, its tracker, the target button) reads the same quest state many
+-- times: ObjCount and IsStepDone keep their answers for the length of a pass. Outside a pass,
+-- nothing is kept.
+local passDepth, passGen = 0, 0
+function ns.PassBegin() if passDepth == 0 then passGen = passGen + 1 end passDepth = passDepth + 1 end
+function ns.PassEnd() if passDepth > 0 then passDepth = passDepth - 1 end end
+function ns.PassGen() return passDepth > 0 and passGen or nil end
+-- runs fn inside a pass; errors still reach the caller
+function ns.InPass(fn, ...)
+  ns.PassBegin()
+  local r = { pcall(fn, ...) }
+  ns.PassEnd()
+  if not r[1] then error(r[2], 0) end
+  return unpack(r, 2, table.maxn(r))
 end
 
 local function ClassOK(c, cls)
@@ -220,10 +250,26 @@ end
 -- loc  : {m,x,y,n}  ou  ins = clé du donjon (alors la position est l'entrée du donjon)
 local function MakeNodes(sel, cls)
   local nodes, byKey = {}, {}
+  -- tag: the route dungeon the nodes serve (dk) and, for a prerequisite, the main quest it unlocks
+  -- (forQ, a list: one prerequisite shared by two main quests is one node) and its place in that
+  -- quest's chain (ci of cn)
+  local tag
+  local function Tag(n)
+    if not tag then return end
+    n.dk = n.dk or tag.dk
+    if tag.forQ then
+      n.forQ = n.forQ or {}
+      local has = false
+      for _, x in ipairs(n.forQ) do if x == tag.forQ then has = true break end end
+      if not has then table.insert(n.forQ, tag.forQ) end
+      n.ci = n.ci or tag.ci; n.cn = n.cn or tag.cn
+    end
+  end
   local function add(n)
     n.key = n.kind .. ":" .. tostring(n.q) .. (n.sub and (":" .. n.sub) or "")
-    if byKey[n.key] then return byKey[n.key] end
+    if byKey[n.key] then Tag(byKey[n.key]) return byKey[n.key] end
     n.deps = n.deps or {}
+    Tag(n)
     byKey[n.key] = n; table.insert(nodes, n)
     return n
   end
@@ -277,11 +323,24 @@ local function MakeNodes(sel, cls)
         -- objet à acheter/échanger (HV) : pas de point
       elseif o.w and not outerHere and not o.ins then
         real = real + 1
-        table.insert(outs, add({ kind = "o", q = qid, sub = i, loc = o.w, npc = o.t and o.t[1] or o.n, obj = o, d = home, pre = isPre, deps = { A } }))
+        -- one action per objective: done when that objective is done (ns.ObjDone), so the route
+        -- moves on objective by objective instead of waiting for the whole quest
+        table.insert(outs, add({ kind = "o", q = qid, sub = i, oi = i, loc = o.w, npc = o.t and o.t[1] or o.n, obj = o, oneObj = o, d = home, pre = isPre, deps = { A } }))
       elseif o.ins or outerHere or o.unk then
         real = real + 1
         inside = true
         if not outerHere then outer = false end
+      end
+    end
+    -- objectives with no known place but a known list (q.req: "Pylon Fragment, guarded in a centaur
+    -- village"): one step per item anyway, so the turn-in never comes straight after the take; the
+    -- arrow then uses the game's own quest area (UI.lua GamePOI) where there is one
+    if real == 0 and not inside and q.req and #q.req > 0 and (isPre or q.noin) then
+      for i, r in ipairs(q.req) do
+        local o = { k = "item", n = r[1], c = r[2] or 1, note = r[3], unk = true }
+        real = real + 1
+        table.insert(outs, add({ kind = "o", q = qid, sub = i, oi = i, unknown = true, npc = r[1], obj = o, oneObj = o,
+          noLoc = true, mapHint = q.s and not q.s.i and q.s.m or nil, d = home, pre = isPre, deps = { A } }))
       end
     end
     -- quête de donjon sans objectif connu (quêtes Forever récentes) : objectifs dans le donjon
@@ -304,10 +363,13 @@ local function MakeNodes(sel, cls)
       if not (WLDTDB.off and WLDTDB.off[qid]) and not q.extra then
         local prevT
         local Tby = {}
-        for _, pid in ipairs(FullChain(qid, cls) or {}) do
+        local chain = FullChain(qid, cls) or {}
+        for ci, pid in ipairs(chain) do
           local pq = ns.Q[pid]
           if pq then
+            tag = { dk = dkey, forQ = qid, ci = ci, cn = #chain }
             local A, T = qnodes(pid, dkey, true)
+            tag = nil
             if A then
               -- quêtes données ensemble (ex. les Épreuves des crânes) : elles dépendent de la même quête, pas l'une de l'autre
               local par = ns.PARALLEL and ns.PARALLEL[pid]
@@ -318,14 +380,137 @@ local function MakeNodes(sel, cls)
             prevT = T or prevT
           end
         end
+        tag = { dk = dkey }
         local A = qnodes(qid, dkey, false)
+        tag = nil
         if A and prevT then table.insert(A.deps, prevT) end
       end
     end
   end
   -- extras (maillet de Zul'Farrak...)
   if ns.Extras then ns.Extras(nodes, byKey, add, sel, cls) end
+  ns.AssignPhases(nodes)
   return nodes, byKey
+end
+
+-- =====================================================================
+--  Phases: "before" (outside, before entering: prerequisites, takes, outside objectives, the
+--  entrance), "inside" (in the instance), "after" (turn-ins and follow-ups once the dungeon is done)
+-- =====================================================================
+local PH_RANK = { before = 1, inside = 2, after = 3 }
+ns.PHASES = { "before", "inside", "after" }
+local function NodeDungeon(n) return n.dk or n.ins or n.d end
+-- a node done in the instance itself: objectives of the zone around the dungeon (outer) are outside
+local function InsideNode(n) return n.ins ~= nil and not (n.kind == "c" and n.outer) end
+function ns.AssignPhases(nodes)
+  local memo = {}
+  -- does n wait (through its dependencies) on something done inside dungeon d?
+  local function afterInside(n, d, depth)
+    local k = tostring(n) .. "@" .. tostring(d)
+    if memo[k] ~= nil then return memo[k] end
+    memo[k] = false
+    if depth > 60 then return false end
+    for _, p in ipairs(n.deps or {}) do
+      if (InsideNode(p) and p.ins == d) or afterInside(p, d, depth + 1) then memo[k] = true; return true end
+    end
+    return false
+  end
+  for _, n in ipairs(nodes) do
+    if InsideNode(n) then n.phase = "inside"
+    elseif afterInside(n, NodeDungeon(n), 0) then n.phase = "after"
+    else n.phase = "before" end
+  end
+end
+
+-- The phase of a route step (gate = before; a step with anything done in the instance = inside;
+-- otherwise the earliest phase of its actions).
+function ns.StepPhase(st)
+  if not st then return nil end
+  if st.phase then return st.phase end
+  local ph
+  if st.gate then ph = "before"
+  elseif st.split or st.inner then ph = "inside"
+  else
+    for _, n in ipairs(st.acts or {}) do
+      local p = n.phase or (InsideNode(n) and "inside") or "before"
+      if p == "inside" then ph = "inside" break end
+      if not ph or PH_RANK[p] < PH_RANK[ph] then ph = p end
+    end
+  end
+  st.phase = ph or "before"
+  return st.phase
+end
+
+-- The route dungeon a step belongs to (multi-dungeon routes count each dungeon on its own).
+function ns.StepDungeon(st)
+  if not st then return nil end
+  if st.dk then return st.dk end
+  if st.gate then return st.gate end
+  local a = st.acts and st.acts[1]
+  -- done in an instance: that instance (a prerequisite done in another dungeon counts there), else
+  -- the route dungeon the action serves
+  return (a and InsideNode(a) and a.ins) or (a and NodeDungeon(a)) or st.ins or st.d
+end
+
+-- Steps per phase for one dungeon of the route (dkey nil: the whole route).
+-- -> { before = { done, total }, inside = {...}, after = {...} } (fields done / total).
+function ns.PhaseProgress(dkey)
+  local out = { before = { done = 0, total = 0 }, inside = { done = 0, total = 0 }, after = { done = 0, total = 0 } }
+  local steps = ns.route and ns.route.steps or {}
+  local log = ns.LogEntries()
+  for i, st in ipairs(steps) do
+    if not dkey or ns.StepDungeon(st) == dkey then
+      local b = out[ns.StepPhase(st)] or out.before
+      b.total = b.total + 1
+      local ok
+      if ns.IsStepDone then ok = ns.IsStepDone(log, i)
+      else
+        ok = #st.acts > 0
+        for _, n in ipairs(st.acts) do if not ns.NodeOK(log, n) then ok = false break end end
+      end
+      if ok then b.done = b.done + 1 end
+    end
+  end
+  return out
+end
+
+-- =====================================================================
+--  Prerequisite chains: how far the player is in the chain of one main quest
+-- =====================================================================
+-- -> { total, done, inLog, nextPid, nextInLog, chain } (chain = the prerequisite ids in order)
+function ns.ChainState(mainQid)
+  local _, cls = UnitClass("player")
+  local chain = FullChain(mainQid, cls) or {}
+  local log = ns.LogEntries()
+  local out = { total = #chain, done = 0, inLog = 0, chain = chain }
+  for _, pid in ipairs(chain) do
+    if IsDone(pid) then out.done = out.done + 1
+    else
+      if log[pid] then out.inLog = out.inLog + 1 end
+      if not out.nextPid then out.nextPid = pid; out.nextInLog = log[pid] ~= nil end
+    end
+  end
+  return out
+end
+
+-- One ranked status word per quest, shared by the picker, the list and the card:
+-- "done" > "ready" > "active" > "prelog" > "pre" > "low" > "pickup".
+-- -> code, text (one of the ST_ strings), and for "pre"/"prelog" the ChainState.
+function ns.QuestStatus(qid, log)
+  log = log or ns.LogEntries()
+  local s = State(log, qid)
+  if s == "done" then return "done", L.ST_DONE end
+  if s == "ready" then return "ready", L.ST_READY end
+  if s == "on" then return "active", L.ST_ACTIVE end
+  local cs = ns.ChainState(qid)
+  if cs.nextPid then
+    if cs.nextInLog then return "prelog", L.ST_PRELOG:format(cs.done + 1, cs.total), cs end
+    return "pre", L.ST_PRE:format(cs.done + 1, cs.total), cs
+  end
+  local q = ns.Q[qid]
+  local lvl = UnitLevel and UnitLevel("player") or 1
+  if q and q.r and q.r > lvl then return "low", L.ST_LOW:format(q.r) end
+  return "pickup", L.ST_PICKUP
 end
 
 -- Position d'un nœud
@@ -529,20 +714,129 @@ function ns.MakeSteps(order)
     if st.unknown then st.travel = "TRAVEL_UNK" end
     prev = p or prev
   end
+  -- the phase of each step (before / inside / after) and the route dungeon it serves
+  for _, st in ipairs(steps) do ns.StepPhase(st); st.dk = ns.StepDungeon(st) end
   return steps
+end
+
+-- =====================================================================
+--  Cibler et marquer : the step's mobs and NPCs, and the macro text that targets them
+-- =====================================================================
+-- The names a "target" macro looks for at one action (nil when there is nothing to target).
+function ns.NodeTargets(n)
+  if n.tgt then return n.tgt end
+  if n.kind == "b" then return n.targets end
+  if n.kind == "i" then return nil end
+  local q = ns.Q[n.q]
+  if n.kind == "a" or n.kind == "t" or n.kind == "h" then
+    if n.npc and not n.ins then return { (n.npc:gsub(" %(.*%)", ""):gsub(",.*$", "")) } end
+    if n.kind == "t" and n.ins and n.npc then return { n.npc } end
+    return nil
+  end
+  local out, seen = {}, {}
+  local objs = q and q.o or {}
+  if n.kind == "o" and n.obj then objs = { n.obj } end
+  if n.oneObj then objs = { n.oneObj } end
+  for _, o in ipairs(objs) do
+    -- an objective done outside has no target in the dungeon
+    if not (n.kind == "c" and o.w and not o.ins and not o.outer) then
+      for _, t in ipairs(o.t or {}) do if not seen[t] then seen[t] = true; table.insert(out, t) end end
+      for _, x in ipairs(o.src or {}) do if x[1] and not seen[x[1]] and #out < 4 then seen[x[1]] = true; table.insert(out, x[1]) end end
+    end
+  end
+  return out[1] and out or nil
+end
+
+-- The step the player is on: the first one not done (nil once the whole route is done).
+function ns.CurrentStepIndex(log)
+  local steps = ns.route and ns.route.steps or {}
+  if #steps == 0 or not ns.IsStepDone then return nil end
+  log = log or ns.LogEntries()
+  for i = 1, #steps do if not ns.IsStepDone(log, i) then return i, steps[i] end end
+  return nil
+end
+
+-- The text of the "target and mark" macro for a step (default: the current one): /targetexact on
+-- each mob or NPC still to do there, then the skull on the target. Fits a macro (255 characters).
+-- Returns the text and the names it targets.
+function ns.TargetMacroText(st, log)
+  log = log or ns.LogEntries()
+  if st == nil then local _; _, st = ns.CurrentStepIndex(log) end
+  local names, seen = {}, {}
+  if st then
+    for _, n in ipairs(st.acts or {}) do
+      if not ns.NodeOK(log, n) then
+        for _, nm in ipairs(ns.NodeTargets(n) or {}) do
+          if not seen[nm] then seen[nm] = true; table.insert(names, nm) end
+        end
+      end
+    end
+  end
+  if #names == 0 then
+    return "/run print('|cffce1918WL|r " .. L.MACRO_NONE:gsub("'", "\\'") .. "')", names
+  end
+  local tail = "/run if UnitExists'target'and GetRaidTargetIndex'target'~=8 then SetRaidTarget('target',8)end"
+  local m = { "/cleartarget" }
+  local len = #m[1] + #tail + 2
+  for _, nm in ipairs(names) do
+    local line = "/targetexact " .. nm
+    if len + #line + 1 > 255 then break end
+    table.insert(m, line); len = len + #line + 1
+  end
+  table.insert(m, tail)
+  return table.concat(m, "\n"), names
 end
 
 -- =====================================================================
 --  Partage des quêtes
 -- =====================================================================
+-- The guide's quests in your log that can be shared: those of the route when there is one
+-- (otherwise every dungeon quest of the guide), unless the data marks them unshareable.
+local function RouteQuests()
+  if not (ns.route and ns.route.steps) then return nil end
+  local set = {}
+  for _, st in ipairs(ns.route.steps) do
+    for _, n in ipairs(st.acts or {}) do if n.q then set[n.q] = true end end
+    for _, n in ipairs(st.checks or {}) do if n.q then set[n.q] = true end end
+  end
+  return set
+end
+function ns.ShareList()
+  local log, set, out = ns.LogEntries(), RouteQuests(), {}
+  for id in pairs(log) do
+    local q = ns.Q[id]
+    if q and q.sh ~= false and (not set or set[id]) then out[#out + 1] = id end
+  end
+  table.sort(out, function(a, b) return (log[a].index or 0) < (log[b].index or 0) end)
+  return out, log
+end
+-- Can this quest be shared (QuestLogPushQuest rules)? Asks the game; the log selection comes back.
+local function Pushable(id, e)
+  if CQL and CQL.IsPushableQuest then
+    local ok, v = pcall(CQL.IsPushableQuest, id)
+    if ok and type(v) == "boolean" then return v end
+  end
+  if SelectQuestLogEntry and GetQuestLogPushable and e and e.index then
+    local prev = GetQuestLogSelection and GetQuestLogSelection()
+    SelectQuestLogEntry(e.index)
+    local ok, v = pcall(GetQuestLogPushable)
+    if type(prev) == "number" and prev > 0 then SelectQuestLogEntry(prev) end
+    return ok and (v == true or v == 1)
+  end
+  return true
+end
+ns.Pushable = Pushable
+-- How many quests of the route in your log can be shared now (the share button's count).
+function ns.ShareCount()
+  local list, log = ns.ShareList()
+  local n = 0
+  for _, id in ipairs(list) do if Pushable(id, log[id]) then n = n + 1 end end
+  return n
+end
 function ns.ShareQuests()
   local P = ns.Print
   if not IsInGroup() then P(L.NOGROUP) return end
-  local log, queue = ns.LogEntries(), {}
-  for id in pairs(log) do
-    local q = ns.Q[id]
-    if q and q.sh ~= false then table.insert(queue, id) end
-  end
+  local queue = ns.ShareList()
   if #queue == 0 then P(L.NOSHARE) return end
   local delay = 0
   for _, id in ipairs(queue) do
@@ -637,17 +931,127 @@ function ns.BossOrder(dkey)
   return out
 end
 
+-- Live state of one objective of a quest in the log: have, need, finished (3, 8, false).
+-- have/need are nil for an objective without a count; everything is nil when the game does not
+-- list it. Found by name, or by position when the game lists as many objectives as the data
+-- (a French client writes other names).
+local function plainNum(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) end
+local function plainStr(v) return type(v) == "string" and not (issecretvalue and issecretvalue(v)) end
+-- the objective's name without its count ("Plaguehound Runt slain: 3/20" -> "Plaguehound Runt")
+local function Head(t)
+  t = t:gsub("^%s*%d+%s*/%s*%d+%s*", ""):gsub("%s*:?%s*%d+%s*/%s*%d+%s*$", ""):gsub("%s+slain$", "")
+  return t
+end
+-- the game's objective type for each kind of the data
+local GTYPE = { kill = "monster", talk = "monster", item = "item", object = "object", event = "event" }
+-- does the game's objective x agree with the data's o (type and count, when both are known)?
+local function Agrees(x, o)
+  local want = GTYPE[o.k or ""]
+  if want and plainStr(x.type) and x.type ~= "" and x.type ~= want then return false end
+  if o.c and plainNum(x.b) and x.b > 0 and x.b ~= o.c then return false end
+  return true
+end
+-- Which of the game's objectives (list of { text, type, a, b, fin }) is the data's o (index oi of n)?
+-- By exact name first, then by a unique name match, then by the unique objective of the same type
+-- and count, then by position among those that agree. nil when nothing agrees: late, never wrong.
+local function Pick(objs, o, oi, n)
+  local oname = o.n
+  if oname then
+    local exact, found, nf = nil, nil, 0
+    for _, x in ipairs(objs) do
+      if plainStr(x.text) then
+        if Head(x.text) == oname and not exact then exact = x end
+        if x.text:find(oname, 1, true) then nf = nf + 1; found = found or x end
+      end
+    end
+    if exact then return exact end
+    if nf == 1 then return found end
+  end
+  local agree, posOK = {}, nil
+  for j, x in ipairs(objs) do
+    if Agrees(x, o) then
+      agree[#agree + 1] = x
+      if j == oi and #objs == n then posOK = x end
+    end
+  end
+  if #agree == 1 and (posOK == agree[1] or (o.c and plainNum(agree[1].b)) or GTYPE[o.k or ""] and plainStr(agree[1].type)) then
+    return agree[1]
+  end
+  return posOK
+end
+local memo, memoGen, memoLog = {}, nil, nil
+local NIL = {}
+-- Live state of one objective of a quest in the log: have, need, finished (3, 8, false).
+-- have/need are nil for an objective without a count; everything is nil when the game does not
+-- list it (or no listed objective agrees with the data: a French client writes other names).
+function ns.ObjCount(log, qid, o)
+  local e = log and log[qid]
+  if not (e and o) then return nil end
+  local q = ns.Q[qid]
+  local list = q and q.o or {}
+  local oi
+  for k, x in ipairs(list) do if x == o then oi = k break end end
+  local g = ns.PassGen and ns.PassGen()
+  local mk
+  if g then
+    if memoGen ~= g or memoLog ~= log then memo, memoGen, memoLog = {}, g, log end
+    mk = tostring(qid) .. ":" .. tostring(oi or o.n or o)
+    local m = memo[mk]
+    if m == NIL then return nil end
+    if m then return m[1], m[2], m[3] end
+  end
+  local function result(a, b, fin)
+    if not (plainNum(a) and plainNum(b) and b > 0) then a, b = nil, nil end
+    if issecretvalue and issecretvalue(fin) then fin = nil end
+    if fin == nil and a then fin = a >= b end
+    if fin == nil then return nil end
+    return a, b, fin and true or false
+  end
+  local function keep(a, b, fin)
+    if mk then memo[mk] = (fin == nil) and NIL or { a, b, fin } end
+    return a, b, fin
+  end
+  if CQL and CQL.GetQuestObjectives then
+    local ok, objs = pcall(CQL.GetQuestObjectives, qid)
+    if ok and type(objs) == "table" and #objs > 0 then
+      local c = {}
+      for _, x in ipairs(objs) do
+        if type(x) == "table" then
+          c[#c + 1] = { text = x.text, type = x.type, a = x.numFulfilled, b = x.numRequired, fin = x.finished }
+        else c[#c + 1] = {} end
+      end
+      local pick = Pick(c, o, oi, #list)
+      if pick then
+        local a, b, fin = result(pick.a, pick.b, pick.fin)
+        if fin ~= nil then return keep(a, b, fin) end
+      end
+    end
+  end
+  if e.index and GetNumQuestLeaderBoards and GetQuestLogLeaderBoard then
+    local okN, n = pcall(GetNumQuestLeaderBoards, e.index)
+    if not okN or not plainNum(n) then return keep(nil) end
+    local c = {}
+    for j = 1, n do
+      local okT, text, typ, finished = pcall(GetQuestLogLeaderBoard, j, e.index)
+      local x = {}
+      if okT and plainStr(text) then
+        local a, b = text:match("(%d+)%s*/%s*(%d+)")
+        x = { text = text, type = typ, a = tonumber(a), b = tonumber(b), fin = finished and true or false }
+      end
+      c[#c + 1] = x
+    end
+    local pick = Pick(c, o, oi, #list)
+    if pick and pick.text then return keep(result(pick.a, pick.b, pick.fin)) end
+  end
+  return keep(nil)
+end
+
 function ns.ObjDone(log, qid, o)
   local s = ns.State(log, qid)
   if s == "done" or s == "ready" then return true end
-  local e = log[qid]
-  if e and e.index and GetNumQuestLeaderBoards and GetQuestLogLeaderBoard and o.n then
-    for j = 1, (GetNumQuestLeaderBoards(e.index) or 0) do
-      local text, _, finished = GetQuestLogLeaderBoard(j, e.index)
-      if text and text:find(o.n, 1, true) then return finished and true or false end
-    end
-  end
-  return false
+  if not (log and log[qid]) then return false end
+  local _, _, fin = ns.ObjCount(log, qid, o)
+  return fin == true
 end
 
 local function BossOf(bo, names)
@@ -742,7 +1146,8 @@ local function SplitOne(st)
   local out = {}
   for k, g in ipairs(groups) do
     local ns_ = { ins = st.ins, d = st.d, pos = st.pos, inner = st.inner, q = st.q, acts = g.acts, npcs = st.npcs,
-      split = true, part = k, parts = #groups, bossIdx = g.boss, trash = (g.boss ~= 999) and trash or nil }
+      split = true, part = k, parts = #groups, bossIdx = g.boss, trash = (g.boss ~= 999) and trash or nil,
+      phase = "inside", dk = st.ins or st.dk }
     local B = bo.list[g.boss]
     if B then ns_.bossName, ns_.bossEn, ns_.bossTip, ns_.bossModel, ns_.bossNpc = B.name, B.en, B.tip, B.model, B.npc end
     if k == 1 then ns_.travel = st.travel end

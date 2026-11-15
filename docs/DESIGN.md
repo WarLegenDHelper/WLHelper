@@ -194,6 +194,7 @@ All components live in one module (`ns.UI`, reused by Writs through `S`), each w
 
 - Backdrop `bg` at 0.97, 1 px `cardEdge` outline. No title-bar gradient.
 - Width is fixed per window and chosen from: 360 (HUD-like), 420 (single list), 520 (two columns), 640 (wide tools). Width is never computed from text.
+- One recorded exception: the guide tracker (Tracker.lua) is 300, a compact overlay that stays on screen beside the game's own trackers.
 - Movable by the header; position saved per window; clamped to screen.
 - Strata MEDIUM, raised on mouse down. Escape closes (UISpecialFrames).
 
@@ -478,6 +479,10 @@ One word per concept, everywhere: tab names, card titles, buttons, tooltips, cha
 | Guilde | Guild | |
 | PvP / Victoires honorables | PvP / Honorable kills | |
 | Idée / Bug | Idea / Bug | the feedback command |
+| Suivi du guide | Guide tracker | the small window with the current action and the next two; "le suivi" / "the tracker" in running text; `/wlh tracker` (or `/wlh suivi`) |
+| Vue d'ensemble | Overview | one dungeon's page: picture, entrance, key, its quests in three parts |
+| Boss et rares | Bosses and rares | the panel of a dungeon's bosses and rare mobs, with "Cibler et marquer" / "Target and mark" |
+| Actif | On | a step row's GPS button while the GPS leads there; never "Suivi", which is the tracker |
 
 ---
 

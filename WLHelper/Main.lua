@@ -30,14 +30,23 @@ local function StepKeys(steps)
 end
 
 -- Reconstruit les étapes ; garde l'ordre sauvegardé si possible.
-function ns.Assemble(recalc)
+-- order/byKey: a route BuildRoute already made (Replan), so it is not built twice.
+function ns.Assemble(recalc, order, byKey)
   if ns.EnsureClassCards then ns.EnsureClassCards() end
   local db = WLDTDB
   local any = next(db.sel) ~= nil
   if not any then ns.route = nil; return end
-  local start = ns.PlayerWorld()
-  local order = ns.BuildRoute(db.sel, start)
+  if not order then order, byKey = ns.BuildRoute(db.sel, ns.PlayerWorld()) end
   if not recalc and db.order and #db.order > 0 then
+    -- BuildRoute leaves out what is done: the done steps of the saved order come back, so the
+    -- list and "<" still show them (after a replan or a /reload)
+    local have, log, full = {}, ns.LogEntries(), {}
+    for _, n in ipairs(order) do have[n] = true; full[#full + 1] = n end
+    for _, k in ipairs(db.order) do
+      local n = byKey and byKey[k]
+      if n and not have[n] and ns.NodeOK(log, n) then full[#full + 1] = n; have[n] = true end
+    end
+    order = full
     local rank = {}
     for i, k in ipairs(db.order) do rank[k] = i end
     local known, extra = {}, {}
@@ -92,14 +101,23 @@ local function QuestSig()
   table.sort(t)
   return table.concat(t, ",")
 end
-function ns.Replan()
+-- Returns true when there is nothing left to do (rebuilt, or nothing to replan); false when it has
+-- to wait (combat, inside an instance): the caller asks again later. Second value: rebuilt (and
+-- refreshed).
+local function Replan()
   local db = WLDTDB
-  if db.autoReplan == false or not (db.sel and next(db.sel)) or not ns.route then return end
-  if InCombatLockdown and InCombatLockdown() then return end
+  if not db or db.autoReplan == false or not (db.sel and next(db.sel)) or not ns.route then return true end
+  if InCombatLockdown and InCombatLockdown() then return false end
   local _, kind = GetInstanceInfo and GetInstanceInfo()
-  if kind == "party" or kind == "raid" then return end   -- inside, the boss order is the route
+  if kind == "party" or kind == "raid" then return false end   -- inside, the boss order is the route
   local f = ns.frame
-  if not f then return end
+  if not f then return true end
+  -- the step followed now, by key: indexes mean nothing across a rebuild
+  local follow = (f.view == nil or f.view == f.auto)
+  local old = f.auto and ns.route.steps[f.auto]
+  local oldKey = old and old.key
+  local seen0 = not follow and f.view and ns.route.steps[f.view]
+  local viewKey = seen0 and seen0.key
   local order, byKey = ns.BuildRoute(db.sel, ns.PlayerWorld())
   local log = ns.LogEntries()
   local new, seen = {}, {}
@@ -110,10 +128,27 @@ function ns.Replan()
   for _, n in ipairs(order) do if not seen[n] then new[#new + 1] = n; seen[n] = true end end
   db.order = {}
   for _, n in ipairs(new) do db.order[#db.order + 1] = n.key end
-  ns.Assemble(false)
+  ns.Assemble(false, order, byKey)
   f.auto, f.sig = nil, nil
+  if follow then f.view = nil
+  elseif viewKey and ns.route then
+    -- the step you were looking at, at its new place
+    local at
+    for i, st in ipairs(ns.route.steps) do if st.key == viewKey then at = i break end end
+    f.view = at
+  end
   if f.view and ns.route and f.view > #ns.route.steps then f.view = nil end
-  if f:IsShown() then ns.Refresh(true) end
+  -- not silent: the "route finished" message still plays; f.auto is nil, so no step advance is
+  -- announced there (indexes moved), only below, by key
+  ns.Refresh()
+  -- a new current step: the same sound and message as an advance seen by Refresh
+  local i, st = ns.CurrentStepIndex()
+  if oldKey and st and st.key ~= oldKey and ns.AnnounceStep then ns.AnnounceStep(i) end
+  return true, true
+end
+function ns.Replan()
+  if ns.InPass then return ns.InPass(Replan) end
+  return Replan()
 end
 
 function ns.Recalc()
@@ -131,7 +166,15 @@ local ev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_LOGIN", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE",
   "PLAYER_LEVEL_UP", "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA" }) do pcall(ev.RegisterEvent, ev, e) end
 pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED")
-local pending
+local pending, sawQuest, replanWanted
+-- a replan that had to wait (combat, inside an instance) runs once it can
+local function ReplanLater()
+  if not replanWanted then return false end
+  replanWanted = false
+  local ok, ran = pcall(ns.Replan)
+  if not (ok and ran) then replanWanted = true end
+  return ok and ran
+end
 -- the dungeon guide can be switched off (Settings > General > Modules)
 local function GuideOn()
   local WP = ns.Writs and ns.Writs.WP
@@ -167,6 +210,8 @@ OnInstanceEntry = function()
     -- out of a route dungeon: the "inside" band goes away and the guide goes back to the current step
     local was = ns.instIn
     ns.instIn = nil
+    -- out of the instance: the replan that waited for it
+    ReplanLater()
     local f = ns.frame
     if was and f and f:IsShown() and ns.route then
       ns.Refresh(true)
@@ -207,6 +252,8 @@ end
 ev:SetScript("OnEvent", function(_, e)
   -- module switched off in combat: the deferred action-bar update still has to hide the bar
   if e == "PLAYER_REGEN_ENABLED" and not GuideOn() then
+    -- the target button and its key still have to be made (or emptied) once combat ends
+    if ns.TargetPending and ns.TargetPending() then ns.UpdateTargetButton() end
     if ns.ActionBarPending and ns.ActionBarPending() and ns.UpdateActionBar then ns.UpdateActionBar() end
     return
   end
@@ -222,6 +269,7 @@ ev:SetScript("OnEvent", function(_, e)
       if GuideOn() then
         if WLDTDB.hidden == false and ns.route and #ns.route.steps > 0 then f:Show() end
         ns.Refresh(true)
+        if not f:IsShown() then ns.AfterRefresh() end
       end
     end)
     local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
@@ -236,6 +284,8 @@ ev:SetScript("OnEvent", function(_, e)
       ns.Print(L.OLD_FOLDER)
     end
   elseif e == "PLAYER_REGEN_ENABLED" then
+    if ns.TargetPending() then ns.UpdateTargetButton() end
+    ReplanLater()
     if ns.frame and ns.frame:IsShown() then ns.Refresh()
     else
       -- the macro and the action bar wait for the end of combat even with the guide closed
@@ -246,19 +296,32 @@ ev:SetScript("OnEvent", function(_, e)
     if ns.frame then
       C_Timer.After(1, function()
         if GuideOn() then OnInstanceEntry() end
-        if ns.frame:IsShown() or (GuideOn() and ns.route) then ns.Refresh() end
+        if ns.frame:IsShown() or (GuideOn() and ns.route) then ns.Refresh() elseif GuideOn() then ns.AfterRefresh() end
       end)
     end
-  elseif ns.frame and not pending then
+  elseif ns.frame then
+    -- any quest event in the 0.3 s window counts, not only the first event of the window
+    if e == "QUEST_LOG_UPDATE" or e == "QUEST_TURNED_IN" then sawQuest = true end
+    if pending then return end
     pending = true
     C_Timer.After(0.3, function()
       pending = false
-      if (e == "QUEST_LOG_UPDATE" or e == "QUEST_TURNED_IN") and GuideOn() then
+      local quest = sawQuest
+      sawQuest = false
+      local refreshed
+      if quest and GuideOn() then
         local sig = QuestSig()
-        if questSig and sig ~= questSig then pcall(ns.Replan) end
+        if questSig and sig ~= questSig then
+          local ok, ran, rebuilt = pcall(ns.Replan)
+          if not (ok and ran) then replanWanted = true end
+          -- a rebuild refreshes the guide itself
+          refreshed = ok and rebuilt
+        end
         questSig = sig
       end
-      if ns.frame:IsShown() or (GuideOn() and ns.route) then ns.Refresh() end
+      if not refreshed then
+        if ns.frame:IsShown() or (GuideOn() and ns.route) then ns.Refresh() elseif GuideOn() then ns.AfterRefresh() end
+      end
       ns.RenderPicker()
     end)
   end
@@ -495,6 +558,8 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "idee" or cmd == "idea" or cmd == "bug" then if WP and WP.Feedback then WP.Feedback(cmd == "bug" and "bug" or "idea") end
   elseif cmd == "textes" or cmd == "texts" or cmd == "truncated" then ns.DebugTexts(arg)
   elseif cmd == "share" then ns.ShareQuests()
+  elseif cmd == "tracker" or cmd == "suivi" then
+    if WLHelperTracker then WLHelperTracker.Toggle() end
   elseif cmd == "next" then ns.GoTo((ns.frame.view or 1) + 1)
   elseif cmd == "prev" then ns.GoTo((ns.frame.view or 1) - 1)
   elseif cmd == "list" then ns.frame.list:SetShown(not ns.frame.list:IsShown()); WLDTDB.list = ns.frame.list:IsShown(); ns.Render()
@@ -525,7 +590,14 @@ BINDING_NAME_WLDT_NEXT = ns.L.B_NEXTSTEP
 BINDING_NAME_WLDT_PREV = ns.L.B_PREV
 BINDING_NAME_WLDT_POINTS = ns.L.B_POINTS
 BINDING_NAME_WLDT_ARROW = ns.L.B_ARROW
+BINDING_NAME_WLDT_TARGET = ns.L.B_TARGET
 function WLDT_Binding(what)
+  -- the key bound to WLDT_TARGET clicks WLDTTargetButton through an override binding; this runs
+  -- only while the override waits for the end of combat
+  if what == "target" then
+    if InCombatLockdown and InCombatLockdown() then ns.Print(L.TARGET_LATER) else ns.ApplyTargetBinding() end
+    return
+  end
   if not ns.frame then return end
   if what == "toggle" then ns.ToggleMain()
   elseif what == "pick" then ns.TogglePicker()
@@ -533,4 +605,96 @@ function WLDT_Binding(what)
   elseif what == "prev" then ns.GoTo((ns.frame.view or 1) - 1)
   elseif what == "points" then ns.PlacePoints()
   elseif what == "arrow" then ns.ToggleArrow(); ns.Render() end
+end
+
+-- =====================================================================
+--  "Target and mark the step's target": a hidden secure button (type macro) whose text is the
+--  guide's target macro (ns.TargetMacroText). Created, changed and bound out of combat only: in
+--  combat the change waits for PLAYER_REGEN_ENABLED. The WLDT_TARGET key clicks it through an
+--  override binding owned by the button.
+-- =====================================================================
+do
+  local btn, pending, text, bindPending, applied, busy
+  local function Locked() return InCombatLockdown and InCombatLockdown() end
+  local function Ensure()
+    if btn then return btn end
+    if Locked() then pending = true return nil end
+    btn = CreateFrame("Button", "WLDTTargetButton", UIParent, "SecureActionButtonTemplate")
+    btn:SetSize(1, 1)
+    btn:SetPoint("TOPLEFT", UIParent, "TOPLEFT", -10, 10)
+    btn:Hide()
+    -- both directions, like the other secure buttons: the template keeps the one the game's
+    -- ActionButtonUseKeyDown option asks for now (the macro does nothing more if run twice)
+    btn:RegisterForClicks("AnyUp", "AnyDown")
+    btn:SetAttribute("type", "macro")
+    btn:SetAttribute("macrotext", "")
+    return btn
+  end
+  function ns.TargetPending() return pending or bindPending end
+  -- The key bound to WLDT_TARGET clicks the button (override binding, out of combat).
+  -- Setting override bindings fires UPDATE_BINDINGS again: only rebind when the keys changed.
+  function ns.ApplyTargetBinding()
+    if busy then return end
+    if not Ensure() then bindPending = true return end
+    if Locked() then bindPending = true return end
+    bindPending = false
+    if not (ClearOverrideBindings and SetOverrideBindingClick and GetBindingKey) then return end
+    local keys = { GetBindingKey("WLDT_TARGET") }
+    local list = {}
+    for _, k in ipairs(keys) do if type(k) == "string" and k ~= "" then list[#list + 1] = k end end
+    local sig = table.concat(list, " ")
+    if sig == applied then return end
+    busy = true
+    local ok, err = pcall(function()
+      ClearOverrideBindings(btn)
+      for _, k in ipairs(list) do SetOverrideBindingClick(btn, false, k, "WLDTTargetButton", "LeftButton") end
+    end)
+    busy = false
+    if ok then applied = sig else error(err, 0) end
+  end
+  function ns.UpdateTargetButton()
+    if Locked() then pending = true return end
+    if not Ensure() then return end
+    if bindPending then ns.ApplyTargetBinding() end
+    pending = false
+    -- guide switched off: no macro left behind (the key does nothing)
+    local ok, body = true, ""
+    if not (ns.GuideOn and not ns.GuideOn()) then ok, body = pcall(ns.TargetMacroText) end
+    if not ok or type(body) ~= "string" then body = "" end
+    if body ~= text then text = body; btn:SetAttribute("macrotext", body) end
+  end
+  local ev2 = CreateFrame("Frame")
+  for _, e in ipairs({ "PLAYER_LOGIN", "UPDATE_BINDINGS" }) do pcall(ev2.RegisterEvent, ev2, e) end
+  ev2:SetScript("OnEvent", function(_, e)
+    if busy then return end
+    if e == "PLAYER_LOGIN" then Ensure() end
+    ns.ApplyTargetBinding()
+  end)
+end
+
+-- After each refresh of the guide (and on quest changes while it is closed): the target button's
+-- text and the tracker follow the current step.
+local function AfterRefresh()
+  if ns.GuideOn and not ns.GuideOn() then
+    -- the target button is emptied (out of combat) so a switched-off guide leaves no live macro
+    ns.UpdateTargetButton()
+    if WLHelperTracker and WLHelperTracker.Refresh then pcall(WLHelperTracker.Refresh) end
+    return
+  end
+  ns.UpdateTargetButton()
+  if WLHelperTracker and WLHelperTracker.Refresh then WLHelperTracker.Refresh() end
+end
+-- one pass: the step states read by the target button and the tracker are those of the refresh
+function ns.AfterRefresh() return ns.InPass(AfterRefresh) end
+do
+  local refresh = ns.Refresh
+  if refresh then
+    ns.Refresh = function(...)
+      local args = { ... }
+      ns.InPass(function()
+        refresh(unpack(args))
+        AfterRefresh()
+      end)
+    end
+  end
 end
