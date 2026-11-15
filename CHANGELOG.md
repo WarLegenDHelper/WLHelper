@@ -6,6 +6,13 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.50] — 2026-11-15
+
+### Corrigé / Fixed
+- **Un seul affichage à la fois** : le petit suivi s'efface quand la grande fenêtre du guide est ouverte, et revient quand tu la fermes.
+  *The tracker hides while the big guide window is open.*
+- **« Membres du groupe sans la quête »** ne te compte plus toi-même.
+
 ## [1.0.0-beta.49] — 2026-11-15
 
 ### Corrigé / Fixed

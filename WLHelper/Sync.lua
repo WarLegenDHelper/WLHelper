@@ -90,11 +90,14 @@ end
 -- « Bob ✓, Ann (en cours) · sans la quête : Jim » pour une quête donnée
 function ns.PartyLine(qid)
   local has, miss = {}, {}
+  local me = UnitName and UnitName("player")
   for who, list in pairs(ns.party) do
+   if who ~= me then
     local s = list[qid]
     if s == "ready" then table.insert(has, "|cff59e67a" .. who .. "|r")
     elseif s == "on" then table.insert(has, who)
     else table.insert(miss, "|cffff9933" .. who .. "|r") end
+   end
   end
   if #has == 0 and #miss == 0 then return nil end
   local t = {}

@@ -389,6 +389,8 @@ end
 local function Wanted()
   if not WLDTDB or WLDTDB.tracker == false then return false end
   if ns.GuideOn and not ns.GuideOn() then return false end
+  -- one view at a time: the small tracker while you play, the big guide window when you open it
+  if ns.frame and ns.frame:IsShown() then return false end
   return ns.route ~= nil and ns.route.steps ~= nil and #ns.route.steps > 0
 end
 

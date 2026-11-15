@@ -1065,6 +1065,8 @@ local function Build()
   -- except when the Dungeons module is switched off (ns.quietHide), which is not your choice.
   f:Hide()
   f:HookScript("OnShow", function() WLDTDB.hidden = false end)
+  -- the small tracker takes over when the big window closes
+  f:HookScript("OnHide", function() if WLHelperTracker and WLHelperTracker.Refresh then pcall(WLHelperTracker.Refresh) end end)
   f:HookScript("OnHide", function() if not ns.quietHide then WLDTDB.hidden = true end end)
   ns.frame = f
   if ns.RegisterWindow then ns.RegisterWindow(f) end
