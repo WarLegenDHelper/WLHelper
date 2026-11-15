@@ -6,6 +6,28 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.71] — 2026-11-15
+
+### Ajouté / Added
+- **Prêt pour le donjon ?** En haut du résumé, sous l'entrée : « Prêt : tu as les 7 quêtes à prendre dehors », ou « Il te manque 2 quêtes à prendre avant d'entrer » avec leurs noms (survol : qui la donne et où ; clic : le GPS y va), celles qui attendent une autre quête ou un niveau, et combien se prennent dans le donjon. Chaque carte dit aussi « À prendre » ou « Dans le donjon ».
+  *Ready to go in? The summary says whether every quest to pick up outside is in your log, and which are missing.*
+- **Artisans en haut des commandes** : dans un métier, une ligne de pastilles sous son nom (« Fallanx · 38 », point vert en ligne) ; un clic ouvre ses recettes ; ceux qui n'ont rien partagé sont en gris avec l'explication au survol. La section du bas disparaît.
+  *Crafters shown as pills at the top of a profession's catalogue.*
+- **Clic droit sur un portrait de boss** : le marque tué ou pas tué, pour les boss que l'addon n'a pas vus mourir.
+  *Right-click a boss portrait to mark it killed or not.*
+
+### Corrigé / Fixed
+- **Zul'Farrak** : Ukorz Sandscalp est le dernier boss, juste après Ruuzlu ; Velratha et Gahz'rilla passent avant.
+  *Zul'Farrak: Ruuzlu and Chief Ukorz last.*
+- **Boss morts non cochés** (Nekrum, Sezz'ziz, Bly) : une mort se voit aussi sur la barre de nom du boss et, en fin de combat, sur les cibles du groupe.
+  *Boss kills also seen on nameplates and the group's targets.*
+- **Points d'interrogation à la place des récompenses** : un objet connu seulement par son nom retrouve son numéro dans LibForeverData (vraie icône, qualité, comparaison).
+  *Reward icons: names matched to item ids through LibForeverData.*
+- **Commander** : quand un seul artisan sait fabriquer l'objet, l'infobulle le dit simplement, sans la ligne Maj-clic.
+  *Order tooltip: no shift-click line when only one crafter can make it.*
+- **Étape « prêt ? » du guide** : une quête qu'on rend dans le donjon compte aussi parmi celles à prendre avant d'entrer.
+  *The guide's ready step also counts quests turned in inside.*
+
 ## [1.0.0-beta.70] — 2026-11-15
 
 ### Corrigé / Fixed

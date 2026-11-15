@@ -541,7 +541,8 @@ end
 ns.NodePos = NodePos
 
 -- Nœuds « avant d'entrer » : quêtes à prendre dehors avant la visite du donjon.
-local function PreEntry(nodes)
+-- withTurnIn (summary only): a quest turned in inside the dungeon also needs its outside pickup.
+local function PreEntry(nodes, withTurnIn)
   local insideOf = {}
   for _, n in ipairs(nodes) do if n.ins then insideOf[n] = n.ins end end
   -- n dépend-il (transitivement) d'un nœud intérieur du donjon d ?
@@ -557,7 +558,7 @@ local function PreEntry(nodes)
   end
   local gate = {}
   for _, n in ipairs(nodes) do
-    if n.kind == "c" and n.ins then
+    if (n.kind == "c" or (withTurnIn and n.kind == "t")) and n.ins then
       for _, p in ipairs(n.deps) do
         if p.kind == "a" and not p.ins and not dependsInside(p, n.ins) then
           gate[n.ins] = gate[n.ins] or {}
@@ -567,6 +568,22 @@ local function PreEntry(nodes)
     end
   end
   return gate
+end
+
+-- Read-only, for the summary: the guide's "before entering" list (PreEntry) per dungeon of sel,
+-- and the quests taken inside it. -> { [dkey] = { before = { [qid] = true }, inside = { [qid] = true } } }
+function ns.PreEntryQuests(sel, cls)
+  if not cls then cls = select(2, UnitClass("player")) end
+  local nodes = MakeNodes(sel, cls)
+  local out = {}
+  local function slot(d) out[d] = out[d] or { before = {}, inside = {} }; return out[d] end
+  for d, set in pairs(PreEntry(nodes, true)) do
+    for p in pairs(set) do if p.q and ns.Q[p.q] then slot(d).before[p.q] = true end end
+  end
+  for _, n in ipairs(nodes) do
+    if n.kind == "a" and n.ins and n.q and ns.Q[n.q] then slot(n.ins).inside[n.q] = true end
+  end
+  return out
 end
 
 -- =====================================================================
@@ -604,7 +621,8 @@ function ns.BuildRoute(sel, startPos)
       byKey[n.key] = n; table.insert(nodes, n)
     end
   end
-  local gate = PreEntry(nodes)
+  -- quests turned in inside count too: the summary's "ready" line and the guide agree
+  local gate = PreEntry(nodes, true)
   local lvl = UnitLevel("player") or 1
   local order, pos, inDungeon = {}, startPos, nil
   local remaining = 0

@@ -75,6 +75,14 @@ local STR = {
     SUM_IT_UP1 = "%s dont %d amélioration", SUM_IT_UP = "%s dont %d améliorations",
     SUM_UP_PCT = "+%d\194\160%%", SUM_UP_EMPTY = "vide", SUM_UP_EMPTY_TT = "Tu n'as rien à cet emplacement.",
     SUM_BEST = "Ton meilleur choix", SUM_BEST_TT = "Le meilleur choix pour ta spécialisation parmi les récompenses au choix.",
+    SUM_RDY_OK1 = "Prêt : tu as la quête à prendre dehors", SUM_RDY_OK = "Prêt : tu as les %d quêtes à prendre dehors",
+    SUM_RDY_NONE = "Prêt : aucune quête à prendre dehors",
+    SUM_RDY_IN1 = "%d autre se prend dans le donjon", SUM_RDY_IN = "%d autres se prennent dans le donjon",
+    SUM_RDY_INALL1 = "Ta quête se prend dans le donjon", SUM_RDY_INALL = "Tes quêtes se prennent toutes dans le donjon",
+    SUM_RDY_MISS1 = "Il te manque %d quête à prendre avant d'entrer", SUM_RDY_MISS = "Il te manque %d quêtes à prendre avant d'entrer",
+    SUM_RDY_AFTER = "après « %s »", SUM_RDY_MORE1 = "et %d autre", SUM_RDY_MORE = "et %d autres",
+    SUM_ST_TAKE = "À prendre", SUM_ST_TAKE_TT = "Elle se prend dehors : prends-la avant d'entrer dans le donjon.",
+    SUM_ST_IN = "Dans le donjon", SUM_ST_IN_TT = "Elle se prend dans le donjon : rien à faire avant d'entrer.",
   },
   en = {
     SUM_T = "Summary", SUM_ROUTE_T = "Route summary", SUM_DG1 = "%d dungeon", SUM_DG = "%d dungeons",
@@ -117,7 +125,7 @@ local STR = {
     SUM_NOQ = "No quest for you in this dungeon.",
     SUM_NOHELPER1 = "Without WL Helper: %s (their state shows when you share)",
     SUM_NOHELPER = "Without WL Helper: %s (their state shows when you share)",
-    SUM_G_ON = "Has it in their log", SUM_G_READY = "Ready to turn in", SUM_G_DONE = "Already turned in", SUM_G_TAKE = "To take",
+    SUM_G_ON = "Has it in their log", SUM_G_READY = "Ready to turn in", SUM_G_DONE = "Already turned in", SUM_G_TAKE = "To pick up",
     SUM_G_PRE = "Missing prerequisite", SUM_G_LOW = "Level too low", SUM_G_NA = "Not for this character", SUM_G_INVALID = "Not eligible",
     SUM_G_DECLINED = "Declined", SUM_G_FULL = "Log full", SUM_G_BUSY = "Busy", SUM_G_FAR = "Too far",
     SUM_G_SENT = "Sent", SUM_G_UNKNOWN = "No answer yet", SUM_G_WAIT = "Waiting",
@@ -131,6 +139,14 @@ local STR = {
     SUM_IT_UP1 = "%s including %d upgrade", SUM_IT_UP = "%s including %d upgrades",
     SUM_UP_PCT = "+%d%%", SUM_UP_EMPTY = "empty", SUM_UP_EMPTY_TT = "You wear nothing in this slot.",
     SUM_BEST = "Your best pick", SUM_BEST_TT = "The best of the rewards to choose from for your spec.",
+    SUM_RDY_OK1 = "Ready: you have the quest to pick up outside", SUM_RDY_OK = "Ready: you have all %d quests to pick up outside",
+    SUM_RDY_NONE = "Ready: no quest to pick up outside",
+    SUM_RDY_IN1 = "%d more is picked up inside the dungeon", SUM_RDY_IN = "%d more are picked up inside the dungeon",
+    SUM_RDY_INALL1 = "Your quest is picked up inside the dungeon", SUM_RDY_INALL = "Your quests are all picked up inside the dungeon",
+    SUM_RDY_MISS1 = "%d quest still to pick up before you go in", SUM_RDY_MISS = "%d quests still to pick up before you go in",
+    SUM_RDY_AFTER = "after \"%s\"", SUM_RDY_MORE1 = "and %d more", SUM_RDY_MORE = "and %d more",
+    SUM_ST_TAKE = "To pick up", SUM_ST_TAKE_TT = "Given outside: pick it up before you go into the dungeon.",
+    SUM_ST_IN = "Inside the dungeon", SUM_ST_IN_TT = "Given inside the dungeon: nothing to do before you go in.",
   },
 }
 do
@@ -314,6 +330,29 @@ local function CachedName(id)
   return ok and type(n) == "string" and not secret(n) and n or nil
 end
 local function Loose(s) return (s:lower():gsub("[%p%s]", "")) end
+-- Item name -> id from LibForeverData's item list (built once, on the first name neither source
+-- matched): a reward known only by its name still gets its real icon, quality and comparison.
+local libItemIds
+local function LibItemId(n)
+  if libItemIds == nil then
+    libItemIds = false
+    local lib = Lib()
+    if lib and type(lib.Ids) == "function" and type(lib.Name) == "function" then
+      local ok, ids = pcall(lib.Ids, "item")
+      if ok and type(ids) == "table" then
+        libItemIds = {}
+        for _, id in ipairs(ids) do
+          local okN, nm = pcall(lib.Name, "item", id)
+          if okN and type(nm) == "string" and nm ~= "" then
+            local k = nm:lower()
+            if not libItemIds[k] then libItemIds[k] = id end
+          end
+        end
+      end
+    end
+  end
+  return libItemIds and libItemIds[n:lower()] or nil
+end
 local function Rewards(qid, q)
   if rewardCache[qid] then return rewardCache[qid] end
   local out = {}
@@ -360,6 +399,15 @@ local function Rewards(qid, q)
         if not rw.id and not used[id] then rw.id = id; used[id] = true; unmatched = unmatched - 1 end
       end
     end
+    -- still nameless of an id: LibForeverData's item list
+    if unmatched > 0 then
+      for _, rw in ipairs(out) do
+        if not rw.id and rw.name then
+          local id = LibItemId(rw.name)
+          if id and not used[id] then rw.id = id; used[id] = true; unmatched = unmatched - 1 end
+        end
+      end
+    end
     -- Gear's other ids follow, unless a name is still unmatched and Gear has no more ids than our
     -- names (that id is most likely the same item under another name: it would show twice)
     if unmatched == 0 or #ids > #ri then
@@ -370,6 +418,11 @@ local function Rewards(qid, q)
   end
   rewardCache[qid] = out
   return out
+end
+-- for the tests: the rewards of a quest, read again (and the item list built again) when fresh
+ns.SummaryRewards = function(qid, q, fresh)
+  if fresh then rewardCache[qid] = nil; libItemIds = nil end
+  return Rewards(qid, q)
 end
 -- How many items the quest gives you (one for a reward of your choice).
 local function ItemCount(qid, q)
@@ -969,6 +1022,34 @@ local function MakeObjLine(parent)
   return o
 end
 
+-- One quest still to pick up before going in: pin (or clock while it cannot be taken yet), its name
+-- and what it waits on; hover for the giver and where, a click guides to the giver.
+local function MakeReadyLine(parent)
+  local o = CreateFrame("Button", nil, parent)
+  o.wlOwned = true
+  o.hl = ns.Tex(o, "BACKGROUND", T.hoverFill); o.hl:SetAllPoints(); o.hl:Hide()
+  o.press = ns.Tex(o, "BORDER", T.pressFill); o.press:SetAllPoints(); o.press:Hide()
+  o.icon = ns.Icon(o, "pin", 12, "ARTWORK", T.accentSoft); o.icon:SetPoint("TOPLEFT", 0, -2)
+  o.text = ns.Text(o, ns.F.meta, T.text); o.text:SetPoint("TOPLEFT", 16, -1)
+  o:SetScript("OnEnter", function(self)
+    if self.point then self.hl:Show() end
+    if self.tip then ns.ShowTip(self, self.tip) end
+  end)
+  o:SetScript("OnLeave", function(self) self.hl:Hide(); self.press:Hide(); self.text:SetPoint("TOPLEFT", 16, -1); ns.HideTip() end)
+  o:SetScript("OnMouseDown", function(self) if self.point then self.press:Show(); self.text:SetPoint("TOPLEFT", 16, -2) end end)
+  o:SetScript("OnMouseUp", function(self) self.press:Hide(); self.text:SetPoint("TOPLEFT", 16, -1) end)
+  o:SetScript("OnClick", function(self) if self.point then GoPoint(self.point) end end)
+  return o
+end
+
+-- What a quest given outside waits on before it can be taken: its next prerequisite, else its level.
+local function TakeWhy(log, qid, q, lvl, cls)
+  local pre = ns.QuestPreInfo(qid, log, cls)
+  if pre.nextPid then return L.SUM_RDY_AFTER:format(ns.QName(pre.nextPid)), pre end
+  if q.r and q.r > lvl then return L.ST_LOW:format(q.r), pre end
+  return nil, pre
+end
+
 -- The objectives of a quest with a place outside the dungeon, not done yet (4 at most).
 local function OutsidePlaces(log, qid, q)
   local out = {}
@@ -1186,7 +1267,18 @@ local function FillRow(r, qid, dkey, inf, ctx)
   -- pills only when they say something: in your log / ready, elite, another dungeon, too high
   local pills = {}
   if st == "on" then pills[#pills + 1] = { L.SUM_ST_ON, T.info, nil, { L.SUM_ST_ON } }
-  elseif st == "ready" then pills[#pills + 1] = { L.SUM_ST_READY, T.ok, "check", { L.SUM_ST_READY } } end
+  elseif st == "ready" then pills[#pills + 1] = { L.SUM_ST_READY, T.ok, "check", { L.SUM_ST_READY } }
+  elseif st == "none" and ctx.peBefore and ctx.peBefore[qid] then
+    -- on the guide's "before entering" list: given outside, to pick up before going in
+    local tip = { L.SUM_ST_TAKE, L.SUM_ST_TAKE_TT }
+    local g = GiverText(q, st)
+    if g then tip[#tip + 1] = g end
+    local why = TakeWhy(log, qid, q, ctx.lvl, ctx.cls)
+    if why then tip[#tip + 1] = { why, T.warn[1], T.warn[2], T.warn[3] } end
+    pills[#pills + 1] = { L.SUM_ST_TAKE, T.warn, nil, tip }
+  elseif st == "none" and ctx.peInside and ctx.peInside[qid] then
+    pills[#pills + 1] = { L.SUM_ST_IN, T.muted, "portal", { L.SUM_ST_IN, L.SUM_ST_IN_TT } }
+  end
   if inf.elite then pills[#pills + 1] = { L.SUM_ELITE, T.warn, "skull", { L.SUM_ELITE, L.SUM_ELITE_TT } } end
   if inf.other then
     local dn = ns.DName(inf.other)
@@ -1431,6 +1523,7 @@ local function Build()
   f.child:SetWidth(CW)
   local c = f.child
   f.heroes, f.info, f.gpsBtns, f.notes, f.rows, f.heads, f.folds = {}, {}, {}, {}, {}, {}, {}
+  f.rdyLines, f.rdySubs = {}, {}
   -- your selection's totals (they follow your ticks), and the members without WL Helper, once
   f.totals = ns.Text(c, ns.F.body, T.fg)
   f.noHelper = ns.Text(c, ns.F.meta, T.muted)
@@ -1621,6 +1714,20 @@ Render = function()
     per[dkey] = { todo = todo, done = done }
   end
   f.shareList = shareList
+  -- the guide's "before entering" list (Engine PreEntry) over the ticks: what to pick up outside
+  local pe, peB, peI = {}, {}, {}
+  if ns.PreEntryQuests then
+    local s = {}
+    for _, k in ipairs(keys) do s[k] = true end
+    local ok, res = pcall(ns.PreEntryQuests, s, cls)
+    if ok and type(res) == "table" then pe = res end
+  end
+  for _, v in pairs(pe) do
+    for id in pairs(v.before) do peB[id] = true end
+    for id in pairs(v.inside) do peI[id] = true end
+  end
+  ctx.peBefore, ctx.peInside = peB, peI
+  f.ready = {}
   f.totalsInfo = { quests = tq, xp = txp, money = tmoney, items = titems, upgrades = tup }
   local allDone = nQuests > 0 and nTodo == 0
   f.allDoneNow = allDone
@@ -1636,6 +1743,7 @@ Render = function()
 
   local y = 0
   local hi, ii, gi, ni, ri, hdi, fi = 0, 0, 0, 0, 0, 0, 0
+  local rli, rsi = 0, 0
   local totalsShown, noHelperShown, allDoneShown, extraShown = false, false, false, false
   local noHelperText, extraText
 
@@ -1686,6 +1794,94 @@ Render = function()
     local eh = f.allDone:Set("check", title, runnable and (#keys > 1 and L.SUM_RUN_SUB_N or L.SUM_RUN_SUB) or nil, L.SUM_OTHER_DG, OpenPicker, "secondary")
     f.allDone:Show(); allDoneShown = true
     y = y + 12 + (num(eh) or 80) + 12
+  end
+
+  -- "Can I go in now?": the ticked quests given outside (the guide's "before entering" list), in
+  -- your log or not; the ones still to pick up by name, each with what it waits on
+  local function SubLine(text)
+    rsi = rsi + 1
+    local fs = f.rdySubs[rsi] or ns.Text(c, ns.F.meta, T.muted); f.rdySubs[rsi] = fs
+    fs:SetText(text)
+    fs:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
+    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 22, -(y - 2))
+    fs:Show()
+    y = y - 2 + LineH(fs, ns.F.meta, CW - 22, c) + 6
+    return fs
+  end
+  local MAX_MISS = 5
+  local function ReadyBlock(dkey, place)
+    local rd = pe[dkey]
+    if not rd then return end
+    local have, miss, inside = 0, {}, 0
+    for id in pairs(rd.before) do
+      local s = QState(log, id)
+      if s == "on" or s == "ready" then have = have + 1 elseif s == "none" then miss[#miss + 1] = id end
+    end
+    for id in pairs(rd.inside) do
+      if not rd.before[id] and QState(log, id) == "none" then inside = inside + 1 end
+    end
+    local nOut = have + #miss
+    if nOut + inside == 0 then return end
+    local info = { have = have, missing = miss, inside = inside, lines = {} }
+    f.ready[dkey] = info
+    if #miss == 0 then
+      ii = ii + 1
+      local txt = nOut == 0 and L.SUM_RDY_NONE or ns.Plural(nOut, "SUM_RDY_OK1", "SUM_RDY_OK", nOut)
+      local it = InfoLine(ii, "check", T.ok, txt, T.ok)
+      place(it, CW - 22)
+      info.head = it.fs
+      if inside > 0 then
+        info.sub = SubLine(nOut == 0 and ns.Plural(inside, "SUM_RDY_INALL1", "SUM_RDY_INALL")
+          or ns.Plural(inside, "SUM_RDY_IN1", "SUM_RDY_IN", inside))
+      end
+      return
+    end
+    ii = ii + 1
+    local it = InfoLine(ii, "warning", T.warn, ns.Plural(#miss, "SUM_RDY_MISS1", "SUM_RDY_MISS", #miss), T.warn)
+    place(it, CW - 22)
+    info.head = it.fs
+    table.sort(miss, function(a, b)
+      local la, lb = ns.Q[a].l or 0, ns.Q[b].l or 0
+      if la ~= lb then return la < lb end
+      return a < b
+    end)
+    y = y - 2
+    for i, id in ipairs(miss) do
+      if i > MAX_MISS then break end
+      local q = ns.Q[id]
+      local why, pre = TakeWhy(log, id, q, lvl, cls)
+      rli = rli + 1
+      local o = f.rdyLines[rli] or MakeReadyLine(c); f.rdyLines[rli] = o
+      o.qid = id
+      o.point = PointFor(log, id, q, "none", pre)
+      local name = ns.QName(id)
+      o.text:SetText(why and (name .. " · " .. why) or name)
+      local tc = why and T.muted or T.text
+      o.text:SetTextColor(tc[1], tc[2], tc[3])
+      ns.SetHDIcon(o.icon, why and "clock" or (o.point and "pin" or "dot"), why and T.muted or T.accentSoft)
+      local tip = { name }
+      local g = GiverText(q, "none")
+      if g then tip[#tip + 1] = g end
+      if why then tip[#tip + 1] = { why, T.warn[1], T.warn[2], T.warn[3] } end
+      if o.point then
+        tip[#tip + 1] = L.OV_GPS_T:format(o.point[4] or "")
+        tip[#tip + 1] = L.OV_GPS_CLICK
+      end
+      o.tip = tip
+      local th = LineH(o.text, ns.F.meta, CW - 22 - 16, o)
+      o:SetSize(CW - 22, th + 3)
+      o:ClearAllPoints(); o:SetPoint("TOPLEFT", c, "TOPLEFT", 22, -y)
+      o:Show()
+      info.lines[#info.lines + 1] = o
+      y = y + th + 3 + 2
+    end
+    y = y + 4
+    if #miss > MAX_MISS then
+      info.more = SubLine(ns.Plural(#miss - MAX_MISS, "SUM_RDY_MORE1", "SUM_RDY_MORE", #miss - MAX_MISS))
+    end
+    if inside > 0 then
+      info.sub = SubLine(ns.Plural(inside, "SUM_RDY_IN1", "SUM_RDY_IN", inside))
+    end
   end
 
   -- the route of several dungeons: its totals (or "all turned in") first
@@ -1765,6 +1961,7 @@ Render = function()
           place(InfoLine(ii, icon, col, k[1], T.text), CW - 22)
         end
       end
+      ReadyBlock(dkey, place)
       y = y + 6
     end
 
@@ -1878,6 +2075,8 @@ Render = function()
   for j = gi + 1, #f.gpsBtns do f.gpsBtns[j]:Hide() end
   if gi == 0 then f.entryGps, f.entryPoint = nil, nil end
   for j = ni + 1, #f.notes do f.notes[j]:Hide() end
+  for j = rli + 1, #f.rdyLines do f.rdyLines[j]:Hide() end
+  for j = rsi + 1, #f.rdySubs do f.rdySubs[j]:Hide() end
   for j = ri + 1, #f.rows do f.rows[j]:Hide(); f.rows[j].shownNow = nil end
   for j = hdi + 1, #f.heads do f.heads[j]:Hide() end
   for j = fi + 1, #f.folds do f.folds[j]:Hide() end

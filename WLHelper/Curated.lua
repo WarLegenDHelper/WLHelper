@@ -355,7 +355,7 @@ ns.WALK = {
   ScarletMonasteryCathedral = { "Scarlet Commander Mograine", "High Inquisitor Whitemane", "High Inquisitor Fairbanks" },
   RazorfenDowns = { "Tuten'kash", "Mordresh Fire Eye", "Glutton", "Ragglesnout", "Amnennar the Coldbringer", "Plaguemaw the Rotting" },
   Uldaman = { "Baelog", "Revelosh", "Ironaya", "Obsidian Sentinel", "Ancient Stone Keeper", "Galgann Firehammer", "Grimlok", "Archaedas" },
-  ZulFarrak = { "Theka the Martyr", "Antu'sul", "Witch Doctor Zum'rah", "Nekrum Gutchewer", "Shadowpriest Sezz'ziz", "Sergeant Bly", "Chief Ukorz Sandscalp", "Hydromancer Velratha", "Gahz'rilla", "Zerillis" },
+  ZulFarrak = { "Theka the Martyr", "Antu'sul", "Witch Doctor Zum'rah", "Nekrum Gutchewer", "Shadowpriest Sezz'ziz", "Sergeant Bly", "Hydromancer Velratha", "Gahz'rilla", "Ruuzlu", "Chief Ukorz Sandscalp", "Zerillis" },
   Maraudon = { "Lord Vyletongue", "Noxxion", "Razorlash", "Meshlok the Harvester", "Celebras the Cursed", "Landslide", "Princess Theradras", "Rotgrip", "Tinkerer Gizlock" },
   SunkenTemple = { "Atal'alarion", "Jammal'an the Prophet", "Ogom the Wretched", "Dreamscythe", "Weaver", "Hazzas", "Morphaz", "Shade of Eranikus", "Avatar of Hakkar" },
   BlackrockDepths = { "High Interrogator Gerstahn", "Lord Roccor", "Houndmaster Grebmar", "Fineous Darkvire", "Lord Incendius", "Pyromancer Loregrain", "Bael'Gar", "General Angerforge", "Golem Lord Argelmach", "Phalanx", "Ambassador Flamelash", "Panzor the Invincible", "Magmus", "Emperor Dagran Thaurissan" },
@@ -466,6 +466,9 @@ ns.STEP_TIPS = {
     ["Gahz'rilla"] = {
       "One player needs the Mallet of Zul'Farrak: use it on the gong by the pool to summon Gahz'rilla. Loot the Electrified Scale from her.",
       "Un joueur doit avoir le Mallet of Zul'Farrak : utilise-le sur le gong au bord du bassin pour invoquer Gahz'rilla. Récupère l'Electrified Scale sur elle." },
+    ["Ruuzlu"] = {
+      "Ruuzlu stands with Chief Ukorz Sandscalp, behind the door Weegli blows open: both fight together, the last fight of the dungeon.",
+      "Ruuzlu est avec Chief Ukorz Sandscalp, derrière la porte que Weegli fait sauter : les deux combattent ensemble, c'est le dernier combat du donjon." },
     ["*trash"] = {
       "Troll Temper drops from the Sandfury trolls all over the instance, the Uncracked Scarab Shells from the scarabs.",
       "Le Troll Temper tombe sur les trolls Sandfury dans toute l'instance, les Uncracked Scarab Shells sur les scarabées." },

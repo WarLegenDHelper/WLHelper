@@ -81,8 +81,12 @@ ns.AddEnglish({
     ["Clic : commander à %s"] = "Click: order from %s",
     ["Clic : commander à la guilde"] = "Click: order from the guild",
     ["Maj-clic : demander à toute la guilde"] = "Shift-click: ask the whole guild",
-    ["Artisans de ce métier"] = "Crafters of this profession",
-    ["Voir les recettes"] = "See recipes",
+    ["Artisans :"] = "Crafters:",
+    ["1 autre artisan"] = "1 more crafter",
+    ["%d autres artisans"] = "%d more crafters",
+    ["Clic : voir tous les artisans"] = "Click: show every crafter",
+    ["Réduire"] = "Show less",
+    ["Clic : n'afficher que les premiers artisans"] = "Click: show only the first crafters",
     ["Clic : voir les recettes de %s"] = "Click: see %s's recipes",
     ["en ligne"] = "online",
     ["hors ligne"] = "offline",
@@ -91,15 +95,13 @@ ns.AddEnglish({
     ["vu hier"] = "seen yesterday",
     ["toi"] = "you",
     ["(toi)"] = "(you)",
-    ["Pas encore de recettes partagées par %s."] = "No recipes shared yet by %s.",
     ["Pas encore de recettes partagées par %s. Elles arrivent quand ce membre ouvre sa fenêtre de métier."] =
         "No recipes shared yet by %s. They show up when this member opens their profession window.",
-    ["Pas encore de recettes partagées par %s. Elles arrivent quand ils ouvrent leur fenêtre de métier."] =
-        "No recipes shared yet by %s. They show up when they open their profession window.",
     ["Ouvre ta fenêtre de métier pour partager les tiennes."] = "Open your profession window to share yours.",
     ["%d étoiles reçues pour des commandes livrées"] = "%d stars received for delivered orders",
     ["1 étoile reçue pour une commande livrée"] = "1 star received for a delivered order",
     ["Clic : commander à toute la guilde (le premier artisan qui accepte s'en charge)"] = "Click: order from the whole guild (the first crafter to accept takes it)",
+    ["Clic : commander à %s, le seul artisan qui sait le fabriquer"] = "Click: order from %s, the only crafter who can make it",
     ["Maj-clic : commander à %s seulement"] = "Shift-click: order from %s only",
     ["Affine la recherche pour voir la suite (%d objets affichés sur %d)."] = "Narrow the search to see the rest (%d of %d items shown).",
     -- the catalogue's categories
@@ -636,8 +638,14 @@ local function ItemTip(id, re, who, best)
         for _, c in ipairs(who) do all[#all + 1] = CrafterName(c) end
         tip[#tip + 1] = string.format(L("Peuvent le fabriquer : %s"), table.concat(all, ", "))
     end
-    tip[#tip + 1] = L("Clic : commander à toute la guilde (le premier artisan qui accepte s'en charge)")
-    if best then tip[#tip + 1] = string.format(L("Maj-clic : commander à %s seulement"), best) end
+    local others = 0
+    for _, c in ipairs(who or {}) do if not c.me then others = others + 1 end end
+    if best and others == 1 then
+        tip[#tip + 1] = string.format(L("Clic : commander à %s, le seul artisan qui sait le fabriquer"), best)
+    else
+        tip[#tip + 1] = L("Clic : commander à toute la guilde (le premier artisan qui accepte s'en charge)")
+        if best then tip[#tip + 1] = string.format(L("Maj-clic : commander à %s seulement"), best) end
+    end
     return tip
 end
 
@@ -908,18 +916,22 @@ local function BuildFind(p)
     f.ctitle:SetWidth(CW - 40); S.ClampLabel(f.ctitle, nil, h)
     f.ccount = S.Text(h, F.meta, C.muted); f.ccount:SetPoint("TOPLEFT", f.ctitle, "BOTTOMLEFT", 0, -3)
     f.ccount:SetWidth(CW - 40); S.ClampLabel(f.ccount, nil, h)
+    -- the profession's crafters, one pill each, between the title and the search (CrafterStrip)
+    f.cwho = S.Text(h, F.meta, C.muted); f.cwho:SetText(L("Artisans :")); f.cwho:Hide()
+    S.ClampLabel(f.cwho, nil, h)
+    f.cchips = {}
     f.cbox = S.Input(h, CW, { search = true, placeholder = L("Ex. Potion de soins") })
     f.cbox:SetPoint("TOPLEFT", 0, -80)
     f.cbox:HookScript("OnTextChanged", function() if f.prof then WP.RefreshOrders() end end)
 
-    -- the catalogue's rows: an item (who makes it, Request), or a crafter (Recipes)
-    -- the row does what its button does: an item opens the order form for the whole guild (the
-    -- first crafter who accepts takes it), shift-click for its best crafter only; a crafter, his recipes
+    -- the catalogue's rows: an item (who makes it, Request); the row does what its button does: the
+    -- order form for the whole guild (the first crafter who accepts takes it), shift-click for its
+    -- best crafter only
     local function Act(r)
         if r.kind == "item" then
             local shift = IsShiftKeyDown and IsShiftKeyDown()
             WP.NewOrder(r.item, (shift and r.crafter) or nil)
-        elseif r.kind == "crafter" and r.open then f.view = r.open; f.list.Reset(); WP.RefreshOrders() end
+        end
     end
     f.cat = List(p, function(parent)
         local r = Row(parent)
@@ -948,9 +960,6 @@ local function BuildFind(p)
         for j = i, #pool do pool[j]:Hide() end
     end
     f.catEmpty = S.EmptyState(f.cat.content, "search", "", nil, nil, nil)
-    f.catHead = Header(f.cat.content)
-    f.catNote = S.Text(f.cat.content, F.meta, C.muted)
-    f.catNote:SetJustifyH("LEFT"); f.catNote:SetJustifyV("TOP"); f.catNote:Hide()
     f.catMore = S.Text(f.cat.content, F.meta, C.muted)
     f.catMore:SetJustifyH("LEFT"); f.catMore:SetJustifyV("TOP"); f.catMore:Hide()
 end
@@ -962,7 +971,7 @@ local function SetMode(f, mode)
     local cat = mode == "cat"
     f.chead:SetShown(cat); f.box:SetShown(not cat)
     f.back:SetShown(mode == "list" and f.view ~= nil)
-    p.topH = cat and 120 or (f.back:IsShown() and (28 + 8 + 24 + 12) or (28 + 12))
+    p.topH = cat and ((f.cheadH or 108) + 12) or (f.back:IsShown() and (28 + 8 + 24 + 12) or (28 + 12))
     local l = mode == "list" and f.list or (mode == "grid" and f.grid or f.cat)
     l.Top(p.topH)
     return l
@@ -1065,6 +1074,214 @@ local function RenderGrid(f, g)
     return y
 end
 
+-- ---------------------------------------------------------------- the catalogue's crafters
+-- One pill per crafter under the profession's title, above its search: a click opens that
+-- crafter's recipes. Online first. A crafter who shared nothing yet is a quiet pill, its tooltip
+-- says why. Two lines at most, then "+N" (its tooltip names the rest, a click shows more: five
+-- lines at most, so the items keep their room).
+local CHIP_H, CHIP_GAP, CHIP_LINES, CHIP_LINES_ALL = 20, 4, 2, 5
+local STRIP_Y = 76   -- under the profession icon (36 + 32 + 8)
+
+local function ClassHex(c)
+    local cls = c.me and select(2, UnitClass("player")) or O.ClassOf(c.name)
+    local cc = cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls]
+    if not cc then return S.Hex(C.fg) end
+    return string.format("|cff%02x%02x%02x", math.floor(cc.r * 255 + 0.5), math.floor(cc.g * 255 + 0.5), math.floor(cc.b * 255 + 0.5))
+end
+
+local function CrafterChip(parent)
+    local c = CreateFrame("Button", nil, parent)
+    c.wlOwned = true
+    c:SetHeight(CHIP_H)
+    c.bg = S.Solid(c, "BACKGROUND", { 1, 1, 1, 0.10 }); c.bg:SetAllPoints()
+    c.edge = S.Border(c, { 1, 1, 1 }, 0.20)
+    c.dot = S.Icon(c, "dot", 8, "ARTWORK", C.ok); c.dot:SetPoint("LEFT", 7, 0); c.dot:Hide()
+    c.label = S.Text(c, F.meta, C.fg); c.label:SetJustifyH("LEFT"); c.label:SetWordWrap(false)
+    S.ClampLabel(c.label, nil, c)
+    function c:Paint()
+        if self.quiet or self.dim then
+            self.bg:SetColorTexture(1, 1, 1, self.hov and 0.07 or 0.04); self.edge({ 1, 1, 1 }, self.hov and 0.24 or 0.12)
+        else
+            self.bg:SetColorTexture(1, 1, 1, self.hov and 0.16 or 0.10); self.edge({ 1, 1, 1 }, self.hov and 0.40 or 0.20)
+        end
+    end
+    -- the words set the width (measured like the pills, never cut)
+    function c:Measure(text)
+        self.label:SetText(text)
+        local left = self.dot:IsShown() and 19 or 8
+        local tw = root.TextWidth(self.label) + 2
+        self.wlNeed = tw
+        self.label:ClearAllPoints(); self.label:SetPoint("LEFT", left, 0)
+        local w = left + tw + 8
+        if w > CW then tw = CW - left - 8; w = CW end   -- one pill wider than the window: the tooltip has the name
+        self.label:SetWidth(tw); self.wlTextW = tw
+        self:SetWidth(w); self.wlW = w
+        return w
+    end
+    c:SetScript("OnClick", function(self) if self.onClick then self.onClick(self) end end)
+    c:SetScript("OnEnter", function(self)
+        self.hov = true; self:Paint()
+        local t = self.tip
+        if type(t) == "function" then t = t(self) end
+        if type(t) == "table" then S.Tip(self, t) end
+    end)
+    c:SetScript("OnLeave", function(self) self.hov = nil; self:Paint(); S.HideTip() end)
+    return c
+end
+
+local function OpenCrafter(f, c)
+    f.view = { name = c.name, prof = c.prof, me = c.me }
+    f.list.Reset(); WP.RefreshOrders()
+end
+
+-- "Forge 151 · en ligne · 38 recettes"
+local function CrafterFacts(key, c)
+    local s = string.format(L("%s %d"), ProfLabel(key), c.rank) .. " · " .. Where(c.online)
+    if c.n > 0 then s = s .. " · " .. P(c.n, L("1 recette"), L("%d recettes")) end
+    return s
+end
+
+local function FillChip(f, ch, key, c)
+    ch.quiet = c.n == 0
+    -- "online only": an offline crafter stays reachable, only quieter
+    ch.dim = (not ch.quiet and f.onlineOnly and not c.online and not c.me) and true or nil
+    ch.dot:SetShown(c.online and not c.me and true or false)
+    ch.dot:SetAlpha(ch.quiet and 0.6 or 1)
+    local name = c.name
+    local text
+    if ch.quiet then
+        text = S.Hex(C.muted) .. name .. (c.me and (" " .. L("(toi)")) or "") .. "|r"
+    else
+        text = (ch.dim and S.Hex(C.muted) or ClassHex(c)) .. name .. "|r" .. (c.me and (" " .. S.Hex(C.muted) .. L("(toi)") .. "|r") or "")
+            .. " " .. S.Hex(C.muted) .. "· " .. c.n .. "|r"
+            .. (c.stars > 0 and (" " .. STAR .. S.Hex(C.gold) .. c.stars .. "|r") or "")
+    end
+    ch.crafter = c
+    local tip = { ClassHex(c) .. name .. "|r", CrafterFacts(key, c) }
+    local sl = (not c.me) and StarLine(c.name) or nil
+    if sl then tip[#tip + 1] = sl end
+    if ch.quiet then
+        tip[#tip + 1] = c.me and L("Ouvre ta fenêtre de métier pour partager les tiennes.")
+            or string.format(L("Pas encore de recettes partagées par %s. Elles arrivent quand ce membre ouvre sa fenêtre de métier."), name)
+        ch.onClick = nil
+    else
+        tip[#tip + 1] = string.format(L("Clic : voir les recettes de %s"), name)
+        ch.onClick = function() OpenCrafter(f, c) end
+    end
+    ch.tip = tip
+    ch:Paint()
+    return ch:Measure(text)
+end
+
+-- places the pills, the search under them, and sets the header's height (f.cheadH)
+local function CrafterTipName(c)
+    return (c.n > 0 and ClassHex(c) or S.Hex(C.muted)) .. c.name .. "|r"
+        .. (c.n > 0 and (S.Hex(C.muted) .. " · " .. P(c.n, L("1 recette"), L("%d recettes")) .. "|r") or "")
+end
+
+local function CrafterStrip(f, e, key)
+    local list, quiet = {}, {}
+    for _, c in ipairs(e and e.crafters or {}) do
+        if c.n > 0 then list[#list + 1] = c else quiet[#quiet + 1] = c end
+    end
+    table.sort(list, ByCrafter); table.sort(quiet, ByCrafter)
+    for _, c in ipairs(quiet) do list[#list + 1] = c end
+    local pool = f.cchips
+    local function Get(i)
+        local ch = pool[i]
+        if not ch then ch = CrafterChip(f.chead); pool[i] = ch end
+        return ch
+    end
+    local used, lines = 0, 0
+    if #list > 0 then
+        f.cwho:Show()
+        local lw = root.TextWidth(f.cwho) + 2
+        f.cwho:SetWidth(lw)
+        f.cwho:ClearAllPoints(); f.cwho:SetPoint("TOPLEFT", 0, -(STRIP_Y + math.floor((CHIP_H - F.meta) / 2)))
+        local indent = math.min(lw + 8, 120)
+        f.chipsAll = f.chipsAll or {}
+        local all = f.chipsAll[key] and true or false
+        local cap = all and CHIP_LINES_ALL or CHIP_LINES
+        local more, fold = pool.more, pool.fold
+        if not more then more = CrafterChip(f.chead); pool.more = more end
+        if not fold then fold = CrafterChip(f.chead); pool.fold = fold end
+        local function MoreW(n) more.dot:Hide(); return more:Measure(S.Hex(C.fg) .. "+" .. n .. "|r") end
+        local function FoldW() fold.dot:Hide(); return fold:Measure(S.Hex(C.fg) .. L("Réduire") .. "|r") end
+        -- what must still fit after the last pill of the last allowed line: "+N", and "Réduire" when open
+        local function Tail(rest)
+            local w = rest > 0 and MoreW(rest) or 0
+            if all then w = (w > 0 and (w + CHIP_GAP) or 0) + FoldW() end
+            return w
+        end
+        local x, line, cut = indent, 1, nil
+        local function Place(ch, w)
+            ch:ClearAllPoints(); ch:SetPoint("TOPLEFT", x, -(STRIP_Y + (line - 1) * (CHIP_H + CHIP_GAP)))
+            ch.wlX, ch.wlLine = x, line
+            ch:Show()
+            x = x + w + CHIP_GAP
+        end
+        for i, c in ipairs(list) do
+            local ch = Get(i)
+            local w = FillChip(f, ch, key, c)
+            local rest = #list - i
+            local function Need()
+                if line < cap then return w end
+                local t = Tail(rest)
+                return t > 0 and (w + CHIP_GAP + t) or w
+            end
+            if x > indent and x + Need() > CW then
+                if line >= cap then cut = i; break end
+                line, x = line + 1, indent
+            end
+            if line >= cap and x > indent and x + Need() > CW then cut = i; break end
+            Place(ch, w)
+            used = i
+        end
+        for j = used + 1, #pool do pool[j]:Hide() end
+        local rest = cut and (#list - cut + 1) or 0
+        if rest > 0 then
+            local mw = MoreW(rest)
+            more.quiet = nil; more:Paint()
+            local tip = { P(rest, L("1 autre artisan"), L("%d autres artisans")) }
+            for j = cut, math.min(#list, cut + 14) do tip[#tip + 1] = CrafterTipName(list[j]) end
+            if rest > 15 then tip[#tip + 1] = S.Hex(C.muted) .. "+" .. (rest - 15) .. "|r" end
+            if all then
+                more.onClick = nil   -- already open: the tooltip names the rest
+            else
+                tip[#tip + 1] = L("Clic : voir tous les artisans")
+                more.onClick = function() f.chipsAll[key] = true; WP.RefreshOrders() end
+            end
+            more.tip = tip
+            if x + mw > CW then line, x = line + 1, indent end
+            Place(more, mw)
+        else
+            more:Hide()
+        end
+        if all then
+            -- a way back to the short strip
+            local fw = FoldW()
+            fold.quiet = nil; fold:Paint()
+            fold.tip = { L("Réduire"), L("Clic : n'afficher que les premiers artisans") }
+            fold.onClick = function() f.chipsAll[key] = nil; WP.RefreshOrders() end
+            if x > indent and x + fw > CW then line, x = line + 1, indent end
+            Place(fold, fw)
+        else
+            fold:Hide()
+        end
+        lines = line
+    else
+        f.cwho:Hide()
+        for j = 1, #pool do pool[j]:Hide() end
+        if pool.more then pool.more:Hide() end
+        if pool.fold then pool.fold:Hide() end
+    end
+    f.cchipsN, f.cchipLines = used, lines
+    local boxY = lines > 0 and (STRIP_Y + lines * CHIP_H + (lines - 1) * CHIP_GAP + 10) or 80
+    f.cbox:ClearAllPoints(); f.cbox:SetPoint("TOPLEFT", 0, -boxY)
+    f.cheadH = boxY + 28
+    f.chead:SetHeight(f.cheadH)
+end
+
 local function RenderCatalog(f, g)
     local key = f.prof
     local e = g[key] or { crafters = {}, items = {}, nItems = 0, nOnline = 0, unshared = {} }
@@ -1079,7 +1296,6 @@ local function RenderCatalog(f, g)
     local raw = ((f.cbox:GetText() or ""):gsub("^%s+", ""):gsub("%s+$", ""))
     local linked = tonumber(raw:match("item:(%d+)"))
     local q = linked and "" or raw:lower()
-    local filtered = q ~= "" or linked ~= nil or f.onlineOnly
     -- the matching items, names read once each
     local items = {}
     for id, it in pairs(e.items) do
@@ -1125,8 +1341,15 @@ local function RenderCatalog(f, g)
         if lvl ~= "" then lvl = lvl .. "  " end
         r.detail:SetText(lvl .. S.IconMarkup("user", 12, C.muted) .. " " .. WhoText(it.who, 3)); r.detail:Show()
         r.btn:SetText(L("Commander")); r.btn:Show()
-        r.btnTip = { L("Commander"), L("Clic : commander à toute la guilde (le premier artisan qui accepte s'en charge)") }
-        if r.crafter then r.btnTip[3] = string.format(L("Maj-clic : commander à %s seulement"), r.crafter) end
+        -- one crafter only: shift-click would do the same as a click, so it is not offered
+        local others = 0
+        for _, c in ipairs(it.who) do if not c.me then others = others + 1 end end
+        if r.crafter and others == 1 then
+            r.btnTip = { L("Commander"), string.format(L("Clic : commander à %s, le seul artisan qui sait le fabriquer"), r.crafter) }
+        else
+            r.btnTip = { L("Commander"), L("Clic : commander à toute la guilde (le premier artisan qui accepte s'en charge)") }
+            if r.crafter then r.btnTip[3] = string.format(L("Maj-clic : commander à %s seulement"), r.crafter) end
+        end
         -- the reagents and every crafter go in the tooltip, built on hover only
         local id, re, who, crafter = it.id, it.re, it.who, r.crafter
         r.tip = function() return ItemTip(id, re, who, crafter) end
@@ -1179,54 +1402,7 @@ local function RenderCatalog(f, g)
         y = y + 6 + S.FitText(f.catMore, 0, CW, f.cat.content)
         f.catMore:Show()
     else f.catMore:Hide() end
-    -- the profession's crafters who shared recipes: their own lists
-    local sharing = {}
-    if not filtered then
-        for _, c in ipairs(e.crafters) do if c.n > 0 then sharing[#sharing + 1] = c end end
-        table.sort(sharing, ByCrafter)
-    end
-    if #sharing > 0 then
-        f.catHead:Set(L("Artisans de ce métier"), #sharing)
-        f.catHead:ClearAllPoints(); f.catHead:SetPoint("TOPLEFT", 0, -(y + 14)); f.catHead:Show()
-        y = y + 14 + 32 + 8
-        for _, c in ipairs(sharing) do
-            i = i + 1
-            local r = f.cat.Get(i)
-            r.kind, r.item, r.crafter, r.it = "crafter", nil, nil, nil
-            r.open = { name = c.name, prof = c.prof, me = c.me }
-            SetClass(r, c.name)
-            r.name:SetText(c.name .. (c.me and (" " .. S.Hex(C.muted) .. L("(toi)") .. "|r") or "")
-                .. (c.stars > 0 and (" " .. STAR .. S.Hex(C.gold) .. c.stars .. "|r") or ""))
-            r.detail:SetText(string.format(L("%s %d"), ProfLabel(key), c.rank) .. " · " .. Where(c.online)
-                .. " · " .. P(c.n, L("1 recette"), L("%d recettes"))); r.detail:Show()
-            r.btn:SetText(L("Voir les recettes")); r.btn:Show()
-            r.btnTip = { string.format(L("Recettes de %s"), c.name), string.format(L("Clic : voir les recettes de %s"), c.name) }
-            local tip = { c.name, r.detail:GetText() }
-            local sl = StarLine(c.name); if sl then tip[#tip + 1] = sl end
-            tip[#tip + 1] = string.format(L("Clic : voir les recettes de %s"), c.name)
-            r.tip, r.tipFill = tip, nil
-            local rh = r:Fit(CW)
-            r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
-            y = y + rh + 2
-        end
-    else f.catHead:Hide() end
     f.cat.HideFrom(i + 1)
-    -- declared the profession, shared nothing: who, and what they have to do
-    -- (under the empty state, which already says how recipes arrive: the names only)
-    if (#e.unshared > 0 or e.meUnshared) and not filtered then
-        local parts = {}
-        if #e.unshared > 0 then
-            local names = table.concat(e.unshared, ", ")
-            if f.catEmpty:IsShown() then parts[1] = string.format(L("Pas encore de recettes partagées par %s."), names)
-            elseif #e.unshared == 1 then parts[1] = string.format(L("Pas encore de recettes partagées par %s. Elles arrivent quand ce membre ouvre sa fenêtre de métier."), names)
-            else parts[1] = string.format(L("Pas encore de recettes partagées par %s. Elles arrivent quand ils ouvrent leur fenêtre de métier."), names) end
-        end
-        if e.meUnshared then parts[#parts + 1] = L("Ouvre ta fenêtre de métier pour partager les tiennes.") end
-        f.catNote:SetText(S.IconMarkup("info", 12, C.muted) .. " " .. table.concat(parts, " "))
-        f.catNote:ClearAllPoints(); f.catNote:SetPoint("TOPLEFT", 0, -(y + 10))
-        y = y + 10 + S.FitText(f.catNote, 0, CW, f.cat.content)
-        f.catNote:Show()
-    else f.catNote:Hide() end
     f.cat.content:SetHeight(math.max(1, y))
     return y
 end
@@ -1304,8 +1480,10 @@ local function RenderFind()
     end
     -- a profession picked in the grid: its catalogue
     if f.prof then
+        local g = GuildCrafts()
+        CrafterStrip(f, g[f.prof], f.prof)   -- sets the header's height before the list is placed
         local l = SetMode(f, "cat")
-        Fit(p, l, RenderCatalog(f, GuildCrafts()))
+        Fit(p, l, RenderCatalog(f, g))
         return
     end
     -- an item link (shift-click an item) or "item:12345": order it from the guild, recipe known or not

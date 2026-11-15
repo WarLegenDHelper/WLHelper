@@ -126,6 +126,7 @@ local function Finish()
   indexReady = true
   scanIds = nil
   for k in pairs(mobsCache) do mobsCache[k] = nil end
+  if ns.BossWatchReset then ns.BossWatchReset() end
   for k in pairs(nearCache) do nearCache[k] = nil end
   local list = onReady
   onReady = {}
@@ -228,6 +229,8 @@ local function NewRun(k, iid)
   k.objs = KillSnapshot()
   -- the run's numbers: XP and gold gained inside, when each boss died, the dungeon it is
   k.xp, k.money, k.at, k.lastKill, k.dkey, k.reported = 0, 0, {}, nil, nil, nil
+  -- the panel's right-click: marked killed by hand / marked not killed by hand
+  k.manual, k.off = nil, nil
 end
 -- Inside an instance: a new run when it is another instance, or the same one reset or left long ago.
 -- Outside: remember when you left.
@@ -497,7 +500,9 @@ local function Dynamic(res)
             local okD, v = pcall(ns.ObjDone, log, qid, o)
             if okD then done = v end
             -- finished now but not when the visit started: killed during this visit
-            if o.k == "kill" and done and log[qid] and fresh and k.objs and not k.objs[qid .. ":" .. oi] then
+            -- (unless marked "not killed" by hand on the panel)
+            if o.k == "kill" and done and log[qid] and fresh and k.objs and not k.objs[qid .. ":" .. oi]
+              and not (k.off and k.off[rec.en]) then
               rec.killed = true
               -- the guide's boss step reads the run's kills: this one counts too
               k.names[rec.en] = true
@@ -523,7 +528,11 @@ function ns.DungeonMobs(dkey, sync)
   if not res then
     res = BuildMobs(dkey)
     -- a list built before the index was ready is rebuilt once it is
-    if ready or not hasLib then mobsCache[dkey] = res end
+    if ready or not hasLib then
+      mobsCache[dkey] = res
+      -- the death checks pick up the new list (NPC ids)
+      if ns.BossWatchReset then ns.BossWatchReset() end
+    end
   end
   res.loading = (hasLib and not ready) or nil
   res.noLib = (not hasLib) or nil
@@ -1117,6 +1126,7 @@ local function HeadTip(head)
   elseif rec.rare then lines[#lines + 1] = { L.BOSS_SEEN, T.silver[1], T.silver[2], T.silver[3] } end
   if head.stale then lines[#lines + 1] = { L.BOSS_WAIT, T.warn[1], T.warn[2], T.warn[3] } end
   lines[#lines + 1] = L.BOSS_TT_CLICKM:format(MarkName(Marker(rec)))
+  if ns.BossCanToggle and ns.BossCanToggle() then lines[#lines + 1] = L.BOSS_TT_RCLICK end
   ns.ShowTip(head, lines)
 end
 
@@ -1219,6 +1229,8 @@ local function MakeHead(i)
   b:SetSize(SIZE, SIZE)
   b:RegisterForClicks("AnyUp", "AnyDown")   -- as the teleport and action-bar buttons, which work on this client
   b:SetAttribute("type", "macro")
+  -- the right button runs no secure action: it marks the boss killed or not (PostClick below)
+  b:SetAttribute("type2", "")
   local face = CreateFrame("Frame", nil, b)
   face:SetAllPoints()
   b.face = face
@@ -1253,7 +1265,19 @@ local function MakeHead(i)
   b:HookScript("OnMouseDown", function(self) self.press:Show() end)
   b:HookScript("OnMouseUp", function(self) self.press:Hide() end)
   -- after the click: say it when the creature was not found (out of sight, or another name)
-  b:HookScript("PostClick", function(self)
+  b:HookScript("PostClick", function(self, button, down)
+    -- right-click: killed / not killed by hand (plain data and textures: fine in combat too); press
+    -- and release both come here, the release toggles
+    if button == "RightButton" then
+      if down or not self.rec then return end
+      local now = GetTime and GetTime() or 0
+      if self.lastRight and now - self.lastRight < 0.3 then return end
+      self.lastRight = now
+      if ns.BossToggleKilled then ns.BossToggleKilled(self.rec) end
+      local okM, over = pcall(self.IsMouseOver, self)
+      if okM and over == true then HeadTip(self) end
+      return
+    end
     local want = self.rec and (self.rec.name or self.rec.en)
     if not want or not C_Timer then return end
     -- press and release both come here: one check per click
@@ -1299,6 +1323,7 @@ local function FillHead(b, rec, n)
   local m = MacroFor(rec)
   if b.macro ~= m then b:SetAttribute("macrotext", m); b.macro = m end
   b:SetAttribute("type", "macro")
+  b:SetAttribute("type2", "")
   PaintHead(b)
 end
 
@@ -1567,6 +1592,8 @@ local function RenderNow()
   P.attached = (host ~= nil and not db.bossDetached) and true or false
   local res = dkey and ns.DungeonMobs(dkey) or { bosses = {}, rares = {} }
   P.res = res
+  -- the death checks read the bosses shown now
+  if ns.BossWatchReset then ns.BossWatchReset() end
   local nb, nr = #res.bosses, #res.rares
   P.cols = COLS
   -- header: name, then from the right close, attach (when moved away), new run (during the run)
@@ -2073,6 +2100,13 @@ local function MarkKilled(name, id, enc, en)
   if id then k.ids[id] = true; hit = true end
   if enc then k.enc[enc] = true; hit = true end
   if hit then
+    -- a real kill overrides a "not killed" set by hand
+    for _, t in ipairs({ k.off or false, k.manual or false }) do
+      if t then
+        if name then t[name] = nil end
+        if en then t[en] = nil end
+      end
+    end
     -- when it died (the tooltip's "+12:34", the run's end)
     local t = Now()
     k.at = k.at or {}
@@ -2114,6 +2148,8 @@ local function AliveCheck(unit, rec, id)
   local iid = CurrentInstance()
   if not (iid and k.iid == iid) then return false end
   if not ((id and k.ids[id]) or (rec.en and k.names[rec.en])) then return false end
+  -- marked killed by hand on the panel: a mistake there never resets the run
+  if k.manual and rec.en and k.manual[rec.en] then return false end
   local okA, atk = pcall(UnitCanAttack or function() return nil end, "player", unit)
   if not (okA and bool(atk) == true) then return false end
   local okC, fight = pcall(UnitAffectingCombat or function() return true end, unit)
@@ -2187,6 +2223,136 @@ local function TargetCheck(unit)
 end
 ns.BossTargetCheck = TargetCheck
 
+-- The bosses of the dungeon you stand in, by NPC id and by name, for the cheap death checks
+-- (nameplates, the group's targets): false outside or without a boss list, nil = to build again
+-- (a loading screen, the panel drawn again).
+local watch, watchRetry = nil, 0
+local function Watch()
+  if watch then return watch end
+  -- nothing to watch (yet): asked again two seconds later at most, so the dungeon found late (its
+  -- key set after the loading screen) still gets its checks without a rebuild on every health tick
+  local now = GetTime and GetTime()
+  if watch == false and now and now < watchRetry then return false end
+  watch = false
+  if now then watchRetry = now + 2 else watch = nil end
+  if not CurrentInstance() then return false end
+  local list = Candidates()
+  if #list == 0 then return false end
+  local w = { ids = {}, names = {} }
+  for _, r in ipairs(list) do
+    for _, x in ipairs(r.ids or {}) do w.ids[x] = r end
+    local jn = r.journal and num(r.journal.npc)
+    if jn then w.ids[jn] = r end
+    if r.en then w.names[r.en] = r end
+    if r.name then w.names[r.name] = r end
+  end
+  watch = w
+  return watch
+end
+ns.BossWatchReset = function() watch, watchRetry = nil, 0 end
+
+-- A boss unit seen dead (UnitIsDead, or no health left; a secret answer is never trusted): counted
+-- as killed. No alive check here: a nameplate never starts a new run.
+local function KillCheck(unit)
+  local w = Watch()
+  if not w then return end
+  local id = NpcIdOf(unit)
+  local rec = id and w.ids[id]
+  if not rec then
+    -- by name only when the unit's NPC id is unknown, or the boss has none on record: a trash mob,
+    -- a summon or an image sharing a boss's name is not that boss
+    local okN, nm = pcall(UnitName, unit)
+    nm = okN and str(nm)
+    local r = nm and w.names[nm]
+    if r and (not id or (#(r.ids or {}) == 0 and not (r.journal and num(r.journal.npc)))) then rec = r end
+  end
+  if not rec then return end
+  local dead = false
+  local okD, d = pcall(UnitIsDead or function() return nil end, unit)
+  if okD and bool(d) == true then dead = true
+  elseif not (okD and secret(d)) and UnitHealth then
+    local okH, hp = pcall(UnitHealth, unit)
+    local okM, mx = pcall(UnitHealthMax or function() return nil end, unit)
+    hp, mx = okH and num(hp), okM and num(mx)
+    if hp == 0 and mx and mx > 0 then dead = true end
+  end
+  if not dead then return end
+  local k = Kills()
+  if CurrentInstance() == k.iid and ((id and k.ids[id]) or k.names[rec.en]) then return end
+  MarkKilled(rec.name, id, nil, rec.en)
+end
+ns.BossKillCheck = KillCheck
+
+-- the units whose health is watched for a boss's death (besides the target, see TargetCheck)
+local function Watched(unit)
+  if type(unit) ~= "string" or secret(unit) then return false end
+  if unit:sub(1, 9) == "nameplate" or unit:sub(1, 4) == "boss" then return true end
+  return unit == "focus" or unit == "mouseover"
+end
+
+-- The panel's right-click: the boss marked killed (by hand) or not killed. Not killed undoes every
+-- trace of it in the run (names, NPC ids, its encounter: a boss sharing the encounter, Ruuzlu with
+-- Chief Ukorz, stays killed) and the guide's boss step done only from that kill opens again.
+-- Only inside a dungeon, and only on the panel of the dungeon you stand in (another dungeon's
+-- bosses shown there are not this run's).
+local function CanToggle()
+  if not CurrentInstance() then return false end
+  local k = Kills()
+  local here = (CurrentInstance() == k.iid and RunDungeon(k)) or DungeonHere()
+  if here and P and P.dkey and P.dkey ~= here then return false end
+  return true
+end
+ns.BossCanToggle = CanToggle
+
+local function ToggleKilled(rec)
+  if not (rec and rec.en and CanToggle()) then return end
+  NewVisitCheck()
+  if not CanToggle() then return end
+  local k = Kills()
+  k.at = k.at or {}
+  if RecKilled(k, rec) then
+    local function clear(key) if key and key ~= "" then k.names[key] = nil; k.at[key] = nil end end
+    clear(rec.en); clear(rec.name)
+    for _, id in ipairs(rec.ids or {}) do k.ids[id] = nil; k.at["#" .. id] = nil end
+    if rec.journal then
+      clear(str(rec.journal.name))
+      local jn = num(rec.journal.npc)
+      if jn then k.ids[jn] = nil; k.at["#" .. jn] = nil end
+    end
+    if rec.journal and type(rec.journal.enc) == "table" then
+      for _, e in ipairs(rec.journal.enc) do
+        if k.enc[e] then
+          local others = {}
+          for _, list in ipairs({ P and P.res and P.res.bosses or {}, P and P.res and P.res.rares or {} }) do
+            for _, o in ipairs(list) do
+              if o ~= rec and o.en ~= rec.en and o.journal and type(o.journal.enc) == "table" then
+                for _, e2 in ipairs(o.journal.enc) do if e2 == e then others[#others + 1] = o end end
+              end
+            end
+          end
+          for _, o in ipairs(others) do
+            k.names[o.en] = true
+            if not k.at[o.en] then k.at[o.en] = k.at["e" .. e] end
+          end
+          k.enc[e] = nil; k.at["e" .. e] = nil
+        end
+      end
+    end
+    if k.manual then k.manual[rec.en] = nil end
+    k.off = k.off or {}
+    k.off[rec.en] = true
+    local dk = P and P.dkey or RunDungeon(k)
+    if ns.UndoBossStepKill and dk then pcall(ns.UndoBossStepKill, dk, rec.en) end
+    liveIid, liveRun = k.iid, k.run
+    ns.RefreshBosses(); GuideAfterKill()
+  else
+    MarkKilled(rec.name, nil, nil, rec.en)
+    k.manual = k.manual or {}
+    k.manual[rec.en] = true
+  end
+end
+ns.BossToggleKilled = ToggleKilled
+
 -- the game's "%s has been reset." as a pattern (nil when the client has no such string)
 local resetPat
 local function ResetPattern()
@@ -2202,16 +2368,16 @@ end
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "ENCOUNTER_START", "ENCOUNTER_END", "BOSS_KILL", "PLAYER_LOGOUT",
   "PLAYER_TARGET_CHANGED", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "NAME_PLATE_UNIT_ADDED", "UPDATE_MOUSEOVER_UNIT", "CHAT_MSG_SYSTEM",
-  "PLAYER_XP_UPDATE", "PLAYER_MONEY", "PLAYER_UNGHOST", "PLAYER_ALIVE" }) do
+  "PLAYER_XP_UPDATE", "PLAYER_MONEY", "PLAYER_UNGHOST", "PLAYER_ALIVE", "NAME_PLATE_UNIT_REMOVED", "UNIT_HEALTH" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
--- the target's health only (a dead boss you look at counts as killed)
-if not (ev.RegisterUnitEvent and pcall(ev.RegisterUnitEvent, ev, "UNIT_HEALTH", "target")) then
-  pcall(ev.RegisterEvent, ev, "UNIT_HEALTH")
-end
+-- UNIT_HEALTH: the target (TargetCheck), and the nameplates, focus, mouseover and boss frames of
+-- the dungeon's bosses (a boss dying in view counts as killed: some bosses here have no encounter)
 local questPending = false
+local GROUP_TARGETS = { "target", "focus", "party1target", "party2target", "party3target", "party4target", "boss1", "boss2", "boss3", "boss4", "boss5" }
 ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
   if e == "PLAYER_ENTERING_WORLD" then
+    watch, watchRetry = nil, 0
     if C_Timer and C_Timer.After then C_Timer.After(2.5, OnEntering) else OnEntering() end
   elseif e == "PLAYER_XP_UPDATE" then
     if a1 == nil or a1 == "player" then OnXP(); UpdateStats() end
@@ -2244,6 +2410,12 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
     if pending.render or pending.snap then pending.render, pending.snap = nil, nil; if P and P:IsShown() then Render() end end
     AlertAfterCombat()
     LookNext()
+    -- the end of a fight: a boss the group was hitting lies dead (no encounter event for it)
+    if Watch() then
+      for _, u in ipairs(GROUP_TARGETS) do
+        if UnitExists and UnitExists(u) then KillCheck(u) end
+      end
+    end
   elseif e == "ENCOUNTER_END" then
     -- encounterID, encounterName, difficultyID, groupSize, success
     if num(a5) == 1 then
@@ -2274,7 +2446,12 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
       ns.RareAlert(unit)
     end
   elseif e == "UNIT_HEALTH" then
-    if a1 == "target" then TargetCheck("target") end
+    -- the target always (as before); the others only while there are bosses to watch (Watch is
+    -- cached, and asked again at most every two seconds while it has none)
+    if a1 == "target" then TargetCheck("target")
+    elseif Watched(a1) then KillCheck(a1) end
+  elseif e == "NAME_PLATE_UNIT_REMOVED" then
+    if Watched(a1) then KillCheck(a1) end
   elseif (e == "QUEST_LOG_UPDATE" or e == "QUEST_TURNED_IN") and P and P:IsShown() and not questPending then
     questPending = true
     local function go() questPending = false; ns.RefreshBosses() end

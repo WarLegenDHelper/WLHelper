@@ -116,7 +116,8 @@ end
 local function BossStepDone(log, i, st)
   if ns.BossStepKilled(st) then
     if #st.acts > 0 and not StepAuto(log, st) then return false end
-    if not ns.BossRunLive or ns.BossRunLive() then SetManual(st, true) end
+    -- ("kill": done from the kill, undone when the boss panel's right-click marks it not killed)
+    if not ns.BossRunLive or ns.BossRunLive() then SetManual(st, Manual(st) or "kill") end
     return true
   end
   local steps = Steps()
@@ -131,6 +132,15 @@ local function BossStepDone(log, i, st)
   return false
 end
 ns.BossStepDone = BossStepDone
+-- The boss panel's right-click marked this boss not killed: its steps done only from the kill
+-- open again (a step ticked by hand stays ticked).
+function ns.UndoBossStepKill(dkey, en)
+  local any = false
+  for _, st in ipairs(Steps()) do
+    if st.bossStep and st.ins == dkey and st.bossEn == en and Manual(st) == "kill" then SetManual(st, nil); any = true end
+  end
+  return any
+end
 -- Out of a dungeon: its boss steps with nothing for you count as skipped.
 function ns.SkipOptionalBosses(dkey)
   local log = ns.LogEntries()
