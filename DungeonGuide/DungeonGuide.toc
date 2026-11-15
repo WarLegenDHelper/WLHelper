@@ -1,0 +1,30 @@
+## Interface: 16001
+## Title: |cff0cd29dWL|r Helper
+## Notes: Dungeon quests step by step, Craftsman's Writs and a built-in GPS (flights, zeppelins, teleports). Dungeons: dungeon picker, custom multi-dungeon route from where you stand, ready check, waypoints, arrow, target/mark and quest item buttons, quest sharing. French / English. /wl
+## Notes-frFR: Quêtes de donjon pas à pas, Craftsman's Writs et GPS intégré (vols, zeppelins, téléportations). Donjons : sélecteur de donjons, route perso sur plusieurs donjons depuis ta position, check-list avant d'entrer, points, flèche, boutons cibler/marquer et objet de quête, partage. Français / anglais. /wl
+## Author: Alandir (WarLegend)
+## Version: 4.0
+## X-Credits: LibForeverData (CC BY 4.0), RestedXP Guides (CC BY-NC-SA 4.0), ForeverDungeonJournal, Naowh Forever, Wowhead via Waylaid Crate Helper, TSM, wow.gg, Zygor (coordinates). See CREDITS.txt
+## IconTexture: Interface\Icons\INV_Misc_Map_01
+## OptionalDeps: EllesmereUI, NaowhForever, NaowhForever_DungeonJournal, TomTom, WayDirect, ForeverDungeonJournal, Auctionator, TradeSkillMaster, Mastercraft
+## SavedVariables: WLWritsDB
+## SavedVariablesPerCharacter: WLDTDB, WLWritsCharDB
+
+Locale.lua
+Texts_frFR.lua
+Theme.lua
+Data.lua
+Engine.lua
+Sync.lua
+Curated.lua
+Nav.lua
+UI.lua
+Picker.lua
+Main.lua
+Writs\Locale.lua
+Writs\Data.lua
+Writs\Core.lua
+Writs\Route.lua
+Writs\Scan.lua
+Writs\UI.lua
+Writs\Arrow.lua

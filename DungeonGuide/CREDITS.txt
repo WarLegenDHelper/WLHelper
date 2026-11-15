@@ -1,0 +1,31 @@
+WL Helper (ex WL Dungeon Guide) - credits / crédits
+
+Guide de donjons - données et vérifications :
+- LibForeverData : quêtes, PNJ, objets, positions (CC BY 4.0).
+- RestedXP Guides : ordre et détails de quelques chaînes (Onyxia Horde, clé de Scholomance,
+  Unending Torment), réécrits ici ; CC BY-NC-SA 4.0 - https://creativecommons.org/licenses/by-nc-sa/4.0/
+  Les parties adaptées de RestedXP restent sous CC BY-NC-SA 4.0 (usage non commercial, même licence).
+- ForeverDungeonJournal et Naowh Forever : listes de quêtes de donjon, noms français, clés ;
+  les conseils de boss de Naowh sont lus en direct dans son addon, pas copiés.
+- FojjiCore : non utilisé comme source (sa licence l'interdit) ; seulement comparé pour repérer
+  des quêtes manquantes, ensuite vérifiées dans LibForeverData.
+
+Module Writs (Craftsman's Writs) - données :
+- Naowh Forever (Naowh) : l'objet demandé par chaque writ (WritRequestsData) et les lieux de remise
+  (JourneysData / QuestSpots), recopiés dans Writs/Data.lua.
+- LibForeverData : quêtes des writs, PNJ de remise et leurs noms (CC BY 4.0).
+- Wowhead (base WoW Forever), via le catalogue de Waylaid Crate and Writs Helper (qqytqqyt) :
+  writs réservés à une faction, nombre d'objets demandés, PNJ de remise. Seuls ces faits sont repris,
+  pas le code ; son principe de scan de l'HV par lots d'item keys a servi d'inspiration.
+- TradeSkillMaster (application de bureau) : prix de secours (instantané) dans Writs/Data.lua.
+- Guide « Merchant's Favor » de wow.gg : règles des writs (réputation par rang, une fois par jour).
+- Zygor Guides (données de trajet LibRover pour Forever) : positions des quais des zeppelins et des
+  bateaux et points d'arrivée des téléportations de mage, utilisées par le GPS. Seules ces
+  coordonnées sont reprises, aucun texte ni code.
+- Naowh Forever : la façon de lire les points de vol (C_TaxiMap) et de convertir les positions
+  monde (C_Map.GetWorldPosFromMapPos) a servi de modèle.
+
+Fonctionne avec (optionnel, lu en direct, rien n'est copié) :
+- Auctionator (son API publique : prix, recherche, liste d'achat), TradeSkillMaster (TSM_API),
+  Mastercraft (recettes connues, pour la mention « craft »), TomTom, EllesmereUI (couleur d'accent
+  et police, pour le style).

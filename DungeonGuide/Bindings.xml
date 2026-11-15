@@ -1,0 +1,8 @@
+<Bindings>
+  <Binding name="WLDT_TOGGLE" header="WLDT" category="ADDONS">WLDT_Binding("toggle")</Binding>
+  <Binding name="WLDT_PICK" category="ADDONS">WLDT_Binding("pick")</Binding>
+  <Binding name="WLDT_NEXT" category="ADDONS">WLDT_Binding("next")</Binding>
+  <Binding name="WLDT_PREV" category="ADDONS">WLDT_Binding("prev")</Binding>
+  <Binding name="WLDT_POINTS" category="ADDONS">WLDT_Binding("points")</Binding>
+  <Binding name="WLDT_ARROW" category="ADDONS">WLDT_Binding("arrow")</Binding>
+</Bindings>
