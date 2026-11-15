@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.67] — 2026-11-15
+
+### Corrigé / Fixed
+- **Clic sur un portrait de boss sans effet** : le portrait réagit maintenant à l'appui comme au relâchement, comme les boutons de téléportation et du guide qui marchent sur ce client. Si le boss n'est pas ciblé après le clic, un message le dit dans le chat avec le nom cherché.
+  *Boss portraits: click now registered like the working buttons; a chat line says when the boss was not targeted.*
+
 ## [1.0.0-beta.66] — 2026-11-15
 
 ### Corrigé / Fixed

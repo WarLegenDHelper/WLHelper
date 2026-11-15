@@ -219,7 +219,7 @@ local S = {
     OV_SEC_DONE = "Rendues", OV_EMPTY_NONE = "Ce donjon n'a pas de quête.", OV_GO_DONE = "Toutes les quêtes sont rendues.",
     TT_SHIFT_LINK = "Maj-clic : lier dans le chat",
     -- bosses and rares panel (Bosses.lua)
-    BOSS_TITLE = "Boss et rares", BOSS_SEC = "Boss", BOSS_RARES = "Rares", BOSS_LVL = "Niveau %d", BOSS_LVL2 = "Niveau %d-%d",
+    BOSS_NOTFOUND = "Pas ciblé : %s. Il doit être en vue ; s'il l'est, dis-le-nous (le clic n'arrive peut-être pas).", BOSS_TITLE = "Boss et rares", BOSS_SEC = "Boss", BOSS_RARES = "Rares", BOSS_LVL = "Niveau %d", BOSS_LVL2 = "Niveau %d-%d",
     BOSS_TARGET = "Cibler et marquer",
     BOSS_TT_TARGET = "Cible %s et pose le repère %s sur lui.", BOSS_TT_CLICK = "Clic : cibler et marquer",
     BOSS_WAIT = "Mis à jour après le combat",
@@ -442,7 +442,7 @@ local S = {
     OV_SEC_DONE = "Turned in", OV_EMPTY_NONE = "This dungeon has no quests.", OV_GO_DONE = "All quests are turned in.",
     TT_SHIFT_LINK = "Shift-click: link in chat",
     -- bosses and rares panel (Bosses.lua)
-    BOSS_TITLE = "Bosses and rares", BOSS_SEC = "Boss", BOSS_RARES = "Rares", BOSS_LVL = "Level %d", BOSS_LVL2 = "Level %d-%d",
+    BOSS_NOTFOUND = "Not targeted: %s. It must be in sight; if it is, tell us (the click may not reach it).", BOSS_TITLE = "Bosses and rares", BOSS_SEC = "Boss", BOSS_RARES = "Rares", BOSS_LVL = "Level %d", BOSS_LVL2 = "Level %d-%d",
     BOSS_TARGET = "Target and mark", BOSS_TT_TARGET = "Targets %s and puts the %s marker on it.",
     BOSS_TT_CLICK = "Click: target and mark", BOSS_WAIT = "Updates after combat",
     BOSS_KILLED = "Killed during this visit", BOSS_R_BOSS = "Boss", BOSS_R_ELITE = "Elite", BOSS_R_RAREELITE = "Rare elite",

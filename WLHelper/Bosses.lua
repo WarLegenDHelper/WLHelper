@@ -1217,7 +1217,7 @@ end
 local function MakeHead(i)
   local b = CreateFrame("Button", "WLBossTarget" .. i, P, "SecureActionButtonTemplate")
   b:SetSize(SIZE, SIZE)
-  b:RegisterForClicks("LeftButtonUp", "LeftButtonDown")
+  b:RegisterForClicks("AnyUp", "AnyDown")   -- as the teleport and action-bar buttons, which work on this client
   b:SetAttribute("type", "macro")
   local face = CreateFrame("Frame", nil, b)
   face:SetAllPoints()
@@ -1252,6 +1252,20 @@ local function MakeHead(i)
   b:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); self.press:Hide(); ns.HideTip() end)
   b:HookScript("OnMouseDown", function(self) self.press:Show() end)
   b:HookScript("OnMouseUp", function(self) self.press:Hide() end)
+  -- after the click: say it when the creature was not found (out of sight, or another name)
+  b:HookScript("PostClick", function(self)
+    local want = self.rec and (self.rec.name or self.rec.en)
+    if not want or not C_Timer then return end
+    -- press and release both come here: one check per click
+    local now = GetTime and GetTime() or 0
+    if self.lastPost and now - self.lastPost < 0.5 then return end
+    self.lastPost = now
+    C_Timer.After(0.3, function()
+      local ok, cur = pcall(UnitName, "target")
+      if ok and type(cur) == "string" and not secret(cur) and cur == want then return end
+      ns.Print((L.BOSS_NOTFOUND or "Not found: %s (it must be in sight).") :format(want))
+    end)
+  end)
   return b
 end
 
@@ -1825,7 +1839,7 @@ local function BuildAlertButton()
   AB = CreateFrame("Button", "WLRareAlertTarget", UIParent, "SecureActionButtonTemplate")
   AB:SetFrameStrata("HIGH")
   AB:SetHeight(24)
-  AB:RegisterForClicks("LeftButtonUp", "LeftButtonDown")
+  AB:RegisterForClicks("AnyUp", "AnyDown")
   AB:SetAttribute("type", "macro")
   ns.Flat(AB, T.btnFill, T.btnEdge)
   AB.hl = ns.Tex(AB, "BACKGROUND", T.hoverFill); AB.hl:SetAllPoints(); AB.hl:SetAlpha(0)
