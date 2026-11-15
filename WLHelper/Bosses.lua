@@ -1,20 +1,32 @@
--- Bosses.lua: the bosses and rares of a dungeon as a strip of heads beside the guide (or on its own).
+-- Bosses.lua: the bosses and rares of a dungeon as a small panel beside the guide (or on its own).
 -- Data read LIVE from LibForeverData (optional dependency, never copied): every NPC whose spawns
 -- sit on the dungeon's instance map (ns.D[k].inst = the client Map id LibForeverData stores for
 -- instance spawns), ranked boss (3) or rare (2 rare elite, 4 rare), plus the bosses of the walk
 -- order (ns.WALK / ns.BossOrder: most 5-player bosses are only "elite" in the data).
--- The strip: one square portrait per boss in dungeon order, then the rares under a "Rares" label.
--- Killed: greyed, veiled, a check. A rare not seen yet: greyed and faded (seen = its nameplate,
--- your target or your mouse met it once, kept in WLDTDB.raresSeen). The name, level, quests and
--- the click line live in the tooltip. Each head IS a secure button (macro: target and mark),
--- created, moved, shown and given its macro out of combat only; changes in combat wait for
--- PLAYER_REGEN_ENABLED (only the colours change in combat).
+-- The panel: a header (the dungeon's name, a "new run" button, close), the current run's numbers
+-- (time since entering, XP and gold gained inside), then a grid of ROUND creature portraits, five per
+-- row in dungeon order, and the rares under a "Rares" label. Every creature gets a face: its display
+-- id (the dungeon journal's model, the game's encounter journal, or a one-time hidden model lookup
+-- made outside instances and kept in WLDTDB.bossDisplay) drawn with
+-- SetPortraitTextureFromCreatureDisplayID; once the creature is seen as a unit its live portrait;
+-- else its creature family's painted icon, cropped round. Forever paints a creature portrait as a
+-- black square until its model has loaded: portraits are drawn off screen first and moved in once
+-- ready (one texture per creature, kept for the session).
+-- Killed: greyed, veiled, a check. A rare not seen yet: a grey silhouette (seen = its nameplate,
+-- your target or your mouse met it once, kept in WLDTDB.raresSeen); seen: full colour, silver ring.
+-- The name, level, quests and the click line live in the tooltip. Each portrait IS a secure button
+-- (macro: target and mark), created, moved, shown and given its macro out of combat only; changes
+-- in combat wait for PLAYER_REGEN_ENABLED (only colours and texts change in combat).
+-- Run numbers (WLDTDB.bossKills: xp, money, at, lastKill, dkey): XP from PLAYER_XP_UPDATE deltas and
+-- gold from PLAYER_MONEY gains while inside the run's copy. Leaving keeps them in WLDTDB.lastRun
+-- and prints a one-line report.
 -- Rare alert (inside a dungeon, WLDTDB.rareAlert ~= false; the open world too when
 -- WLDTDB.rareAlertWorld is true): a rare shows up -> a sound and a small banner with a secure
 -- "Target and mark" button (made out of combat), at most once per 10 min per rare.
 -- API: ns.DungeonMobs(dkey[, sync]) -> { bosses = {...}, rares = {...}, loading, source }
 --      ns.ShowBosses(dkey), ns.HideBosses(), ns.ToggleBosses(dkey), ns.AttachBosses(parentFrame),
---      ns.RefreshBosses(), ns.BossesShown(), ns.RareSeen(npcId), ns.RareAlert(unit)
+--      ns.RefreshBosses(), ns.BossesShown(), ns.RareSeen(npcId), ns.RareAlert(unit),
+--      ns.NewBossRun(), ns.BossCommand(), ns.BossRunStats(dkey)
 local ADDON, ns = ...
 local L = ns.L
 local T = ns.Tok
@@ -214,6 +226,8 @@ local function NewRun(k, iid)
   k.run = (k.run or 0) + 1
   k.start, k.reset, k.left = Now(), nil, nil
   k.objs = KillSnapshot()
+  -- the run's numbers: XP and gold gained inside, when each boss died, the dungeon it is
+  k.xp, k.money, k.at, k.lastKill, k.dkey, k.reported = 0, 0, {}, nil, nil, nil
 end
 -- Inside an instance: a new run when it is another instance, or the same one reset or left long ago.
 -- Outside: remember when you left.
@@ -387,7 +401,7 @@ local function BuildMobs(dkey)
       local listed = mine[r.name] ~= nil or (jb ~= nil and not shared)
       if (rk == 2 or rk == 3 or rk == 4 or listed) and MyWing(r) then
         local rec = { id = r.id, en = r.name, rank = rk, minL = num(r.minLevel), maxL = num(r.maxLevel),
-          rare = (rk == 2 or rk == 4), order = mine[r.name] or (jb and jb._i and 200 + jb._i) or nil,
+          rare = (rk == 2 or rk == 4) or (jb ~= nil and jb.rare == true), order = mine[r.name] or (jb and jb._i and 200 + jb._i) or nil,
           model = jb and num(jb.model) or nil, journal = jb, sub = str(r.subName) }
         Add(rec, rec.rare and res.rares or res.bosses)
       end
@@ -400,9 +414,10 @@ local function BuildMobs(dkey)
   for _, nm in ipairs(lists) do
     if nm and not byName[nm] then
       local jb = boByEn[nm]
-      local rec = { id = jb and jb.npc, en = nm, rank = 1, rare = false, order = mine[nm],
+      local rare = (jb ~= nil and jb.rare == true)
+      local rec = { id = jb and jb.npc, en = nm, rank = rare and 4 or 1, rare = rare, order = mine[nm],
         model = jb and num(jb.model) or nil, journal = jb }
-      Add(rec, res.bosses)
+      Add(rec, rare and res.rares or res.bosses)
       res.source = res.source or "journal"
     end
   end
@@ -414,6 +429,8 @@ local function BuildMobs(dkey)
     return a.en < b.en
   end)
   table.sort(res.rares, function(a, b)
+    local oa, ob = a.order or 10000, b.order or 10000
+    if oa ~= ob then return oa < ob end
     local la, lb = a.maxL or 0, b.maxL or 0
     if la ~= lb then return la < lb end
     return a.en < b.en
@@ -517,16 +534,24 @@ function ns.DungeonMobs(dkey, sync)
 end
 
 -- ---------------------------------------------------------------- the guide's walkthrough
--- A boss's name as this client writes it (the strip's list when built, else the English name).
+-- A boss's name as this client writes it (the panel's list when built, else the English name).
 function ns.BossLocalName(dkey, en)
   local res = dkey and mobsCache[dkey]
-  if res then for _, r in ipairs(res.bosses) do if r.en == en then return LocalName(r.id, r.en, r.journal) end end end
+  if res then
+    for _, list in ipairs({ res.bosses, res.rares }) do
+      for _, r in ipairs(list) do if r.en == en then return LocalName(r.id, r.en, r.journal) end end
+    end
+  end
   return en
 end
 -- The NPC ids of a boss on the dungeon's map (LibForeverData, once the index is ready).
 function ns.BossNpcIds(dkey, en)
   local res = dkey and mobsCache[dkey]
-  if res then for _, r in ipairs(res.bosses) do if r.en == en then return r.ids end end end
+  if res then
+    for _, list in ipairs({ res.bosses, res.rares }) do
+      for _, r in ipairs(list) do if r.en == en then return r.ids end end
+    end
+  end
   return nil
 end
 
@@ -631,13 +656,409 @@ function ns.BossLoot(dkey, en, npcIds)
   return out
 end
 
--- ---------------------------------------------------------------- the strip of heads
-local P               -- the strip
+-- ---------------------------------------------------------------- the dungeon you are in
+local function DungeonHere()
+  if not ns.InstanceKeys then return nil end
+  local okK, keys, iid = pcall(ns.InstanceKeys)
+  if not okK or type(keys) ~= "table" or #keys == 0 then return nil, nil end
+  if ns.instIn then for _, k in ipairs(keys) do if k == ns.instIn then return k, iid end end end
+  local sel = ns.route and ns.route.sel
+  if sel then for _, k in ipairs(keys) do if sel[k] then return k, iid end end end
+  if #keys == 1 then return keys[1], iid end
+  return nil, iid
+end
+
+-- ---------------------------------------------------------------- run numbers
+-- The run in progress (inside its copy) -> the kills record, else nil.
+local function InRun()
+  local iid = CurrentInstance()
+  local k = Kills()
+  if iid and k.iid == iid then return k end
+  return nil
+end
+-- The run's dungeon, learned inside (the instance alone may hold several wings).
+local function RunDungeon(k)
+  if not k.dkey and CurrentInstance() == k.iid then k.dkey = DungeonHere() end
+  return k.dkey
+end
+
+-- XP and money seen last (session only: a loading screen sets them again, nothing counts across it)
+local xpLast, xpMax, xpLvl, moneyLast
+local function ReadXP()
+  if not (UnitXP and UnitXPMax) then return nil end
+  local okX, x = pcall(UnitXP, "player")
+  local okM, m = pcall(UnitXPMax, "player")
+  local okL, l = pcall(UnitLevel or function() return nil end, "player")
+  return okX and num(x) or nil, okM and num(m) or nil, okL and num(l) or nil
+end
+local function ReadMoney()
+  if not GetMoney then return nil end
+  local ok, m = pcall(GetMoney)
+  return ok and num(m) or nil
+end
+local function Baseline()
+  xpLast, xpMax, xpLvl = ReadXP()
+  moneyLast = ReadMoney()
+end
+-- PLAYER_XP_UPDATE: the gain since the last reading goes to the run. A level-up is the bar rolling
+-- over (the XP read goes down): what was left of the old bar plus the new bar's XP, counted once.
+-- The client may update the XP, the bar's size and the level in separate events: a level read
+-- higher without a rollover adds only the XP difference, and the old bar's size is kept for the
+-- rollover still to come.
+local function OnXP()
+  local x, m, l = ReadXP()
+  if not x then return end
+  local k = InRun()
+  local rolled = xpLast ~= nil and x < xpLast
+  if k and xpLast then
+    local d
+    if rolled then d = math.max(0, (xpMax or xpLast) - xpLast) + x
+    else d = x - xpLast end
+    if d > 0 then k.xp = (k.xp or 0) + d end
+  end
+  if rolled then
+    xpMax = m
+    xpLvl = math.max(l or 0, (xpLvl or l or 0) + 1)
+  elseif l and xpLvl and l > xpLvl then
+    -- the level first, the XP field later: keep the old bar's size for its rollover
+    xpLvl = l
+  else
+    xpMax = m
+    xpLvl = l or xpLvl
+  end
+  xpLast = x
+end
+-- PLAYER_MONEY: gains only (purchases and repairs inside do not count against the run)
+local function OnMoney()
+  local m = ReadMoney()
+  if not m then return end
+  local k = InRun()
+  if k and moneyLast and m > moneyLast then k.money = (k.money or 0) + (m - moneyLast) end
+  moneyLast = m
+end
+
+-- No XP to show at the level cap.
+local function AtCap()
+  if IsXPUserDisabled then
+    local ok, v = pcall(IsXPUserDisabled)
+    if ok and v == true then return true end
+  end
+  local okL, l = pcall(UnitLevel or function() return nil end, "player")
+  l = okL and num(l)
+  local maxL = 60
+  if GetMaxPlayerLevel then
+    local okM, mx = pcall(GetMaxPlayerLevel)
+    maxL = okM and num(mx) or maxL
+  end
+  return l ~= nil and l >= maxL
+end
+
+-- 38200 -> "38 200" (fr) / "38,200" (en)
+local function FmtNum(n)
+  n = math.floor((n or 0) + 0.5)
+  local s = tostring(n)
+  local sep = ns.lang == "fr" and " " or ","
+  local out = s:reverse():gsub("(%d%d%d)", "%1" .. sep):reverse()
+  if out:sub(1, #sep) == sep then out = out:sub(#sep + 1) end
+  return out
+end
+ns.BossFmtNum = FmtNum
+-- seconds -> "4:05", "1:02:07"
+local function FmtClock(sec)
+  sec = math.max(0, math.floor(sec or 0))
+  local h, m, s = math.floor(sec / 3600), math.floor((sec % 3600) / 60), sec % 60
+  if h > 0 then return ("%d:%02d:%02d"):format(h, m, s) end
+  return ("%d:%02d"):format(m, s)
+end
+ns.BossFmtClock = FmtClock
+
+-- Was this head's creature killed in run k (whatever instance you are in now)?
+local function RecKilled(k, rec)
+  if k.names[rec.en] or (rec.name and k.names[rec.name]) then return true end
+  for _, id in ipairs(rec.ids or {}) do if k.ids[id] then return true end end
+  if rec.journal and type(rec.journal.enc) == "table" then
+    for _, e in ipairs(rec.journal.enc) do if k.enc[e] then return true end end
+  end
+  return false
+end
+-- When it died (server time), nil when unknown.
+local function KillTime(k, rec)
+  local at = k.at
+  if not at then return nil end
+  local t = at[rec.en] or (rec.name and at[rec.name])
+  for _, id in ipairs(rec.ids or {}) do t = t or at["#" .. id] end
+  if rec.journal and type(rec.journal.enc) == "table" then
+    for _, e in ipairs(rec.journal.enc) do t = t or at["e" .. e] end
+  end
+  return t
+end
+
+-- The numbers of the run shown for `dkey`: { secs, xp, money, killed, total, done } or nil when
+-- the last run was in another dungeon. The time runs from the entry to the last boss's death
+-- (frozen while you are outside).
+function ns.BossRunStats(dkey, res)
+  local k = Kills()
+  if not (dkey and k.start and RunDungeon(k) == dkey) then return nil end
+  res = res or (mobsCache[dkey])
+  local killed, total = 0, 0
+  for _, rec in ipairs(res and res.bosses or {}) do
+    total = total + 1
+    if RecKilled(k, rec) then killed = killed + 1 end
+  end
+  local done = total > 0 and killed == total and k.lastKill ~= nil
+  local stop
+  if done then stop = k.lastKill
+  elseif CurrentInstance() == k.iid then stop = Now()
+  else stop = k.left or k.t or Now() end
+  return { secs = math.max(0, stop - k.start), xp = k.xp or 0, money = k.money or 0,
+    killed = killed, total = total, done = done }
+end
+
+-- "Zul'Farrak : 32 min · 38 200 XP · 12 po · 7/7 boss"
+local function DurWords(sec)
+  local m = math.floor((sec or 0) / 60)
+  if m >= 60 then return L.RUN_HMIN:format(math.floor(m / 60), m % 60) end
+  return L.RUN_MIN:format(m)
+end
+local function MoneyWords(c)
+  c = math.floor(c or 0)
+  local g, s = math.floor(c / 10000), math.floor((c % 10000) / 100)
+  if g > 0 then return L.RUN_G:format(g) end
+  if s > 0 then return L.RUN_S:format(s) end
+  return L.RUN_C:format(c % 100)
+end
+function ns.BossRunReport(dkey, st)
+  local name = ns.DName(dkey)
+  if AtCap() then
+    return L.RUN_REPORT_NOXP:format(name, DurWords(st.secs), MoneyWords(st.money), st.killed, st.total)
+  end
+  return L.RUN_REPORT:format(name, DurWords(st.secs), FmtNum(st.xp), MoneyWords(st.money), st.killed, st.total)
+end
+-- Out of the dungeon: the run's numbers kept in WLDTDB.lastRun and one line in the chat, once per
+-- change. Dead or a ghost (a wipe, a hearthstone after a release): the numbers are kept now and
+-- the chat line waits until you are alive outside (k.reportDue).
+local function RunReport()
+  local k = Kills()
+  local dkey = k.dkey
+  if not (dkey and k.start and ns.D and ns.D[dkey]) then k.reportDue = nil return end
+  local dead = false
+  if UnitIsDeadOrGhost then
+    local ok, d = pcall(UnitIsDeadOrGhost, "player")
+    dead = ok and d == true
+  end
+  local okR, res = pcall(ns.DungeonMobs, dkey)
+  local st = ns.BossRunStats(dkey, okR and res or nil)
+  if not st or (st.killed == 0 and st.xp == 0 and st.money == 0) then k.reportDue = nil return end
+  local sig = k.run .. ":" .. st.killed .. ":" .. st.xp .. ":" .. st.money
+  if k.reported == sig and not k.reportDue then return end
+  k.reported = sig
+  DB().lastRun = { dkey = dkey, at = Now(), secs = st.secs, xp = st.xp, money = st.money,
+    killed = st.killed, total = st.total, done = st.done or nil }
+  if dead then k.reportDue = true return end
+  k.reportDue = nil
+  if ns.Print then ns.Print(ns.BossRunReport(dkey, st)) end
+end
+ns.BossRunReportNow = RunReport
+
+-- ---------------------------------------------------------------- faces
+-- Display ids learned once (a hidden model, outside instances): WLDTDB.bossDisplay[npcId].
+local function DisplayDB()
+  local db = DB()
+  db.bossDisplay = db.bossDisplay or {}
+  return db.bossDisplay
+end
+
+-- The game's encounter journal: the creature of an encounter (matched by NPC id, else the only one).
+local ejCache = {}
+local function EJDisplay(rec)
+  local jb = rec.journal
+  if not (jb and type(jb.enc) == "table" and EJ_GetCreatureInfo) then return nil end
+  if ejCache[rec.en] ~= nil then return ejCache[rec.en] or nil end
+  local want = {}
+  for _, id in ipairs(rec.ids or {}) do want[id] = true end
+  if rec.id then want[rec.id] = true end
+  local found
+  for _, enc in ipairs(jb.enc) do
+    local only, count = nil, 0
+    for i = 1, 8 do
+      local ok, cid, _, _, disp = pcall(EJ_GetCreatureInfo, i, enc)
+      if not ok then break end
+      cid, disp = num(cid), num(disp)
+      if not cid and not disp then break end
+      count = count + 1
+      only = only or disp
+      if cid and want[cid] and disp and disp > 0 then found = disp break end
+    end
+    if not found and count == 1 and only and only > 0 then found = only end
+    if found then break end
+  end
+  ejCache[rec.en] = found or false
+  return found
+end
+
+-- The hidden model lookup: one creature at a time, outside instances and combat only (inside, a
+-- hidden model load can stall the loading screen). The result is kept for good.
+local lookQ, lookTried, lookBusy, lookModel = {}, {}, false, nil
+local RefreshSoon
+local LookNext
+local function LookDone(npc, did)
+  lookBusy = false
+  if did then DisplayDB()[npc] = did; if RefreshSoon then RefreshSoon() end end
+  if C_Timer and C_Timer.After then C_Timer.After(0.5, LookNext) end
+end
+local function LookModel()
+  if lookModel ~= nil then return lookModel or nil end
+  local ok, m = pcall(CreateFrame, "PlayerModel", nil, UIParent)
+  if not (ok and m and m.SetCreature and m.GetDisplayInfo) then lookModel = false return nil end
+  lookModel = m
+  m:SetSize(1, 1)
+  m:SetAlpha(0)
+  m:SetPoint("TOPLEFT", UIParent, "TOPRIGHT", 10000, 0)
+  m:Show()
+  return m
+end
+LookNext = function()
+  if lookBusy or #lookQ == 0 then return end
+  if CurrentInstance() or InCombat() or not (C_Timer and C_Timer.After) then return end
+  if not LookModel() then lookQ = {} return end
+  local npc = table.remove(lookQ, 1)
+  if DisplayDB()[npc] then return LookNext() end
+  lookBusy = true
+  if lookModel.ClearModel then pcall(lookModel.ClearModel, lookModel) end
+  pcall(lookModel.SetCreature, lookModel, npc)
+  local tries = 0
+  local function poll()
+    tries = tries + 1
+    local ok, did = pcall(lookModel.GetDisplayInfo, lookModel)
+    did = ok and num(did) or nil
+    if did and did > 0 then LookDone(npc, did)
+    elseif tries >= 10 or CurrentInstance() then LookDone(npc, nil)
+    else C_Timer.After(0.3, poll) end
+  end
+  C_Timer.After(0.3, poll)
+end
+local function QueueLookup(npc)
+  npc = num(npc)
+  if not npc or lookTried[npc] or DisplayDB()[npc] then return end
+  lookTried[npc] = true
+  lookQ[#lookQ + 1] = npc
+  LookNext()
+end
+-- The creature stood in front of you (nameplate, target, mouse): it is in the client's cache now,
+-- so a lookup that failed before may be tried again; out of combat its display id is read from the
+-- unit itself when the client allows it (its model is already loaded).
+local learnAt = {}
+local function LearnUnit(unit, npc)
+  npc = num(npc)
+  if not (npc and unit) or num(DisplayDB()[npc]) then return end
+  lookTried[npc] = nil
+  if InCombat() or lookBusy then return end
+  -- one read per creature every 15 s at most (the mouse and the target fire often)
+  local now = (GetTime and num(GetTime())) or 0
+  if learnAt[npc] and now >= learnAt[npc] and now - learnAt[npc] < 15 then return end
+  learnAt[npc] = now
+  local m = LookModel()
+  if not (m and m.SetUnit) then return end
+  if not pcall(m.SetUnit, m, unit) then return end
+  local ok, did = pcall(m.GetDisplayInfo, m)
+  did = ok and num(did) or nil
+  if m.ClearModel then pcall(m.ClearModel, m) end
+  if did and did > 0 then
+    DisplayDB()[npc] = did
+    if RefreshSoon then RefreshSoon() end
+  end
+end
+
+-- The creature's display id: the dungeon journal's model, one learned before, the encounter journal;
+-- else a lookup is queued (outside) and nil for now.
+local function DisplayFor(rec)
+  if num(rec.model) then return rec.model end
+  local db = DisplayDB()
+  for _, id in ipairs(rec.ids or {}) do if num(db[id]) then return db[id] end end
+  if rec.id and num(db[rec.id]) then return db[rec.id] end
+  local d = EJDisplay(rec)
+  if d then return d end
+  if not CurrentInstance() and not InCombat() then QueueLookup(rec.id or (rec.ids and rec.ids[1])) end
+  return nil
+end
+
+-- Creature type from the game's tooltip for that NPC (its second lines: "Level 45 Humanoid").
+local typeTip = {}
+local function TipType(id)
+  if not id or not (C_TooltipInfo and C_TooltipInfo.GetHyperlink) then return nil end
+  if typeTip[id] ~= nil then return typeTip[id] or nil end
+  local ok, data = pcall(C_TooltipInfo.GetHyperlink, "unit:Creature-0-0-0-0-" .. id .. "-0000000000")
+  local found
+  if ok and type(data) == "table" and type(data.lines) == "table" then
+    for i = 2, math.min(4, #data.lines) do
+      local t = data.lines[i] and str(data.lines[i].leftText)
+      if t then for word in pairs(TYPE_ICON) do if t:find(word, 1, true) then found = word end end end
+    end
+  end
+  typeTip[id] = found or false
+  return found
+end
+-- The painted icon of the creature's family (learned when you target it, or from its tooltip); a
+-- plain head when the family is not known (never a question mark: an unseen rare shows it as a
+-- dark silhouette).
+local SILHOUETTE = "INV_Misc_Head_Human_01"
+local function FamilyIcon(rec)
+  local db = DB()
+  local ty = db.bossType and db.bossType[rec.en]
+  if not (ty and TYPE_ICON[ty]) then ty = TipType(rec.id) end
+  return "Interface\\Icons\\" .. ((ty and TYPE_ICON[ty]) or SILHOUETTE)
+end
+
+-- Off-screen portraits: one texture per creature, drawn on a stage far right of the screen, moved
+-- onto its head once the model had time to load (Forever paints a black square until then). They
+-- are prepared ahead (outside for the route's dungeons, on entering for this one), so the grid
+-- usually finds them ready.
+local MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+local PORTRAIT_WAIT = 3
+local stage
+local pool = {}   -- [displayId .. ":" .. en] = { tex, ready, owner } or false
+local function Stage()
+  if stage then return stage end
+  stage = CreateFrame("Frame", nil, UIParent)
+  stage:SetSize(48, 48)
+  stage:SetPoint("TOPLEFT", UIParent, "TOPRIGHT", 10000, 0)
+  stage:Show()
+  return stage
+end
+local function PoolGet(did, rec)
+  if not SetPortraitTextureFromCreatureDisplayID then return nil end
+  local key = did .. ":" .. rec.en
+  local e = pool[key]
+  if e ~= nil then return e or nil end
+  local st = Stage()
+  local tex = st:CreateTexture(nil, "ARTWORK")
+  tex:SetAllPoints(st)
+  local ok = pcall(SetPortraitTextureFromCreatureDisplayID, tex, did)
+  if not ok or not tex.SetParent then pool[key] = false; tex:Hide(); return nil end
+  tex:SetTexCoord(0, 1, 0, 1)
+  e = { tex = tex, key = key }
+  pool[key] = e
+  local function ready() e.ready = true; if RefreshSoon then RefreshSoon() end end
+  if C_Timer and C_Timer.After then C_Timer.After(PORTRAIT_WAIT, ready) else ready() end
+  return e
+end
+local function Release(e)
+  if not e then return end
+  e.owner = nil
+  pcall(e.tex.SetParent, e.tex, Stage())
+  e.tex:ClearAllPoints(); e.tex:SetAllPoints(Stage())
+  if e.tex.SetDesaturated then e.tex:SetDesaturated(false) end
+  e.tex:SetVertexColor(1, 1, 1, 1)
+end
+
+-- ---------------------------------------------------------------- the panel
+local P               -- the panel
 local parentFrame     -- the guide window it sits beside
 local pending = {}    -- what waits for the end of combat
-local dismissed = {}  -- instance IDs whose strip you closed during this visit
-local SIZE, GAP, PAD, TOPBAR, LABEL = 40, 6, 8, 22, 18
-local MAXCOLS = 5
+local dismissed = {}  -- instance IDs whose panel you closed during this visit
+local SIZE, GAP, PAD, COLS = 40, 6, 12, 5
+local W = PAD + COLS * SIZE + (COLS - 1) * GAP + PAD   -- 248: fixed, like the reference panels
+local HEADER, STATS_Y, RULE_Y, GRID_Y, LABEL = 30, 34, 70, 78, 18
 
 local function Marker(rec)
   local db = DB()
@@ -668,7 +1089,7 @@ local function RankWord(rec)
   return L.BOSS_R_ELITE
 end
 
--- the head's tooltip: name; boss number or rank and level; quests; state; the click line
+-- the portrait's tooltip: name; boss number or rank, level; quests; state; the click line
 local function HeadTip(head)
   local rec = head.rec
   if not rec then return end
@@ -687,7 +1108,11 @@ local function HeadTip(head)
       lines[#lines + 1] = { L.BOSS_FOR:format(qname), T.gold[1], T.gold[2], T.gold[3] }
     end
   end
-  if rec.killed then lines[#lines + 1] = { L.BOSS_KILLED, T.ok[1], T.ok[2], T.ok[3] }
+  if rec.killed then
+    local k = Kills()
+    local t = KillTime(k, rec)
+    local text = (t and k.start and t >= k.start) and L.BOSS_KILLED_AT:format(FmtClock(t - k.start)) or L.BOSS_KILLED
+    lines[#lines + 1] = { text, T.ok[1], T.ok[2], T.ok[3] }
   elseif rec.rare and not rec.seen then lines[#lines + 1] = L.BOSS_UNSEEN
   elseif rec.rare then lines[#lines + 1] = { L.BOSS_SEEN, T.silver[1], T.silver[2], T.silver[3] } end
   if head.stale then lines[#lines + 1] = { L.BOSS_WAIT, T.warn[1], T.warn[2], T.warn[3] } end
@@ -695,26 +1120,84 @@ local function HeadTip(head)
   ns.ShowTip(head, lines)
 end
 
--- painted portrait: the creature's display (journal), its type icon, else the HD skull / star
-local function SetPortrait(head, rec)
-  local tex, hd = head.port, head.portHD
-  local shown = false
-  if rec.model and SetPortraitTextureFromCreatureDisplayID then
-    local ok = pcall(SetPortraitTextureFromCreatureDisplayID, tex, rec.model)
-    if ok then tex:SetTexCoord(0.15, 0.85, 0.15, 0.85); shown = true end
-  end
-  if not shown then
-    local db = DB()
-    local ty = db.bossType and db.bossType[rec.en]
-    local icon = ty and TYPE_ICON[ty]
-    if icon then ns.SetPainted(tex, "Interface\\Icons\\" .. icon); shown = true end
-  end
-  tex:SetShown(shown)
-  hd:SetShown(not shown)
-  if not shown then ns.SetHDIcon(hd, rec.rare and "star" or "skull", rec.rare and T.silver or T.muted) end
+-- a round texture of the portrait mask, tinted (the dark disc, the veil, the hover light)
+local function Disc(parent, layer, r, g, b, a, sub)
+  local t = parent:CreateTexture(nil, layer, nil, sub or 0)
+  t:SetTexture(MASK)
+  t:SetVertexColor(r, g, b, a)
+  return t
 end
 
--- One head: a secure button (the click targets and marks) holding a plain frame with the looks
+-- the one face shown: the pooled portrait, the live unit portrait or the painted icon
+local function ShowFace(b, cur)
+  b.fb:SetShown(cur == b.fb)
+  b.live:SetShown(cur == b.live)
+  if b.pooled and b.pooled.tex ~= cur then b.pooled.tex:Hide() end
+  if cur then cur:Show() end
+  b.cur = cur
+end
+-- Moves a ready pooled portrait onto the head (a plain texture: allowed in combat). False when the
+-- client refuses to move it: that portrait is dropped from the pool (hidden, never left drawing on
+-- the stage) and the head draws the display itself.
+local function Attach(b, e)
+  if b.pooled == e then return true end
+  if b.pooled then Release(b.pooled); b.pooled = nil end
+  if e.owner and e.owner ~= b then
+    local o = e.owner
+    o.pooled = nil
+    if o.cur == e.tex then o.cur = nil end
+  end
+  local ok = pcall(e.tex.SetParent, e.tex, b.face)
+  if not ok then
+    e.tex:Hide()
+    e.owner = nil
+    if e.key then pool[e.key] = false end
+    return false
+  end
+  e.owner = b
+  b.pooled = e
+  e.tex:SetDrawLayer("ARTWORK", 1)
+  e.tex:ClearAllPoints()
+  e.tex:SetPoint("TOPLEFT", b.face, "TOPLEFT", 1, -1)
+  e.tex:SetPoint("BOTTOMRIGHT", b.face, "BOTTOMRIGHT", -1, 1)
+  return true
+end
+
+-- The display drawn straight on the head's own texture (when the pool cannot serve it).
+local function Direct(b, did)
+  if not SetPortraitTextureFromCreatureDisplayID then return false end
+  if b.directDid ~= did then
+    if not pcall(SetPortraitTextureFromCreatureDisplayID, b.live, did) then return false end
+    b.directDid = did
+  end
+  b.liveFor = nil
+  ShowFace(b, b.live)
+  return true
+end
+
+-- the creature's face: the pooled portrait when ready, else the live portrait, else the painted
+-- icon (plain textures only: also run in combat)
+local function SetPortrait(b, rec)
+  local did = DisplayFor(rec)
+  b.hasModel = did ~= nil
+  local e = did and PoolGet(did, rec)
+  if e and e.ready then
+    if Attach(b, e) then
+      b.liveFor = nil
+      ShowFace(b, e.tex)
+      return
+    end
+    e = nil
+  end
+  if b.pooled then Release(b.pooled); b.pooled = nil end
+  if did and not e and pool[did .. ":" .. rec.en] == false and Direct(b, did) then return end
+  if b.liveFor == rec.en then ShowFace(b, b.live) return end
+  b.liveFor = nil
+  ns.SetPainted(b.fb, FamilyIcon(rec))
+  ShowFace(b, b.fb)
+end
+
+-- One portrait: a secure button (the click targets and marks) holding a plain frame with the looks
 -- (its alpha may change in combat; the secure button's own state never does).
 local function MakeHead(i)
   local b = CreateFrame("Button", "WLBossTarget" .. i, P, "SecureActionButtonTemplate")
@@ -724,21 +1207,36 @@ local function MakeHead(i)
   local face = CreateFrame("Frame", nil, b)
   face:SetAllPoints()
   b.face = face
-  local bg = ns.Tex(face, "BACKGROUND", T.cardFill); bg:SetAllPoints()
-  b.edge = ns.Outline(face, T.cardEdge)
-  b.port = face:CreateTexture(nil, "ARTWORK"); b.port:SetPoint("TOPLEFT", 1, -1); b.port:SetPoint("BOTTOMRIGHT", -1, 1)
-  b.portHD = ns.Icon(face, "skull", 20, "ARTWORK", T.muted); b.portHD:SetPoint("CENTER")
-  b.veil = ns.Tex(face, "OVERLAY", T.scrim); b.veil:SetPoint("TOPLEFT", 1, -1); b.veil:SetPoint("BOTTOMRIGHT", -1, 1); b.veil:Hide()
-  b.check = ns.Icon(face, "check", 18, "OVERLAY", T.ok); b.check:SetPoint("CENTER"); b.check:Hide()
-  b.hl = ns.Tex(face, "OVERLAY", T.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
-  -- the boss's number in the dungeon (bottom left, on a dark chip)
-  b.chip = ns.Tex(face, "OVERLAY", T.scrim); b.chip:SetPoint("BOTTOMLEFT", 1, 1); b.chip:SetSize(14, 13)
-  b.badge = ns.Text(face, ns.F.foot, T.fg, true)
-  b.badge:SetPoint("CENTER", b.chip, "CENTER", 0, 0)
+  b.disc = Disc(face, "BACKGROUND", 0.02, 0.02, 0.025, 1); b.disc:SetAllPoints()
+  -- the painted icon (family), cropped round by the portrait mask
+  b.fb = face:CreateTexture(nil, "ARTWORK")
+  b.fb:SetPoint("TOPLEFT", 3, -3); b.fb:SetPoint("BOTTOMRIGHT", -3, 3)
+  if face.CreateMaskTexture and b.fb.AddMaskTexture then
+    local m = face:CreateMaskTexture()
+    m:SetTexture(MASK, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    m:SetAllPoints(b.fb)
+    b.fb:AddMaskTexture(m)
+    b.mask = m
+  end
+  -- the unit's live portrait (already round)
+  b.live = face:CreateTexture(nil, "ARTWORK")
+  b.live:SetPoint("TOPLEFT", 1, -1); b.live:SetPoint("BOTTOMRIGHT", -1, 1)
+  b.live:Hide()
+  b.veil = Disc(face, "OVERLAY", 0, 0, 0, 0.55, 0); b.veil:SetPoint("TOPLEFT", 1, -1); b.veil:SetPoint("BOTTOMRIGHT", -1, 1); b.veil:Hide()
+  b.press = Disc(face, "OVERLAY", 0, 0, 0, 0.35, 1); b.press:SetAllPoints(b.veil); b.press:Hide()
+  b.hl = Disc(face, "OVERLAY", 1, 1, 1, 0.10, 1); b.hl:SetAllPoints(b.veil); b.hl:SetAlpha(0)
+  if b.hl.SetBlendMode then b.hl:SetBlendMode("ADD") end
+  -- the ring around the face (HD ring: its circle is 80/128 of the texture)
+  b.ring = ns.Icon(face, "ring", math.floor(SIZE * 128 / 80 + 0.5), "OVERLAY", T.muted)
+  b.ring:SetPoint("CENTER")
+  -- killed: a small check on a dark disc, bottom right
+  b.checkBg = Disc(face, "OVERLAY", 0, 0, 0, 0.85, 2); b.checkBg:SetSize(16, 16); b.checkBg:SetPoint("BOTTOMRIGHT", 1, -1); b.checkBg:Hide()
+  b.check = ns.Icon(face, "check", 12, "OVERLAY", T.ok); b.check:SetDrawLayer("OVERLAY", 3)
+  b.check:SetPoint("CENTER", b.checkBg, "CENTER", 0, 0); b.check:Hide()
   b:SetScript("OnEnter", function(self) self.hl:SetAlpha(1); HeadTip(self) end)
-  b:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); ns.HideTip() end)
-  b:HookScript("OnMouseDown", function(self) self.port:SetPoint("TOPLEFT", 1, -2) end)
-  b:HookScript("OnMouseUp", function(self) self.port:SetPoint("TOPLEFT", 1, -1) end)
+  b:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); self.press:Hide(); ns.HideTip() end)
+  b:HookScript("OnMouseDown", function(self) self.press:Show() end)
+  b:HookScript("OnMouseUp", function(self) self.press:Hide() end)
   return b
 end
 
@@ -748,23 +1246,26 @@ local function PaintHead(b)
   if not rec then return end
   local dead = rec.killed == true
   local unseen = (rec.rare and not rec.seen and not dead) and true or false
-  if b.port.SetDesaturated then b.port:SetDesaturated(dead or unseen) end
+  local tex = b.cur
+  if tex then
+    if tex.SetDesaturated then tex:SetDesaturated(dead or unseen) end
+    -- an unseen rare: its grey face, or without a face a dark silhouette on the dark disc
+    local v = unseen and (tex == b.fb and 0.12 or 0.45) or (dead and 0.75 or 1)
+    tex:SetVertexColor(v, v, v, 1)
+  end
   b.veil:SetShown(dead)
-  b.check:SetShown(dead)
-  local e = rec.rare and T.silver or T.cardEdge
-  b.edge(e, rec.rare and (unseen and 0.5 or 0.9) or T.cardEdge[4])
-  local a = unseen and 0.45 or 1
+  b.check:SetShown(dead); b.checkBg:SetShown(dead)
+  if rec.rare and not unseen and not dead then b.ring:SetVertexColor(T.silver[1], T.silver[2], T.silver[3], 0.95)
+  elseif rec.rare and unseen then b.ring:SetVertexColor(T.silver[1], T.silver[2], T.silver[3], 0.25)
+  else b.ring:SetVertexColor(T.muted[1], T.muted[2], T.muted[3], dead and 0.15 or 0.35) end
+  local a = unseen and 0.7 or 1
   b.face:SetAlpha(a)
   b.faceAlpha = a
-  local c = dead and T.muted or T.fg
-  b.badge:SetTextColor(c[1], c[2], c[3])
+  b.unseen = unseen
 end
 
 local function FillHead(b, rec, n)
   b.rec, b.n, b.stale = rec, n, nil
-  b.badge:SetText(n and tostring(n) or "")
-  b.badge:SetShown(n ~= nil); b.chip:SetShown(n ~= nil)
-  b.chip:SetWidth((n and n >= 10) and 18 or 14)
   SetPortrait(b, rec)
   local m = MacroFor(rec)
   if b.macro ~= m then b:SetAttribute("macrotext", m); b.macro = m end
@@ -772,7 +1273,25 @@ local function FillHead(b, rec, n)
   PaintHead(b)
 end
 
--- where the strip docks: the guide when it shows, else the tracker
+-- The creature is in front of you (nameplate, target, mouse): a head not showing a real portrait yet
+-- (no model known, or its portrait still loading) takes the unit's live portrait (its model is
+-- loaded: no black square).
+local function LiveFace(unit, rec)
+  if not (P and P:IsShown() and rec and unit and SetPortraitTexture) then return end
+  for _, b in ipairs(P.heads) do
+    local real = (b.pooled ~= nil and b.cur == b.pooled.tex) or (b.cur == b.live and b.directDid ~= nil)
+    if b:IsShown() and b.rec and b.rec.en == rec.en and not real and b.liveFor ~= rec.en then
+      if pcall(SetPortraitTexture, b.live, unit) then
+        b.liveFor = rec.en
+        b.directDid = nil
+        ShowFace(b, b.live)
+        PaintHead(b)
+      end
+    end
+  end
+end
+
+-- where the panel docks: the guide when it shows, else the tracker
 local function Host()
   if parentFrame and parentFrame:IsShown() then return parentFrame end
   local tr = WLHelperTracker and WLHelperTracker.Frame and WLHelperTracker.Frame()
@@ -780,7 +1299,7 @@ local function Host()
   return nil
 end
 
--- a frame's box in the strip's units (nil when the client does not know yet)
+-- a frame's box in the panel's units (nil when the client does not know yet)
 local function BoxOf(fr)
   local okS, ps = pcall(fr.GetEffectiveScale, fr)
   ps = okS and num(ps)
@@ -791,11 +1310,80 @@ local function BoxOf(fr)
   return l * k, r * k, t * k, b * k
 end
 
+-- the run is going on in this dungeon (the "new run" button shows then)
+local function RunLive(dkey)
+  local k = InRun()
+  return k ~= nil and dkey ~= nil and RunDungeon(k) == dkey
+end
+
+-- the money in its largest coin only, like the journal: "12 [gold]", "45 [silver]", "0 [copper]"
+local COIN = "|TInterface\\MoneyFrame\\UI-%sIcon:0:0:2:0|t"
+local function CoinShort(c)
+  c = math.max(0, math.floor(c or 0))
+  local g, s = math.floor(c / 10000), math.floor((c % 10000) / 100)
+  if g > 0 then return FmtNum(g) .. COIN:format("Gold") end
+  if s > 0 then return s .. COIN:format("Silver") end
+  return (c % 100) .. COIN:format("Copper")
+end
+ns.BossCoinShort = CoinShort
+
+-- the three numbers (texts and colours only: safe in combat)
+local function UpdateStats()
+  if not (P and P:IsShown()) then return end
+  local st = ns.BossRunStats(P.dkey, P.res)
+  local s = P.stats
+  if P.armed then
+    for _, c in ipairs(s) do c.label:Hide(); c.value:Hide() end
+    P.confirm:Show()
+    return
+  end
+  P.confirm:Hide()
+  for i, c in ipairs(s) do
+    local on = not (i == 2 and P.capXP)
+    c.label:SetShown(on); c.value:SetShown(on)
+  end
+  local fg = T.fg
+  if not st then
+    for _, c in ipairs(s) do c.value:SetText("-"); c.value:SetTextColor(T.faint[1], T.faint[2], T.faint[3]) end
+    s[3].value.wlFull, s[3].value.wlFullAuto = nil, true
+    return
+  end
+  local tc = st.done and T.ok or fg
+  s[1].value:SetText(FmtClock(st.secs)); s[1].value:SetTextColor(tc[1], tc[2], tc[3])
+  s[2].value:SetText(FmtNum(st.xp)); s[2].value:SetTextColor(fg[1], fg[2], fg[3])
+  s[3].value:SetText(CoinShort(st.money)); s[3].value:SetTextColor(T.gold[1], T.gold[2], T.gold[3])
+  s[3].value.wlFull = (ns.S and ns.S.Money) and ns.S.Money(st.money) or MoneyWords(st.money)
+  s[3].value.wlFullAuto = false
+end
+ns.BossUpdateStats = UpdateStats
+
+-- the "new run" button: the first click asks (in the panel), the second within 4 s starts over
+local function Disarm()
+  if not P then return end
+  P.armed = nil
+  if P.reset and P.reset.SetIcon then P.reset:SetIcon("refresh") end
+  UpdateStats()
+end
+local function ResetClick()
+  if P.armed then
+    P.armed = nil
+    if P.reset.SetIcon then P.reset:SetIcon("refresh") end
+    if ns.NewBossRun then ns.NewBossRun() end
+    UpdateStats()
+    return
+  end
+  local token = {}
+  P.armed = token
+  if P.reset.SetIcon then P.reset:SetIcon("refresh", T.warn) end
+  UpdateStats()
+  if C_Timer and C_Timer.After then C_Timer.After(4, function() if P and P.armed == token then Disarm() end end) end
+end
+
 local function Build()
   if P then return P end
   if InCombat() then return nil end
   P = CreateFrame("Frame", "WLBossPanel", UIParent)
-  P:SetSize(SIZE + 2 * PAD, 120)
+  P:SetSize(W, 160)
   P:SetFrameStrata("MEDIUM")
   P:SetClampedToScreen(true)
   P:SetMovable(true)
@@ -804,7 +1392,7 @@ local function Build()
   if ns.RegisterWindow then ns.RegisterWindow(P) end
   local bg = ns.Tex(P, "BACKGROUND", T.bg); bg:SetAllPoints()
   ns.Outline(P, T.cardEdge)
-  -- drag anywhere off the heads: the strip leaves the guide and stays where you drop it
+  -- drag anywhere off the portraits: the panel leaves the guide and stays where you drop it
   P:RegisterForDrag("LeftButton")
   P:SetScript("OnDragStart", function() if not InCombat() then P.wlMoving = true; P:StartMoving() end end)
   P:SetScript("OnDragStop", function()
@@ -814,26 +1402,55 @@ local function Build()
     P.SavePos()
   end)
   P:SetScript("OnEnter", function(self)
-    local lines = { L.BOSS_TITLE }
-    if P.dkey then lines[#lines + 1] = ns.DName(P.dkey) end
+    local lines = { P.dkey and ns.DName(P.dkey) or L.BOSS_TITLE, L.BOSS_TITLE }
+    lines[#lines + 1] = { L.RUN_STATS_TIP, T.muted[1], T.muted[2], T.muted[3] }
     lines[#lines + 1] = P.attached and L.BOSS_DRAG or L.BOSS_DRAG2
     ns.ShowTip(self, lines)
   end)
   P:SetScript("OnLeave", ns.HideTip)
-  -- top bar: close (and "attach" once moved away)
   local S = ns.S
-  P.close = S.CloseButton(P, 20, function() ns.HideBosses(true) end, { L.BOSS_TITLE, L.BOSS_CLOSE_CLICK })
-  P.close:SetPoint("TOPRIGHT", -2, -2)
-  P.attach = S.IconButton(P, "pin", 20, { L.BOSS_ATTACH, L.BOSS_ATTACH_CLICK }, function()
+  -- header: the dungeon (portal icon, name), then new run / attach / close on the right
+  P.icon = ns.Icon(P, "portal", 16, "ARTWORK", T.gold)
+  P.icon:SetPoint("TOPLEFT", PAD, -8)
+  P.title = ns.Text(P, ns.F.heading, T.gold, true)
+  P.title:SetPoint("LEFT", P.icon, "RIGHT", 6, 0)
+  P.title:SetWordWrap(false)
+  ns.ClampLabel(P.title, nil, P)
+  P.close = S.CloseButton(P, 24, function() ns.HideBosses(true) end, { L.BOSS_TITLE, L.BOSS_CLOSE_CLICK })
+  P.close:SetPoint("TOPRIGHT", -4, -3)
+  P.attach = S.IconButton(P, "pin", 24, { L.BOSS_ATTACH, L.BOSS_ATTACH_CLICK }, function()
     if InCombat() then return end
     DB().bossDetached = nil
     ns.RefreshBosses()
   end)
-  P.attach:SetPoint("RIGHT", P.close, "LEFT", -2, 0)
-  -- section labels (11, muted; the rares' in silver)
-  P.secBoss = ns.Text(P, ns.F.meta, T.muted, false)
-  P.secRare = ns.Text(P, ns.F.meta, T.silver, false)
-  ns.ClampLabel(P.secBoss, nil, P); ns.ClampLabel(P.secRare, nil, P)
+  P.reset = S.IconButton(P, "refresh", 24, function()
+    if P.armed then return { L.RUN_RESET, { L.RUN_RESET_CONFIRM, T.warn[1], T.warn[2], T.warn[3] } } end
+    return { L.RUN_RESET, L.RUN_RESET_TIP, { L.RUN_RESET_CLICK, T.hint[1], T.hint[2], T.hint[3] } }
+  end, ResetClick)
+  -- the run's numbers: small label over the value, three columns (two at the level cap)
+  P.stats = {}
+  for i, key in ipairs({ "RUN_TIME", "RUN_XP", "RUN_GOLD" }) do
+    local c = {}
+    c.label = ns.Text(P, ns.F.meta, T.muted, false)
+    c.label:SetWordWrap(false)
+    c.label:SetText(L[key])
+    -- the money in a smaller size (coin icons are wide); cut, the panel's tooltip gives it whole
+    c.value = ns.Text(P, i == 3 and ns.F.label or ns.F.heading, T.fg, true)
+    c.value:SetWordWrap(false)
+    if i == 3 then ns.ClampLabel(c.value, nil, P) end
+    P.stats[i] = c
+  end
+  P.confirm = ns.Text(P, ns.F.label, T.warn, false)
+  P.confirm:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -(STATS_Y + 6))
+  P.confirm:SetWidth(W - 2 * PAD)
+  P.confirm:SetText(L.RUN_RESET_CONFIRM)
+  P.confirm:Hide()
+  P.rule = ns.Rule(P, T.divider)
+  P.rule:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -RULE_Y)
+  P.rule:SetPoint("TOPRIGHT", P, "TOPRIGHT", -PAD, -RULE_Y)
+  -- the rares' label (gold, like the journal's)
+  P.secRare = ns.Text(P, ns.F.meta, T.gold, true)
+  ns.ClampLabel(P.secRare, nil, P)
   -- nothing to show: one short sentence
   P.empty = ns.Text(P, ns.F.meta, T.muted, false)
   P.empty:SetJustifyH("LEFT")
@@ -851,21 +1468,24 @@ local function Build()
       ns.RefreshBosses()
     end
   end
-  -- docked: follow the guide (or the tracker) when it moves or changes height, out of combat
-  local acc = 0
+  -- docked: follow the guide (or the tracker) when it moves, out of combat; the time ticks each second
+  local acc, tick = 0, 0
   P:SetScript("OnUpdate", function(_, el)
-    acc = acc + (num(el) or 0)
+    el = num(el) or 0
+    tick = tick + el
+    if tick >= 1 then tick = 0; UpdateStats() end
+    acc = acc + el
     if acc < 0.2 or InCombat() or not P.attached then return end
     acc = 0
     local h = Host()
     if not h then return end
     local l, _, t, b = BoxOf(h)
-    if h ~= P.host or l ~= P.lastL or t ~= P.lastT or b ~= P.lastB then ns.RefreshBosses() end
+    if h ~= P.host or l ~= P.lastL or t ~= P.lastT or b ~= P.lastB then ns.SnapBosses() end
   end)
   return P
 end
 
--- Puts the strip 4 px right of its host, tops aligned (left of it when the screen has no room).
+-- Puts the panel 4 px right of its host, tops aligned (left of it when the screen has no room).
 -- Absolute position: no anchor to the guide, so the guide never becomes a protected frame.
 function ns.SnapBosses()
   if not P then return end
@@ -876,9 +1496,8 @@ function ns.SnapBosses()
     if l then
       local okW, sw = pcall(UIParent.GetWidth, UIParent)
       sw = okW and num(sw) or 1920
-      local w = num(P:GetWidth()) or SIZE
       local x = r + 4
-      if x + w > sw then x = l - 4 - w end
+      if x + W > sw then x = l - 4 - W end
       P:ClearAllPoints()
       P:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, t)
       P.host, P.lastL, P.lastT, P.lastB = h, l, t, b
@@ -891,21 +1510,111 @@ function ns.SnapBosses()
   else P:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -240, -220) end
 end
 
--- the grid for `cols` columns: label, the bosses, label, the rares -> height
+-- the panel's height for nb bosses and nr rares (`cols` per row, 5 by default)
 local function GridHeight(nb, nr, cols)
-  local h = TOPBAR
-  local function block(n) return LABEL + math.ceil(n / cols) * (SIZE + GAP) - GAP end
-  if nb > 0 then h = h + block(nb) end
-  if nr > 0 then h = h + (nb > 0 and 10 or 0) + block(nr) end
+  cols = cols or COLS
+  local h = GRID_Y
+  local function rows(n) return math.ceil(n / cols) * (SIZE + GAP) - GAP end
+  if nb > 0 then h = h + rows(nb) end
+  if nr > 0 then h = h + (nb > 0 and 10 or 0) + LABEL + rows(nr) end
   return h + PAD
 end
 ns.BossGridHeight = GridHeight
 
+local function RenderNow()
+  pending.render = nil
+  local dkey = P.dkey
+  local db = DB()
+  local host = Host()
+  P.attached = (host ~= nil and not db.bossDetached) and true or false
+  local res = dkey and ns.DungeonMobs(dkey) or { bosses = {}, rares = {} }
+  P.res = res
+  local nb, nr = #res.bosses, #res.rares
+  P.cols = COLS
+  -- header: name, then from the right close, attach (when moved away), new run (during the run)
+  P.title:SetText(dkey and ns.DName(dkey) or L.BOSS_TITLE)
+  local showAttach = host ~= nil and db.bossDetached == true
+  local live = RunLive(dkey)
+  if not live and P.armed then P.armed = nil; if P.reset.SetIcon then P.reset:SetIcon("refresh") end end
+  P.attach:SetShown(showAttach)
+  P.reset:SetShown(live)
+  local prev, right = P.close, 4 + 24
+  for _, btn in ipairs({ showAttach and P.attach or false, live and P.reset or false }) do
+    if btn then
+      btn:ClearAllPoints(); btn:SetPoint("RIGHT", prev, "LEFT", -2, 0)
+      prev, right = btn, right + 2 + 24
+    end
+  end
+  P.title:SetWidth(math.max(40, W - (PAD + 16 + 6) - right - 4))
+  -- the numbers: three columns, or two at the level cap (no XP)
+  P.capXP = AtCap()
+  local cols = P.capXP and 2 or 3
+  local colW = (W - 2 * PAD) / cols
+  local at = 0
+  for i, c in ipairs(P.stats) do
+    if not (i == 2 and P.capXP) then
+      local x = PAD + at * colW
+      c.label:ClearAllPoints(); c.label:SetPoint("TOPLEFT", P, "TOPLEFT", x, -STATS_Y); c.label:SetWidth(colW - 4)
+      c.value:ClearAllPoints(); c.value:SetPoint("TOPLEFT", P, "TOPLEFT", x, -(STATS_Y + (i == 3 and 16 or 14))); c.value:SetWidth(colW - 4)
+      at = at + 1
+    end
+  end
+  UpdateStats()
+  -- the grid: row by row, five per row, in the dungeon's order; the rares under their label
+  local used = 0
+  local y = GRID_Y
+  local function place(list, numbered)
+    for i, rec in ipairs(list) do
+      used = used + 1
+      local b = P.heads[used]
+      if not b then b = MakeHead(used); P.heads[used] = b end
+      local c, r = (i - 1) % COLS, math.floor((i - 1) / COLS)
+      b.col, b.row = c, r
+      b:ClearAllPoints()
+      b:SetPoint("TOPLEFT", P, "TOPLEFT", PAD + c * (SIZE + GAP), -(y + r * (SIZE + GAP)))
+      FillHead(b, rec, numbered and i or nil)
+      b:Show()
+    end
+    y = y + math.ceil(#list / COLS) * (SIZE + GAP) - GAP
+  end
+  if nb + nr == 0 then
+    P.secRare:Hide()
+    local text = L.BOSS_EMPTY_NONE
+    if res.loading then text = L.BOSS_LOADING elseif res.noLib then text = L.BOSS_EMPTY_NOLIB end
+    P.empty:SetText(text)
+    P.empty:ClearAllPoints(); P.empty:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -y)
+    local eh = ns.FitText(P.empty, 4, W - 2 * PAD, P)
+    P.empty:Show()
+    y = y + math.ceil(num(eh) or 28)
+  else
+    P.empty:Hide()
+    if nb > 0 then place(res.bosses, true) end
+    if nr > 0 then
+      if nb > 0 then y = y + 10 end
+      P.secRare:SetText(L.BOSS_RARES)
+      P.secRare:ClearAllPoints(); P.secRare:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -(y + 2))
+      P.secRare:SetWidth(W - 2 * PAD); P.secRare:Show()
+      y = y + LABEL
+      place(res.rares, false)
+    else P.secRare:Hide() end
+  end
+  for i = used + 1, #P.heads do
+    local b = P.heads[i]
+    b:Hide(); b.rec = nil
+    if b.pooled then Release(b.pooled); b.pooled = nil end
+    b.liveFor = nil
+  end
+  P:SetWidth(W)
+  P:SetHeight(math.ceil(y + PAD))
+  ns.SnapBosses()
+end
+
 local function Render()
   if not P then return end
+  if P.rendering then P.again = true return end
   if InCombat() then
     pending.render = true
-    -- what can change now: killed and seen
+    -- what can change now: killed and seen, and the numbers
     if P.dkey and P:IsShown() then
       local res = ns.DungeonMobs(P.dkey)
       local by = {}
@@ -913,83 +1622,37 @@ local function Render()
       for _, r in ipairs(res.rares) do by[r.en] = r end
       for _, b in ipairs(P.heads) do
         local r = b.rec and by[b.rec.en]
-        if r then b.rec.killed, b.rec.seen = r.killed, r.seen; b.stale = true; PaintHead(b) end
+        if r then
+          b.rec.killed, b.rec.seen = r.killed, r.seen; b.stale = true
+          -- a portrait ready now goes on (plain textures: allowed in combat)
+          pcall(SetPortrait, b, b.rec)
+          PaintHead(b)
+        end
       end
+      UpdateStats()
     end
     return
   end
-  pending.render = nil
-  local dkey = P.dkey
-  local db = DB()
-  local host = Host()
-  P.attached = (host ~= nil and not db.bossDetached) and true or false
-  P.attach:SetShown(host ~= nil and db.bossDetached == true)
-  local res = dkey and ns.DungeonMobs(dkey) or { bosses = {}, rares = {} }
-  P.res = res
-  local nb, nr = #res.bosses, #res.rares
-  -- as tall as the host at most (the screen's 80 % on its own): more columns when it is not enough.
-  -- The host's height is the tallest seen for this dungeon, so the columns do not jump from one
-  -- step to the next as the guide grows and shrinks.
-  local okH, screen = pcall(UIParent.GetHeight, UIParent)
-  screen = okH and num(screen) or 768
-  local cap = math.floor(screen * 0.8)
-  if P.capKey ~= dkey then P.capKey, P.capHost = dkey, nil end
-  if P.attached and host then
-    local _, _, t, b = BoxOf(host)
-    if t and b and t - b >= 200 then P.capHost = math.max(P.capHost or 0, math.floor(t - b)) end
-    if P.capHost then cap = math.min(cap, P.capHost) end
-  end
-  local cols = 1
-  while cols < MAXCOLS and GridHeight(nb, nr, cols) > cap do cols = cols + 1 end
-  P.cols = cols
-  local W = PAD + cols * SIZE + (cols - 1) * GAP + PAD
-  local used = 0
-  local y = TOPBAR
-  -- column by column (1 2 3 down the first column, then the next): the dungeon's order reads downward
-  local function place(list, numbered)
-    local rows = math.max(1, math.ceil(#list / cols))
-    for i, rec in ipairs(list) do
-      used = used + 1
-      local b = P.heads[used]
-      if not b then b = MakeHead(used); P.heads[used] = b end
-      local c, r = math.floor((i - 1) / rows), (i - 1) % rows
-      b:ClearAllPoints()
-      b:SetPoint("TOPLEFT", P, "TOPLEFT", PAD + c * (SIZE + GAP), -(y + r * (SIZE + GAP)))
-      FillHead(b, rec, numbered and i or nil)
-      b:Show()
-    end
-    y = y + math.ceil(#list / cols) * (SIZE + GAP) - GAP
-  end
-  local function label(fs, text)
-    fs:SetText(text)
-    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -(y + 2))
-    fs:SetWidth(W - 2 * PAD); fs:Show()
-    y = y + LABEL
-  end
-  if nb + nr == 0 then
-    P.secBoss:Hide(); P.secRare:Hide()
-    W = 180
-    local text = L.BOSS_EMPTY_NONE
-    if res.loading then text = L.BOSS_LOADING elseif res.noLib then text = L.BOSS_EMPTY_NOLIB end
-    P.empty:SetText(text)
-    P.empty:ClearAllPoints(); P.empty:SetPoint("TOPLEFT", P, "TOPLEFT", PAD + 2, -TOPBAR)
-    local eh = ns.FitText(P.empty, 4, W - 2 * PAD - 4, P)
-    P.empty:Show()
-    y = TOPBAR + math.ceil(num(eh) or 28)
-  else
-    P.empty:Hide()
-    if nb > 0 then label(P.secBoss, L.BOSS_SEC); place(res.bosses, true) else P.secBoss:Hide() end
-    if nr > 0 then
-      if nb > 0 then y = y + 10 end
-      label(P.secRare, L.BOSS_RARES); place(res.rares, false)
-    else P.secRare:Hide() end
-  end
-  for i = used + 1, #P.heads do P.heads[i]:Hide(); P.heads[i].rec = nil end
-  P:SetWidth(W)
-  P:SetHeight(math.ceil(y + PAD))
-  ns.SnapBosses()
+  P.rendering = true
+  local ok, err = pcall(RenderNow)
+  P.rendering = nil
+  if P.again then P.again = nil; if ok and P:IsShown() then Render() end end
+  if not ok then error(err, 0) end
 end
 ns.RenderBosses = Render
+
+-- a portrait or a looked-up face is ready: one redraw a moment later
+local refreshQueued = false
+RefreshSoon = function()
+  if refreshQueued then return end
+  refreshQueued = true
+  local function go()
+    refreshQueued = false
+    -- (in combat: the faces now, the rest after combat)
+    if P and P:IsShown() then Render() end
+  end
+  if C_Timer and C_Timer.After then C_Timer.After(0.05, go) else go() end
+end
 
 function ns.RefreshBosses()
   if not P then return end
@@ -1005,7 +1668,7 @@ function ns.BossesShown()
   return P ~= nil and P:IsShown()
 end
 
--- Opens the strip on a dungeon (from the guide, the overview or on entering it).
+-- Opens the panel on a dungeon (from the guide, the overview, /wlh boss or on entering it).
 function ns.ShowBosses(dkey, auto)
   if not (dkey and ns.D and ns.D[dkey]) then return end
   if InCombat() then
@@ -1049,8 +1712,19 @@ function ns.ToggleBosses(dkey)
   if ns.BossesShown() and (not dkey or key == dkey) then ns.HideBosses(true) else ns.ShowBosses(dkey or key) end
 end
 
--- The guide window the strip sits beside (UI.lua calls it once the guide is built). Hiding the
--- guide moves the strip beside the tracker (or to its saved place).
+-- /wlh boss: the dungeon you are in, else the guide's, else the one shown last.
+function ns.BossCommand()
+  local dkey = DungeonHere() or ns.instIn
+  if not dkey and ns.route and ns.route.sel then
+    for _, k in ipairs(ns.ORDER or {}) do if ns.route.sel[k] then dkey = k break end end
+  end
+  dkey = dkey or (P and P.dkey)
+  if not dkey then if ns.Print then ns.Print(L.BOSS_MENU_NONE) end return end
+  ns.ToggleBosses(dkey)
+end
+
+-- The guide window the panel sits beside (UI.lua calls it once the guide is built). Hiding the
+-- guide moves the panel beside the tracker (or to its saved place).
 function ns.AttachBosses(parent)
   if not parent then return end
   parentFrame = parent
@@ -1081,7 +1755,7 @@ local function IsRareUnit(unit)
   return c == "rare" or c == "rareelite"
 end
 
--- the strip's rare with this NPC id (nil when the strip does not list it)
+-- the panel's rare with this NPC id (nil when the panel does not list it)
 local function StripRare(id)
   if not (id and P and P.res) then return nil end
   for _, r in ipairs(P.res.rares or {}) do
@@ -1089,8 +1763,18 @@ local function StripRare(id)
   end
   return nil
 end
+-- the panel's boss or rare with this NPC id
+local function PanelRec(id)
+  if not (id and P and P.res) then return nil end
+  for _, list in ipairs({ P.res.bosses or {}, P.res.rares or {} }) do
+    for _, r in ipairs(list) do
+      for _, x in ipairs(r.ids or {}) do if x == id then return r end end
+    end
+  end
+  return nil
+end
 
--- Records a rare as seen; the strip's head lights up (colours only in combat).
+-- Records a rare as seen; the panel's head lights up (colours only in combat).
 function ns.RareSeen(id)
   id = num(id)
   if not id then return end
@@ -1104,6 +1788,9 @@ local function SeenCheck(unit)
   local id = NpcIdOf(unit)
   if not id then return end
   if IsRareUnit(unit) or StripRare(id) then ns.RareSeen(id) end
+  -- its face, for a portrait without a known model
+  local rec = PanelRec(id)
+  if rec then LiveFace(unit, rec); LearnUnit(unit, id) end
 end
 
 -- the banner (plain frame, fixed place) and its secure button (on UIParent at a fixed place too:
@@ -1240,7 +1927,7 @@ ns.HideRareAlert = function() if A then HideAlert(A.token) end end
 -- a boolean the code may read (nil when the client hides it behind a secret value)
 local function bool(v) if type(v) == "boolean" and not secret(v) then return v end return nil end
 
--- A rare's nameplate: seen for the strip, and the alert (once per 10 minutes per rare). The alert
+-- A rare's nameplate: seen for the panel, and the alert (once per 10 minutes per rare). The alert
 -- plays inside a dungeon (WLDTDB.rareAlert ~= false); in the open world only when
 -- WLDTDB.rareAlertWorld is true.
 function ns.RareAlert(unit)
@@ -1270,32 +1957,53 @@ function ns.RareAlert(unit)
 end
 
 -- ---------------------------------------------------------------- inside a dungeon
-local function DungeonHere()
-  if not ns.InstanceKeys then return nil end
-  local okK, keys, iid = pcall(ns.InstanceKeys)
-  if not okK or type(keys) ~= "table" or #keys == 0 then return nil, nil end
-  if ns.instIn then for _, k in ipairs(keys) do if k == ns.instIn then return k, iid end end end
+
+-- A dungeon's portraits prepared off screen before its panel shows (the known display ids drawn on
+-- the stage now, ready to move onto their heads a few seconds later).
+local function WarmPortraits(dkey)
+  local okM, res = pcall(ns.DungeonMobs, dkey)
+  if not (okM and type(res) == "table") then return end
+  for _, list in ipairs({ res.bosses or {}, res.rares or {} }) do
+    for _, rec in ipairs(list) do
+      local okD, did = pcall(DisplayFor, rec)
+      if okD and did then pcall(PoolGet, did, rec) end
+    end
+  end
+end
+ns.BossWarmPortraits = WarmPortraits
+
+-- the faces of the route's dungeons, looked up and prepared outside (one creature at a time)
+local function WarmFaces()
+  if CurrentInstance() or InCombat() then return end
   local sel = ns.route and ns.route.sel
-  if sel then for _, k in ipairs(keys) do if sel[k] then return k, iid end end end
-  if #keys == 1 then return keys[1], iid end
-  return nil, iid
+  for k in pairs(sel or {}) do WarmPortraits(k) end
+  LookNext()
 end
 
 local function OnEntering()
+  local wasIn = Kills().iid ~= nil and not Kills().left
   NewVisitCheck(true)
+  Baseline()
   local dkey, iid = DungeonHere()
   if not iid then
-    -- out of the dungeon: the strip opened for it goes away
+    -- out of the dungeon: the run's report, and the panel opened for it goes away
+    if wasIn or Kills().reportDue then RunReport() end
     if P and P:IsShown() and P.auto then ns.HideBosses() end
     for k in pairs(dismissed) do dismissed[k] = nil end
+    -- face lookups wait a while after the loading screen
+    if C_Timer and C_Timer.After then C_Timer.After(8, WarmFaces) end
     return
   end
+  local k = Kills()
+  -- back inside before the report of the last exit went out: it goes with the next exit
+  k.reportDue = nil
+  if dkey and k.iid == iid and not k.dkey then k.dkey = dkey end
   if Lib() then
     StartIndex(false)
-    -- the dungeon's boss list (local names, NPC ids) is built even with the strip hidden: the
+    -- the dungeon's boss list (local names, NPC ids) is built even with the panel hidden: the
     -- guide matches kills on it (a French ENCOUNTER_END name, a boss without encounter ID)
     if dkey then
-      local function warm() pcall(ns.DungeonMobs, dkey) end
+      local function warm() WarmPortraits(dkey) end
       if indexReady then warm() else onReady[#onReady + 1] = warm end
     end
   end
@@ -1326,9 +2034,38 @@ local function MarkKilled(name, id, enc, en)
   if en and en ~= "" then k.names[en] = true; hit = true end
   if id then k.ids[id] = true; hit = true end
   if enc then k.enc[enc] = true; hit = true end
-  if hit then liveIid, liveRun = k.iid, k.run; ns.RefreshBosses(); GuideAfterKill() end
+  if hit then
+    -- when it died (the tooltip's "+12:34", the run's end)
+    local t = Now()
+    k.at = k.at or {}
+    for _, key in ipairs({ name or false, en or false, id and ("#" .. id) or false, enc and ("e" .. enc) or false }) do
+      if key and key ~= "" and not k.at[key] then k.at[key] = t end
+    end
+    k.lastKill = t
+    RunDungeon(k)
+    liveIid, liveRun = k.iid, k.run; ns.RefreshBosses(); GuideAfterKill()
+  end
 end
 ns.BossMarkKilled = MarkKilled
+
+-- "New run" (the panel's button): inside, a fresh run now (kills, time, XP and gold from zero);
+-- outside, the next entry starts one.
+function ns.NewBossRun()
+  local k = Kills()
+  local iid = CurrentInstance()
+  if iid then
+    local dk = k.dkey or DungeonHere()
+    NewRun(k, iid)
+    k.t = Now()
+    k.dkey = dk
+  else
+    k.reset = true
+  end
+  Baseline()
+  if ns.Print then ns.Print(L.RUN_RESET_DONE) end
+  ns.RefreshBosses()
+  GuideAfterKill()
+end
 
 -- A boss counted as killed stands alive, attackable and out of combat: this is another copy of the
 -- instance (reset by the group leader, or entered again after a logout), a new run.
@@ -1350,8 +2087,8 @@ local function AliveCheck(unit, rec, id)
   return true
 end
 
--- The bosses a unit may be: the strip's heads when it shows, else the dungeon's boss list (the
--- list built for the strip, or the walk order) -> list of { en, name, ids }
+-- The bosses a unit may be: the panel's heads when it shows, else the dungeon's boss list (the
+-- list built for the panel, or the walk order) -> list of { en, name, ids }
 local function Candidates()
   if P and P:IsShown() and P.res then
     local out = {}
@@ -1374,7 +2111,7 @@ local function Candidates()
 end
 
 -- Your target (or the mob under the mouse) is one of the dungeon's bosses: learn its creature type,
--- and a dead one counts as killed (the strip's head and the guide's boss step).
+-- and a dead one counts as killed (the panel's head and the guide's boss step).
 local function TargetCheck(unit)
   unit = unit or "target"
   if not (UnitExists and UnitExists(unit)) then return end
@@ -1389,6 +2126,8 @@ local function TargetCheck(unit)
     if id then for _, x in ipairs(r.ids or {}) do if x == id then rec = r end end end
   end
   if not rec then return end
+  LiveFace(unit, rec)
+  LearnUnit(unit, id)
   -- learn its creature type for the painted icon
   if strip and UnitCreatureType then
     local okT, ty = pcall(UnitCreatureType, unit)
@@ -1424,7 +2163,8 @@ end
 
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "ENCOUNTER_START", "ENCOUNTER_END", "BOSS_KILL", "PLAYER_LOGOUT",
-  "PLAYER_TARGET_CHANGED", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "NAME_PLATE_UNIT_ADDED", "UPDATE_MOUSEOVER_UNIT", "CHAT_MSG_SYSTEM" }) do
+  "PLAYER_TARGET_CHANGED", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "NAME_PLATE_UNIT_ADDED", "UPDATE_MOUSEOVER_UNIT", "CHAT_MSG_SYSTEM",
+  "PLAYER_XP_UPDATE", "PLAYER_MONEY", "PLAYER_UNGHOST", "PLAYER_ALIVE" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
 -- the target's health only (a dead boss you look at counts as killed)
@@ -1435,6 +2175,13 @@ local questPending = false
 ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
   if e == "PLAYER_ENTERING_WORLD" then
     if C_Timer and C_Timer.After then C_Timer.After(2.5, OnEntering) else OnEntering() end
+  elseif e == "PLAYER_XP_UPDATE" then
+    if a1 == nil or a1 == "player" then OnXP(); UpdateStats() end
+  elseif e == "PLAYER_MONEY" then
+    OnMoney(); UpdateStats()
+  elseif e == "PLAYER_UNGHOST" or e == "PLAYER_ALIVE" then
+    -- alive again outside: the run's report held back while you were dead
+    if Kills().reportDue and not CurrentInstance() then RunReport() end
   elseif e == "PLAYER_LOGOUT" then
     -- a logout (or /reload) inside counts as leaving: back much later, it is another copy
     Touch(true)
@@ -1458,6 +2205,7 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
     if pending.show then local k, a = pending.show, pending.showAuto; pending.show, pending.showAuto = nil, nil; ns.ShowBosses(k, a) end
     if pending.render or pending.snap then pending.render, pending.snap = nil, nil; if P and P:IsShown() then Render() end end
     AlertAfterCombat()
+    LookNext()
   elseif e == "ENCOUNTER_END" then
     -- encounterID, encounterName, difficultyID, groupSize, success
     if num(a5) == 1 then
@@ -1496,3 +2244,4 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
   end
 end)
 ns.BossEvents = ev
+Baseline()

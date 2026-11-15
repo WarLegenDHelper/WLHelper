@@ -581,6 +581,7 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "commandes" or cmd == "orders" or cmd == "cmd" then if WP and WP.ToggleOrders then WP.ToggleOrders() end
   elseif cmd == "events" or cmd == "evenements" or cmd == "lfg" or cmd == "calendar" or cmd == "agenda" then if WP and WP.ToggleEvents then WP.ToggleEvents() end
   elseif cmd == "guild" or cmd == "guilde" then if WP and WP.ToggleGuild then WP.ToggleGuild() end
+  elseif cmd == "boss" or cmd == "bosses" then if ns.BossCommand then ns.BossCommand() end
   elseif cmd == "gps" then if WP and WP.StopOrStartGPS then WP.StopOrStartGPS() end
   elseif cmd == "reglages" or cmd == "options" or cmd == "settings" or cmd == "opt" then if WP and WP.ShowOptionsPage then WP.ShowOptionsPage() end
   elseif cmd == "bienvenue" or cmd == "welcome" or cmd == "setup" then if WP and WP.ShowWelcome then WP.ShowWelcome() end

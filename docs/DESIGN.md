@@ -119,6 +119,7 @@ One left edge per panel: titles, body text, list icons and buttons all start at 
 - Every border and rule is exactly 1 physical pixel: thickness = `PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()`, refit on `UI_SCALE_CHANGED` and `DISPLAY_SIZE_CHANGED` (both registered through pcall).
 - The only thicker line is the 2 px underline of the active tab.
 - Corners: square everywhere. No mixing of rounded and square. The two round shapes allowed are the switch knob and the dot icon, both drawn from `Media/Icons/dot`.
+- Recorded exception: creature portraits (the dungeon boss panel, Bosses.lua) are round, as the game draws them (`SetPortraitTextureFromCreatureDisplayID`, `SetPortraitTexture`). Every layer of a portrait stays round: the dark disc, the veil, the hover light and the painted fallback icon use the game's portrait mask `Interface\CharacterFrame\TempPortraitAlphaMask`, the edge is the HD `ring`. The panel around them stays square.
 - Card: `cardFill` + 1 px `cardEdge`. No gradient, no inner glow, no stripe.
 
 ### 1.5 Motion
@@ -195,6 +196,7 @@ All components live in one module (`ns.UI`, reused by Writs through `S`), each w
 - Backdrop `bg` at 0.97, 1 px `cardEdge` outline. No title-bar gradient.
 - Width is fixed per window and chosen from: 360 (HUD-like), 420 (single list), 520 (two columns), 640 (wide tools). Width is never computed from text.
 - One recorded exception: the guide tracker (Tracker.lua) is 300, a compact overlay that stays on screen beside the game's own trackers.
+- Second recorded exception: the dungeon boss panel (Bosses.lua) is 248, five 40 px portraits with 6 px gaps and a 12 px pad, docked beside the guide like a dungeon journal.
 - Movable by the header; position saved per window; clamped to screen.
 - Strata MEDIUM, raised on mouse down. Escape closes (UISpecialFrames).
 

@@ -6,6 +6,13 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.64] — 2026-11-15
+
+### Modifié / Changed
+- **Fenêtre des boss façon Dungeon Journal** : en haut, la sortie en cours (Temps, XP, Or) avec « Nouveau run » ; puis les boss en **portraits ronds**, 5 par ligne, dans l'ordre du donjon (tués : grisés avec une coche) ; puis les **Rares** en silhouettes grises tant que tu ne les as pas vus, en couleur avec un anneau argenté ensuite. Chaque créature a un vrai visage (modèle du jeu, portrait vu en jeu, ou icône de sa famille). Un clic sur un portrait le cible et le marque. `/wlh boss`.
+  *Boss panel like Dungeon Journal: run stats, round portraits, rares greyed until seen.*
+- **Bilan de sortie** : en quittant le donjon, une ligne dans le chat (« Zul'Farrak : 32 min · 38 200 XP · 12 po · 7/7 boss »).
+
 ## [1.0.0-beta.63] — 2026-11-15
 
 ### Modifié / Changed
