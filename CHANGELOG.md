@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.44] — 2026-11-15
+
+### Modifié / Changed
+- **Commandes, catalogue des métiers** : « Commander » passe la commande à **toute la guilde** (le premier artisan qui accepte s'en charge) ; Maj-clic pour la passer à un seul artisan. Les objets sont rangés comme dans la fenêtre de métier : catégories repliables (Armes, Armure par emplacement, Sacs, Consommables, Composants, Enchantements…), triés par niveau requis (« Niv. 24 ») puis par qualité.
+  *Orders catalogue: Order goes to the whole guild; items grouped by category, sorted by level.*
+
 ## [1.0.0-beta.43] — 2026-11-15
 
 ### Corrigé / Fixed

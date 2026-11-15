@@ -99,6 +99,23 @@ ns.AddEnglish({
     ["Ouvre ta fenêtre de métier pour partager les tiennes."] = "Open your profession window to share yours.",
     ["%d étoiles reçues pour des commandes livrées"] = "%d stars received for delivered orders",
     ["1 étoile reçue pour une commande livrée"] = "1 star received for a delivered order",
+    ["Clic : commander à toute la guilde (le premier artisan qui accepte s'en charge)"] = "Click: order from the whole guild (the first crafter to accept takes it)",
+    ["Maj-clic : commander à %s seulement"] = "Shift-click: order from %s only",
+    ["Affine la recherche pour voir la suite (%d objets affichés sur %d)."] = "Narrow the search to see the rest (%d of %d items shown).",
+    -- the catalogue's categories
+    ["Niv. %d"] = "Lvl %d",
+    ["Armes"] = "Weapons",
+    ["Armure"] = "Armor",
+    ["Sacs"] = "Bags",
+    ["Consommables"] = "Consumables",
+    ["Gemmes"] = "Gems",
+    ["Munitions"] = "Ammo",
+    ["Recettes"] = "Recipes",
+    ["Divers"] = "Miscellaneous",
+    ["Enchantements"] = "Enchants",
+    ["Autres"] = "Other",
+    ["Clic : replier la catégorie"] = "Click: fold the category",
+    ["Clic : déplier la catégorie"] = "Click: unfold the category",
     -- a crafter's recipes
     ["Recettes de %s"] = "%s's recipes",
     ["%s %d"] = "%s %d",
@@ -605,7 +622,8 @@ local function ReqLevel(id)
     return ok and type(minLevel) == "number" and minLevel > 1 and minLevel or nil
 end
 -- an item's tooltip: name, level, every reagent on its own line, who makes it, what a click does
-local function ItemTip(id, re, who, crafter)
+-- (a click orders from the whole guild, shift-click from the best crafter only)
+local function ItemTip(id, re, who, best)
     local qc = id > 0 and S.QualityColor(id) or C.fg
     local tip = { S.Hex(qc) .. Name(id) .. "|r" }
     local lvl = ReqLevel(id)
@@ -618,9 +636,176 @@ local function ItemTip(id, re, who, crafter)
         for _, c in ipairs(who) do all[#all + 1] = CrafterName(c) end
         tip[#tip + 1] = string.format(L("Peuvent le fabriquer : %s"), table.concat(all, ", "))
     end
-    tip[#tip + 1] = crafter and string.format(L("Clic : commander à %s"), crafter) or L("Clic : commander à la guilde")
-    tip[#tip + 1] = L("Maj-clic : demander à toute la guilde")
+    tip[#tip + 1] = L("Clic : commander à toute la guilde (le premier artisan qui accepte s'en charge)")
+    if best then tip[#tip + 1] = string.format(L("Maj-clic : commander à %s seulement"), best) end
     return tip
+end
+
+-- ---------------------------------------------------------------- the catalogue's categories
+-- Grouped like a profession window: the item's class (weapons, armour, bags...), then its slot
+-- (armour) or its subclass (the rest); enchants (negative spell IDs) by the slot their name names.
+-- Inside a group: required level, then quality (best first), then name.
+local CLASS_GROUP = {   -- classID = { group key, order, label }
+    [2] = { "weapon", 1, "Armes" }, [4] = { "armor", 2, "Armure" }, [1] = { "bag", 3, "Sacs" }, [11] = { "bag", 3, "Sacs" },
+    [0] = { "consumable", 4, "Consommables" }, [3] = { "gem", 5, "Gemmes" }, [7] = { "reagent", 6, "Composants" },
+    [5] = { "reagent", 6, "Composants" }, [6] = { "ammo", 7, "Munitions" }, [9] = { "recipe", 9, "Recettes" },
+    [15] = { "misc", 10, "Divers" },
+}
+local ENCHANT_ORDER, OTHER_ORDER = 8, 99
+local SLOT_ORDER = {}
+for i, s in ipairs({ "INVTYPE_HEAD", "INVTYPE_NECK", "INVTYPE_SHOULDER", "INVTYPE_CLOAK", "INVTYPE_CHEST", "INVTYPE_BODY",
+    "INVTYPE_TABARD", "INVTYPE_WRIST", "INVTYPE_HAND", "INVTYPE_WAIST", "INVTYPE_LEGS", "INVTYPE_FEET", "INVTYPE_FINGER",
+    "INVTYPE_TRINKET", "INVTYPE_HOLDABLE" }) do SLOT_ORDER[s] = i end
+local SLOT_SAME = { INVTYPE_ROBE = "INVTYPE_CHEST" }
+local catCache = {}   -- [id] = { top, order, label, sub, subOrder, subLabel }: what the class says never changes
+
+local function SubClassName(classID, subID)
+    local f = (C_Item and C_Item.GetItemSubClassInfo) or GetItemSubClassInfo
+    if not (f and classID and subID) then return nil end
+    local ok, n = pcall(f, classID, subID)
+    return ok and type(n) == "string" and n ~= "" and n or nil
+end
+-- "Enchant Bracer - Minor Health" / "Enchantement de bracelets - Vie mineure": "Bracer" / "Bracelets"
+local function EnchantSlot(name)
+    local head = type(name) == "string" and name:match("^(.-)%s+%-%s+")
+    if not head then return nil end
+    head = head:gsub("^[Ee]nchantement%s+d[e']%s*", ""):gsub("^[Ee]nchantement%s+", ""):gsub("^[Ee]nchanter%s+", "")
+        :gsub("^[Ee]nchant%s+", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if head == "" or head:find("item:", 1, true) then return nil end
+    return (head:gsub("^%l", string.upper))
+end
+local function CatOf(id, name)
+    local c = catCache[id]
+    if c then return c end
+    if id < 0 then
+        local slot = EnchantSlot(name)
+        -- an enchant's name may not be known yet: only a found slot is kept
+        c = { "enchant", ENCHANT_ORDER, L("Enchantements"), slot and slot:lower() or "other", slot and 1 or 99, slot or L("Autres") }
+        if slot then catCache[id] = c end
+        return c
+    end
+    local instant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    local classID, subID, equipLoc
+    if instant then
+        local ok, iid, _, _, loc, _, cls, sub = pcall(instant, id)
+        if ok and iid then classID, subID, equipLoc = cls, sub, loc end
+    end
+    local g = classID and CLASS_GROUP[classID]
+    if not classID then return { "other", OTHER_ORDER, L("Autres"), "other", 99, L("Autres") } end
+    local top, order, label
+    if g then top, order, label = g[1], g[2], L(g[3])
+    else
+        local cf = (C_Item and C_Item.GetItemClassInfo) or GetItemClassInfo
+        local ok, n = false, nil
+        if cf then ok, n = pcall(cf, classID) end
+        top, order, label = "class" .. classID, 20, (ok and type(n) == "string" and n ~= "") and n or L("Autres")
+    end
+    local sub, subOrder, subLabel
+    if classID == 4 and subID ~= 6 and type(equipLoc) == "string" and equipLoc ~= "" then
+        local loc = SLOT_SAME[equipLoc] or equipLoc
+        local sl = _G[loc]
+        if type(sl) == "string" and sl ~= "" then sub, subOrder, subLabel = loc, SLOT_ORDER[loc] or 50, sl end
+    end
+    if not sub then
+        local sn = SubClassName(classID, subID)
+        if sn then sub, subOrder, subLabel = "s" .. classID .. "." .. tostring(subID), (classID == 4 and subID == 6) and 60 or 50, sn
+        else sub, subOrder, subLabel = "other", 99, L("Autres") end
+    end
+    -- [7]: an armour piece's subclass ("Mailles"), told apart in a slot shared by several
+    c = { top, order, label, sub, subOrder, subLabel, (classID == 4 and sub ~= nil and sub:sub(1, 1) ~= "s") and SubClassName(classID, subID) or nil }
+    catCache[id] = c
+    return c
+end
+-- an item's level asked and quality, when the game has it cached (0 / -1 meanwhile)
+local function LevelQuality(id)
+    if id <= 0 then return 0, -1 end
+    local info = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    if not info then return 0, -1 end
+    local ok, n, _, q, _, minLevel = pcall(info, id)
+    if not ok or not n then return 0, -1 end
+    return type(minLevel) == "number" and minLevel or 0, type(q) == "number" and q or -1
+end
+-- the items in their groups: { { key, label, n, subs = { { key, label, n, items } } } }, sorted
+local function Group(items)
+    local tops, byTop = {}, {}
+    for _, it in ipairs(items) do
+        local c = CatOf(it.id, it.name)
+        it.lvl, it.q = LevelQuality(it.id)
+        it.kind = c[7]
+        local t = byTop[c[1]]
+        if not t then
+            t = { key = c[1], order = c[2], label = c[3], n = 0, subs = {}, bySub = {} }
+            byTop[c[1]] = t; tops[#tops + 1] = t
+        end
+        local s = t.bySub[c[4]]
+        if not s then
+            s = { key = c[1] .. "/" .. c[4], order = c[5], label = c[6], items = {} }
+            t.bySub[c[4]] = s; t.subs[#t.subs + 1] = s
+        end
+        s.items[#s.items + 1] = it
+        if it.kind then
+            if s.kind == nil then s.kind = it.kind elseif s.kind ~= it.kind then s.mixed = true end
+        end
+        t.n = t.n + 1
+    end
+    local function ByOrder(a, b) if a.order ~= b.order then return a.order < b.order end return a.label < b.label end
+    -- a level not known yet (item info still on its way) sorts last, so known rows keep their place
+    local function Lvl(it) return (it.q == -1 and it.lvl == 0) and math.huge or it.lvl end
+    local function ByItem(a, b)
+        local la, lb = Lvl(a), Lvl(b)
+        if la ~= lb then return la < lb end
+        if a.q ~= b.q then return a.q > b.q end
+        if a.name ~= b.name then return a.name < b.name end
+        return a.id < b.id
+    end
+    table.sort(tops, ByOrder)
+    for _, t in ipairs(tops) do
+        table.sort(t.subs, ByOrder)
+        for _, s in ipairs(t.subs) do table.sort(s.items, ByItem) end
+    end
+    return tops
+end
+-- the folded groups of a profession's catalogue, kept between sessions
+local function Folds(prof)
+    WLWritsDB.ordersFold = type(WLWritsDB.ordersFold) == "table" and WLWritsDB.ordersFold or {}
+    local t = WLWritsDB.ordersFold[prof]
+    if type(t) ~= "table" then t = {}; WLWritsDB.ordersFold[prof] = t end
+    return t
+end
+
+-- a category head of the catalogue: chevron, label, count, the rule under it; a click folds it.
+-- sub: a slot or subclass inside a group (24 high, indented, label 12 text)
+local function CatHead(parent, sub)
+    local b = CreateFrame("Button", nil, parent)
+    b.wlOwned = true
+    b.sub = sub
+    b:SetHeight(sub and 24 or 32); b:SetWidth(CW - (sub and 12 or 0))
+    b.hl = S.Solid(b, "BACKGROUND", C.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
+    b.chev = S.Icon(b, "chevron_down", 12, "ARTWORK", C.muted)
+    b.label = sub and S.Text(b, F.label, C.text) or S.Text(b, F.body, C.fg); b.label:SetWordWrap(false)
+    S.ClampLabel(b.label, nil, b)
+    b.chev:SetPoint("BOTTOMLEFT", 0, sub and 6 or 8)
+    b.label:SetPoint("BOTTOMLEFT", 18, sub and 5 or 6)
+    b.count = S.Text(b, F.meta, C.muted); b.count:SetWordWrap(false)
+    b.count:SetPoint("BOTTOMLEFT", b.label, "BOTTOMRIGHT", 6, 0)
+    b.rule = S.Rule(b); b.rule:SetPoint("BOTTOMLEFT"); b.rule:SetPoint("BOTTOMRIGHT")
+    b:SetScript("OnClick", function(self) if self.foldable and self.onFold then self.onFold(self) end end)
+    b:SetScript("OnEnter", function(self)
+        if not self.foldable then return end
+        self.hl:SetAlpha(1); self.chev:SetVertexColor(C.fg[1], C.fg[2], C.fg[3])
+        S.Tip(self, { self.label:GetText(), self.folded and L("Clic : déplier la catégorie") or L("Clic : replier la catégorie") })
+    end)
+    b:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); self.chev:SetVertexColor(C.muted[1], C.muted[2], C.muted[3]); S.HideTip() end)
+    function b:Set(text, n, foldable, folded)
+        self.foldable, self.folded = foldable, folded
+        local indent = self.sub and 12 or 0
+        S.HDIcon(self.chev, folded and "chevron_right" or "chevron_down", C.muted)
+        self.label:SetText(text or "")
+        self.count:SetText(n or ""); self.count:SetShown(n ~= nil)
+        local ok, w = pcall(self.label.GetStringWidth, self.label)
+        self.label:SetWidth(math.max(40, math.min(math.ceil((ok and num(w)) or 100) + 1, CW - indent - 18 - 48)))
+    end
+    return b
 end
 
 -- ---------------------------------------------------------------- page: crafters
@@ -728,27 +913,46 @@ local function BuildFind(p)
     f.cbox:HookScript("OnTextChanged", function() if f.prof then WP.RefreshOrders() end end)
 
     -- the catalogue's rows: an item (who makes it, Request), or a crafter (Recipes)
+    -- the row does what its button does: an item opens the order form for the whole guild (the
+    -- first crafter who accepts takes it), shift-click for its best crafter only; a crafter, his recipes
+    local function Act(r)
+        if r.kind == "item" then
+            local shift = IsShiftKeyDown and IsShiftKeyDown()
+            WP.NewOrder(r.item, (shift and r.crafter) or nil)
+        elseif r.kind == "crafter" and r.open then f.view = r.open; f.list.Reset(); WP.RefreshOrders() end
+    end
     f.cat = List(p, function(parent)
         local r = Row(parent)
         r.who = r.detail
-        r.btn = RowButton(r, L("Commander"), function()
-            if r.kind == "item" then WP.NewOrder(r.item, r.crafter)
-            elseif r.open then f.view = r.open; f.list.Reset(); WP.RefreshOrders() end
-        end, function() return r.btnTip or { r.btn:GetText() } end)
-        -- the row does what its button does: an item opens the order form (to its best crafter), a
-        -- crafter his recipes; shift-click on an item asks the whole guild (the Request form filled in)
-        r:SetScript("OnClick", function(self)
-            if self.kind == "item" and IsShiftKeyDown and IsShiftKeyDown() and WP.AskOrder then
-                WP.AskOrder(self.item, PROFS[self.prof] and PROFS[self.prof][2] or self.prof)
-            elseif self.kind == "item" then WP.NewOrder(self.item, self.crafter)
-            elseif self.kind == "crafter" and self.open then f.view = self.open; f.list.Reset(); WP.RefreshOrders() end
-        end)
+        r.btn = RowButton(r, L("Commander"), function() Act(r) end, function() return r.btnTip or { r.btn:GetText() } end)
+        r:SetScript("OnClick", Act)
         return r
     end)
+    -- the category heads (a group, a slot or subclass inside it): a click folds it, kept per profession
+    local function Fold(hd)
+        if not (f.prof and hd.foldKey) then return end
+        local t = Folds(f.prof)
+        t[hd.foldKey] = (not t[hd.foldKey]) or nil
+        WP.RefreshOrders()
+    end
+    f.catHeads, f.catSubs = {}, {}
+    function f.CatHeadGet(i, sub)
+        local pool = sub and f.catSubs or f.catHeads
+        local h = pool[i]
+        if not h then h = CatHead(f.cat.content, sub); h.onFold = Fold; pool[i] = h end
+        h:Show()
+        return h
+    end
+    function f.CatHeadsHideFrom(i, sub)
+        local pool = sub and f.catSubs or f.catHeads
+        for j = i, #pool do pool[j]:Hide() end
+    end
     f.catEmpty = S.EmptyState(f.cat.content, "search", "", nil, nil, nil)
     f.catHead = Header(f.cat.content)
     f.catNote = S.Text(f.cat.content, F.meta, C.muted)
     f.catNote:SetJustifyH("LEFT"); f.catNote:SetJustifyV("TOP"); f.catNote:Hide()
+    f.catMore = S.Text(f.cat.content, F.meta, C.muted)
+    f.catMore:SetJustifyH("LEFT"); f.catMore:SetJustifyV("TOP"); f.catMore:Hide()
 end
 
 -- which of the page's areas shows: the result list, the grid, or a catalogue; and where it starts
@@ -888,7 +1092,6 @@ local function RenderCatalog(f, g)
             end
         end
     end
-    table.sort(items, function(a, b) if a.name ~= b.name then return a.name < b.name end return a.id < b.id end)
     local y, i = 0, 0
     if #items == 0 then
         if e.nItems == 0 then
@@ -903,8 +1106,11 @@ local function RenderCatalog(f, g)
                 L("Faire une demande"), function() WP.AskOrder(nil, PROFS[key] and PROFS[key][2]) end)
         end
     else f.catEmpty:Hide() end
-    for n, it in ipairs(items) do
-        if n > CAT_MAX then break end
+    -- the items by category, like a profession window: a search opens every category it matches
+    local folds = Folds(key)
+    local searching = q ~= "" or linked ~= nil
+    local nh, ns, drawn = 0, 0, 0
+    local function Item(it, mixed)
         i = i + 1
         local r = f.cat.Get(i)
         r.kind, r.item, r.prof, r.open = "item", it.id, key, nil
@@ -914,10 +1120,13 @@ local function RenderCatalog(f, g)
         r.crafter = best and best.name or nil
         SetItem(r, ItemTex(it.id), it.id)
         r.name:SetText(it.name)
-        r.detail:SetText(S.IconMarkup("user", 12, C.muted) .. " " .. WhoText(it.who, 3)); r.detail:Show()
+        local lvl = (it.lvl or 0) > 1 and (S.Hex(C.text) .. string.format(L("Niv. %d"), it.lvl) .. "|r") or ""
+        if mixed and it.kind then lvl = lvl .. (lvl ~= "" and " · " or "") .. it.kind end
+        if lvl ~= "" then lvl = lvl .. "  " end
+        r.detail:SetText(lvl .. S.IconMarkup("user", 12, C.muted) .. " " .. WhoText(it.who, 3)); r.detail:Show()
         r.btn:SetText(L("Commander")); r.btn:Show()
-        r.btnTip = { L("Commander"), r.crafter and string.format(L("Clic : commander à %s"), r.crafter) or L("Clic : commander à la guilde"),
-            L("Maj-clic : demander à toute la guilde") }
+        r.btnTip = { L("Commander"), L("Clic : commander à toute la guilde (le premier artisan qui accepte s'en charge)") }
+        if r.crafter then r.btnTip[3] = string.format(L("Maj-clic : commander à %s seulement"), r.crafter) end
         -- the reagents and every crafter go in the tooltip, built on hover only
         local id, re, who, crafter = it.id, it.re, it.who, r.crafter
         r.tip = function() return ItemTip(id, re, who, crafter) end
@@ -926,6 +1135,50 @@ local function RenderCatalog(f, g)
         r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
         y = y + rh + 2
     end
+    local groups = #items > 0 and Group(items) or {}
+    local cut = false
+    for gi, g in ipairs(groups) do
+        if drawn >= CAT_MAX then cut = true; break end
+        nh = nh + 1
+        local hd = f.CatHeadGet(nh, false)
+        local folded = (not searching) and folds[g.key] == true
+        hd.foldKey = g.key
+        hd:Set(g.label, g.n, not searching, folded)
+        if gi > 1 then y = y + 8 end
+        hd:ClearAllPoints(); hd:SetPoint("TOPLEFT", 0, -y)
+        y = y + 32 + 4
+        if not folded then
+            local showSubs = #g.subs > 1
+            for _, s in ipairs(g.subs) do
+                if drawn >= CAT_MAX then cut = true; break end
+                local sfolded = false
+                if showSubs then
+                    ns = ns + 1
+                    local sh = f.CatHeadGet(ns, true)
+                    sfolded = (not searching) and folds[s.key] == true
+                    sh.foldKey = s.key
+                    sh:Set(s.label, #s.items, not searching, sfolded)
+                    sh:ClearAllPoints(); sh:SetPoint("TOPLEFT", 12, -y)
+                    y = y + 24 + 4
+                end
+                if not sfolded then
+                    for _, it in ipairs(s.items) do
+                        if drawn >= CAT_MAX then cut = true; break end
+                        drawn = drawn + 1
+                        Item(it, s.mixed)
+                    end
+                end
+            end
+        end
+    end
+    f.CatHeadsHideFrom(nh + 1, false); f.CatHeadsHideFrom(ns + 1, true)
+    -- the list was cut at CAT_MAX: say so
+    if cut then
+        f.catMore:SetText(string.format(L("Affine la recherche pour voir la suite (%d objets affichés sur %d)."), drawn, #items))
+        f.catMore:ClearAllPoints(); f.catMore:SetPoint("TOPLEFT", 0, -(y + 6))
+        y = y + 6 + S.FitText(f.catMore, 0, CW, f.cat.content)
+        f.catMore:Show()
+    else f.catMore:Hide() end
     -- the profession's crafters who shared recipes: their own lists
     local sharing = {}
     if not filtered then
