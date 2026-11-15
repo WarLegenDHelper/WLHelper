@@ -6,7 +6,9 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
-## [1.0.0-beta.39] — 2026-11-15
+## [1.0.0-beta.40] — 2026-11-15
+
+(La bêta.39 n'a pas été publiée : son numéro de version était faux.)
 
 ### Modifié / Changed
 - **Refonte visuelle complète** : un guide de style commun (couleurs, tailles, espacements, boutons avec survol et appui, onglets, cartes, états vides), des icônes HD dessinées pour l'addon, des fenêtres qui s'ajustent à leur contenu, plus de texte coupé ni de traits colorés sur le côté, et tous les textes réécrits en contexte, en français et en anglais.
@@ -23,6 +25,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ### Corrigé / Fixed
 - **Prérequis des quêtes** vérifiés contre la base de Forever (234 quêtes) : chaîne manquante de Blackfathom Deeps ajoutée (Trouble in the Deeps), fausses étapes obligatoires retirées, classes, niveaux et faction corrigés. Le guide suit maintenant toute la chaîne, tient compte de ta faction et de ta race, et ne propose plus une quête dont un prérequis t'est impossible.
   *Quest prerequisites checked against Forever's data; the guide follows whole chains and respects faction and race.*
+
+## [1.0.0-beta.38] — 2026-11-15
+
+### Corrigé / Fixed
+- **Améliorations : mauvaise spé avec WL Helper Gear** (un mage Givre jugé Arcane, d'où des % faux comme +88 %). Le sous-addon reçoit maintenant la spé que voit WL Helper (tes talents, ou ton choix dans Réglages › Améliorations).
+  *Upgrades: WL Helper Gear now uses the spec WL Helper detects (a frost mage was judged as arcane).*
 
 ## [1.0.0-beta.37] — 2026-11-15
 
