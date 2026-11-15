@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.58] — 2026-11-15
+
+### Modifié / Changed
+- **Nouvel écran de bienvenue**, en 4 ou 5 étapes courtes avec points de progression, Retour et Passer : à quoi sert WL Helper ; les modules qui t'intéressent (cartes avec icône et une ligne, interrupteur) ; ta spé (seulement si le jeu ne la donne pas) ; le confort (clics éteints par défaut, avertissement pour les chasseurs) ; « C'est prêt » avec de gros boutons pour démarrer et où tout retrouver. `/wlh setup` le rouvre.
+  *New welcome flow: short steps, modules, spec, comfort, ready.*
+
 ## [1.0.0-beta.57] — 2026-11-15
 
 ### Corrigé / Fixed
