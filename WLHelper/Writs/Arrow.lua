@@ -362,7 +362,7 @@ local function Build()
     arrow:SetSize(HUD_W, 12 + ARROW_SIZE + 12)
     local pos = WLWritsDB.arrowPos
     if pos then arrow:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4]) else arrow:SetPoint("TOP", 0, -150) end
-    arrow:SetFrameStrata("MEDIUM")
+    arrow:SetFrameStrata("HIGH")   -- above unit frames and action bars (EllesmereUI and others draw at MEDIUM)
     arrow:SetClampedToScreen(true)
     arrow:SetMovable(true)
     arrow:EnableMouse(true)
@@ -437,7 +437,7 @@ local function Build()
     teleport = CreateFrame("Button", "WLGPSTeleport", UIParent, "SecureActionButtonTemplate")
     teleport.wlOwned = true
     teleport:SetSize(HUD_W - 24, BTN_H)
-    teleport:SetFrameStrata("MEDIUM")
+    teleport:SetFrameStrata("HIGH")
     teleport:SetFrameLevel(arrow:GetFrameLevel() + 5)
     teleport:RegisterForClicks("AnyUp", "AnyDown")   -- the game acts on the press or the release (its "cast on key down" setting): both registered
     S.Solid(teleport, "BACKGROUND", C.bg, 0.92):SetAllPoints()

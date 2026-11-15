@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.51] — 2026-11-15
+
+### Corrigé / Fixed
+- **Flèche GPS cachée sous les cadres de personnage** (EllesmereUI et autres) : elle passe au-dessus, avec son bouton de téléportation.
+  *The GPS arrow now draws above unit frames.*
+
 ## [1.0.0-beta.50] — 2026-11-15
 
 ### Corrigé / Fixed
