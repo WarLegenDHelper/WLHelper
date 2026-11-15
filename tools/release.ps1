@@ -1,6 +1,7 @@
 # Publishes a version: checks that the toc, the CHANGELOG and the tag agree, builds the zip,
 # commits, tags vX.Y.Z, pushes and creates the GitHub release with the CHANGELOG section as notes.
-#   .\tools\release.ps1 -Sync        copy the addon from AddOns first (usual case)
+#   .\tools\release.ps1              publish the addon as it is in this repo (usual case)
+#   .\tools\release.ps1 -Sync        old way: copy it from AddOns first (avoid: WowUp may overwrite AddOns)
 #   .\tools\release.ps1 -DryRun      check and build only, publish nothing
 param(
     [switch]$Sync,
