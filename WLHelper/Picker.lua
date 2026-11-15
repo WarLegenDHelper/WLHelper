@@ -208,7 +208,15 @@ local function MakeCard(parent)
   -- double-click: this dungeon alone, through its summary (the route's first screen)
   c:SetScript("OnDoubleClick", function(self)
     wipe(Selected()); Selected()[self.dkey] = true
-    if ns.ShowSummary then Render(); ns.ShowSummary({ self.dkey }) else ns.StartGuide() end
+    if ns.ShowSummary then
+      Render()
+      local left, top = p:GetLeft(), p:GetTop()
+      local sum = ns.ShowSummary({ self.dkey })
+      if sum then
+        p:Hide()
+        if left and top and sum.ClearAllPoints then sum:ClearAllPoints(); sum:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top) end
+      end
+    else ns.StartGuide() end
   end)
   c:SetScript("OnMouseDown", function(self) self.press:Show() end)
   c:SetScript("OnMouseUp", function(self) self.press:Hide() end)
@@ -299,7 +307,16 @@ local function Build()
   -- the main action opens the route's summary first: tick the quests seeing XP, rewards and
   -- chains, then start the route from there
   p.go = S.Button(p.foot, L.PICK_GO, 0, 32, "primary", function()
-    if ns.ShowSummary and ns.ShowSummary() then return end
+    -- the picker gives way to the summary, opened at the same place on the screen
+    local left, top = p:GetLeft(), p:GetTop()
+    local sum = ns.ShowSummary and ns.ShowSummary()
+    if sum then
+      p:Hide()
+      if left and top and sum.ClearAllPoints then
+        sum:ClearAllPoints(); sum:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+      end
+      return
+    end
     ns.StartGuide()
   end, function() return { p.go:GetText(), L.SUM_PICK_GO_TT } end)
   p.go:SetPoint("RIGHT", 0, 0)

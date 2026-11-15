@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.60] — 2026-11-15
+
+### Corrigé / Fixed
+- **« Me guider dans le donjon »** : le choix des donjons se ferme et le résumé s'ouvre à sa place (il restait ouvert par-dessus).
+  *The dungeon picker closes when the summary opens.*
+
 ## [1.0.0-beta.59] — 2026-11-15
 
 ### Ajouté / Added
