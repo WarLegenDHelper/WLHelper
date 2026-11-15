@@ -19,8 +19,8 @@ ns.AddEnglish({
     ["vu il y a %d j"] = "seen %d d ago",
     ["hors ligne"] = "offline",
     ["Commander"] = "Order",
-    ["Aucune recette connue pour l'instant : elles arrivent quand les membres qui ont WL Helper ouvrent leur fenêtre de métier."] =
-        "No recipe known yet: they arrive when members who have WL Helper open their profession window.",
+    ["Aucune recette connue pour l'instant. Chaque membre qui a WL Helper, toi compris, doit ouvrir une fois sa fenêtre de métier pour partager ses recettes."] =
+        "No recipe known yet. Each member who has WL Helper, you included, has to open their profession window once to share their recipes.",
     ["Tape au moins 2 lettres."] = "Type at least 2 letters.",
     ["Nouvelle commande"] = "New order",
     ["Toute la guilde"] = "Whole guild",
@@ -167,7 +167,7 @@ local function RenderFind()
     end
     f.list.HideFrom(math.min(#rows, 60) + 1)
     f.empty:SetShown(#rows == 0)
-    f.empty:SetText(next(catalog) == nil and L("Aucune recette connue pour l'instant : elles arrivent quand les membres qui ont WL Helper ouvrent leur fenêtre de métier.")
+    f.empty:SetText(next(catalog) == nil and L("Aucune recette connue pour l'instant. Chaque membre qui a WL Helper, toi compris, doit ouvrir une fois sa fenêtre de métier pour partager ses recettes.")
         or (#q < 2 and L("Tape au moins 2 lettres.") or ""))
     f.list.content:SetHeight(math.max(10, y))
 end
@@ -401,7 +401,7 @@ local function Build()
         pages[k] = p
     end
     BuildFind(pages.find); BuildNew(pages.new); BuildOrders(pages.mine, "mine"); BuildOrders(pages.recv, "recv")
-    win:SetScript("OnShow", function() WP.RefreshOrders() end)
+    win:SetScript("OnShow", function() if O.AskRecipes then O.AskRecipes() end; WP.RefreshOrders() end)
 end
 
 function WP.ShowOrdersTab(k)

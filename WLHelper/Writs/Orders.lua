@@ -189,8 +189,11 @@ local function QueueRead()
 end
 
 -- My professions' hashes to the guild: those with an older copy will ask for the list.
-function O.Announce()
+local announcedAt = 0
+function O.Announce(throttled)
     if WLWritsDB.ordersShare == false then return end
+    if throttled and GetTime() - announcedAt < 30 then return end
+    announcedAt = GetTime()
     for prof, p in pairs(DB().mine) do
         Guild("H|" .. prof .. "|" .. (p.rank or 0) .. "|" .. (p.max or 0) .. "|" .. p.hash)
     end
@@ -607,6 +610,9 @@ local function OnMessage(msg, channel, sender)
             if changed then O.Notify(merged) end
             if WP.RefreshOrders then WP.RefreshOrders() end
         end
+    elseif kind == "Q" and channel == "GUILD" then
+        -- someone asks who crafts what: my professions' hashes (they ask for the lists they lack)
+        O.Announce(true)
     elseif kind == "S" and channel == "GUILD" then
         -- someone just logged in: resend the running orders I published or I am crafting
         local me = Me()
@@ -629,6 +635,15 @@ local function Prune()
         for _, p in pairs(profs) do if (p.t or now) > now - 30 * 86400 then recent = true end end
         if not recent then d.crafters[name] = nil end
     end
+end
+
+-- Asks the guild for its crafters (at login and when the Orders window opens, once a minute at most):
+-- each copy answers with its professions' hashes, and the lists we lack come by themselves.
+local askedAt = -60
+function O.AskRecipes()
+    if GetTime() - askedAt < 60 then return end
+    askedAt = GetTime()
+    Guild("Q|")
 end
 
 -- One chat line when an order concerns you.
@@ -663,6 +678,7 @@ f:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
         C_Timer.After(20, function()
             O.Announce()
             Guild("S|")   -- ask the others to resend their running orders
+            O.AskRecipes()
         end)
     elseif e == "TRADE_SKILL_SHOW" or e == "TRADE_SKILL_UPDATE" or e == "CRAFT_SHOW" or e == "CRAFT_UPDATE" then
         QueueRead()

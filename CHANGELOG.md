@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.22] — 2026-11-15
+
+### Corrigé / Fixed
+- **Commandes : les artisans n'apparaissaient pas** chez un membre connecté après eux. L'addon demande maintenant les recettes à la guilde à la connexion et à l'ouverture de la fenêtre Commandes ; chacun répond, et les listes manquantes arrivent seules. Le message « aucune recette » rappelle que chacun, toi compris, doit ouvrir une fois sa fenêtre de métier.
+  *Orders: crafters now show for members who log in later (recipes are asked for at login and when the window opens).*
+
 ## [1.0.0-beta.21] — 2026-11-15
 
 ### Corrigé / Fixed
