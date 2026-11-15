@@ -14,9 +14,9 @@ body:
     id: version
     attributes:
       label: "Version"
-      description: "Remplie par /wl idee / Filled by /wl idea"
+      description: "Remplie par /wlh idee / Filled by /wlh idea"
   - type: input
     id: context
     attributes:
       label: "Client et personnage / Client and character"
-      description: "Rempli par /wl idee / Filled by /wl idea"
+      description: "Rempli par /wlh idee / Filled by /wlh idea"

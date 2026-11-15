@@ -69,36 +69,36 @@ Alt-clic pour inviter (chat, monde, portraits) et Maj + clic droit pour tirer su
 
 ## Commandes
 
-Une seule commande, `/wl`, et les mêmes mots en français et en anglais.
+Une seule commande, `/wlh` (aussi `/wl` si WaR LegenD RaidTool n'est pas installé : il l'utilise déjà), et les mêmes mots en français et en anglais.
 
 | Commande | Effet |
 |---|---|
-| `/wl` | Accueil |
-| `/wl dungeons` | Le guide des donjons |
-| `/wl pick` | Choisir les donjons |
-| `/wl trade` | Le Comptoir (`/wl trade gps`, `scan`, `reset`) |
-| `/wl bags` | Nettoyeur de sacs |
-| `/wl orders` | Commandes d'artisanat |
-| `/wl guild` | La guilde et le classement PvP |
-| `/wl gps` | Arrête ou relance le guidage |
-| `/wl options` | Réglages |
-| `/wl setup` | Écran de bienvenue : modules et clics |
-| `/wl idea` | Proposer une idée ou signaler un bug |
-| `/wl help` | Toutes les commandes |
+| `/wlh` | Accueil |
+| `/wlh dungeons` | Le guide des donjons |
+| `/wlh pick` | Choisir les donjons |
+| `/wlh trade` | Le Comptoir (`/wlh trade gps`, `scan`, `reset`) |
+| `/wlh bags` | Nettoyeur de sacs |
+| `/wlh orders` | Commandes d'artisanat |
+| `/wlh guild` | La guilde et le classement PvP |
+| `/wlh gps` | Arrête ou relance le guidage |
+| `/wlh options` | Réglages |
+| `/wlh setup` | Écran de bienvenue : modules et clics |
+| `/wlh idea` | Proposer une idée ou signaler un bug |
+| `/wlh help` | Toutes les commandes |
 
 Bouton de la minimap : clic pour l'accueil, clic droit pour un menu vers chaque module.
 
 ## Une idée, un bug ?
 
 Ouvre un [ticket](https://github.com/WarLegenDHelper/WLHelper/issues/new/choose) : idée, bug ou donnée de quête fausse.
-En jeu, `/wl idea` te donne le lien déjà rempli avec ta version.
+En jeu, `/wlh idea` te donne le lien déjà rempli avec ta version.
 
 ## Bon à savoir
 
 - **Le dossier s'appelle `WLHelper`** depuis la 1.0.0-beta.4 (avant : `DungeonGuide`). Si tu avais installé une
   ancienne version à la main, supprime le dossier `DungeonGuide`. S'il traîne encore, l'addon le
   désactive tout seul et te le dit.
-- **Versions** : `1.0.0-beta.24` veut dire bêta de la 1.0. Le détail de chaque version est dans le
+- **Versions** : `1.0.0-beta.25` veut dire bêta de la 1.0. Le détail de chaque version est dans le
   [CHANGELOG](CHANGELOG.md).
 
 ## Crédits et licence

@@ -15,6 +15,8 @@ ns.AddEnglish({
     ["Reçues"] = "Received",
     ["Chercher un objet à faire fabriquer"] = "Search an item to have crafted",
     ["%d artisans connus · %d en ligne"] = "%d crafters known · %d online",
+    ["Tes métiers partagés : %s"] = "Your shared professions: %s",
+    ["Tes métiers : aucun lu. Ouvre une fois chacune de tes fenêtres de métier."] = "Your professions: none read yet. Open each of your profession windows once.",
     ["en ligne"] = "online",
     ["vu il y a %d j"] = "seen %d d ago",
     ["hors ligne"] = "offline",
@@ -108,8 +110,9 @@ local function BuildFind(p)
     f.box = Box(p, W - 2 * PAD, 30, false, L("Chercher un objet à faire fabriquer"))
     f.box:SetPoint("TOPLEFT", PAD, -12)
     f.box:HookScript("OnTextChanged", function() WP.RefreshOrders() end)
-    f.info = S.Text(p, 12, C.dim); f.info:SetPoint("TOPLEFT", PAD, -48)
-    f.list = List(p, -68, 52, function(parent)
+    f.info = S.Text(p, 12, C.dim); f.info:SetPoint("TOPLEFT", PAD, -48); f.info:SetPoint("RIGHT", -PAD, 0)
+    f.info:SetJustifyH("LEFT"); f.info:SetWordWrap(true)
+    f.list = List(p, -86, 52, function(parent)
         local r = CreateFrame("Frame", nil, parent)
         r:SetSize(W - 2 * PAD, 40)
         S.Solid(r, "BACKGROUND", C.card):SetAllPoints(); S.Border(r, C.border)
@@ -135,7 +138,17 @@ local function RenderFind()
     local crafters, online = 0, 0
     local on = O.OnlineGuild()
     for name in pairs(O.DB().crafters) do crafters = crafters + 1; if on[name] then online = online + 1 end end
-    f.info:SetText(string.format(L("%d artisans connus · %d en ligne"), crafters, online))
+    -- what this copy read of your own professions (so you can see that sharing works)
+    local mineT = {}
+    for prof, p in pairs(O.DB().mine or {}) do
+        local n = 0
+        for _ in pairs(p.recipes or {}) do n = n + 1 end
+        mineT[#mineT + 1] = prof .. " " .. (p.rank or 0) .. " (" .. n .. ")"
+    end
+    table.sort(mineT)
+    f.info:SetText(string.format(L("%d artisans connus · %d en ligne"), crafters, online) .. "\n"
+        .. (#mineT > 0 and string.format(L("Tes métiers partagés : %s"), table.concat(mineT, ", "))
+            or L("Tes métiers : aucun lu. Ouvre une fois chacune de tes fenêtres de métier.")))
     local catalog = O.Catalog()
     local rows = {}
     if #q >= 2 then

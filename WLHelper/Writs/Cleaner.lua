@@ -15,7 +15,7 @@ ns.AddEnglish({
     ["Objet rare : à détruire toi-même"] = "Rare item: destroy it yourself",
     ["Quête inconnue dans ton journal : à détruire toi-même"] = "Unknown quest in your log: destroy it yourself",
     ["Pas lié à une quête rendue : à détruire toi-même si tu es sûr"] = "Not tied to a turned-in quest: destroy it yourself if you are sure",
-    ["Aucune quête de ton journal ne les demande. Cochés : l'addon les détruit. Grisés : glisse-les hors du sac pour les détruire toi-même."] = "No quest in your log asks for them. Ticked: the addon destroys them. Greyed: drag them out of your bag to destroy them yourself.",
+    ["Aucune quête de ton journal ne les demande.\nCoche, clique sur Détruire puis dans le monde : le jeu demande confirmation. En gris : vérifie avant."] = "No quest in your log asks for them.\nTick, click Destroy, then click in the world: the game asks to confirm. Greyed: check first.",
     ["Rien que l'addon puisse détruire"] = "Nothing the addon can destroy",
     ["Objets de quête inutiles"] = "Useless quest items",
     ["Quête rendue : %s"] = "Quest turned in: %s",
@@ -214,6 +214,10 @@ local function LogNeeds()
         end
         if qid and qid > 0 and not header then
             active[#active + 1] = qid
+            -- the quest's own title: an item named like a quest in your log (its letter, its
+            -- instructions) belongs to it, even when no objective names it
+            local title = (info and info.title) or select(1, safe(GetQuestLogTitle, i))
+            if type(title) == "string" and title ~= "" then texts[#texts + 1] = title:lower() end
             -- the item the quest gives you to use ("use the torch on ...") is never a required item
             local link = GetQuestLogSpecialItemInfo and safe(GetQuestLogSpecialItemInfo, i)
             local sid = type(link) == "string" and tonumber(link:match("item:(%d+)"))
@@ -358,7 +362,7 @@ local function Scan()
 end
 
 local function IsChecked(e)
-    if e.manual then return false end
+    if e.manual then return userChecked[e.id] == true end   -- never ticked for you
     local u = userChecked[e.id]
     if u ~= nil then return u end
     return not e.amber
@@ -385,7 +389,7 @@ local function Destroy()
         if IsChecked(e) and n == 0 then
             for _, s in ipairs(e.slots) do
                 local info = safe(C_Container.GetContainerItemInfo, s[1], s[2])
-                if n == 0 and info and info.itemID == e.id and not info.isLocked and (info.quality or 0) < MANUAL_QUALITY then
+                if n == 0 and info and info.itemID == e.id and not info.isLocked then
                     -- this client refuses DeleteCursorItem() to addons: the stack goes on your cursor
                     -- and the game's own "Destroy?" box finishes it when you click in the world
                     C_Container.PickupContainerItem(s[1], s[2])
@@ -406,7 +410,7 @@ local win, rows, offset = nil, {}, 0
 
 local function Paint(row, e)
     local on = IsChecked(e)
-    row.box:SetShown(not e.manual)
+    row.box:SetShown(true)
     row.fill:SetColorTexture(C.brand[1], C.brand[2], C.brand[3], on and 1 or 0)
     row.boxBorder(on and C.brand or { 0.353, 0.373, 0.400 })
     row.check:SetShown(on)
@@ -470,7 +474,7 @@ local function MakeRow(parent)
     row:SetScript("OnLeave", function() hl:SetColorTexture(C.hover[1], C.hover[2], C.hover[3], 0); GameTooltip:Hide() end)
     row:SetScript("OnClick", function(self)
         local e = self.entry
-        if not e or e.manual then return end
+        if not e then return end
         userChecked[e.id] = not IsChecked(e)
         Paint(self, e)
         win.UpdateFooter()
@@ -523,7 +527,7 @@ local function Build()
     intro:SetJustifyH("LEFT"); intro:SetJustifyV("TOP")
     intro:SetPoint("TOPLEFT", PAD, -38 - PAD)
     intro:SetWidth(460 - 2 * PAD)
-    intro:SetText(L("Aucune quête de ton journal ne les demande. Cochés : l'addon les détruit. Grisés : glisse-les hors du sac pour les détruire toi-même."))
+    intro:SetText(L("Aucune quête de ton journal ne les demande.\nCoche, clique sur Détruire puis dans le monde : le jeu demande confirmation. En gris : vérifie avant."))
 
     local footer = CreateFrame("Frame", nil, win)
     footer:SetPoint("BOTTOMLEFT", 1, 1); footer:SetPoint("BOTTOMRIGHT", -1, 1); footer:SetHeight(60)
@@ -543,7 +547,7 @@ local function Build()
         destroy:SetEnabled(n > 0)
         -- only greyed items: nothing to tick, say it instead of "tick what you want"
         local any = false
-        for _, e in ipairs(entries) do if not e.manual then any = true end end
+        for _ in ipairs(entries) do any = true end
         if not any and #entries > 0 then destroy.label:SetText(L("Rien que l'addon puisse détruire")) end
         destroy.Paint(false)
     end

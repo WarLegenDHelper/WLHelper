@@ -1,5 +1,5 @@
 -- Writs/Locale.lua: the module's text is written in French; this table gives the English for every
--- string. The language is WL Helper's own (its FR/EN button and /wl lang), the client's by default.
+-- string. The language is WL Helper's own (its FR/EN button and /wlh lang), the client's by default.
 local ADDON, root = ...
 -- The Writs module of WL Helper keeps its own table inside the addon's namespace.
 root.Writs = root.Writs or {}
@@ -120,11 +120,11 @@ local EN = {
     ["ouvre une carte de vol une fois : le GPS apprendra tes points de vol."] = "open a flight map once: the GPS will learn your flight paths.",
     -- commands
     ["commandes :"] = "commands:",
-    ["  /wl trade : ouvre ou ferme le Comptoir"] = "  /wl trade: open or close the Trading Post",
-    ["  /wl trade gps : lance ou arrête la tournée GPS (writs prêts à rendre)"] = "  /wl trade gps: start or stop the GPS tour (writs ready to hand in)",
-    ["  /wl trade stop : arrête le GPS"] = "  /wl trade stop: stop the GPS",
-    ["  /wl trade scan : scanne la liste d'achat à l'HV"] = "  /wl trade scan: scan the shopping list at the AH",
-    ["  /wl trade reset : oublie les bourses mesurées et la faction"] = "  /wl trade reset: forget the measured pouches and the faction",
+    ["  /wlh trade : ouvre ou ferme le Comptoir"] = "  /wlh trade: open or close the Trading Post",
+    ["  /wlh trade gps : lance ou arrête la tournée GPS (writs prêts à rendre)"] = "  /wlh trade gps: start or stop the GPS tour (writs ready to hand in)",
+    ["  /wlh trade stop : arrête le GPS"] = "  /wlh trade stop: stop the GPS",
+    ["  /wlh trade scan : scanne la liste d'achat à l'HV"] = "  /wlh trade scan: scan the shopping list at the AH",
+    ["  /wlh trade reset : oublie les bourses mesurées et la faction"] = "  /wlh trade reset: forget the measured pouches and the faction",
     -- Comptoir window and GPS arrow (v2)
     ["%d rép · %s %.0f, %.0f"] = "%d rep · %s %.0f, %.0f",
     ["%s atteint"] = "%s reached",

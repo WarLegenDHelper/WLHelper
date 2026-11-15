@@ -6,6 +6,23 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.25] — 2026-11-15
+
+### Modifié / Changed
+- **La commande devient `/wlh`** : WaR LegenD RaidTool utilise déjà `/wl`. `/wl` ouvre encore WL Helper quand RaidTool n'est pas installé. **Le logo passe en or** pour ne pas le confondre avec celui de RaidTool.
+  *The command is now /wlh (RaidTool owns /wl); /wl still works without RaidTool. Gold logo, to tell it from RaidTool's.*
+- **Guilde, classement PvP** : les victoires honorables comptées par le jeu (champs de bataille compris), donc ton total s'affiche tout de suite ; **cette semaine**, **saison** (un mois) et **depuis toujours** ; le podium de la saison passée est gardé. Les victoires en monde ouvert restent affichées à part.
+  *PvP ranking: the game's honorable kills (week, monthly season, all time), last season's podium kept.*
+- **Guilde, membres** : recherche (nom, zone, rang), tri (niveau, nom, zone, rang), « où est la guilde » (les zones les plus remplies), clic pour chuchoter, clic droit ou Alt-clic pour inviter, note publique et métiers dans l'infobulle.
+  *Members: search, sort, busiest zones, click to whisper, right-click to invite, note and professions in the tooltip.*
+- **Améliorations** : une page à elle dans les Réglages (spé, seuil de la flèche, ligne d'infobulle, tableau des poids utilisés) ; les poids changent avec ta tranche de niveaux (1-20, 21-40, 41-59, 60).
+  *Upgrades: its own settings page; weights adjusted by level bracket.*
+- **Flèches d'amélioration** dans les sacs du jeu (séparés ou combinés) et dans EllesmereUI Bags, en plus de Baganator.
+  *Upgrade arrows in the game's bags (separate or combined) and EllesmereUI Bags, besides Baganator.*
+- **Nettoyeur** : tous les objets se cochent (les gris jamais d'office) puisque le jeu demande confirmation ; un objet nommé comme une quête de ton journal n'est plus proposé (The Pariah's Instructions).
+- **Hôtel des ventes** : le scan automatique ne part que si la fenêtre du Comptoir est ouverte et que des prix ont plus d'une heure.
+- Bouton Accueil plus sobre (la pierre de foyer) ; la fenêtre Commandes montre les métiers que ton addon a lus.
+
 ## [1.0.0-beta.24] — 2026-11-15
 
 ### Corrigé / Fixed

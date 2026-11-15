@@ -768,10 +768,10 @@ local REFRESH_EVENTS = { QUEST_LOG_UPDATE = true, BAG_UPDATE_DELAYED = true, UPD
 function WP.Print(msg) if root.Print then root.Print(msg) else print("WL Helper " .. tostring(msg)) end end   -- one chat prefix for the whole addon
 
 -- When the game blocks something WL Helper did, say which function (the game's own popup does not)
--- and keep it for the bug form (/wl idea, Writs/Feedback.lua).
+-- and keep it for the bug form (/wlh idea, Writs/Feedback.lua).
 ns.AddEnglish({
-    ["le jeu a bloqué « %s »%s. Signale-le avec /wl idea (bug) : la fonction est déjà dans le formulaire."] =
-        "the game blocked \"%s\"%s. Report it with /wl idea (bug): the function is already in the form.",
+    ["le jeu a bloqué « %s »%s. Signale-le avec /wlh idea (bug) : la fonction est déjà dans le formulaire."] =
+        "the game blocked \"%s\"%s. Report it with /wlh idea (bug): the function is already in the form.",
     [" en combat"] = " in combat",
 })
 local blocked = CreateFrame("Frame")
@@ -788,7 +788,7 @@ blocked:SetScript("OnEvent", function(_, _, addon, func)
     local key = tostring(func)
     if blockedSaid[key] then return end
     blockedSaid[key] = true
-    WP.Print(string.format(L("le jeu a bloqué « %s »%s. Signale-le avec /wl idea (bug) : la fonction est déjà dans le formulaire."),
+    WP.Print(string.format(L("le jeu a bloqué « %s »%s. Signale-le avec /wlh idea (bug) : la fonction est déjà dans le formulaire."),
         tostring(func), combat and L(" en combat") or ""))
 end)
 
@@ -853,16 +853,16 @@ f:SetScript("OnEvent", function(_, event, a1)
     end
 end)
 
--- The Trading Post's words come through /wl trade (Main.lua): /wl trade gps, scan, stop, reset.
+-- The Trading Post's words come through /wlh trade (Main.lua): /wlh trade gps, scan, stop, reset.
 
 local function Help()
     WP.Print(L("commandes :"))
     for _, line in ipairs({
-        L("  /wl trade : ouvre ou ferme le Comptoir"),
-        L("  /wl trade gps : lance ou arrête la tournée GPS (writs prêts à rendre)"),
-        L("  /wl trade stop : arrête le GPS"),
-        L("  /wl trade scan : scanne la liste d'achat à l'HV"),
-        L("  /wl trade reset : oublie les bourses mesurées et la faction"),
+        L("  /wlh trade : ouvre ou ferme le Comptoir"),
+        L("  /wlh trade gps : lance ou arrête la tournée GPS (writs prêts à rendre)"),
+        L("  /wlh trade stop : arrête le GPS"),
+        L("  /wlh trade scan : scanne la liste d'achat à l'HV"),
+        L("  /wlh trade reset : oublie les bourses mesurées et la faction"),
     }) do print(line) end
 end
 
@@ -926,7 +926,7 @@ function WP.SetModule(key, on)
     if WP.SyncOptions then WP.SyncOptions() end
 end
 
--- /wl trade: the Trading Post's own words need the module; options, clean, idea work anyway
+-- /wlh trade: the Trading Post's own words need the module; options, clean, idea work anyway
 local WRIT_COMMANDS = { [""] = true, gps = true, stop = true, scan = true, reset = true }
 function WP.Command(msg)
     local cmd = (msg or ""):lower():match("^%s*(%S*)")

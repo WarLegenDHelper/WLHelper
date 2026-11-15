@@ -571,7 +571,7 @@ function WP.StopGPS()
     if root.Render then root.Render() end
 end
 
--- /wl gps: stops the GPS when it guides; otherwise the dungeon arrow comes back if a route is
+-- /wlh gps: stops the GPS when it guides; otherwise the dungeon arrow comes back if a route is
 -- running, else the Comptoir's tour starts.
 function WP.StopOrStartGPS()
     if GPS.Active() then WP.StopGPS(); return end

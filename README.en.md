@@ -68,36 +68,36 @@ Alt-click to invite (chat, world, portraits) and Shift + right-click to shoot an
 
 ## Commands
 
-One command, `/wl`, with the same words in every language.
+One command, `/wlh` (also `/wl` when WaR LegenD RaidTool is not installed: it already uses it), with the same words in every language.
 
 | Command | What it does |
 |---|---|
-| `/wl` | Home |
-| `/wl dungeons` | The dungeon guide |
-| `/wl pick` | Pick dungeons |
-| `/wl trade` | The Trading Post (`/wl trade gps`, `scan`, `reset`) |
-| `/wl bags` | Bag cleaner |
-| `/wl orders` | Crafting orders |
-| `/wl guild` | The guild and the PvP ranking |
-| `/wl gps` | Stop or restart guidance |
-| `/wl options` | Settings |
-| `/wl setup` | Welcome screen: modules and clicks |
-| `/wl idea` | Suggest an idea or report a bug |
-| `/wl help` | Every command |
+| `/wlh` | Home |
+| `/wlh dungeons` | The dungeon guide |
+| `/wlh pick` | Pick dungeons |
+| `/wlh trade` | The Trading Post (`/wlh trade gps`, `scan`, `reset`) |
+| `/wlh bags` | Bag cleaner |
+| `/wlh orders` | Crafting orders |
+| `/wlh guild` | The guild and the PvP ranking |
+| `/wlh gps` | Stop or restart guidance |
+| `/wlh options` | Settings |
+| `/wlh setup` | Welcome screen: modules and clicks |
+| `/wlh idea` | Suggest an idea or report a bug |
+| `/wlh help` | Every command |
 
 Minimap button: click for home, right-click for a menu to each module.
 
 ## An idea, a bug?
 
 Open an [issue](https://github.com/WarLegenDHelper/WLHelper/issues/new/choose): idea, bug or wrong quest data.
-In game, `/wl idea` gives you the link already filled with your version.
+In game, `/wlh idea` gives you the link already filled with your version.
 
 ## Good to know
 
 - **The folder is named `WLHelper`** since 1.0.0-beta.4 (it was `DungeonGuide`). If you installed an older
   version by hand, delete the `DungeonGuide` folder. If it is still there, the addon turns
   it off and tells you.
-- **Versions**: `1.0.0-beta.24` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
+- **Versions**: `1.0.0-beta.25` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
 
 ## Credits and license
 

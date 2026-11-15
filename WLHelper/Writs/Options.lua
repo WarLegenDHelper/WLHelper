@@ -1,4 +1,4 @@
--- Writs/Options.lua: WL Helper's options window (/wl options), one place for the dungeon guide, the
+-- Writs/Options.lua: WL Helper's options window (/wlh options), one place for the dungeon guide, the
 -- Comptoir (Craftsman's Writs), the GPS and the bag cleaner. A 720x600 window: pages listed on the
 -- left, rows of "label left, control right" on the right, built lazily the first time it opens.
 -- Also registers WL Helper in the game's own settings (Esc > Options > AddOns) and, when present,
@@ -61,7 +61,7 @@ ns.AddEnglish({
     ["Automatismes"] = "Automation",
     ["Rendre les writs automatiquement"] = "Turn in writs automatically",
     ["Accepter la quête en ouvrant l'enveloppe"] = "Accept the quest when opening the envelope",
-    ["Rescanner la liste d'achat en ouvrant l'HV"] = "Rescan the shopping list when the AH opens",
+    ["Rescanner la liste d'achat en ouvrant l'HV (Comptoir ouvert, prix de plus d'une heure)"] = "Rescan the shopping list when the AH opens (Trading Post open, prices over an hour old)",
     ["Infos"] = "Info",
     ["Rappel à la connexion"] = "Reminder on login",
     ["« 3 prêts, 1 enveloppe à ouvrir »"] = "\"3 ready, 1 envelope to open\"",
@@ -94,6 +94,22 @@ ns.AddEnglish({
         "Sources and thanks: see CREDITS.txt in the addon's folder.",
     ["GitHub"] = "GitHub", ["Clique puis Ctrl+C pour copier"] = "Click, then Ctrl+C to copy",
     ["Commandes du chat"] = "Chat commands",
+    ["Améliorations"] = "Upgrades",
+    ["Spé"] = "Spec",
+    ["Affichage"] = "Display",
+    ["Flèche à partir de"] = "Arrow from",
+    ["Le gain minimum pour montrer la flèche dans les sacs"] = "The smallest gain that shows the arrow in your bags",
+    ["Ligne dans les infobulles d'objet"] = "Line in item tooltips",
+    ["Poids utilisés (%s, niveaux %s)"] = "Weights used (%s, levels %s)",
+    ["Dégâts des sorts"] = "Spell damage", ["Soins"] = "Healing", ["Intelligence"] = "Intellect", ["Esprit"] = "Spirit",
+    ["Endurance"] = "Stamina", ["Force"] = "Strength", ["Agilité"] = "Agility", ["Puissance d'attaque"] = "Attack power",
+    ["Puissance d'attaque à distance"] = "Ranged attack power", ["Critique (1 %)"] = "Crit (1%)",
+    ["Critique des sorts (1 %)"] = "Spell crit (1%)", ["Toucher (1 %)"] = "Hit (1%)", ["Toucher des sorts (1 %)"] = "Spell hit (1%)",
+    ["Mana toutes les 5 s"] = "Mana per 5 s", ["Armure"] = "Armor", ["Défense"] = "Defense", ["Esquive (1 %)"] = "Dodge (1%)",
+    ["Parade (1 %)"] = "Parry (1%)", ["Blocage (1 %)"] = "Block (1%)", ["Valeur de blocage"] = "Block value",
+    ["Dégâts par seconde de l'arme"] = "Weapon damage per second",
+    ["Les poids sont ceux de WL Helper : par classe et par spé, ajustés à ta tranche de niveaux (1-20, 21-40, 41-59, 60). Les dégâts d'une école de magie comptent selon ta spé. Un objet que ta classe ne peut pas porter n'a pas de flèche."] =
+        "These are WL Helper's weights: per class and spec, adjusted to your level bracket (1-20, 21-40, 41-59, 60). One school's spell damage counts for your spec. An item your class can't wear gets no arrow.",
     ["Police"] = "Font",
     ["Du jeu"] = "The game's",
     ["Celle d'EllesmereUI peut laisser des textes vides sur certaines installations"] = "EllesmereUI's may leave some texts blank on some installs",
@@ -329,6 +345,7 @@ local PAGES = {
     { key = "comptoir", label = "Comptoir" },
     { key = "gps",      label = "GPS" },
     { key = "bags",     label = "Sacs" },
+    { key = "upgrades", label = "Améliorations" },
     { key = "about",    label = "À propos" },
 }
 
@@ -422,7 +439,7 @@ function BUILD.comptoir(p)
     SwitchRow(p, L("Rendre les caisses automatiquement"), function() return Comfort().autoCrates ~= false end, SetComfort("autoCrates"),
         L("Dokimi / Marcy Baker"))
     SwitchRow(p, L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
-    SwitchRow(p, L("Rescanner la liste d'achat en ouvrant l'HV"), function() return Writs().autoRescan end,
+    SwitchRow(p, L("Rescanner la liste d'achat en ouvrant l'HV (Comptoir ouvert, prix de plus d'une heure)"), function() return Writs().autoRescan end,
         function(v) Writs().autoRescan = v; RefreshWrits() end)
 
     Section(p, L("Infos"))
@@ -519,20 +536,49 @@ function BUILD.bags(p)
     CloseSection(p)
     Note(p, L("Les objets qui lancent une quête ne sont jamais proposés."), 8)
 
-    -- upgrade arrows: the spec they judge for (auto = the talent tree with the most points)
-    if ns.WP.Weights then
-        Section(p, L("Améliorations"))
-        local function SpecDB()
-            WLWritsDB.upgradeSpec = WLWritsDB.upgradeSpec or {}
-            local _, class = UnitClass("player")
-            return WLWritsDB.upgradeSpec, class
-        end
-        local srow = Row(p, L("Spé jugée"), L("Auto : l'arbre de talents où tu as le plus de points"))
-        Place(p, srow, S.Segmented(srow, ns.WP.Weights.SpecChoices(),
-            function() local db, c = SpecDB(); return db[c] or "auto" end,
-            function(v) local db, c = SpecDB(); db[c] = v; if ns.WP.RefreshUpgrades then ns.WP.RefreshUpgrades() end end))
-        CloseSection(p)
+end
+
+-- Upgrades: the spec judged, the weights it uses at your level, when an arrow shows, the tooltip line.
+local STAT_NAMES = {
+    SP = "Dégâts des sorts", HEAL = "Soins", INT = "Intelligence", SPI = "Esprit", STA = "Endurance",
+    STR = "Force", AGI = "Agilité", AP = "Puissance d'attaque", RAP = "Puissance d'attaque à distance",
+    CRIT = "Critique (1 %)", SCRIT = "Critique des sorts (1 %)", HIT = "Toucher (1 %)", SHIT = "Toucher des sorts (1 %)",
+    MP5 = "Mana toutes les 5 s", ARMOR = "Armure", DEF = "Défense", DODGE = "Esquive (1 %)", PARRY = "Parade (1 %)",
+    BLOCK = "Blocage (1 %)", BLOCKV = "Valeur de blocage", DPS = "Dégâts par seconde de l'arme",
+}
+function BUILD.upgrades(p)
+    local Wt = ns.WP.Weights
+    if not Wt then return end
+    local function SpecDB()
+        WLWritsDB.upgradeSpec = WLWritsDB.upgradeSpec or {}
+        local _, class = UnitClass("player")
+        return WLWritsDB.upgradeSpec, class
     end
+    local function Refresh() if ns.WP.RefreshUpgrades then ns.WP.RefreshUpgrades() end end
+    Section(p, L("Spé"))
+    local srow = Row(p, L("Spé jugée"), L("Auto : l'arbre de talents où tu as le plus de points"))
+    Place(p, srow, S.Segmented(srow, Wt.SpecChoices(),
+        function() local db, c = SpecDB(); return db[c] or "auto" end,
+        function(v) local db, c = SpecDB(); db[c] = v; Refresh(); if Rebuild then C_Timer.After(0, Rebuild) end end))
+    CloseSection(p)
+
+    Section(p, L("Affichage"))
+    local trow = Row(p, L("Flèche à partir de"), L("Le gain minimum pour montrer la flèche dans les sacs"))
+    Place(p, trow, S.Segmented(trow, { { 1, "1 %" }, { 3, "3 %" }, { 5, "5 %" }, { 10, "10 %" } },
+        function() return WLWritsDB.upgradeMin or 1 end, function(v) WLWritsDB.upgradeMin = v; Refresh() end))
+    SwitchRow(p, L("Ligne dans les infobulles d'objet"), function() return WLWritsDB.upgradeTip ~= false end,
+        function(v) WLWritsDB.upgradeTip = v end)
+    CloseSection(p)
+
+    local _, label = Wt.Bracket()
+    Section(p, string.format(L("Poids utilisés (%s, niveaux %s)"), Wt.SpecName(), label))
+    local lines = {}
+    for _, e in ipairs(Wt.Table()) do
+        lines[#lines + 1] = string.format("%s  %s", L(STAT_NAMES[e[1]] or e[1]), string.format("%.2f", e[2]))
+    end
+    Note(p, table.concat(lines, "\n"), 4)
+    CloseSection(p)
+    Note(p, L("Les poids sont ceux de WL Helper : par classe et par spé, ajustés à ta tranche de niveaux (1-20, 21-40, 41-59, 60). Les dégâts d'une école de magie comptent selon ta spé. Un objet que ta classe ne peut pas porter n'a pas de flèche."), 8)
 end
 
 local function Version()
@@ -608,8 +654,8 @@ function BUILD.about(p)
     CloseSection(p)
 
     Section(p, L("Commandes du chat"))
-    -- the same list as /wl help, in the guide's language
-    Note(p, root.L and root.L.HELP or "/wl")
+    -- the same list as /wlh help, in the guide's language
+    Note(p, root.L and root.L.HELP or "/wlh")
 end
 
 -- ---------------------------------------------------------------- the window

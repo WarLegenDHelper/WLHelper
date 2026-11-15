@@ -221,23 +221,59 @@ local function SchoolDamage(link)
     return c
 end
 
+-- ---------------------------------------------------------------- by level
+-- What a stat is worth changes while levelling: spell damage counts less early (small spells, short
+-- fights), Intellect, Spirit and Stamina more (drinking and resting time), the weapon more, hit little
+-- (low-level mobs rarely resist); at 60, hit counts most. Four brackets, a multiplier per stat.
+local BRACKETS = {
+    { to = 20, label = "1-20" }, { to = 40, label = "21-40" }, { to = 59, label = "41-59" }, { to = 60, label = "60" },
+}
+local LEVEL_MULT = {        -- [stat] = { 1-20, 21-40, 41-59, 60 }
+    SP = { 0.5, 0.75, 0.9, 1 }, HEAL = { 0.5, 0.75, 0.9, 1 },
+    INT = { 1.3, 1.15, 1, 0.95 }, SPI = { 1.5, 1.3, 1, 0.8 }, STA = { 1.3, 1.15, 1, 1 },
+    HIT = { 0.5, 0.7, 0.85, 1.2 }, SHIT = { 0.5, 0.7, 0.85, 1.2 },
+    CRIT = { 0.8, 0.9, 1, 1 }, SCRIT = { 0.8, 0.9, 1, 1 },
+    DPS = { 1.4, 1.25, 1.1, 1 }, MP5 = { 0.7, 0.85, 1, 1.1 }, ARMOR = { 1.5, 1.2, 1, 1 },
+}
+local function Bracket(level)
+    level = level or UnitLevel("player") or 60
+    for i, b in ipairs(BRACKETS) do if level <= b.to then return i, b.label end end
+    return #BRACKETS, BRACKETS[#BRACKETS].label
+end
+W.Bracket = Bracket
+-- a stat's weight for this spec at your level
+function W.WeightOf(spec, code)
+    local base = spec and spec[4][code]
+    if not base then return nil end
+    local m = LEVEL_MULT[code]
+    return base * (m and m[(Bracket())] or 1)
+end
+-- the stats a spec weighs, heaviest first: { { code, weight }, ... } (for the settings page)
+function W.Table(spec)
+    spec = spec or W.Spec()
+    local t = {}
+    for code in pairs(spec and spec[4] or {}) do t[#t + 1] = { code, W.WeightOf(spec, code) } end
+    table.sort(t, function(a, b) return a[2] > b[2] end)
+    return t
+end
+
 -- the item's score in a slot for a spec
 function W.Score(link, slot, spec)
     spec = spec or W.Spec()
     if not (link and spec) then return 0 end
-    local key = link .. "|" .. (slot or 0) .. "|" .. spec[1]
+    local key = link .. "|" .. (slot or 0) .. "|" .. spec[1] .. "|" .. (Bracket())
     if scoreCache[key] then return scoreCache[key] end
     local w = spec[4]
     local s = 0
     for k, v in pairs(Stats(link)) do
         local code = KEYS[k]
-        if code and code ~= "DPS" and w[code] and type(v) == "number" then s = s + w[code] * v end
+        if code and code ~= "DPS" and w[code] and type(v) == "number" then s = s + W.WeightOf(spec, code) * v end
     end
     -- one school's spell damage, worth the spec's spell damage times the school's share
     local shares = SCHOOL_SHARE[Class()] and SCHOOL_SHARE[Class()][spec[1]]
     if shares and w.SP then
         for school, n in pairs(SchoolDamage(link)) do
-            if shares[school] then s = s + w.SP * shares[school] * n end
+            if shares[school] then s = s + W.WeightOf(spec, "SP") * shares[school] * n end
         end
     end
     -- weapon damage per second: main hand and ranged in full, off hand half
@@ -245,7 +281,7 @@ function W.Score(link, slot, spec)
     if dps and w.DPS then
         local f = (slot == 17 and 0.5) or 1
         if slot == 18 and Class() ~= "HUNTER" and not (spec[4] == CASTER or w.SP) then f = 0.3 end
-        s = s + w.DPS * dps * f
+        s = s + W.WeightOf(spec, "DPS") * dps * f
     end
     scoreCache[key] = s
     return s

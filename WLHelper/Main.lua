@@ -153,11 +153,26 @@ ev:SetScript("OnEvent", function(_, e)
 end)
 
 -- =====================================================================
---  Commandes : /wl (et /dg, /dguide, /wldt, /zfg pour l'habitude) ; /wl comptoir ... pour le Comptoir (writs)
+--  Commandes : /wlh (et /dg, /dguide, /wldt, /zfg pour l'habitude) ; /wlh comptoir ... pour le Comptoir (writs)
 -- =====================================================================
--- One command, /wl, and one English word per action (the same in French): dungeons, pick, trade,
+-- One command, /wlh, and one English word per action (the same in French): dungeons, pick, trade,
 -- bags, orders, gps, options, setup, idea, help. Older words (French, clean, comptoir...) still work.
-SLASH_WLDUNGEONTOOL1 = "/wl"
+SLASH_WLDUNGEONTOOL1 = "/wlh"
+-- WaR LegenD RaidTool (Vulcan) owns /wl: WL Helper takes it only when RaidTool is not installed
+do
+  local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+  local exists = (C_AddOns and C_AddOns.GetAddOnInfo) or GetAddOnInfo
+  local function RaidTool()
+    if isLoaded and isLoaded("WarLegendRaidTool") then return true end
+    local ok, name, _, _, loadable = pcall(exists or function() end, "WarLegendRaidTool")
+    return ok and name ~= nil and loadable ~= false and SLASH_WARLEGENDRT1 ~= nil
+  end
+  local f = CreateFrame("Frame")
+  pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
+  f:SetScript("OnEvent", function()
+    if not RaidTool() and not SLASH_WARLEGENDRT1 then SLASH_WLDUNGEONTOOL2 = "/wl" end
+  end)
+end
 SlashCmdList.WLDUNGEONTOOL = function(msg)
   if not ns.frame then return end
   -- « réglages », « idée » typed with accents: accents out before lower(), which may touch UTF-8 bytes

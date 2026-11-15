@@ -232,12 +232,20 @@ f:SetScript("OnEvent", function(_, event)
     elseif event == "AUCTION_HOUSE_BROWSE_FAILURE" then
         S.SkipBatch()
     elseif event == "AUCTION_HOUSE_SHOW" then
-        -- Last-minute prices: rescan the shopping list as the auction house opens.
+        -- Last-minute prices, only when they are needed: the Trading Post window is open, and
+        -- some item of the shopping list has no price or one older than an hour.
         if WLWritsDB and WLWritsDB.autoRescan and WP.ShoppingIDs and WP.ModuleOn("writs") then
             -- After Blizzard's own favourites search has had its turn.
             C_Timer.After(4, function()
+                if not (WP.WindowShown and WP.WindowShown()) then return end
                 local ids = WP.ShoppingIDs()
-                if ids and #ids > 0 and not state then S.Start(ids) end
+                if not ids or #ids == 0 or state then return end
+                local stale = false
+                for _, id in ipairs(ids) do
+                    local e = Book()[id]
+                    if not (type(e) == "table" and e.t and time() - e.t < 3600) then stale = true; break end
+                end
+                if stale then S.Start(ids) end
             end)
         end
     else

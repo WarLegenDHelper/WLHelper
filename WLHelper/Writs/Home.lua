@@ -1,6 +1,6 @@
 -- Writs/Home.lua: WL Helper's home page and the minimap button's tooltip and menu.
 -- One card per module with where you stand (dungeon route, writs, bag items), the GPS line, then
--- "An idea, a bug?" and the settings. Opened by /wl and a click on the minimap button.
+-- "An idea, a bug?" and the settings. Opened by /wlh and a click on the minimap button.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -206,7 +206,7 @@ local function Build()
         Close(); if WP.ShowOptionsPage then WP.ShowOptionsPage() end
     end)
     win.ver = S.Text(win, 12, C.muted)
-    win.ver:SetText("v" .. Version() .. " · /wl")
+    win.ver:SetText("v" .. Version() .. " · /wlh")
 
     -- stacks the optional lines under the cards, then the footer, and sizes the window
     function win.Layout(showUpdate, showGps)

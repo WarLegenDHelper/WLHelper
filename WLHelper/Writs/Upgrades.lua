@@ -39,7 +39,7 @@ local function Check(link)
     local gain = can and W.Gain(link)
     local r
     if gain == "empty" then r = { up = true, text = L("vide") }
-    elseif type(gain) == "number" and gain >= 1 then r = { up = true, text = gain >= 999 and "+999%" or ("+" .. math.floor(gain + 0.5) .. "%") }
+    elseif type(gain) == "number" and gain >= (WLWritsDB.upgradeMin or 1) then r = { up = true, text = gain >= 999 and "+999%" or ("+" .. math.floor(gain + 0.5) .. "%") }
     else r = NO end
     cache[link] = r
     return r
@@ -49,7 +49,7 @@ local function IsUpgrade(link) return Check(link).up end
 
 -- ---------------------------------------------------------------- tooltip line
 local function TooltipLine(tip, link)
-    if not (Active() and link) then return end
+    if not (Active() and link) or WLWritsDB.upgradeTip == false then return end
     local can = W.CanWear(link)
     if not can then return end
     local spec = W.SpecName()
@@ -83,43 +83,82 @@ else
     end
 end
 
--- ---------------------------------------------------------------- the game's own bags
+-- ---------------------------------------------------------------- bag slots (the game's bags, EllesmereUI Bags...)
+-- Every bag slot built on the game's item-button template is marked: the game's own bags (separate
+-- or combined) and the bag addons that use it (EllesmereUI Bags). Slot buttons are protected frames:
+-- nothing is written on them; the marks live in a table of our own, keyed by the button.
+local marks = setmetatable({}, { __mode = "k" })
 local function Mark(button, link)
-    local r = Check(link)
+    local r = link and Check(link) or NO
+    local m = marks[button]
     if not r.up then
-        if button.wlUp then button.wlUp:Hide(); button.wlUpText:Hide() end
+        if m then m.arrow:Hide(); m.text:Hide() end
         return
     end
-    if not button.wlUp then
-        button.wlUp = button:CreateTexture(nil, "OVERLAY", nil, 7)
-        button.wlUp:SetTexture(ARROW)
-        button.wlUp:SetVertexColor(GREEN[1], GREEN[2], GREEN[3])
-        button.wlUp:SetSize(16, 16)
-        button.wlUp:SetPoint("TOPLEFT", -1, 1)
-        button.wlUpText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-        button.wlUpText:SetPoint("TOPRIGHT", -1, -2)
-        button.wlUpText:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
+    if not m then
+        m = {}
+        m.arrow = button:CreateTexture(nil, "OVERLAY", nil, 7)
+        m.arrow:SetTexture(ARROW)
+        m.arrow:SetVertexColor(GREEN[1], GREEN[2], GREEN[3])
+        m.arrow:SetSize(16, 16)
+        m.arrow:SetPoint("TOPLEFT", -1, 1)
+        m.text = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+        m.text:SetPoint("TOPRIGHT", -1, -2)
+        m.text:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
+        marks[button] = m
     end
-    button.wlUp:Show()
-    button.wlUpText:SetText(r.text or ""); button.wlUpText:Show()
+    m.arrow:Show()
+    m.text:SetText(r.text or ""); m.text:Show()
 end
 
-local function PaintBlizzard()
-    local GetLink = C_Container and C_Container.GetContainerItemLink or GetContainerItemLink
-    for f = 1, (NUM_CONTAINER_FRAMES or 13) do
-        local frame = _G["ContainerFrame" .. f]
-        if frame and frame:IsShown() then
-            local bag = frame:GetID()
-            for i = 1, (frame.size or 36) do
-                local button = _G["ContainerFrame" .. f .. "Item" .. i]
-                if button then
-                    local link = Active() and GetLink and GetLink(bag, button:GetID())
-                    if link then Mark(button, link)
-                    elseif button.wlUp then button.wlUp:Hide(); button.wlUpText:Hide() end
-                end
-            end
-        end
+local GetLink = C_Container and C_Container.GetContainerItemLink or GetContainerItemLink
+-- bag and slot of an item button, or nil when it is not a bag slot
+local function BagSlot(b)
+    if not (b.GetID and b:IsVisible()) then return nil end
+    local ok, bag = false, nil
+    if b.GetBagID then ok, bag = pcall(b.GetBagID, b) end
+    if not (ok and type(bag) == "number") then
+        local parent = b.GetParent and b:GetParent()
+        bag = parent and parent.GetID and parent:GetID()
     end
+    local slot = b:GetID()
+    if type(bag) ~= "number" or type(slot) ~= "number" or slot < 1 or bag < 0 or bag > 12 then return nil end
+    return bag, slot
+end
+-- the item buttons of the bags on screen: the game's frames, then every other one built on its
+-- container template (found by walking the frames once, then remembered)
+local known = setmetatable({}, { __mode = "k" })
+local walked = 0
+local function Walk()
+    if GetTime() - walked < 2 then return end
+    walked = GetTime()
+    local f = EnumerateFrames and EnumerateFrames()
+    while f do
+        if not known[f] and f.GetObjectType and f:GetObjectType() == "ItemButton" and (f.GetBagID or f.UpdateNewItem or f.SetItemButtonTexture) then
+            -- Baganator's slots get its own corner widgets (below): not marked twice
+            local ok, dn = pcall(f.GetDebugName, f)
+            if not (ok and type(dn) == "string" and dn:find("Baganator", 1, true)) then known[f] = true end
+        end
+        f = EnumerateFrames(f)
+    end
+end
+local function PaintBags()
+    if not Active() then
+        for b, m in pairs(marks) do m.arrow:Hide(); m.text:Hide() end
+        return
+    end
+    Walk()
+    for b in pairs(known) do
+        local bag, slot = BagSlot(b)
+        if bag then Mark(b, GetLink and GetLink(bag, slot))
+        elseif marks[b] then marks[b].arrow:Hide(); marks[b].text:Hide() end
+    end
+end
+local paintQueued = false
+local function PaintSoon()
+    if paintQueued then return end
+    paintQueued = true
+    C_Timer.After(0.2, function() paintQueued = false; PaintBags() end)
 end
 
 -- ---------------------------------------------------------------- Baganator
@@ -158,7 +197,8 @@ local function Refresh()
     cache = {}
     W.Reset()
     if baganator and Baganator.API.RequestItemButtonsRefresh then pcall(Baganator.API.RequestItemButtonsRefresh) end
-    PaintBlizzard()
+    walked = 0
+    PaintSoon()
 end
 WP.RefreshUpgrades = Refresh
 local function Soon()
@@ -167,7 +207,10 @@ local function Soon()
     C_Timer.After(0.3, function() queued = false; Refresh() end)
 end
 
-if ContainerFrame_Update then hooksecurefunc("ContainerFrame_Update", function() PaintBlizzard() end) end
+-- opening a bag, the game refreshing it, EllesmereUI Bags refreshing its window
+for _, name in ipairs({ "ContainerFrame_Update", "OpenAllBags", "ToggleAllBags", "ToggleBackpack", "OpenBag", "ToggleBag" }) do
+    if _G[name] then hooksecurefunc(name, function() walked = 0; PaintSoon() end) end
+end
 
 local ev = CreateFrame("Frame")
 pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
@@ -175,6 +218,15 @@ for _, e in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "CHARACTER_P
     pcall(ev.RegisterEvent, ev, e)
 end
 ev:SetScript("OnEvent", function(_, e)
-    if e == "PLAYER_LOGIN" then HookBaganator(); return end
-    if e == "BAG_UPDATE_DELAYED" then C_Timer.After(0.1, PaintBlizzard) else Soon() end
+    if e == "PLAYER_LOGIN" then
+        HookBaganator()
+        if EUI_Bags and EUI_Bags.RefreshInventory then
+            hooksecurefunc(EUI_Bags, "RefreshInventory", function() walked = 0; PaintSoon() end)
+        end
+        for _, f in ipairs({ ContainerFrameCombinedBags }) do
+            if f and f.HookScript then f:HookScript("OnShow", function() walked = 0; PaintSoon() end) end
+        end
+        return
+    end
+    if e == "BAG_UPDATE_DELAYED" then PaintSoon() else Soon() end
 end)

@@ -582,7 +582,7 @@ local function Build()
   f.mini = WLDTDB.mini
   f.list:SetShown(WLDTDB.list and true or false)
   -- a new frame is visible: closed at first; Main.lua reopens it at login if it was open before.
-  -- Every way of opening or closing it (x, Escape, /wl, home, minimap) is remembered here,
+  -- Every way of opening or closing it (x, Escape, /wlh, home, minimap) is remembered here,
   -- except when the Dungeons module is switched off (ns.quietHide), which is not your choice.
   f:Hide()
   f:HookScript("OnShow", function() WLDTDB.hidden = false end)
