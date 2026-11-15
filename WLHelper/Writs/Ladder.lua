@@ -33,6 +33,8 @@ function WP.CostFor(id, n)
     if n <= 0 then return 0, true end
     local tiers = WP.Ladder(id)
     if not tiers then return nil end
+    -- an empty ladder: nothing for sale, so no price (but we know none can be bought)
+    if #tiers == 0 then return nil, false end
     local left, cost = n, 0
     for _, t in ipairs(tiers) do
         local take = math.min(left, t[2])

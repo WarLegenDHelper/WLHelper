@@ -131,6 +131,18 @@ local SCOL = { none = "|cffff9933", on = "|cff66b3ff", ready = "|cff59e67a", don
 
 local Render
 
+-- Moves the scrollbar thumb to the current scroll offset (no full Render while scrolling).
+local function PositionThumb()
+  local holder = f and f.holder
+  if not holder or not holder.sbar or not f.scroll then return end
+  local over = holder.over or 0
+  if over <= 0 then return end
+  local hh = holder:GetHeight()
+  local off = (f.scroll.offset or 0) / over
+  holder.sbar:ClearAllPoints()
+  holder.sbar:SetPoint("TOPRIGHT", 0, -2 - (hh - holder.sbar:GetHeight() - 4) * math.min(1, off))
+end
+
 -- The step's points on the map and the arrow (the big button, the "..." menu, the key binding).
 -- Without TomTom, a second press goes to the step's next point.
 function ns.PlacePoints()
@@ -449,7 +461,7 @@ local function Build()
     local max = math.max(0, card:GetHeight() - self:GetHeight())
     self.offset = math.max(0, math.min(max, (self.offset or 0) - delta * 40))
     self:SetVerticalScroll(self.offset)
-    Render()
+    PositionThumb()
   end)
   -- barre de défilement : poignée qu'on peut tirer (la molette marche aussi)
   local sb = CreateFrame("Button", nil, holder)
@@ -467,7 +479,7 @@ local function Build()
       if over <= 0 or track <= 0 then return end
       local off = me.drag[2] + (me.drag[1] - y2) * over / track
       sf.offset = math.max(0, math.min(over, off)); sf:SetVerticalScroll(sf.offset)
-      Render()
+      PositionThumb()
     end)
   end)
   sb:SetScript("OnMouseUp", function(self) self:SetScript("OnUpdate", nil) end)
@@ -505,8 +517,11 @@ local function Build()
   f.prev:SetPoint("BOTTOMLEFT")
   f.moreBtn = Button(foot, 44, 24, "...", function() f.menu:SetShown(not f.menu:IsShown()) end, function() return { L.MORE } end)
   f.moreBtn:SetPoint("BOTTOMRIGHT")
-  f.next = Button(foot, W - PAD * 2 - 96, 24, L.NEXT2, function() ns.GoTo(f.view + 1) end)
+  f.next = Button(foot, W - PAD * 2 - 170, 24, L.NEXT2, function() ns.GoTo(f.view + 1) end)
   f.next:SetPoint("LEFT", f.prev, "RIGHT", 4, 0)
+  -- "Ready?": straight to the check-list of the dungeon of the step on screen (quests, items, keys)
+  f.readyBtn = Button(foot, 70, 24, L.B_READY, function() if ns.GoReady then ns.GoReady() end end, function() return { L.B_READY, L.TT_READY } end)
+  f.readyBtn:SetPoint("RIGHT", f.moreBtn, "LEFT", -4, 0)
 
   -- the "..." menu: everything that used to be a row of small buttons
   local menu = CreateFrame("Frame", nil, f)
@@ -605,7 +620,7 @@ function ns.Relayout(nw, nh)
   card.ready:SetWidth(CW - 12); card.note:SetWidth(CW)
   for _, row in ipairs(card.rows) do row:SetWidth(CW + 8); row.sub:SetWidth(CW - 90) end
   f.go:SetWidth(W - PAD * 2)
-  f.next:SetWidth(W - PAD * 2 - 96)
+  f.next:SetWidth(W - PAD * 2 - 170)
 end
 
 -- =====================================================================
@@ -617,58 +632,11 @@ local function SetSecureRow() end
 --  Ordre dans le donjon : objectifs rangés boss par boss, dans l'ordre du journal de Naowh
 --  (« Pendant tout le donjon » en premier pour le butin des trash). Une ligne par objectif.
 -- =====================================================================
-local NKEY = { TheDeadmines = "Deadmines", TheStockade = "Stockade", HallofThanes = "HallOfThanes",
-  RuinsofLordaeron = "RuinsOfLordaeron", ExcavationSiteWetlands = "ExcavationSite", CityofDalaran = "Dalaran",
-  TheDrownedCity = "DrownedCity", KroldokStronghold = "Kroldok", DireMaulEast = "DireMaul", DireMaulWest = "DireMaul",
-  DireMaulNorth = "DireMaul", StratholmeLiving = "Stratholme", StratholmeUndead = "Stratholme" }
-local bossCache = {}
-local function BossOrder(dkey)
-  if bossCache[dkey] ~= nil then return bossCache[dkey] end
-  local out = false
-  local N = _G.NaowhForever
-  local J = N and N.Journal
-  if J and J.Get then
-    local ok, d = pcall(J.Get, NKEY[dkey] or dkey)
-    if ok and d and d.wings then
-      out = { list = {}, idx = {} }
-      for _, wing in ipairs(d.wings) do
-        for _, b in ipairs(wing.bosses or {}) do
-          if b.npc and not b.trash and not b.chest then
-            local en = b.english or b.name
-            table.insert(out.list, { en = en, name = b.name or en, tip = J.Tip and J.Tip(b) or nil })
-            out.idx[en] = #out.list
-            for tok in en:gmatch("[^%s,]+") do
-              tok = tok:gsub("'s$", "")
-              if #tok > 4 then
-                local k = "#" .. tok
-                if out.idx[k] == nil then out.idx[k] = #out.list elseif out.idx[k] ~= #out.list then out.idx[k] = false end
-              end
-            end
-          end
-        end
-      end
-    end
-  end
-  bossCache[dkey] = out
-  return out
-end
-
-local function ObjDone(log, q, qid, o)
-  local s = ns.State(log, qid)
-  if s == "done" or s == "ready" then return true end
-  local e = log[qid]
-  if e and e.index and GetNumQuestLeaderBoards and GetQuestLogLeaderBoard and o.n then
-    for j = 1, (GetNumQuestLeaderBoards(e.index) or 0) do
-      local text, _, finished = GetQuestLogLeaderBoard(j, e.index)
-      if text and text:find(o.n, 1, true) then return finished and true or false end
-    end
-  end
-  return false
-end
+-- BossOrder / ObjDone live in Engine.lua (ns.BossOrder, ns.ObjDone).
 
 function ns.StepView(st, log)
   if not st or st.gate or not st.ins or st.split then return st and st.acts or {} end
-  local bo = BossOrder(st.ins)
+  local bo = ns.BossOrder(st.ins)
   local function BossOf(names)
     if not bo then return nil end
     for _, nm in ipairs(names) do
@@ -696,7 +664,7 @@ function ns.StepView(st, log)
           for _, x in ipairs(o.src or {}) do if x[1] then table.insert(names, x[1]) end end
           if o.n then table.insert(names, o.n) end
           if q.oe then table.insert(names, q.oe) end
-          local v = setmetatable({ oneObj = o, firstOfQuest = first, vok = ObjDone(log, q, nd.q, o) }, { __index = nd })
+          local v = setmetatable({ oneObj = o, firstOfQuest = first, vok = ns.ObjDone(log, nd.q, o) }, { __index = nd })
           first = false
           order = order + 0.01
           table.insert(items, { node = v, boss = BossOf(names) or 0, ord = order })
@@ -709,7 +677,10 @@ function ns.StepView(st, log)
       table.insert(items, { node = nd, boss = BossOf(names) or 0, ord = order })
     end
   end
-  if not bo then
+  -- SplitOne leaves a step unsplit only when no boss matched: keep it a plain list then
+  local any = false
+  for _, it in ipairs(items) do if it.boss > 0 then any = true end end
+  if not bo or not any then
     local out = {}
     for _, it in ipairs(items) do table.insert(out, it.node) end
     return out
@@ -800,24 +771,6 @@ Render = function()
   elseif f.auto and i < f.auto then card.badge:SetText(Hex({ 1, 0.6, 0.2 }) .. L.B_LATE .. "|r")
   else card.badge:SetText(Hex(T.dim) .. L.B_NEXT .. "|r") end
 
-  -- où
-  local dn = ns.Upper(ns.DName(dkey))
-  if st.gate then ns.SetChip(card.where, L.GATE:format(dn), dc)
-  elseif st.ins then
-    local allOuter = true
-    for _, nd in ipairs(st.acts) do if nd.kind ~= "c" or nd.outer == false then allOuter = false end end
-    if allOuter then ns.SetChip(card.where, L.OUTER:format(dn), dc) else ns.SetChip(card.where, L.IN_DUNGEON:format(dn), dc) end
-  else
-    ns.SetChip(card.where, L.OUT:format(ns.Upper((st.loc and ZoneName(st.loc.m)) or "")), { 0.75, 0.78, 0.82 })
-  end
-  local cls
-  local allCls = #st.acts > 0
-  for _, nd in ipairs(st.acts) do local q = ns.Q[nd.q]; if not (q and q.c) then allCls = false else cls = q.c end end
-  if allCls and cls then
-    local tok = cls:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
-    ns.SetChip(card.clsChip, ns.ClassIconText(tok, 13) .. L.CLASSQ:format(ns.Upper(cn)), cc)
-  else card.clsChip:Hide() end
-
   local hasModel = false
   if st.bossModel and card.model.SetDisplayInfo then
     if card.modelShown == st.bossModel then hasModel = true
@@ -827,6 +780,28 @@ Render = function()
     end
     if hasModel and card.model.SetPortraitZoom then pcall(card.model.SetPortraitZoom, card.model, 0.85) end
   end
+  -- room for the chips: the card minus its margins and the boss portrait
+  local avail = card:GetWidth() - 28 - (hasModel and 84 or 0)
+  -- où
+  local dn = ns.Upper(ns.DName(dkey))
+  if st.gate then ns.SetChip(card.where, L.GATE:format(dn), dc, avail)
+  elseif st.ins then
+    local allOuter = true
+    for _, nd in ipairs(st.acts) do if nd.kind ~= "c" or nd.outer == false then allOuter = false end end
+    if allOuter then ns.SetChip(card.where, L.OUTER:format(dn), dc, avail) else ns.SetChip(card.where, L.IN_DUNGEON:format(dn), dc, avail) end
+  else
+    ns.SetChip(card.where, L.OUT:format(ns.Upper((st.loc and ZoneName(st.loc.m)) or "")), { 0.75, 0.78, 0.82 }, avail)
+  end
+  local cls
+  local allCls = #st.acts > 0
+  for _, nd in ipairs(st.acts) do local q = ns.Q[nd.q]; if not (q and q.c) then allCls = false else cls = q.c end end
+  if allCls and cls then
+    local tok = cls:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
+    local room = avail - card.where:GetWidth() - 6
+    if room >= 60 then ns.SetChip(card.clsChip, ns.ClassIconText(tok, 13) .. L.CLASSQ:format(ns.Upper(cn)), cc, room)
+    else card.clsChip:Hide() end
+  else card.clsChip:Hide() end
+
   card.model:SetShown(hasModel); card.modelBg:SetShown(hasModel)
   card.title:SetWidth(hasModel and (W - 2 * PAD - 40 - 84) or (W - 2 * PAD - 40))
   card.title:SetText(StepTitle(st, not st.gate and not st.ins))
@@ -846,6 +821,9 @@ Render = function()
     end
     card.ready:Show(); card.readyBg:Show()
   else card.ready:Hide(); card.readyBg:Hide() end
+  if not card.shareBtn then
+    card.shareBtn = Button(card, 96, 22, L.SHARE_SHORT, function() ns.ShareQuests() end, function() return { L.M_SHARE, L.TT_FSHARE } end)
+  end
 
   if st.travel then
     card.travel:SetText("> " .. L[st.travel]); card.travel:SetTextColor(T.accent[1], T.accent[2], T.accent[3]); card.travel:Show()
@@ -855,7 +833,11 @@ Render = function()
     card.ready:ClearAllPoints(); card.ready:SetPoint("TOPLEFT", 20, -(y + 14))
     card.readyBg:ClearAllPoints(); card.readyBg:SetPoint("TOPLEFT", card.ready, "TOPLEFT", -6, 6); card.readyBg:SetPoint("BOTTOMRIGHT", card.ready, "BOTTOMRIGHT", 6, -6)
     y = y + 14 + card.ready:GetStringHeight() + 6
-  end
+    if st.gate and IsInGroup() then
+      card.shareBtn:ClearAllPoints(); card.shareBtn:SetPoint("TOPLEFT", 14, -(y + 6)); card.shareBtn:Show()
+      y = y + 6 + 22
+    else card.shareBtn:Hide() end
+  else card.shareBtn:Hide() end
   local note
   if st.gate then
     note = L.GATE_N
@@ -908,6 +890,7 @@ Render = function()
       row.tag:SetText(nd.bossIdx > 0 and L.BOSS_N:format(nd.bossIdx) or L.ALLDUNGEON_T); row.tag:SetTextColor(1, 0.45, 0.45); row.tag:SetAlpha(nd.allOk and 0.5 or 1)
       row.name:SetText(nd.bossIdx > 0 and nd.bossName or L.ALLDUNGEON); row.name:SetTextColor(unpack(nd.allOk and T.dim or { 1, 0.62, 0.62 }))
       row.npc:SetText(nd.allOk and ("|cff59e67a" .. L.S_DONE .. "|r") or ""); row.npc:ClearAllPoints(); row.npc:SetPoint("TOPRIGHT", -6, -5)
+      row.npc:SetWidth(math.min(row.npc:GetStringWidth() + 2, 150))
       row.gb:Hide(); row.wpOn:Hide(); row.wpBar:Hide(); row.pip:Hide(); row.icon:Hide()
       row.kicon:SetTexture(nd.bossIdx > 0 and "Interface\\TargetingFrame\\UI-TargetingFrame-Skull" or "Interface\\Icons\\INV_Misc_Map_01")
       row.kicon:SetTexCoord(0, 1, 0, 1); row.kicon:Show()
@@ -926,7 +909,11 @@ Render = function()
       local kc = T.kind[nd.kind] or T.text
       row.tag:SetText(L[KTAG[nd.kind]] or ""); row.tag:SetTextColor(kc[1], kc[2], kc[3])
       row.name:SetText(nd.label or ns.QName(nd.q))
-      local right = nd.npc and not nd.ins and nd.npc:gsub(",.*$", "") or (SCOL[s] .. L[SLABEL[s]] .. "|r")
+      -- the NPC on the right, unless the step's title already names it (then the quest's state)
+      local npcShort = nd.npc and not nd.ins and nd.npc:gsub(",.*$", "")
+      local title = card.title:GetText() or ""
+      if npcShort and title:find(npcShort, 1, true) then npcShort = nil end
+      local right = npcShort or (SCOL[s] .. L[SLABEL[s]] .. "|r")
       row.npc:SetText(right)
       SetSecureRow(row, nd, ok)
       row.gb:SetShown(nd.loc ~= nil)
@@ -961,7 +948,8 @@ Render = function()
       local tags = ""
       if nd.d and nd.d ~= dkey then local c2 = DColor(nd.d); tags = tags .. Hex(c2) .. "[" .. ns.DName(nd.d) .. "]|r " end
       if nd.pre then tags = tags .. "|cffb0b0b0[" .. L.PRE .. "]|r " end
-      if q.c then local cn, cc = ns.ClassInfo(q.c:match("^[^,]+")); tags = tags .. ns.ClassIconText(q.c:match("^[^,]+"), 12) .. Hex(cc) .. "[" .. L.CLASS_TAG:format(cn) .. "]|r " end
+      -- the class, unless the card's "Class quest" chip already says it
+      if q.c and not card.clsChip:IsShown() then local cn, cc = ns.ClassInfo(q.c:match("^[^,]+")); tags = tags .. ns.ClassIconText(q.c:match("^[^,]+"), 12) .. Hex(cc) .. "[" .. L.CLASS_TAG:format(cn) .. "]|r " end
       if tags ~= "" then table.insert(parts, (tags:gsub("%s+$", ""))) end
       if not ok then
         if nd.kind == "a" and s == "none" then
@@ -1019,18 +1007,18 @@ Render = function()
   holder:SetHeight(hh)
   local over = y + 8 - hh
   if over > 0 then
-    holder.sbar:ClearAllPoints()
     local frac = hh / (y + 8)
     holder.sbar:SetHeight(math.max(20, hh * frac))
-    local off = (f.scroll.offset or 0) / over
-    holder.sbar:SetPoint("TOPRIGHT", 0, -2 - (hh - holder.sbar:GetHeight() - 4) * math.min(1, off))
     holder.over, holder.track = over, hh - holder.sbar:GetHeight() - 4
+    PositionThumb()
     holder.sbar:Show()
-  else holder.sbar:Hide(); f.scroll.offset = 0 end
+  else holder.over = 0; holder.sbar:Hide(); f.scroll.offset = 0 end
   f.scroll:SetVerticalScroll(math.min(f.scroll.offset or 0, math.max(0, over)))
 
   f.prev:SetEnabled(i > 1); f.next:SetEnabled(i < #steps); f.moreBtn:SetEnabled(true)
-  local np = #StepPoints(log, st, true)
+  -- count the points PlacePoints cycles through: the unfinished ones, else all of them
+  local np = #StepPoints(log, st, false)
+  if np == 0 then np = #StepPoints(log, st, true) end
   -- the big button: back to the current step when looking elsewhere, else "go there"
   local cycling = not ns.HasTomTom() and np > 1 and f.wpKey == i
   if f.auto and i ~= f.auto then
@@ -1307,6 +1295,21 @@ end
 function ns.ActionBarPending() return abPending end
 
 -- For WL Helper's home and the minimap: the route's dungeons, the current step and how many there are.
+-- The check-list step ("ready?") of the dungeon the step on screen belongs to
+function ns.GoReady()
+  local steps = Steps()
+  local cur = steps[f and f.view or 1]
+  local dkey = cur and (cur.gate or cur.ins or cur.d)
+  local first
+  for i, st in ipairs(steps) do
+    if st.gate then
+      first = first or i
+      if st.gate == dkey then ns.GoTo(i); return end
+    end
+  end
+  if first then ns.GoTo(first) else ns.Print(L.NO_READY) end
+end
+
 function ns.GuideStatus()
   local steps = Steps()
   if #steps == 0 then return nil end

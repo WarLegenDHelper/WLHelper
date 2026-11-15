@@ -229,13 +229,15 @@ local function ProfessionRanks()
     end
     return out
 end
-function O.ImportFromMastercraft()
+function O.ImportFromMastercraft(quiet)
     local db = MastercraftDB and MastercraftDB.recipes
     local mine = db and UnitGUID and db[UnitGUID("player")]
     if type(mine) ~= "table" then return false end
     local d, ranks, changed = DB(), ProfessionRanks(), false
     for prof, p in pairs(mine) do
-        if type(p) == "table" and type(p.list) == "table" and not d.mine[prof] then
+        -- an entry with no recipe yet (made by ReadProfessionList) has not been read: fill it
+        local cur = d.mine[prof]
+        if type(p) == "table" and type(p.list) == "table" and (not cur or not next(cur.recipes or {})) then
             local recipes = {}
             for _, r in ipairs(p.list) do
                 if type(r) == "table" and r.learned ~= false and (r.output or r.id) then
@@ -249,18 +251,19 @@ function O.ImportFromMastercraft()
             end
             if next(recipes) then
                 local rk = ranks[prof] or {}
-                d.mine[prof] = { rank = rk[1] or 0, max = rk[2] or 0, recipes = recipes, hash = Hash(recipes), from = "Mastercraft" }
+                d.mine[prof] = { rank = (cur and cur.rank ~= 0 and cur.rank) or rk[1] or 0, max = (cur and cur.max ~= 0 and cur.max) or rk[2] or 0,
+                    recipes = recipes, hash = Hash(recipes), from = "Mastercraft" }
                 changed = true
             end
         end
     end
-    if changed then O.Announce() end
+    if changed and not quiet then O.Announce() end
     return changed
 end
 
 -- Your professions and their level, straight from the game (no profession window needed): the guild
 -- sees who crafts what even before the recipe lists arrive.
-function O.ReadProfessionList()
+function O.ReadProfessionList(quiet)
     local d, changed = DB(), false
     for prof, rk in pairs(ProfessionRanks()) do
         local p = d.mine[prof]
@@ -272,7 +275,7 @@ function O.ReadProfessionList()
             changed = true
         end
     end
-    if changed then O.Announce() end
+    if changed and not quiet then O.Announce() end
 end
 
 local readQueued = false
@@ -587,7 +590,8 @@ function O.FillMail(o, kind)
     local to = kind == "give" and (o.by or o.to) or o.from
     if not to then return end
     if SendMailNameEditBox then SendMailNameEditBox:SetText(to) end
-    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(string.format(L("Commande WL : %s ×%d"), O.Name(o.item), o.qty or 1) .. " " .. O.Tag(o)) end
+    -- the tag goes first: the subject is cut at 64 characters, and a cut tag no longer matches
+    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(O.Tag(o) .. " " .. string.format(L("Commande WL : %s ×%d"), O.Name(o.item), o.qty or 1)) end
     local want = {}
     if kind == "give" then
         for _, r in ipairs(O.Decode(o.give)) do want[#want + 1] = { r[1], r[2] * (o.qty or 1) } end
@@ -664,6 +668,7 @@ local function OnPayload(sender, key, payload)
     end
 end
 
+local askedW
 local function OnMessage(msg, channel, sender)
     local d = DB()
     local kind, rest = msg:match("^(%u)|(.*)$")
@@ -673,12 +678,30 @@ local function OnMessage(msg, channel, sender)
         if prof then
             d.crafters[sender] = d.crafters[sender] or {}
             local c = d.crafters[sender][prof] or {}
-            c.rank, c.max = tonumber(rank), tonumber(max)
+            c.rank, c.max, c.t = tonumber(rank), tonumber(max), time()   -- seen now, even if the list did not change
             d.crafters[sender][prof] = c
-            if c.hash ~= hash then Send("W|" .. prof, "WHISPER", sender) end
+            -- ask for the list on the guild channel, naming its owner: no whisper (a whisper to a name
+            -- without its realm fails with "No player named ..." for members of a connected realm).
+            -- "0" = professions only, no recipe list to ask for.
+            if c.hash ~= hash and hash ~= "0" then
+                askedW = askedW or {}
+                local k = sender .. "|" .. prof
+                if not askedW[k] or GetTime() - askedW[k] > 60 then
+                    askedW[k] = GetTime()
+                    Guild("W|" .. prof .. "|" .. sender)
+                end
+            end
+            if WP.RefreshOrders then WP.RefreshOrders() end
         end
     elseif kind == "W" then
-        SendRecipes(rest)
+        -- "W|prof|owner" on the guild (1.0.0-beta.29+): only the owner answers; "W|prof" by whisper
+        -- from older copies: answered too (the list itself always goes on the guild channel)
+        local prof, owner = rest:match("^(.-)|([^|]+)$")
+        if prof then
+            if owner == Me() then SendRecipes(prof) end
+        else
+            SendRecipes(rest)
+        end
     elseif kind == "P" and channel == "GUILD" then
         local key, i, n, chunk = rest:match("^(.-)|(%d+)|(%d+)|(.*)$")
         if key then
@@ -726,7 +749,7 @@ local function Prune()
     end
     for name, profs in pairs(d.crafters) do
         local recent = false
-        for _, p in pairs(profs) do if (p.t or now) > now - 30 * 86400 then recent = true end end
+        for _, p in pairs(profs) do if (p.t or 0) > now - 30 * 86400 then recent = true end end
         if not recent then d.crafters[name] = nil end
     end
 end
@@ -750,7 +773,7 @@ function O.Notify(o)
     elseif o.from == me and o.status == "accepted" then
         WP.Print(string.format(L("%s a accepté ta commande : %s ×%d."), o.by or "?", name, o.qty or 1))
     elseif o.from == me and o.status == "declined" then
-        WP.Print(string.format(L("%s a refusé ta commande (%s)."), o.by or "?", o.reason or "?"))
+        WP.Print(string.format(L("%s a refusé ta commande (%s)."), o.by or "?", L(o.reason or "?")))
     elseif o.from == me and o.status == "crafted" then
         WP.Print(string.format(L("%s a fabriqué ta commande : %s ×%d. Elle arrive par la poste."), o.by or "?", name, o.qty or 1))
     end
@@ -772,9 +795,10 @@ f:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
     if e == "PLAYER_LOGIN" then
         pcall(Prune)
         C_Timer.After(20, function()
+            -- read quietly, then announce once
+            pcall(O.ImportFromMastercraft, true)
+            pcall(O.ReadProfessionList, true)
             O.Announce()
-            pcall(O.ImportFromMastercraft)
-            pcall(O.ReadProfessionList)
             Guild("S|")   -- ask the others to resend their running orders
             O.AskRecipes()
         end)

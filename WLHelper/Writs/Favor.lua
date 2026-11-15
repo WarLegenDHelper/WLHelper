@@ -17,7 +17,8 @@ local C = S.C
 
 ns.AddEnglish({
     ["Favor"] = "Favor",
-    ["Merchant's Favor : %s"] = "Merchant's Favor: %s",
+    ["Faveur du marchand"] = "Merchant's Favor",
+    ["Caisse de niveau %d"] = "Supply Shipment (%d)",
     ["Objectif"] = "Goal",
     ["Il te manque %s Favor."] = "You need %s more Favor.",
     ["Objectif atteint : tu as déjà assez de Favor."] = "Goal reached: you already have enough Favor.",
@@ -32,6 +33,7 @@ ns.AddEnglish({
         "This planner needs Naowh Forever.\nIt knows each crate's bundles: turn it on.",
     ["Scanner les prix (HV)"] = "Scan prices (AH)",
     ["Ouvre l'hôtel des ventes pour scanner"] = "Open the auction house to scan",
+    ["Ouvre l'HV pour scanner"] = "Open the AH to scan",
     ["%d Favor"] = "%d Favor",
     ["~%d Favor (à confirmer)"] = "~%d Favor (to confirm)",
     ["Favor inconnue : rends-en une pour l'apprendre"] = "Favor unknown: hand one in to learn it",
@@ -46,8 +48,8 @@ ns.AddEnglish({
     ["déjà là"] = "already have",
     ["Prix réels : %d objets restants"] = "Real prices: %d items left",
     ["Prix à jour · à l'instant"] = "Prices up to date · just now",
-    ["Prix d'il y a %d min · rescanner"] = "Prices from %d min ago · rescan",
-    ["Prix d'il y a %d min · ouvre l'HV pour rescanner"] = "Prices from %d min ago · open the AH to rescan",
+    ["Prix : %d min · rescanner"] = "Prices: %d min · rescan",
+    ["Prix : il y a %d min"] = "Prices: %d min old",
     ["%d Favor · un lot par caisse : %s"] = "%d Favor · one bundle per crate: %s",
     ["pour %d caisses"] = "for %d crates",
     ["Prix réels de l'HV, offre par offre."] = "Real AH prices, listing by listing.",
@@ -179,7 +181,8 @@ function WP.FavorPlan(missing, rows)
                     if WP.CostFor then c, all = WP.CostFor(o.item, buy) end
                     if c then return c, true, all end
                     local unit = WP.Price(o.item)
-                    if unit then return unit * buy, false, true end
+                    -- no listing read (or none for sale): the scan price, short when nobody sells it
+                    if unit then return unit * buy, false, all ~= false end
                 end
                 local matCost, matExact, matAll, ok = 0, true, true, true
                 for _ = 1, n do
@@ -255,7 +258,7 @@ local function Learn()
     db.favorByLevel = db.favorByLevel or {}
     local old = db.favorByLevel[removedLevel]
     db.favorByLevel[removedLevel] = old and math.min(old, gain) or gain
-    if not old then WP.Print(string.format(L("Favor apprise : %s donne %d."), "Supply Shipment (" .. removedLevel .. ")", gain)) end
+    if not old then WP.Print(string.format(L("Favor apprise : %s donne %d."), string.format(L("Caisse de niveau %d"), removedLevel), gain)) end
     removedAt, gainAt = nil, nil
 end
 
@@ -394,6 +397,8 @@ function WP.BuildFavor(p)
         return WP.AuctionHouseOpen() and { L("Scanner les prix (HV)") } or { L("Ouvre l'hôtel des ventes pour scanner") }
     end)
     ui.scan:SetWidth(W - 2 * PAD - 128)
+    -- the label truncates inside the button instead of running onto "Rendre les caisses"
+    if ui.scan.label then ui.scan.label:SetWidth(ui.scan:GetWidth() - 12); ui.scan.label:SetWordWrap(false) end
     ui.scan:SetPoint("LEFT", PAD, 0)
     -- the Inventory Intake NPC who takes the filled crates (Supply Shipments)
     ui.go = S.Button(foot, L("Rendre les caisses"), 120, 36, "secondary", function()
@@ -418,7 +423,10 @@ end
 function WP.RenderFavor()
     if not ui.page then return end
     local now = WP.FavorNow()
-    ui.now:SetText(string.format(L("Merchant's Favor : %s"), now and tostring(now) or "?"))
+    -- the client's own (localized) currency name
+    local info = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo and safe(C_CurrencyInfo.GetCurrencyInfo, CURRENCY)
+    local cname = type(info) == "table" and info.name or L("Faveur du marchand")
+    ui.now:SetText(string.format("%s : %s", cname, now and tostring(now) or "?"))
     local goal = WLWritsCharDB.favorGoal or 0
     if not ui.box:HasFocus() then ui.box:SetText(goal > 0 and tostring(goal) or "") end
     local rows = WP.FavorRows()
@@ -531,14 +539,15 @@ function WP.RenderFavor()
         ui.barFill:SetWidth((W - 2 * PAD) * 0.5)
     elseif newest then
         local mins = math.floor(newest / 60)
-        ui.scan.label:SetText(mins < 1 and L("Prix à jour · à l'instant") or string.format(L("Prix d'il y a %d min · rescanner"), mins))
+        ui.scan.label:SetText(mins < 1 and L("Prix à jour · à l'instant") or string.format(L("Prix : %d min · rescanner"), mins))
         ui.bar:Hide()
     else
-        ui.scan.label:SetText(WP.AuctionHouseOpen() and L("Scanner les prix (HV)") or L("Ouvre l'hôtel des ventes pour scanner"))
+        ui.scan.label:SetText(WP.AuctionHouseOpen() and L("Scanner les prix (HV)") or L("Ouvre l'HV pour scanner"))
         ui.bar:Hide()
     end
     if not WP.AuctionHouseOpen() and not (done and tot) then
-        ui.scan.label:SetText(newest and string.format(L("Prix d'il y a %d min · ouvre l'HV pour rescanner"), math.floor(newest / 60))
-            or L("Ouvre l'hôtel des ventes pour scanner"))
+        -- short label; "open the AH" is in the button's tooltip
+        ui.scan.label:SetText(newest and string.format(L("Prix : il y a %d min"), math.floor(newest / 60))
+            or L("Ouvre l'HV pour scanner"))
     end
 end

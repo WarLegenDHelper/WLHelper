@@ -82,6 +82,12 @@ local function GFRead(link)
     return nil
 end
 local tries, retryQueued = {}, false
+-- item IDs asked while not loaded yet: only their GET_ITEM_INFO_RECEIVED repaints the bags
+local pending = {}
+local function Pending(link)
+    local id = tonumber(link:match("item:(%d+)"))
+    if id then pending[id] = true end
+end
 
 -- { up = true/false, text = "+24%" }
 local function Check(link)
@@ -89,10 +95,18 @@ local function Check(link)
     local c = cache[link]
     if c then return c end
     if UseGF() then
+        -- not gear (potion, reagent): Geared Forever writes nothing on it, no need to wait for it
+        local Instant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+        if Instant then
+            local _, _, _, equipLoc = Instant(link)
+            if not (equipLoc and W.SLOTS[equipLoc]) then cache[link] = NO; return NO end
+        end
         local up, text, n = GFRead(link)
         if up == nil then
+            Pending(link)
             tries[link] = (tries[link] or 0) + 1
-            if tries[link] <= 5 and not retryQueued then
+            if tries[link] > 5 then cache[link] = NO; return NO end
+            if not retryQueued then
                 retryQueued = true
                 C_Timer.After(1, function() retryQueued = false; cache = {}; if WP.RefreshUpgrades then WP.RefreshUpgrades() end end)
             end
@@ -103,7 +117,7 @@ local function Check(link)
         return r
     end
     local can = W.CanWear(link)
-    if can == nil then return NO end   -- item not loaded yet: not cached, asked again later
+    if can == nil then Pending(link); return NO end   -- item not loaded yet: not cached, asked again later
     local gain = can and W.Gain(link)
     local r
     if gain == "empty" then r = { up = true, text = L("vide") }
@@ -172,11 +186,17 @@ local function Mark(button, link)
         m.arrow:SetPoint("TOPLEFT", -1, 1)
         m.text = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
         m.text:SetPoint("TOPRIGHT", -1, -2)
+        m.text:SetPoint("TOPLEFT", m.arrow, "TOPRIGHT", -2, -3)
+        m.text:SetJustifyH("RIGHT")
+        if m.text.SetWordWrap then m.text:SetWordWrap(false) end
         m.text:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
         marks[button] = m
     end
     m.arrow:Show()
-    m.text:SetText(r.text or ""); m.text:Show()
+    -- "+250%" is too wide next to the arrow on a slot: "250%" keeps the width of "+24%"
+    local t = r.text or ""
+    if #t > 4 then t = t:gsub("^%+", "") end
+    m.text:SetText(t); m.text:Show()
 end
 
 local GetLink = C_Container and C_Container.GetContainerItemLink or GetContainerItemLink
@@ -263,7 +283,6 @@ end
 local queued = false
 local function Refresh()
     cache = {}
-    tries = {}
     W.Reset()
     if baganator and Baganator.API.RequestItemButtonsRefresh then pcall(Baganator.API.RequestItemButtonsRefresh) end
     walked = 0
@@ -286,7 +305,7 @@ pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
 for _, e in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "CHARACTER_POINTS_CHANGED", "GET_ITEM_INFO_RECEIVED", "BAG_UPDATE_DELAYED" }) do
     pcall(ev.RegisterEvent, ev, e)
 end
-ev:SetScript("OnEvent", function(_, e)
+ev:SetScript("OnEvent", function(_, e, ...)
     if e == "PLAYER_LOGIN" then
         HookBaganator()
         if EUI_Bags and EUI_Bags.RefreshInventory then
@@ -297,5 +316,18 @@ ev:SetScript("OnEvent", function(_, e)
         end
         return
     end
-    if e == "BAG_UPDATE_DELAYED" then PaintSoon() else Soon() end
+    if not Active() then return end
+    if e == "GET_ITEM_INFO_RECEIVED" then
+        -- only an item we asked for and that was not loaded: a repaint, not a full refresh
+        local id = tonumber((...))
+        if not (id and pending[id]) then return end
+        pending[id] = nil
+        cache = {}
+        PaintSoon()
+        return
+    end
+    if e == "BAG_UPDATE_DELAYED" then PaintSoon(); return end
+    -- what you wear, your level or your talents changed: Geared Forever may answer differently now
+    wipe(tries)
+    Soon()
 end)

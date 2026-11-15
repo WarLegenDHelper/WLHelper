@@ -268,8 +268,11 @@ function WP.RepNeeded()
     local name, reaction, _, _, total, nextAt = WP.Reputation()
     if not name then return nil end
     local goal = WLWritsDB.goal or 0
-    if goal > 0 and REACTION_TOTAL[goal] and REACTION_TOTAL[goal] > total then
-        return REACTION_TOTAL[goal] - total, goal
+    -- a chosen goal stops there: once reached, nothing more is needed
+    if goal > 0 and REACTION_TOTAL[goal] then
+        local t = REACTION_TOTAL[goal]
+        if t > total then return t - total, goal end
+        return 0, goal
     end
     if reaction and reaction >= 8 then return 0, 8 end
     return math.max(0, (nextAt or total) - total), (reaction or 4) + 1

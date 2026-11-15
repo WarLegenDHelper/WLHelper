@@ -44,14 +44,18 @@ local function CurrentQuestID()
     return GetQuestID and GetQuestID() or 0
 end
 
--- Envelope names, as the NPC's greeting lists them; built once the names are known.
+-- Envelope names, as the NPC's greeting lists them (the client's real names, plus the English data
+-- names); kept for the session only once every real name has loaded.
 local titles
 local function WritTitles()
     if titles then return titles end
     local t, complete = {}, true
+    local getName = C_Item and C_Item.GetItemNameByID or GetItemInfo
     for _, w in ipairs(ns.WRITS) do
-        local name = WP.ItemName(w.writ, w.writName)
-        if name then t[name] = w else complete = false end
+        local ok, real = false, nil
+        if getName then ok, real = pcall(getName, w.writ) end
+        if ok and real then t[real] = w else complete = false end
+        if w.writName then t[w.writName] = t[w.writName] or w end
     end
     if complete then titles = t end
     return t

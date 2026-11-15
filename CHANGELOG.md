@@ -6,6 +6,19 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.29] — 2026-11-15
+
+### Corrigé / Fixed
+- **Spam « Aucun joueur nommé X ne joue actuellement »** : les Commandes demandaient les recettes par message privé, au nom sans royaume. Plus aucun message privé : la demande passe par le canal de guilde et seul le propriétaire répond.
+  *"No player named X" spam: recipe requests no longer go by whisper.*
+- **Passe complète sur tout l'addon** (audit par module, chaque défaut contre-vérifié avant correction) : textes coupés ou superposés dans le Comptoir, la flèche GPS (plus large), le guide, le sélecteur, la Guilde, le LFG, les Commandes, l'accueil, les réglages et l'écran de bienvenue ; prix de l'HV qui pouvaient compter 0 à tort ; objectif de réputation mal lu ; épingle de carte effacée à tort ; noms de writs en français reconnus ; classement PvP et événements séparés par guilde ; semaines PvP alignées sur la remise à zéro du jeu ; invitations LFG au-delà de 5 (passage en raid) ; inscription reçue avant l'événement ; flèches d'amélioration plus légères ; un deux-mains n'est plus comparé à la main gauche ; bouton « Publier la commande » qui cachait le réglage de paiement ; raisons de refus traduites chez chacun ; et d'autres.
+  *A full audit pass: dozens of layout, logic and text fixes, each one checked before being fixed.*
+
+### Ajouté / Added
+- **Commandes, onglet Artisans** : les artisans groupés par métier avec l'icône du métier et son nom dans ta langue ; « Recettes » montre ce qu'un artisan sait fabriquer, avec Commander sur chaque objet.
+- **Guide** : bouton **Prêt ?** en bas, qui ouvre la check-list de l'instance ; bouton **Partager** sur la check-list quand tu es en groupe ; la classe et le PNJ ne sont plus répétés sur la ligne de quête.
+- Réglages › Quêtes de donjon : « Quêtes répétables et de métiers que tu n'as pas : Masquer / Afficher » remplace « Toutes / Utiles ».
+
 ## [1.0.0-beta.28] — 2026-11-15
 
 ### Modifié / Changed

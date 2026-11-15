@@ -30,20 +30,33 @@ local W, PAD = 480, 18
 local win
 local rows = {}
 
-local function Line(parent, y, title, hint, get, set, disabledBy)
+-- A row with a switch. With a hint, the hint wraps under the title (the row grows with it);
+-- with tipOnly, the row stays one line tall and the hint shows on hover.
+local function Line(parent, y, title, hint, get, set, disabledBy, tipOnly)
     local r = CreateFrame("Frame", nil, parent)
     r:SetPoint("TOPLEFT", PAD, y); r:SetPoint("TOPRIGHT", -PAD, y)
-    r:SetHeight(hint and 42 or 28)
-    r.title = S.Text(r, 14, C.text, true); r.title:SetPoint("TOPLEFT", 0, -2); r.title:SetText(title)
-    if hint then
-        r.hint = S.Text(r, 12, C.dim); r.hint:SetPoint("TOPLEFT", 0, -22); r.hint:SetPoint("RIGHT", -56, 0)
-        r.hint:SetJustifyH("LEFT"); r.hint:SetText(disabledBy and string.format(L("Déjà fait par %s"), disabledBy) or hint)
+    r:SetHeight(28)
+    r.title = S.Text(r, 14, C.text, true); r.title:SetPoint("TOPLEFT", 0, -2); r.title:SetPoint("RIGHT", -56, 0)
+    r.title:SetJustifyH("LEFT"); r.title:SetText(title)
+    local step = 34
+    if hint and tipOnly then
+        r:EnableMouse(true)
+        r:SetScript("OnEnter", function(self) S.Tip(self, { title, hint }) end)
+        r:SetScript("OnLeave", S.HideTip)
+    elseif hint then
+        r.hint = S.Text(r, 12, C.dim); r.hint:SetPoint("TOPLEFT", 0, -22)
+        r.hint:SetWidth(W - 2 * PAD - 56)   -- a fixed width so the wrapped height is known right away
+        r.hint:SetJustifyH("LEFT"); r.hint:SetJustifyV("TOP"); r.hint:SetWordWrap(true)
+        r.hint:SetText(disabledBy and string.format(L("Déjà fait par %s"), disabledBy) or hint)
+        local h = math.ceil(r.hint:GetStringHeight() or 14)
+        r:SetHeight(22 + h)
+        step = 22 + h + 6
     end
     r.switch = S.Switch(r, get, set)
     r.switch:SetPoint("TOPRIGHT", 0, -2)
     if disabledBy then r.switch:Disable(); r.switch:SetAlpha(0.4) end
     rows[#rows + 1] = r.switch
-    return r, y - (hint and 48 or 34)
+    return r, y - step
 end
 
 local function Section(parent, y, text)
@@ -68,7 +81,8 @@ local function Build()
     for _, m in ipairs(WP.MODULES) do
         local key = m.key
         local _
-        _, y = Line(win, y, L(m.label), L(m.hint), function() return WP.ModuleOn(key) end, function(v) WP.SetModule(key, v) end)
+        -- one line per module, its hint on hover: the window must fit a 768-unit screen
+        _, y = Line(win, y, L(m.label), L(m.hint), function() return WP.ModuleOn(key) end, function(v) WP.SetModule(key, v) end, nil, true)
     end
 
     y = Section(win, y - 4, L("Clics (désactivés par défaut)"))
@@ -89,10 +103,10 @@ local function Build()
         local _, class = UnitClass("player")
         if class == "HUNTER" then
             local note = S.Text(win, 12, C.warn)
-            note:SetPoint("TOPLEFT", PAD, y); note:SetPoint("RIGHT", -PAD, 0)
-            note:SetJustifyH("LEFT"); note:SetWordWrap(true)
+            note:SetPoint("TOPLEFT", PAD, y); note:SetWidth(W - 2 * PAD)
+            note:SetJustifyH("LEFT"); note:SetJustifyV("TOP"); note:SetWordWrap(true)
             note:SetText(L("Chasseur : le clic droit seul reste ton attaque au corps-à-corps. Avec la touche, Tir automatique démarre et ne s'arrête jamais sur un second clic : alterne librement pour le weaving."))
-            y = y - 48
+            y = y - math.ceil(note:GetStringHeight() or 30) - 10
         end
     end
 
@@ -104,7 +118,11 @@ local function Build()
 
     local go = S.Button(win, L("C'est parti"), W - 2 * PAD, 36, "primary", function() win:Hide() end)
     go:SetPoint("TOPLEFT", PAD, y - 10)
-    win:SetHeight(-(y - 10) + 36 + PAD)
+    local h = -(y - 10) + 36 + PAD
+    win:SetHeight(h)
+    -- still too tall for the screen (a small UI scale, more modules): shrink the window to fit
+    local room = UIParent and UIParent:GetHeight() or 0
+    if room > 0 and h > room - 40 then win:SetScale(math.max(0.6, (room - 40) / h)) end
     win:HookScript("OnHide", function() WLWritsDB.welcomed = 1 end)
 end
 

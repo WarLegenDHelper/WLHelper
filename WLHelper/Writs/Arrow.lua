@@ -15,7 +15,10 @@ local S = ns.S
 local C = S.C
 local GPS = WP.GPS
 
-ns.AddEnglish({ ["Dans le donjon"] = "Inside the dungeon" })
+ns.AddEnglish({
+    ["Dans le donjon"] = "Inside the dungeon",
+    ["Téléportation, le plus rapide"] = "Teleport, fastest",
+})
 
 local arrow, teleport, demo
 local ARROW_TEX = "Interface\\Minimap\\MinimapArrow"
@@ -145,8 +148,9 @@ local function Draw(self, now, combat)
         end
     elseif leg and leg.kind == "teleport" then
         SetIcon(self, SpellIcon(leg.to.spell), true)
-        SetText(self.big, string.format(L("Téléport. %s"), leg.to.name))
-        SetText(self.step, L("le plus rapide d'ici"))
+        -- the destination alone in large type: "Téléport. <city>" did not fit
+        SetText(self.big, leg.to.name)
+        SetText(self.step, L("Téléportation, le plus rapide"))
         SetText(self.sub, stepText)
         button = "teleport"
     else
@@ -210,7 +214,7 @@ end
 
 local function Build()
     arrow = CreateFrame("Frame", "WLGPSArrow", UIParent)
-    arrow:SetSize(270, SHORT)
+    arrow:SetSize(320, SHORT)
     local pos = WLWritsDB.arrowPos
     if pos then arrow:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4]) else arrow:SetPoint("TOP", 0, -150) end
     arrow:SetFrameStrata("MEDIUM")
@@ -234,13 +238,13 @@ local function Build()
 
     arrow.big = S.Text(arrow, 22, C.text, true)
     arrow.big:SetPoint("TOPLEFT", 86, -14)
-    arrow.big:SetWidth(170)
+    arrow.big:SetPoint("RIGHT", -22, 0)   -- up to the close ×
     arrow.step = S.Text(arrow, 14, C.text)
     arrow.step:SetPoint("TOPLEFT", 86, -42)
-    arrow.step:SetWidth(170)
+    arrow.step:SetPoint("RIGHT", -22, 0)   -- up to the close ×
     arrow.sub = S.Text(arrow, 12, { 0.79, 0.8, 0.82 })
     arrow.sub:SetPoint("TOPLEFT", 86, -62)
-    arrow.sub:SetWidth(170)
+    arrow.sub:SetPoint("RIGHT", -22, 0)   -- up to the close ×
 
     local close = CreateFrame("Button", nil, arrow)
     close:SetSize(18, 18)
@@ -287,6 +291,8 @@ local function Build()
         if combat ~= self.combat then
             self.combat = combat
             self:SetAlpha(combat and Opt("hideCombat", false) and 0 or 1)
+            -- the secure teleport button cannot hide in combat, but it can go transparent
+            if teleport then teleport:SetAlpha(self:GetAlpha()) end
             textAcc = TEXT_EVERY            -- redraw now: amber, buttons off
         end
         if textAcc >= TEXT_EVERY then
@@ -295,7 +301,10 @@ local function Build()
         end
         if self.turn then Turn(self, now, combat) end
     end)
-    arrow:SetScript("OnHide", function() SetTeleport(nil) end)
+    arrow:SetScript("OnHide", function()
+        if teleport and InCombatLockdown() then teleport:SetAlpha(0) end
+        SetTeleport(nil)
+    end)
     arrow:Hide()
     -- the drawn values belong to the frame: forget them so the next show draws everything
     arrow:HookScript("OnShow", function(self) textAcc = TEXT_EVERY; self.combat = nil end)
@@ -305,7 +314,8 @@ end
 local ev = CreateFrame("Frame")
 pcall(ev.RegisterEvent, ev, "PLAYER_REGEN_ENABLED")
 ev:SetScript("OnEvent", function()
-    if teleport then SetTeleport(WantedTeleport()) end
+    -- restored here, not in SetTeleport (which returns early for the spell already shown)
+    if teleport then teleport:SetAlpha(1); SetTeleport(WantedTeleport()) end
 end)
 
 -- Size and background opacity from the options.

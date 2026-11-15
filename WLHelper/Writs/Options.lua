@@ -55,13 +55,16 @@ ns.AddEnglish({
     ["Guide"] = "Guide",
     ["Flèche des donjons"] = "Dungeon arrow",
     ["Guide automatique des points"] = "Automatic waypoint guide",
-    ["Toutes les quêtes ou seulement les utiles"] = "All quests or only the useful ones",
+    ["Quêtes répétables et de métiers que tu n'as pas"] = "Repeatable quests and quests of professions you don't have",
+    ["Masquer"] = "Hide", ["Afficher"] = "Show",
+    ["Masquées, elles ne sont ni dans la route ni dans le décompte des quêtes de chaque donjon."] = "Hidden, they are neither in the route nor counted in each dungeon's quests.",
     ["Toutes"] = "All", ["Utiles"] = "Useful",
     -- Comptoir
     ["Automatismes"] = "Automation",
     ["Rendre les writs automatiquement"] = "Turn in writs automatically",
     ["Accepter la quête en ouvrant l'enveloppe"] = "Accept the quest when opening the envelope",
-    ["Rescanner la liste d'achat en ouvrant l'HV (Comptoir ouvert, prix de plus d'une heure)"] = "Rescan the shopping list when the AH opens (Trading Post open, prices over an hour old)",
+    ["Rescanner en ouvrant l'HV"] = "Rescan when the AH opens",
+    ["Comptoir ouvert, prix > 1 h"] = "Trading Post open, prices > 1 h",
     ["Infos"] = "Info",
     ["Rappel à la connexion"] = "Reminder on login",
     ["« 3 prêts, 1 enveloppe à ouvrir »"] = "\"3 ready, 1 envelope to open\"",
@@ -330,6 +333,15 @@ local function Place(p, row, control, xOff)
         row:EnableMouse(true)
         row:SetScript("OnEnter", function(self) S.Tip(self, { row.label:GetText() or "", full }) end)
         row:SetScript("OnLeave", S.HideTip)
+    else
+        -- no hint: the label stops before the control, cut with "..." when longer, whole on hover
+        row.label:SetPoint("RIGHT", control, "LEFT", -10, 0)
+        row:EnableMouse(true)
+        row:SetScript("OnEnter", function(self)
+            if row.label.IsTruncated and not row.label:IsTruncated() then return end
+            S.Tip(self, { row.label:GetText() or "" })
+        end)
+        row:SetScript("OnLeave", S.HideTip)
     end
     p.controls[#p.controls + 1] = control
     return control
@@ -436,8 +448,9 @@ function BUILD.dungeons(p)
         L("Dans un donjon, un message et un son quand un monstre rare apparaît"))
     SwitchRow(p, L("Guide automatique des points"), function() return Guide().autoWay and true or false end,
         function(v) Guide().autoWay = v; RefreshGuide() end)
-    local row = Row(p, L("Toutes les quêtes ou seulement les utiles"))
-    Place(p, row, S.Segmented(row, { { false, L("Toutes") }, { true, L("Utiles") } },
+    -- "useful" hides the repeatable reputation quests and the quests of professions you don't have
+    local row = Row(p, L("Quêtes répétables et de métiers que tu n'as pas"))
+    Place(p, row, S.Segmented(row, { { true, L("Masquer") }, { false, L("Afficher") } },
         function() return Guide().useful ~= false end,
         function(v)
             if (Guide().useful ~= false) == v then return end
@@ -446,6 +459,7 @@ function BUILD.dungeons(p)
             if root.RenderPicker then root.RenderPicker() end
         end))
     CloseSection(p)
+    Note(p, L("Masquées, elles ne sont ni dans la route ni dans le décompte des quêtes de chaque donjon."), 4)
 end
 
 function BUILD.comptoir(p)
@@ -454,8 +468,8 @@ function BUILD.comptoir(p)
     SwitchRow(p, L("Rendre les caisses automatiquement"), function() return Comfort().autoCrates ~= false end, SetComfort("autoCrates"),
         L("Dokimi / Marcy Baker"))
     SwitchRow(p, L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
-    SwitchRow(p, L("Rescanner la liste d'achat en ouvrant l'HV (Comptoir ouvert, prix de plus d'une heure)"), function() return Writs().autoRescan end,
-        function(v) Writs().autoRescan = v; RefreshWrits() end)
+    SwitchRow(p, L("Rescanner en ouvrant l'HV"), function() return Writs().autoRescan end,
+        function(v) Writs().autoRescan = v; RefreshWrits() end, L("Comptoir ouvert, prix > 1 h"))
 
     Section(p, L("Infos"))
     SwitchRow(p, L("Rappel à la connexion"), function() return Comfort().reminder end, SetComfort("reminder"),
@@ -594,6 +608,12 @@ function BUILD.upgrades(p)
     CloseSection(p)
 
     local _, label = Wt.Bracket()
+    -- built once: a level-up across a bracket or a respec on Auto rebuilds the pages when shown
+    local built = Wt.SpecName() .. label
+    p.controls[#p.controls + 1] = { Sync = function()
+        local _, l = Wt.Bracket()
+        if Wt.SpecName() .. l ~= built and Rebuild then C_Timer.After(0, Rebuild) end
+    end }
     Section(p, string.format(L("Poids utilisés (%s, niveaux %s)"), Wt.SpecName(), label))
     p.y = p.y - 4
     for i, e in ipairs(Wt.Table()) do
@@ -675,8 +695,8 @@ function BUILD.about(p)
 
     Section(p, L("Une idée, un bug ?"))
     local fb = Row(p, L("Formulaire GitHub prérempli"))
-    local bIdea = S.Button(fb, L("Proposer une idée"), 150, 30, "primary", function() if WP.Feedback then WP.Feedback("idea") end end)
-    local bBug = S.Button(fb, L("Signaler un bug"), 130, 30, "secondary", function() if WP.Feedback then WP.Feedback("bug") end end)
+    local bIdea = S.Button(fb, L("Proposer une idée"), 150, 30, "primary", function() if ns.WP.Feedback then ns.WP.Feedback("idea") end end)
+    local bBug = S.Button(fb, L("Signaler un bug"), 130, 30, "secondary", function() if ns.WP.Feedback then ns.WP.Feedback("bug") end end)
     bBug:SetPoint("RIGHT", fb, "RIGHT", 0, 0)
     Place(p, fb, bIdea)
     bIdea:ClearAllPoints(); bIdea:SetPoint("RIGHT", bBug, "LEFT", -8, 0)

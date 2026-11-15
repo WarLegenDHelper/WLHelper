@@ -371,6 +371,8 @@ function GPS.Go(w)
     Start(dest, "writs")
     if C_Map and C_Map.SetUserWaypoint and UiMapPoint then
         pcall(C_Map.SetUserWaypoint, UiMapPoint.CreateFromCoordinates(w.map, w.x / 100, w.y / 100))
+        -- remembered so GPS.Stop clears this pin (and not one the player placed since)
+        state.pin = { map = w.map, x = w.x / 100, y = w.y / 100 }
     end
     if GPS.KnownFlights() == 0 then WP.Print(L("ouvre une carte de vol une fois : le GPS apprendra tes points de vol.")) end
 end
@@ -394,6 +396,15 @@ function GPS.Stop(source)
         local Z = Zygor()
         if Z and Z.Pointer.ClearWaypoints then pcall(Z.Pointer.ClearWaypoints, Z.Pointer, "manual") end
     end
+    if state.pin and C_Map and C_Map.ClearUserWaypoint then
+        local ok, p = pcall(C_Map.GetUserWaypoint or function() end)
+        local pos = ok and p and p.position
+        if not (ok and p) or (pos and p.uiMapID == state.pin.map and math.abs(pos.x - state.pin.x) < 0.001
+            and math.abs(pos.y - state.pin.y) < 0.001) then
+            pcall(C_Map.ClearUserWaypoint)
+        end
+    end
+    state.pin = nil
     state.dest, state.source, state.legs, state.eta, state.zygor, state.suspended = nil, nil, nil, nil, nil, nil
     if ticker then ticker:Cancel(); ticker = nil end
     if GPS.Hide then GPS.Hide() end

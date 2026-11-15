@@ -155,6 +155,8 @@ local function MakeCard(parent)
   c.check = c:CreateTexture(nil, "OVERLAY"); c.check:SetSize(22, 22); c.check:SetPoint("BOTTOMRIGHT", -8, 6)
   c.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
   c.picked = Text(c, 12, T.text, true); c.picked:SetPoint("RIGHT", c.check, "LEFT", 0, 1)
+  -- the level line stops before "Picked" (it ends in "..." rather than running under it)
+  c.lvl:SetPoint("RIGHT", c.picked, "LEFT", -8, 0); c.lvl:SetWordWrap(false); c.lvl:SetJustifyH("LEFT")
   c.bar = Tex(c, "OVERLAY", T.accent); c.bar:SetPoint("BOTTOMLEFT", 1, 1); c.bar:SetHeight(3); ns.Accent(c.bar)
   c.bigIcon = c:CreateTexture(nil, "ARTWORK", nil, 1); c.bigIcon:SetSize(48, 48); c.bigIcon:SetPoint("CENTER", 0, -4); c.bigIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.bigIcon:Hide()
   c.dicon = c:CreateTexture(nil, "OVERLAY"); c.dicon:Hide()
@@ -177,7 +179,7 @@ local function MakeCard(parent)
     for _, k in ipairs(ns.KeyLines and ns.KeyLines(self.dkey) or {}) do table.insert(lines, { k[1], 0.9, 0.9, 0.9 }) end
     table.insert(lines, { " ", 1, 1, 1 })
     table.insert(lines, { L.PICK_HINT, T.accent[1], T.accent[2], T.accent[3] })
-    table.insert(lines, { L.PICK_CUSTOM .. " : clic droit / right click", 0.6, 0.6, 0.6 })
+    table.insert(lines, { L.PICK_RCLICK, 0.6, 0.6, 0.6 })
     ns.ShowTip(self, lines)
   end)
   c:SetScript("OnLeave", ns.HideTip)
@@ -303,12 +305,15 @@ Render = function()
     if d.cq then SetClassIcon(c.cicon, (d.cq:match("^[^,]+"))) else c.cicon:Hide() end
     c.name:SetText(ns.DName(k))
     local soon = d.up and time() < d.up
-    c.lvl:SetText((d.raid and (L.RAID .. (d.size and (" " .. L.PICK_SIZE:format(d.size)) or "") .. "  ·  ") or "")
-      .. (d.lvl and d.lvl[1] and (L.PICK_LV:format(d.lvl[1], d.lvl[2] or d.lvl[1])) or "")
-      .. (soon and ("  ·  " .. L.PICK_OPENS:format(date(L.PICK_DATE, d.up))) or ""))
     local n, done = Counts(k)
     local finished = n > 0 and done >= n
-    c.info:SetText(n > 0 and L.PICK_QN:format(done, n) or (soon and L.PICK_SOON) or L.PICK_NOQ)
+    -- an upcoming raid without quests shows its opening date at the top, so the level line stays short
+    local dateTop = soon and n == 0
+    c.lvl:SetText((d.raid and (L.RAID .. (d.size and (" " .. L.PICK_SIZE:format(d.size)) or "") .. "  ·  ") or "")
+      .. (d.lvl and d.lvl[1] and (L.PICK_LV:format(d.lvl[1], d.lvl[2] or d.lvl[1])) or "")
+      .. ((soon and not dateTop) and ("  ·  " .. L.PICK_OPENS:format(date(L.PICK_DATE, d.up))) or ""))
+    c.info:SetText(n > 0 and L.PICK_QN:format(done, n)
+      or (dateTop and (L.PICK_SOON .. " · " .. date(L.PICK_DATE, d.up))) or L.PICK_NOQ)
     local horde = UnitFactionGroup("player") ~= "Alliance"
     c.faction:SetTexture(horde and "Interface\\TargetingFrame\\UI-PVP-Horde" or "Interface\\TargetingFrame\\UI-PVP-Alliance")
     c.faction:SetShown(n > 0)
@@ -363,7 +368,7 @@ function ns.HidePicker() if p then p:Hide() end end
 local QROWS = 22
 local function BuildQuests()
   qp = CreateFrame("Frame", "WLDTQuestPicker", UIParent)
-  qp:SetSize(460, 40 + QROWS * 22 + 16); qp:SetFrameStrata("DIALOG"); qp:SetPoint("CENTER", 120, 0)
+  qp:SetSize(460, 40 + 18 + QROWS * 22 + 16); qp:SetFrameStrata("DIALOG"); qp:SetPoint("CENTER", 120, 0)
   qp:SetMovable(true); qp:EnableMouse(true); qp:SetClampedToScreen(true)
   ns.Flat(qp, T.bg)
   local h = CreateFrame("Frame", nil, qp)
@@ -373,10 +378,12 @@ local function BuildQuests()
   h:SetScript("OnDragStart", function() qp:StartMoving() end); h:SetScript("OnDragStop", function() qp:StopMovingOrSizing() end)
   qp.title = Text(h, 12, T.text, true); qp.title:SetPoint("LEFT", 10, 0); qp.title:SetWidth(400); qp.title:SetWordWrap(false)
   local close = Button(h, 22, 20, "x", function() qp:Hide() end); close:SetPoint("RIGHT", -4, 0)
+  qp.hint = Text(qp, 11, T.dim); qp.hint:SetPoint("TOPLEFT", 10, -34); qp.hint:SetWidth(440); qp.hint:SetWordWrap(true)
+  qp.hint:SetJustifyH("LEFT"); qp.hint:SetText(L.PICK_CUSTOM_H)
   qp.rows = {}
   for r = 1, QROWS do
     local row = CreateFrame("Button", nil, qp)
-    row:SetHeight(22); row:SetPoint("TOPLEFT", 8, -34 - (r - 1) * 22); row:SetPoint("TOPRIGHT", -8, -34 - (r - 1) * 22)
+    row:SetHeight(22); row:SetPoint("TOPLEFT", 8, -52 - (r - 1) * 22); row:SetPoint("TOPRIGHT", -8, -52 - (r - 1) * 22)
     row.hl = Tex(row, "HIGHLIGHT", { 1, 1, 1, 0.06 }); row.hl:SetAllPoints()
     row.box = Tex(row, "ARTWORK", { 0.2, 0.2, 0.22 }); row.box:SetSize(14, 14); row.box:SetPoint("LEFT", 4, 0)
     row.tick = Tex(row, "OVERLAY", T.accent); row.tick:SetSize(8, 8); row.tick:SetPoint("CENTER", row.box); ns.Accent(row.tick)
@@ -405,7 +412,7 @@ function ns.OpenQuests(dkey, keep)
   if not qp then BuildQuests() end
   local _, cls = UnitClass("player")
   qp.dkey = dkey
-  qp.title:SetText(L.PICK_CUSTOM_T:format(ns.DName(dkey)))
+  qp.title:SetText(L.PICK_CUSTOM_T:format(ns.DName(dkey))); qp.hint:SetText(L.PICK_CUSTOM_H)
   local qs = ns.DungeonQuests(dkey, cls)
   for r, row in ipairs(qp.rows) do
     local qid = qs[r]
@@ -423,6 +430,6 @@ function ns.OpenQuests(dkey, keep)
       row:Show()
     else row:Hide() end
   end
-  qp:SetHeight(40 + math.max(1, math.min(#qs, QROWS)) * 22 + 12)
+  qp:SetHeight(40 + 18 + math.max(1, math.min(#qs, QROWS)) * 22 + 12)
   qp:Show()
 end

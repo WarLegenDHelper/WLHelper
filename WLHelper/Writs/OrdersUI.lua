@@ -16,6 +16,15 @@ ns.AddEnglish({
     ["Chercher un objet à faire fabriquer"] = "Search an item to have crafted",
     ["%d artisans connus · %d en ligne"] = "%d crafters known · %d online",
     ["Chuchoter"] = "Whisper",
+    ["Recettes"] = "Recipes",
+    ["Recettes de %s : %s %d"] = "%s's recipes: %s %d",
+    ["Tous les artisans"] = "All crafters",
+    ["%d artisans"] = "%d crafters",
+    ["(toi)"] = "(you)",
+    ["%d recettes"] = "%d recipes",
+    ["recettes pas encore partagées"] = "recipes not shared yet",
+    ["Ses recettes ne sont pas encore arrivées : elles viennent quand il ouvre sa fenêtre de métier, ou de Mastercraft s'il l'a."] =
+        "Their recipes have not arrived yet: they come when they open their profession window, or from Mastercraft if they have it.",
     ["Aucun artisan connu pour l'instant : les membres qui ont WL Helper partagent leurs métiers en se connectant. Tape un objet pour chercher qui le fabrique."] =
         "No crafter known yet: members who have WL Helper share their professions when they log in. Type an item to find who makes it.",
     ["tes métiers : %s"] = "yours: %s",
@@ -60,6 +69,7 @@ ns.AddEnglish({
     ["Raison du refus"] = "Reason",
     ["%s fournit"] = "%s provides",
     ["Tes recettes sont partagées avec la guilde"] = "Your recipes are shared with the guild",
+    ["3 j"] = "3 d",
 })
 
 local W, H, PAD = 400, 600, 14
@@ -115,21 +125,27 @@ local function BuildFind(p)
     f.box:HookScript("OnTextChanged", function() WP.RefreshOrders() end)
     f.info = S.Text(p, 12, C.dim); f.info:SetPoint("TOPLEFT", PAD, -48); f.info:SetPoint("RIGHT", -PAD, 0)
     f.info:SetJustifyH("LEFT"); f.info:SetWordWrap(false)
-    f.list = List(p, -70, 52, function(parent)
+    -- your own professions on their own line (up to two lines), so the counts are never cut
+    f.mine = S.Text(p, 12, C.dim); f.mine:SetPoint("TOPLEFT", PAD, -64); f.mine:SetPoint("RIGHT", -PAD, 0)
+    f.mine:SetJustifyH("LEFT"); f.mine:SetWordWrap(true); if f.mine.SetMaxLines then f.mine:SetMaxLines(2) end
+    f.list = List(p, -96, 52, function(parent)
         local r = CreateFrame("Frame", nil, parent)
         r:SetSize(W - 2 * PAD, 40)
-        S.Solid(r, "BACKGROUND", C.card):SetAllPoints(); S.Border(r, C.border)
+        r.bg = S.Solid(r, "BACKGROUND", C.card); r.bg:SetAllPoints(); S.Border(r, C.border)
         r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:SetSize(22, 22); r.icon:SetPoint("LEFT", 9, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         r.name = S.Text(r, 14, C.text); r.name:SetPoint("TOPLEFT", 40, -5); r.name:SetPoint("RIGHT", -96, 0); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
         r.sub = S.Text(r, 12, C.dim); r.sub:SetPoint("BOTTOMLEFT", 40, 6); r.sub:SetPoint("RIGHT", -96, 0); r.sub:SetJustifyH("LEFT"); r.sub:SetWordWrap(false)
         r.btn = S.Button(r, L("Commander"), 80, 26, "secondary", function()
             if r.item then WP.NewOrder(r.item, r.crafter)
+            elseif r.open then ui.find.view = r.open; f.list.sf:SetVerticalScroll(0); WP.RefreshOrders()
             elseif r.whisper and ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. r.whisper .. " ") end
         end)
         r.btn:SetPoint("RIGHT", -7, 0)
         return r
     end)
     f.empty = S.Text(f.list.content, 13, C.dim); f.empty:SetPoint("TOPLEFT", 2, -8); f.empty:SetWidth(W - 2 * PAD - 4); f.empty:SetWordWrap(true)
+    f.back = S.Button(p, L("Tous les artisans"), 130, 24, "secondary", function() f.view = nil; WP.RefreshOrders() end)
+    f.back:SetPoint("TOPRIGHT", -PAD, -46); f.back:Hide()
     -- sharing my recipes: on by default
     local foot = CreateFrame("Frame", nil, p); foot:SetPoint("BOTTOMLEFT"); foot:SetPoint("BOTTOMRIGHT"); foot:SetHeight(48)
     local fl = S.Solid(foot, "BORDER", C.divider); fl:SetPoint("TOPLEFT"); fl:SetPoint("TOPRIGHT"); fl:SetHeight(1)
@@ -137,6 +153,36 @@ local function BuildFind(p)
     local sw = S.Switch(foot, function() return WLWritsDB.ordersShare ~= false end, function(v) WLWritsDB.ordersShare = v; if v then O.Announce() end end)
     sw:SetPoint("RIGHT", -PAD, 0)
 end
+
+local Reagents   -- defined with the order cards below
+-- ---------------------------------------------------------------- professions
+-- One key per profession whatever the client's language, its name in yours and its icon.
+local PROFS = {
+    alchemy = { "Alchimie", "Alchemy", "Interface\\Icons\\Trade_Alchemy" },
+    blacksmithing = { "Forge", "Blacksmithing", "Interface\\Icons\\Trade_BlackSmithing" },
+    enchanting = { "Enchantement", "Enchanting", "Interface\\Icons\\Trade_Engraving" },
+    engineering = { "Ingénierie", "Engineering", "Interface\\Icons\\Trade_Engineering" },
+    leatherworking = { "Travail du cuir", "Leatherworking", "Interface\\Icons\\INV_Misc_ArmorKit_17" },
+    tailoring = { "Couture", "Tailoring", "Interface\\Icons\\Trade_Tailoring" },
+    herbalism = { "Herboristerie", "Herbalism", "Interface\\Icons\\Spell_Nature_NatureTouchGrow" },
+    mining = { "Minage", "Mining", "Interface\\Icons\\Trade_Mining" },
+    skinning = { "Dépeçage", "Skinning", "Interface\\Icons\\INV_Misc_Pelt_Wolf_01" },
+    cooking = { "Cuisine", "Cooking", "Interface\\Icons\\INV_Misc_Food_15" },
+    firstaid = { "Secourisme", "First Aid", "Interface\\Icons\\Spell_Holy_SealOfSacrifice" },
+    fishing = { "Pêche", "Fishing", "Interface\\Icons\\Trade_Fishing" },
+}
+local PROF_ORDER = { "alchemy", "blacksmithing", "enchanting", "engineering", "leatherworking", "tailoring",
+    "cooking", "firstaid", "herbalism", "mining", "skinning", "fishing" }
+local profByName
+local function ProfKey(name)
+    if not profByName then
+        profByName = {}
+        for k, p in pairs(PROFS) do profByName[p[1]:lower()], profByName[p[2]:lower()] = k, k end
+    end
+    return name and profByName[tostring(name):lower()] or nil
+end
+local function ProfLabel(key, raw) local p = PROFS[key]; return p and ((root.lang == "en") and p[2] or p[1]) or raw or "?" end
+local function ProfIcon(key) local p = PROFS[key]; return p and p[3] or "Interface\\Icons\\INV_Misc_Note_01" end
 
 local function RenderFind()
     local f = ui.find
@@ -152,8 +198,8 @@ local function RenderFind()
         mineT[#mineT + 1] = prof .. " " .. (p.rank or 0) .. " (" .. n .. ")"
     end
     table.sort(mineT)
-    f.info:SetText(string.format(L("%d artisans connus · %d en ligne"), crafters, online) .. "  ·  "
-        .. (#mineT > 0 and string.format(L("tes métiers : %s"), table.concat(mineT, ", ")) or L("tes métiers : aucun")))
+    f.info:SetText(string.format(L("%d artisans connus · %d en ligne"), crafters, online))
+    f.mine:SetText(#mineT > 0 and string.format(L("tes métiers : %s"), table.concat(mineT, ", ")) or L("tes métiers : aucun"))
     local catalog = O.Catalog()
     local rows = {}
     if #q >= 2 then
@@ -169,31 +215,89 @@ local function RenderFind()
         if a.c.online ~= b.c.online then return a.c.online end
         return a.c.rank > b.c.rank
     end)
-    -- nothing typed: the guild's crafters by profession (shared at login, recipes or not)
-    if #q < 2 then
-        local list = {}
-        for name, profs in pairs(O.DB().crafters) do
-            for prof, p in pairs(profs) do list[#list + 1] = { name = name, prof = prof, rank = p.rank or 0, online = on[name] or false, n = p.recipes and next(p.recipes) and 1 or 0 } end
-        end
-        table.sort(list, function(a, b)
-            if a.prof ~= b.prof then return a.prof < b.prof end
-            if a.online ~= b.online then return a.online end
-            return a.rank > b.rank
-        end)
+    -- one crafter picked: what they make (when their recipe list arrived)
+    if f.view and #q < 2 then
+        local v = f.view
+        local p = v.me and O.DB().mine[v.prof] or (O.DB().crafters[v.name] or {})[v.prof]
+        local items = {}
+        for id in pairs(p and p.recipes or {}) do items[#items + 1] = id end
+        table.sort(items, function(a, b) return Name(a) < Name(b) end)
+        f.back:Show()
+        f.mine:SetText(string.format(L("Recettes de %s : %s %d"), v.name, ProfLabel(ProfKey(v.prof), v.prof), p and p.rank or 0))
         local y = 0
-        for i, c in ipairs(list) do
+        for i, id in ipairs(items) do
             local row = f.list.Get(i)
             row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y)
-            row.item, row.crafter, row.whisper = nil, nil, c.name
-            row.icon:SetTexture("Interface\\Icons\\INV_Misc_Note_01")
-            row.name:SetText(c.name); row.name:SetTextColor(C.text[1], C.text[2], C.text[3])
-            row.sub:SetText(c.prof .. " " .. c.rank .. " · " .. (c.online and (S.Hex(C.ready) .. L("en ligne") .. "|r") or L("hors ligne")))
-            row.btn.label:SetText(L("Chuchoter")); row.btn:SetShown(c.online)
+            row.item, row.crafter, row.whisper, row.open = id, not v.me and v.name or nil, nil, nil
+            row.icon:Show(); row.icon:SetTexture(S.ItemIcon(id))
+            row.name:SetText(Name(id)); local qc = S.QualityColor(id); row.name:SetTextColor(qc[1], qc[2], qc[3])
+            row.sub:SetText(Reagents(O.DB() and (p.recipes[id] or ""), 1))
+            row.btn.label:SetText(L("Commander")); row.btn:SetShown(not v.me)
+            row.bg:SetColorTexture(C.card[1], C.card[2], C.card[3], 1)
             y = y + 46
-            if i >= 80 then break end
+            if i >= 150 then break end
         end
-        f.list.HideFrom(math.min(#list, 80) + 1)
-        f.empty:SetShown(#list == 0)
+        f.list.HideFrom(math.min(#items, 150) + 1)
+        f.empty:SetShown(#items == 0)
+        f.empty:SetText(L("Ses recettes ne sont pas encore arrivées : elles viennent quand il ouvre sa fenêtre de métier, ou de Mastercraft s'il l'a."))
+        f.list.content:SetHeight(math.max(10, y))
+        return
+    end
+    f.back:Hide()
+    -- nothing typed: the guild's crafters, grouped by profession (shared at login, recipes or not)
+    if #q < 2 then
+        local groups = {}
+        local function Add(name, prof, p, me)
+            local key = ProfKey(prof) or prof
+            groups[key] = groups[key] or {}
+            local n = 0
+            for _ in pairs(p.recipes or {}) do n = n + 1 end
+            table.insert(groups[key], { name = name, prof = prof, rank = p.rank or 0, online = me or on[name] or false, n = n, me = me })
+        end
+        for name, profs in pairs(O.DB().crafters) do for prof, p in pairs(profs) do Add(name, prof, p) end end
+        for prof, p in pairs(O.DB().mine or {}) do Add(UnitName("player"), prof, p, true) end
+        local order = {}
+        for _, k in ipairs(PROF_ORDER) do if groups[k] then order[#order + 1] = k end end
+        for k in pairs(groups) do if not PROFS[k] then order[#order + 1] = k end end
+        local y, i = 0, 0
+        for _, key in ipairs(order) do
+            local members = groups[key]
+            table.sort(members, function(a, b)
+                if a.online ~= b.online then return a.online end
+                return a.rank > b.rank
+            end)
+            -- the profession's header
+            i = i + 1
+            local h = f.list.Get(i)
+            h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -y)
+            h.item, h.crafter, h.whisper, h.open = nil, nil, nil, nil
+            h.icon:Show(); h.icon:SetTexture(ProfIcon(key))
+            h.name:SetText(ProfLabel(key, members[1].prof)); h.name:SetTextColor(C.text[1], C.text[2], C.text[3])
+            h.sub:SetText(string.format(L("%d artisans"), #members))
+            h.btn:Hide()
+            h.bg:SetColorTexture(C.brandBg[1], C.brandBg[2], C.brandBg[3], 1)
+            y = y + 46
+            for _, c in ipairs(members) do
+                i = i + 1
+                local row = f.list.Get(i)
+                row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y)
+                row.item, row.crafter = nil, nil
+                row.whisper = (not c.me and c.online) and c.name or nil
+                row.open = c.n > 0 and { name = c.name, prof = c.prof, me = c.me } or nil
+                row.icon:Hide()
+                row.name:SetText("   " .. c.name .. (c.me and (" " .. S.Hex(C.muted) .. L("(toi)") .. "|r") or ""))
+                row.name:SetTextColor(C.text[1], C.text[2], C.text[3])
+                row.sub:SetText("   " .. c.rank .. "  ·  " .. (c.online and (S.Hex(C.ready) .. L("en ligne") .. "|r") or L("hors ligne"))
+                    .. "  ·  " .. (c.n > 0 and string.format(L("%d recettes"), c.n) or L("recettes pas encore partagées")))
+                row.btn.label:SetText(c.n > 0 and L("Recettes") or L("Chuchoter"))
+                row.btn:SetShown(c.n > 0 or row.whisper ~= nil)
+                row.bg:SetColorTexture(C.card[1], C.card[2], C.card[3], 1)
+                y = y + 46
+            end
+            if i >= 200 then break end
+        end
+        f.list.HideFrom(i + 1)
+        f.empty:SetShown(i == 0)
         f.empty:SetText(L("Aucun artisan connu pour l'instant : les membres qui ont WL Helper partagent leurs métiers en se connectant. Tape un objet pour chercher qui le fabrique."))
         f.list.content:SetHeight(math.max(10, y))
         return
@@ -238,33 +342,33 @@ local function BuildNew(p)
     n.rows = {}
     for i = 1, 8 do
         local r = CreateFrame("Button", nil, p)
-        r:SetSize(W - 2 * PAD, 30); r:SetPoint("TOPLEFT", PAD, -118 - (i - 1) * 32)
+        r:SetSize(W - 2 * PAD, 26); r:SetPoint("TOPLEFT", PAD, -118 - (i - 1) * 28)
         S.Solid(r, "BACKGROUND", C.card):SetAllPoints()
         S.Solid(r, "HIGHLIGHT", { 1, 1, 1 }, 0.05):SetAllPoints()
-        r.name = S.Text(r, 13, C.text); r.name:SetPoint("LEFT", 8, 0); r.name:SetPoint("RIGHT", -150, 0); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
-        r.tag = S.Text(r, 12, C.ready); r.tag:SetPoint("RIGHT", -8, 0); r.tag:SetJustifyH("RIGHT")
+        r.tag = S.Text(r, 12, C.ready); r.tag:SetPoint("RIGHT", -8, 0); r.tag:SetWidth(170); r.tag:SetJustifyH("RIGHT"); r.tag:SetWordWrap(false)
+        r.name = S.Text(r, 13, C.text); r.name:SetPoint("LEFT", 8, 0); r.name:SetPoint("RIGHT", r.tag, "LEFT", -6, 0); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
         r:SetScript("OnClick", function(self) if self.id then draft.crafterGives[self.id] = not draft.crafterGives[self.id]; WP.RefreshOrders() end end)
         r:SetScript("OnEnter", function(self) S.Tip(self, { L("Clic : qui le fournit") }) end)
         r:SetScript("OnLeave", S.HideTip)
         n.rows[i] = r
     end
-    local y0 = -118 - 8 * 32 - 6
-    local fl = S.Text(p, 13, C.dim); fl:SetPoint("TOPLEFT", PAD, y0); fl:SetText(L("Commission") .. " (" .. L("po") .. ")")
-    n.fee = Box(p, 80, 28, true); n.fee:SetPoint("TOPLEFT", PAD, y0 - 18)
+    local y0 = -118 - 8 * 28 - 6
+    local fl = S.Text(p, 13, C.dim); fl:SetPoint("TOPLEFT", PAD, y0); fl:SetText(L("Commission"))
+    n.fee = Box(p, 80, 28, true, L("po")); n.fee:SetPoint("TOPLEFT", PAD, y0 - 18)
     n.fee:HookScript("OnTextChanged", function(self, user) if user then draft.fee = (tonumber(self:GetText() or "") or 0) * 10000 end end)
-    local tl = S.Text(p, 13, C.dim); tl:SetPoint("TOPLEFT", PAD + 96, y0); tl:SetText(L("Pourboire") .. " (" .. L("po") .. ")")
-    n.tip = Box(p, 80, 28, true); n.tip:SetPoint("TOPLEFT", PAD + 96, y0 - 18)
+    local tl = S.Text(p, 13, C.dim); tl:SetPoint("TOPLEFT", PAD + 96, y0); tl:SetText(L("Pourboire"))
+    n.tip = Box(p, 80, 28, true, L("po")); n.tip:SetPoint("TOPLEFT", PAD + 96, y0 - 18)
     n.tip:HookScript("OnTextChanged", function(self, user) if user then draft.tip = (tonumber(self:GetText() or "") or 0) * 10000 end end)
     local vl = S.Text(p, 13, C.dim); vl:SetPoint("TOPLEFT", PAD + 192, y0); vl:SetText(L("Valable"))
-    n.hours = S.Segmented(p, { { 12, "12 h" }, { 24, "24 h" }, { 72, "3 j" } }, function() return draft and draft.hours or 24 end,
+    n.hours = S.Segmented(p, { { 12, "12 h" }, { 24, "24 h" }, { 72, L("3 j") } }, function() return draft and draft.hours or 24 end,
         function(v) draft.hours = v; WP.RefreshOrders() end, 28)
     n.hours:SetPoint("TOPLEFT", PAD + 192, y0 - 18)
-    n.note = Box(p, W - 2 * PAD, 28, false, L("Un mot pour l'artisan")); n.note:SetPoint("TOPLEFT", PAD, y0 - 56)
+    n.note = Box(p, W - 2 * PAD, 28, false, L("Un mot pour l'artisan")); n.note:SetPoint("TOPLEFT", PAD, y0 - 52)
     n.note:SetMaxLetters(60)
     n.payUp = S.Switch(p, function() return draft and draft.payUp end, function(v) draft.payUp = v end)
-    n.payUp:SetPoint("TOPRIGHT", -PAD, y0 - 92)
+    n.payUp:SetPoint("TOPRIGHT", -PAD, y0 - 86)
     local pl = S.Text(p, 13, C.text); pl:SetPoint("RIGHT", n.payUp, "LEFT", -10, 0); pl:SetText(L("Payer d'avance"))
-    n.go = S.Button(p, L("Publier la commande"), W - 2 * PAD, 36, "primary", function()
+    n.go = S.Button(p, L("Publier la commande"), W - 2 * PAD, 34, "primary", function()
         local give, crafter = {}, {}
         for _, r in ipairs(O.Reagents(draft.item)) do
             if draft.crafterGives[r[1]] then crafter[#crafter + 1] = r[1] .. ":" .. r[2] else give[#give + 1] = r[1] .. ":" .. r[2] end
@@ -335,7 +439,7 @@ local function OrderCard(parent)
     return c
 end
 
-local function Reagents(s, qty)
+Reagents = function(s, qty)
     local t = {}
     for _, r in ipairs(O.Decode(s)) do t[#t + 1] = (r[2] * (qty or 1)) .. "× " .. Name(r[1]) end
     return table.concat(t, ", ")
@@ -369,7 +473,7 @@ local function PaintOrder(c, o, side)
         if fee > 0 then parts[#parts + 1] = string.format(L("argent %s / %s"), Money(math.min(money, fee)), Money(fee)); if money < fee then all = false end end
         if #parts > 0 then lines[#lines + 1] = string.format(L("Reçu : %s"), all and L("tout est arrivé") or table.concat(parts, ", ")) end
     end
-    if o.reason then lines[#lines + 1] = S.Hex(C.danger) .. o.reason .. "|r" end
+    if o.reason then lines[#lines + 1] = S.Hex(C.danger) .. L(o.reason) .. "|r" end
     if o.note and o.note ~= "" then lines[#lines + 1] = "« " .. o.note .. " »" end
     c.detail:SetText(table.concat(lines, "\n"))
     -- buttons by side and status
@@ -419,7 +523,7 @@ function WP.AskDecline(o)
         local y = -48
         for _, r in ipairs({ "Commission trop basse", "Pas les composants", "Pas le temps", "Recharge en cours", "Autre" }) do
             local b = S.Button(declineMenu, L(r), 272, 28, "secondary", function()
-                if declineMenu.order then O.Decline(declineMenu.order, L(r)) end
+                if declineMenu.order then O.Decline(declineMenu.order, r) end
                 declineMenu:Hide()
             end)
             b:SetPoint("TOP", 0, y); y = y - 32
@@ -449,7 +553,13 @@ local function Build()
         pages[k] = p
     end
     BuildFind(pages.find); BuildNew(pages.new); BuildOrders(pages.mine, "mine"); BuildOrders(pages.recv, "recv")
-    win:SetScript("OnShow", function() if O.AskRecipes then O.AskRecipes() end; WP.RefreshOrders() end)
+    win:SetScript("OnShow", function()
+        -- warm the item cache so the search can match names the client has not seen yet
+        if C_Item and C_Item.RequestLoadItemDataByID then
+            for id in pairs(O.Catalog()) do if id > 0 then pcall(C_Item.RequestLoadItemDataByID, id) end end
+        end
+        if O.AskRecipes then O.AskRecipes() end; WP.RefreshOrders()
+    end)
 end
 
 function WP.ShowOrdersTab(k)
@@ -478,6 +588,16 @@ function WP.ToggleOrders()
     if not win then Build() end
     WP.ShowOrdersTab(current == "new" and "find" or current)
 end
+
+-- item names arriving from the server: redraw once (names and search results were "item:N")
+local itemEv, itemPend = CreateFrame("Frame"), false
+pcall(itemEv.RegisterEvent, itemEv, "GET_ITEM_INFO_RECEIVED")
+itemEv:SetScript("OnEvent", function()
+    if win and win:IsShown() and not itemPend then
+        itemPend = true
+        C_Timer.After(0.3, function() itemPend = false; WP.RefreshOrders() end)
+    end
+end)
 
 -- ---------------------------------------------------------------- beside the mailbox
 local panel

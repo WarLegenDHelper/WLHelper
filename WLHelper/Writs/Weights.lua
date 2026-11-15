@@ -318,23 +318,29 @@ function W.Gain(link)
     local _, _, equipLoc = Info(link)
     local slots = SLOTS[equipLoc]
     if equipLoc == "INVTYPE_WEAPON" and DUAL[Class()] and UnitLevel("player") >= DUAL[Class()] then slots = { 16, 17 } end
+    -- a two-hander in the main hand blocks the off hand: slot 17 is not an empty slot then
+    local mh = Equipped(16)
+    local mhLoc = mh and select(3, Info(mh))
+    local twoHanded = mhLoc == "INVTYPE_2HWEAPON"
     local bestGain, bestSlot
     for _, slot in ipairs(slots) do
-        local new = W.Score(link, slot, spec)
-        local cur = Equipped(slot)
-        local old
-        if equipLoc == "INVTYPE_2HWEAPON" then
-            old = (cur and W.Score(cur, 16, spec) or 0) + (Equipped(17) and W.Score(Equipped(17), 17, spec) or 0)
-        else
-            old = cur and W.Score(cur, slot, spec) or 0
+        if not (slot == 17 and twoHanded) then
+            local new = W.Score(link, slot, spec)
+            local cur = Equipped(slot)
+            local old
+            if equipLoc == "INVTYPE_2HWEAPON" then
+                old = (cur and W.Score(cur, 16, spec) or 0) + (Equipped(17) and W.Score(Equipped(17), 17, spec) or 0)
+            else
+                old = cur and W.Score(cur, slot, spec) or 0
+            end
+            if cur and cur == link then return nil end
+            local g
+            if new <= 0 then g = nil
+            elseif not cur and old == 0 then g = "empty"
+            elseif old > 0 then g = (new - old) / old * 100 end
+            if g == "empty" then return "empty", slot end
+            if g and (not bestGain or g > bestGain) then bestGain, bestSlot = g, slot end
         end
-        if cur and cur == link then return nil end
-        local g
-        if new <= 0 then g = nil
-        elseif not cur and old == 0 then g = "empty"
-        elseif old > 0 then g = (new - old) / old * 100 end
-        if g == "empty" then return "empty", slot end
-        if g and (not bestGain or g > bestGain) then bestGain, bestSlot = g, slot end
     end
     return bestGain, bestSlot
 end

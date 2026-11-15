@@ -116,11 +116,14 @@ function ns.Chip(parent)
   c.text = ns.Text(c, 10, T.text, true); c.text:SetPoint("LEFT", 7, 0); c.text:SetWordWrap(false); c.text:SetJustifyV("MIDDLE")
   return c
 end
-function ns.SetChip(c, label, col)
+-- maxW (optional): the chip never gets wider; the text then ends in "..."
+function ns.SetChip(c, label, col, maxW)
   if not label then c:Hide() return end
   c.text:SetText(label); c.text:SetTextColor(col[1], col[2], col[3])
   c.bg:SetColorTexture(col[1], col[2], col[3], 0.14); c.edge:SetColorTexture(col[1], col[2], col[3], 1)
-  c:SetWidth(c.text:GetStringWidth() + 14); c:Show()
+  local w = c.text:GetStringWidth()
+  if maxW and w + 14 > maxW then w = math.max(0, maxW - 14); c.text:SetWidth(w) else c.text:SetWidth(w + 1) end
+  c:SetWidth(w + 14); c:Show()
 end
 
 -- icône officielle de classe en texte (|T...|t), pour les puces et les lignes

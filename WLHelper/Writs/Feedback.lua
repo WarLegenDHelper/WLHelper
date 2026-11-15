@@ -70,7 +70,15 @@ local function Link(kind)
 end
 
 local win
-local W, PAD = 460, 16
+
+-- the chosen form's button in the brand colour, the others dim (S.Button resets it on mouse-out)
+local function Recolor(bt)
+    if not (bt and bt.label and win) then return end
+    local c = bt.kind == win.kind and (C.brandSoft or C.brand) or C.dim
+    bt.label:SetTextColor(c[1], c[2], c[3])
+end
+
+local W, PAD = 520, 16   -- the three form buttons are 150 px: "Quête ou donnée fausse" fits
 
 -- A numbered step: the number in the brand colour, the text beside it.
 local function Step(parent, n, text, y)
@@ -98,6 +106,8 @@ local function Build()
     for i, kind in ipairs(ORDER) do
         local bt = S.Button(win, L(FORMS[kind].label), w, 30, "secondary", function() WP.Feedback(kind) end)
         bt:SetPoint("TOPLEFT", PAD + 22 + (i - 1) * (w + 8), y)
+        bt.kind = kind
+        bt:HookScript("OnLeave", Recolor)
         win.buttons[kind] = bt
     end
     y = y - 30 - 18
@@ -140,10 +150,8 @@ function WP.Feedback(kind)
     if not win then Build() end
     kind = FORMS[kind] and kind or "idea"
     win.link = Link(kind)
-    for k, bt in pairs(win.buttons) do
-        local c = k == kind and (C.brandSoft or C.brand) or C.dim
-        if bt.label then bt.label:SetTextColor(c[1], c[2], c[3]) end
-    end
+    win.kind = kind
+    for _, bt in pairs(win.buttons) do Recolor(bt) end
     win:Show()
     win.box:SetText(win.link)
     win.box:SetCursorPosition(0)   -- the start of the link shows, not its tail

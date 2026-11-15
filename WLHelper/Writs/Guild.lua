@@ -80,7 +80,17 @@ if Register then pcall(Register, PREFIX) end
 local function Me() return (UnitName("player")) end
 -- "Name-Realm" or "Name Realm": the name alone
 local function Short(n) return n and (n:gsub("[%- ].*$", "")) end
-local function Week() return date("%Y-%W") end
+-- The week follows the server's weekly reset (like the game's weekly kill counter), not the calendar.
+-- The key is the date the current week started: the same on every client, the reset is server-wide.
+local function Week()
+    local ok, secs = false, nil
+    if C_DateAndTime and C_DateAndTime.GetSecondsUntilWeeklyReset then ok, secs = pcall(C_DateAndTime.GetSecondsUntilWeeklyReset) end
+    if ok and type(secs) == "number" and secs > 0 then
+        local now = GetServerTime and GetServerTime() or time()
+        return date("%Y-%m-%d", now + secs - 7 * 86400)
+    end
+    return date("%Y-%W")
+end
 local function Season() return date("%Y-%m") end
 local function On() return WP.ModuleOn("guild") end
 
@@ -123,9 +133,37 @@ local function Numbers()
     return hk, week, season
 end
 
+-- The saved data of the current guild (WLWritsDB is account-wide: alts can be in other guilds).
+-- No guild (or the game does not know it yet, a few seconds after login): a throwaway table.
+local function GuildSlot(tbl)
+    local g = GetGuildInfo and GetGuildInfo("player")
+    if not g then return {}, false end
+    local k = g .. "-" .. (GetRealmName and GetRealmName() or "")
+    WLWritsDB[tbl] = WLWritsDB[tbl] or {}
+    local s = WLWritsDB[tbl]
+    s[k] = s[k] or {}
+    return s[k], true
+end
+
 local function Board()
-    WLWritsDB.guild = WLWritsDB.guild or {}
-    return WLWritsDB.guild
+    local b, known = GuildSlot("guildBy")
+    -- once: the board saved before it was kept per guild goes to the current guild
+    if known and WLWritsDB.guild then
+        if next(b) == nil then for name, e in pairs(WLWritsDB.guild) do b[name] = e end end
+        WLWritsDB.guild = nil
+    end
+    return b
+end
+
+-- { key = the season last seen, list = { [season] = podium } } of the current guild
+local function Seasons()
+    local sl, known = GuildSlot("guildSeasonsBy")
+    if known and (WLWritsDB.guildSeasons or WLWritsDB.guildSeasonKey) then
+        if next(sl) == nil then sl.key, sl.list = WLWritsDB.guildSeasonKey, WLWritsDB.guildSeasons end
+        WLWritsDB.guildSeasons, WLWritsDB.guildSeasonKey = nil, nil
+    end
+    sl.list = sl.list or {}
+    return sl, known
 end
 
 -- ---------------------------------------------------------------- sharing
@@ -216,23 +254,26 @@ local function Ranking(mode, key)
         if mode == "week" then n = (e.wk == key) and e.w or 0
         elseif mode == "season" then n = (e.sk == key) and e.s or 0
         else n = e.hk or 0 end
-        if (n or 0) > 0 then out[#out + 1] = { name = name, n = n, ow = (mode == "all") and (e.kb or 0) or ((e.wk == Week()) and e.week or 0), lvl = e.lvl } end
+        -- open world: the total for "all", this week's for "week"; no season counter exists, so none for "season"
+        local ow = (mode == "all") and (e.kb or 0) or (mode == "week" and e.wk == Week() and e.week) or 0
+        if (n or 0) > 0 then out[#out + 1] = { name = name, n = n, ow = ow, lvl = e.lvl } end
     end
     table.sort(out, function(a, b) if a.n ~= b.n then return a.n > b.n end return a.name < b.name end)
     return out
 end
 local function ArchiveSeason()
+    local sl, known = Seasons()
+    if not known then return end   -- the guild is not known yet: nothing to archive into
     local cur = Season()
-    local last = WLWritsDB.guildSeasonKey
+    local last = sl.key
     if last and last ~= cur then
-        WLWritsDB.guildSeasons = WLWritsDB.guildSeasons or {}
-        if not WLWritsDB.guildSeasons[last] then
+        if not sl.list[last] then
             local top = {}
             for i, e in ipairs(Ranking("season", last)) do if i <= 3 then top[i] = { e.name, e.n } end end
-            WLWritsDB.guildSeasons[last] = top
+            sl.list[last] = top
         end
     end
-    WLWritsDB.guildSeasonKey = cur
+    sl.key = cur
 end
 
 -- { { name, n, ow, lvl }, ... } best first. mode: "week", "season", "all" (true = week, false = all)
@@ -261,7 +302,7 @@ local function Roster(onlineOnly, filter, sort)
             if hit and (isOnline or not onlineOnly) then
                 local y, m, d, h = 0, 0, 0, 0
                 if not isOnline and GetGuildRosterLastOnline then y, m, d, h = GetGuildRosterLastOnline(i) end
-                local b = WLWritsDB.guild and WLWritsDB.guild[short]
+                local b = Board()[short]
                 out[#out + 1] = { name = short, rank = rank, level = level or 0, zone = zone, online = isOnline and true or false,
                     spec = b and b.spec,
                     class = class, note = note, rankIndex = select(3, GetGuildRosterInfo(i)) or 99,
@@ -382,10 +423,12 @@ local function RankRow(parent)
     r:SetSize(W - 2 * PAD, 34)
     r.bg = S.Solid(r, "BACKGROUND", C.card); r.bg:SetAllPoints()
     r.pos = S.Text(r, 16, C.dim, true); r.pos:SetPoint("LEFT", 10, 0); r.pos:SetWidth(36); r.pos:SetJustifyH("LEFT")
-    r.name = S.Text(r, 14, C.text, true); r.name:SetPoint("LEFT", 50, 0); r.name:SetWidth(200); r.name:SetJustifyH("LEFT")
-    r.n = S.Text(r, 16, C.text, true); r.n:SetPoint("RIGHT", -170, 0); r.n:SetJustifyH("RIGHT")
+    r.name = S.Text(r, 14, C.text, true); r.name:SetPoint("LEFT", 50, 0); r.name:SetWidth(180); r.name:SetJustifyH("LEFT")
+    -- the count leaves room for its unit ("VH") before the open-world slot (170 px on the right)
+    r.n = S.Text(r, 16, C.text, true); r.n:SetPoint("RIGHT", -205, 0); r.n:SetJustifyH("RIGHT")
     r.unit = S.Text(r, 12, C.dim); r.unit:SetPoint("LEFT", r.n, "RIGHT", 5, -1)
     r.ow = S.Text(r, 12, C.muted); r.ow:SetPoint("RIGHT", -10, 0); r.ow:SetJustifyH("RIGHT")
+    r.ow:SetWidth(170); r.ow:SetWordWrap(false)
     return r
 end
 
@@ -411,6 +454,7 @@ local function RenderMembers()
         r.ver = board[m.name] and board[m.name].ver
         r.logo:SetShown(r.addon)
         r.name:ClearAllPoints(); r.name:SetPoint("LEFT", r.addon and 72 or 54, 0)
+        r.name:SetWidth(r.addon and 142 or 160)   -- ends before the zone column (216) either way
         local sp = SpecName(m.class, m.spec)
         r.name:SetText(m.name .. (sp and ("  " .. S.Hex(C.muted) .. sp .. "|r") or ""))
         r.name:SetTextColor(col[1], col[2], col[3], m.online and 1 or 0.55)
@@ -448,7 +492,7 @@ local function RenderPvP()
     ui.none:SetText(mode == "week" and L("Personne n'a encore de victoire cette semaine.")
         or mode == "season" and L("Personne n'a encore de victoire cette saison.") or L("Personne n'a encore de victoire."))
     -- the last season's podium
-    local past, pastKey = WLWritsDB.guildSeasons, nil
+    local past, pastKey = Seasons().list, nil
     for k in pairs(past or {}) do if not pastKey or k > pastKey then pastKey = k end end
     if pastKey and #past[pastKey] > 0 then
         local t = {}
@@ -467,7 +511,8 @@ local function SearchBox(parent, w)
     if font then eb:SetFont(font, size or 13, flags or "") else eb:SetFontObject(ChatFontNormal) end
     eb:SetTextColor(C.text[1], C.text[2], C.text[3]); eb:SetTextInsets(10, 10, 0, 0)
     S.Solid(eb, "BACKGROUND", C.card):SetAllPoints(); S.Border(eb, C.border)
-    local hint = S.Text(eb, 13, C.muted); hint:SetPoint("LEFT", 10, 0); hint:SetText(L("Chercher un nom, une zone, un rang"))
+    local hint = S.Text(eb, 13, C.muted); hint:SetPoint("LEFT", 10, 0); hint:SetPoint("RIGHT", -10, 0)
+    hint:SetJustifyH("LEFT"); hint:SetWordWrap(false); hint:SetText(L("Chercher un nom, une zone, un rang"))
     eb:SetScript("OnTextChanged", function(self) hint:SetShown(self:GetText() == ""); WP.RefreshGuild() end)
     eb:SetScript("OnEscapePressed", function(self) self:SetText(""); self:ClearFocus() end)
     eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
@@ -495,6 +540,8 @@ local function Build()
     local sort = S.Segmented(m, { { "level", L("Niveau") }, { "name", L("Nom") }, { "class", L("Classe") }, { "zone", L("Zone") }, { "rank", L("Rang") } },
         function() return WLWritsDB.guildSort or "level" end, function(v) WLWritsDB.guildSort = v; WP.RefreshGuild() end, 28)
     sort:SetPoint("TOPRIGHT", -PAD, -42)
+    -- the search box takes what the sort control leaves on the row
+    ui.search:SetWidth(math.max(140, W - 2 * PAD - (sort:GetWidth() or 0) - 10))
     ui.zones = S.Text(m, 12, C.dim); ui.zones:SetPoint("TOPLEFT", PAD, -80); ui.zones:SetPoint("RIGHT", -PAD, 0)
     ui.zones:SetJustifyH("LEFT"); ui.zones:SetWordWrap(false)
     ui.members = List(m, -100, PAD, MemberRow, 30)

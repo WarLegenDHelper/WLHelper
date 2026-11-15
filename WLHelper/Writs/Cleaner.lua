@@ -547,8 +547,8 @@ local function Build()
         destroy:SetEnabled(n > 0)
         -- only greyed items: nothing to tick, say it instead of "tick what you want"
         local any = false
-        for _ in ipairs(entries) do any = true end
-        if not any and #entries > 0 then destroy.label:SetText(L("Rien que l'addon puisse détruire")) end
+        for _, e in ipairs(entries) do if not e.manual then any = true end end
+        if n == 0 and not any and #entries > 0 then destroy.label:SetText(L("Rien que l'addon puisse détruire")) end
         destroy.Paint(false)
     end
 

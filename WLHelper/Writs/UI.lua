@@ -13,6 +13,8 @@ local L = ns.L
 local S = ns.S
 local C = S.C
 
+ns.AddEnglish({ ["nouveaux writs dans %d min"] = "new writs in %d min" })
+
 local W, H, PAD = 400, 600, 14
 local frame, tabs, pages = nil, nil, {}
 local data, plan, shop, shopTotal = {}, {}, {}, 0
@@ -162,7 +164,7 @@ local function MakeZoneCard(parent)
         r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         r.name = S.Text(r, 14, C.text)
         r.name:SetPoint("LEFT", r.icon, "RIGHT", 8, 0)
-        r.name:SetWidth(200)
+        r.name:SetWidth(164)   -- set again per row: up to the envelope button or the right text
         r.right = S.Text(r, 13, C.dim)
         r.right:SetPoint("RIGHT", -10, 0)
         r.right:SetJustifyH("RIGHT")
@@ -267,7 +269,7 @@ local function RenderToday()
         today.barPending:SetWidth(math.max(0.01, barW * pend))
         today.standing:SetText(string.format("%s / %s", BreakUpLargeNumbers and BreakUpLargeNumbers(inStanding) or inStanding, BreakUpLargeNumbers and BreakUpLargeNumbers(size) or size))
         if not need or need <= 0 then
-            today.hero:SetText(string.format(L("%s atteint"), WP.Reaction(reaction)))
+            today.hero:SetText(string.format(L("%s atteint"), WP.Reaction(goal or reaction)))
             today.message:SetText(L("Choisis un objectif plus haut dans les options du Comptoir."))
         else
             today.hero:SetText(string.format(L("%s dans %d rép"), WP.Reaction(goal), need))
@@ -285,7 +287,11 @@ local function RenderToday()
         end
     end
     local secs = WP.SecondsToReset()
-    today.reset:SetText(string.format(L("nouveaux writs dans %d h"), math.floor(secs / 3600)))
+    if secs < 3600 then
+        today.reset:SetText(string.format(L("nouveaux writs dans %d min"), math.max(1, math.floor(secs / 60))))
+    else
+        today.reset:SetText(string.format(L("nouveaux writs dans %d h"), math.floor(secs / 3600)))
+    end
 
     -- Cards: writs you hold, by zone, closest first is not known cheaply: biggest first.
     local zones, order, later = {}, {}, 0
@@ -306,6 +312,7 @@ local function RenderToday()
     for i, z in ipairs(order) do
         local c = today.cards.Get(i)
         c:ClearAllPoints(); c:SetPoint("TOPLEFT", 0, -y)
+        c.name:SetWidth(0)   -- back to the text's own width before measuring it
         c.name:SetText(z.name)
         local lo = WP.ZoneMin(z.map)
         if lo then
@@ -319,6 +326,9 @@ local function RenderToday()
         c.first = z.rows[1].w
         local mins = minutes[i]
         c.eta:SetText(mins and string.format(L("~%d min"), mins) or "")
+        -- a long zone name stops before the level badge and "~N min" (left of the 70 px button)
+        local room = (W - 2 * PAD) - 12 - 84 - c.eta:GetStringWidth() - 8 - (c.level:IsShown() and (c.level:GetWidth() + 8) or 0)
+        c.name:SetWidth(math.max(40, math.min(c.name:GetStringWidth() + 2, room)))
         local ry = 40
         for j, r in ipairs(z.rows) do
             local row = c.rows.Get(j)
@@ -340,6 +350,9 @@ local function RenderToday()
                 row.status:SetTexture(ICON_WARN); row.status:SetVertexColor(1, 1, 1)
                 row.right:SetText(L("objet manquant")); SetColor(row.right, C.warn)
             end
+            -- the name stops before the envelope button (132 px + gaps) or the right text
+            local rowW = W - 2 * PAD - 2
+            row.name:SetWidth(row.envItem and (rowW - 60 - 146) or math.max(60, rowW - 60 - 10 - row.right:GetStringWidth() - 8))
             row.tip = { WP.ItemName(w.writ, w.writName), string.format(L("%d rép · %s %.0f, %.0f"), w.rep, z.name, w.x, w.y),
                 w.npcName and string.format(L("À rendre à %s"), w.npcName) or L("lieu de remise sur la carte"), { L("Clic : GPS jusqu'au PNJ"), 0.6, 0.6, 0.6 } }
             ry = ry + 34
@@ -396,11 +409,12 @@ local function BuildShop(p)
         r.icon = r:CreateTexture(nil, "ARTWORK")
         r.icon:SetSize(18, 18); r.icon:SetPoint("LEFT", 12, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         r.name = S.Text(r, 14, C.text)
-        r.name:SetPoint("LEFT", r.icon, "RIGHT", 10, 0)
-        r.name:SetWidth(230)
         r.price = S.Text(r, 13, C.text)
         r.price:SetPoint("RIGHT", -12, 0)
+        r.price:SetWidth(120)   -- stable, so the name truncates at the same place on every row
         r.price:SetJustifyH("RIGHT")
+        r.name:SetPoint("LEFT", r.icon, "RIGHT", 10, 0)
+        r.name:SetPoint("RIGHT", r.price, "LEFT", -8, 0)
         r:SetScript("OnClick", function(self)
             local e = self.entry
             if not e then return end
@@ -579,15 +593,17 @@ local function BuildAll(p)
             if x and x.state ~= "done" then WP.SetPicked(x.w, not WP.IsPicked(x.w)) end
         end)
         r.icon:SetSize(20, 20); r.icon:SetPoint("LEFT", 30, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        r.name = S.Text(r, 14, C.text)
-        r.name:SetPoint("TOPLEFT", 58, -7)
-        r.name:SetWidth(260)
-        r.sub = S.Text(r, 12, C.dim)
-        r.sub:SetPoint("TOPLEFT", 58, -26)
-        r.sub:SetWidth(260)
         r.cost = S.Text(r, 13, C.text)
         r.cost:SetPoint("RIGHT", -6, 0)
+        r.cost:SetWidth(80)
         r.cost:SetJustifyH("RIGHT")
+        -- name and sub stop before the cost column
+        r.name = S.Text(r, 14, C.text)
+        r.name:SetPoint("TOPLEFT", 58, -7)
+        r.name:SetPoint("RIGHT", r.cost, "LEFT", -8, 0)
+        r.sub = S.Text(r, 12, C.dim)
+        r.sub:SetPoint("TOPLEFT", 58, -26)
+        r.sub:SetPoint("RIGHT", r.cost, "LEFT", -8, 0)
         r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         r:SetScript("OnClick", function(self, button)
             local x = self.row

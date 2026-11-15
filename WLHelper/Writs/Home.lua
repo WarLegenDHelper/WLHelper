@@ -21,7 +21,6 @@ ns.AddEnglish({
     ["Rien à rendre pour l'instant"] = "Nothing to hand in yet",
     ["Faction pas encore vue"] = "Faction not seen yet",
     ["Sacs"] = "Bags",
-    ["%d objets de quête qui ne servent plus"] = "%d quest items you no longer need",
     ["Rien à jeter"] = "Nothing to throw away",
     ["vers %s"] = "to %s",
     ["Arrêter"] = "Stop",
@@ -37,7 +36,6 @@ ns.AddEnglish({
     ["aucun"] = "none",
     ["Maintenant : "] = "Now: ",
     ["%d commandes à accepter"] = "%d orders to accept",
-    ["Faire fabriquer par un artisan de la guilde"] = "Have a guild crafter make it",
     ["%d de tes commandes en cours"] = "%d of your orders running",
     ["terminé"] = "done",
     ["Route terminée"] = "Route finished",
@@ -49,6 +47,11 @@ ns.AddEnglish({
     ["mis de côté"] = "set aside",
     ["Clic droit : ne pas le faire"] = "Right-click: skip it",
     ["Clic droit : le remettre dans le plan"] = "Right-click: back in the plan",
+    ["%d objets de quête à jeter"] = "%d quest items to drop",
+    ["Commander à la guilde"] = "Order from the guild",
+    ["%d améliorations en sac"] = "%d upgrades in your bags",
+    ["Tu es %de cette semaine"] = "You are #%d this week",
+    ["Réglages : spé et poids"] = "Settings: spec, weights",
 })
 
 local W, PAD, CARD_H, TILE_H = 440, 14, 72, 84
@@ -133,7 +136,9 @@ local function Card(parent, y, icon, tint, onClick, col)
     c.line2:SetPoint("RIGHT", c, "RIGHT", -40, 0); c.line2:SetJustifyH("LEFT"); c.line2:SetWordWrap(false)
     c.bar = CreateFrame("Frame", nil, c)
     c.bar:SetHeight(4)
-    c.bar:SetPoint("TOPLEFT", c.line2, "BOTTOMLEFT", 0, -6); c.bar:SetPoint("RIGHT", c, "RIGHT", -110, 0)
+    if c.tile then
+        c.bar:SetPoint("TOPLEFT", c.line2, "BOTTOMLEFT", 0, -6); c.bar:SetPoint("RIGHT", c, "RIGHT", -110, 0)
+    end
     S.Solid(c.bar, "BACKGROUND", C.divider):SetAllPoints()
     c.fill = S.Solid(c.bar, "ARTWORK", C.brand)
     c.fill:SetPoint("TOPLEFT"); c.fill:SetPoint("BOTTOMLEFT")
@@ -147,19 +152,29 @@ local function Card(parent, y, icon, tint, onClick, col)
         if c.off then WP.SetModule(c.key, true) else onClick() end
     end)
     c.action:SetPoint("RIGHT", -12, 0)
+    if not c.tile then
+        -- the full card's bar sits under its button: under line2 it would fall below the card
+        c.bar:SetPoint("TOPLEFT", c.action, "BOTTOMLEFT", 0, -6); c.bar:SetPoint("TOPRIGHT", c.action, "BOTTOMRIGHT", 0, -6)
+    end
     c.chev = S.Text(c, 18, C.muted, true)
     c.chev:SetPoint("RIGHT", -14, 0); c.chev:SetText(">")
     if c.tile then
-        c.action:SetSize(70, 22); c.action:ClearAllPoints(); c.action:SetPoint("TOPRIGHT", -8, -10)
+        c.action:SetSize(70, 22); c.action:ClearAllPoints(); c.action:SetPoint("BOTTOMRIGHT", -8, 8)
         c.chev:ClearAllPoints(); c.chev:SetPoint("TOPRIGHT", -10, -14)
     end
     c:SetScript("OnClick", Click)
+    -- a switched-off card: its line is cut short, the whole module hint shows on hover
+    c:SetScript("OnEnter", function(self)
+        if self.off and self.hintFull and self.hintFull ~= "" then S.Tip(self, { self.title:GetText() or "", self.hintFull }) end
+    end)
+    c:SetScript("OnLeave", S.HideTip)
     -- with a button on the right, the text stops before it
     function c:Narrow(on)
         if self.tile then
-            -- a tile: the "on" button sits on the title line; the title stops before it
-            self.title:SetPoint("RIGHT", self, "RIGHT", on and -84 or -26, 0)
-            self.line1:SetPoint("RIGHT", self, "RIGHT", -8, 0); self.line2:SetPoint("RIGHT", self, "RIGHT", -8, 0)
+            -- a tile: the "on" button sits at the bottom right; the title keeps its width and
+            -- line1 stops before the button
+            self.title:SetPoint("RIGHT", self, "RIGHT", -26, 0)
+            self.line1:SetPoint("RIGHT", self, "RIGHT", on and -84 or -8, 0); self.line2:SetPoint("RIGHT", self, "RIGHT", -8, 0)
             return
         end
         local r = on and -110 or -40
@@ -325,7 +340,7 @@ function WP.RefreshHome()
     local b = cards.bags
     b.title:SetText(L("Sacs")); b.tag:SetText(""); b.bar:Hide(); b.action:Hide(); b.chev:Show(); b.line2:SetText(""); b:Narrow(false)
     local n = BagCount()
-    b.line1:SetText(n > 0 and string.format(L("%d objets de quête qui ne servent plus"), n) or L("Rien à jeter"))
+    b.line1:SetText(n > 0 and string.format(L("%d objets de quête à jeter"), n) or L("Rien à jeter"))
     SetActive(b, false)
 
     -- orders: what waits for you
@@ -336,7 +351,7 @@ function WP.RefreshHome()
         local open, running = 0, 0
         for _, o in ipairs(forMe) do if o.status == "open" then open = open + 1 end end
         for _, o in ipairs(mine) do if o.status == "open" or o.status == "accepted" or o.status == "crafted" then running = running + 1 end end
-        oc.line1:SetText(open > 0 and string.format(L("%d commandes à accepter"), open) or L("Faire fabriquer par un artisan de la guilde"))
+        oc.line1:SetText(open > 0 and string.format(L("%d commandes à accepter"), open) or L("Commander à la guilde"))
         oc.line2:SetText(running > 0 and string.format(L("%d de tes commandes en cours"), running) or "")
         oc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
     end
@@ -350,7 +365,7 @@ function WP.RefreshHome()
         gc.line1:SetText(string.format(L("%d en ligne"), online))
         local pos
         for i, e in ipairs(WP.GuildRanking and WP.GuildRanking(true) or {}) do if e.name == UnitName("player") then pos = i end end
-        gc.line2:SetText(pos and string.format(L("Tu es %de du classement de la semaine"), pos) or L("Classement PvP"))
+        gc.line2:SetText(pos and string.format(L("Tu es %de cette semaine"), pos) or L("Classement PvP"))
     else
         gc.line1:SetText(L("Pas de guilde.")); gc.line2:SetText("")
     end
@@ -387,8 +402,8 @@ function WP.RefreshHome()
                 end
             end
         end
-        uc.line1:SetText(n > 0 and string.format(L("%d objets meilleurs que les tiens dans tes sacs"), n) or L("Rien de mieux dans tes sacs"))
-        uc.line2:SetText(L("Spé, seuil et poids dans les réglages"))
+        uc.line1:SetText(n > 0 and string.format(L("%d améliorations en sac"), n) or L("Rien de mieux dans tes sacs"))
+        uc.line2:SetText(L("Réglages : spé et poids"))
         uc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
     end
 
@@ -401,7 +416,8 @@ function WP.RefreshHome()
         local a = card.off and 0.45 or 1
         card.icon:SetAlpha(a); card.title:SetAlpha(a); card.tag:SetAlpha(a); card.line1:SetAlpha(a); card.line2:SetAlpha(a)
         if card.off then
-            card.tag:SetText(L("éteint")); card.line1:SetText(L(hints[key] or ""))
+            card.hintFull = L(hints[key] or "")
+            card.tag:SetText(L("éteint")); card.line1:SetText(card.hintFull)
             card.line2:SetText(""); card.bar:Hide(); card.chev:Hide()
             card.action.label:SetText(L("Allumer")); card.action:Show(); card:Narrow(true)
             SetActive(card, false)
@@ -507,9 +523,9 @@ function WP.MinimapMenu(owner)
     if menu:IsShown() then menu:Hide(); return end
     menu.owner = owner; menu.away = 0
     menu.buttons.gps:SetEnabled(WP.GPS.Active())
-    for _, k in ipairs({ "dungeons", "writs", "bags", "orders" }) do
-        local b = menu.buttons[k]
-        if b then b.label:SetAlpha(WP.ModuleOn(k) and 1 or 0.45) end
+    for _, m in ipairs(WP.MODULES) do
+        local b = menu.buttons[m.key]
+        if b then b.label:SetAlpha(WP.ModuleOn(m.key) and 1 or 0.45) end
     end
     menu:ClearAllPoints()
     menu:SetPoint("TOPRIGHT", owner, "BOTTOMLEFT", 4, 4)

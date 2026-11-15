@@ -104,6 +104,11 @@ local function GuideOn()
 end
 ns.GuideOn = GuideOn
 ev:SetScript("OnEvent", function(_, e)
+  -- module switched off in combat: the deferred action-bar update still has to hide the bar
+  if e == "PLAYER_REGEN_ENABLED" and not GuideOn() then
+    if ns.ActionBarPending and ns.ActionBarPending() and ns.UpdateActionBar then ns.UpdateActionBar() end
+    return
+  end
   if e ~= "PLAYER_LOGIN" and not GuideOn() then return end
   if e == "PLAYER_LOGIN" then
     DB()
@@ -215,7 +220,7 @@ end
 BINDING_HEADER_WLDT = "|cffce1918WL|r Helper"
 BINDING_NAME_WLDT_TOGGLE = ns.L.B_TOGGLE
 BINDING_NAME_WLDT_PICK = ns.L.B_PICK
-BINDING_NAME_WLDT_NEXT = ns.L.B_NEXT
+BINDING_NAME_WLDT_NEXT = ns.L.B_NEXTSTEP
 BINDING_NAME_WLDT_PREV = ns.L.B_PREV
 BINDING_NAME_WLDT_POINTS = ns.L.B_POINTS
 BINDING_NAME_WLDT_ARROW = ns.L.B_ARROW

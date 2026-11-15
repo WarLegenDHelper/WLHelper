@@ -59,6 +59,7 @@ ns.AddEnglish({
     ["%d objets meilleurs que les tiens dans tes sacs"] = "%d items in your bags better than yours",
     ["Rien de mieux dans tes sacs"] = "Nothing better in your bags",
     ["Spé, seuil et poids dans les réglages"] = "Spec, threshold and weights in the settings",
+    ["Les autres seront invités dès que le groupe passe en raid."] = "The others will be invited as soon as the group becomes a raid.",
 })
 
 local PREFIX = "WLHevt"
@@ -70,7 +71,20 @@ if Register then pcall(Register, PREFIX) end
 local function Me() return (UnitName("player")) end
 local function Short(n) return n and (n:gsub("[%- ].*$", "")) end
 local function On() return WP.ModuleOn("events") end
-local function Clean(s, max) s = tostring(s or ""):gsub("[|~\n]", " "); if max and #s > max then s = s:sub(1, max) end; return s end
+-- max is in bytes; the cut moves back to a character boundary so French letters are never split
+local function Clean(s, max)
+    s = tostring(s or ""):gsub("[|~\n]", " ")
+    if max and #s > max then
+        local cut = max
+        while cut > 0 do
+            local b = s:byte(cut + 1)
+            if not b or b < 128 or b >= 192 then break end   -- not a UTF-8 continuation byte
+            cut = cut - 1
+        end
+        s = s:sub(1, cut)
+    end
+    return s
+end
 local ROLES = { "tank", "heal", "dps" }
 local ROLE_LABEL = { tank = "Tank", heal = "Soins", dps = "DPS" }
 -- the game's role icons (64 x 64 sheet): shield, cross, sword
@@ -84,9 +98,25 @@ local function RoleIcon(role, size)
 end
 local function RoleText(role, size) return RoleIcon(role, size) .. " " .. L(ROLE_LABEL[role] or "?") end
 
+-- The saved data of the current guild (WLWritsDB is account-wide: alts can be in other guilds).
+-- No guild (or the game does not know it yet, a few seconds after login): a throwaway table.
+local function GuildSlot(tbl)
+    local g = GetGuildInfo and GetGuildInfo("player")
+    if not g then return {}, false end
+    local k = g .. "-" .. (GetRealmName and GetRealmName() or "")
+    WLWritsDB[tbl] = WLWritsDB[tbl] or {}
+    local s = WLWritsDB[tbl]
+    s[k] = s[k] or {}
+    return s[k], true
+end
+
 local function DB()
-    WLWritsDB.events = WLWritsDB.events or {}
-    local d = WLWritsDB.events
+    local d, known = GuildSlot("eventsBy")
+    -- once: the events saved before they were kept per guild go to the current guild
+    if known and WLWritsDB.events then
+        if next(d) == nil then for k, v in pairs(WLWritsDB.events) do d[k] = v end end
+        WLWritsDB.events = nil
+    end
     d.list, d.lfg, d.reminded = d.list or {}, d.lfg or {}, d.reminded or {}
     return d
 end
@@ -131,7 +161,12 @@ local function SignupMsg(id, name, s) return table.concat({ "J", id, s.role or "
 -- ---------------------------------------------------------------- the data
 local function Prune()
     local d, now = DB(), time()
-    for id, e in pairs(d.list) do if (e.when or 0) < now - 6 * 3600 then d.list[id] = nil; d.reminded[id] = nil end end
+    for id, e in pairs(d.list) do
+        -- a stub holds signups that came before their event: an hour to get the event, then gone
+        local old
+        if e.stub then old = e.stub < now - 3600 else old = (e.when or 0) < now - 6 * 3600 end
+        if old then d.list[id] = nil; d.reminded[id] = nil end
+    end
     for name, l in pairs(d.lfg) do if (l.t or 0) < now - 1800 then d.lfg[name] = nil end end
 end
 
@@ -139,7 +174,7 @@ end
 function WP.EventList()
     Prune()
     local out = {}
-    for _, e in pairs(DB().list) do out[#out + 1] = e end
+    for _, e in pairs(DB().list) do if e.when then out[#out + 1] = e end end
     table.sort(out, function(a, b) return (a.when or 0) < (b.when or 0) end)
     return out
 end
@@ -187,14 +222,45 @@ local function InviteName(name)
     local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
     if invite then pcall(invite, name) end
 end
+-- A party holds 5 (pending invites count), and only a real group can become a raid: the first ones
+-- fill the free party places, the rest wait until the group is converted to a raid (60 s at most).
+local pendingInvites, inviteTicker = {}, nil
+local function InviteLater(names)
+    for _, n in ipairs(names) do pendingInvites[#pendingInvites + 1] = n end
+    if inviteTicker or not C_Timer.NewTicker then return end
+    local tries = 0
+    inviteTicker = C_Timer.NewTicker(1, function()
+        tries = tries + 1
+        if IsInRaid() then
+            local rest = pendingInvites
+            pendingInvites = {}
+            for i, name in ipairs(rest) do C_Timer.After(0.2 * i, function() InviteName(name) end) end
+            inviteTicker:Cancel(); inviteTicker = nil
+        elseif tries >= 60 then
+            pendingInvites = {}
+            inviteTicker:Cancel(); inviteTicker = nil
+        elseif IsInGroup() and UnitIsGroupLeader and UnitIsGroupLeader("player") then
+            local convert = (C_PartyInfo and C_PartyInfo.ConvertToRaid) or ConvertToRaid
+            if convert then pcall(convert) end
+        end
+    end)
+end
 function WP.InviteSignups(e)
     local names = {}
     for name in pairs(e.signups or {}) do if name ~= Me() then names[#names + 1] = name end end
-    if #names >= 5 and not IsInRaid() then
-        local convert = (C_PartyInfo and C_PartyInfo.ConvertToRaid) or ConvertToRaid
-        if convert and IsInGroup() then pcall(convert) end
+    local now, later = names, {}
+    if not IsInRaid() then
+        local free = math.max(0, 4 - (GetNumSubgroupMembers and GetNumSubgroupMembers() or 0))
+        if #names > free then
+            now, later = {}, {}
+            for i, name in ipairs(names) do if i <= free then now[#now + 1] = name else later[#later + 1] = name end end
+        end
     end
-    for i, name in ipairs(names) do C_Timer.After(0.2 * i, function() InviteName(name) end) end
+    for i, name in ipairs(now) do C_Timer.After(0.2 * i, function() InviteName(name) end) end
+    if #later > 0 then
+        WP.Print(L("Les autres seront invités dès que le groupe passe en raid."))
+        InviteLater(later)
+    end
 end
 
 function WP.SetLooking(role, what)
@@ -219,10 +285,11 @@ local function OnMessage(msg, sender)
         local id, by, when, tank, heal, dps, status, title, note = msg:match("^E|([^|]+)|([^|]+)|(%d+)|(%d+)|(%d+)|(%d+)|(%a+)|([^|]*)|?(.*)$")
         if not id or Short(by) ~= sender then return end
         local cur = d.list[id]
-        local isNew = not cur
+        local isNew = not cur or cur.stub ~= nil
         cur = cur or { signups = {} }
         cur.id, cur.by, cur.when, cur.tank, cur.heal, cur.dps = id, sender, tonumber(when), tonumber(tank), tonumber(heal), tonumber(dps)
         cur.status, cur.title, cur.note = status, title, note
+        cur.stub = nil   -- signups that came first are kept
         d.list[id] = cur
         if isNew and status == "open" and cur.when > time() and On() then
             WP.Print(string.format(L("Nouvel événement : %s, %s (par %s). /wlh events"), cur.title, When(cur.when), sender))
@@ -231,7 +298,9 @@ local function OnMessage(msg, sender)
     elseif kind == "J" then
         local id, role, cls, lvl, name = msg:match("^J|([^|]+)|(%a+)|(%u*)|(%d+)|([^|]+)$")
         local e = id and d.list[id]
-        if not e or Short(name) ~= sender then return end
+        if not id or Short(name) ~= sender then return end
+        -- the event itself may come a little later (each copy sends one line a second): keep the signup
+        if not e then e = { id = id, signups = {}, stub = time() }; d.list[id] = e end
         e.signups = e.signups or {}
         if role == "x" then e.signups[sender] = nil
         else e.signups[sender] = { role = role, cls = cls, lvl = tonumber(lvl), t = time() } end
@@ -245,9 +314,11 @@ local function OnMessage(msg, sender)
     elseif kind == "Q" then
         -- someone logged in: what I organize, what I signed up for, whether I'm looking
         for _, e in pairs(d.list) do
-            if e.by == Me() and (e.when or 0) > time() - 3600 then Send(EventMsg(e)) end
-            local s = e.signups and e.signups[Me()]
-            if s and (e.when or 0) > time() then Send(SignupMsg(e.id, Me(), s)) end
+            if e.when then
+                if e.by == Me() and e.when > time() - 3600 then Send(EventMsg(e)) end
+                local s = e.signups and e.signups[Me()]
+                if s and e.when > time() then Send(SignupMsg(e.id, Me(), s)) end
+            end
         end
         local l = d.lfg[Me()]
         if l then Send(table.concat({ "N", l.role, l.cls or "", l.lvl or 0, l.what or "" }, "|")) end
@@ -260,7 +331,7 @@ local function Remind()
     local d, now = DB(), time()
     for id, e in pairs(d.list) do
         local mine = e.by == Me() or (e.signups and e.signups[Me()])
-        if mine and e.status == "open" then
+        if e.when and mine and e.status == "open" then
             local left = (e.when or 0) - now
             local r = d.reminded[id] or 0
             if left <= 900 and left > 0 and r < 1 then
@@ -368,18 +439,21 @@ local function PaintEvent(c, e)
     c.who:SetText(#t > 0 and table.concat(t, ", ") or "")
     c.note:SetText(e.note or "")
     -- buttons: sign up with a role / step out; the organizer invites or cancels
+    -- the organizer's own sign-up buttons go on a second row, above Invite / Cancel
     local mine = WP.MySignup(e)
+    local organizer = e.by == Me() and not cancelled
     local x, y = 12, 10
+    local rowY = organizer and 44 or 10
     for _, b in ipairs(c.btns) do
         b:SetShown(not cancelled and not mine)
-        b:ClearAllPoints(); b:SetPoint("BOTTOMLEFT", x, y); x = x + 90
+        b:ClearAllPoints(); b:SetPoint("BOTTOMLEFT", x, rowY); x = x + 92 + 6
     end
-    c.out:SetShown(not cancelled and mine ~= nil); c.out:ClearAllPoints(); c.out:SetPoint("BOTTOMLEFT", 12, y)
-    local organizer = e.by == Me() and not cancelled
+    c.out:SetShown(not cancelled and mine ~= nil); c.out:ClearAllPoints(); c.out:SetPoint("BOTTOMLEFT", 12, rowY)
     c.invite:SetShown(organizer); c.cancel:SetShown(organizer)
     c.cancel:ClearAllPoints(); c.cancel:SetPoint("BOTTOMRIGHT", -12, y)
     c.invite:ClearAllPoints(); c.invite:SetPoint("RIGHT", c.cancel, "LEFT", -8, 0)
     local h = 82 + math.max(0, (c.who:GetStringHeight() or 0)) + ((e.note and e.note ~= "") and ((c.note:GetStringHeight() or 14) + 6) or 0) + 44
+    h = h + (organizer and 34 or 0)
     c:SetHeight(h)
     return h
 end
@@ -390,8 +464,8 @@ local function LookRow(parent)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     r.bg = S.Solid(r, "BACKGROUND", C.card); r.bg:SetAllPoints()
     r.name = S.Text(r, 14, C.text, true); r.name:SetPoint("LEFT", 10, 0); r.name:SetWidth(150); r.name:SetJustifyH("LEFT")
-    r.role = S.Text(r, 12, C.brandSoft, true); r.role:SetPoint("LEFT", 166, 0); r.role:SetWidth(60); r.role:SetJustifyH("LEFT")
-    r.what = S.Text(r, 13, C.text); r.what:SetPoint("LEFT", 230, 0); r.what:SetPoint("RIGHT", -80, 0); r.what:SetJustifyH("LEFT"); r.what:SetWordWrap(false)
+    r.role = S.Text(r, 12, C.brandSoft, true); r.role:SetPoint("LEFT", 166, 0); r.role:SetWidth(78); r.role:SetJustifyH("LEFT")
+    r.what = S.Text(r, 13, C.text); r.what:SetPoint("LEFT", 248, 0); r.what:SetPoint("RIGHT", -80, 0); r.what:SetJustifyH("LEFT"); r.what:SetWordWrap(false)
     r.ago = S.Text(r, 12, C.muted); r.ago:SetPoint("RIGHT", -10, 0)
     r:SetScript("OnClick", function(self, button)
         local who = self.who
@@ -477,7 +551,8 @@ local function BuildCreate(p)
         for _, c in ipairs(inner.items or {}) do c:Hide() end
         inner.items = inner.items or {}
         local list = (draft.kind == "dg" or draft.kind == "raid") and Instances(draft.kind) or {}
-        local cw, ch, cols = math.floor((W - 2 * PAD - 18) / 3), 26, 3
+        -- two columns: the full French names fit (Monastère écarlate : Cathédrale...)
+        local cw, ch, cols = math.floor((W - 2 * PAD - 6) / 2), 26, 2
         for i, e in ipairs(list) do
             local c = inner.items[i]
             if not c then
@@ -485,7 +560,9 @@ local function BuildCreate(p)
                 c:SetSize(cw, ch)
                 c.bg = S.Solid(c, "BACKGROUND", C.card); c.bg:SetAllPoints()
                 c.edge = S.Border(c, C.border)
-                c.t = S.Text(c, 12, C.text); c.t:SetPoint("LEFT", 8, 0); c.t:SetPoint("RIGHT", -6, 0); c.t:SetJustifyH("LEFT"); c.t:SetWordWrap(false)
+                -- the level has its own slot on the right, so a long name is cut before it, never the level
+                c.lv = S.Text(c, 12, C.muted); c.lv:SetPoint("RIGHT", -6, 0); c.lv:SetJustifyH("RIGHT")
+                c.t = S.Text(c, 12, C.text); c.t:SetPoint("LEFT", 8, 0); c.t:SetPoint("RIGHT", c.lv, "LEFT", -4, 0); c.t:SetJustifyH("LEFT"); c.t:SetWordWrap(false)
                 c:SetScript("OnClick", function(self)
                     picked[self.key] = not picked[self.key] or nil
                     ui.title:SetText(PickedTitle())
@@ -495,7 +572,7 @@ local function BuildCreate(p)
             end
             c.key = e[1]
             c:ClearAllPoints(); c:SetPoint("TOPLEFT", ((i - 1) % cols) * (cw + 6), -math.floor((i - 1) / cols) * (ch + 6))
-            c.t:SetText(e[2] .. "  " .. S.Hex(C.muted) .. e[3] .. "|r")
+            c.t:SetText(e[2]); c.lv:SetText(e[3])
             local on = picked[e[1]]
             c.bg:SetColorTexture((on and C.brandBg or C.card)[1], (on and C.brandBg or C.card)[2], (on and C.brandBg or C.card)[3], 1)
             c.edge(on and C.brand or C.border)
