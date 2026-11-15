@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.4] — 2026-11-15
+
+### Modifié / Changed
+- **Le dossier de l'addon s'appelle maintenant `WLHelper`** (avant : `DungeonGuide`), et son titre dans la liste des addons du jeu est « WaR LegenD Helper ». Le jeu range les réglages par nom de dossier : ils repartent de zéro une fois (donjons choisis, points de vol appris, valeur des Coin Pouch, zones mises de côté). Si l'ancien dossier `DungeonGuide` est encore là, l'addon le désactive et te dit de le supprimer.
+  *The addon's folder is now `WLHelper` (it was `DungeonGuide`), titled "WaR LegenD Helper" in the game's addon list. Settings are stored by folder name, so they start over once. If the old folder is still there, the addon turns it off and tells you to delete it.*
+- Icône de l'addon : le logo War Legend.
+  *Addon icon: the War Legend logo.*
+
+### Corrigé / Fixed
+- Le menu du clic droit sur la minimap passait derrière les barres de boutons de minimap (EllesmereUI…) ; le menu « ... » du guide aussi peut passer devant tout.
+  *The minimap right-click menu no longer opens behind minimap button bars; same for the guide's "..." menu.*
+
 ## [1.0.0-beta.3] — 2026-11-15
 
 Une interface rangée : un accueil, un guide allégé, une minimap et des commandes claires.
@@ -115,7 +127,8 @@ Première version de WL Helper (bêta). WL Dungeon Guide devient **WL Helper**.
 WL Dungeon Guide jusqu'à la 3.3 : guide des quêtes de donjon Horde pas à pas (versions partagées
 à la main, avant ce dépôt).
 
-[Unreleased]: https://github.com/NEM3S15/WLHelper/compare/v1.0.0-beta.3...HEAD
+[Unreleased]: https://github.com/NEM3S15/WLHelper/compare/v1.0.0-beta.4...HEAD
+[1.0.0-beta.4]: https://github.com/NEM3S15/WLHelper/compare/v1.0.0-beta.3...v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/NEM3S15/WLHelper/compare/v1.0.0-beta.2...v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/NEM3S15/WLHelper/compare/v1.0.0-beta.1...v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/NEM3S15/WLHelper/releases/tag/v1.0.0-beta.1

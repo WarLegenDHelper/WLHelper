@@ -495,7 +495,7 @@ local function Build()
 
   -- the "..." menu: everything that used to be a row of small buttons
   local menu = CreateFrame("Frame", nil, f)
-  menu:SetSize(230, 10); menu:SetFrameStrata("DIALOG"); menu:SetPoint("BOTTOMRIGHT", f.moreBtn, "TOPRIGHT", 0, 4)
+  menu:SetSize(230, 10); menu:SetFrameStrata("FULLSCREEN_DIALOG"); menu:SetToplevel(true); menu:SetPoint("BOTTOMRIGHT", f.moreBtn, "TOPRIGHT", 0, 4)
   ns.Flat(menu, { 0.08, 0.09, 0.1, 0.98 }, { 1, 1, 1, 0.12 })
   menu:EnableMouse(true); menu:Hide()
   f.menu = menu

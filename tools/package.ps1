@@ -1,22 +1,22 @@
 # Builds the release zip for WowUp / manual installs: dist\WLHelper-<version>.zip with the
-# DungeonGuide folder at its root. With -Sync, first copies the addon from the game's AddOns folder.
+# WLHelper folder at its root. With -Sync, first copies the addon from the game's AddOns folder.
 param(
     [switch]$Sync,
     [string]$AddOns = "G:\World of Warcraft\_forever_\Interface\AddOns"
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
-$addon = Join-Path $repo "DungeonGuide"
+$addon = Join-Path $repo "WLHelper"
 
 if ($Sync) {
-    $src = Join-Path $AddOns "DungeonGuide"
-    if (-not (Test-Path (Join-Path $src "DungeonGuide.toc"))) { throw "Not found: $src" }
+    $src = Join-Path $AddOns "WLHelper"
+    if (-not (Test-Path (Join-Path $src "WLHelper.toc"))) { throw "Not found: $src" }
     Remove-Item -Recurse -Force $addon -Confirm:$false
     Copy-Item -Recurse $src $addon
     Write-Host "Synced from $src"
 }
 
-$toc = Get-Content (Join-Path $addon "DungeonGuide.toc") -Encoding UTF8
+$toc = Get-Content (Join-Path $addon "WLHelper.toc") -Encoding UTF8
 $version = ($toc | Where-Object { $_ -match '^## Version:\s*(.+)$' } | Select-Object -First 1) -replace '^## Version:\s*', ''
 if (-not $version) { throw "No version in the toc" }
 

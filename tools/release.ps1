@@ -13,7 +13,7 @@ Set-Location $repo
 
 & (Join-Path $PSScriptRoot "package.ps1") -Sync:$Sync -AddOns $AddOns
 
-$toc = Get-Content "DungeonGuide\DungeonGuide.toc" -Encoding UTF8
+$toc = Get-Content "WLHelper\WLHelper.toc" -Encoding UTF8
 $version = (($toc | Where-Object { $_ -match '^## Version:' } | Select-Object -First 1) -replace '^## Version:\s*', '').Trim()
 if ($version -notmatch '^\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$') { throw "Version '$version' is not SemVer (X.Y.Z or X.Y.Z-beta.N)" }
 $tag = "v$version"

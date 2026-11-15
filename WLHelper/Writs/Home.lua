@@ -299,7 +299,8 @@ local menu
 function WP.MinimapMenu(owner)
     if not menu then
         menu = CreateFrame("Frame", "WLHelperMinimapMenu", UIParent)
-        menu:SetFrameStrata("DIALOG"); menu:SetClampedToScreen(true); menu:EnableMouse(true)
+        -- above minimap button bars and every window
+        menu:SetFrameStrata("TOOLTIP"); menu:SetFrameLevel(50); menu:SetClampedToScreen(true); menu:EnableMouse(true)
         S.Solid(menu, "BACKGROUND", C.card):SetAllPoints()
         S.Border(menu, C.border)
         tinsert(UISpecialFrames, "WLHelperMinimapMenu")

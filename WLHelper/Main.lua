@@ -110,6 +110,14 @@ ev:SetScript("OnEvent", function(_, e)
     local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
     ns.VERSION = meta and meta(ADDON, "Version") or "?"
     ns.Print("v" .. ns.VERSION .. " " .. L.LOADED)
+    -- the addon's folder was DungeonGuide up to 1.0.0-beta.3: an old copy left next to WLHelper
+    -- would run twice. It is turned off for the next login, with a word on what to do.
+    local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+    local disable = (C_AddOns and C_AddOns.DisableAddOn) or DisableAddOn
+    if ADDON ~= "DungeonGuide" and isLoaded and isLoaded("DungeonGuide") then
+      if disable then pcall(disable, "DungeonGuide") end
+      ns.Print(L.OLD_FOLDER)
+    end
   elseif e == "PLAYER_REGEN_ENABLED" then
     if ns.frame and ns.frame:IsShown() then ns.Refresh()
     else

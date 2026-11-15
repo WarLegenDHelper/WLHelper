@@ -23,7 +23,7 @@
 Les mises à jour arrivent ensuite d'elles-mêmes.
 
 **À la main** : télécharge le zip de la [dernière version](https://github.com/NEM3S15/WLHelper/releases/latest) et
-décompresse-le dans `World of Warcraft\_forever_\Interface\AddOns`. Le dossier `DungeonGuide` doit se trouver
+décompresse-le dans `World of Warcraft\_forever_\Interface\AddOns`. Le dossier `WLHelper` doit se trouver
 directement dans `AddOns`.
 
 ## Ce que fait l'addon
@@ -74,14 +74,15 @@ En jeu, `/wl idee` te donne le lien déjà rempli avec ta version.
 
 ## Bon à savoir
 
-- **Le dossier s'appelle `DungeonGuide`**, le nom d'origine de l'addon. Il reste ainsi pour que tes réglages
-  et ta progression soient gardés à chaque mise à jour.
-- **Versions** : `1.0.0-beta.3` veut dire bêta de la 1.0. Le détail de chaque version est dans le
+- **Le dossier s'appelle `WLHelper`** depuis la 1.0.0-beta.4 (avant : `DungeonGuide`). Si tu avais installé une
+  ancienne version à la main, supprime le dossier `DungeonGuide`. S'il traîne encore, l'addon le
+  désactive tout seul et te le dit.
+- **Versions** : `1.0.0-beta.4` veut dire bêta de la 1.0. Le détail de chaque version est dans le
   [CHANGELOG](CHANGELOG.md).
 
 ## Crédits et licence
 
-Données et idées reprises d'autres projets, tous cités dans [`CREDITS.txt`](DungeonGuide/CREDITS.txt) :
+Données et idées reprises d'autres projets, tous cités dans [`CREDITS.txt`](WLHelper/CREDITS.txt) :
 LibForeverData, RestedXP Guides, Naowh Forever, ForeverDungeonJournal, Wowhead, TradeSkillMaster, wow.gg, Zygor
 (coordonnées seulement). Logo : War Legend Raid Tool.
 
