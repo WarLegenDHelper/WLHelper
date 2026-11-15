@@ -875,7 +875,7 @@ function WP.SetModule(key, on)
     local G = WP.GPS
     if key == "dungeons" then
         if not on then
-            if root.frame and root.frame:IsShown() then root.frame:Hide() end
+            if root.frame and root.frame:IsShown() then root.quietHide = true; root.frame:Hide(); root.quietHide = nil end
             if root.HidePicker then root.HidePicker() end
             if root.ClearPoints then root.ClearPoints() end   -- map points, TomTom and the arrow
             if G then G.Stop("dungeon") end

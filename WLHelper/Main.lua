@@ -111,8 +111,11 @@ ev:SetScript("OnEvent", function(_, e)
       ns.Assemble(false)
       local f = ns.frame
       if WLDTDB.view then f.view = WLDTDB.view end
-      -- the guide never opens by itself at login or /reload: /wl, the home page or the minimap open it
-      if GuideOn() then ns.Refresh(true) end
+      -- at login or /reload the guide comes back only if it was open when you left
+      if GuideOn() then
+        if WLDTDB.hidden == false and ns.route and #ns.route.steps > 0 then f:Show() end
+        ns.Refresh(true)
+      end
     end)
     local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
     ns.VERSION = meta and meta(ADDON, "Version") or "?"

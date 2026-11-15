@@ -94,7 +94,7 @@ ns.AddEnglish({
     ["Sources et remerciements : voir CREDITS.txt dans le dossier de l'addon."] =
         "Sources and thanks: see CREDITS.txt in the addon's folder.",
     ["GitHub"] = "GitHub", ["Clique puis Ctrl+C pour copier"] = "Click, then Ctrl+C to copy",
-    ["Commandes"] = "Commands",
+    ["Commandes du chat"] = "Chat commands",
     ["/wl : ouvre ou ferme le guide des donjons"] = "/wl: open or close the dungeon guide",
     ["/comptoir ou /wl comptoir : fenêtre du Comptoir"] = "/comptoir or /wl trade: the Trading Post window",
     ["/wl gps : lance ou arrête la tournée GPS"] = "/wl gps: start or stop the GPS tour",
@@ -577,7 +577,7 @@ function BUILD.about(p)
     bIdea:ClearAllPoints(); bIdea:SetPoint("RIGHT", bBug, "LEFT", -8, 0)
     CloseSection(p)
 
-    Section(p, L("Commandes"))
+    Section(p, L("Commandes du chat"))
     -- the same list as /wl aide, in the guide's language
     Note(p, root.L and root.L.HELP or "/wl")
 end

@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.13] — 2026-11-15
+
+### Modifié / Changed
+- La fenêtre des donjons revient après un /reload ou une connexion si elle était ouverte quand tu es parti, et reste fermée si tu l'avais fermée.
+  *The dungeon window comes back after /reload or login only if it was open when you left.*
+
+### Corrigé / Fixed
+- En anglais, la carte de l'accueil et le menu de la minimap disaient « Commands » au lieu de « Orders ».
+  *English: the Orders card and minimap entry read "Commands".*
+
 ## [1.0.0-beta.12] — 2026-11-15
 
 ### Corrigé / Fixed
