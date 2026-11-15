@@ -81,6 +81,41 @@ function ns.StartGuide()
   if ns.route then ns.Print(L.ROUTE_BUILT:format(#ns.route.steps, ns.route.label)) end
 end
 
+-- The rest of the route planned again from where you stand when a quest changes state (objectives
+-- done, taken, turned in): a turn-in that is close and opens the next quest comes first instead of
+-- after a detour. Steps already done stay at the top, in their order, so you can still look back.
+local questSig
+local function QuestSig()
+  local log = ns.LogEntries and ns.LogEntries() or {}
+  local t = {}
+  for id, e in pairs(log) do t[#t + 1] = id .. ":" .. tostring(e.complete or e.state or "") end
+  table.sort(t)
+  return table.concat(t, ",")
+end
+function ns.Replan()
+  local db = WLDTDB
+  if db.autoReplan == false or not (db.sel and next(db.sel)) or not ns.route then return end
+  if InCombatLockdown and InCombatLockdown() then return end
+  local _, kind = GetInstanceInfo and GetInstanceInfo()
+  if kind == "party" or kind == "raid" then return end   -- inside, the boss order is the route
+  local f = ns.frame
+  if not f then return end
+  local order, byKey = ns.BuildRoute(db.sel, ns.PlayerWorld())
+  local log = ns.LogEntries()
+  local new, seen = {}, {}
+  for _, k in ipairs(db.order or {}) do
+    local n = byKey and byKey[k]
+    if n and ns.NodeOK(log, n) and not seen[n] then new[#new + 1] = n; seen[n] = true end
+  end
+  for _, n in ipairs(order) do if not seen[n] then new[#new + 1] = n; seen[n] = true end end
+  db.order = {}
+  for _, n in ipairs(new) do db.order[#db.order + 1] = n.key end
+  ns.Assemble(false)
+  f.auto, f.sig = nil, nil
+  if f.view and ns.route and f.view > #ns.route.steps then f.view = nil end
+  if f:IsShown() then ns.Refresh(true) end
+end
+
 function ns.Recalc()
   ns.Assemble(true)
   local f = ns.frame
@@ -218,6 +253,11 @@ ev:SetScript("OnEvent", function(_, e)
     pending = true
     C_Timer.After(0.3, function()
       pending = false
+      if (e == "QUEST_LOG_UPDATE" or e == "QUEST_TURNED_IN") and GuideOn() then
+        local sig = QuestSig()
+        if questSig and sig ~= questSig then pcall(ns.Replan) end
+        questSig = sig
+      end
       if ns.frame:IsShown() then ns.Refresh() end
       ns.RenderPicker()
     end)

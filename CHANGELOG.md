@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.41] — 2026-11-15
+
+### Corrigé / Fixed
+- **Guide : la route se réorganise toute seule.** Dès qu'une quête change d'état (objectifs finis, prise, rendue), la suite de la route est recalculée depuis ta position : un rendu tout proche qui débloque la quête suivante passe en premier au lieu d'un détour (ex. Les réactifs des Terres ingrates à Kargath avant Uldaman). Les étapes déjà faites restent visibles en haut. Pas pendant un combat ni dans un donjon.
+  *Guide: the rest of the route is planned again from where you stand when a quest changes state.*
+
 ## [1.0.0-beta.40] — 2026-11-15
 
 (La bêta.39 n'a pas été publiée : son numéro de version était faux.)
