@@ -180,6 +180,24 @@ end
 
 -- ---------------------------------------------------------------- buying in Blizzard's window
 
+-- A queue of items to buy one after the other (a writ's envelope, then its item): the next buy
+-- page opens by itself once a purchase goes through.
+local queue = {}
+function S.BuyQueue(list)
+    queue = {}
+    for _, e in ipairs(list) do queue[#queue + 1] = e end
+    local first = table.remove(queue, 1)
+    if first then S.OpenToBuy(first.id, first.qty) end
+    if queue[1] then WP.Print(string.format(L("Ensuite : %s (s'ouvre après l'achat)."), WP.ItemName(queue[1].id) or "?")) end
+end
+local qf = CreateFrame("Frame")
+for _, e in ipairs({ "COMMODITY_PURCHASE_SUCCEEDED", "AUCTION_HOUSE_PURCHASE_COMPLETED", "AUCTION_HOUSE_CLOSED" }) do pcall(qf.RegisterEvent, qf, e) end
+qf:SetScript("OnEvent", function(_, e)
+    if e == "AUCTION_HOUSE_CLOSED" then queue = {}; return end
+    local nxt = table.remove(queue, 1)
+    if nxt then C_Timer.After(0.6, function() S.OpenToBuy(nxt.id, nxt.qty) end) end
+end)
+
 -- Opens an item's buy page in the auction house and, for a stackable item, fills in the quantity.
 function S.OpenToBuy(id, quantity)
     local ah = AuctionHouseFrame

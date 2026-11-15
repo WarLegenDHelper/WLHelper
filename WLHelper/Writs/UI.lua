@@ -425,7 +425,18 @@ local function BuildShop(p)
         r:SetScript("OnClick", function(self)
             local e = self.entry
             if not e then return end
-            if IsShiftKeyDown() then WP.SearchList({ e }) else WP.Scan.OpenToBuy(e.id, math.max(1, e.need - e.have)) end
+            -- the envelope and its item go together: one click opens the first, the other follows
+            local pair, entries = {}, {}
+            for _, x in ipairs(shop) do
+                if x.group == e.group and not x.done then
+                    pair[#pair + 1] = { id = x.id, qty = math.max(1, x.need - x.have), order = x.order or 0 }
+                    entries[#entries + 1] = x
+                end
+            end
+            if IsShiftKeyDown() then WP.SearchList(#entries > 0 and entries or { e }); return end
+            table.sort(pair, function(a, b) return a.order < b.order end)
+            if #pair == 0 then pair = { { id = e.id, qty = math.max(1, e.need - e.have) } } end
+            WP.Scan.BuyQueue(pair)
         end)
         r:SetScript("OnEnter", function(self)
             local e = self.entry
@@ -433,7 +444,7 @@ local function BuildShop(p)
             local lines = { e.name, string.format(L("Dans tes sacs : %d / %d"), e.have, e.need) }
             if e.listed then lines[#lines + 1] = string.format(L("En vente (dernier scan) : %d"), e.listed) end
             if e.maxPrice then lines[#lines + 1] = string.format(L("Plafond de recherche : %s"), S.Money(e.maxPrice)) end
-            lines[#lines + 1] = { L("Clic : acheter à l'HV · Maj-clic : Auctionator"), 0.6, 0.6, 0.6 }
+            lines[#lines + 1] = { L("Clic : acheter l'enveloppe et son objet à l'HV · Maj-clic : Auctionator"), 0.6, 0.6, 0.6 }
             S.Tip(self, lines)
         end)
         r:SetScript("OnLeave", S.HideTip)

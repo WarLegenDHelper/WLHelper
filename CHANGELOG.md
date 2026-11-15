@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.33] — 2026-11-15
+
+### Modifié / Changed
+- **Writs, onglet Achats : l'enveloppe et son objet d'un seul clic.** Un clic sur l'un ou l'autre ouvre la page d'achat de l'enveloppe ; dès que l'achat passe, celle de l'objet s'ouvre seule. Maj-clic envoie les deux à Auctionator.
+  *Writs Shopping tab: one click buys the envelope then its item; shift-click sends both to Auctionator.*
+
 ## [1.0.0-beta.32] — 2026-11-15
 
 ### Modifié / Changed
