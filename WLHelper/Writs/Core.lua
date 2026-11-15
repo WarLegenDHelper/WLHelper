@@ -395,8 +395,10 @@ function WP.Plan(rows)
     local function build()
         byZone = {}
         for _, r in ipairs(rows) do
+            -- zones you left out (a click on the zone in the Shopping tab) are never planned
+            local skipZone = WLWritsCharDB.skipZones and WLWritsCharDB.skipZones[r.w.map]
             local pick = r.show and r.state == "buy" and r.per100 and r.w.map and not r.tooHigh and not r.skipped
-                and (not cap or r.per100 <= cap)
+                and not skipZone and (not cap or r.per100 <= cap)
             if pick then
                 local z = byZone[r.w.map] or {}
                 byZone[r.w.map] = z

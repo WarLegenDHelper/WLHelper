@@ -402,9 +402,22 @@ local function BuildShop(p)
     sc:SetPoint("TOPLEFT", PAD, -104); sc:SetPoint("BOTTOMRIGHT", -PAD, 62)
     buy.scroll = sc
     buy.heads = Pool(function()
-        local t = S.Text(sc.content, 13, C.dim)
-        t:SetWidth(W - 2 * PAD)
-        return t
+        local b = CreateFrame("Button", nil, sc.content)
+        b:SetSize(W - 2 * PAD, 20)
+        b.t = S.Text(b, 13, C.dim); b.t:SetPoint("LEFT", 0, 0); b.t:SetPoint("RIGHT", -4, 0); b.t:SetJustifyH("LEFT"); b.t:SetWordWrap(false)
+        function b:SetText(text) self.t:SetText(text) end
+        b:SetScript("OnClick", function(self)
+            if not self.map then return end
+            WLWritsCharDB.skipZones = WLWritsCharDB.skipZones or {}
+            WLWritsCharDB.skipZones[self.map] = not WLWritsCharDB.skipZones[self.map] or nil
+            WP.Refresh()
+        end)
+        b:SetScript("OnEnter", function(self)
+            self.t:SetTextColor(1, 1, 1)
+            if self.map then S.Tip(self, { self.excluded and L("Clic : remettre cette zone dans le plan") or L("Clic : laisser cette zone de côté (le plan prend d'autres writs)") }) end
+        end)
+        b:SetScript("OnLeave", function(self) self.t:SetTextColor(C.dim[1], C.dim[2], C.dim[3]); S.HideTip() end)
+        return b
     end)
     buy.rows = Pool(function()
         local r = CreateFrame("Button", nil, sc.content)
@@ -495,7 +508,8 @@ local function RenderShop()
         h:ClearAllPoints(); h:SetPoint("TOPLEFT", 2, -y)
         local writs = 0
         for _, e in ipairs(groups[key]) do if e.isWrit then writs = writs + 1 end end
-        h:SetText(string.format(L("À rendre en %s · %d writs"), key, writs))
+        h.map, h.excluded = groups[key][1] and groups[key][1].map, false
+        h:SetText(string.format(L("À rendre en %s · %d writs"), key, writs) .. "   " .. S.Hex(C.muted) .. L("(exclure)") .. "|r")
         y = y + 22
         for idx, e in ipairs(groups[key]) do
             ri = ri + 1
@@ -523,6 +537,16 @@ local function RenderShop()
             y = y + 37
         end
         y = y + 12
+    end
+    -- the zones left out, to bring back
+    for map in pairs(WLWritsCharDB.skipZones or {}) do
+        hi = hi + 1
+        local h = buy.heads.Get(hi)
+        h:ClearAllPoints(); h:SetPoint("TOPLEFT", 2, -(y + 6))
+        h.map, h.excluded = map, true
+        local info = C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(map)
+        h:SetText(S.Hex(C.warn) .. string.format(L("Zone exclue : %s · clic pour la remettre"), info and info.name or tostring(map)) .. "|r")
+        y = y + 26
     end
     buy.heads.HideFrom(hi + 1)
     buy.rows.HideFrom(ri + 1)

@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.34] — 2026-11-15
+
+### Ajouté / Added
+- **Writs, zones à exclure** : dans Achats, un clic sur une zone (« À rendre en Les Paluns ») la laisse de côté, le plan prend d'autres writs, toujours les moins chers et le moins de zones ; les zones exclues restent en bas, un clic les remet.
+  *Writs: click a zone in the Shopping tab to leave it out of the plan.*
+- **Guilde, filtres par classe et par rôle** : les icônes officielles des classes et des rôles (tank, soins, dégâts, d'après la spé partagée par WL Helper ; un druide farouche compte comme tank et dégâts), et l'icône de classe devant chaque nom.
+  *Guild: class and role filters with the game's icons; class icon on each member.*
+
 ## [1.0.0-beta.33] — 2026-11-15
 
 ### Modifié / Changed

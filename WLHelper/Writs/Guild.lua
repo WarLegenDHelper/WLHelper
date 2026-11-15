@@ -53,6 +53,8 @@ ns.AddEnglish({
     ["Zone"] = "Zone",
     ["Rang"] = "Rank",
     ["Classe"] = "Class",
+    ["Toutes les classes"] = "All classes",
+    ["Tous"] = "All",
     ["Où est la guilde : %s"] = "Where the guild is: %s",
     ["Clic : chuchoter · clic droit ou Alt-clic : inviter"] = "Click: whisper · right-click or Alt-click: invite",
     ["Note : %s"] = "Note: %s",
@@ -285,6 +287,15 @@ end
 function WP.GuildMine() local hk, week, season = Numbers(); return week, season, hk end
 
 -- ---------------------------------------------------------------- the roster
+local ROLE_OF = { prot = "tank", holy = "heal", disc = "heal", resto = "heal", feral = "tank,dps" }
+local function HasRole(spec, role)
+    if not role then return true end
+    if not spec then return false end
+    local roles = ROLE_OF[spec] or "dps"
+    return roles:find(role, 1, true) ~= nil
+end
+local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
+
 local function Roster(onlineOnly, filter, sort)
     local out, online, zones = {}, 0, {}
     if not (IsInGuild and IsInGuild() and GetNumGuildMembers) then return out, 0, zones end
@@ -299,7 +310,10 @@ local function Roster(onlineOnly, filter, sort)
             local short = Short(name)
             local hit = not filter or short:lower():find(filter, 1, true) or (zone or ""):lower():find(filter, 1, true)
                 or (rank or ""):lower():find(filter, 1, true)
-            if hit and (isOnline or not onlineOnly) then
+            local b0 = Board()[short]
+            local classOk = not WLWritsDB.guildClass or WLWritsDB.guildClass == class
+            local roleOk = HasRole(b0 and b0.spec, WLWritsDB.guildRole)
+            if hit and classOk and roleOk and (isOnline or not onlineOnly) then
                 local y, m, d, h = 0, 0, 0, 0
                 if not isOnline and GetGuildRosterLastOnline then y, m, d, h = GetGuildRosterLastOnline(i) end
                 local b = Board()[short]
@@ -394,7 +408,9 @@ local function MemberRow(parent)
     r.dot = S.Solid(r, "ARTWORK", C.ready); r.dot:SetSize(6, 6); r.dot:SetPoint("LEFT", 8, 0)
     r.lvl = S.Text(r, 12, C.dim, true); r.lvl:SetPoint("LEFT", 22, 0); r.lvl:SetWidth(24); r.lvl:SetJustifyH("RIGHT")
     r.name = S.Text(r, 14, C.text, true); r.name:SetPoint("LEFT", 54, 0); r.name:SetWidth(160); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
-    r.logo = r:CreateTexture(nil, "OVERLAY"); r.logo:SetSize(14, 14); r.logo:SetTexture(S.LOGO); r.logo:SetPoint("LEFT", 54, 0)
+    r.cls = r:CreateTexture(nil, "OVERLAY"); r.cls:SetSize(16, 16); r.cls:SetPoint("LEFT", 52, 0)
+    r.cls:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
+    r.logo = r:CreateTexture(nil, "OVERLAY"); r.logo:SetSize(14, 14); r.logo:SetTexture(S.LOGO); r.logo:SetPoint("LEFT", 72, 0)
     r.where = S.Text(r, 12, C.dim); r.where:SetPoint("LEFT", 216, 0); r.where:SetWidth(190); r.where:SetJustifyH("LEFT")
     r.rank = S.Text(r, 12, C.muted); r.rank:SetPoint("RIGHT", -10, 0); r.rank:SetWidth(110); r.rank:SetJustifyH("RIGHT")
     r:SetScript("OnEnter", function(self)
@@ -433,6 +449,11 @@ local function RankRow(parent)
 end
 
 local function RenderMembers()
+    for _, b in ipairs(ui.classBtns or {}) do
+        local on = b.cls == WLWritsDB.guildClass
+        b.edge(on and C.brand or C.border)
+        b.bg:SetColorTexture((on and C.brandBg or C.card)[1], (on and C.brandBg or C.card)[2], (on and C.brandBg or C.card)[3], 1)
+    end
     local list, online, zones = Roster(WLWritsDB.guildOnline ~= false, ui.search and ui.search:GetText(), WLWritsDB.guildSort)
     local all = IsInGuild() and GetNumGuildMembers() or 0
     ui.count:SetText(IsInGuild() and string.format(L("%d en ligne sur %d"), online, all) or L("Pas de guilde."))
@@ -453,8 +474,11 @@ local function RenderMembers()
         r.addon = board[m.name] ~= nil
         r.ver = board[m.name] and board[m.name].ver
         r.logo:SetShown(r.addon)
-        r.name:ClearAllPoints(); r.name:SetPoint("LEFT", r.addon and 72 or 54, 0)
-        r.name:SetWidth(r.addon and 142 or 160)   -- ends before the zone column (216) either way
+        -- the class icon, then the WL logo for members who have the addon, then the name
+        local tc = CLASS_ICON_TCOORDS and m.class and CLASS_ICON_TCOORDS[m.class]
+        if tc then r.cls:SetTexCoord(tc[1], tc[2], tc[3], tc[4]); r.cls:Show() else r.cls:Hide() end
+        r.name:ClearAllPoints(); r.name:SetPoint("LEFT", r.addon and 90 or 72, 0)
+        r.name:SetWidth(r.addon and 124 or 142)   -- ends before the zone column (216) either way
         local sp = SpecName(m.class, m.spec)
         r.name:SetText(m.name .. (sp and ("  " .. S.Hex(C.muted) .. sp .. "|r") or ""))
         r.name:SetTextColor(col[1], col[2], col[3], m.online and 1 or 0.55)
@@ -542,9 +566,37 @@ local function Build()
     sort:SetPoint("TOPRIGHT", -PAD, -42)
     -- the search box takes what the sort control leaves on the row
     ui.search:SetWidth(math.max(140, W - 2 * PAD - (sort:GetWidth() or 0) - 10))
-    ui.zones = S.Text(m, 12, C.dim); ui.zones:SetPoint("TOPLEFT", PAD, -80); ui.zones:SetPoint("RIGHT", -PAD, 0)
+    -- filters: a class (the game's class icons) and a role (from the spec shared by WL Helper)
+    ui.classBtns = {}
+    local x = PAD
+    for i, cls in ipairs({ "ALL", unpack(CLASSES) }) do
+        local b = CreateFrame("Button", nil, m)
+        b:SetSize(24, 24); b:SetPoint("TOPLEFT", x, -78)
+        b.bg = S.Solid(b, "BACKGROUND", C.card); b.bg:SetAllPoints()
+        b.edge = S.Border(b, C.border)
+        local t = b:CreateTexture(nil, "ARTWORK"); t:SetPoint("TOPLEFT", 2, -2); t:SetPoint("BOTTOMRIGHT", -2, 2)
+        local tc = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[cls]
+        if tc then t:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles"); t:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
+        else t:SetTexture("Interface\\Icons\\INV_Misc_GroupNeedMore"); t:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
+        b.cls = cls ~= "ALL" and cls or nil
+        b:SetScript("OnClick", function(self) WLWritsDB.guildClass = self.cls; WP.RefreshGuild() end)
+        b:SetScript("OnEnter", function(self)
+            local name = self.cls and ((LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[self.cls]) or self.cls) or L("Toutes les classes")
+            S.Tip(self, { name })
+        end)
+        b:SetScript("OnLeave", S.HideTip)
+        ui.classBtns[i] = b
+        x = x + 27
+    end
+    local RI = "Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES"
+    local function RoleIcon(tc) return string.format("|T%s:16:16:0:0:64:64:%d:%d:%d:%d|t", RI, tc[1], tc[2], tc[3], tc[4]) end
+    ui.role = S.Segmented(m, { { "all", L("Tous") }, { "tank", RoleIcon({ 0, 19, 22, 41 }) }, { "heal", RoleIcon({ 20, 39, 1, 20 }) }, { "dps", RoleIcon({ 20, 39, 22, 41 }) } },
+        function() return WLWritsDB.guildRole or "all" end,
+        function(v) WLWritsDB.guildRole = v ~= "all" and v or nil; WP.RefreshGuild() end, 26)
+    ui.role:SetPoint("TOPRIGHT", -PAD, -77)
+    ui.zones = S.Text(m, 12, C.dim); ui.zones:SetPoint("TOPLEFT", PAD, -112); ui.zones:SetPoint("RIGHT", -PAD, 0)
     ui.zones:SetJustifyH("LEFT"); ui.zones:SetWordWrap(false)
-    ui.members = List(m, -100, PAD, MemberRow, 30)
+    ui.members = List(m, -132, PAD, MemberRow, 30)
     ui.noMatch = S.Text(ui.members.content, 13, C.dim); ui.noMatch:SetPoint("TOPLEFT", 2, -8); ui.noMatch:SetText(L("Aucun membre ne correspond."))
     -- pvp
     local p = pages.pvp
