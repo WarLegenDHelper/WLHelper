@@ -100,8 +100,11 @@ local function MakeCard(parent)
     else e:SetPoint("TOP" .. side); e:SetPoint("BOTTOM" .. side); e:SetWidth(2) end
     ns.Accent(e); c.selBorder[side] = e
   end
-  c.check = c:CreateTexture(nil, "OVERLAY"); c.check:SetSize(20, 20); c.check:SetPoint("TOPRIGHT", -6, -6)
-  c.check:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-Ready")
+  -- ticked for the route: red border and a check box tick; every quest done: a green check
+  c.check = c:CreateTexture(nil, "OVERLAY"); c.check:SetSize(22, 22); c.check:SetPoint("TOPRIGHT", -4, -4)
+  c.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+  c.doneMark = c:CreateTexture(nil, "OVERLAY"); c.doneMark:SetSize(26, 26); c.doneMark:SetPoint("CENTER", c, "TOPRIGHT", -20, -22)
+  c.doneMark:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-Ready")
   c.name = Text(c, 14, T.text, true); c.name:SetPoint("BOTTOMLEFT", 8, 30); c.name:SetWidth(CW - 16); c.name:SetWordWrap(true)
   c.lvl = Text(c, 11, T.accent, true); c.lvl:SetPoint("TOPLEFT", 8, -8)
   c.info = Text(c, 11, T.dim); c.info:SetPoint("BOTTOMLEFT", 8, 10); c.info:SetWidth(CW - 16); c.info:SetWordWrap(false)
@@ -182,17 +185,23 @@ end
 Render = function()
   if not p then return end
   ns.EnsureClassCards()
-  local list = {}
+  -- Sections, in this order: to do at your level, later (too high), done, then (All) no Horde quest.
+  -- "My level" shows the first and the done ones; "All" shows every section.
   local tab = CurTab()
+  local secs = { todo = {}, later = {}, done = {}, noq = {} }
+  local list = {}
+  local tooHigh = function(d) return d.lvl and d.lvl[1] and UnitLevel("player") < d.lvl[1] - 4 end
   for _, k in ipairs(ns.ORDER) do
     local d = ns.D[k]
-    if TabOf(d) == tab then
-      local n = Counts(k)
-      local ok
-      if tab == "cls" then ok = ClassMatch(d) and (WLDTDB.pickAll or LevelOK(d))
-      elseif tab == "raid" then ok = true
-      else ok = (WLDTDB.pickAll or LevelOK(d)) and (n > 0 or WLDTDB.pickAll) end
-      if ok then table.insert(list, k) end
+    if TabOf(d) == tab and (tab ~= "cls" or ClassMatch(d)) then
+      local n, done = Counts(k)
+      local sec
+      if n == 0 then sec = tab == "raid" and "todo" or "noq"
+      elseif done >= n then sec = "done"
+      elseif tooHigh(d) or not LevelOK(d) then sec = "later"
+      else sec = "todo" end
+      local show = WLDTDB.pickAll or sec == "todo" or sec == "done"
+      if show then table.insert(secs[sec], k); table.insert(list, k) end
     end
   end
   for _, b in ipairs(p.tabs) do
@@ -205,16 +214,30 @@ Render = function()
   p.hint:SetText(tab == "cls" and L.PICK_HINT_CLS or tab == "raid" and L.PICK_HINT_RAID or L.PICK_HINT)
   p.empty = p.empty or Text(p.grid, 13, T.dim)
   p.empty:SetPoint("TOP", 0, -40); p.empty:SetText(#list == 0 and (tab == "cls" and L.PICK_EMPTY_CLS or L.PICK_EMPTY) or "")
-  table.sort(list, function(a, b)
+  local function byLevel(a, b)
     local la, lb = ns.D[a].lvl and ns.D[a].lvl[1] or 0, ns.D[b].lvl and ns.D[b].lvl[1] or 0
     if la ~= lb then return la < lb end
     return a < b
-  end)
-  for i, k in ipairs(list) do
-    local c = p.cards[i] or MakeCard(p.grid); p.cards[i] = c
-    local col, row = (i - 1) % COLS, math.floor((i - 1) / COLS)
-    c:ClearAllPoints(); c:SetPoint("TOPLEFT", col * (CW + GAP), -row * (CH + GAP))
-    local d = ns.D[k]
+  end
+  p.heads = p.heads or {}
+  for _, h in ipairs(p.heads) do h:Hide() end
+  local i, y, hi = 0, 0, 0
+  for _, s in ipairs({ { "todo", L.SEC_TODO }, { "later", L.SEC_LATER }, { "done", L.SEC_DONE }, { "noq", L.SEC_NOQ } }) do
+    local keys = secs[s[1]]
+    if #keys > 0 then
+      table.sort(keys, byLevel)
+      hi = hi + 1
+      local h = p.heads[hi] or Text(p.grid, 12, T.dim, true); p.heads[hi] = h
+      h:ClearAllPoints(); h:SetPoint("TOPLEFT", 2, -y)
+      h:SetText(ns.Upper(s[2]) .. "  ·  " .. #keys); h:Show()
+      y = y + 22
+      for j, k in ipairs(keys) do
+        i = i + 1
+        local c = p.cards[i] or MakeCard(p.grid); p.cards[i] = c
+        local col, row = (j - 1) % COLS, math.floor((j - 1) / COLS)
+        c:ClearAllPoints(); c:SetPoint("TOPLEFT", col * (CW + GAP), -(y + row * (CH + GAP)))
+        c.section = s[1]
+        local d = ns.D[k]
     c.dkey = k
     Art(c.art, d, c)
     c.dicon:Hide()
@@ -222,16 +245,25 @@ Render = function()
     c.name:SetText(ns.DName(k))
     c.lvl:SetText((d.raid and (L.RAID .. "  ") or "") .. (d.lvl and d.lvl[1] and (d.lvl[1] .. "-" .. (d.lvl[2] or d.lvl[1])) or ""))
     local n, done = Counts(k)
-    c.info:SetText(n > 0 and (L.PICK_QUESTS:format(n) .. "  ·  " .. L.PICK_DONE:format(done)) or L.PICK_NOQ)
+    local finished = n > 0 and done >= n
+    c.info:SetText(finished and L.PICK_FINISHED:format(n)
+      or n > 0 and (L.PICK_QUESTS:format(n) .. "  ·  " .. L.PICK_DONE:format(done)) or L.PICK_NOQ)
     c.bar:SetWidth(math.max(1, (CW - 2) * (n > 0 and done / n or 0)))
+    if finished then c.bar:SetColorTexture(0.35, 0.86, 0.48, 1) else c.bar:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1) end
+    c.doneMark:SetShown(finished)
+    c.lvl:SetTextColor(unpack(c.section == "later" and T.dim or T.accent))
     local sel = Selected()[k] and true or false
     c.check:SetShown(sel)
+    if sel then c.check:ClearAllPoints(); c.check:SetPoint("TOPRIGHT", finished and -36 or -4, -4) end
     for _, e in pairs(c.selBorder) do e:SetShown(sel) end
-    c.shade:SetColorTexture(0, 0, 0, sel and 0.35 or (LevelOK(d) and 0.55 or 0.75))
+    c.shade:SetColorTexture(0, 0, 0, sel and 0.35 or (c.section == "todo" and 0.5 or 0.72))
     c:Show()
+      end
+      y = y + math.ceil(#keys / COLS) * (CH + GAP) + 8
+    end
   end
-  for i = #list + 1, #p.cards do p.cards[i]:Hide() end
-  p.grid:SetHeight(math.ceil(#list / COLS) * (CH + GAP))
+  for j = i + 1, #p.cards do p.cards[j]:Hide() end
+  p.grid:SetHeight(math.max(10, y))
   local ns_ = 0; for _ in pairs(Selected()) do ns_ = ns_ + 1 end
   p.selText:SetText(L.PICK_SEL:format(ns_))
   p.go:SetEnabled(ns_ > 0)

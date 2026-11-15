@@ -111,7 +111,8 @@ ev:SetScript("OnEvent", function(_, e)
       ns.Assemble(false)
       local f = ns.frame
       if WLDTDB.view then f.view = WLDTDB.view end
-      if not WLDTDB.hidden and GuideOn() then f:Show() end
+      -- the guide comes back after a reload only if it was open on a route (never empty, never by itself)
+      if not WLDTDB.hidden and GuideOn() and ns.GuideStatus and ns.GuideStatus() then f:Show() end
       if GuideOn() then ns.Refresh(true) end
     end)
     local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
@@ -135,7 +136,7 @@ ev:SetScript("OnEvent", function(_, e)
   elseif e == "PLAYER_ENTERING_WORLD" then
     if ns.frame then
       C_Timer.After(1, function()
-        if not WLDTDB.hidden and not ns.frame:IsShown() then ns.frame:Show() end
+        if not WLDTDB.hidden and GuideOn() and not ns.frame:IsShown() and ns.GuideStatus and ns.GuideStatus() then ns.frame:Show() end
         if ns.frame:IsShown() then ns.Refresh() end
       end)
     end

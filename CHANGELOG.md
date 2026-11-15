@@ -6,6 +6,30 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.6] — 2026-11-15
+
+### Ajouté / Added
+- **Planificateur de Merchant's Favor** (onglet « Favor » du Comptoir) : tu tapes combien de Favor tu veux ; il prend les Waylaid Crates les moins chères (caisse + le lot de composants le moins cher, ce que tu as déjà est gratuit), tient compte de ce qui est en vente au dernier scan, et liste quoi acheter. Clic : acheter la caisse ; Maj-clic : le lot. La Favor de chaque caisse s'apprend quand tu en rends une. Les lots sont lus dans Naowh Forever.
+  *Merchant's Favor planner: type the Favor you want; the cheapest Waylaid Crates and bundles, what to buy, one click at the AH.*
+- **Choisir ses writs** : dans « Tous », une case par writ ; le total (prix, prix après Coin Pouch, réputation) se met à jour à chaque coche, et la liste d'achat suit ta sélection. Sans coche, le plan automatique reste.
+  *Tick the writs you want in "All": live total of cost and reputation; the shopping list follows your pick.*
+
+### Modifié / Changed
+- **Choix des donjons** rangé en sections : à ton niveau, plus tard, terminés (coche verte, barre verte), sans quête Horde (avec « Tous »).
+  *Dungeon picker in sections, with a green check on finished dungeons.*
+- Titre « WaR LegenD Helper » dans l'infobulle de la minimap et sur l'accueil.
+- Liste d'achat : groupes « À rendre en <zone> · N writs », enveloppes écrites « Enveloppe · objet » ; bouton « Liste Auctionator » retiré (l'achat est intégré).
+  *Shopping list groups and names are clearer; the Auctionator list button is gone.*
+- Textes : paragraphes coupés en lignes courtes ; « Une idée, un bug ? » en trois étapes numérotées.
+  *Texts split into short lines; the feedback window in three steps.*
+
+### Corrigé / Fixed
+- Le guide ne s'ouvre plus tout seul au /reload quand il n'y a pas de route.
+  *The guide no longer opens by itself at /reload without a route.*
+- Nettoyeur : le Mallet of Zul'Farrak (invoque Gahz'rilla) n'est jamais proposé ; un objet utilisable est signalé « lis son infobulle avant de le jeter ».
+  *Cleaner: the Mallet of Zul'Farrak is kept; usable items are flagged.*
+- Accueil : le texte de la carte Donjons ne déborde plus.
+
 ## [1.0.0-beta.5] — 2026-11-15
 
 ### Ajouté / Added
@@ -145,7 +169,8 @@ Première version de WL Helper (bêta). WL Dungeon Guide devient **WL Helper**.
 WL Dungeon Guide jusqu'à la 3.3 : guide des quêtes de donjon Horde pas à pas (versions partagées
 à la main, avant ce dépôt).
 
-[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.5...HEAD
+[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.6...HEAD
+[1.0.0-beta.6]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.5...v1.0.0-beta.6
 [1.0.0-beta.5]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.4...v1.0.0-beta.5
 [1.0.0-beta.4]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.3...v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.2...v1.0.0-beta.3

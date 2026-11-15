@@ -435,6 +435,45 @@ function WP.Plan(rows)
     return plan, need, pending, readyRep, WP.ZoneList(route)
 end
 
+-- Writs you tick yourself ("All" tab). When any is ticked, the buying plan is your pick.
+function WP.IsPicked(w) local p = WLWritsCharDB.picked; return p and p[w.writ] and true or false end
+function WP.SetPicked(w, on)
+    WLWritsCharDB.picked = WLWritsCharDB.picked or {}
+    WLWritsCharDB.picked[w.writ] = on and true or nil
+    if WP.Refresh then WP.Refresh() end
+end
+function WP.ClearPicked()
+    WLWritsCharDB.picked = {}
+    if WP.Refresh then WP.Refresh() end
+end
+-- Your pick in numbers: writs, cost to buy (envelope + item), cost after the Coin Pouches, reputation.
+function WP.PickTotals(rows)
+    local n, cost, net, rep, unknown = 0, 0, 0, 0, 0
+    for _, r in ipairs(rows) do
+        if WP.IsPicked(r.w) and r.state ~= "done" then
+            n = n + 1
+            rep = rep + r.w.rep
+            if r.state == "buy" then
+                if r.cost then cost = cost + r.cost; net = net + (r.net or r.cost) else unknown = unknown + 1 end
+            end
+        end
+    end
+    return n, cost, net, rep, unknown
+end
+
+local AutoPlan = WP.Plan
+function WP.Plan(rows)
+    local plan, need, pending, readyRep, zones = AutoPlan(rows)
+    local picked = WLWritsCharDB.picked
+    if not picked or not next(picked) then return plan, need, pending, readyRep, zones end
+    for _, r in ipairs(plan) do r.inPlan = nil end
+    plan = {}
+    for _, r in ipairs(rows) do
+        if picked[r.w.writ] and r.state == "buy" then r.inPlan = true; plan[#plan + 1] = r end
+    end
+    return plan, need, pending, readyRep, zones
+end
+
 function WP.ZoneList(maps)
     local list = {}
     for i, map in ipairs(maps) do list[i] = WP.ZoneName(map) end

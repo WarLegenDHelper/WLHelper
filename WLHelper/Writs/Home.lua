@@ -15,7 +15,7 @@ ns.AddEnglish({
     ["Reprendre"] = "Resume",
     ["Choisir"] = "Pick",
     ["étape %d sur %d"] = "step %d of %d",
-    ["Choisis un ou plusieurs donjons : la route part de ta position."] = "Pick one or several dungeons: the route starts where you stand.",
+    ["Route depuis ta position"] = "Route from where you stand",
     ["%d writs prêts à rendre"] = "%d writs ready to hand in",
     ["%d enveloppes à ouvrir"] = "%d envelopes to open",
     ["Rien à rendre pour l'instant"] = "Nothing to hand in yet",
@@ -147,7 +147,7 @@ end
 local function Close() if win then win:Hide() end end
 
 local function Build()
-    win = S.Window("WLHelperHome", W, 10, "WL Helper", nil, WLWritsDB, "homePos")
+    win = S.Window("WLHelperHome", W, 10, "WaR |cffce1918LegenD|r Helper", nil, WLWritsDB, "homePos")
 
     local y = -38 - PAD
     cards.dungeons = Card(win, y, "Interface\\Icons\\INV_Misc_Map_01", C.brandHi or C.brand, function()
@@ -228,8 +228,7 @@ function WP.RefreshHome()
     else
         d.tag:SetText("")
         d.line1:SetText(L("Aucun donjon choisi"))
-        d.line2:SetText(L("Choisis un ou plusieurs donjons : la route part de ta position."))
-        d.line2:SetWordWrap(true)
+        d.line2:SetText(L("Route depuis ta position"))
         d.bar:Hide()
         d.action.label:SetText(L("Choisir"))
         SetActive(d, false)
@@ -302,7 +301,7 @@ end
 function WP.MinimapTooltip(owner)
     local tt = GameTooltip
     tt:SetOwner(owner, "ANCHOR_LEFT")
-    tt:AddLine("|T" .. S.LOGO .. ":16:16|t WL Helper", 1, 1, 1)
+    tt:AddLine("WaR |cffce1918LegenD|r Helper", 1, 1, 1)
     local label, cur, total, finished = DungeonState()
     tt:AddDoubleLine(L("Donjons"), not WP.ModuleOn("dungeons") and L("éteint") or label and (label .. ", " .. (finished and L("terminé") or string.format(L("%d / %d"), cur, total))) or L("aucun"),
         C.dim[1], C.dim[2], C.dim[3], C.text[1], C.text[2], C.text[3])

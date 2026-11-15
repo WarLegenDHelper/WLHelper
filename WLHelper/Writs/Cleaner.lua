@@ -13,8 +13,8 @@ local L = ns.L
 
 ns.AddEnglish({
     ["Objets de quête inutiles"] = "Useless quest items",
-    ["Aucune quête de ton journal ne les demande. Les objets qui lancent une quête ne sont jamais proposés."] =
-        "No quest in your log needs them. Items that start a quest are never offered.",
+    ["Aucune quête de ton journal ne les demande.\nLes objets qui lancent une quête ne sont jamais proposés."] =
+        "No quest in your log needs them.\nItems that start a quest are never offered.",
     ["Quête rendue : %s"] = "Quest turned in: %s",
     ["Aucune quête ne le demande"] = "No quest asks for it",
     ["Peut servir à une quête suivante"] = "May be needed for a later quest",
@@ -25,6 +25,11 @@ ns.AddEnglish({
     ["Rien à jeter : tes sacs sont propres."] = "Nothing to throw away: your bags are clean.",
     ["impossible en combat."] = "not possible in combat.",
     ["%d pile(s) détruite(s)."] = "%d stack(s) destroyed.",
+    ["À garder : invoque Gahz'rilla au gong de Zul'Farrak (quête « Gahz'rilla »)"] =
+        "Keep it: summons Gahz'rilla at the gong in Zul'Farrak (quest \"Gahz'rilla\")",
+    ["À garder : se change en Mallet of Zul'Farrak à l'autel de Hakkar"] =
+        "Keep it: becomes the Mallet of Zul'Farrak at the altar of Hakkar",
+    ["Objet utilisable : lis son infobulle avant de le jeter"] = "Usable item: read its tooltip before throwing it away",
     ["La liste a changé : vérifie-la et clique encore."] = "The list changed: check it and click again.",
 })
 
@@ -68,18 +73,22 @@ local function Kept(id)
 end
 
 -- "This Item Begins a Quest" in the item's tooltip; the answer per item ID never changes.
-local startsCache = {}
+-- Also notes a "Use:" line (usableCache): an item you can use may matter outside any quest.
+local startsCache, usableCache = {}, {}
 local scanTip
 local function TooltipStartsQuest(bag, slot, id)
     if startsCache[id] ~= nil then return startsCache[id] end
     local needle = ITEM_STARTS_QUEST or "This Item Begins a Quest"
-    local found, read = false, false
+    local use = ITEM_SPELL_TRIGGER_ONUSE or "Use:"
+    local found, read, usable = false, false, false
     if C_TooltipInfo and C_TooltipInfo.GetBagItem then
         local data = safe(C_TooltipInfo.GetBagItem, bag, slot)
         if data and data.lines and #data.lines > 0 then
             read = true
             for _, line in ipairs(data.lines) do
-                if line.leftText and line.leftText:find(needle, 1, true) then found = true; break end
+                local t = line.leftText
+                if t and t:find(needle, 1, true) then found = true end
+                if t and t:find(use, 1, true) == 1 then usable = true end
             end
         end
     end
@@ -94,14 +103,21 @@ local function TooltipStartsQuest(bag, slot, id)
         for i = 1, scanTip:NumLines() do
             local fs = _G["WLHelperCleanerScanTipTextLeft" .. i]
             local t = fs and fs:GetText()
-            if t and t:find(needle, 1, true) then found = true; break end
+            if t and t:find(needle, 1, true) then found = true end
+            if t and t:find(use, 1, true) == 1 then usable = true end
         end
         scanTip:Hide()
     end
     -- A tooltip that has not loaded yet proves nothing: ask again next scan.
-    if read then startsCache[id] = found end
+    if read then startsCache[id] = found; usableCache[id] = usable end
     return found
 end
+
+-- Items no quest asks for but that still do something: never checked, with the reason.
+local KEEP = {
+    [9240] = "À garder : invoque Gahz'rilla au gong de Zul'Farrak (quête « Gahz'rilla »)",
+    [9239] = "À garder : se change en Mallet of Zul'Farrak à l'autel de Hakkar",
+}
 
 -- ---------------------------------------------------------------- LibForeverData index
 
@@ -277,8 +293,13 @@ local function Scan()
                         end
                         if active then
                             e = nil                      -- a quest in your log uses it
+                        elseif KEEP[id] then
+                            e.manual, e.keep, e.reason = true, true, L(KEEP[id])
                         elseif e.quality >= MANUAL_QUALITY then
                             e.manual, e.reason = true, L("Qualité rare ou plus : à détruire à la main")
+                        elseif usableCache[id] and not done then
+                            -- it does something when used: maybe a summon, a key, a teleport
+                            e.amber, e.reason = true, L("Objet utilisable : lis son infobulle avant de le jeter")
                         elseif pending then
                             e.amber, e.reason = true, L("Peut servir à une quête suivante")
                         elseif done then
@@ -369,7 +390,7 @@ local function Paint(row, e)
     end
     row.name:SetText((e.name or "?") .. (e.count > 1 and (" ×" .. e.count) or ""))
     row.name:SetTextColor(q[1], q[2], q[3])
-    local rc = e.amber and C.warn or e.manual and C.muted or C.dim
+    local rc = (e.amber or e.keep) and C.warn or e.manual and C.muted or C.dim
     row.reason:SetText(e.reason or "")
     row.reason:SetTextColor(rc[1], rc[2], rc[3])
 end
@@ -472,7 +493,7 @@ local function Build()
     intro:SetJustifyH("LEFT"); intro:SetJustifyV("TOP")
     intro:SetPoint("TOPLEFT", PAD, -38 - PAD)
     intro:SetWidth(400 - 2 * PAD)
-    intro:SetText(L("Aucune quête de ton journal ne les demande. Les objets qui lancent une quête ne sont jamais proposés."))
+    intro:SetText(L("Aucune quête de ton journal ne les demande.\nLes objets qui lancent une quête ne sont jamais proposés."))
 
     local footer = CreateFrame("Frame", nil, win)
     footer:SetPoint("BOTTOMLEFT", 1, 1); footer:SetPoint("BOTTOMRIGHT", -1, 1); footer:SetHeight(60)

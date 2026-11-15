@@ -434,8 +434,6 @@ local function BuildShop(p)
     buy.rescan:SetPoint("LEFT", PAD, 0)
     buy.age = S.Text(foot, 13, C.dim)
     buy.age:SetPoint("LEFT", buy.rescan, "RIGHT", 10, 0)
-    buy.auct = S.Button(foot, L("Liste Auctionator"), 120, 32, "ghost", function() WP.SaveAuctionatorList(shop) end)
-    buy.auct:SetPoint("RIGHT", -PAD, 0)
 end
 
 local function RenderShop()
@@ -461,7 +459,9 @@ local function RenderShop()
         hi = hi + 1
         local h = buy.heads.Get(hi)
         h:ClearAllPoints(); h:SetPoint("TOPLEFT", 2, -y)
-        h:SetText(string.format(L("%s, à rendre là-bas"), key))
+        local writs = 0
+        for _, e in ipairs(groups[key]) do if e.isWrit then writs = writs + 1 end end
+        h:SetText(string.format(L("À rendre en %s · %d writs"), key, writs))
         y = y + 22
         for idx, e in ipairs(groups[key]) do
             ri = ri + 1
@@ -470,7 +470,9 @@ local function RenderShop()
             r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -(y - (idx > 1 and 1 or 0)))
             r.icon:SetTexture(S.ItemIcon(e.id))
             local qty = (e.need > 1) and (" ×" .. e.need) or ""
-            r.name:SetText((e.isWrit and L("Enveloppe : ") or "") .. e.name .. qty)
+            -- "Envelope: Craftsman's Writ: Iridescent Hammer" reads "Enveloppe · Iridescent Hammer"
+            local short = e.isWrit and (e.name:match(".*:%s*(.+)$") or e.name) or e.name
+            r.name:SetText((e.isWrit and (L("Enveloppe") .. " · ") or "") .. short .. qty)
             SetColor(r.name, e.isWrit and C.text or S.QualityColor(e.id))
             local leftN = e.need - e.have
             if e.done then
@@ -500,7 +502,6 @@ local function RenderShop()
         if ago and (not newest or ago < newest) then newest = ago end
     end
     buy.age:SetText(newest and string.format(L("prix d'il y a %d min"), math.floor(newest / 60)) or (WP.AuctionHouseOpen() and "" or L("ouvre l'HV pour scanner")))
-    buy.auct:SetShown(Auctionator and Auctionator.API and #shop > 0 and true or false)
 end
 
 -- ---------------------------------------------------------------- Tous les writs
@@ -536,8 +537,17 @@ local function BuildAll(p)
     all.seg:SetPoint("LEFT", rank, "RIGHT", 10, 0)
 
     local sc = Scroller(p)
-    sc:SetPoint("TOPLEFT", PAD, -84); sc:SetPoint("BOTTOMRIGHT", -PAD, 8)
+    sc:SetPoint("TOPLEFT", PAD, -84); sc:SetPoint("BOTTOMRIGHT", -PAD, 66)
     all.scroll = sc
+    local foot = CreateFrame("Frame", nil, p)
+    foot:SetPoint("BOTTOMLEFT"); foot:SetPoint("BOTTOMRIGHT"); foot:SetHeight(60)
+    local fl = S.Solid(foot, "BORDER", C.divider); fl:SetPoint("TOPLEFT"); fl:SetPoint("TOPRIGHT"); fl:SetHeight(1)
+    all.pickLine = S.Text(foot, 15, C.text, true)
+    all.pickLine:SetPoint("TOPLEFT", PAD, -12); all.pickLine:SetPoint("RIGHT", -110, 0); all.pickLine:SetJustifyH("LEFT")
+    all.pickSub = S.Text(foot, 12, C.dim)
+    all.pickSub:SetPoint("TOPLEFT", all.pickLine, "BOTTOMLEFT", 0, -4); all.pickSub:SetPoint("RIGHT", -110, 0); all.pickSub:SetJustifyH("LEFT")
+    all.clear = S.Button(foot, L("Tout décocher"), 92, 30, "secondary", function() WP.ClearPicked() end)
+    all.clear:SetPoint("RIGHT", -PAD, 0)
     all.heads = Pool(function()
         local b = CreateFrame("Button", nil, sc.content)
         b:SetSize(W - 2 * PAD, 30)
@@ -551,12 +561,24 @@ local function BuildAll(p)
         r:SetSize(W - 2 * PAD, 46)
         S.Solid(r, "HIGHLIGHT", { 1, 1, 1 }, 0.05):SetAllPoints()   -- above the text: must stay see-through
         r.icon = r:CreateTexture(nil, "ARTWORK")
-        r.icon:SetSize(20, 20); r.icon:SetPoint("LEFT", 4, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        -- the tick box: your own list of writs to do
+        r.box = CreateFrame("Button", nil, r)
+        r.box:SetSize(18, 18); r.box:SetPoint("LEFT", 4, 0)
+        r.box.fill = S.Solid(r.box, "BACKGROUND", C.brand, 0); r.box.fill:SetAllPoints()
+        r.box.border = S.Border(r.box, C.border)
+        r.box.check = r.box:CreateTexture(nil, "ARTWORK")
+        r.box.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check"); r.box.check:SetDesaturated(true)
+        r.box.check:SetPoint("CENTER"); r.box.check:SetSize(20, 20)
+        r.box:SetScript("OnClick", function(self)
+            local x = self:GetParent().row
+            if x and x.state ~= "done" then WP.SetPicked(x.w, not WP.IsPicked(x.w)) end
+        end)
+        r.icon:SetSize(20, 20); r.icon:SetPoint("LEFT", 30, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         r.name = S.Text(r, 14, C.text)
-        r.name:SetPoint("TOPLEFT", 34, -7)
+        r.name:SetPoint("TOPLEFT", 58, -7)
         r.name:SetWidth(260)
         r.sub = S.Text(r, 12, C.dim)
-        r.sub:SetPoint("TOPLEFT", 34, -26)
+        r.sub:SetPoint("TOPLEFT", 58, -26)
         r.sub:SetWidth(260)
         r.cost = S.Text(r, 13, C.text)
         r.cost:SetPoint("RIGHT", -6, 0)
@@ -627,6 +649,11 @@ local function RenderAll()
         ri = ri + 1
         local b = all.rows.Get(ri)
         b.row = r
+        local on = WP.IsPicked(r.w) and r.state ~= "done"
+        b.box:SetShown(r.state ~= "done")
+        b.box.fill:SetAlpha(on and 1 or 0)
+        b.box.border(on and C.brand or C.border)
+        b.box.check:SetShown(on)
         b:ClearAllPoints(); b:SetPoint("TOPLEFT", 0, -y)
         local w = r.w
         b.icon:SetTexture(S.ItemIcon(w.item))
@@ -659,6 +686,17 @@ local function RenderAll()
     all.heads.HideFrom(hi + 1)
     all.rows.HideFrom(ri + 1)
     all.scroll.content:SetHeight(math.max(y, 10))
+    local n, cost, net, rep, unknown = WP.PickTotals(data)
+    if n == 0 then
+        all.pickLine:SetText(L("Coche les writs que tu veux faire"))
+        all.pickSub:SetText(L("Sans coche, le plan prend les moins chers pour ton objectif."))
+        all.clear:Hide()
+    else
+        all.pickLine:SetText(string.format(L("%d writs · %s · +%d rép"), n, S.Money(cost), rep))
+        all.pickSub:SetText(string.format(L("%s après les Coin Pouch · la liste d'achat suit ta sélection"), S.Money(net))
+            .. (unknown > 0 and ("  " .. string.format(L("(%d sans prix)"), unknown)) or ""))
+        all.clear:Show()
+    end
 end
 
 -- ---------------------------------------------------------------- window
@@ -679,7 +717,7 @@ local function Build()
         if WP.OpenOptions then WP.OpenOptions("comptoir") end
     end)
     opts:SetPoint("RIGHT", frame.close, "LEFT", 0, 0)
-    tabs = S.Tabs(frame, { { "today", L("Aujourd'hui") }, { "shop", L("Achats") }, { "all", L("Tous les writs") } },
+    tabs = S.Tabs(frame, { { "today", L("Aujourd'hui") }, { "shop", L("Achats") }, { "all", L("Tous") }, { "favor", L("Favor") } },
         function() return current end, WP.ShowTab, function(key)
             if key ~= "shop" then return nil end
             local n = 0
@@ -687,7 +725,7 @@ local function Build()
             return n
         end)
     tabs:SetPoint("TOPLEFT", 1, -39); tabs:SetPoint("TOPRIGHT", -1, -39)
-    for _, key in ipairs({ "today", "shop", "all" }) do
+    for _, key in ipairs({ "today", "shop", "all", "favor" }) do
         local p = CreateFrame("Frame", nil, frame)
         p:SetPoint("TOPLEFT", 0, -76); p:SetPoint("BOTTOMRIGHT")
         pages[key] = p
@@ -695,6 +733,7 @@ local function Build()
     BuildToday(pages.today)
     BuildShop(pages.shop)
     BuildAll(pages.all)
+    if WP.BuildFavor then WP.BuildFavor(pages.favor) end
     frame:SetScript("OnShow", function() WP.Refresh() end)
     frame:HookScript("OnHide", HideEnvelopes)
     -- the envelope buttons follow the window: off while it moves, laid again where it lands
@@ -729,6 +768,7 @@ function WP.Refresh()
     tabs:Update()
     if current == "today" then RenderToday()
     elseif current == "shop" then RenderShop()
+    elseif current == "favor" then if WP.RenderFavor then WP.RenderFavor() end
     else RenderAll() end
     -- once the new layout has its sizes
     C_Timer.After(0, PlaceEnvelopes)

@@ -25,8 +25,8 @@ ns.AddEnglish({
     ["Guide des quêtes de donjon, route, flèche"] = "Dungeon quest guide, route, arrow",
     ["Craftsman's Writs, liste d'achat, remise auto"] = "Craftsman's Writs, shopping list, auto turn-in",
     ["Nettoyeur des objets de quête inutiles"] = "Cleaner for quest items you no longer need",
-    ["Le GPS reste toujours actif : les autres modules s'en servent. Rallumer un module est immédiat, sans /reload."] =
-        "The GPS always stays on: the other modules use it. Turning a module back on is immediate, no /reload.",
+    ["Le GPS reste toujours actif : les autres modules s'en servent.\nRallumer un module est immédiat, sans /reload."] =
+        "The GPS always stays on: the other modules use it.\nTurning a module back on is immediate, no /reload.",
     ["le module %s est éteint : Réglages › Général › Modules."] = "the %s module is off: Settings › General › Modules.",
     ["éteint"] = "off",
     ["Allumer"] = "Turn on",
@@ -36,8 +36,8 @@ ns.AddEnglish({
     ["/wl idee : proposer une idée ou signaler un bug"] = "/wl idea: suggest an idea or report a bug",
     -- General
     ["Langue"] = "Language", ["Automatique"] = "Automatic", ["Français"] = "Français", ["English"] = "English",
-    ["Auto suit la langue du client. Les fenêtres déjà ouvertes se mettent à jour après un /reload."] =
-        "Auto follows the client's language. Windows already open update after a /reload.",
+    ["Auto suit la langue du client.\nLes fenêtres déjà ouvertes changent après un /reload."] =
+        "Auto follows the client's language.\nWindows already open change after a /reload.",
     ["Fenêtres"] = "Windows",
     ["Bouton de la minimap"] = "Minimap button",
     ["Rouvrir le guide au chargement"] = "Reopen the guide on login",
@@ -329,7 +329,7 @@ function BUILD.general(p)
         SwitchRow(p, L(m.label), function() return ns.WP.ModuleOn(m.key) end,
             function(v) ns.WP.SetModule(m.key, v) end, L(m.hint))
     end
-    Note(p, L("Le GPS reste toujours actif : les autres modules s'en servent. Rallumer un module est immédiat, sans /reload."), 6)
+    Note(p, L("Le GPS reste toujours actif : les autres modules s'en servent.\nRallumer un module est immédiat, sans /reload."), 6)
 
     Section(p, L("Langue"))
     local row = Row(p, L("Langue"))
@@ -350,7 +350,7 @@ function BUILD.general(p)
         C_Timer.After(0, function() if Rebuild then Rebuild() end end)
     end))
     CloseSection(p)
-    Note(p, L("Auto suit la langue du client. Les fenêtres déjà ouvertes se mettent à jour après un /reload."), 8)
+    Note(p, L("Auto suit la langue du client.\nLes fenêtres déjà ouvertes changent après un /reload."), 8)
 
     Section(p, L("Fenêtres"))
     SwitchRow(p, L("Bouton de la minimap"), function() return not Guide().hideMinimap end, SetMinimap)

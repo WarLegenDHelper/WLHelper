@@ -15,9 +15,13 @@ ns.AddEnglish({
     ["Proposer une idée"] = "Suggest an idea",
     ["Signaler un bug"] = "Report a bug",
     ["Quête ou donnée fausse"] = "Wrong quest data",
-    ["Le jeu ne laisse pas un addon aller sur internet : copie ce lien (Ctrl+C) et colle-le dans ton navigateur. Le formulaire GitHub s'ouvre déjà rempli avec ta version ; il te faut un compte GitHub (gratuit)."] =
-        "The game does not let an addon go online: copy this link (Ctrl+C) and paste it into your browser. The GitHub form opens already filled with your version; you need a (free) GitHub account.",
-    ["Lien copié dans la zone : Ctrl+C"] = "Link selected: Ctrl+C",
+    ["Le jeu interdit aux addons d'aller sur internet. Il te faut trois clics :"] =
+        "The game does not let addons go online. Three clicks:",
+    ["Choisis ce que tu veux envoyer"] = "Pick what you want to send",
+    ["Copie le lien (Ctrl+C)"] = "Copy the link (Ctrl+C)",
+    ["Colle-le dans ton navigateur : le formulaire s'ouvre déjà rempli avec ta version."] =
+        "Paste it into your browser: the form opens already filled with your version.",
+    ["Il faut un compte GitHub, c'est gratuit."] = "You need a GitHub account, it is free.",
 })
 
 local REPO = "https://github.com/WarLegenDHelper/WLHelper/issues/new"
@@ -61,18 +65,43 @@ local function Link(kind)
 end
 
 local win
-local function Build()
-    win = S.Window("WLHelperFeedback", 460, 236, L("Une idée, un bug ?"), nil, WLWritsDB, "feedbackPos")
-    local PAD = 14
-    local intro = S.Text(win, 13, C.dim)
-    intro:SetPoint("TOPLEFT", PAD, -38 - PAD)
-    intro:SetPoint("TOPRIGHT", -PAD, -38 - PAD)
-    intro:SetJustifyH("LEFT"); intro:SetWordWrap(true)
-    intro:SetText(L("Le jeu ne laisse pas un addon aller sur internet : copie ce lien (Ctrl+C) et colle-le dans ton navigateur. Le formulaire GitHub s'ouvre déjà rempli avec ta version ; il te faut un compte GitHub (gratuit)."))
+local W, PAD = 460, 16
 
+-- A numbered step: the number in the brand colour, the text beside it.
+local function Step(parent, n, text, y)
+    local num = S.Text(parent, 15, C.brandSoft or C.brand, true)
+    num:SetPoint("TOPLEFT", PAD, y); num:SetText(n)
+    local t = S.Text(parent, 14, C.text)
+    t:SetPoint("TOPLEFT", PAD + 22, y); t:SetPoint("RIGHT", -PAD, 0)
+    t:SetJustifyH("LEFT"); t:SetWordWrap(true); t:SetText(text)
+    return t
+end
+
+local function Build()
+    win = S.Window("WLHelperFeedback", W, 10, L("Une idée, un bug ?"), nil, WLWritsDB, "feedbackPos")
+    local y = -38 - PAD
+    local intro = S.Text(win, 13, C.dim)
+    intro:SetPoint("TOPLEFT", PAD, y); intro:SetPoint("RIGHT", -PAD, 0); intro:SetJustifyH("LEFT")
+    intro:SetText(L("Le jeu interdit aux addons d'aller sur internet. Il te faut trois clics :"))
+    y = y - 30
+
+    -- 1. what to send: one button per form, the chosen one bright
+    Step(win, "1", L("Choisis ce que tu veux envoyer"), y)
+    y = y - 26
+    local w = (W - 2 * PAD - 22 - 2 * 8) / 3
+    win.buttons = {}
+    for i, kind in ipairs(ORDER) do
+        local bt = S.Button(win, L(FORMS[kind].label), w, 30, "secondary", function() WP.Feedback(kind) end)
+        bt:SetPoint("TOPLEFT", PAD + 22 + (i - 1) * (w + 8), y)
+        win.buttons[kind] = bt
+    end
+    y = y - 30 - 18
+
+    -- 2. the link, selected, ready for Ctrl+C
+    Step(win, "2", L("Copie le lien (Ctrl+C)"), y)
+    y = y - 26
     local eb = CreateFrame("EditBox", nil, win)
-    eb:SetPoint("BOTTOMLEFT", PAD, PAD)
-    eb:SetPoint("BOTTOMRIGHT", -PAD, PAD)
+    eb:SetPoint("TOPLEFT", PAD + 22, y); eb:SetPoint("RIGHT", -PAD, 0)
     eb:SetHeight(28)
     eb:SetAutoFocus(false)
     local probe = S.Text(win, 13, C.text)
@@ -89,15 +118,16 @@ local function Build()
     eb:SetScript("OnEscapePressed", function(self) self:ClearFocus(); win:Hide() end)
     eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
     win.box = eb
+    y = y - 28 - 18
 
-    -- one button per form; the chosen one is the primary
-    local w = (460 - 2 * PAD - 2 * 8) / 3
-    win.buttons = {}
-    for i, kind in ipairs(ORDER) do
-        local b = S.Button(win, L(FORMS[kind].label), w, 32, "secondary", function() WP.Feedback(kind) end)
-        b:SetPoint("BOTTOMLEFT", PAD + (i - 1) * (w + 8), PAD + 28 + 12)
-        win.buttons[kind] = b
-    end
+    -- 3. into the browser
+    local t3 = Step(win, "3", L("Colle-le dans ton navigateur : le formulaire s'ouvre déjà rempli avec ta version."), y)
+    y = y - math.max(18, math.ceil(t3:GetStringHeight() or 18)) - 16
+
+    local note = S.Text(win, 12, C.dim)
+    note:SetPoint("TOPLEFT", PAD + 22, y); note:SetText(L("Il faut un compte GitHub, c'est gratuit."))
+    y = y - 18 - PAD
+    win:SetHeight(-y)
 end
 
 -- Opens the window on a form ("idea" by default) with its link selected, ready for Ctrl+C.
@@ -105,11 +135,13 @@ function WP.Feedback(kind)
     if not win then Build() end
     kind = FORMS[kind] and kind or "idea"
     win.link = Link(kind)
-    for k, b in pairs(win.buttons) do
-        if b.label then b.label:SetTextColor((k == kind and C.text or C.dim)[1], (k == kind and C.text or C.dim)[2], (k == kind and C.text or C.dim)[3]) end
+    for k, bt in pairs(win.buttons) do
+        local c = k == kind and (C.brandSoft or C.brand) or C.dim
+        if bt.label then bt.label:SetTextColor(c[1], c[2], c[3]) end
     end
     win:Show()
     win.box:SetText(win.link)
+    win.box:SetCursorPosition(0)   -- the start of the link shows, not its tail
     win.box:SetFocus()
     win.box:HighlightText()
 end
