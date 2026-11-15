@@ -50,13 +50,29 @@ local function TrySet(tex, path)
   if ok == false or (tex.GetTextureFileID and (not id or id == 0)) then missing[path] = true; return false end
   return true
 end
+-- ForeverDungeonJournal present in the AddOns folder (loaded or not)
+local fdj
+function ns.FDJInstalled()
+  if fdj ~= nil then return fdj end
+  fdj = false
+  local info = (C_AddOns and C_AddOns.GetAddOnInfo) or GetAddOnInfo
+  if info then
+    local ok, name, _, _, _, reason = pcall(info, "ForeverDungeonJournal")
+    fdj = (ok and name ~= nil and reason ~= "MISSING") and true or false
+  end
+  return fdj
+end
 local function Art(tex, d, c)
   if c then c.bigIcon:Hide() end
   tex:SetDesaturated(false)
-  if d.art and ns.IsLoaded("ForeverDungeonJournal") then
+  -- ForeverDungeonJournal's pictures are read from its folder when it is installed, even switched
+  -- off (only the picture file is shown, nothing of its code runs)
+  if d.art and (ns.IsLoaded("ForeverDungeonJournal") or ns.FDJInstalled()) then
     tex:SetTexture("Interface\\AddOns\\ForeverDungeonJournal\\Media\\" .. d.art); tex:SetTexCoord(0, 1, 0.12, 0.88); return true
   end
   local key = d.home or d.key
+  -- the Scarlet Monastery wings share the game's one Monastery picture when there is no other
+  if key and key:find("^ScarletMonastery") then key = "ScarletMonasteryGraveyard" end
   if GAME_ART[key] then tex:SetTexture(GAME_ART[key]); tex:SetTexCoord(0.02, 0.98, 0.26, 0.74); return true end
   if MAYBE_ART[key] and TrySet(tex, LS .. MAYBE_ART[key]) then tex:SetTexCoord(0.02, 0.98, 0.26, 0.74); return true end
   if d.nart then tex:SetTexture(d.nart); tex:SetTexCoord(0, 1, 0.3, 0.7); return true end

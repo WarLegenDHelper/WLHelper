@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.47] — 2026-11-15
+
+### Corrigé / Fixed
+- **Images manquantes dans le choix des donjons** (ailes du Monastère écarlate, Stratholme) : les images de ForeverDungeonJournal sont lues dès qu'il est installé, même désactivé ; sinon les ailes du Monastère prennent l'image du jeu.
+  *Missing dungeon pictures (Scarlet Monastery wings, Stratholme).*
+
 ## [1.0.0-beta.46] — 2026-11-15
 
 ### Corrigé / Fixed
