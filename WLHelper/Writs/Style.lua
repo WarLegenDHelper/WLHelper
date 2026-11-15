@@ -108,6 +108,158 @@ function S.LevelColor(level)
     return S.C.dim
 end
 
+-- ---------------------------------------------------------------- icons
+-- Modern art where this client has it: the first atlas of the list that exists; otherwise a file
+-- every client has, with its own texture coordinates. A missing atlas never shows a green square.
+
+local function TryAtlas(tex, name)
+    if not (tex.SetAtlas and name) then return false end
+    local ok, res = pcall(tex.SetAtlas, tex, name, false)
+    if not ok or res == false then return false end
+    local okG, cur = pcall(tex.GetAtlas, tex)
+    return okG and type(cur) == "string" and cur:lower() == name:lower()
+end
+
+-- S.SetIcon(tex, { "atlas1", "atlas2" }, fallbackPath, { l, r, t, b }) -> true when an atlas was used.
+function S.SetIcon(tex, atlases, path, coords)
+    if type(atlases) == "string" then atlases = { atlases } end
+    for _, a in ipairs(atlases or {}) do
+        if TryAtlas(tex, a) then return true end
+    end
+    tex:SetTexture(path)
+    if coords then tex:SetTexCoord(coords[1], coords[2], coords[3], coords[4]) else tex:SetTexCoord(0, 1, 0, 1) end
+    return false
+end
+
+-- Whether an atlas exists (for |A...|a text markup, which shows nothing when it does not).
+function S.HasAtlas(name)
+    if not (C_Texture and C_Texture.GetAtlasInfo) then return false end
+    local ok, info = pcall(C_Texture.GetAtlasInfo, name)
+    return ok and info ~= nil
+end
+
+local CIRCLES = "Interface\\TargetingFrame\\UI-Classes-Circles"
+-- The class's icon: the modern square one, else the old circle sheet. False when neither is known.
+function S.ClassIcon(tex, class)
+    if not class then return false end
+    if TryAtlas(tex, "classicon-" .. class:lower()) then return true end
+    local tc = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
+    if not tc then return false end
+    tex:SetTexture(CIRCLES); tex:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
+    return true
+end
+
+-- Role icons: the modern ones, else the LFG portrait sheet (coordinates in 64ths).
+local ROLE_SHEET = "Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES"
+local ROLE_PX = { tank = { 0, 19, 22, 41 }, heal = { 20, 39, 1, 20 }, dps = { 20, 39, 22, 41 } }
+local ROLE_ATLAS = {
+    tank = { "roleicon-tiny-tank", "UI-LFG-RoleIcon-Tank", "groupfinder-icon-role-large-tank" },
+    heal = { "roleicon-tiny-healer", "UI-LFG-RoleIcon-Healer", "groupfinder-icon-role-large-heal" },
+    dps  = { "roleicon-tiny-dps", "UI-LFG-RoleIcon-DPS", "groupfinder-icon-role-large-dps" },
+}
+function S.RoleIcon(tex, role)
+    role = ROLE_PX[role] and role or "dps"
+    local px = ROLE_PX[role]
+    return S.SetIcon(tex, ROLE_ATLAS[role], ROLE_SHEET, { px[1] / 64, px[2] / 64, px[3] / 64, px[4] / 64 })
+end
+-- The same icon as text markup, for labels.
+function S.RoleMarkup(role, size)
+    role = ROLE_PX[role] and role or "dps"
+    size = size or 16
+    for _, a in ipairs(ROLE_ATLAS[role]) do
+        if S.HasAtlas(a) then return string.format("|A:%s:%d:%d|a", a, size, size) end
+    end
+    local px = ROLE_PX[role]
+    return string.format("|T%s:%d:%d:0:0:64:64:%d:%d:%d:%d|t", ROLE_SHEET, size, size, px[1], px[2], px[3], px[4])
+end
+
+-- Drawn glyphs: a close cross, chevrons and a tick made of two crisp lines (no font glyph, no
+-- blown-up 16 px texture). g:SetKind("x" | "right" | "left" | "down" | "up" | "check"), g:SetColor(c, a).
+local GLYPH = {
+    x     = function(r) return { { -r, r, r, -r }, { -r, -r, r, r } } end,
+    right = function(r) return { { -r * 0.45, r, r * 0.45, 0 }, { r * 0.45, 0, -r * 0.45, -r } } end,
+    left  = function(r) return { { r * 0.45, r, -r * 0.45, 0 }, { -r * 0.45, 0, r * 0.45, -r } } end,
+    down  = function(r) return { { -r, r * 0.45, 0, -r * 0.45 }, { 0, -r * 0.45, r, r * 0.45 } } end,
+    up    = function(r) return { { -r, -r * 0.45, 0, r * 0.45 }, { 0, r * 0.45, r, -r * 0.45 } } end,
+    check = function(r) return { { -r, 0, -r * 0.3, -r * 0.7 }, { -r * 0.3, -r * 0.7, r, r * 0.75 } } end,
+}
+-- when this client cannot draw lines: the old textures, same meaning
+local GLYPH_FALLBACK = {
+    x = "Interface\\Buttons\\UI-StopButton", check = "Interface\\Buttons\\UI-CheckBox-Check",
+    right = "Interface\\Buttons\\UI-PlusButton-Up", left = "Interface\\Buttons\\UI-PlusButton-Up",
+    down = "Interface\\Buttons\\UI-MinusButton-Up", up = "Interface\\Buttons\\UI-MinusButton-Up",
+}
+
+function S.Glyph(parent, kind, size, color, thickness)
+    local g = CreateFrame("Frame", nil, parent)
+    size = size or 12
+    g:SetSize(size, size)
+    g.th = thickness or (size >= 12 and 2 or 1.5)
+    local l1 = g.CreateLine and g:CreateLine(nil, "ARTWORK")
+    if l1 and l1.SetStartPoint and l1.SetEndPoint and l1.SetThickness then
+        g.lines = { l1, g:CreateLine(nil, "ARTWORK") }
+        for _, l in ipairs(g.lines) do l:SetThickness(g.th) end
+    else
+        if l1 and l1.Hide then l1:Hide() end
+        g.tex = g:CreateTexture(nil, "ARTWORK")
+        g.tex:SetAllPoints()
+    end
+    function g:SetColor(c, a)
+        self.c, self.a = c, a
+        if self.lines then
+            for _, l in ipairs(self.lines) do l:SetColorTexture(c[1], c[2], c[3], a or 1) end
+        else
+            self.tex:SetVertexColor(c[1], c[2], c[3], a or 1)
+        end
+    end
+    function g:SetKind(k)
+        if not GLYPH[k] then k = "x" end
+        if self.kind == k then return end
+        self.kind = k
+        if self.lines then
+            local r = size / 2 - self.th / 2
+            local e = self.th * 0.35   -- each stroke a little longer: no notch where two meet
+            for i, s in ipairs(GLYPH[k](r)) do
+                local dx, dy = s[3] - s[1], s[4] - s[2]
+                local len = math.sqrt(dx * dx + dy * dy)
+                local ux, uy = len > 0 and dx / len or 0, len > 0 and dy / len or 0
+                local l = self.lines[i]
+                l:SetStartPoint("CENTER", self, s[1] - ux * e, s[2] - uy * e)
+                l:SetEndPoint("CENTER", self, s[3] + ux * e, s[4] + uy * e)
+            end
+        else
+            self.tex:SetTexture(GLYPH_FALLBACK[k])
+            self.tex:SetDesaturated(k == "check")
+        end
+    end
+    g:SetKind(kind or "x")
+    g:SetColor(color or S.C.dim)
+    return g
+end
+
+-- A close button: a drawn cross, dim, white with a soft square under the mouse.
+function S.CloseButton(parent, size, onClick, tip, glyphSize)
+    local C = S.C
+    size = size or 24
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(size, size)
+    local inset = size >= 28 and 4 or 1
+    local hl = S.Solid(b, "BACKGROUND", { 1, 1, 1 }, 0)
+    hl:SetPoint("TOPLEFT", inset, -inset); hl:SetPoint("BOTTOMRIGHT", -inset, inset)
+    b.glyph = S.Glyph(b, "x", glyphSize or math.max(8, math.floor(size * 0.36 + 0.5)), C.dim)
+    b.glyph:SetPoint("CENTER")
+    b:SetScript("OnEnter", function(self)
+        hl:SetColorTexture(1, 1, 1, 0.08); self.glyph:SetColor({ 1, 1, 1 })
+        if tip then S.Tip(self, tip) end
+    end)
+    b:SetScript("OnLeave", function(self)
+        hl:SetColorTexture(1, 1, 1, 0); self.glyph:SetColor(C.dim)
+        if tip then S.HideTip() end
+    end)
+    if onClick then b:SetScript("OnClick", onClick) end
+    return b
+end
+
 -- ---------------------------------------------------------------- widgets
 
 -- Buttons: "primary" (filled red, one per screen), "secondary" (outlined), "ghost" (text only),
@@ -392,12 +544,8 @@ function S.Window(name, width, height, title, subtitle, db, posKey)
     f.subtitle = S.Text(h, 13, C.dim)
     f.subtitle:SetPoint("LEFT", f.title, "RIGHT", 8, 0)
     f.subtitle:SetText(subtitle or "")
-    local close = CreateFrame("Button", nil, h)
-    close:SetSize(32, 32); close:SetPoint("RIGHT", -2, 0)
-    local x = S.Text(close, 18, C.dim); x:SetPoint("CENTER"); x:SetText("×")
-    close:SetScript("OnEnter", function() x:SetTextColor(1, 1, 1) end)
-    close:SetScript("OnLeave", function() x:SetTextColor(C.dim[1], C.dim[2], C.dim[3]) end)
-    close:SetScript("OnClick", function() f:Hide() end)
+    local close = S.CloseButton(h, 32, function() f:Hide() end, nil, 11)
+    close:SetPoint("RIGHT", -2, 0)
     f.header, f.close = h, close
     -- Two windows open at once must not mix: the one clicked or opened last comes on top, whole.
     f:SetToplevel(true)
@@ -407,14 +555,15 @@ function S.Window(name, width, height, title, subtitle, db, posKey)
     return f
 end
 
--- A small icon button (header actions).
+-- A small icon button (header actions). texture: a file path, or { atlases = { ... }, path = file }.
 function S.IconButton(parent, texture, size, tip, onClick)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(size or 28, size or 28)
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetSize((size or 28) - 12, (size or 28) - 12)
     b.icon:SetPoint("CENTER")
-    b.icon:SetTexture(texture)
+    if type(texture) == "table" then S.SetIcon(b.icon, texture.atlases, texture.path, texture.coords)
+    else b.icon:SetTexture(texture) end
     b.icon:SetVertexColor(S.C.dim[1], S.C.dim[2], S.C.dim[3])
     b:SetScript("OnEnter", function(self) self.icon:SetVertexColor(1, 1, 1); if tip then S.Tip(self, tip) end end)
     b:SetScript("OnLeave", function(self) self.icon:SetVertexColor(S.C.dim[1], S.C.dim[2], S.C.dim[3]); S.HideTip() end)

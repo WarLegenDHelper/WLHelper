@@ -121,7 +121,10 @@ local function Pool(make)
     return p
 end
 
-local ICON_CHECK = "Interface\\RaidFrame\\ReadyCheck-Ready"
+local ICON_CHECK = "Interface\\RaidFrame\\ReadyCheck-Ready"   -- fallback of the modern tick
+local ATLAS_CHECK = { "common-icon-checkmark" }
+local ATLAS_WARN = { "services-icon-warning" }
+local REFRESH = { atlases = { "uitools-icon-refresh", "UI-RefreshButton" }, path = "Interface\\Buttons\\UI-RefreshButton" }
 local ICON_MAIL = "Interface\\Icons\\INV_Letter_15"
 local ICON_WARN = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew"
 
@@ -271,9 +274,8 @@ local function BuildToday(p)
     today.cards = Pool(function() return MakeZoneCard(sc.content) end)
     today.later = CreateFrame("Button", nil, sc.content)
     today.later:SetSize(W - 2 * PAD, 30)
-    today.laterIcon = today.later:CreateTexture(nil, "ARTWORK")
-    today.laterIcon:SetSize(12, 12); today.laterIcon:SetPoint("LEFT", 2, 0)
-    today.laterIcon:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
+    today.laterIcon = S.Glyph(today.later, "right", 10, C.dim)
+    today.laterIcon:SetPoint("LEFT", 3, 0)
     today.laterText = S.Text(today.later, 13, C.dim)
     today.laterText:SetPoint("LEFT", today.laterIcon, "RIGHT", 6, 0)
     today.later:SetScript("OnClick", function() WP.ShowTab("all") end)
@@ -297,7 +299,7 @@ local function BuildToday(p)
     end)
     today.scan:SetPoint("LEFT", today.tour, "RIGHT", 8, 0)
     local ic = today.scan:CreateTexture(nil, "ARTWORK")
-    ic:SetSize(16, 16); ic:SetPoint("CENTER"); ic:SetTexture("Interface\\Buttons\\UI-RefreshButton")
+    ic:SetSize(16, 16); ic:SetPoint("CENTER"); S.SetIcon(ic, REFRESH.atlases, REFRESH.path)
     today.scanIcon = ic
 end
 
@@ -443,16 +445,16 @@ local function RenderToday()
             SetColor(row.name, S.QualityColor(w.item))
             row.envItem = nil
             if r.state == "ready" then
-                row.status:SetTexture(ICON_CHECK); row.status:SetVertexColor(1, 1, 1)
+                S.SetIcon(row.status, ATLAS_CHECK, ICON_CHECK); row.status:SetVertexColor(1, 1, 1)
                 row.right:SetText(string.format("%.0f, %.0f", w.x, w.y)); SetColor(row.right, C.dim)
             elseif r.state == "bag" then
-                row.status:SetTexture(ICON_MAIL)
+                S.SetIcon(row.status, nil, ICON_MAIL, { 0.08, 0.92, 0.08, 0.92 })
                 -- the item is still missing: the envelope tinted amber
                 if r.ownItem then row.status:SetVertexColor(1, 1, 1) else row.status:SetVertexColor(C.warn[1], C.warn[2], C.warn[3]) end
                 row.envItem = w.writ   -- PlaceEnvelopes lays the secure button over this text
                 row.right:SetText(L("Ouvrir l'enveloppe")); SetColor(row.right, C.warn)
             else
-                row.status:SetTexture(ICON_WARN); row.status:SetVertexColor(1, 1, 1)
+                S.SetIcon(row.status, ATLAS_WARN, ICON_WARN); row.status:SetVertexColor(1, 1, 1)
                 local missingN = math.max(1, (w.count or 1) - (r.haveItems or 0))
                 row.right:SetText(r.itemPrice and string.format(L("manque · %s"), S.Money(r.itemPrice * missingN)) or L("objet manquant"))
                 SetColor(row.right, C.warn)
@@ -556,7 +558,7 @@ local function BuildShop(p)
     buy.heads = Pool(function()
         local b = CreateFrame("Button", nil, sc.content)
         b:SetSize(W - 2 * PAD - 2, 22)
-        b.fold = b:CreateTexture(nil, "ARTWORK"); b.fold:SetSize(14, 14); b.fold:SetPoint("LEFT", 0, 0)
+        b.fold = S.Glyph(b, "right", 10, C.dim); b.fold:SetPoint("LEFT", 2, 0)
         b.t = S.Text(b, 13, C.dim); b.t:SetPoint("LEFT", 18, 0); b.t:SetPoint("RIGHT", -78, 0); b.t:SetJustifyH("LEFT"); b.t:SetWordWrap(false)
         function b:SetText(text) self.t:SetText(text) end
         b:SetScript("OnClick", function(self)
@@ -665,7 +667,7 @@ local function BuildShop(p)
     end)
     buy.rescan:SetPoint("RIGHT", -PAD, 0)
     local ic = buy.rescan:CreateTexture(nil, "ARTWORK")
-    ic:SetSize(16, 16); ic:SetPoint("CENTER"); ic:SetTexture("Interface\\Buttons\\UI-RefreshButton")
+    ic:SetSize(16, 16); ic:SetPoint("CENTER"); S.SetIcon(ic, REFRESH.atlases, REFRESH.path)
     buy.rescanIcon = ic
 end
 
@@ -744,7 +746,7 @@ local function RenderShop()
         local h = head(string.format(L("À rendre en %s · %d writs"), key, writs) .. "  " .. S.Hex(C.muted) .. S.Money(zoneCost) .. "|r",
             groups[key][1] and groups[key][1].map, false, L("Exclure"))
         h.foldKey, h.folded = key, folded
-        h.fold:SetTexture(folded and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
+        h.fold:SetKind(folded and "right" or "down")
         h.fold:Show()
         h:ClearAllPoints(); h:SetPoint("TOPLEFT", 2, -y)
         y = y + 24
@@ -833,7 +835,8 @@ local function BuildAll(p)
     S.Solid(box, "BACKGROUND", C.card):SetAllPoints()
     S.Border(box, C.border)
     local glass = box:CreateTexture(nil, "ARTWORK")
-    glass:SetSize(14, 14); glass:SetPoint("LEFT", 9, 0); glass:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+    glass:SetSize(14, 14); glass:SetPoint("LEFT", 9, 0)
+    S.SetIcon(glass, { "common-search-magnifyingglass" }, "Interface\\Common\\UI-Searchbox-Icon")
     box.hint = S.Text(box, 13, C.muted)
     box.hint:SetPoint("LEFT", 28, 0)
     box.hint:SetText(L("Objet ou zone"))
@@ -871,9 +874,9 @@ local function BuildAll(p)
         b:SetSize(W - 2 * PAD, 30)
         b.text = S.Text(b, 13, C.dim)
         b.text:SetPoint("LEFT", 2, 0)
-        -- plus / minus for the sections that fold (no glyphs: the game font may lack them)
-        b.fold = b:CreateTexture(nil, "ARTWORK")
-        b.fold:SetSize(14, 14); b.fold:SetPoint("LEFT", 0, 0)
+        -- a drawn chevron for the sections that fold (no font glyph: the game font may lack them)
+        b.fold = S.Glyph(b, "right", 10, C.dim)
+        b.fold:SetPoint("LEFT", 2, 0)
         b:SetScript("OnClick", function(self) if self.key then all.open[self.key] = not all.open[self.key]; WP.Refresh() end end)
         return b
     end)
@@ -887,9 +890,8 @@ local function BuildAll(p)
         r.box:SetSize(18, 18); r.box:SetPoint("LEFT", 4, 0)
         r.box.fill = S.Solid(r.box, "BACKGROUND", C.brand, 0); r.box.fill:SetAllPoints()
         r.box.border = S.Border(r.box, C.border)
-        r.box.check = r.box:CreateTexture(nil, "ARTWORK")
-        r.box.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check"); r.box.check:SetDesaturated(true)
-        r.box.check:SetPoint("CENTER"); r.box.check:SetSize(20, 20)
+        r.box.check = S.Glyph(r.box, "check", 12, { 1, 1, 1 })
+        r.box.check:SetPoint("CENTER")
         r.box:SetScript("OnClick", function(self)
             local x = self:GetParent().row
             if x and x.state ~= "done" then WP.SetPicked(x.w, not WP.IsPicked(x.w)) end
@@ -968,7 +970,7 @@ local function RenderAll()
         h.text:SetText(text)
         h.text:ClearAllPoints()
         if key then
-            h.fold:SetTexture(all.open[key] and "Interface\\Buttons\\UI-MinusButton-Up" or "Interface\\Buttons\\UI-PlusButton-Up")
+            h.fold:SetKind(all.open[key] and "down" or "right")
             h.fold:Show(); h.text:SetPoint("LEFT", 18, 0)
         else
             h.fold:Hide(); h.text:SetPoint("LEFT", 2, 0)
@@ -1043,7 +1045,7 @@ end
 local function Build()
     local db = WLWritsDB
     frame = S.Window("WLHelperComptoir", W, H, L("Writs"), nil, db, "point")
-    local opts = S.IconButton(frame.header, "Interface\\Buttons\\UI-OptionsButton", 28, { L("Réglages des Writs") }, function()
+    local opts = S.IconButton(frame.header, { atlases = { "QuestLog-icon-setting" }, path = "Interface\\Buttons\\UI-OptionsButton" }, 28, { L("Réglages des Writs") }, function()
         if WP.OpenOptions then WP.OpenOptions("comptoir") end
     end)
     opts:SetPoint("RIGHT", frame.close, "LEFT", 0, 0)

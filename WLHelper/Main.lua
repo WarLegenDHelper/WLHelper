@@ -127,7 +127,20 @@ end
 local OnInstanceEntry
 OnInstanceEntry = function()
   local keys, iid = ns.InstanceKeys()
-  if #keys == 0 then ns.instOffer = nil; ns.instSeen = nil; return end
+  if #keys == 0 then
+    ns.instOffer = nil; ns.instSeen = nil
+    -- out of a route dungeon: the "inside" band goes away and the guide goes back to the current step
+    local was = ns.instIn
+    ns.instIn = nil
+    local f = ns.frame
+    if was and f and f:IsShown() and ns.route then
+      ns.Refresh(true)
+      local cur = ns.route.steps[f.view or 0]
+      if f.auto and (not cur or cur.ins == was) then ns.GoTo(f.auto) end
+      ns.Print(L.INST_LEFT:format(ns.DName(was) or was))
+    end
+    return
+  end
   if ns.instSeen and ns.instSeen == iid then return end
   -- after a /reload inside, the saved route is rebuilt a moment later: wait for it
   if not ns.route and WLDTDB.sel and next(WLDTDB.sel) then C_Timer.After(1.5, OnInstanceEntry) return end
@@ -138,12 +151,14 @@ OnInstanceEntry = function()
   for _, k in ipairs(keys) do if sel[k] then inRoute = k break end end
   if inRoute then
     ns.instOffer = nil
+    ns.instIn = inRoute
     if not f:IsShown() then f:Show(); WLDTDB.hidden = false end
     ns.Refresh(true)
     local log = ns.LogEntries()
     for i, st in ipairs(ns.route.steps) do
       if st.ins == inRoute and not st.gate and not ns.IsStepDone(log, i) then ns.GoTo(i) break end
     end
+    ns.Print(L.INST_IN:format(ns.DName(inRoute) or inRoute))
   else
     local cands = {}
     for _, k in ipairs(keys) do if ns.InstLeft(k) > 0 then table.insert(cands, k) end end

@@ -6,6 +6,36 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.36] — 2026-11-15
+
+### Ajouté / Added
+- **Commandes, grille des métiers et catalogue de la guilde** : l'onglet Artisans s'ouvre sur une grille (une grande icône par métier, nombre d'artisans, d'objets, qui est en ligne). Un clic montre tout ce que la guilde sait fabriquer dans ce métier, avec qui peut le faire, une recherche, un filtre « en ligne » et un bouton « Demander ».
+  *Orders: profession grid and the guild's craftable items per profession.*
+- **Commandes, onglet « Demander »** : demande un objet par son nom ou un lien, choisis le métier (ou « je ne sais pas »), la quantité et le prix ; les artisans de ce métier reçoivent l'alerte, le premier qui accepte la prend. Compatible avec les anciennes versions.
+  *Orders: a Request tab for any item, even one nobody has shared.*
+- **Groupes, sélecteur de donjons en images** : « Choisir le donjon » ouvre de grandes cartes avec l'écran de chargement, le nom et les niveaux ; plusieurs choix possibles.
+  *LFG: dungeon picker with loading-screen art, multi-select.*
+- **Carte des vols** : un anneau doré qui pulse autour de la destination prévue, avec son nom.
+  *Flight map: a pulsing ring on the planned landing.*
+- **Guide, dans le donjon** : un bandeau « DANS LE DONJON : … » avec la progression des quêtes à l'intérieur et le boss suivant ; un clic ramène à l'étape du donjon.
+  *Guide: a clear "inside the dungeon" band.*
+
+### Modifié / Changed
+- **Flèche GPS** redessinée en haute définition ; dorée, elle passe au vert quand tu es dans l'axe.
+  *New HD GPS arrow.*
+- **Distances en mètres et km** dans toutes les langues (yards en option dans Réglages › GPS).
+  *Distances in meters and km everywhere; yards as an option.*
+- **Bouton de téléportation** : il s'enfonce au clic, montre « Téléportation en cours » et une barre d'incantation, dit si c'est interrompu.
+  *Teleport button: pressed look and cast progress.*
+- **« Prêt ? » devient « Check-list »** avec une icône d'état et une explication claire de ce qui est vérifié.
+  *"Ready?" is now a clear Checklist.*
+- **Étapes terminées** : la liste des étapes est affichée par défaut, les étapes faites restent visibles et se rouvrent, même après la fin de la route.
+  *Finished steps stay visible and can be reopened.*
+- **Objectifs des quêtes** : le GPS suit la zone du jeu quand la quête est dans le journal ; progression « 2/5 » en direct.
+- **Infobulles d'objet** : le bloc Geared Forever est masqué puisque notre ligne donne le même % (réglable).
+  *Tooltips: Geared Forever's block hidden, our line shows the same %.*
+- **Icônes plus nettes** un peu partout (icônes de classe et de rôle modernes, boutons de fermeture, coches).
+
 ## [1.0.0-beta.35] — 2026-11-15
 
 ### Ajouté / Added

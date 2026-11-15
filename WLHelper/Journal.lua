@@ -10,6 +10,9 @@ local L = ns.L
 -- ---------------------------------------------------------------- the journal
 local function CurrentDungeonKey()
   local f = ns.frame
+  -- standing in one of the route's dungeons: that one, whatever step is on screen
+  local inside = ns.InsideKey and ns.InsideKey()
+  if inside then return inside end
   local steps = ns.route and ns.route.steps
   local st = steps and f and steps[f.view or f.auto or 1]
   if st and st.d then return st.d end

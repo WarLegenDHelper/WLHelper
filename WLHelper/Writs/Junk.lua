@@ -113,7 +113,7 @@ local function Banner()
     b.text = S.Text(b, 12, C.dim); b.text:SetPoint("TOPLEFT", 56, -30); b.text:SetWidth(150); b.text:SetWordWrap(false)
     b.go = S.Button(b, L("Libérer une place"), 112, 30, "primary", function() Free(); b:Hide() end)
     b.go:SetPoint("RIGHT", -30, 0)
-    b.close = S.Button(b, "x", 20, 20, "secondary", function() b:Hide() end, { L("Fermer") })
+    b.close = S.CloseButton(b, 20, function() b:Hide() end, { L("Fermer") }, 8)
     b.close:SetPoint("TOPRIGHT", -4, -4)
     b:Hide()
     banner = b

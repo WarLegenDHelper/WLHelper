@@ -51,6 +51,13 @@ local function Art(tex, d, c)
   if c then c.bigIcon:SetTexture(d.icon or "Interface\\Icons\\INV_Misc_Map_01"); c.bigIcon:Show() end
   return false
 end
+-- the same picture for other windows (the Events page's dungeon picker): the texture, the dungeon's
+-- key and, optionally, a texture that shows the dungeon's icon when there is no picture
+function ns.DungeonArt(tex, dkey, bigIcon)
+  local d = ns.D and ns.D[dkey]
+  if not d then tex:SetColorTexture(0.10, 0.11, 0.13, 1); if bigIcon then bigIcon:Hide() end; return false end
+  return Art(tex, d, bigIcon and { bigIcon = bigIcon } or nil)
+end
 
 -- a shade from transparent to dark, top or bottom of the card
 local function Gradient(tex, fromTop, a)

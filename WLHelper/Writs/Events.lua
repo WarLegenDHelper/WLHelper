@@ -91,6 +91,19 @@ ns.AddEnglish({
     ["Créer un événement"] = "Create an event",
     ["Sera publié : %s, %s"] = "Will be published: %s, %s",
     ["Cette heure est déjà passée aujourd'hui. Choisis Demain."] = "That time is already past today. Pick Tomorrow.",
+    -- the dungeon / raid picker
+    ["Choisir le donjon"] = "Pick the dungeon",
+    ["Choisir le raid"] = "Pick the raid",
+    ["Choisir les donjons"] = "Pick the dungeons",
+    ["Choisir les raids"] = "Pick the raids",
+    ["(+%d)"] = "(+%d)",
+    ["Clique sur une carte pour la choisir, plusieurs à la fois si tu veux."] = "Click a card to pick it, several at once if you like.",
+    ["Pour ton niveau"] = "For your level",
+    ["Les autres"] = "The others",
+    ["Effacer"] = "Clear",
+    ["Valider"] = "Apply",
+    ["Valider (%d)"] = "Apply (%d)",
+    ["Écris ce que tu organises dans Quoi, juste en dessous."] = "Write what you organize in What, just below.",
 })
 
 local PREFIX = "WLHevt"
@@ -727,17 +740,241 @@ local function Instances(kind)
     for _, k in ipairs(root.ORDER or {}) do
         local d = root.D and root.D[k]
         if d and not d.cq and ((kind == "raid") == (d.raid == true)) then
-            out[#out + 1] = { k, root.DName and root.DName(k) or d.n, d.lvl and d.lvl[1] or 0 }
+            local lo = d.lvl and d.lvl[1] or 0
+            out[#out + 1] = { k, root.DName and root.DName(k) or d.n, lo, d.lvl and d.lvl[2] or lo }
         end
     end
     table.sort(out, function(a, b) if a[3] ~= b[3] then return a[3] < b[3] end return a[2] < b[2] end)
     return out
 end
 local picked = {}
-local function PickedTitle()
+-- the names picked, in level order
+local function PickedNames()
     local t = {}
     for _, e in ipairs(Instances(draft.kind == "raid" and "raid" or "dg")) do if picked[e[1]] then t[#t + 1] = e[2] end end
-    return table.concat(t, " + ")
+    return t
+end
+local function PickedTitle() return table.concat(PickedNames(), " + ") end
+
+-- "Maraudon, Zul'Farrak" on one line; the names that do not fit become "(+2)", never a cut name
+local function FitNames(fs, names, maxW)
+    local measure = fs.GetUnboundedStringWidth or fs.GetStringWidth
+    fs:SetWidth(maxW); fs:SetWordWrap(false)
+    for i = #names, 1, -1 do
+        local s = table.concat(names, ", ", 1, i)
+        if i < #names then s = s .. "  " .. string.format(L("(+%d)"), #names - i) end
+        fs:SetText(s)
+        if (measure(fs) or 0) <= maxW then return end
+    end
+    -- even the first name alone is too long: shorten the name ourselves so the "(+n)" count stays seen
+    local suffix = #names > 1 and ("  " .. string.format(L("(+%d)"), #names - 1)) or ""
+    local name = names[1]
+    while #name > 1 do
+        -- drop the last UTF-8 character (its continuation bytes too)
+        local cut = #name
+        while cut > 1 and name:byte(cut) >= 0x80 and name:byte(cut) < 0xC0 do cut = cut - 1 end
+        name = (name:sub(1, cut - 1):gsub("[%s,:%-]+$", ""))
+        fs:SetText(name .. "..." .. suffix)
+        if (measure(fs) or 0) <= maxW then return end
+    end
+    fs:SetText(names[1] .. suffix)
+end
+
+-- a card name on one line, never cut: 13px bold, else 12px bold, else 11px
+local function FitCardName(fs, text, maxW)
+    local measure = fs.GetUnboundedStringWidth or fs.GetStringWidth
+    local canSize = root.SetFont and fs._size ~= nil
+    for _, size in ipairs({ 13, 12, 11 }) do
+        if canSize then fs._size = size; root.SetFont(fs) end
+        fs:SetText(text)
+        if not canSize or (measure(fs) or 0) <= maxW then return end
+    end
+end
+
+-- ---------------------------------------------------------------- the dungeon / raid picker
+-- Big cards with the loading-screen art of the guide's picker, two columns, several can be picked.
+-- The choice is kept aside (sel) until "Valider": closing the window changes nothing.
+local PCW, PCH, PGAP = 260, 96, 8   -- 2 x 260 + 8 + 2 x PAD = 560, the width of the Events window
+local PW, PH = 2 * PCW + PGAP + 2 * PAD, 540
+local picker
+local sel = {}
+
+local function PaintPickCard(c)
+    local on = sel[c.key] and true or false
+    c.edge(on and C.brand or C.border)
+    c.edge2(C.brand, on and 1 or 0)
+    c.tint:SetShown(on)
+    c.checkBg:SetShown(on); c.check:SetShown(on)
+end
+
+local function PickCard(parent)
+    local c = CreateFrame("Button", nil, parent)
+    c:SetSize(PCW, PCH)
+    c.art = c:CreateTexture(nil, "BACKGROUND")
+    c.art:SetPoint("TOPLEFT", 1, -1); c.art:SetPoint("BOTTOMRIGHT", -1, 1)
+    -- the dungeon's icon on a dark card when the client has no picture for it
+    c.icon = c:CreateTexture(nil, "ARTWORK")
+    c.icon:SetSize(40, 40); c.icon:SetPoint("CENTER", 0, 12); c.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.icon:Hide()
+    c.tint = S.Solid(c, "ARTWORK", C.brand, 0.16)
+    c.tint:SetPoint("TOPLEFT", 1, -1); c.tint:SetPoint("BOTTOMRIGHT", -1, 1); c.tint:Hide()
+    -- a dark band under the name, so the text reads on any picture
+    local shade = S.Solid(c, "BORDER", { 0, 0, 0 }, 0.62)
+    shade:SetPoint("BOTTOMLEFT", 1, 1); shade:SetPoint("BOTTOMRIGHT", -1, 1); shade:SetHeight(40)
+    c.name = S.Text(c, 13, C.text, true)
+    c.name:SetPoint("BOTTOMLEFT", 10, 21); c.name:SetWidth(PCW - 20); c.name:SetJustifyH("LEFT"); c.name:SetWordWrap(false)
+    c.name:SetShadowOffset(1, -1); c.name:SetShadowColor(0, 0, 0, 1)
+    c.lv = S.Text(c, 11, C.dim)
+    c.lv:SetPoint("BOTTOMLEFT", 10, 6); c.lv:SetWidth(PCW - 20); c.lv:SetJustifyH("LEFT"); c.lv:SetWordWrap(false)
+    c.edge = S.Border(c, C.border)
+    -- the second pixel of the brand frame, inside the first one
+    local inner = CreateFrame("Frame", nil, c)
+    inner:SetPoint("TOPLEFT", 1, -1); inner:SetPoint("BOTTOMRIGHT", -1, 1)
+    c.edge2 = S.Border(inner, C.brand, 0)
+    c.checkBg = S.Solid(inner, "OVERLAY", { 0, 0, 0 }, 0.7)
+    c.checkBg:SetSize(26, 26); c.checkBg:SetPoint("TOPRIGHT", -6, -6)
+    c.check = inner:CreateTexture(nil, "OVERLAY", nil, 2)
+    c.check:SetSize(26, 26); c.check:SetPoint("CENTER", c.checkBg, "CENTER", 0, 0)
+    c.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+    local hl = S.Solid(c, "HIGHLIGHT", { 1, 1, 1 }, 0.06)
+    hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1)
+    c:SetScript("OnClick", function(self)
+        sel[self.key] = not sel[self.key] or nil
+        PaintPickCard(self)
+        if picker then picker.UpdateOk() end
+    end)
+    return c
+end
+
+local function BuildPicker(host)
+    local f = CreateFrame("Frame", "WLHelperEventsPicker", host)
+    f:SetSize(PW, PH); f:SetPoint("CENTER", host, "CENTER", 0, 0)
+    f:SetFrameStrata("DIALOG"); f:SetToplevel(true); f:SetClampedToScreen(true); f:EnableMouse(true)
+    tinsert(UISpecialFrames, "WLHelperEventsPicker")
+    S.Solid(f, "BACKGROUND", C.bg):SetAllPoints()
+    S.Border(f, C.border)
+    local hd = CreateFrame("Frame", nil, f)
+    hd:SetPoint("TOPLEFT", 1, -1); hd:SetPoint("TOPRIGHT", -1, -1); hd:SetHeight(38)
+    S.Solid(hd, "BACKGROUND", C.header):SetAllPoints()
+    local line = S.Solid(hd, "BORDER", C.divider); line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); line:SetHeight(1)
+    f.close = S.IconButton(hd, "Interface\\Buttons\\UI-StopButton", 28, nil, function() f:Hide() end)
+    f.close:SetPoint("RIGHT", -6, 0)
+    f.title = S.Text(hd, 15, C.text, true)
+    f.title:SetPoint("LEFT", 12, 0); f.title:SetPoint("RIGHT", f.close, "LEFT", -8, 0); f.title:SetJustifyH("LEFT")
+    f.hint = S.Text(f, 12, C.muted)
+    f.hint:SetPoint("TOPLEFT", PAD, -50); f.hint:SetPoint("RIGHT", -PAD, 0); f.hint:SetJustifyH("LEFT")
+    f.hint:SetText(L("Clique sur une carte pour la choisir, plusieurs à la fois si tu veux."))
+    -- the grid, scrolled with the wheel
+    local sf = CreateFrame("ScrollFrame", nil, f)
+    sf:SetPoint("TOPLEFT", PAD, -72); sf:SetPoint("BOTTOMRIGHT", -PAD, 56)
+    local content = CreateFrame("Frame", nil, sf); content:SetSize(PW - 2 * PAD, 10); sf:SetScrollChild(content)
+    sf:EnableMouseWheel(true)
+    sf:SetScript("OnMouseWheel", function(self, dlt)
+        local max = math.max(0, content:GetHeight() - (self:GetHeight() or 0))
+        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - dlt * (PCH + PGAP))))
+    end)
+    f.sf, f.content, f.cards, f.heads = sf, content, {}, {}
+    -- the bar at the bottom: clear on the left, apply on the right
+    local bl = S.Solid(f, "BORDER", C.divider); bl:SetPoint("BOTTOMLEFT", 1, 52); bl:SetPoint("BOTTOMRIGHT", -1, 52); bl:SetHeight(1)
+    f.clear = S.Button(f, L("Effacer"), 120, 32, "secondary", function()
+        wipe(sel)
+        for _, c in ipairs(f.cards) do if c:IsShown() then PaintPickCard(c) end end
+        f.UpdateOk()
+    end)
+    f.clear:SetPoint("BOTTOMLEFT", PAD, 10)
+    f.ok = S.Button(f, L("Valider"), 180, 32, "primary", function()
+        wipe(picked)
+        for k in pairs(sel) do picked[k] = true end
+        f:Hide()
+        if ui.onPicked then ui.onPicked() end
+    end)
+    f.ok:SetPoint("BOTTOMRIGHT", -PAD, 10)
+    function f.UpdateOk()
+        local n = 0
+        for _ in pairs(sel) do n = n + 1 end
+        f.ok.label:SetText(n > 0 and string.format(L("Valider (%d)"), n) or L("Valider"))
+    end
+    f:Hide()
+    -- One Escape hides every shown frame of UISpecialFrames, so while the picker is up the Events
+    -- window leaves that list: Escape closes the picker only, the form stays open.
+    local WIN = "WLHelperEvents"
+    local function Unlist()
+        for k = #UISpecialFrames, 1, -1 do
+            if UISpecialFrames[k] == WIN then table.remove(UISpecialFrames, k) end
+        end
+    end
+    local function Relist()
+        if f:IsVisible() then return end
+        for _, v in ipairs(UISpecialFrames) do if v == WIN then return end end
+        tinsert(UISpecialFrames, WIN)
+    end
+    f:SetScript("OnShow", Unlist)
+    -- put back one frame later: CloseSpecialWindows is still walking the list when the picker hides,
+    -- and a name added during that walk could be hidden by the same Escape
+    f:SetScript("OnHide", function()
+        if C_Timer and C_Timer.After then C_Timer.After(0, Relist) else Relist() end
+    end)
+    return f
+end
+
+-- opens the picker on the kind of the form (dungeons or raids), the current choice already ticked
+function WP.OpenEventPicker()
+    if not (pages.create and (draft.kind == "dg" or draft.kind == "raid")) then return end
+    picker = picker or BuildPicker(pages.create)
+    local raid = draft.kind == "raid"
+    picker.title:SetText(raid and L("Choisir les raids") or L("Choisir les donjons"))
+    wipe(sel)
+    for k in pairs(picked) do sel[k] = true end
+    -- the ones for your level first, then the others; each part by level
+    local lv = UnitLevel("player") or 1
+    local mine, rest = {}, {}
+    for _, e in ipairs(Instances(raid and "raid" or "dg")) do
+        local ok = lv >= e[3] - 4 and lv <= e[4] + 1
+        if ok then mine[#mine + 1] = e else rest[#rest + 1] = e end
+    end
+    local parts = {}
+    if #mine > 0 and #rest > 0 then
+        parts = { { L("Pour ton niveau"), mine }, { L("Les autres"), rest } }
+    else
+        parts = { { nil, #mine > 0 and mine or rest } }
+    end
+    for _, c in ipairs(picker.cards) do c:Hide() end
+    for _, h in ipairs(picker.heads) do h:Hide() end
+    local y, i, hi = 0, 0, 0
+    for _, part in ipairs(parts) do
+        if part[1] then
+            hi = hi + 1
+            local h = picker.heads[hi]
+            if not h then
+                h = S.Text(picker.content, 12, C.dim, true); h:SetJustifyH("LEFT"); h:SetWidth(PW - 2 * PAD)
+                picker.heads[hi] = h
+            end
+            h:ClearAllPoints(); h:SetPoint("TOPLEFT", 2, -y)
+            h:SetText(part[1] .. "  ·  " .. #part[2]); h:Show()
+            y = y + 22
+        end
+        for j, e in ipairs(part[2]) do
+            i = i + 1
+            local c = picker.cards[i] or PickCard(picker.content); picker.cards[i] = c
+            local col, row = (j - 1) % 2, math.floor((j - 1) / 2)
+            c:ClearAllPoints(); c:SetPoint("TOPLEFT", col * (PCW + PGAP), -(y + row * (PCH + PGAP)))
+            c.key = e[1]
+            if root.DungeonArt then
+                root.DungeonArt(c.art, e[1], c.icon)
+            else
+                c.art:SetColorTexture(0.10, 0.11, 0.13, 1)
+            end
+            FitCardName(c.name, e[2], PCW - 20)
+            c.lv:SetText(string.format(L("niv. %s"), e[3] == e[4] and tostring(e[3]) or (e[3] .. "-" .. e[4])))
+            PaintPickCard(c)
+            c:Show()
+        end
+        y = y + math.ceil(#part[2] / 2) * (PCH + PGAP) + 6
+    end
+    picker.content:SetHeight(math.max(10, y))
+    picker.sf:SetVerticalScroll(0)
+    picker.UpdateOk()
+    picker:Show(); picker:Raise()
+    return picker
 end
 
 local function BuildCreate(p)
@@ -770,47 +1007,47 @@ local function BuildCreate(p)
             ui.recap:SetText("")
         end
     end
-    -- the kind, then the instances of that kind as chips (several can be picked)
-    local chips = CreateFrame("ScrollFrame", nil, p)
-    local inner = CreateFrame("Frame", nil, chips)
-    local function Chips()
-        for _, c in ipairs(inner.items or {}) do c:Hide() end
-        inner.items = inner.items or {}
-        local list = (draft.kind == "dg" or draft.kind == "raid") and Instances(draft.kind) or {}
-        -- two columns: the full French names fit (Monastère écarlate : Cathédrale...)
-        local cw, ch, cols = math.floor((W - 2 * PAD - 6) / 2), 26, 2
-        for i, e in ipairs(list) do
-            local c = inner.items[i]
-            if not c then
-                c = CreateFrame("Button", nil, inner)
-                c:SetSize(cw, ch)
-                c.bg = S.Solid(c, "BACKGROUND", C.card); c.bg:SetAllPoints()
-                c.edge = S.Border(c, C.border)
-                -- the level has its own slot on the right, so a long name is cut before it, never the level
-                c.lv = S.Text(c, 12, C.muted); c.lv:SetPoint("RIGHT", -6, 0); c.lv:SetJustifyH("RIGHT")
-                c.t = S.Text(c, 12, C.text); c.t:SetPoint("LEFT", 8, 0); c.t:SetPoint("RIGHT", c.lv, "LEFT", -4, 0); c.t:SetJustifyH("LEFT"); c.t:SetWordWrap(false)
-                c:SetScript("OnClick", function(self)
-                    picked[self.key] = not picked[self.key] or nil
-                    ui.title:SetText(PickedTitle())
-                    Chips()
-                    Recap()
-                end)
-                inner.items[i] = c
-            end
-            c.key = e[1]
-            c:ClearAllPoints(); c:SetPoint("TOPLEFT", ((i - 1) % cols) * (cw + 6), -math.floor((i - 1) / cols) * (ch + 6))
-            c.t:SetText(e[2]); c.lv:SetText(e[3])
-            local on = picked[e[1]]
-            c.bg:SetColorTexture((on and C.brandBg or C.card)[1], (on and C.brandBg or C.card)[2], (on and C.brandBg or C.card)[3], 1)
-            c.edge(on and C.brand or C.border)
-            c:Show()
+    -- the kind, then (dungeon or raid) one button that opens the picker with the pictures
+    ui.pick = S.Button(p, "", W - 2 * PAD, 34, "secondary", function() WP.OpenEventPicker() end)
+    ui.pick.icon = ui.pick:CreateTexture(nil, "ARTWORK")
+    ui.pick.icon:SetSize(22, 22); ui.pick.icon:SetPoint("LEFT", 8, 0); ui.pick.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    ui.pick.arrow = ui.pick:CreateTexture(nil, "ARTWORK")
+    ui.pick.arrow:SetSize(16, 16); ui.pick.arrow:SetPoint("RIGHT", -10, 0)
+    ui.pick.arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+    -- the label between the icon and the arrow: 40 px kept on each side
+    ui.pick.label:ClearAllPoints(); ui.pick.label:SetPoint("CENTER", 0, 0)
+    ui.pickHint = S.Text(p, 12, C.muted)
+    ui.pickHint:SetWidth(W - 2 * PAD); ui.pickHint:SetJustifyH("LEFT")
+    ui.pickHint:SetText(L("Écris ce que tu organises dans Quoi, juste en dessous."))
+    local function PickUpdate()
+        local inst = draft.kind == "dg" or draft.kind == "raid"
+        ui.pick:SetShown(inst); ui.pickHint:SetShown(not inst)
+        if not inst then return end
+        local names = PickedNames()
+        local lb = ui.pick.label
+        if #names == 0 then
+            lb:SetWidth(W - 2 * PAD - 80); lb:SetWordWrap(false)
+            lb:SetText(draft.kind == "raid" and L("Choisir le raid") or L("Choisir le donjon"))
+            ui.pick.icon:SetTexture(draft.kind == "raid" and "Interface\\Icons\\INV_Misc_Head_Dragon_01" or "Interface\\Icons\\INV_Misc_Map_01")
+        else
+            FitNames(lb, names, W - 2 * PAD - 80)
+            local first
+            for _, e in ipairs(Instances(draft.kind)) do if picked[e[1]] then first = e[1]; break end end
+            local d = first and root.D and root.D[first]
+            ui.pick.icon:SetTexture(d and d.icon or "Interface\\Icons\\INV_Misc_Map_01")
         end
-        inner:SetSize(W - 2 * PAD, math.max(10, math.ceil(#list / cols) * (ch + 6)))
-        chips:SetShown(#list > 0)
+    end
+    -- the picker's "Valider": the title from the names, like the chips did
+    ui.onPicked = function()
+        ui.title:SetText(PickedTitle())
+        PickUpdate()
+        Recap()
     end
     local kind = S.Segmented(p, { { "dg", L("Donjon") }, { "raid", L("Raid") }, { "quest", L("Quête") }, { "other", L("Autre") } },
         function() return draft.kind end, function(v)
-            draft.kind = v; wipe(picked); ui.title:SetText(""); Chips()
+            draft.kind = v; wipe(picked); ui.title:SetText("")
+            if picker then picker:Hide() end
+            PickUpdate()
             if not placesTouched and PRESET[v] then
                 for i, role in ipairs(ROLES) do
                     draft[role] = PRESET[v][i]
@@ -820,18 +1057,14 @@ local function BuildCreate(p)
             Recap()
         end, 28)
     kind:SetPoint("TOPLEFT", PAD, y); y = y - 38
-    chips:SetPoint("TOPLEFT", PAD, y); chips:SetSize(W - 2 * PAD, 104); chips:SetScrollChild(inner)
-    chips:EnableMouseWheel(true)
-    chips:SetScript("OnMouseWheel", function(self, dlt)
-        local max = math.max(0, inner:GetHeight() - self:GetHeight())
-        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - dlt * 32)))
-    end)
-    y = y - 112
+    ui.pick:SetPoint("TOPLEFT", PAD, y)
+    ui.pickHint:ClearAllPoints(); ui.pickHint:SetPoint("TOPLEFT", PAD, y - 10)
+    y = y - 46
     Label(L("Quoi"))
     ui.title = Box(p, W - 2 * PAD, L("Zul'Farrak, Onyxia, farm de cuir..."))
     ui.title:SetPoint("TOPLEFT", PAD, y); ui.title:SetMaxLetters(60); y = y - 40
     ui.title:HookScript("OnTextChanged", function() Recap() end)
-    Chips()
+    PickUpdate()
     Label(L("Jour"))
     local function DaySet(v) draft.day = v; Recap() end
     ui.day = S.Segmented(p, DayChoices(), function() return draft.day end, DaySet, 28)
@@ -878,7 +1111,7 @@ local function BuildCreate(p)
         end
         local function N(role) return tonumber(ui["n_" .. role]:GetText()) or 0 end
         WP.CreateEvent(title, when, N("tank"), N("heal"), N("dps"), ui.note:GetText())
-        ui.err:SetText(""); ui.title:SetText(""); ui.note:SetText(""); wipe(picked); Chips()
+        ui.err:SetText(""); ui.title:SetText(""); ui.note:SetText(""); wipe(picked); PickUpdate()
         placesTouched = false
         Recap()
         WP.ShowEventsTab("upcoming")
@@ -968,6 +1201,8 @@ function WP.ToggleEvents()
     WP.ShowEventsTab(current)
 end
 function WP.HideEvents() if win then win:Hide() end end
+-- the title typed or built from the picker (read by the tests)
+function WP.EventDraftTitle() return ui.title and ui.title:GetText() or "", ui.title end
 
 -- askedAt is declared above OnMessage, which reads it
 function WP.AskEvents()

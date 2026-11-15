@@ -24,6 +24,12 @@ ns.AddEnglish({
 
 local ARROW = "Interface\\Buttons\\Arrow-Up-Up"
 local GREEN = { 0.25, 1, 0.3 }
+-- the game's own green "upgrade" arrow of the bags when this client has it (already green: no tint)
+local ARROW_ATLAS = { "bags-greenarrow" }
+local function PaintArrow(tex)
+    if ns.S.SetIcon(tex, ARROW_ATLAS, ARROW) then tex:SetVertexColor(1, 1, 1)
+    else tex:SetVertexColor(GREEN[1], GREEN[2], GREEN[3]) end
+end
 
 local function Active() return WP.ModuleOn("upgrades") end
 WP.UpgradesActive = Active
@@ -42,6 +48,19 @@ local function Loaded(name)
     return f and f(name) and true or false
 end
 local function UseGF() return WLWritsDB.upgradeSource ~= "wl" and Loaded("GearedForever") end
+-- Hides Geared Forever's block in item tooltips while our line shows the same % (an option, on by
+-- default); puts it back when the option or our line is off.
+function WP.ApplyGFTip()
+    local db = GearedForeverDB
+    if not db or not Loaded("GearedForever") then return end
+    local hide = UseGF() and WLWritsDB.upgradeTip ~= false and WLWritsDB.hideGFTip ~= false
+    if hide then
+        if db.tooltip ~= false then WLWritsDB.gfTipHidden = true end
+        db.tooltip = false
+    elseif WLWritsDB.gfTipHidden then
+        db.tooltip = true; WLWritsDB.gfTipHidden = nil
+    end
+end
 WP.UpgradeUsesGF = UseGF
 local gfTip
 local function GFSpec()
@@ -58,7 +77,14 @@ local function GFVerdict(link)
     if not gfTip then gfTip = CreateFrame("GameTooltip", "WLHelperGFTip", nil, "GameTooltipTemplate") end
     gfTip:SetOwner(WorldFrame, "ANCHOR_NONE")
     gfTip:ClearLines()
-    if not pcall(gfTip.SetHyperlink, gfTip, link) then gfTip:Hide(); return false end
+    -- Geared Forever's own block may be hidden from the player's tooltips (it repeats our %):
+    -- it is switched on just for this private read
+    local db = GearedForeverDB
+    local was, wasShift = db and db.tooltip, db and db.tooltipShift
+    if db then db.tooltip = true; db.tooltipShift = nil end
+    local okSet = pcall(gfTip.SetHyperlink, gfTip, link)
+    if db then db.tooltip = was; db.tooltipShift = wasShift end
+    if not okSet then gfTip:Hide(); return false end
     local want = GFSpec()
     local saw, best, equipped = false, nil, false
     for i = 1, gfTip:NumLines() do
@@ -240,8 +266,7 @@ local function Mark(button, link, icon)
     if not m then
         m = {}
         m.arrow = button:CreateTexture(nil, "OVERLAY", nil, 7)
-        m.arrow:SetTexture(ARROW)
-        m.arrow:SetVertexColor(GREEN[1], GREEN[2], GREEN[3])
+        PaintArrow(m.arrow)
         m.arrow:SetSize(16, 16)
         m.text = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
         if icon then
@@ -388,8 +413,7 @@ local function HookBaganator()
         return IsUpgrade(details.itemLink)
     end, function(itemButton)
         local arrow = itemButton:CreateTexture(nil, "OVERLAY")
-        arrow:SetTexture(ARROW)
-        arrow:SetVertexColor(GREEN[1], GREEN[2], GREEN[3])
+        PaintArrow(arrow)
         arrow:SetSize(16, 16)
         return arrow
     end, { corner = "top_left", priority = 1 })
@@ -436,6 +460,7 @@ for _, e in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "CHARACTER_P
 end
 ev:SetScript("OnEvent", function(_, e, ...)
     if e == "PLAYER_LOGIN" then
+        WP.ApplyGFTip()
         HookBaganator()
         if EUI_Bags and EUI_Bags.RefreshInventory then
             hooksecurefunc(EUI_Bags, "RefreshInventory", function() walked = 0; PaintSoon() end)

@@ -12,7 +12,8 @@
 --            attachments, money or cash on delivery) and the player clicks Send. The crafter's
 --            inbox is read to tell what already arrived from the customer: reagents and money.
 --
--- Only item IDs, counts, prices, names of guild members and the note travel. Nothing else.
+-- Only item IDs, counts, prices, names of guild members, the note, and for a request with no item
+-- its short title and profession travel. Nothing else.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -49,6 +50,8 @@ ns.AddEnglish({
     ["Commande livrée à %s : %s."] = "Order delivered to %s: %s.",
     ["%s te remercie pour sa commande."] = "%s thanks you for their order.",
     ["Contre-remboursement impossible sans objet joint : demande %s à %s."] = "Cash on delivery needs an attached item: ask %s from %s.",
+    ["Nouvelle demande de %s : %s ×%d (%s, %s)."] = "New request from %s: %s ×%d (%s, %s).",
+    ["métier inconnu"] = "profession unknown",
 })
 
 local PREFIX = "WLHord"
@@ -329,9 +332,15 @@ local function SendRecipes(prof)
     if IsInGuild and IsInGuild() then SendParts("R:" .. prof .. ":" .. p.hash, table.concat(t, ";"), "GUILD") end
 end
 
--- An item's name, or an enchant's (kept as a negative spell ID).
+-- An item's name, or an enchant's (kept as a negative spell ID). Given an order, its item's name,
+-- or its title when it asks for something with no known item.
 function O.Name(id)
-    if not id then return "?" end
+    if type(id) == "table" then
+        local o = id
+        if o.item and o.item ~= 0 then return O.Name(o.item) end
+        return (o.title and o.title ~= "") and o.title or "?"
+    end
+    if not id or id == 0 then return "?" end
     if id > 0 then return WP.ItemName(id) or ("item " .. id) end
     local n = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(-id)) or (GetSpellInfo and GetSpellInfo(-id))
     return n or "?"
@@ -341,23 +350,99 @@ end
 local function NewID() return Me() .. "-" .. time() .. "-" .. math.random(100, 999) end
 
 -- order = { id, from, to (nil = guild), item, qty, give = "id:n,..." (customer), crafter = "id:n,..."
---           (crafter provides), fee (copper), tip, paid (upfront copper), note, expires, status, by, reason }
-local FIELDS = { "id", "from", "to", "item", "qty", "give", "crafter", "fee", "tip", "paid", "expires", "status", "by", "reason", "note" }
+--           (crafter provides), fee (copper), tip, paid (upfront copper), note, expires, status, by, reason,
+--           title (what is asked when no item is known), prof (English profession key, "" = unknown;
+--           nil on an order made from a recipe: then only its recipe decides who is told) }
+--
+-- The fields go in this order, separated by "~". title and prof come AFTER the note, never before:
+-- a copy older than them reads the first 15 positions and ignores the rest, so it still reads the
+-- note where it always was (inserting them before the note would make it read the title as the
+-- note and lose the real one). The note never holds a "~" (every field is cleaned), so being last
+-- was never needed to parse it, only to shorten it first: NOTE_AT names its place.
+-- An older copy does not know the title: for an order with no item, the title also goes at the front
+-- of the note on the wire ("title - note"), so its crafters can read what is asked. Parse and Merge
+-- take that prefix off again. An older copy that sends the order back (accepting it) drops title
+-- and prof: Merge keeps the ones we had.
+local FIELDS = { "id", "from", "to", "item", "qty", "give", "crafter", "fee", "tip", "paid", "expires", "status", "by", "reason", "note",
+    "title", "prof" }
+local NOTE_AT, TITLE_AT = 15, 16
+local NUMERIC = { qty = true, fee = true, tip = true, paid = true, expires = true, item = true }
 
--- "O|" + fields must fit in one 255-byte message: the note is shortened (whole UTF-8 characters).
+-- A request's title: one short line with none of the wire's separators, at most 40 bytes (whole
+-- UTF-8 characters).
+local function Utf8Cut(t, max)
+    if #t <= max then return t end
+    t = t:sub(1, max)
+    while #t > 0 and t:byte(#t) >= 0x80 and t:byte(#t) < 0xC0 do t = t:sub(1, -2) end
+    if #t > 0 and t:byte(#t) >= 0xC0 then t = t:sub(1, -2) end
+    return t
+end
+function O.CleanTitle(t)
+    t = tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h", ""):gsub("|h", "")
+    t = t:gsub("[|~;%c]", " "):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")
+    t = Utf8Cut(t, 40)
+    -- " - " separates the title from the note on the wire: never inside a title, nor a dash at its end
+    local n
+    repeat t, n = t:gsub("%s+%-%s+", " ") until n == 0
+    repeat t, n = t:gsub("%s+%-+$", "") until n == 0
+    t = t:gsub(" $", "")
+    return t
+end
+
+-- "title - note" on the wire back to the note alone
+local function StripTitle(o)
+    local t, n = o.title, o.note
+    if not (t and t ~= "" and n and (o.item or 0) == 0) then return end
+    if n == t then o.note = nil
+    elseif n:sub(1, #t + 3) == t .. " - " then
+        n = n:sub(#t + 4)
+        o.note = n ~= "" and n or nil
+    end
+end
+O.StripTitle = StripTitle
+
+-- "O|" + fields must fit in one 255-byte message: the customer's note is shortened (whole UTF-8
+-- characters), never the "title - " in front of it; then, if ever needed, the title.
+-- The title of an item-less request travels once: in front of the note, with TITLE_MARK in its own
+-- field to say so (Parse reads it back from the note: the part before the first " - ").
 local MAXMSG = 250
+local TITLE_MARK = "^"
+local function CutLast(v) return (v:gsub("[%z\1-\127\192-\255][\128-\191]*$", "")) end
 local function Serialize(o)
     local t = {}
+    local title = (o.item or 0) == 0 and o.title and o.title ~= "" and o.title:gsub("[|;~]", " ") or nil
     for i, k in ipairs(FIELDS) do
         local v = o[k]
         if v == nil then v = "" end
-        t[i] = (tostring(v):gsub("[|;~]", " "))
+        if k == "prof" and v == "" and o.prof then v = "*" end   -- "" = unknown, kept apart from "no field"
+        if k == "item" and v == 0 then v = "" end
+        v = (tostring(v):gsub("[|;~]", " "))
+        if title and k == "note" then v = title .. ((v ~= "") and (" - " .. v) or "") end
+        if title and k == "title" then v = TITLE_MARK end
+        t[i] = v
     end
     local s = table.concat(t, "~")
-    local noteAt = #FIELDS
-    while #s + 2 > MAXMSG and t[noteAt] ~= "" do
-        t[noteAt] = t[noteAt]:gsub("[%z\1-\127\192-\255][\128-\191]*$", "")
+    if title then
+        -- the customer's own words first, down to "title - "; then that separator; then the title
+        local keep = #title + 3
+        while #s + 2 > MAXMSG and #t[NOTE_AT] > keep do
+            t[NOTE_AT] = CutLast(t[NOTE_AT])
+            s = table.concat(t, "~")
+        end
+        if #t[NOTE_AT] < keep then t[NOTE_AT] = title end   -- a cut ending inside "title - "
+        if #s + 2 > MAXMSG then t[NOTE_AT] = title; s = table.concat(t, "~") end
+        while #s + 2 > MAXMSG and #t[NOTE_AT] > 1 do
+            t[NOTE_AT] = CutLast(t[NOTE_AT])
+            s = table.concat(t, "~")
+        end
         s = table.concat(t, "~")
+    else
+        for _, at in ipairs({ NOTE_AT, TITLE_AT }) do
+            while #s + 2 > MAXMSG and t[at] ~= "" do
+                t[at] = CutLast(t[at])
+                s = table.concat(t, "~")
+            end
+        end
     end
     return s
 end
@@ -366,10 +451,22 @@ local function Parse(s)
     for v in (s .. "~"):gmatch("(.-)~") do
         i = i + 1
         local k = FIELDS[i]
-        if k and v ~= "" then o[k] = (k == "qty" or k == "fee" or k == "tip" or k == "paid" or k == "expires" or k == "item") and tonumber(v) or v end
+        if k and v ~= "" then o[k] = NUMERIC[k] and tonumber(v) or v end
+    end
+    if o.prof == "*" then o.prof = "" end
+    if o.title == TITLE_MARK then
+        local n = o.note or ""
+        local at = n:find(" - ", 1, true)
+        if at then o.title, o.note = n:sub(1, at - 1), n:sub(at + 3)
+        else o.title, o.note = n, nil end
+        if o.title == "" then o.title = nil end
+        if o.note == "" then o.note = nil end
+    else
+        StripTitle(o)
     end
     return o.id and o
 end
+O.Serialize, O.Parse = Serialize, Parse
 
 local STATUS_RANK = { open = 1, accepted = 2, crafted = 3, delivered = 4, declined = 5, cancelled = 5, expired = 5 }
 
@@ -396,7 +493,11 @@ local function Merge(o)
     local changed = cur.status ~= o.status or cur.by ~= o.by
     if cur.status ~= o.status then LogStep(cur, o.status, o.status == "open" and o.from or o.by or o.from) end
     local tip = math.max(cur.tip or 0, o.tip or 0)
-    for _, k in ipairs(FIELDS) do cur[k] = o[k] end
+    for _, k in ipairs(FIELDS) do
+        -- title and prof: an older copy sends the order back without them, keep ours
+        if k == "title" or k == "prof" then cur[k] = o[k] or cur[k] else cur[k] = o[k] end
+    end
+    StripTitle(cur)
     if tip > 0 then cur.tip = tip end
     -- my order was just crafted: what my bags hold now, so the item arriving marks it delivered
     if changed and cur.status == "crafted" and cur.from == Me() and (cur.item or 0) > 0 and not cur.custBase then
@@ -428,6 +529,13 @@ function O.Publish(order)
     order.status = "open"
     order.expires = time() + (order.hours or 24) * 3600
     order.hours = nil
+    if order.item == 0 then order.item = nil end
+    -- a title only for what has no item; it never holds the wire's separators
+    if order.item then order.title = nil
+    else
+        order.title = O.CleanTitle(order.title)
+        if order.title == "" then order.title = nil end
+    end
     LogStep(order, "open", order.from)
     Merge(order)
     Broadcast(order)
@@ -508,7 +616,7 @@ function O.Board(canOnly)
     local d, me, now, out = DB(), Me(), time(), {}
     for _, o in pairs(d.list) do
         if o.status == "open" and (o.expires or 0) >= now and o.from ~= me and (not o.to or o.to == me)
-            and not (d.hidden and d.hidden[o.id]) and (not canOnly or O.CanCraft(me, o.item)) then
+            and not (d.hidden and d.hidden[o.id]) and (not canOnly or O.CanServe(me, o)) then
             out[#out + 1] = o
         end
     end
@@ -559,20 +667,45 @@ function O.LikelyProfs(item)
     end
     return {}
 end
+O.PROF_KEYS = { "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Leatherworking", "Tailoring", "Cooking", "First Aid", "Mining" }
+-- a profession name as the game gives it (either language) to its English key, or nil
+function O.ProfKeyOf(name)
+    if not name then return nil end
+    for key in pairs(PROF_NAMES) do if SameProf(name, key) then return key end end
+end
+-- does a declared profession (name in either language) match a key; key "" = any profession
+local function ProfMatches(name, key)
+    if key == "" then return true end
+    return SameProf(name, key) or tostring(name):lower() == tostring(key):lower()
+end
+O.ProfMatches = ProfMatches
+-- a profession key's name in the player's language ("" = unknown)
+function O.ProfName(key)
+    if not key or key == "" then return L("métier inconnu") end
+    local n = PROF_NAMES[key]
+    if not n then return key end
+    return (root.lang == "en") and n[1] or n[2]
+end
+
 -- Members whose declared profession may make this item: { { name, prof, rank, online, exact } }.
 -- Exact ones (a shared recipe) first, then the ones whose profession fits, best rank first.
-function O.Possible(item)
+-- prof (optional): the profession asked for (English key, "" = any profession) instead of the ones
+-- the kind of item tells; item may be nil (a request with only a title).
+function O.Possible(item, prof)
     local out, seen = {}, {}
-    for _, c in ipairs(O.Crafters(item)) do c.exact = true; out[#out + 1] = c; seen[c.name] = true end
+    if item and item ~= 0 then
+        for _, c in ipairs(O.Crafters(item)) do c.exact = true; out[#out + 1] = c; seen[c.name] = true end
+    end
     local online = O.OnlineGuild()
-    local profs = O.LikelyProfs(item)
+    local profs
+    if prof == "" then profs = { "" } elseif prof then profs = { prof } else profs = O.LikelyProfs(item) end
     for name, list in pairs(DB().crafters) do
         if not seen[name] then
-            for prof, p in pairs(list) do
+            for pname, p in pairs(list) do
                 for _, key in ipairs(profs) do
-                    if SameProf(prof, key) and not seen[name] then
+                    if ProfMatches(pname, key) and not seen[name] then
                         seen[name] = true
-                        out[#out + 1] = { name = name, prof = prof, rank = p.rank or 0, online = online[name] or false }
+                        out[#out + 1] = { name = name, prof = pname, rank = p.rank or 0, online = online[name] or false }
                     end
                 end
             end
@@ -607,8 +740,9 @@ function O.Lists()
     for _, o in pairs(d.list) do
         if o.status == "open" and o.expires and o.expires < now then o.status = "expired" end
         if o.from == me then mine[#mine + 1] = o
-        elseif (o.to == me or (not o.to and O.CanCraft(me, o.item))) and not (d.hidden and d.hidden[o.id]) then
-            if o.status == "open" or o.by == me then forMe[#forMe + 1] = o end
+        elseif o.by == me then forMe[#forMe + 1] = o   -- taken by me, even from the board's full list
+        elseif (o.to == me or (not o.to and O.CanServe(me, o))) and not (d.hidden and d.hidden[o.id]) then
+            if o.status == "open" then forMe[#forMe + 1] = o end
         end
     end
     local function newest(a, b) return (a.expires or 0) > (b.expires or 0) end
@@ -643,6 +777,15 @@ function O.CanCraft(name, item)
         return false
     end
     for _, p in pairs(DB().crafters[name] or {}) do if p.recipes and p.recipes[item] then return true end end
+    return false
+end
+-- May this member take this order: he has its recipe, or it is a request (o.prof set) for a
+-- profession he declared ("" = any profession: everyone who has one).
+function O.CanServe(name, o)
+    if o.item and o.item ~= 0 and O.CanCraft(name, o.item) then return true end
+    if o.prof == nil then return false end
+    local profs = (name == Me()) and DB().mine or DB().crafters[name] or {}
+    for pname in pairs(profs) do if ProfMatches(pname, o.prof) then return true end end
     return false
 end
 -- Reagents of an item, from any crafter's list.
@@ -770,7 +913,7 @@ function O.FillMail(o, kind)
     if not to then return end
     if SendMailNameEditBox then SendMailNameEditBox:SetText(to) end
     -- the tag goes first: the subject is cut at 64 characters, and a cut tag no longer matches
-    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(O.Tag(o) .. " " .. string.format(L("Commande WL : %s ×%d"), O.Name(o.item), o.qty or 1)) end
+    if SendMailSubjectEditBox then SendMailSubjectEditBox:SetText(O.Tag(o) .. " " .. string.format(L("Commande WL : %s ×%d"), O.Name(o), o.qty or 1)) end
     local want = {}
     if kind == "give" then
         for _, r in ipairs(O.Decode(o.give)) do want[#want + 1] = { r[1], r[2] * (o.qty or 1) } end
@@ -913,7 +1056,7 @@ local function OnMessage(msg, channel, sender)
         if o and (sender == o.from or sender == o.by) and (Me() == o.from or Me() == o.by) then
             AddMessage(o, sender, CleanText(text))
             if WP.ModuleOn("orders") then
-                WP.Print(string.format(L("Message de %s sur la commande %s : %s"), sender, O.Name(o.item), CleanText(text)))
+                WP.Print(string.format(L("Message de %s sur la commande %s : %s"), sender, O.Name(o), CleanText(text)))
             end
             if WP.RefreshOrders then WP.RefreshOrders() end
         end
@@ -967,9 +1110,12 @@ end
 function O.Notify(o)
     if WP.ModuleOn and not WP.ModuleOn("orders") then return end
     local me = Me()
-    local name = O.Name(o.item)
-    if o.status == "open" and o.from ~= me and (o.to == me or (not o.to and O.CanCraft(me, o.item))) then
-        local msg = string.format(L("Nouvelle commande de %s : %s ×%d (%s)."), o.from, name, o.qty or 1, S.Money((o.fee or 0) + (o.tip or 0)))
+    local name = O.Name(o)
+    -- a request (o.prof set) alerts everyone who declared its profession, or any profession when unknown
+    if o.status == "open" and o.from ~= me and (o.to == me or (not o.to and O.CanServe(me, o))) then
+        local fee = S.Money((o.fee or 0) + (o.tip or 0))
+        local msg = o.prof and string.format(L("Nouvelle demande de %s : %s ×%d (%s, %s)."), o.from, name, o.qty or 1, O.ProfName(o.prof), fee)
+            or string.format(L("Nouvelle commande de %s : %s ×%d (%s)."), o.from, name, o.qty or 1, fee)
         WP.Print(msg)
         if WLWritsDB.ordersAlert ~= false then
             if RaidNotice_AddMessage and RaidWarningFrame then RaidNotice_AddMessage(RaidWarningFrame, msg, { r = 1, g = 0.82, b = 0.3 }) end
@@ -992,7 +1138,7 @@ end
 -- ---------------------------------------------------------------- automatic steps
 local function PrintReceived(o)
     WP.Print(string.format(L("Commande reçue : %s ×%d de %s. Clique sur Merci dans Mes commandes pour lui donner une étoile."),
-        O.Name(o.item), o.qty or 1, o.by or "?"))
+        O.Name(o), o.qty or 1, o.by or "?"))
 end
 -- The crafter made the order: the item shows up in their bags (more than when they accepted it).
 -- The customer got it: the item shows up in their bags (more than when it was crafted).
@@ -1004,7 +1150,7 @@ local function CheckBags()
         if o.by == me and o.status == "accepted" and o.item and o.item > 0 and o.baseCount then
             if (count(o.item) or 0) >= o.baseCount + (o.qty or 1) then
                 O.Crafted(o)
-                WP.Print(string.format(L("Commande fabriquée : %s ×%d pour %s. Envoie-la par la poste ou en échange."), O.Name(o.item), o.qty or 1, o.from))
+                WP.Print(string.format(L("Commande fabriquée : %s ×%d pour %s. Envoie-la par la poste ou en échange."), O.Name(o), o.qty or 1, o.from))
             end
         end
     end
@@ -1042,11 +1188,11 @@ local function TradeDone()
             and (o.item or 0) > 0 and got[o.item]
         if o.from == me and o.by == who and o.status == "accepted" and not o.sentGive then
             for _, g in ipairs(O.Decode(o.give)) do
-                if gave[g[1]] then o.sentGive = true; WP.Print(string.format(L("Composants remis à %s pour %s."), who, O.Name(o.item))); break end
+                if gave[g[1]] then o.sentGive = true; WP.Print(string.format(L("Composants remis à %s pour %s."), who, O.Name(o))); break end
             end
-        elseif o.by == me and o.from == who and (o.status == "accepted" or o.status == "crafted") and gave[o.item] then
+        elseif o.by == me and o.from == who and (o.status == "accepted" or o.status == "crafted") and (o.item or 0) > 0 and gave[o.item] then
             O.Delivered(o)
-            WP.Print(string.format(L("Commande livrée à %s : %s."), who, O.Name(o.item)))
+            WP.Print(string.format(L("Commande livrée à %s : %s."), who, O.Name(o)))
         end
         if received then O.Delivered(o); PrintReceived(o) end
     end

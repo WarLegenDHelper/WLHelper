@@ -16,6 +16,9 @@ local C = S.C
 local GPS = WP.GPS
 
 ns.AddEnglish({
+    ["Téléportation demandée..."] = "Teleport requested...",
+    ["Téléportation en cours..."] = "Teleporting...",
+    ["Interrompue : clique pour recommencer"] = "Interrupted: click to try again",
     ["Dans le donjon"] = "Inside the dungeon",
     ["Téléportation, le plus rapide"] = "Teleport, fastest",
 })
@@ -23,7 +26,8 @@ ns.AddEnglish({
 local arrow, teleport, demo
 local ARROW_TEX = "Interface\\Minimap\\MinimapArrow"
 local ICON_LINK = "Interface\\Icons\\INV_Misc_Map_01"
-local ICON_HERE = "Interface\\RaidFrame\\ReadyCheck-Ready"
+local ICON_HERE = "Interface\\RaidFrame\\ReadyCheck-Ready"   -- fallback of the modern tick
+local ATLAS_HERE = { "common-icon-checkmark" }
 local ICON_DUNGEON = "Interface\\Icons\\INV_Misc_Key_03"
 local SHORT, TALL = 86, 128
 local TURN_EVERY, TEXT_EVERY = 0.05, 0.25
@@ -41,11 +45,19 @@ local function Opt(k, d)
 end
 
 local function Distance(yards)
-    if ns.English() then return string.format(L("%d m"), math.floor(yards + 0.5)) end
+    if WLWritsDB and WLWritsDB.gpsOpts and WLWritsDB.gpsOpts.yards then
+        return string.format("%d yd", math.floor(yards + 0.5))
+    end
     local m = yards * 0.9144
-    if m >= 1000 then return (string.format("%.1f km", m / 1000):gsub("%.", ",")) end
-    return string.format(L("%d m"), math.floor(m + 0.5))
+    local comma = not ns.English()
+    if m >= 1000 then
+        local t = string.format("%.1f km", m / 1000)
+        return comma and (t:gsub("%.", ",")) or t
+    end
+    if m >= 100 then m = math.floor(m / 10 + 0.5) * 10 end   -- 350 m, not 347 m, while far
+    return string.format("%d m", math.floor(m + 0.5))
 end
+GPS.Distance = Distance
 
 local function Minutes(seconds)
     if not seconds then return "" end
@@ -74,8 +86,8 @@ local function SetIcon(self, tex, crop)
     self.tex:Hide(); self.icon:Show()
     if self.icon.cur ~= tex then
         self.icon.cur = tex
-        self.icon:SetTexture(tex)
-        if crop then self.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) else self.icon:SetTexCoord(0, 1, 0, 1) end
+        -- "you are there": the crisp modern tick when this client has it (the old one is 32 px)
+        S.SetIcon(self.icon, tex == ICON_HERE and ATLAS_HERE or nil, tex, crop and { 0.08, 0.92, 0.08, 0.92 } or nil)
     end
 end
 
@@ -192,8 +204,10 @@ local function Turn(self, now, combat)
         if combat then
             self.tex:SetVertexColor(C.warn[1], C.warn[2], C.warn[3])
         else
+            -- gold off course, green when facing it (within about 25 degrees), a smooth blend between
             local off = math.abs(((angle + math.pi) % (2 * math.pi)) - math.pi) / math.pi
-            self.tex:SetVertexColor(math.min(1, 0.35 + 1.3 * off), math.min(1, 0.95 - 0.6 * off), 0.35 + 0.2 * (1 - off))
+            local k = math.max(0, math.min(1, (off - 0.08) / 0.25))
+            self.tex:SetVertexColor(0.40 + 0.60 * k, 0.90 - 0.08 * k, 0.45 - 0.17 * k)
         end
     else
         self.tex:SetRotation(0); self.tex:SetVertexColor(0.5, 0.5, 0.5)
@@ -232,12 +246,9 @@ local function Build()
     arrow.tex:SetPoint("TOPLEFT", 12, -12)
     -- the game's own smooth navigation arrow (the one of its tracked waypoints); the old minimap
     -- arrow only when this client has no such drawing
-    local okA = arrow.tex.SetAtlas and pcall(arrow.tex.SetAtlas, arrow.tex, "Navigation-Tracked-Arrow", false)
-    if okA and arrow.tex:GetAtlas() then
-        arrow.tex:SetSize(48, 48); arrow.tex:ClearAllPoints(); arrow.tex:SetPoint("TOPLEFT", 18, -18)
-    else
-        arrow.tex:SetTexture(ARROW_TEX)
-    end
+    -- WL Helper's own HD arrow (Media/Arrow.tga, 256 px, smooth at any scale)
+    arrow.tex:SetTexture("Interface\\AddOns\\WLHelper\\Media\\Arrow")
+    arrow.tex:SetSize(60, 60); arrow.tex:ClearAllPoints(); arrow.tex:SetPoint("TOPLEFT", 12, -12)
     arrow.icon = arrow:CreateTexture(nil, "ARTWORK")
     arrow.icon:SetSize(48, 48)
     arrow.icon:SetPoint("CENTER", arrow.tex, "CENTER")
@@ -253,10 +264,8 @@ local function Build()
     arrow.sub:SetPoint("TOPLEFT", 86, -62)
     arrow.sub:SetPoint("RIGHT", -22, 0)   -- up to the close ×
 
-    local close = CreateFrame("Button", nil, arrow)
-    close:SetSize(18, 18)
+    local close = S.CloseButton(arrow, 18, nil, nil, 8)
     close:SetPoint("TOPRIGHT", -2, -2)
-    local x = S.Text(close, 14, C.dim); x:SetPoint("CENTER"); x:SetText("×")
     close:SetScript("OnClick", function()
         if demo then GPS.Lock(); return end
         if GPS.Source() == "dungeon" then
@@ -281,9 +290,53 @@ local function Build()
     teleport:RegisterForClicks("AnyUp", "AnyDown")   -- the game acts on the press or the release (its "cast on key down" setting): both registered
     S.Solid(teleport, "BACKGROUND", { 0.086, 0.196, 0.290 }):SetAllPoints()
     S.Border(teleport, { 0.169, 0.353, 0.502 })
+    -- what the click does, seen: lighter on hover, pressed look on click, then the cast's progress
+    local hover = S.Solid(teleport, "HIGHLIGHT", { 1, 1, 1 }, 0.10); hover:SetAllPoints()
+    local press = S.Solid(teleport, "ARTWORK", { 0, 0, 0 }, 0.35); press:SetAllPoints(); press:Hide()
+    local fill = S.Solid(teleport, "BORDER", { 0.25, 0.55, 0.85 }, 0.55)
+    fill:SetPoint("TOPLEFT", 1, -1); fill:SetPoint("BOTTOMLEFT", 1, 1); fill:SetWidth(1); fill:Hide()
     local tl = S.Text(teleport, 13, { 0.85, 0.93, 1 }, true)
     tl:SetPoint("CENTER")
     tl:SetText(L("Lancer la téléportation"))
+    teleport.label = tl
+    teleport:HookScript("OnMouseDown", function() press:Show(); tl:SetPoint("CENTER", 1, -1) end)
+    teleport:HookScript("OnMouseUp", function() press:Hide(); tl:SetPoint("CENTER", 0, 0) end)
+    teleport:HookScript("OnClick", function()
+        tl:SetText(L("Téléportation demandée..."))
+        C_Timer.After(1.5, function()
+            if not teleport.casting then tl:SetText(L("Lancer la téléportation")) end
+        end)
+    end)
+    -- the cast bar inside the button: filled from the player's cast (numbers read under pcall,
+    -- they may be secret on this client)
+    local cev = CreateFrame("Frame", nil, teleport)
+    for _, e in ipairs({ "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_SUCCEEDED" }) do
+        pcall(cev.RegisterUnitEvent or cev.RegisterEvent, cev, e, "player")
+    end
+    cev:SetScript("OnEvent", function(_, e, unit)
+        if unit ~= "player" or not teleport:IsShown() then return end
+        if e == "UNIT_SPELLCAST_START" then
+            teleport.casting = true
+            tl:SetText(L("Téléportation en cours...")); fill:Show()
+        elseif e == "UNIT_SPELLCAST_SUCCEEDED" then
+            teleport.casting = false; fill:Hide(); tl:SetText(L("Lancer la téléportation"))
+        else
+            if teleport.casting then
+                teleport.casting = false; fill:Hide()
+                tl:SetText(L("Interrompue : clique pour recommencer"))
+                C_Timer.After(3, function() if not teleport.casting then tl:SetText(L("Lancer la téléportation")) end end)
+            end
+        end
+    end)
+    teleport:HookScript("OnUpdate", function(self)
+        if not self.casting then return end
+        local ok, k = pcall(function()
+            local _, _, _, startMS, endMS = UnitCastingInfo("player")
+            if not (startMS and endMS) or endMS <= startMS then return nil end
+            return math.max(0, math.min(1, (GetTime() * 1000 - startMS) / (endMS - startMS)))
+        end)
+        if ok and k then fill:SetWidth(math.max(1, (self:GetWidth() - 2) * k)) end
+    end)
     teleport:Hide()
 
     local turnAcc, textAcc = 0, TEXT_EVERY

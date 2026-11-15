@@ -114,6 +114,8 @@ ns.AddEnglish({
     ["Affichage"] = "Display",
     ["Flèche à partir de"] = "Arrow from",
     ["Le gain minimum pour montrer la flèche dans les sacs"] = "The smallest gain that shows the arrow in your bags",
+    ["Distances en yards (sinon mètres et km)"] = "Distances in yards (otherwise meters and km)",
+    ["Masquer le bloc Geared Forever des infobulles (même %)"] = "Hide the Geared Forever block in tooltips (same %)",
     ["Place dans les sacs"] = "Bag space",
     ["Proposer de libérer une place quand les sacs sont pleins"] = "Offer to free a slot when the bags are full",
     ["Vendre les objets gris chez les marchands"] = "Sell grey items at merchants",
@@ -557,6 +559,7 @@ function BUILD.gps(p)
         self:SetText((ok and n or 0) .. L(" connus"))
     end
     Place(p, row, known)
+    SwitchRow(p, L("Distances en yards (sinon mètres et km)"), function() return Gps().yards end, SetGps("yards"))
 
     Section(p, L("Flèche"))
     PercentSlider(p, L("Taille"), 70, 150, function() return Gps().scale end, SetGps("scale"))
@@ -626,7 +629,9 @@ function BUILD.upgrades(p)
     Place(p, trow, S.Segmented(trow, { { 1, "1 %" }, { 3, "3 %" }, { 5, "5 %" }, { 10, "10 %" } },
         function() return WLWritsDB.upgradeMin or 1 end, function(v) WLWritsDB.upgradeMin = v; Refresh() end))
     SwitchRow(p, L("Ligne dans les infobulles d'objet"), function() return WLWritsDB.upgradeTip ~= false end,
-        function(v) WLWritsDB.upgradeTip = v end)
+        function(v) WLWritsDB.upgradeTip = v; if ns.WP.ApplyGFTip then ns.WP.ApplyGFTip() end end)
+    SwitchRow(p, L("Masquer le bloc Geared Forever des infobulles (même %)"), function() return WLWritsDB.hideGFTip ~= false end,
+        function(v) WLWritsDB.hideGFTip = v; if ns.WP.ApplyGFTip then ns.WP.ApplyGFTip() end end)
     CloseSection(p)
 
     local _, label = Wt.Bracket()
@@ -902,13 +907,12 @@ BuildSearch = function(nav, content)
     S.Solid(box, "BACKGROUND", C.card):SetAllPoints()
     local border = S.Border(box, C.border)
     local glass = box:CreateTexture(nil, "ARTWORK")
-    glass:SetSize(14, 14); glass:SetPoint("LEFT", 8, 0); glass:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+    glass:SetSize(14, 14); glass:SetPoint("LEFT", 8, 0)
+    S.SetIcon(glass, { "common-search-magnifyingglass" }, "Interface\\Common\\UI-Searchbox-Icon")
     local hint = S.Text(box, 13, C.muted)
     hint:SetPoint("LEFT", 28, 0); hint:SetText(L("Chercher un réglage"))
-    local clear = CreateFrame("Button", nil, box)
-    clear:SetSize(20, 20); clear:SetPoint("RIGHT", -2, 0)
-    local x = S.Text(clear, 15, C.dim); x:SetPoint("CENTER"); x:SetText("×")
-    clear:SetScript("OnClick", function() box:SetText(""); box:ClearFocus() end)
+    local clear = S.CloseButton(box, 20, function() box:SetText(""); box:ClearFocus() end, nil, 8)
+    clear:SetPoint("RIGHT", -2, 0)
     clear:Hide()
     body.searchBox = box
     ns.WP.searchBox = box   -- for a key binding, and the offline tests

@@ -54,7 +54,6 @@ local QUEST_CLASS = 12               -- Enum.ItemClass.Questitem
 local MANUAL_QUALITY = 3             -- rare and up: the game asks to type DELETE
 local ROW_H, PAD = 56, 14
 local COIN_POUCHES = { 284583, 284584, 284585, 284586 }
-local CHECK_TEX = "Interface\\Buttons\\UI-CheckBox-Check"
 
 local function safe(f, ...)
     if not f then return nil end
@@ -467,11 +466,8 @@ local function MakeRow(parent)
     row.fill = S.Solid(row.box, "BACKGROUND", C.brand, 0)
     row.fill:SetAllPoints()
     row.boxBorder = S.Border(row.box, C.border)
-    row.check = row.box:CreateTexture(nil, "ARTWORK")
-    row.check:SetTexture(CHECK_TEX)
-    row.check:SetDesaturated(true)
-    row.check:SetVertexColor(1, 1, 1)
-    row.check:SetPoint("CENTER"); row.check:SetSize(18, 18)
+    row.check = S.Glyph(row.box, "check", 10, { 1, 1, 1 })   -- a drawn white tick
+    row.check:SetPoint("CENTER")
 
     local iconHolder = CreateFrame("Frame", nil, row)
     iconHolder:SetSize(22, 22); iconHolder:SetPoint("LEFT", 26, 0)

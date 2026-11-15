@@ -179,11 +179,11 @@ local function Card(parent, y, icon, tint, onClick, col)
         -- the full card's bar sits under its button: under line2 it would fall below the card
         c.bar:SetPoint("TOPLEFT", c.action, "BOTTOMLEFT", 0, -6); c.bar:SetPoint("TOPRIGHT", c.action, "BOTTOMRIGHT", 0, -6)
     end
-    c.chev = S.Text(c, 18, C.muted, true)
-    c.chev:SetPoint("RIGHT", -14, 0); c.chev:SetText(">")
+    c.chev = S.Glyph(c, "right", 12, C.muted)   -- a drawn chevron, crisp at any scale
+    c.chev:SetPoint("RIGHT", -14, 0)
     if c.tile then
         c.action:SetSize(70, 22); c.action:ClearAllPoints(); c.action:SetPoint("BOTTOMRIGHT", -8, 8)
-        c.chev:ClearAllPoints(); c.chev:SetPoint("TOPRIGHT", -10, -14)
+        c.chev:ClearAllPoints(); c.chev:SetPoint("TOPRIGHT", -12, -13)   -- centred on the count badge line
     end
     c:SetScript("OnClick", Click)
     -- a tile's count of what waits (replaces the chevron when there is something)

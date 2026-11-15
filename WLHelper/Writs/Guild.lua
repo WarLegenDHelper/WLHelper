@@ -315,8 +315,7 @@ local function HasRole(spec, role)
     local roles = ROLE_OF[spec] or "dps"
     return roles:find(role, 1, true) ~= nil
 end
--- texture coordinates of the role icons on Interface\LFGFrame\UI-LFG-ICON-PORTRAITROLES
-local ROLE_TC = { tank = { 0, 19 / 64, 22 / 64, 41 / 64 }, heal = { 20 / 64, 39 / 64, 1 / 64, 20 / 64 }, dps = { 20 / 64, 39 / 64, 22 / 64, 41 / 64 } }
+-- role and class icons: S.RoleIcon / S.ClassIcon (modern atlases, the old sheets as fallback)
 local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
 
 -- returns the list, the number online, the zones of those online, and, among the members that pass
@@ -439,11 +438,9 @@ local function MemberRow(parent)
     r.lvl = S.Text(r, 12, C.dim, true); r.lvl:SetPoint("LEFT", 22, 0); r.lvl:SetWidth(24); r.lvl:SetJustifyH("RIGHT")
     r.name = S.Text(r, 14, C.text, true); r.name:SetPoint("LEFT", 54, 0); r.name:SetWidth(160); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
     r.cls = r:CreateTexture(nil, "OVERLAY"); r.cls:SetSize(16, 16); r.cls:SetPoint("LEFT", 52, 0)
-    r.cls:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
     r.logo = r:CreateTexture(nil, "OVERLAY"); r.logo:SetSize(14, 14); r.logo:SetTexture(S.LOGO); r.logo:SetPoint("LEFT", 72, 0)
     -- the role of the spec shared by WL Helper (the game's role icons), just before the zone column
     r.role = r:CreateTexture(nil, "OVERLAY"); r.role:SetSize(14, 14); r.role:SetPoint("LEFT", 198, 0)
-    r.role:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES")
     r.where = S.Text(r, 12, C.dim); r.where:SetPoint("LEFT", 216, 0); r.where:SetWidth(190); r.where:SetJustifyH("LEFT")
     r.rank = S.Text(r, 12, C.muted); r.rank:SetPoint("RIGHT", -10, 0); r.rank:SetWidth(110); r.rank:SetJustifyH("RIGHT")
     -- Invite shows in place of the rank while the mouse is on an online member
@@ -572,16 +569,19 @@ local function RenderMembers()
         r.ver = board[m.name] and board[m.name].ver
         r.logo:SetShown(r.addon)
         -- the class icon, then the WL logo for members who have the addon, then the name
-        local tc = CLASS_ICON_TCOORDS and m.class and CLASS_ICON_TCOORDS[m.class]
-        if tc then r.cls:SetTexCoord(tc[1], tc[2], tc[3], tc[4]); r.cls:Show() else r.cls:Hide() end
+        if r.clsKey ~= m.class then
+            r.clsKey = m.class
+            r.clsOk = S.ClassIcon(r.cls, m.class)
+        end
+        r.cls:SetShown(r.clsOk and true or false)
         r.name:ClearAllPoints(); r.name:SetPoint("LEFT", r.addon and 90 or 72, 0)
         r.name:SetWidth(r.addon and 104 or 122)   -- ends before the role icon (198) either way
         r.name:SetText(m.name)
         -- the role icon of the shared spec (a feral druid shows as tank, its first role)
         if m.spec then
             local ro = (ROLE_OF[m.spec] or "dps"):match("^(%a+)")
-            local tc = ROLE_TC[ro] or ROLE_TC.dps
-            r.role:SetTexCoord(tc[1], tc[2], tc[3], tc[4]); r.role:Show()
+            if r.roleKey ~= ro then r.roleKey = ro; S.RoleIcon(r.role, ro) end
+            r.role:Show()
         else
             r.role:Hide()
         end
@@ -681,9 +681,9 @@ local function Build()
         b.bg = S.Solid(b, "BACKGROUND", C.card); b.bg:SetAllPoints()
         b.edge = S.Border(b, C.border)
         local t = b:CreateTexture(nil, "ARTWORK"); t:SetPoint("TOPLEFT", 2, -2); t:SetPoint("BOTTOMRIGHT", -2, 2)
-        local tc = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[cls]
-        if tc then t:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles"); t:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
-        else t:SetTexture("Interface\\Icons\\INV_Misc_GroupNeedMore"); t:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
+        if cls == "ALL" or not S.ClassIcon(t, cls) then
+            t:SetTexture("Interface\\Icons\\INV_Misc_GroupNeedMore"); t:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        end
         b.cls = cls ~= "ALL" and cls or nil
         b:SetScript("OnClick", function(self) WLWritsDB.guildClass = self.cls; WP.RefreshGuild() end)
         b:SetScript("OnEnter", function(self)
@@ -694,9 +694,7 @@ local function Build()
         ui.classBtns[i] = b
         x = x + 27
     end
-    local RI = "Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES"
-    local function RoleIcon(tc) return string.format("|T%s:16:16:0:0:64:64:%d:%d:%d:%d|t", RI, tc[1], tc[2], tc[3], tc[4]) end
-    ui.role = S.Segmented(m, { { "all", L("Tous") }, { "tank", RoleIcon({ 0, 19, 22, 41 }) }, { "heal", RoleIcon({ 20, 39, 1, 20 }) }, { "dps", RoleIcon({ 20, 39, 22, 41 }) } },
+    ui.role = S.Segmented(m, { { "all", L("Tous") }, { "tank", S.RoleMarkup("tank", 16) }, { "heal", S.RoleMarkup("heal", 16) }, { "dps", S.RoleMarkup("dps", 16) } },
         function() return WLWritsDB.guildRole or "all" end,
         function(v) WLWritsDB.guildRole = v ~= "all" and v or nil; WP.RefreshGuild() end, 26)
     ui.role:SetPoint("TOPRIGHT", -PAD, -77)
@@ -707,13 +705,14 @@ local function Build()
         b:SetScript("OnLeave", S.HideTip)
     end
     -- one click to see everyone again
-    ui.clear = S.Button(m, "x", 24, 24, "secondary", function()
+    ui.clear = S.Button(m, "", 24, 24, "secondary", function()
         WLWritsDB.guildClass = nil; WLWritsDB.guildRole = nil
         ui.search:SetText("")
         ui.role:Update()
         WP.RefreshGuild()
     end, { L("Enlever tous les filtres") })
     ui.clear:SetPoint("TOPLEFT", PAD + 10 * 27 + 6, -78)
+    ui.clear.glyph = S.Glyph(ui.clear, "x", 9, C.text); ui.clear.glyph:SetPoint("CENTER")
     -- where the guild is: the busiest zones as chips (built in RenderMembers)
     ui.zonesLabel = S.Text(m, 12, C.dim); ui.zonesLabel:SetPoint("TOPLEFT", PAD, -112); ui.zonesLabel:SetText(L("Où est la guilde :"))
     ui.zoneChips = {}

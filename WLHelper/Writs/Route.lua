@@ -530,6 +530,57 @@ function GPS.TakeFlight()
     end
 end
 
+-- The planned landing on the flight map: a pulsing gold ring around its node and its name, so
+-- the player sees where to click (the game's own map, nothing of it replaced).
+local ring
+local function TaxiTarget()
+    local leg = GPS.FlightLeg()
+    if not (leg and C_TaxiMap and GetTaxiMapID) then return end
+    local ok, nodes = pcall(C_TaxiMap.GetAllTaxiNodes, GetTaxiMapID())
+    if not ok or type(nodes) ~= "table" then return end
+    for _, n in ipairs(nodes) do
+        if n.nodeID == leg.to.nodeID and n.slotIndex then return n.slotIndex, n.name end
+    end
+end
+local function TaxiButtonFor(slot)
+    -- the classic flight map: TaxiButton1..n; the modern one: pins that carry the node's data
+    local b = _G["TaxiButton" .. slot]
+    if b and b:IsShown() then return b end
+    if FlightMapFrame and FlightMapFrame:IsShown() and FlightMapFrame.EnumerateAllPins then
+        for pin in FlightMapFrame:EnumerateAllPins() do
+            local d = pin.taxiNodeData
+            if d and d.slotIndex == slot then return pin end
+        end
+    end
+end
+function GPS.MarkTaxi()
+    if ring then ring:Hide() end
+    local slot, name = TaxiTarget()
+    local btn = slot and TaxiButtonFor(slot)
+    if not btn then return end
+    if not ring then
+        ring = CreateFrame("Frame", nil, UIParent)
+        ring:SetSize(46, 46)
+        ring.t = ring:CreateTexture(nil, "OVERLAY")
+        ring.t:SetAllPoints()
+        ring.t:SetTexture("Interface\\AddOns\\WLHelper\\Media\\Icons\\ring")
+        ring.t:SetVertexColor(1, 0.82, 0.25)
+        ring.label = ring:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        ring.label:SetPoint("TOP", ring, "BOTTOM", 0, 2)
+        ring.label:SetTextColor(1, 0.86, 0.35)
+        ring.label:SetShadowOffset(1, -1)
+        local ag = ring:CreateAnimationGroup(); ag:SetLooping("BOUNCE")
+        local a1 = ag:CreateAnimation("Alpha"); a1:SetFromAlpha(1); a1:SetToAlpha(0.35); a1:SetDuration(0.7)
+        local s1 = ag:CreateAnimation("Scale"); s1:SetScaleFrom(1, 1); s1:SetScaleTo(1.15, 1.15); s1:SetDuration(0.7)
+        ring.anim = ag
+    end
+    ring:SetParent(btn); ring:SetFrameStrata("DIALOG")
+    ring:ClearAllPoints(); ring:SetPoint("CENTER", btn, "CENTER")
+    ring.label:SetText(name and (name:gsub(",.*$", "")) or "")
+    ring:Show(); ring.anim:Play()
+end
+function GPS.UnmarkTaxi() if ring then ring.anim:Stop(); ring:Hide() end end
+
 -- ---------------------------------------------------------------- the GPS tour
 
 -- Writs to hand in now: ready ones, and envelopes still to open whose items you hold,
@@ -621,6 +672,7 @@ local f = CreateFrame("Frame")
 pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
 pcall(f.RegisterEvent, f, "QUEST_TURNED_IN")
 pcall(f.RegisterEvent, f, "TAXIMAP_OPENED")
+pcall(f.RegisterEvent, f, "TAXIMAP_CLOSED")
 pcall(f.RegisterEvent, f, "ZONE_CHANGED_NEW_AREA")
 pcall(f.RegisterEvent, f, "PLAYER_CONTROL_GAINED")
 pcall(f.RegisterEvent, f, "LOADING_SCREEN_DISABLED")
@@ -631,7 +683,10 @@ f:SetScript("OnEvent", function(_, event, a1)
     elseif event == "TAXIMAP_OPENED" then
         RecordTaxi()
         GPS.Replan()
+        C_Timer.After(0.1, function() pcall(GPS.MarkTaxi) end)
         if Opt("autoFlight", false) and GPS.FlightLeg() then C_Timer.After(0.3, GPS.TakeFlight) end
+    elseif event == "TAXIMAP_CLOSED" then
+        GPS.UnmarkTaxi()
     elseif event == "QUEST_TURNED_IN" then
         local db = WLWritsCharDB
         if not writOfQuest then
