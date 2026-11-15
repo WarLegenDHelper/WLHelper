@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.15] — 2026-11-15
+
+### Modifié / Changed
+- Améliorations : dans Baganator, les flèches reprennent les réglages de Geared Arrows (mêmes coins), qu'il n'est plus nécessaire d'installer.
+  *Upgrades: Baganator keeps your Geared Arrows corner settings; Geared Arrows is no longer needed.*
+
 ## [1.0.0-beta.14] — 2026-11-15
 
 ### Ajouté / Added

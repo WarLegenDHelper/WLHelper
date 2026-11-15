@@ -158,11 +158,12 @@ end
 
 -- ---------------------------------------------------------------- Baganator
 local baganator = false
+-- same names and IDs as Geared Arrows: Baganator keeps the corners you had set for it
 local function HookBaganator()
     if baganator or not (Baganator and Baganator.API) then return end
     baganator = true
     local API = Baganator.API
-    pcall(API.RegisterCornerWidget, "WL Helper: amélioration", "wlhelper_up", function(_, details)
+    pcall(API.RegisterCornerWidget, "Geared Forever", "gearedforever", function(_, details)
         return IsUpgrade(details.itemLink)
     end, function(itemButton)
         local arrow = itemButton:CreateTexture(nil, "OVERLAY")
@@ -170,7 +171,7 @@ local function HookBaganator()
         arrow:SetSize(14, 14)
         return arrow
     end, { corner = "top_left", priority = 1 })
-    pcall(API.RegisterCornerWidget, "WL Helper: amélioration %", "wlhelper_up_pct", function(text, details)
+    pcall(API.RegisterCornerWidget, "Geared Forever %", "gearedforever_pct", function(text, details)
         local r = Check(details.itemLink)
         if not r.up then return false end
         text:SetText(r.text)
@@ -181,7 +182,7 @@ local function HookBaganator()
         text.sizeFont = true
         return text
     end, { corner = "top_right", priority = 1 })
-    if API.RegisterUpgradePlugin then pcall(API.RegisterUpgradePlugin, "WL Helper", "wlhelper", IsUpgrade) end
+    if API.RegisterUpgradePlugin then pcall(API.RegisterUpgradePlugin, "Geared Forever", "gearedforever", IsUpgrade) end
 end
 
 -- ---------------------------------------------------------------- refresh
