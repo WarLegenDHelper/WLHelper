@@ -332,8 +332,33 @@ function S.Window(name, width, height, title, subtitle, db, posKey)
         f:StopMovingOrSizing()
         if db then local p, _, rp, x, y = f:GetPoint(); db[posKey] = { p, rp, x, y } end
     end)
+    -- back to the home page: "‹" and the logo, in every window but the home page and the small popups
+    local NO_BACK = { WLHelperHome = true, WLHelperDecline = true, WLHelperWelcome = true }
+    local logoX = 9
+    local function GoHome()
+        f:Hide()
+        local WP = ns.WP
+        if WP and WP.OpenHome then WP.OpenHome() end
+    end
+    local function HomeTip(self) S.Tip(self, { ns.L and ns.L("Retour à l'accueil") or "Home" }) end
+    if not NO_BACK[name or ""] then
+        local back = CreateFrame("Button", nil, h)
+        back:SetSize(26, 32); back:SetPoint("LEFT", 4, 0)
+        local chev = S.Text(back, 22, C.dim, true); chev:SetPoint("CENTER", 0, 1); chev:SetText("‹")
+        back:SetScript("OnEnter", function(self) chev:SetTextColor(1, 1, 1); HomeTip(self) end)
+        back:SetScript("OnLeave", function() chev:SetTextColor(C.dim[1], C.dim[2], C.dim[3]); S.HideTip() end)
+        back:SetScript("OnClick", GoHome)
+        f.back = back
+        logoX = 30
+    end
     local logo = h:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(20, 20); logo:SetPoint("LEFT", 9, 0); logo:SetTexture(S.LOGO)
+    logo:SetSize(20, 20); logo:SetPoint("LEFT", logoX, 0); logo:SetTexture(S.LOGO)
+    if not NO_BACK[name or ""] then
+        local lb = CreateFrame("Button", nil, h)
+        lb:SetAllPoints(logo)
+        lb:SetScript("OnClick", GoHome)
+        lb:SetScript("OnEnter", HomeTip); lb:SetScript("OnLeave", S.HideTip)
+    end
     f.title = S.Text(h, 15, C.text, true)
     f.title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
     f.title:SetText(title or "")

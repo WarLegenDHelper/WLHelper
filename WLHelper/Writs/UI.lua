@@ -275,15 +275,17 @@ local function RenderToday()
             for _, r in ipairs(data) do if r.state == "ready" and r.w.map and not r.tooHigh then ready = ready + 1 end end
             if pending >= need then
                 today.message:SetText(string.format(L("Rends tes %d writs et c'est bon."), ready))
-            elseif #plan > 0 then
+            elseif #plan > 0 and ready > 0 then
                 today.message:SetText(string.format(L("Rends les %d writs prêts, achète-en %d de plus."), ready, #plan))
+            elseif #plan > 0 then
+                today.message:SetText(string.format(L("Achète %d writs dans l'onglet Achats."), #plan))
             else
-                today.message:SetText(L("Aucun writ abordable aujourd'hui : reviens après le reset."))
+                today.message:SetText(L("Aucun writ abordable aujourd'hui : reviens demain, quand ils changent."))
             end
         end
     end
     local secs = WP.SecondsToReset()
-    today.reset:SetText(string.format(L("reset dans %d h"), math.floor(secs / 3600)))
+    today.reset:SetText(string.format(L("nouveaux writs dans %d h"), math.floor(secs / 3600)))
 
     -- Cards: writs you hold, by zone, closest first is not known cheaply: biggest first.
     local zones, order, later = {}, {}, 0

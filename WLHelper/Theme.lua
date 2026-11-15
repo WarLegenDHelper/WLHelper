@@ -147,9 +147,31 @@ function ns.ClassInfo(cls)
   return name, c and { c.r, c.g, c.b } or { 0.41, 0.8, 0.94 }
 end
 
+-- A font file can be missing (another EllesmereUI version): the text would then be invisible.
+-- A hidden probe draws "Ag" with it; no width = no font, the game's own is used instead.
+local probe
+local function FontWorks(path)
+  if not probe then
+    local holder = CreateFrame("Frame", nil, UIParent); holder:Hide()
+    probe = holder:CreateFontString(nil, "OVERLAY")
+  end
+  local ok, set = pcall(probe.SetFont, probe, path, 12, "")
+  if not ok or set == false then return false end
+  local f = probe:GetFont()
+  if not f or (type(f) == "string" and f:lower() ~= path:lower()) then return false end
+  probe:SetText("Ag")
+  local w = probe:GetStringWidth()
+  return w and w > 0
+end
+ns.FontWorks = FontWorks
+
 function ns.ApplyLooks()
-  -- The accent stays War Legend red; EllesmereUI only lends its fonts.
-  if ns.IsLoaded("EllesmereUI") then T.font, T.bold = EUI .. "FiraSans Medium.ttf", EUI .. "FiraSans Bold.ttf" end
+  -- The accent stays War Legend red; EllesmereUI only lends its fonts, when its files are there.
+  if ns.IsLoaded("EllesmereUI") then
+    local medium, bold = EUI .. "FiraSans Medium.ttf", EUI .. "FiraSans Bold.ttf"
+    if FontWorks(medium) and FontWorks(bold) then T.font, T.bold = medium, bold
+    else T.font, T.bold = STANDARD_TEXT_FONT, STANDARD_TEXT_FONT end
+  end
   for _, fs in ipairs(fonts) do SetFont(fs) end
   for _, t in ipairs(accents) do t:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], t._accentAlpha) end
   if ns.Render then ns.Render() end

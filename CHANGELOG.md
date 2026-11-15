@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.20] — 2026-11-15
+
+### Ajouté / Added
+- **Retour à l'accueil partout** : un « ‹ » en haut à gauche de chaque fenêtre (Comptoir, Commandes, Guilde, Sacs, Réglages, sélecteur de donjons...), et le logo fait de même.
+  *A "‹" back-to-home button (and the logo) in every window.*
+
+### Corrigé / Fixed
+- **Textes invisibles chez certains joueurs** : avec une autre version d'EllesmereUI, la police qu'on lui emprunte pouvait manquer et les textes disparaissaient (boutons, lignes d'étape). L'addon vérifie maintenant que la police s'affiche, sinon il prend celle du jeu.
+  *Invisible texts with another EllesmereUI version: the borrowed font is checked, the game's font is used otherwise.*
+- Comptoir : « reset dans 14 h » devient « nouveaux writs dans 14 h », et « Rends les 0 writs prêts » devient « Achète 8 writs dans l'onglet Achats ».
+  *Trading Post: no more English "reset", no more "hand in the 0 ready writs".*
+
 ## [1.0.0-beta.19] — 2026-11-15
 
 ### Ajouté / Added

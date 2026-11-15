@@ -5,7 +5,7 @@ local S = {
   fr = {
     WRITS = "Comptoir", TT_HWRITS = "Comptoir (Craftsman's Writs) : writs les moins chers, liste d'achat, GPS jusqu'aux PNJ. /wl trade", MM_TT4 = "Maj-clic : le Comptoir",
     TITLE = "WL HELPER",
-    SEC_TODO = "À faire à ton niveau", SEC_LATER = "Plus tard : trop haut pour toi", SEC_BELOW = "Sous ton niveau", SEC_UP = "À venir", SEC_DONE = "Terminés", SEC_NOQ = "Sans quête Horde",
+    SEC_TODO = "À faire à ton niveau", SEC_LATER = "Plus tard : trop haut pour toi", SEC_BELOW = "Sous ton niveau", SEC_UP = "À venir", BACK_HOME = "Retour à l'accueil", SEC_DONE = "Terminés", SEC_NOQ = "Sans quête Horde",
     PICK_FINISHED = "Terminé · %d quêtes", PICK_QN = "%d/%d quêtes", PICK_LV = "NIV %d-%d", PICK_PICKED = "Choisi", PICK_SIZE = "%d joueurs", PICK_OPENS = "ouvre le %s", PICK_DATE = "%d/%m/%Y", PICK_SOON = "À venir",
     DUNGEONS = "Donjons", HOME = "Accueil", SETTINGS = "Réglages", GO = "Y aller", BACK_CUR = "Revenir à l'étape en cours",
     NOPOINT_S = "Pas de point pour cette étape", NEXT2 = "Étape suivante", MORE = "Plus d'actions", PICK_FIRST = "Choisir des donjons",
@@ -86,7 +86,7 @@ local S = {
   en = {
     WRITS = "Trading Post", TT_HWRITS = "Trading Post (Craftsman's Writs): cheapest writs, shopping list, GPS to the turn-in NPCs. /wl trade", MM_TT4 = "Shift-click: the Trading Post",
     TITLE = "WL HELPER",
-    SEC_TODO = "At your level", SEC_LATER = "Later: too high for you", SEC_BELOW = "Below your level", SEC_UP = "Upcoming", SEC_DONE = "Done", SEC_NOQ = "No Horde quest",
+    SEC_TODO = "At your level", SEC_LATER = "Later: too high for you", SEC_BELOW = "Below your level", SEC_UP = "Upcoming", BACK_HOME = "Back to home", SEC_DONE = "Done", SEC_NOQ = "No Horde quest",
     PICK_FINISHED = "Done · %d quests", PICK_QN = "%d/%d quests", PICK_LV = "LV %d-%d", PICK_PICKED = "Picked", PICK_SIZE = "%d players", PICK_OPENS = "opens %s", PICK_DATE = "%b %d, %Y", PICK_SOON = "Upcoming",
     DUNGEONS = "Dungeons", HOME = "Home", SETTINGS = "Settings", GO = "Go there", BACK_CUR = "Back to the current step",
     NOPOINT_S = "No map point for this step", NEXT2 = "Next step", MORE = "More actions", PICK_FIRST = "Pick dungeons",
