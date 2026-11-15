@@ -56,7 +56,8 @@ Have the guild or one crafter make an item, like retail crafting orders.
 - Inbox check of what the crafter received, mail filled for you.
 
 ### Upgrades
-A green arrow on bag items better than yours, judged by Geared Forever (game bags and Baganator).
+A green arrow and the gain on bag items better than what you wear, and a line in every item tooltip.
+WL Helper's own stat weights, per class and spec (from your talents, or picked in the settings).
 
 ### Clicks
 Alt-click to invite (chat, world, portraits) and Shift + right-click to shoot an enemy.
@@ -91,7 +92,7 @@ In game, `/wl idea` gives you the link already filled with your version.
 - **The folder is named `WLHelper`** since 1.0.0-beta.4 (it was `DungeonGuide`). If you installed an older
   version by hand, delete the `DungeonGuide` folder. If it is still there, the addon turns
   it off and tells you.
-- **Versions**: `1.0.0-beta.17` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
+- **Versions**: `1.0.0-beta.18` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
 
 ## Credits and license
 

@@ -17,8 +17,8 @@ ns.AddEnglish({
     ["Clics (désactivés par défaut)"] = "Clicks (off by default)",
     ["Alt-clic pour inviter"] = "Alt-click to invite",
     ["Sur un nom dans le chat, un joueur ou un portrait ; lien [Inviter] sur les demandes"] = "On a name in chat, a player or a portrait; [Invite] link on requests",
-    ["Touche + clic droit pour tirer"] = "Key + right-click to shoot",
-    ["Sur un ennemi : le cible et lance ton tir à distance (arme, baguette, lancer)"] = "On an enemy: targets it and starts your ranged attack (weapon, wand, throw)",
+    ["Clic droit pour tirer"] = "Right-click to shoot",
+    ["Sur un ennemi : le cible et lance ton tir à distance (arme, baguette, lancer). « Aucune » : le clic droit seul tire."] = "On an enemy: targets it and starts your ranged attack (weapon, wand, throw). \"None\": right-click alone shoots.",
     ["Chasseur : le clic droit seul reste ton attaque au corps-à-corps. Avec la touche, Tir automatique démarre et ne s'arrête jamais sur un second clic : alterne librement pour le weaving."] =
         "Hunter: right-click alone stays your melee attack. With the key, Auto Shot starts and a second click never stops it: alternate freely for weaving.",
     ["Bouton de la minimap"] = "Minimap button",
@@ -80,9 +80,9 @@ local function Build()
             function() return d.chat or d.world or d.link end,
             function(v) d.chat, d.world, d.link = v, v, v; apply() end, WP.ClickOwner and WP.ClickOwner("invite"))
         local shootRow
-        shootRow, y = Line(win, y, L("Touche + clic droit pour tirer"), L("Sur un ennemi : le cible et lance ton tir à distance (arme, baguette, lancer)"),
+        shootRow, y = Line(win, y, L("Clic droit pour tirer"), L("Sur un ennemi : le cible et lance ton tir à distance (arme, baguette, lancer). « Aucune » : le clic droit seul tire."),
             function() return d.shoot end, function(v) d.shoot = v; apply() end, WP.ClickOwner and WP.ClickOwner("shoot"))
-        local seg = S.Segmented(win, { { "SHIFT", "Maj" }, { "CTRL", "Ctrl" }, { "ALT", "Alt" } },
+        local seg = S.Segmented(win, WP.ShootKeys(),
             function() return d.shootMod end, function(v) d.shootMod = v; apply() end, 26)
         seg:SetPoint("TOPLEFT", PAD, y + 2)
         y = y - 34

@@ -99,6 +99,21 @@ if ns.Q[6602] and not ns.D.OnyxiasLair then
   ns.TR[ns.D.OnyxiasLair.ed] = "Accès au raid : la chaîne de l'Amulette Feu-drake (Ordre du seigneur de guerre, Rexxar, l'Épreuve des crânes, le général Drakkisath). Le raid ouvre sur Forever le 9 décembre 2026."
   table.insert(ns.ORDER, "OnyxiasLair")
 end
+-- The three raids open together on Forever on 9 December 2026 (Blizzard's roadmap): Barrow Deeps
+-- (10 players), Hyjal Summit (20), Onyxia's Lair (40). Molten Core comes later, no date yet.
+-- Until then they show as "upcoming"; their entrances and quests come with the raids.
+local RAIDS_OPEN = 1796828400   -- 9 December 2026, 15:00 UTC
+if ns.D.OnyxiasLair then ns.D.OnyxiasLair.up, ns.D.OnyxiasLair.size = RAIDS_OPEN, 40 end
+for _, r in ipairs({
+  { key = "BarrowDeeps", n = "Barrow Deeps", nf = "Barrow Deeps", short = "Barrow", size = 10, icon = "Interface\\Icons\\Spell_Nature_Sleep" },
+  { key = "HyjalSummit", n = "Hyjal Summit", nf = "Sommet d'Hyjal", short = "Hyjal", size = 20, icon = "Interface\\Icons\\Spell_Fire_Fire" },
+}) do
+  if not ns.D[r.key] then
+    r.raid, r.lvl, r.up, r.q = true, { 60, 60 }, RAIDS_OPEN, {}
+    ns.D[r.key] = r
+    table.insert(ns.ORDER, r.key)
+  end
+end
 
 -- =====================================================================
 --  Clés d'accès (d'après la table « Keys » de Naowh, vérifiée dans LibForeverData)

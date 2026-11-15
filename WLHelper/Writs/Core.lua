@@ -849,7 +849,7 @@ WP.MODULES = {
     { key = "writs", label = "Comptoir", hint = "Craftsman's Writs, liste d'achat, remise auto" },
     { key = "bags", label = "Sacs", hint = "Nettoyeur des objets de quête inutiles" },
     { key = "orders", label = "Commandes", hint = "Faire fabriquer par la guilde, accepter des commandes" },
-    { key = "upgrades", label = "Améliorations", hint = "Flèche verte sur les objets meilleurs que les tiens (Geared Forever)" },
+    { key = "upgrades", label = "Améliorations", hint = "Flèche verte sur les objets meilleurs que les tiens" },
 }
 function WP.ModuleOn(key)
     local m = WLWritsDB and WLWritsDB.modules

@@ -6,6 +6,21 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.18] — 2026-11-15
+
+### Modifié / Changed
+- **Améliorations avec nos propres poids de stats** : par classe et par spé (l'arbre de talents le plus rempli, ou la spé choisie dans Réglages › Sacs), en comptant l'arme pour les emplacements qui s'en servent. Plus besoin de Geared Forever. Une ligne « WL Helper · Givre : +12% » dans chaque infobulle d'objet ; les objets que ta classe ne peut pas porter sont ignorés.
+  *Upgrades use WL Helper's own stat weights per class and spec; a line in every item tooltip; Geared Forever no longer needed.*
+- **Clic droit pour tirer sans touche** : le choix « Aucune » tire au clic droit seul sur un ennemi (baguette des mages, prêtres, démonistes : c'est leur réglage de départ). La touche est retenue par classe.
+  *Right-click to shoot with no key ("None"), the default for wand users; the key is kept per class.*
+- **Raids** : Barrow Deeps (10 joueurs) et le Sommet d'Hyjal (20) rejoignent Onyxia (40), marqués « À venir » jusqu'au 9 décembre 2026.
+  *Raids: Barrow Deeps and Hyjal Summit join Onyxia, marked upcoming until 9 December 2026.*
+
+### Corrigé / Fixed
+- Sélecteur : les donjons sous ton niveau avaient leur place dans « Plus tard » ; ils ont maintenant leur section « Sous ton niveau ».
+  *Picker: dungeons below your level get their own section.*
+- « Maj » s'affiche « Shift » en anglais.
+
 ## [1.0.0-beta.17] — 2026-11-15
 
 ### Modifié / Changed

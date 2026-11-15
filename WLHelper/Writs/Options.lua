@@ -94,6 +94,9 @@ ns.AddEnglish({
         "Sources and thanks: see CREDITS.txt in the addon's folder.",
     ["GitHub"] = "GitHub", ["Clique puis Ctrl+C pour copier"] = "Click, then Ctrl+C to copy",
     ["Commandes du chat"] = "Chat commands",
+    ["Spé jugée"] = "Spec judged",
+    ["Auto : l'arbre de talents où tu as le plus de points"] = "Auto: the talent tree with the most points",
+    ["Auto"] = "Auto",
     ["Alerte des monstres rares"] = "Rare monster alert",
     ["Dans un donjon, un message et un son quand un monstre rare apparaît"] = "In a dungeon, a message and a sound when a rare monster shows up",
     -- game settings and EllesmereUI
@@ -349,7 +352,7 @@ function BUILD.general(p)
     SwitchRow(p, L("Lien [Inviter] sur les demandes"), function() return Clicks().link end, setClick("link"))
     SwitchRow(p, L("Clic droit pour tirer"), function() return Clicks().shoot end, setClick("shoot"), shootBy and string.format(L("Déjà fait par %s"), shootBy))
     local mrow = Row(p, L("Touche à tenir"))
-    Place(p, mrow, S.Segmented(mrow, { { "SHIFT", "Maj" }, { "CTRL", "Ctrl" }, { "ALT", "Alt" } },
+    Place(p, mrow, S.Segmented(mrow, ns.WP.ShootKeys(),
         function() return Clicks().shootMod end, setClick("shootMod")))
     end
 
@@ -502,6 +505,21 @@ function BUILD.bags(p)
     Place(p, row, show)
     CloseSection(p)
     Note(p, L("Les objets qui lancent une quête ne sont jamais proposés."), 8)
+
+    -- upgrade arrows: the spec they judge for (auto = the talent tree with the most points)
+    if ns.WP.Weights then
+        Section(p, L("Améliorations"))
+        local function SpecDB()
+            WLWritsDB.upgradeSpec = WLWritsDB.upgradeSpec or {}
+            local _, class = UnitClass("player")
+            return WLWritsDB.upgradeSpec, class
+        end
+        local srow = Row(p, L("Spé jugée"), L("Auto : l'arbre de talents où tu as le plus de points"))
+        Place(p, srow, S.Segmented(srow, ns.WP.Weights.SpecChoices(),
+            function() local db, c = SpecDB(); return db[c] or "auto" end,
+            function(v) local db, c = SpecDB(); db[c] = v; if ns.WP.RefreshUpgrades then ns.WP.RefreshUpgrades() end end))
+        CloseSection(p)
+    end
 end
 
 local function Version()

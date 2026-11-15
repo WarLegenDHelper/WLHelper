@@ -16,6 +16,8 @@ local L = ns.L
 
 ns.AddEnglish({
     ["Inviter"] = "Invite",
+    ["Aucune"] = "None",
+    ["Maj"] = "Shift",
     ["%s est déjà dans ton groupe."] = "%s is already in your group.",
     ["Seul le chef du groupe ou un assistant peut inviter."] = "Only the group leader or an assistant can invite.",
     ["Ton groupe est plein (passe en raid pour inviter davantage)."] = "Your party is full (convert it to a raid to invite more).",
@@ -26,6 +28,7 @@ local function Loaded(name)
     local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
     return f and f(name) and true or false
 end
+local modsLoaded = false
 local function DB()
     WLWritsDB.clicks = WLWritsDB.clicks or {}
     local d = WLWritsDB.clicks
@@ -36,7 +39,14 @@ local function DB()
         d.v = 1
     end
     for _, k in ipairs({ "chat", "world", "link", "shoot" }) do if d[k] == nil then d[k] = false end end
-    d.shootMod = d.shootMod or "SHIFT"
+    -- the key is per class (saved in d.mods at each apply): casters shoot a wand with right-click
+    -- alone; the others keep right-click for melee and hold Shift
+    if not modsLoaded then
+        modsLoaded = true
+        local _, class = UnitClass("player")
+        d.mods = d.mods or {}
+        d.shootMod = d.mods[class] or ((class == "MAGE" or class == "PRIEST" or class == "WARLOCK") and "NONE" or "SHIFT")
+    end
     if type(d.words) ~= "table" or #d.words == 0 then d.words = { "inv", "invite", "invit", "invi" } end
     return d
 end
@@ -66,6 +76,11 @@ local function Invite(name)
     end
     local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
     if invite then invite(name) end
+end
+
+-- the choices of key for shooting, for a segmented control
+function WP.ShootKeys()
+    return { { "NONE", L("Aucune") }, { "SHIFT", L("Maj") }, { "CTRL", "Ctrl" }, { "ALT", "Alt" } }
 end
 
 local function InviteOn(key)
@@ -189,14 +204,23 @@ function WP.ApplyClicks()
     if InCombatLockdown() then pending = true; return end
     pending = false
     local d = DB()
+    local _, class = UnitClass("player")
+    d.mods = d.mods or {}
+    d.mods[class] = d.shootMod
     UnregisterStateDriver(inviteDriver, "invite"); inviteDriver:SetAttribute("state-invite", "off"); ClearOverrideBindings(inviteDriver)
     if InviteOn("world") then RegisterStateDriver(inviteDriver, "invite", "[@mouseover,help,nodead] on; off") end
     UnregisterStateDriver(shootDriver, "shoot"); shootDriver:SetAttribute("state-shoot", "off"); ClearOverrideBindings(shootDriver)
     local spell = ShotSpell()
     if d.shoot and not WP.ClickOwner("shoot") and spell then
         shootButton:SetAttribute("macrotext", "/target [@mouseover,harm,nodead]\n/cast !" .. spell)   -- "!" never toggles Auto Shot / Shoot off
-        shootDriver:SetAttribute("key", d.shootMod .. "-BUTTON2")
-        RegisterStateDriver(shootDriver, "shoot", "[@mouseover,harm,nodead,mod:" .. d.shootMod:lower() .. "] on; off")
+        if d.shootMod == "NONE" then
+            -- right-click alone on an enemy; with any key held, right-click does what it always did
+            shootDriver:SetAttribute("key", "BUTTON2")
+            RegisterStateDriver(shootDriver, "shoot", "[@mouseover,harm,nodead,nomod] on; off")
+        else
+            shootDriver:SetAttribute("key", d.shootMod .. "-BUTTON2")
+            RegisterStateDriver(shootDriver, "shoot", "[@mouseover,harm,nodead,mod:" .. d.shootMod:lower() .. "] on; off")
+        end
     end
 end
 

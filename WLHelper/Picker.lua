@@ -234,7 +234,7 @@ Render = function()
   -- Sections, in this order: to do at your level, later (too high), done, then (All) no Horde quest.
   -- "My level" shows the first and the done ones; "All" shows every section.
   local tab = CurTab()
-  local secs = { todo = {}, later = {}, done = {}, noq = {} }
+  local secs = { todo = {}, later = {}, below = {}, done = {}, noq = {}, upcoming = {} }
   local list = {}
   local tooHigh = function(d) return d.lvl and d.lvl[1] and UnitLevel("player") < d.lvl[1] - 4 end
   for _, k in ipairs(ns.ORDER) do
@@ -242,11 +242,12 @@ Render = function()
     if TabOf(d) == tab and (tab ~= "cls" or ClassMatch(d)) then
       local n, done = Counts(k)
       local sec
-      if n == 0 then sec = tab == "raid" and "todo" or "noq"
+      if n == 0 then sec = (d.up and time() < d.up) and "upcoming" or (tab == "raid" and "todo" or "noq")
       elseif done >= n then sec = "done"
-      elseif tooHigh(d) or not LevelOK(d) then sec = "later"
+      elseif tooHigh(d) then sec = "later"
+      elseif not LevelOK(d) then sec = "below"
       else sec = "todo" end
-      local show = WLDTDB.pickAll or sec == "todo" or sec == "done"
+      local show = WLDTDB.pickAll or sec == "todo" or sec == "done" or sec == "upcoming"
       if show then table.insert(secs[sec], k); table.insert(list, k) end
     end
   end
@@ -268,7 +269,7 @@ Render = function()
   p.heads = p.heads or {}
   for _, h in ipairs(p.heads) do h:Hide() end
   local i, y, hi = 0, 0, 0
-  for _, s in ipairs({ { "todo", L.SEC_TODO }, { "later", L.SEC_LATER }, { "done", L.SEC_DONE }, { "noq", L.SEC_NOQ } }) do
+  for _, s in ipairs({ { "todo", L.SEC_TODO }, { "later", L.SEC_LATER }, { "below", L.SEC_BELOW }, { "done", L.SEC_DONE }, { "upcoming", L.SEC_UP }, { "noq", L.SEC_NOQ } }) do
     local keys = secs[s[1]]
     if #keys > 0 then
       table.sort(keys, byLevel)
@@ -289,10 +290,13 @@ Render = function()
     c.dicon:Hide()
     if d.cq then SetClassIcon(c.cicon, (d.cq:match("^[^,]+"))) else c.cicon:Hide() end
     c.name:SetText(ns.DName(k))
-    c.lvl:SetText((d.raid and (L.RAID .. "  ·  ") or "") .. (d.lvl and d.lvl[1] and (L.PICK_LV:format(d.lvl[1], d.lvl[2] or d.lvl[1])) or ""))
+    local soon = d.up and time() < d.up
+    c.lvl:SetText((d.raid and (L.RAID .. (d.size and (" " .. L.PICK_SIZE:format(d.size)) or "") .. "  ·  ") or "")
+      .. (d.lvl and d.lvl[1] and (L.PICK_LV:format(d.lvl[1], d.lvl[2] or d.lvl[1])) or "")
+      .. (soon and ("  ·  " .. L.PICK_OPENS:format(date(L.PICK_DATE, d.up))) or ""))
     local n, done = Counts(k)
     local finished = n > 0 and done >= n
-    c.info:SetText(n > 0 and L.PICK_QN:format(done, n) or L.PICK_NOQ)
+    c.info:SetText(n > 0 and L.PICK_QN:format(done, n) or (soon and L.PICK_SOON) or L.PICK_NOQ)
     local horde = UnitFactionGroup("player") ~= "Alliance"
     c.faction:SetTexture(horde and "Interface\\TargetingFrame\\UI-PVP-Horde" or "Interface\\TargetingFrame\\UI-PVP-Alliance")
     c.faction:SetShown(n > 0)
@@ -305,7 +309,7 @@ Render = function()
     c.picked:SetText(sel and L.PICK_PICKED or "")
     for _, e in pairs(c.selBorder) do e:SetShown(sel) end
     -- later (too high) and done: greyed; to do: the picture as it is
-    c.art:SetDesaturated(c.section == "later" or c.section == "noq")
+    c.art:SetDesaturated(c.section == "later" or c.section == "below" or c.section == "noq" or c.section == "upcoming")
     c.shade:SetColorTexture(0, 0, 0, (c.section == "todo" or sel) and 0.12 or 0.45)
     c:Show()
       end
