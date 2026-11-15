@@ -123,12 +123,51 @@ function ns.Useful(q)
   return true
 end
 
+-- the player's faction and race: a quest of the other faction, or kept for other races, is never offered
+local function FactionOK(fa)
+  if not fa or fa == "" or fa == "Both" then return true end
+  local mine = UnitFactionGroup and UnitFactionGroup("player")
+  if not mine or mine == "Neutral" then return fa ~= "Alliance" end
+  return fa == mine
+end
+local function RaceOK(race)
+  if not race then return true end
+  local _, tok = UnitRace and UnitRace("player")
+  if not tok then return true end
+  tok = tok:upper(); if tok == "SCOURGE" then tok = "UNDEAD" end
+  for r in race:gmatch("[^,]+") do
+    r = r:upper(); if r == "SCOURGE" then r = "UNDEAD" end
+    if r == tok then return true end
+  end
+  return false
+end
+ns.FactionOK, ns.RaceOK = FactionOK, RaceOK
+-- Every prerequisite of a quest, followed all the way down (the prerequisites of a prerequisite
+-- first), each once, in order. nil when one of them cannot be done by this character (other
+-- faction, class or race, or unknown): the quest itself is then left out of the route.
+local function FullChain(qid, cls, out, seen, depth)
+  out, seen, depth = out or {}, seen or {}, depth or 0
+  local q = ns.Q[qid]
+  if not q or depth > 20 then return out end
+  for _, pid in ipairs(q.p or {}) do
+    if not seen[pid] then
+      seen[pid] = true
+      local pq = ns.Q[pid]
+      if not (pq and FactionOK(pq.fa) and ClassOK(pq.c, cls) and RaceOK(pq.race)) then return nil end
+      if not FullChain(pid, cls, out, seen, depth + 1) then return nil end
+      out[#out + 1] = pid
+    end
+  end
+  return out
+end
+ns.FullChain = FullChain
+
 function ns.DungeonQuests(dkey, cls)
   local d, out = ns.D[dkey], {}
   if not d then return out end
   for _, qid in ipairs(d.q or {}) do
     local q = ns.Q[qid]
-    if q and q.fa ~= "Alliance" and ClassOK(q.c, cls) and not q.unk and ns.Useful(q) then table.insert(out, qid) end
+    if q and FactionOK(q.fa) and ClassOK(q.c, cls) and RaceOK(q.race) and not q.unk and ns.Useful(q) and FullChain(qid, cls) then table.insert(out, qid) end
   end
   return out
 end
@@ -265,9 +304,9 @@ local function MakeNodes(sel, cls)
       if not (WLDTDB.off and WLDTDB.off[qid]) and not q.extra then
         local prevT
         local Tby = {}
-        for _, pid in ipairs(q.p or {}) do
+        for _, pid in ipairs(FullChain(qid, cls) or {}) do
           local pq = ns.Q[pid]
-          if pq and pq.fa ~= "Alliance" and ClassOK(pq.c, cls) then
+          if pq then
             local A, T = qnodes(pid, dkey, true)
             if A then
               -- quêtes données ensemble (ex. les Épreuves des crânes) : elles dépendent de la même quête, pas l'une de l'autre
@@ -518,7 +557,7 @@ function ns.ShareQuests()
     end)
     delay = delay + 1.5
   end
-  P(L.SHARING:format(#queue))
+  P(ns.Plural(#queue, "SHARING1", "SHARING", #queue))
 end
 
 

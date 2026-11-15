@@ -120,7 +120,7 @@ local EN = {
     ["ouvre une carte de vol une fois : le GPS apprendra tes points de vol."] = "open a flight map once: the GPS will learn your flight paths.",
     -- commands
     ["commandes :"] = "commands:",
-    ["  /wlh trade : ouvre ou ferme le Comptoir"] = "  /wlh trade: open or close the Trading Post",
+    ["  /wlh trade : ouvre ou ferme les Writs"] = "  /wlh trade: open or close the Trading Post",
     ["  /wlh trade gps : lance ou arrête la tournée GPS (writs prêts à rendre)"] = "  /wlh trade gps: start or stop the GPS tour (writs ready to hand in)",
     ["  /wlh trade stop : arrête le GPS"] = "  /wlh trade stop: stop the GPS",
     ["  /wlh trade scan : scanne la liste d'achat à l'HV"] = "  /wlh trade scan: scan the shopping list at the AH",
@@ -141,7 +141,7 @@ local EN = {
     ["Aucun writ en main. Achète ceux de l'onglet Achats, puis ouvre les enveloppes."] = "No writ in hand. Buy those in the Shopping tab, then open the envelopes.",
     ["Aujourd'hui"] = "Today",
     ["Autre continent"] = "Other continent",
-    ["Choisis un objectif plus haut dans les options du Comptoir."] = "Pick a higher goal in the Trading Post options.",
+    ["Choisis un objectif plus haut dans les options des Writs."] = "Pick a higher goal in the Trading Post options.",
     ["Clic : GPS · Maj-clic : chercher à l'HV"] = "Click: GPS · Shift-click: search the AH",
     ["Clic : acheter à l'HV · Maj-clic : Auctionator"] = "Click: buy at the AH · Shift-click: Auctionator",
     ["Dans tes sacs : %d / %d"] = "In your bags: %d / %d",
@@ -164,7 +164,7 @@ local EN = {
     ["Enveloppe"] = "Envelope",
     ["Scan %d / %d"] = "Scan %d / %d",
     ["%d en banque"] = "%d in the bank",
-    ["Options du Comptoir"] = "Trading Post settings",
+    ["Options des Writs"] = "Trading Post settings",
     ["Ouvre l'hôtel des ventes pour scanner"] = "Open the auction house to scan",
     ["Ouvre une carte de vol pour aller plus vite"] = "Open a flight map to go faster",
     ["Ouvrir l'enveloppe"] = "Open the envelope",
@@ -220,6 +220,32 @@ local EN = {
     ["À rendre maintenant"] = "To hand in now",
     ["Étape %d sur %d"] = "Step %d of %d",
     ["× pour terminer"] = "× to finish",
+
+    -- shared components (Style.lua): tooltips of the icon buttons, banners and inputs
+    ["Fermer"] = "Close",
+    ["Clic : fermer la fenêtre"] = "Click: close the window",
+    ["Clic : revenir à l'accueil"] = "Click: back to Home",
+    ["Masquer ce message"] = "Hide this message",
+    ["Clic : masquer ce message"] = "Click: hide this message",
+    ["Effacer"] = "Clear",
+    ["Clic : effacer la recherche"] = "Click: clear the search",
+    ["Indisponible en combat"] = "Not available in combat",
+
+    -- /wlh textes (debug: the texts the engine cuts in the open windows)
+    ["Texte coupé : 1 dans 1 fenêtre."] = "Truncated text: 1 in 1 window.",
+    ["Textes coupés : %d dans 1 fenêtre."] = "Truncated texts: %d in 1 window.",
+    ["Textes coupés : %d dans %d fenêtres."] = "Truncated texts: %d in %d windows.",
+    ["(1 ligne)"] = "(1 line)",
+    ["(%d lignes)"] = "(%d lines)",
+    ["(sans limite)"] = "(no limit)",
+    ["(limite)"] = "(at limit)",
+    ["[%s] %s %dpx %dx%d %s : %s"] = "[%s] %s %dpx %dx%d %s: %s",
+    ["Et 1 autre : ferme quelques fenêtres puis relance /wlh textes."] = "And 1 more: close a few windows, then run /wlh texts again.",
+    ["Et %d autres : ferme quelques fenêtres puis relance /wlh textes."] = "And %d more: close a few windows, then run /wlh texts again.",
+    ["Aucun texte coupé dans les fenêtres ouvertes."] = "No truncated text in the open windows.",
+    ["1 fenêtre cachée n'a pas été vérifiée."] = "1 hidden window was not checked.",
+    ["%d fenêtres cachées n'ont pas été vérifiées."] = "%d hidden windows were not checked.",
+    ["Debug : /wlh textes liste les textes coupés dans les fenêtres ouvertes (ajoute « all » pour voir aussi ceux à la limite)."] = "Debug: /wlh texts lists the cut texts in the open windows (add \"all\" to also see those at the limit).",
 }
 
 -- French unless the client is not French; WLWritsDB.lang ("fr" or "en") overrides.

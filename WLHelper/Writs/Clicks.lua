@@ -19,8 +19,11 @@ ns.AddEnglish({
     ["Aucune"] = "None",
     ["Maj"] = "Shift",
     ["%s est déjà dans ton groupe."] = "%s is already in your group.",
-    ["Seul le chef du groupe ou un assistant peut inviter."] = "Only the group leader or an assistant can invite.",
-    ["Ton groupe est plein (passe en raid pour inviter davantage)."] = "Your party is full (convert it to a raid to invite more).",
+    ["Seul le chef du raid ou un assistant peut inviter : demande au chef de te passer assistant."] =
+        "Only the raid leader or an assistant can invite: ask the leader to make you an assistant.",
+    ["Seul le chef du groupe peut inviter : demande-lui d'inviter %s ou de te passer chef."] =
+        "Only the party leader can invite: ask them to invite %s or to make you leader.",
+    ["Ton groupe est plein : passe-le en raid pour inviter plus de monde."] = "Your party is full: convert it to a raid to invite more people.",
 })
 
 local function IsSecret(v) return issecretvalue ~= nil and issecretvalue(v) end
@@ -68,11 +71,16 @@ local function Invite(name)
     local short = ShortName(name)
     if short == UnitName("player") then return end
     if InGroup(short) then WP.Print(string.format(L("%s est déjà dans ton groupe."), short)); return end
-    if IsInGroup() and not (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
-        WP.Print(L("Seul le chef du groupe ou un assistant peut inviter.")); return
+    -- a party has no assistants: only its leader invites; in a raid, assistants can too
+    if IsInRaid() then
+        if not (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
+            WP.Print(L("Seul le chef du raid ou un assistant peut inviter : demande au chef de te passer assistant.")); return
+        end
+    elseif IsInGroup() and not UnitIsGroupLeader("player") then
+        WP.Print(string.format(L("Seul le chef du groupe peut inviter : demande-lui d'inviter %s ou de te passer chef."), short)); return
     end
     if IsInGroup() and not IsInRaid() and GetNumSubgroupMembers() >= (MAX_PARTY_MEMBERS or 4) then
-        WP.Print(L("Ton groupe est plein (passe en raid pour inviter davantage).")); return
+        WP.Print(L("Ton groupe est plein : passe-le en raid pour inviter plus de monde.")); return
     end
     local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
     if invite then invite(name) end
@@ -101,7 +109,8 @@ local function InviteFilter(_, _, msg, sender, ...)
     if msg:find(LINK_PREFIX, 1, true) or not AsksForInvite(msg) then return false end
     local short = ShortName(sender)
     if short == UnitName("player") or InGroup(short) then return false end
-    return false, msg .. " " .. ("|cff6fdc8c|H%s%s|h[%s]|h|r"):format(LINK_PREFIX, sender, L("Inviter")), sender, ...
+    -- the link colour of the design system (accentSoft #E8605A)
+    return false, msg .. " " .. ("|cffe8605a|H%s%s|h[%s]|h|r"):format(LINK_PREFIX, sender, L("Inviter")), sender, ...
 end
 local AddFilter = (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter) or ChatFrame_AddMessageEventFilter
 if AddFilter then

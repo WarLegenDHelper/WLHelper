@@ -1,6 +1,8 @@
--- Writs/Events.lua: the Events module (/wlh events): the guild's own calendar and LFG.
+-- Writs/Events.lua: the group module, "Groupes" / "Groups" (/wlh lfg, /wlh events): the guild's own
+-- calendar and its group searches. The window follows the design system (docs/DESIGN.md): 520 wide,
+-- sized to its content, cards and rows from Writs/Style.lua.
 --
---  Upcoming  A member plans a dungeon or a raid: a name, a day and an hour, places per role (tanks,
+--  Agenda    A member plans a dungeon or a raid: a name, a day and an hour, places per role (tanks,
 --            healers, damage) and a note. Others sign up with a role, change it, or step out. At
 --            login, a line recalls what you organize or joined in the next 24 h; 1 h and 15 minutes
 --            before, those signed up get a reminder; the organizer gets a banner to invite everyone
@@ -21,41 +23,129 @@ local S = ns.S
 local C = S.C
 
 ns.AddEnglish({
-    ["Événements"] = "Events",
-    ["Donjon"] = "Dungeon", ["Raid"] = "Raid", ["Quête"] = "Quest", ["Autre"] = "Other",
-    ["Donjons et raids de la guilde, groupes du moment"] = "Guild dungeons and raids, groups right now",
-    ["À venir"] = "Upcoming",
+    -- the window, its header and its tabs
+    ["Seuls les membres qui ont WL Helper voient les événements et les recherches de groupe."] = "Only members who have WL Helper see the events and the group searches.",
+    ["WL Helper n'envoie jamais de message privé : tout passe par le canal de la guilde."] = "WL Helper never whispers anyone: everything goes through the guild channel.",
+    ["Agenda"] = "Upcoming",
     ["Créer"] = "Create",
     ["Groupe maintenant"] = "Group now",
-    ["Tank"] = "Tank", ["Soins"] = "Healer", ["DPS"] = "Damage",
-    ["Me désinscrire"] = "Step out",
-    ["Inviter les inscrits"] = "Invite everyone",
-    ["Annuler l'événement"] = "Cancel the event",
+    -- Agenda: the empty state, the cards, the auto-accept setting
+    ["Aucun événement prévu"] = "No events planned",
+    ["Les donjons et raids prévus par la guilde apparaîtront ici."] = "Dungeons and raids the guild plans will show up here.",
+    ["Créer un événement"] = "Create an event",
+    ["Tank"] = "Tank", ["Soigneur"] = "Healer", ["DPS"] = "DPS",
+    ["Clic : t'inscrire comme tank"] = "Click: sign up as tank",
+    ["Clic : t'inscrire comme soigneur"] = "Click: sign up as healer",
+    ["Clic : t'inscrire comme DPS"] = "Click: sign up as DPS",
+    ["Me désinscrire"] = "Cancel sign-up",
+    ["Inviter les inscrits"] = "Invite sign-ups",
+    ["Invitations envoyées"] = "Invites sent",
+    ["Personne d'autre n'est inscrit pour l'instant."] = "Nobody else has signed up yet.",
+    ["Annuler l'événement"] = "Cancel event",
+    ["Confirmer l'annulation"] = "Confirm cancel",
+    ["Annulé"] = "Cancelled",
+    ["Organisateur"] = "Organizer",
+    ["Inscrit"] = "Signed up",
     ["par %s"] = "by %s",
-    ["Aucun événement prévu. Crée le premier dans l'onglet Créer."] = "No event planned. Create the first one in the Create tab.",
-    ["Quoi"] = "What",
-    ["Zul'Farrak, Onyxia, farm de cuir..."] = "Zul'Farrak, Onyxia, leather farming...",
+    ["aucun inscrit pour l'instant"] = "no sign-ups yet",
+    ["1 inscrit"] = "1 sign-up",
+    ["%d inscrits"] = "%d sign-ups",
+    ["complet"] = "full",
+    ["+%d en réserve"] = "+%d in reserve",
+    ["Accepter l'invitation de l'organisateur"] = "Accept the organizer's invite",
+    ["Quand tu es inscrit, son invitation est acceptée pour toi, de 30 min avant le début à 30 min après."] = "When you are signed up, their invite is accepted for you, from 30 min before the start to 30 min after.",
+    -- dates and times
+    ["Aujourd'hui"] = "Today", ["Demain"] = "Tomorrow",
+    ["aujourd'hui"] = "today", ["demain"] = "tomorrow",
+    -- Create
+    ["Type"] = "Type",
+    ["Donjon"] = "Dungeon", ["Raid"] = "Raid", ["Quête"] = "Quest", ["Autre"] = "Other",
+    ["Choisir les donjons"] = "Pick dungeons",
+    ["Choisir les raids"] = "Pick raids",
+    ["Clic : choisir les donjons"] = "Click: pick dungeons",
+    ["Clic : choisir les raids"] = "Click: pick raids",
+    ["(+%d)"] = "(+%d)",
+    ["Nom de l'événement"] = "Event name",
+    ["Ex. Zul'Farrak"] = "E.g. Zul'Farrak",
+    ["Ex. Onyxia"] = "E.g. Onyxia",
+    ["Ex. quêtes des Maleterres"] = "E.g. Plaguelands quests",
+    ["Ex. farm de cuir à Feralas"] = "E.g. leather farming in Feralas",
     ["Jour"] = "Day",
     ["Heure"] = "Time",
-    ["Places"] = "Places",
-    ["Note"] = "Note",
-    ["Publier l'événement"] = "Publish the event",
-    ["Donne un nom à l'événement."] = "Give the event a name.",
-    ["Heure invalide : écris par exemple 20:30."] = "Invalid time: write for example 20:30.",
-    ["Cette heure est déjà passée."] = "That time is already past.",
-    ["Nouvel événement : %s, %s (par %s). /wlh events"] = "New event: %s, %s (by %s). /wlh events",
-    ["Rappel : %s commence dans 15 min."] = "Reminder: %s starts in 15 min.",
-    ["%s commence maintenant."] = "%s starts now.",
-    ["Aujourd'hui"] = "Today", ["Demain"] = "Tomorrow",
-    ["annulé"] = "cancelled",
+    ["Places tank"] = "Tank slots",
+    ["Places soigneur"] = "Healer slots",
+    ["Places DPS"] = "DPS slots",
+    ["Note (facultatif)"] = "Note (optional)",
+    ["Ex. niveau 45 minimum, rendez-vous à Gadgetzan"] = "E.g. level 45 and up, meet in Gadgetzan",
+    ["Sera publié : %s, %s."] = "Will be published: %s, %s.",
+    ["Publier l'événement"] = "Publish event",
+    ["Donne un nom à l'événement, par exemple Zul'Farrak."] = "Give the event a name, for example Zul'Farrak.",
+    ["Heure invalide : écris par exemple 20:30."] = "Invalid time: type for example 8:30 PM.",
+    ["Cette heure est déjà passée aujourd'hui : choisis Demain ou une heure plus tard."] = "That time has already passed today: pick Tomorrow or a later time.",
+    ["Cette heure est déjà passée."] = "That time has already passed.",
+    -- the dungeon / raid picker
+    ["Tu peux en cocher plusieurs : l'événement portera tous leurs noms."] = "You can tick several: the event will carry all their names.",
+    ["Pour ton niveau"] = "For your level",
+    ["Autres niveaux"] = "Other levels",
+    ["niveau %s"] = "level %s",
+    ["Clic : cocher"] = "Click: tick",
+    ["Clic : décocher"] = "Click: untick",
+    ["Tout décocher"] = "Untick all",
+    ["Aucun donjon coché."] = "No dungeon ticked.",
+    ["Aucun raid coché."] = "No raid ticked.",
+    ["Continuer sans donjon"] = "Continue without a dungeon",
+    ["Continuer sans raid"] = "Continue without a raid",
+    ["Ajouter 1 donjon"] = "Add 1 dungeon",
+    ["Ajouter %d donjons"] = "Add %d dungeons",
+    ["Ajouter 1 raid"] = "Add 1 raid",
+    ["Ajouter %d raids"] = "Add %d raids",
+    -- Group now
     ["Je cherche un groupe"] = "I'm looking for a group",
-    ["Pour quoi ?"] = "What for?",
-    ["Personne ne cherche de groupe en ce moment."] = "Nobody is looking for a group right now.",
+    ["Les membres qui ont WL Helper te voient dans leur liste. Ta recherche s'arrête seule quand ton groupe est complet."] = "Guildmates with WL Helper see you in their list. Your search stops by itself when your group is full.",
     ["Mon rôle"] = "My role",
+    ["Pour quoi ?"] = "What for?",
+    ["Ex. Zul'Farrak, quêtes des Maleterres"] = "E.g. Zul'Farrak, Plaguelands quests",
+    ["Membres qui cherchent un groupe"] = "Members looking for a group",
+    ["Personne ne cherche de groupe"] = "Nobody is looking for a group",
+    ["Quand un membre allume « Je cherche un groupe », il apparaît ici avec son rôle."] = "When a guildmate turns on \"I'm looking for a group\", they show up here with their role.",
+    ["(toi)"] = "(you)",
+    ["n'importe quel groupe"] = "any group",
+    ["à l'instant"] = "just now",
     ["il y a %d min"] = "%d min ago",
-    ["Seuls les membres qui ont WL Helper voient les événements et les recherches de groupe."] = "Only members who have WL Helper see the events and group searches.",
-    ["%d inscrits"] = "%d signed up",
-    ["complet"] = "full",
+    ["%s, niveau %s"] = "%s, level %s",
+    ["Pour : %s"] = "For: %s",
+    ["Pour n'importe quel groupe"] = "For any group",
+    ["Chuchoter"] = "Whisper",
+    ["Inviter"] = "Invite",
+    ["Invité"] = "Invited",
+    ["Clic : chuchoter"] = "Click: whisper",
+    ["Clic droit : inviter dans ton groupe"] = "Right-click: invite to your group",
+    -- the organizer's banner
+    ["1 inscrit attend ton invitation."] = "1 sign-up is waiting for your invite.",
+    ["%d inscrits attendent ton invitation."] = "%d sign-ups are waiting for your invite.",
+    ["%s : commence dans %d min."] = "%s: starts in %d min.",
+    ["%s : commence maintenant."] = "%s: starting now.",
+    ["Plus tard"] = "Later",
+    -- chat
+    ["Nouvel événement : %s, %s (par %s). Tape /wlh lfg pour t'inscrire."] = "New event: %s, %s (by %s). Type /wlh lfg to sign up.",
+    ["Rappel : %s commence dans 1 h."] = "Reminder: %s starts in 1 h.",
+    ["Rappel : %s commence dans %d min."] = "Reminder: %s starts in %d min.",
+    ["%s commence maintenant."] = "%s starts now.",   -- the same English as Home.lua's, never a second value
+    ["Tu organises %s, %s. Personne n'est encore inscrit."] = "You're organizing %s, %s. Nobody has signed up yet.",
+    ["Tu organises %s, %s : 1 inscrit."] = "You're organizing %s, %s: 1 sign-up.",
+    ["Tu organises %s, %s : %d inscrits."] = "You're organizing %s, %s: %d sign-ups.",
+    ["Tu es inscrit à %s, %s."] = "You're signed up for %s, %s.",
+    ["Invitation de %s acceptée pour %s."] = "Accepted the invite from %s for %s.",
+    ["Événement annulé par %s : %s, %s."] = "Event cancelled by %s: %s, %s.",
+    ["%s s'inscrit à %s (%s). 1 inscrit en tout."] = "%s signed up for %s (%s). 1 sign-up so far.",
+    ["%s s'inscrit à %s (%s). %d inscrits en tout."] = "%s signed up for %s (%s). %d sign-ups so far.",
+    ["%s se désinscrit de %s."] = "%s is no longer signed up for %s.",
+    ["%s cherche un groupe pour %s (%s, niveau %s). Tape /wlh lfg pour l'inviter."] = "%s is looking for a group for %s (%s, level %s). Type /wlh lfg to invite them.",
+    ["%s cherche un groupe (%s, niveau %s). Tape /wlh lfg pour l'inviter."] = "%s is looking for a group (%s, level %s). Type /wlh lfg to invite them.",
+    ["Ton groupe est complet : ta recherche de groupe s'arrête."] = "Your group is full: your group search has stopped.",
+    ["Les autres inscrits seront invités dès que le groupe passe en raid."] = "The other sign-ups will be invited as soon as the group becomes a raid.",
+    -- read by other windows (Home, the module list, the Writs window, the buttons)
+    ["Donjons et raids de la guilde, groupes du moment"] = "Guild dungeons and raids, groups right now",
     ["%d événements à venir"] = "%d upcoming events",
     ["Prochain : %s, %s"] = "Next: %s, %s",
     ["Rien de prévu"] = "Nothing planned",
@@ -64,46 +154,7 @@ ns.AddEnglish({
     ["%d objets meilleurs que les tiens dans tes sacs"] = "%d items in your bags better than yours",
     ["Rien de mieux dans tes sacs"] = "Nothing better in your bags",
     ["Spé, seuil et poids dans les réglages"] = "Spec, threshold and weights in the settings",
-    ["Les autres seront invités dès que le groupe passe en raid."] = "The others will be invited as soon as the group becomes a raid.",
-    -- the day itself
-    ["Tu organises : %s, %s (%d inscrits)."] = "You organize: %s, %s (%d signed up).",
-    ["Tu es inscrit : %s, %s."] = "You are signed up: %s, %s.",
-    ["Rappel : %s commence dans 1 h."] = "Reminder: %s starts in 1 h.",
-    ["Plus tard"] = "Later",
-    ["%s : %d inscrits attendent ton invitation."] = "%s: %d signed up are waiting for your invite.",
-    ["Invitation de %s acceptée pour %s."] = "Invite from %s accepted for %s.",
-    ["Accepter seul l'invitation de l'organisateur quand je suis inscrit"] = "Accept the organizer's invite by myself when I am signed up",
-    ["Événement annulé par %s : %s (%s)."] = "Event cancelled by %s: %s (%s).",
-    -- group now
-    ["%s cherche un groupe (%s, niv. %s) : %s. /wlh events"] = "%s is looking for a group (%s, lv %s): %s. /wlh events",
-    ["n'importe quoi"] = "anything",
-    ["Ton groupe est complet : tu ne cherches plus de groupe."] = "Your group is full: you are no longer looking for a group.",
-    ["Pour quoi ? (ex. Zul'Farrak, quêtes Maleterres)"] = "What for? (e.g. Zul'Farrak, Plaguelands quests)",
-    ["La guilde voit ta recherche. Elle s'arrête seule quand ton groupe est complet."] = "The guild sees your search. It stops by itself when your group is full.",
-    ["Allume pour apparaître dans la liste de la guilde."] = "Turn on to appear in the guild's list.",
-    ["Chuchoter"] = "Whisper",
-    ["Inviter"] = "Invite",
-    -- the event card and the Create form
-    ["Confirmer l'annulation"] = "Confirm cancel",
-    ["+%d en réserve"] = "+%d on standby",
-    ["%s s'inscrit à %s (%s). %d inscrits."] = "%s signed up for %s (%s). %d signed up.",
-    ["%s se désinscrit de %s."] = "%s stepped out of %s.",
-    ["Créer un événement"] = "Create an event",
-    ["Sera publié : %s, %s"] = "Will be published: %s, %s",
-    ["Cette heure est déjà passée aujourd'hui. Choisis Demain."] = "That time is already past today. Pick Tomorrow.",
-    -- the dungeon / raid picker
-    ["Choisir le donjon"] = "Pick the dungeon",
-    ["Choisir le raid"] = "Pick the raid",
-    ["Choisir les donjons"] = "Pick the dungeons",
-    ["Choisir les raids"] = "Pick the raids",
-    ["(+%d)"] = "(+%d)",
-    ["Clique sur une carte pour la choisir, plusieurs à la fois si tu veux."] = "Click a card to pick it, several at once if you like.",
-    ["Pour ton niveau"] = "For your level",
-    ["Les autres"] = "The others",
     ["Effacer"] = "Clear",
-    ["Valider"] = "Apply",
-    ["Valider (%d)"] = "Apply (%d)",
-    ["Écris ce que tu organises dans Quoi, juste en dessous."] = "Write what you organize in What, just below.",
 })
 
 local PREFIX = "WLHevt"
@@ -130,17 +181,18 @@ local function Clean(s, max)
     return s
 end
 local ROLES = { "tank", "heal", "dps" }
-local ROLE_LABEL = { tank = "Tank", heal = "Soins", dps = "DPS" }
--- the game's role icons (64 x 64 sheet): shield, cross, sword
-local ROLE_ICON = "Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES"
-local ROLE_TC = { tank = { 0, 19, 22, 41 }, heal = { 20, 39, 1, 20 }, dps = { 20, 39, 22, 41 } }
-local function RoleIcon(role, size)
-    local t = ROLE_TC[role]
-    if not t then return "" end
-    size = size or 16
-    return string.format("|T%s:%d:%d:0:0:64:64:%d:%d:%d:%d|t", ROLE_ICON, size, size, t[1], t[2], t[3], t[4])
+local ROLE_LABEL = { tank = "Tank", heal = "Soigneur", dps = "DPS" }
+-- the game's role icon (modern atlas when the client has it) and the role's name
+local function RoleText(role, size) return S.RoleMarkup(role, size or 14) .. " " .. L(ROLE_LABEL[role] or "DPS") end
+
+-- The same chat line at most once every 30 s (a sign-up sent again at each login is not news).
+local said = {}
+local function Say(msg)
+    local now = GetTime and GetTime() or 0
+    if said[msg] and now - said[msg] < 30 then return end
+    said[msg] = now
+    WP.Print(msg)
 end
-local function RoleText(role, size) return RoleIcon(role, size) .. " " .. L(ROLE_LABEL[role] or "?") end
 
 -- The saved data of the current guild (WLWritsDB is account-wide: alts can be in other guilds).
 -- No guild (or the game does not know it yet, a few seconds after login): a throwaway table.
@@ -170,14 +222,26 @@ end
 -- ---------------------------------------------------------------- dates
 local DAYS = { fr = { "dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam." }, en = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" } }
 local function DayStart(t) local d = date("*t", t); d.hour, d.min, d.sec = 0, 0, 0; return time(d) end
-local function When(t)
+-- 24 h in French ("21:00"), 12 h in English ("9:00 PM")
+local function Clock(h, m)
+    if root.lang == "en" then
+        local h12 = h % 12
+        if h12 == 0 then h12 = 12 end
+        return string.format("%d:%02d %s", h12, m, h < 12 and "AM" or "PM")
+    end
+    return string.format("%02d:%02d", h, m)
+end
+-- "Demain 21:00", "sam. 15/11 21:00" ("Tomorrow 9:00 PM", "Sat 11/15 9:00 PM");
+-- lower: inside a sentence ("demain 21:00")
+local function When(t, lower)
     local d = date("*t", t)
     local today = DayStart(time())
     local day
-    if DayStart(t) == today then day = L("Aujourd'hui")
-    elseif DayStart(t) == today + 86400 then day = L("Demain")
-    else day = ((root.lang == "en") and DAYS.en or DAYS.fr)[d.wday] .. " " .. string.format("%02d/%02d", d.day, d.month) end
-    return day .. " " .. string.format("%02d:%02d", d.hour, d.min)
+    if DayStart(t) == today then day = lower and L("aujourd'hui") or L("Aujourd'hui")
+    elseif DayStart(t) == today + 86400 then day = lower and L("demain") or L("Demain")
+    elseif root.lang == "en" then day = DAYS.en[d.wday] .. " " .. string.format("%d/%d", d.month, d.day)
+    else day = DAYS.fr[d.wday] .. " " .. string.format("%02d/%02d", d.day, d.month) end
+    return day .. " " .. Clock(d.hour, d.min)
 end
 WP.EventWhen = When
 
@@ -236,6 +300,12 @@ function WP.LFGList()
     for name, l in pairs(DB().lfg) do out[#out + 1] = { name = name, role = l.role, cls = l.cls, lvl = l.lvl, what = l.what, t = l.t } end
     table.sort(out, function(a, b) return a.t > b.t end)
     return out
+end
+-- how many look for a group; excludeMe: the others only (a badge or a count never counts me)
+function WP.LFGCount(excludeMe)
+    local n = 0
+    for _, l in ipairs(WP.LFGList()) do if not (excludeMe and l.name == Me()) then n = n + 1 end end
+    return n
 end
 
 local function Refresh() if WP.RefreshEvents then WP.RefreshEvents() end; if WP.RefreshHome then WP.RefreshHome() end end
@@ -305,39 +375,73 @@ function WP.InviteSignups(e)
     end
     for i, name in ipairs(now) do C_Timer.After(0.2 * i, function() InviteName(name) end) end
     if #later > 0 then
-        WP.Print(L("Les autres seront invités dès que le groupe passe en raid."))
+        Say(L("Les autres inscrits seront invités dès que le groupe passe en raid."))
         InviteLater(later)
     end
 end
 
 -- The organizer's banner when the event is near: invite everyone in one click, or later.
--- A home-made frame (not a StaticPopup): it never touches the game's dialogs, and fades after 2 min.
+-- A toast-like frame at the top centre (not a StaticPopup: it never touches the game's dialogs):
+-- one sentence, the event and when it starts, and two buttons. Fades in, stays 2 minutes (an action
+-- waits on it, unlike the 4-6 s info toasts), fades out. It sits just above the S.Toast stack
+-- (whose first toast hangs at y = -120), so both can show at once; when too tall for that room,
+-- it goes below the deepest the stack can reach (two toasts).
 local toast
-local function ShowInviteToast(e)
+local function HideToast()
+    if not (toast and toast:IsShown()) then return end
+    toast.token = nil
+    root.Tween(toast, toast:GetAlpha() or 1, 0, 0.15, function(v) toast:SetAlpha(v); if v <= 0 then toast:Hide() end end)
+end
+local function ShowInviteToast(e, mins)
     local others = 0
     for name in pairs(e.signups or {}) do if name ~= Me() then others = others + 1 end end
     if others == 0 then return end
+    local TW, TP = 320, 10
     if not toast then
         toast = CreateFrame("Frame", "WLHelperEventToast", UIParent)
-        toast:SetSize(340, 84); toast:SetPoint("TOP", 0, -140); toast:SetFrameStrata("DIALOG")
-        S.Solid(toast, "BACKGROUND", C.card):SetAllPoints(); S.Border(toast, C.brand)
-        toast.text = S.Text(toast, 13, C.text, true)
-        toast.text:SetPoint("TOPLEFT", 12, -12); toast.text:SetPoint("RIGHT", -12, 0)
-        toast.text:SetJustifyH("LEFT"); toast.text:SetWordWrap(true)
-        toast.go = S.Button(toast, L("Inviter les inscrits"), 170, 28, "primary", function()
+        toast.wlOwned = true
+        toast:SetWidth(TW); toast:SetFrameStrata("DIALOG")
+        toast:EnableMouse(true)
+        S.Solid(toast, "BACKGROUND", C.panel):SetAllPoints()
+        S.Border(toast, C.cardEdge)
+        toast.icon = S.Icon(toast, "group", 16, "ARTWORK", C.accentSoft)
+        toast.icon:SetPoint("TOPLEFT", TP, -TP)
+        toast.text = S.Text(toast, S.F.label, C.fg)
+        toast.text:SetPoint("TOPLEFT", toast.icon, "TOPRIGHT", 8, 0)
+        toast.sub = S.Text(toast, S.F.meta, C.muted)
+        toast.sub:SetPoint("TOPLEFT", toast.text, "BOTTOMLEFT", 0, -3)
+        toast.go = S.Button(toast, L("Inviter les inscrits"), 0, 28, "primary", function()
             if toast.e then WP.InviteSignups(toast.e) end
-            toast:Hide()
+            HideToast()
         end)
-        toast.go:SetPoint("BOTTOMLEFT", 12, 10)
-        toast.later = S.Button(toast, L("Plus tard"), 120, 28, "secondary", function() toast:Hide() end)
-        toast.later:SetPoint("BOTTOMRIGHT", -12, 10)
+        toast.go:SetIcon("group")
+        toast.later = S.Button(toast, L("Plus tard"), 0, 28, "secondary", HideToast)
+        toast.later:SetPoint("LEFT", toast.go, "RIGHT", 8, 0)
     end
     toast.e = e
-    toast.text:SetText(string.format(L("%s : %d inscrits attendent ton invitation."), e.title or "?", others))
-    toast:Show()
+    local textW = TW - TP - 16 - 8 - TP
+    toast.text:SetText(others == 1 and L("1 inscrit attend ton invitation.")
+        or string.format(L("%d inscrits attendent ton invitation."), others))
+    toast.sub:SetText((mins and mins > 0) and string.format(L("%s : commence dans %d min."), e.title or "?", mins)
+        or string.format(L("%s : commence maintenant."), e.title or "?"))
+    -- never cut: the toast grows with its text
+    local th = S.FitText(toast.text, 0, textW, toast)
+    local sh = S.FitText(toast.sub, 0, textW, toast)
+    local y = TP + th + 3 + sh + 10
+    toast.go:ClearAllPoints(); toast.go:SetPoint("TOPLEFT", TP + 16 + 8, -y)
+    local h = math.ceil(y + 28 + TP)
+    toast:SetHeight(h)
+    toast:ClearAllPoints()
+    if h <= 120 - 6 - 8 then
+        toast:SetPoint("BOTTOM", UIParent, "TOP", 0, -(120 - 6))
+    else
+        toast:SetPoint("TOP", UIParent, "TOP", 0, -(120 + 2 * (110 + 6)))
+    end
+    toast:SetAlpha(0); toast:Show()
+    root.Tween(toast, 0, 1, 0.15, function(v) toast:SetAlpha(v) end)
     local token = {}
     toast.token = token
-    C_Timer.After(120, function() if toast.token == token then toast:Hide() end end)
+    C_Timer.After(120, function() if toast.token == token then HideToast() end end)
 end
 
 -- The organizer's invite, accepted by itself when I am signed up to one of their events starting
@@ -350,7 +454,7 @@ local function AutoAccept(inviter)
             and math.abs(ev2.when - time()) <= 1800 then
             if AcceptGroup then pcall(AcceptGroup) end
             C_Timer.After(0.1, function() if StaticPopup_Hide then pcall(StaticPopup_Hide, "PARTY_INVITE") end end)
-            WP.Print(string.format(L("Invitation de %s acceptée pour %s."), who, ev2.title or "?"))
+            Say(string.format(L("Invitation de %s acceptée pour %s."), who, ev2.title or "?"))
             return
         end
     end
@@ -403,12 +507,12 @@ local function OnMessage(msg, sender)
         cur.stub = nil   -- signups that came first are kept
         d.list[id] = cur
         if isNew and status == "open" and cur.when > time() and On() then
-            WP.Print(string.format(L("Nouvel événement : %s, %s (par %s). /wlh events"), cur.title, When(cur.when), sender))
+            Say(string.format(L("Nouvel événement : %s, %s (par %s). Tape /wlh lfg pour t'inscrire."), cur.title, When(cur.when, true), sender))
         end
         -- an event I signed up for is cancelled: in the chat and on screen
         if wasOpen and status == "cancelled" and cur.signups and cur.signups[Me()] and On() then
-            local m = string.format(L("Événement annulé par %s : %s (%s)."), sender, cur.title or "?", When(cur.when))
-            WP.Print(m)
+            local m = string.format(L("Événement annulé par %s : %s, %s."), sender, cur.title or "?", When(cur.when, true))
+            Say(m)
             if RaidNotice_AddMessage and RaidWarningFrame then RaidNotice_AddMessage(RaidWarningFrame, m, { r = 0.81, g = 0.1, b = 0.09 }) end
         end
         Refresh()
@@ -425,9 +529,11 @@ local function OnMessage(msg, sender)
         -- the organizer is told who comes and who leaves (not the repeats sent at each login)
         if not e.stub and e.by == Me() and On() then
             if role ~= "x" and not (before and before.role == role) then
-                WP.Print(string.format(L("%s s'inscrit à %s (%s). %d inscrits."), sender, e.title or "?", L(ROLE_LABEL[role] or "DPS"), CountSignups(e)))
+                local n = CountSignups(e)
+                Say(n == 1 and string.format(L("%s s'inscrit à %s (%s). 1 inscrit en tout."), sender, e.title or "?", L(ROLE_LABEL[role] or "DPS"))
+                    or string.format(L("%s s'inscrit à %s (%s). %d inscrits en tout."), sender, e.title or "?", L(ROLE_LABEL[role] or "DPS"), n))
             elseif role == "x" and before then
-                WP.Print(string.format(L("%s se désinscrit de %s."), sender, e.title or "?"))
+                Say(string.format(L("%s se désinscrit de %s."), sender, e.title or "?"))
             end
         end
         Refresh()
@@ -440,8 +546,12 @@ local function OnMessage(msg, sender)
             d.lfg[sender] = { role = role, cls = cls, lvl = tonumber(lvl), what = what, t = time() }
             -- a new search: one line in the chat (not the answers to my own question at login)
             if not was and On() and GetTime() - askedAt > 20 then
-                WP.Print(string.format(L("%s cherche un groupe (%s, niv. %s) : %s. /wlh events"), ClassHex(cls) .. sender .. "|r",
-                    L(ROLE_LABEL[role] or "DPS"), lvl ~= "" and lvl or "?", what ~= "" and what or L("n'importe quoi")))
+                local who, rl, lv = ClassHex(cls) .. sender .. "|r", L(ROLE_LABEL[role] or "DPS"), lvl ~= "" and lvl or "?"
+                if what ~= "" then
+                    Say(string.format(L("%s cherche un groupe pour %s (%s, niveau %s). Tape /wlh lfg pour l'inviter."), who, what, rl, lv))
+                else
+                    Say(string.format(L("%s cherche un groupe (%s, niveau %s). Tape /wlh lfg pour l'inviter."), who, rl, lv))
+                end
             end
         end
         Refresh()
@@ -471,21 +581,23 @@ local function Remind()
         if e.when and mine and e.status == "open" then
             local left = (e.when or 0) - now
             local r = d.reminded[id] or 0
+            local mins = math.ceil(left / 60)
             if left <= 3600 and left > 900 and not d.reminded1h[id] then
                 d.reminded1h[id] = true
-                WP.Print(string.format(L("Rappel : %s commence dans 1 h."), e.title or "?"))
+                Say(left > 2700 and string.format(L("Rappel : %s commence dans 1 h."), e.title or "?")
+                    or string.format(L("Rappel : %s commence dans %d min."), e.title or "?", mins))
             end
             if left <= 900 and left > 0 and r < 1 then
                 d.reminded[id] = 1
-                local msg = string.format(L("Rappel : %s commence dans 15 min."), e.title or "?")
-                WP.Print(msg)
+                local msg = string.format(L("Rappel : %s commence dans %d min."), e.title or "?", mins)
+                Say(msg)
                 if RaidNotice_AddMessage and RaidWarningFrame then RaidNotice_AddMessage(RaidWarningFrame, msg, { r = 0.81, g = 0.1, b = 0.09 }) end
                 if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING, "Master") end
-                if e.by == Me() then ShowInviteToast(e) end
+                if e.by == Me() then ShowInviteToast(e, mins) end
             elseif left <= 0 and left > -600 and r < 2 then
                 d.reminded[id] = 2
-                WP.Print(string.format(L("%s commence maintenant."), e.title or "?"))
-                if e.by == Me() then ShowInviteToast(e) end
+                Say(string.format(L("%s commence maintenant."), e.title or "?"))
+                if e.by == Me() then ShowInviteToast(e, nil) end
             end
         end
     end
@@ -499,148 +611,257 @@ local function LoginRecap()
             if e.by == Me() then
                 local count = 0
                 for name in pairs(e.signups or {}) do if name ~= Me() then count = count + 1 end end
-                WP.Print(string.format(L("Tu organises : %s, %s (%d inscrits)."), e.title or "?", When(e.when), count))
+                local t, w = e.title or "?", When(e.when, true)
+                if count == 0 then Say(string.format(L("Tu organises %s, %s. Personne n'est encore inscrit."), t, w))
+                elseif count == 1 then Say(string.format(L("Tu organises %s, %s : 1 inscrit."), t, w))
+                else Say(string.format(L("Tu organises %s, %s : %d inscrits."), t, w, count)) end
             elseif e.signups and e.signups[Me()] then
-                WP.Print(string.format(L("Tu es inscrit : %s, %s."), e.title or "?", When(e.when)))
+                Say(string.format(L("Tu es inscrit à %s, %s."), e.title or "?", When(e.when, true)))
             end
         end
     end
 end
 
 -- ---------------------------------------------------------------- the window
-local W, H, PAD = 560, 620, 16
+-- "Groupes" / "LFG": 520 wide (one column), sized to its content (f:FitHeight); lists scroll inside
+-- the window only once it reached 80 % of the screen. Three tabs: Agenda, Create, Group now.
+local W, PAD = 520, 16
+local CW = W - 2 * PAD          -- content width
+local LBL = S.F.meta + 2 + 4    -- a field label (11 px) and its 4 px gap
+local F = S.F
 local win, tabs, current = nil, nil, "upcoming"
 local pages, ui = {}, {}
 local draft = { day = 0, tank = 1, heal = 1, dps = 3 }
 
-local function Box(parent, w, hint, numeric)
-    local eb = CreateFrame("EditBox", nil, parent)
-    eb:SetSize(w, 28); eb:SetAutoFocus(false)
-    if numeric then eb:SetNumeric(true); eb:SetMaxLetters(2) end
-    local probe = S.Text(parent, 13, C.text)
-    local font, size, flags = probe:GetFont(); probe:Hide()
-    if font then eb:SetFont(font, size or 13, flags or "") else eb:SetFontObject(ChatFontNormal) end
-    eb:SetTextColor(C.text[1], C.text[2], C.text[3]); eb:SetTextInsets(10, 10, 0, 0)
-    S.Solid(eb, "BACKGROUND", C.card):SetAllPoints(); S.Border(eb, C.border)
-    if hint then
-        local h = S.Text(eb, 13, C.muted); h:SetPoint("LEFT", 10, 0); h:SetText(hint)
-        eb:HookScript("OnTextChanged", function(self) h:SetShown(self:GetText() == "") end)
-    end
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    return eb
+local function Num(v) return type(v) == "number" and not (root.IsSecret and root.IsSecret(v)) and v or nil end
+local function TextW(fs)
+    local ok, w = pcall(fs.GetStringWidth, fs)
+    return math.ceil((ok and Num(w)) or 0)
+end
+local function Place(obj, x, y)
+    obj:ClearAllPoints(); obj:SetPoint("TOPLEFT", x, -y)
+end
+local function FieldLabel(parent, text)
+    local t = S.Text(parent, F.meta, C.muted)
+    t:SetWordWrap(false); t:SetText(text)
+    return t
 end
 
-local function List(parent, top, bottom, make, step)
-    local sf = CreateFrame("ScrollFrame", nil, parent)
-    sf:SetPoint("TOPLEFT", PAD, top); sf:SetPoint("BOTTOMRIGHT", -PAD, bottom)
-    local content = CreateFrame("Frame", nil, sf); content:SetSize(W - 2 * PAD, 10); sf:SetScrollChild(content)
-    sf:EnableMouseWheel(true)
-    sf:SetScript("OnMouseWheel", function(self, dlt)
-        local max = math.max(0, content:GetHeight() - self:GetHeight())
-        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - dlt * (step or 60))))
-    end)
-    local l = { sf = sf, content = content, items = {} }
-    function l.Get(i) local f = l.items[i]; if not f then f = make(content); l.items[i] = f end; f:Show(); return f end
+-- A pooled list inside a scroll area: l.Get(i) gives the i-th item (made by `make` once).
+local function List(parent, make)
+    local sa = S.ScrollArea(parent)
+    local l = { sa = sa, content = sa.child, items = {} }
+    function l.Get(i) local f = l.items[i]; if not f then f = make(sa.child); l.items[i] = f end; f:Show(); return f end
     function l.HideFrom(i) for j = i, #l.items do l.items[j]:Hide() end end
     return l
 end
+-- Anchors a list under the fixed part of a page (y from the page top) down to the page bottom.
+local function PlaceList(l, page, y)
+    l.sa:ClearAllPoints()
+    l.sa:SetPoint("TOPLEFT", page, "TOPLEFT", PAD, -y)
+    l.sa:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -PAD, 12)
+    l.sa.child:SetWidth(CW)
+end
 
+-- A settings row: label 13 on the left, switch on the right, a description on a second line.
+-- The whole row is the click target.
+local function SettingRow(parent, label, desc, get, set, noRule)
+    local r = CreateFrame("Button", nil, parent)
+    r.wlOwned = true
+    if not noRule then r.rule = S.Rule(r); r.rule:SetPoint("TOPLEFT"); r.rule:SetPoint("TOPRIGHT") end
+    r.label = S.Text(r, F.body, C.fg)
+    r.desc = S.Text(r, F.meta, C.muted)
+    r.label:SetText(label); r.desc:SetText(desc or "")
+    r.switch = S.Switch(r, get, set)
+    r.switch:SetPoint("TOPRIGHT", 0, -8)
+    r.switch:AttachRow(r)
+    function r:Fit(w)
+        self:SetWidth(w)
+        local textW = w - 40 - 12
+        Place(self.label, 0, 8)
+        local lh = S.FitText(self.label, 2, textW, self)
+        local h = 8 + math.max(lh, 16)
+        if desc then
+            Place(self.desc, 0, 8 + lh + 3)
+            h = 8 + lh + 3 + S.FitText(self.desc, 0, textW, self)
+        end
+        h = math.max(36, math.ceil(h + 8))
+        self:SetHeight(h)
+        return h
+    end
+    return r
+end
+
+local function SignupsText(n)
+    if n == 0 then return L("aucun inscrit pour l'instant") end
+    if n == 1 then return L("1 inscrit") end
+    return string.format(L("%d inscrits"), n)
+end
+
+-- the dungeons and raids of the guide, for the "What" picker: { { key, name, lvlFrom, lvlTo } }
+local function Instances(kind)
+    local out = {}
+    for _, k in ipairs(root.ORDER or {}) do
+        local d = root.D and root.D[k]
+        if d and not d.cq and ((kind == "raid") == (d.raid == true)) then
+            local lo = d.lvl and d.lvl[1] or 0
+            out[#out + 1] = { k, root.DName and root.DName(k) or d.n, lo, d.lvl and d.lvl[2] or lo }
+        end
+    end
+    table.sort(out, function(a, b) if a[3] ~= b[3] then return a[3] < b[3] end return a[2] < b[2] end)
+    return out
+end
+-- the painted icon of the event: the first dungeon or raid of its name, else the guild's banner
+local function EventIcon(title)
+    local first = tostring(title or ""):match("^(.-)%s+%+%s+") or tostring(title or "")
+    for _, kind in ipairs({ "dg", "raid" }) do
+        for _, e in ipairs(Instances(kind)) do
+            if e[2] == first then
+                local d = root.D and root.D[e[1]]
+                if d and d.icon then return d.icon end
+            end
+        end
+    end
+    return "Interface\\Icons\\Ability_Warrior_BattleShout"
+end
+
+-- ---------------------------------------------------------------- the event card
 local function EventCard(parent)
     local c = CreateFrame("Frame", nil, parent)
-    c:SetWidth(W - 2 * PAD)
-    S.Solid(c, "BACKGROUND", C.card):SetAllPoints(); S.Border(c, C.border)
-    c.when = S.Text(c, 12, C.brandSoft, true); c.when:SetPoint("TOPLEFT", 12, -10)
-    c.title = S.Text(c, 16, C.text, true); c.title:SetPoint("TOPLEFT", 12, -28); c.title:SetPoint("RIGHT", -12, 0); c.title:SetJustifyH("LEFT"); c.title:SetWordWrap(false)
-    c.by = S.Text(c, 12, C.dim); c.by:SetPoint("TOPRIGHT", -12, -10)
-    c.roles = S.Text(c, 13, C.text); c.roles:SetPoint("TOPLEFT", 12, -52)
-    c.who = S.Text(c, 12, C.dim); c.who:SetPoint("TOPLEFT", 12, -72); c.who:SetPoint("RIGHT", -12, 0); c.who:SetJustifyH("LEFT"); c.who:SetWordWrap(true)
-    c.note = S.Text(c, 12, C.muted); c.note:SetPoint("TOPLEFT", c.who, "BOTTOMLEFT", 0, -4); c.note:SetPoint("RIGHT", -12, 0); c.note:SetJustifyH("LEFT"); c.note:SetWordWrap(true)
-    c.btns = {}
-    for i, role in ipairs(ROLES) do
-        -- signed up: the same buttons change the role (WP.SignUp overwrites); mine is outlined in red
-        local b = S.Button(c, RoleText(role, 14), 92, 26, "secondary", function() if c.e then WP.SignUp(c.e, role) end end)
-        b.role = role
-        b.sel = S.Border(b, C.brand)
-        c.btns[i] = b
-    end
-    c.out = S.Button(c, L("Me désinscrire"), 120, 26, "secondary", function() if c.e then WP.SignUp(c.e, nil) end end)
-    c.invite = S.Button(c, L("Inviter les inscrits"), 150, 26, "primary", function() if c.e then WP.InviteSignups(c.e) end end)
-    -- cancel in two clicks: the first one asks, the second (within 4 s) cancels
-    c.cancel = S.Button(c, L("Annuler l'événement"), 150, 26, "warn", function()
+    c.wlOwned = true
+    c:SetWidth(CW)
+    S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
+    S.Border(c, C.cardEdge)
+    c.iconFrame = CreateFrame("Frame", nil, c)
+    c.iconFrame:SetSize(32, 32); c.iconFrame:SetPoint("TOPLEFT", 12, -12)
+    c.icon = c.iconFrame:CreateTexture(nil, "ARTWORK"); c.icon:SetAllPoints()
+    S.Border(c.iconFrame, C.cardEdge)
+    c.title = S.Text(c, F.heading, C.fg)
+    c.pill = S.Pill(c)
+    c.meta = S.Text(c, F.meta, C.muted)
+    c.roles = S.Text(c, F.label, C.text)
+    c.who = S.Text(c, F.meta, C.muted)
+    c.note = S.Text(c, F.label, C.text)
+    -- signing up is one segmented choice: no role yet, or the role you came with (a click changes it)
+    local opts = {}
+    for _, role in ipairs(ROLES) do opts[#opts + 1] = { role, RoleText(role, 14) } end
+    c.seg = S.Segmented(c, opts, function() local m = c.e and WP.MySignup(c.e); return m and m.role end,
+        function(v) if c.e then WP.SignUp(c.e, v) end end, 24)
+    local segTips = { L("Clic : t'inscrire comme tank"), L("Clic : t'inscrire comme soigneur"), L("Clic : t'inscrire comme DPS") }
+    for i, b in ipairs(c.seg.buttons) do b.tip = { L(ROLE_LABEL[ROLES[i]]), segTips[i] } end
+    c.out = S.Button(c, L("Me désinscrire"), 0, 24, "secondary", function() if c.e then WP.SignUp(c.e, nil) end end)
+    c.invite = S.Button(c, L("Inviter les inscrits"), 0, 24, "secondary", function(self)
         if not c.e then return end
-        if c.confirmUntil and GetTime() < c.confirmUntil then
-            c.confirmUntil = nil
-            c.cancel.label:SetText(L("Annuler l'événement"))
-            WP.CancelEvent(c.e)
-        else
-            c.confirmUntil = GetTime() + 4
-            c.cancel.label:SetText(L("Confirmer l'annulation"))
-            C_Timer.After(4.1, function()
-                if not c.confirmUntil or GetTime() >= c.confirmUntil then
-                    c.confirmUntil = nil
-                    c.cancel.label:SetText(L("Annuler l'événement"))
-                end
-            end)
-        end
+        WP.InviteSignups(c.e)
+        self:Flash(L("Invitations envoyées"))
     end)
+    c.invite:SetIcon("group")
+    -- cancel in two clicks: the first asks (the label becomes the confirmation), the second cancels
+    c.cancel = S.Button(c, L("Annuler l'événement"), 0, 24, "danger", function() if c.e then WP.CancelEvent(c.e) end end)
+    c.cancel:SetIcon("trash")
+    c.cancel:SetConfirm(L("Confirmer l'annulation"))
+    function c:Fit()
+        local pad, w = 12, CW
+        local x = pad + 32 + 8
+        local textW = w - x - pad
+        local pillW = self.pill:IsShown() and ((Num(self.pill:GetWidth()) or 0) + 8) or 0
+        self.pill:ClearAllPoints(); self.pill:SetPoint("TOPRIGHT", -pad, -pad)
+        Place(self.title, x, pad)
+        local th = S.FitText(self.title, 2, textW - pillW, self)
+        Place(self.meta, x, pad + th + 3)
+        local mh = S.FitText(self.meta, 2, textW, self)
+        local y = pad + math.max(32, th + 3 + mh) + 8
+        Place(self.roles, pad, y)
+        y = y + S.FitText(self.roles, 2, w - 2 * pad, self)
+        if self.who:IsShown() then
+            y = y + 4; Place(self.who, pad, y)
+            y = y + S.FitText(self.who, 0, w - 2 * pad, self)
+        end
+        if self.note:IsShown() then
+            y = y + 6; Place(self.note, pad, y)
+            y = y + S.FitText(self.note, 0, w - 2 * pad, self)
+        end
+        if self.seg:IsShown() then
+            y = y + 12; Place(self.seg, pad, y)
+            self.out:ClearAllPoints(); self.out:SetPoint("LEFT", self.seg, "RIGHT", 8, 0)
+            y = y + 24
+        end
+        if self.invite:IsShown() then
+            y = y + 8; Place(self.invite, pad, y)
+            self.cancel:ClearAllPoints(); self.cancel:SetPoint("LEFT", self.invite, "RIGHT", 8, 0)
+            y = y + 24
+        end
+        local h = math.ceil(y + pad)
+        self:SetHeight(h)
+        return h
+    end
     return c
 end
 
 local function PaintEvent(c, e)
-    if c.e ~= e then
-        -- the card shows another event now: a pending "Confirm cancel" does not follow
-        c.confirmUntil = nil
-        c.cancel.label:SetText(L("Annuler l'événement"))
-    end
+    -- the card shows another event now: a pending "Confirm cancel" does not follow
+    if c.e ~= e then c.cancel:Disarm() end
     c.e = e
     local cancelled = e.status ~= "open"
-    c.when:SetText(When(e.when) .. (cancelled and ("  ·  " .. L("annulé")) or ""))
+    local mine = WP.MySignup(e)
+    local organizer = e.by == Me()
+    S.Painted(c.icon, EventIcon(e.title))
+    if c.icon.SetDesaturated then pcall(c.icon.SetDesaturated, c.icon, cancelled) end
     c.title:SetText(e.title or "?")
-    c.title:SetTextColor((cancelled and C.dim or C.text)[1], (cancelled and C.dim or C.text)[2], (cancelled and C.dim or C.text)[3])
-    c.by:SetText(string.format(L("par %s"), e.by or "?") .. "  ·  " .. string.format(L("%d inscrits"), CountSignups(e)))
+    local tc = cancelled and C.muted or C.fg
+    c.title:SetTextColor(tc[1], tc[2], tc[3])
+    if cancelled then c.pill:Set(L("Annulé"), C.bad)
+    elseif organizer then c.pill:Set(L("Organisateur"))
+    elseif mine then c.pill:Set(L("Inscrit"), C.ok, "check")
+    else c.pill:Hide() end
+    local count = CountSignups(e)
+    -- the organizer reads "Organisateur" in the pill: the meta line does not say it again
+    if organizer then
+        c.meta:SetText(When(e.when) .. "  ·  " .. SignupsText(count))
+    else
+        c.meta:SetText(When(e.when) .. "  ·  " .. string.format(L("par %s"), e.by or "?") .. "  ·  " .. SignupsText(count))
+    end
+    -- places per role: 2/3, "complet" when full, "+1 en réserve" when more came than asked
     local n = WP.EventCounts(e)
     local parts = {}
     for _, role in ipairs(ROLES) do
         local want = e[role] or 0
-        if want > 0 or n[role] > 0 then
-            local col = (n[role] >= want and want > 0) and C.ready or C.text
-            local s = RoleIcon(role, 16) .. " " .. S.Hex(col) .. n[role] .. "/" .. want
-            -- full: said in words; more than asked: they stay signed up, on standby
+        if want == 0 and n[role] > 0 then
+            -- no slot asked for this role: the ones who came anyway are a reserve
+            parts[#parts + 1] = S.RoleMarkup(role, 14) .. " " .. S.Hex(C.warn) .. string.format(L("+%d en réserve"), n[role]) .. "|r"
+        elseif want > 0 then
+            local full = want > 0 and n[role] >= want
+            local s = S.RoleMarkup(role, 14) .. " " .. (full and S.Hex(C.ok) or "") .. n[role] .. "/" .. want
             if want > 0 and n[role] == want then s = s .. " " .. L("complet") end
-            s = s .. "|r"
+            if full then s = s .. "|r" end
             if want > 0 and n[role] > want then s = s .. " " .. S.Hex(C.warn) .. string.format(L("+%d en réserve"), n[role] - want) .. "|r" end
             parts[#parts + 1] = s
         end
     end
-    c.roles:SetText(table.concat(parts, "   "))
+    c.roles:SetText(table.concat(parts, "     "))
     local names = {}
     for name, s in pairs(e.signups or {}) do names[#names + 1] = { name, s } end
     table.sort(names, function(a, b) return a[1] < b[1] end)
     local t = {}
-    for _, p in ipairs(names) do t[#t + 1] = RoleIcon(p[2].role, 12) .. ClassHex(p[2].cls) .. p[1] .. "|r" end
-    c.who:SetText(#t > 0 and table.concat(t, ", ") or "")
-    c.note:SetText(e.note or "")
-    -- buttons: sign up with a role (signed up: change it) / step out; the organizer invites or cancels
-    -- the organizer's own sign-up buttons go on a second row, above Invite / Cancel
-    local mine = WP.MySignup(e)
-    local organizer = e.by == Me() and not cancelled
-    local x, y = 12, 10
-    local rowY = organizer and 44 or 10
-    for _, b in ipairs(c.btns) do
-        b:SetShown(not cancelled)
-        local on = mine and mine.role == b.role
-        b.sel(on and C.brand or C.border, on and 1 or 0)
-        b:ClearAllPoints(); b:SetPoint("BOTTOMLEFT", x, rowY); x = x + 92 + 6
+    for _, p in ipairs(names) do t[#t + 1] = S.RoleMarkup(p[2].role, 12) .. " " .. ClassHex(p[2].cls) .. p[1] .. "|r" end
+    c.who:SetText(table.concat(t, "   ")); c.who:SetShown(#t > 0)
+    c.note:SetText(e.note or ""); c.note:SetShown((e.note or "") ~= "")
+    -- sign up / change role / step out; the organizer invites or cancels
+    c.seg:SetShown(not cancelled); c.seg:Update()
+    c.out:SetShown(not cancelled and mine ~= nil)
+    local org = organizer and not cancelled
+    c.invite:SetShown(org); c.cancel:SetShown(org)
+    if org then
+        -- the main action only when it is time to invite (30 min around the start)
+        c.invite:SetKind(math.abs((e.when or 0) - time()) <= 1800 and "primary" or "secondary")
+        local others = count - (mine and 1 or 0)
+        if others > 0 then
+            c.invite:Enable(); c.invite:SetDisabledReason(nil)
+        else
+            c.invite:Disable(); c.invite:SetDisabledReason(L("Personne d'autre n'est inscrit pour l'instant."))
+        end
     end
-    c.out:SetShown(not cancelled and mine ~= nil); c.out:ClearAllPoints(); c.out:SetPoint("BOTTOMLEFT", 12 + 3 * 98, rowY)
-    c.invite:SetShown(organizer); c.cancel:SetShown(organizer)
-    c.cancel:ClearAllPoints(); c.cancel:SetPoint("BOTTOMRIGHT", -12, y)
-    c.invite:ClearAllPoints(); c.invite:SetPoint("RIGHT", c.cancel, "LEFT", -8, 0)
-    local h = 82 + math.max(0, (c.who:GetStringHeight() or 0)) + ((e.note and e.note ~= "") and ((c.note:GetStringHeight() or 14) + 6) or 0) + 44
-    h = h + (organizer and 34 or 0)
-    c:SetHeight(h)
-    return h
+    return c:Fit()
 end
 
 local function Whisper(name)
@@ -648,77 +869,159 @@ local function Whisper(name)
     elseif ChatFrameUtil and ChatFrameUtil.OpenChat then ChatFrameUtil.OpenChat("/w " .. name .. " ") end
 end
 
--- two lines: class icon, name, role and how long ago; then what for. Whisper and Invite on the right.
+local function AgoText(t)
+    local mins = math.max(0, math.floor((time() - (t or time())) / 60))
+    if mins < 1 then return L("à l'instant") end
+    return string.format(L("il y a %d min"), mins)
+end
+
+-- A member looking for a group: class icon, name; what for (wraps, the row grows); role, level and
+-- since when on the last line. Whisper and Invite on the right.
 local function LookRow(parent)
     local r = CreateFrame("Button", nil, parent)
-    r:SetSize(W - 2 * PAD, 44)
+    r.wlOwned = true
+    r:SetWidth(CW)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    r.bg = S.Solid(r, "BACKGROUND", C.card); r.bg:SetAllPoints()
-    r.cls = r:CreateTexture(nil, "OVERLAY"); r.cls:SetSize(16, 16); r.cls:SetPoint("TOPLEFT", 8, -6)
-    r.cls:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
-    r.name = S.Text(r, 14, C.text, true); r.name:SetPoint("TOPLEFT", 28, -6); r.name:SetWidth(140); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
-    r.role = S.Text(r, 12, C.brandSoft, true); r.role:SetPoint("TOPLEFT", 172, -7); r.role:SetJustifyH("LEFT")
-    r.ago = S.Text(r, 12, C.muted); r.ago:SetPoint("TOPRIGHT", -160, -8); r.ago:SetJustifyH("RIGHT")
-    r.what = S.Text(r, 13, C.text); r.what:SetPoint("BOTTOMLEFT", 28, 6); r.what:SetPoint("RIGHT", -160, 0); r.what:SetJustifyH("LEFT"); r.what:SetWordWrap(false)
-    r.whisper = S.Button(r, L("Chuchoter"), 72, 22, "secondary", function() if r.who then Whisper(r.who) end end)
-    r.whisper:SetPoint("RIGHT", -80, 0)
-    r.inv = S.Button(r, L("Inviter"), 72, 22, "secondary", function() if r.who then InviteName(r.who) end end)
-    r.inv:SetPoint("RIGHT", -4, 0)
+    r.bg = S.Solid(r, "BACKGROUND", C.cardFill); r.bg:SetAllPoints()
+    r.hl = S.Solid(r, "BORDER", C.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
+    r.press = S.Solid(r, "BORDER", C.pressFill); r.press:SetAllPoints(); r.press:Hide()
+    r.cls = r:CreateTexture(nil, "ARTWORK"); r.cls:SetSize(20, 20); r.cls:SetPoint("TOPLEFT", 8, -8)
+    r.name = S.Text(r, F.label, C.fg)
+    r.what = S.Text(r, F.label, C.text)
+    r.detail = S.Text(r, F.meta, C.muted)
+    r.inv = S.Button(r, L("Inviter"), 0, 24, "secondary", function(self)
+        if r.who then InviteName(r.who); self:Flash(L("Invité")) end
+    end)
+    r.inv:SetIcon("plus")
+    r.whisper = S.Button(r, L("Chuchoter"), 0, 24, "secondary", function() if r.who then Whisper(r.who) end end)
+    local function Hover(on)
+        root.Tween(r, r.hov or 0, on and 1 or 0, 0.10, function(v) r.hov = v; r.hl:SetAlpha(v) end)
+    end
     r:SetScript("OnClick", function(self, button)
         local who = self.who
         if not who or who == Me() then return end
-        if button == "RightButton" or IsAltKeyDown() then InviteName(who) else Whisper(who) end
+        if button == "RightButton" or IsAltKeyDown() then InviteName(who); r.inv:Flash(L("Invité")) else Whisper(who) end
     end)
     r:SetScript("OnEnter", function(self)
-        if not self.who then return end
-        local lines = { self.who }
-        -- the full text (the line may cut it); what0 because r.what is the font string
-        if self.what0 and self.what0 ~= "" then lines[#lines + 1] = self.what0 end
+        Hover(true)
+        if not self.l then return end
+        local l = self.l
+        local c = RAID_CLASS_COLORS and l.cls and RAID_CLASS_COLORS[l.cls]
+        local lines = { c and { l.name, c.r, c.g, c.b } or l.name }
+        lines[#lines + 1] = string.format(L("%s, niveau %s"), L(ROLE_LABEL[l.role] or "DPS"), l.lvl or "?")
+        lines[#lines + 1] = (l.what and l.what ~= "") and string.format(L("Pour : %s"), l.what) or L("Pour n'importe quel groupe")
+        if l.name ~= Me() then
+            lines[#lines + 1] = L("Clic : chuchoter")
+            lines[#lines + 1] = L("Clic droit : inviter dans ton groupe")
+        end
         S.Tip(self, lines)
     end)
-    r:SetScript("OnLeave", S.HideTip)
+    r:SetScript("OnLeave", function() Hover(false); S.HideTip() end)
+    r:SetScript("OnMouseDown", function(self) self.press:Show() end)
+    r:SetScript("OnMouseUp", function(self) self.press:Hide() end)
+    local function Out() if not r:IsMouseOver() then Hover(false) end end
+    r.inv:HookScript("OnEnter", function() Hover(true) end)
+    r.whisper:HookScript("OnEnter", function() Hover(true) end)
+    r.inv:HookScript("OnLeave", Out)
+    r.whisper:HookScript("OnLeave", Out)
+    function r:Fit()
+        local right = 12
+        if self.inv:IsShown() then
+            self.inv:ClearAllPoints(); self.inv:SetPoint("RIGHT", -12, 0)
+            self.whisper:ClearAllPoints(); self.whisper:SetPoint("RIGHT", self.inv, "LEFT", -8, 0)
+            right = 12 + (Num(self.inv:GetWidth()) or 72) + 8 + (Num(self.whisper:GetWidth()) or 84) + 12
+        end
+        local textW = math.max(60, CW - 36 - right)
+        Place(self.name, 36, 6)
+        local nh = math.max(F.label, S.FitText(self.name, 1, textW, self))
+        local y = 6 + nh + 3
+        Place(self.what, 36, y)
+        y = y + S.FitText(self.what, 0, textW, self) + 3
+        Place(self.detail, 36, y)
+        y = y + S.FitText(self.detail, 0, textW, self)
+        local h = math.max(36, math.ceil(y + 8))
+        self:SetHeight(h)
+        return h
+    end
     return r
 end
 
+-- ---------------------------------------------------------------- Agenda
 local function RenderUpcoming()
+    local p = pages.upcoming
     local list = WP.EventList()
+    if #list == 0 then
+        ui.events.sa:Hide()
+        ui.noEvents:Show()
+        ui.noEvents:ClearAllPoints(); ui.noEvents:SetPoint("TOP", p, "TOPLEFT", W / 2, -24)
+        win:FitHeight(12 + ui.noEvents:Fit())
+        return
+    end
+    ui.noEvents:Hide(); ui.events.sa:Show()
     local y = 0
     for i, e in ipairs(list) do
         local c = ui.events.Get(i)
-        c:ClearAllPoints(); c:SetPoint("TOPLEFT", 0, -y)
-        y = y + PaintEvent(c, e) + 10
+        local h = PaintEvent(c, e)
+        Place(c, 0, y)
+        y = y + h + 12
     end
     ui.events.HideFrom(#list + 1)
-    ui.events.content:SetHeight(math.max(10, y))
-    ui.noEvents:SetShown(#list == 0)
-    ui.createFirst:SetShown(#list == 0)
-    ui.autoAccept:Update()
+    -- the organizer's invite, accepted by itself: a setting that belongs right under the list
+    ui.autoRow.switch:Update()
+    Place(ui.autoRow, 0, y)
+    y = y + ui.autoRow:Fit(CW)
+    PlaceList(ui.events, p, 12)
+    ui.events.sa:SetContentHeight(y)
+    win:FitHeight(y)
 end
 
+-- ---------------------------------------------------------------- Group now
 local function RenderNow()
-    local role = WP.IsLooking()
-    ui.lookSwitch:Update()
+    local p = pages.now
+    ui.lookRow.switch:Update()
     ui.lookSeg:Update()
-    ui.lookState:SetText(role and L("La guilde voit ta recherche. Elle s'arrête seule quand ton groupe est complet.")
-        or L("Allume pour apparaître dans la liste de la guilde."))
+    local y = 12
+    Place(ui.lookRow, PAD, y)
+    y = y + ui.lookRow:Fit(CW) + 12
+    Place(ui.roleLabel, PAD, y); y = y + LBL
+    Place(ui.lookSeg, PAD, y); y = y + 28 + 12
+    y = y + LBL
+    Place(ui.what, PAD, y); y = y + 28 + 16
     local list = WP.LFGList()
+    -- the header names the list; with nobody in it, the empty state alone says so
+    ui.lookHead:SetShown(#list > 0)
+    if #list > 0 then
+        ui.lookHead:SetWidth(CW)
+        ui.lookHead:Set(L("Membres qui cherchent un groupe"), #list)
+        Place(ui.lookHead, PAD, y); y = y + 32 + 8
+    end
+    local listH = 0
     for i, l in ipairs(list) do
         local r = ui.looking.Get(i)
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -(i - 1) * 46)
-        r.bg:SetAlpha(i % 2 == 0 and 0.6 or 1)
-        r.who, r.what0 = l.name, l.what
-        local tc = CLASS_ICON_TCOORDS and l.cls and CLASS_ICON_TCOORDS[l.cls]
-        if tc then r.cls:SetTexCoord(tc[1], tc[2], tc[3], tc[4]); r.cls:Show() else r.cls:Hide() end
-        r.name:SetText(ClassHex(l.cls) .. l.name .. "|r " .. S.Hex(C.muted) .. (l.lvl or "") .. "|r")
-        r.role:SetText(RoleText(l.role, 14))
-        r.what:SetText((l.what and l.what ~= "") and l.what or S.Hex(C.muted) .. L("n'importe quoi") .. "|r")
-        r.ago:SetText(string.format(L("il y a %d min"), math.max(0, math.floor((time() - l.t) / 60))))
+        r.who, r.l = l.name, l
+        if not S.ClassIcon(r.cls, l.cls) then r.cls:Hide() else r.cls:Show() end
+        r.name:SetText(ClassHex(l.cls) .. l.name .. "|r" .. (l.name == Me() and (" " .. S.Hex(C.muted) .. L("(toi)") .. "|r") or ""))
+        r.what:SetText((l.what and l.what ~= "") and string.format(L("Pour : %s"), l.what) or L("Pour n'importe quel groupe"))
+        r.detail:SetText(RoleText(l.role, 12) .. "  ·  " .. string.format(L("niveau %s"), l.lvl or "?") .. "  ·  " .. AgoText(l.t))
         local other = l.name ~= Me()
         r.whisper:SetShown(other); r.inv:SetShown(other)
+        local h = r:Fit()
+        Place(r, 0, listH)
+        listH = listH + h + 2
     end
     ui.looking.HideFrom(#list + 1)
-    ui.looking.content:SetHeight(math.max(10, #list * 46))
+    if #list > 0 then listH = listH - 2 end
     ui.noLooking:SetShown(#list == 0)
+    if #list == 0 then
+        ui.noLooking:ClearAllPoints(); ui.noLooking:SetPoint("TOP", p, "TOPLEFT", W / 2, -(y + 4))
+        PlaceList(ui.looking, p, y)
+        ui.looking.sa:SetContentHeight(0)
+        win:FitHeight(y - 12 + 4 + ui.noLooking:Fit())
+        return
+    end
+    PlaceList(ui.looking, p, y)
+    ui.looking.sa:SetContentHeight(listH)
+    win:FitHeight(y - 12 + listH)
 end
 
 -- Today, Tomorrow, then "sam. 21" (the day of the month avoids doubts); short: the day name alone
@@ -734,19 +1037,6 @@ local function DayChoices(short)
     return out
 end
 
--- the dungeons and raids of the guide, for the "What" picker: { { key, name, lvlFrom, raid } }
-local function Instances(kind)
-    local out = {}
-    for _, k in ipairs(root.ORDER or {}) do
-        local d = root.D and root.D[k]
-        if d and not d.cq and ((kind == "raid") == (d.raid == true)) then
-            local lo = d.lvl and d.lvl[1] or 0
-            out[#out + 1] = { k, root.DName and root.DName(k) or d.n, lo, d.lvl and d.lvl[2] or lo }
-        end
-    end
-    table.sort(out, function(a, b) if a[3] ~= b[3] then return a[3] < b[3] end return a[2] < b[2] end)
-    return out
-end
 local picked = {}
 -- the names picked, in level order
 local function PickedNames()
@@ -780,7 +1070,7 @@ local function FitNames(fs, names, maxW)
     fs:SetText(names[1] .. suffix)
 end
 
--- a card name on one line, never cut: 13px bold, else 12px bold, else 11px
+-- a card name on one line, never cut: 13 px, else 12, else 11 (then the full name is in the tooltip)
 local function FitCardName(fs, text, maxW)
     local measure = fs.GetUnboundedStringWidth or fs.GetStringWidth
     local canSize = root.SetFont and fs._size ~= nil
@@ -792,108 +1082,104 @@ local function FitCardName(fs, text, maxW)
 end
 
 -- ---------------------------------------------------------------- the dungeon / raid picker
--- Big cards with the loading-screen art of the guide's picker, two columns, several can be picked.
--- The choice is kept aside (sel) until "Valider": closing the window changes nothing.
-local PCW, PCH, PGAP = 260, 96, 8   -- 2 x 260 + 8 + 2 x PAD = 560, the width of the Events window
-local PW, PH = 2 * PCW + PGAP + 2 * PAD, 540
+-- Cards with the loading-screen art of the guide's picker, two columns, several can be ticked.
+-- The choice is kept aside (sel) until the main button: closing the window changes nothing.
+local PGAP = 8
+local PCW = math.floor((CW - PGAP) / 2)   -- two cards across the content width
+local PCH = 88
 local picker
 local sel = {}
 
 local function PaintPickCard(c)
     local on = sel[c.key] and true or false
-    c.edge(on and C.brand or C.border)
-    c.edge2(C.brand, on and 1 or 0)
+    c.edge(on and C.accent or C.cardEdge, 1)
     c.tint:SetShown(on)
     c.checkBg:SetShown(on); c.check:SetShown(on)
 end
 
 local function PickCard(parent)
     local c = CreateFrame("Button", nil, parent)
+    c.wlOwned = true
     c:SetSize(PCW, PCH)
     c.art = c:CreateTexture(nil, "BACKGROUND")
     c.art:SetPoint("TOPLEFT", 1, -1); c.art:SetPoint("BOTTOMRIGHT", -1, 1)
     -- the dungeon's icon on a dark card when the client has no picture for it
     c.icon = c:CreateTexture(nil, "ARTWORK")
     c.icon:SetSize(40, 40); c.icon:SetPoint("CENTER", 0, 12); c.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.icon:Hide()
-    c.tint = S.Solid(c, "ARTWORK", C.brand, 0.16)
+    c.tint = S.Solid(c, "ARTWORK", C.selFill)
     c.tint:SetPoint("TOPLEFT", 1, -1); c.tint:SetPoint("BOTTOMRIGHT", -1, 1); c.tint:Hide()
     -- a dark band under the name, so the text reads on any picture
     local shade = S.Solid(c, "BORDER", { 0, 0, 0 }, 0.62)
     shade:SetPoint("BOTTOMLEFT", 1, 1); shade:SetPoint("BOTTOMRIGHT", -1, 1); shade:SetHeight(40)
-    c.name = S.Text(c, 13, C.text, true)
-    c.name:SetPoint("BOTTOMLEFT", 10, 21); c.name:SetWidth(PCW - 20); c.name:SetJustifyH("LEFT"); c.name:SetWordWrap(false)
-    c.name:SetShadowOffset(1, -1); c.name:SetShadowColor(0, 0, 0, 1)
-    c.lv = S.Text(c, 11, C.dim)
-    c.lv:SetPoint("BOTTOMLEFT", 10, 6); c.lv:SetWidth(PCW - 20); c.lv:SetJustifyH("LEFT"); c.lv:SetWordWrap(false)
-    c.edge = S.Border(c, C.border)
-    -- the second pixel of the brand frame, inside the first one
-    local inner = CreateFrame("Frame", nil, c)
-    inner:SetPoint("TOPLEFT", 1, -1); inner:SetPoint("BOTTOMRIGHT", -1, 1)
-    c.edge2 = S.Border(inner, C.brand, 0)
-    c.checkBg = S.Solid(inner, "OVERLAY", { 0, 0, 0 }, 0.7)
-    c.checkBg:SetSize(26, 26); c.checkBg:SetPoint("TOPRIGHT", -6, -6)
-    c.check = inner:CreateTexture(nil, "OVERLAY", nil, 2)
-    c.check:SetSize(26, 26); c.check:SetPoint("CENTER", c.checkBg, "CENTER", 0, 0)
-    c.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-    local hl = S.Solid(c, "HIGHLIGHT", { 1, 1, 1 }, 0.06)
-    hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1)
+    c.name = S.Text(c, F.body, C.fg)
+    c.name:SetPoint("BOTTOMLEFT", 10, 21); c.name:SetWidth(PCW - 20)
+    S.ClampLabel(c.name, nil, c)
+    c.lv = S.Text(c, F.meta, C.muted)
+    c.lv:SetPoint("BOTTOMLEFT", 10, 6); c.lv:SetWidth(PCW - 20); c.lv:SetWordWrap(false)
+    c.hl = S.Solid(c, "HIGHLIGHT", C.hoverFill)
+    c.hl:SetPoint("TOPLEFT", 1, -1); c.hl:SetPoint("BOTTOMRIGHT", -1, 1)
+    c.press = S.Solid(c, "OVERLAY", C.pressFill)
+    c.press:SetPoint("TOPLEFT", 1, -1); c.press:SetPoint("BOTTOMRIGHT", -1, 1); c.press:Hide()
+    c.edge = S.Border(c, C.cardEdge)
+    -- ticked: the accent edge, the selection fill and a check in the corner
+    c.checkBg = S.Solid(c, "OVERLAY", C.accent)
+    c.checkBg:SetSize(20, 20); c.checkBg:SetPoint("TOPRIGHT", -6, -6)
+    c.check = S.Icon(c, "check", 16, "OVERLAY", C.fg)
+    c.check:SetDrawLayer("OVERLAY", 2)
+    c.check:SetPoint("CENTER", c.checkBg, "CENTER", 0, 0)
     c:SetScript("OnClick", function(self)
         sel[self.key] = not sel[self.key] or nil
         PaintPickCard(self)
         if picker then picker.UpdateOk() end
+        if self:IsMouseOver() and self:GetScript("OnEnter") then self:GetScript("OnEnter")(self) end
     end)
+    c:SetScript("OnMouseDown", function(self) self.press:Show() end)
+    c:SetScript("OnMouseUp", function(self) self.press:Hide() end)
+    c:SetScript("OnEnter", function(self)
+        S.Tip(self, { self.fullName or "", self.lvText or nil,
+            sel[self.key] and L("Clic : décocher") or L("Clic : cocher") })
+    end)
+    c:SetScript("OnLeave", S.HideTip)
     return c
 end
 
-local function BuildPicker(host)
-    local f = CreateFrame("Frame", "WLHelperEventsPicker", host)
-    f:SetSize(PW, PH); f:SetPoint("CENTER", host, "CENTER", 0, 0)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true); f:SetClampedToScreen(true); f:EnableMouse(true)
-    tinsert(UISpecialFrames, "WLHelperEventsPicker")
-    S.Solid(f, "BACKGROUND", C.bg):SetAllPoints()
-    S.Border(f, C.border)
-    local hd = CreateFrame("Frame", nil, f)
-    hd:SetPoint("TOPLEFT", 1, -1); hd:SetPoint("TOPRIGHT", -1, -1); hd:SetHeight(38)
-    S.Solid(hd, "BACKGROUND", C.header):SetAllPoints()
-    local line = S.Solid(hd, "BORDER", C.divider); line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); line:SetHeight(1)
-    f.close = S.IconButton(hd, "Interface\\Buttons\\UI-StopButton", 28, nil, function() f:Hide() end)
-    f.close:SetPoint("RIGHT", -6, 0)
-    f.title = S.Text(hd, 15, C.text, true)
-    f.title:SetPoint("LEFT", 12, 0); f.title:SetPoint("RIGHT", f.close, "LEFT", -8, 0); f.title:SetJustifyH("LEFT")
-    f.hint = S.Text(f, 12, C.muted)
-    f.hint:SetPoint("TOPLEFT", PAD, -50); f.hint:SetPoint("RIGHT", -PAD, 0); f.hint:SetJustifyH("LEFT")
-    f.hint:SetText(L("Clique sur une carte pour la choisir, plusieurs à la fois si tu veux."))
-    -- the grid, scrolled with the wheel
-    local sf = CreateFrame("ScrollFrame", nil, f)
-    sf:SetPoint("TOPLEFT", PAD, -72); sf:SetPoint("BOTTOMRIGHT", -PAD, 56)
-    local content = CreateFrame("Frame", nil, sf); content:SetSize(PW - 2 * PAD, 10); sf:SetScrollChild(content)
-    sf:EnableMouseWheel(true)
-    sf:SetScript("OnMouseWheel", function(self, dlt)
-        local max = math.max(0, content:GetHeight() - (self:GetHeight() or 0))
-        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - dlt * (PCH + PGAP))))
-    end)
-    f.sf, f.content, f.cards, f.heads = sf, content, {}, {}
-    -- the bar at the bottom: clear on the left, apply on the right
-    local bl = S.Solid(f, "BORDER", C.divider); bl:SetPoint("BOTTOMLEFT", 1, 52); bl:SetPoint("BOTTOMRIGHT", -1, 52); bl:SetHeight(1)
-    f.clear = S.Button(f, L("Effacer"), 120, 32, "secondary", function()
+local function BuildPicker()
+    local f = S.Window("WLHelperEventsPicker", W, 420, L("Choisir les donjons"), nil, nil, nil,
+        { header = S.HEADER_H, minH = 240, strata = "DIALOG", noHome = true })
+    f:EnableMouse(true)
+    f.hint = S.Text(f, F.label, C.muted)
+    f.hint:SetText(L("Tu peux en cocher plusieurs : l'événement portera tous leurs noms."))
+    f.sa = S.ScrollArea(f)
+    f.content = f.sa.child
+    f.cards, f.heads = {}, {}
+    -- the bar at the bottom: untick on the left, the main action on the right
+    f.rule = S.Rule(f)
+    f.rule:SetPoint("BOTTOMLEFT", 0, 12 + 28 + 12); f.rule:SetPoint("BOTTOMRIGHT", 0, 12 + 28 + 12)
+    f.clear = S.Button(f, L("Tout décocher"), 0, 28, "secondary", function()
         wipe(sel)
         for _, c in ipairs(f.cards) do if c:IsShown() then PaintPickCard(c) end end
         f.UpdateOk()
     end)
-    f.clear:SetPoint("BOTTOMLEFT", PAD, 10)
-    f.ok = S.Button(f, L("Valider"), 180, 32, "primary", function()
+    f.clear:SetPoint("BOTTOMLEFT", PAD, 12)
+    f.ok = S.Button(f, L("Continuer sans donjon"), 0, 28, "primary", function()
         wipe(picked)
         for k in pairs(sel) do picked[k] = true end
         f:Hide()
         if ui.onPicked then ui.onPicked() end
     end)
-    f.ok:SetPoint("BOTTOMRIGHT", -PAD, 10)
+    f.ok:SetPoint("BOTTOMRIGHT", -PAD, 12)
     function f.UpdateOk()
         local n = 0
         for _ in pairs(sel) do n = n + 1 end
-        f.ok.label:SetText(n > 0 and string.format(L("Valider (%d)"), n) or L("Valider"))
+        local raid = draft.kind == "raid"
+        local label
+        if n == 0 then label = raid and L("Continuer sans raid") or L("Continuer sans donjon")
+        elseif n == 1 then label = raid and L("Ajouter 1 raid") or L("Ajouter 1 donjon")
+        else label = string.format(raid and L("Ajouter %d raids") or L("Ajouter %d donjons"), n) end
+        f.ok.label:SetText(label)
+        if n > 0 then f.clear:Enable() else f.clear:Disable() end
+        f.clear:SetDisabledReason(raid and L("Aucun raid coché.") or L("Aucun donjon coché."))
     end
-    f:Hide()
     -- One Escape hides every shown frame of UISpecialFrames, so while the picker is up the Events
     -- window leaves that list: Escape closes the picker only, the form stays open.
     local WIN = "WLHelperEvents"
@@ -913,13 +1199,14 @@ local function BuildPicker(host)
     f:SetScript("OnHide", function()
         if C_Timer and C_Timer.After then C_Timer.After(0, Relist) else Relist() end
     end)
+    f:Hide()
     return f
 end
 
 -- opens the picker on the kind of the form (dungeons or raids), the current choice already ticked
 function WP.OpenEventPicker()
     if not (pages.create and (draft.kind == "dg" or draft.kind == "raid")) then return end
-    picker = picker or BuildPicker(pages.create)
+    picker = picker or BuildPicker()
     local raid = draft.kind == "raid"
     picker.title:SetText(raid and L("Choisir les raids") or L("Choisir les donjons"))
     wipe(sel)
@@ -931,70 +1218,96 @@ function WP.OpenEventPicker()
         local ok = lv >= e[3] - 4 and lv <= e[4] + 1
         if ok then mine[#mine + 1] = e else rest[#rest + 1] = e end
     end
-    local parts = {}
+    local parts
     if #mine > 0 and #rest > 0 then
-        parts = { { L("Pour ton niveau"), mine }, { L("Les autres"), rest } }
+        parts = { { L("Pour ton niveau"), mine }, { L("Autres niveaux"), rest } }
     else
         parts = { { nil, #mine > 0 and mine or rest } }
     end
     for _, c in ipairs(picker.cards) do c:Hide() end
     for _, h in ipairs(picker.heads) do h:Hide() end
     local y, i, hi = 0, 0, 0
-    for _, part in ipairs(parts) do
+    for pi, part in ipairs(parts) do
         if part[1] then
             hi = hi + 1
             local h = picker.heads[hi]
-            if not h then
-                h = S.Text(picker.content, 12, C.dim, true); h:SetJustifyH("LEFT"); h:SetWidth(PW - 2 * PAD)
-                picker.heads[hi] = h
-            end
-            h:ClearAllPoints(); h:SetPoint("TOPLEFT", 2, -y)
-            h:SetText(part[1] .. "  ·  " .. #part[2]); h:Show()
-            y = y + 22
+            if not h then h = S.SectionHeader(picker.content, "", nil, nil, nil, true); picker.heads[hi] = h end
+            h:SetWidth(CW)
+            if pi > 1 then y = y + 8 end
+            Place(h, 0, y)
+            h:Set(part[1], #part[2]); h:Show()
+            y = y + 24 + 8
         end
         for j, e in ipairs(part[2]) do
             i = i + 1
             local c = picker.cards[i] or PickCard(picker.content); picker.cards[i] = c
             local col, row = (j - 1) % 2, math.floor((j - 1) / 2)
-            c:ClearAllPoints(); c:SetPoint("TOPLEFT", col * (PCW + PGAP), -(y + row * (PCH + PGAP)))
+            Place(c, col * (PCW + PGAP), y + row * (PCH + PGAP))
             c.key = e[1]
             if root.DungeonArt then
                 root.DungeonArt(c.art, e[1], c.icon)
             else
                 c.art:SetColorTexture(0.10, 0.11, 0.13, 1)
             end
+            c.fullName = e[2]
             FitCardName(c.name, e[2], PCW - 20)
-            c.lv:SetText(string.format(L("niv. %s"), e[3] == e[4] and tostring(e[3]) or (e[3] .. "-" .. e[4])))
+            c.lvText = string.format(L("niveau %s"), e[3] == e[4] and tostring(e[3]) or (e[3] .. "-" .. e[4]))
+            c.lv:SetText(c.lvText)
             PaintPickCard(c)
             c:Show()
         end
-        y = y + math.ceil(#part[2] / 2) * (PCH + PGAP) + 6
+        y = y + math.ceil(#part[2] / 2) * (PCH + PGAP) - PGAP
     end
-    picker.content:SetHeight(math.max(10, y))
-    picker.sf:SetVerticalScroll(0)
+    -- the window: hint, the grid (scrolls past the height cap), the bar
+    local top = S.HEADER_H + 1 + 12
+    Place(picker.hint, PAD, top)
+    local hh = S.FitText(picker.hint, 2, CW, picker)
+    local gridTop = top + hh + 12
+    local barH = 12 + 1 + 12 + 28
+    picker.sa:ClearAllPoints()
+    picker.sa:SetPoint("TOPLEFT", picker, "TOPLEFT", PAD, -gridTop)
+    picker.sa:SetPoint("BOTTOMRIGHT", picker, "BOTTOMRIGHT", -PAD, barH + 12)
+    picker.content:SetWidth(CW)
+    picker.sa:SetContentHeight(y)
     picker.UpdateOk()
+    if win then picker:ClearAllPoints(); picker:SetPoint("TOP", win, "TOP", 0, -24) end
     picker:Show(); picker:Raise()
+    picker:FitHeight(hh + 12 + y + barH)
+    picker.sa:ScrollTo(0, true)
     return picker
 end
 
-local function BuildCreate(p)
-    local y = -12
-    -- x: the column (PAD by default); keepY: the next label goes on the same line
-    local function Label(text, x, keepY)
-        local t = S.Text(p, 13, C.dim, true); t:SetPoint("TOPLEFT", x or PAD, y); t:SetText(text)
-        if not keepY then y = y - 22 end
-        return t
+-- ---------------------------------------------------------------- Create
+-- "21:00", "21h30", "9:00 PM", "9pm" -> hour, minute (nil when it cannot be read)
+local function ParseHour(text)
+    local s = tostring(text or ""):lower():gsub("%s+", "")
+    local ampm = s:match("([ap])%.?m%.?$")
+    if ampm then s = s:gsub("[ap]%.?m%.?$", "") end
+    local hh, mm = s:match("^(%d%d?)[:h%.]?(%d?%d?)$")
+    hh, mm = tonumber(hh), tonumber(mm ~= "" and mm or "0")
+    if not hh or not mm or mm > 59 then return nil end
+    if ampm then
+        if hh < 1 or hh > 12 then return nil end
+        if ampm == "p" and hh < 12 then hh = hh + 12 elseif ampm == "a" and hh == 12 then hh = 0 end
     end
+    if hh > 23 then return nil end
+    return hh, mm
+end
+
+local PLACEHOLDER = { dg = "Ex. Zul'Farrak", raid = "Ex. Onyxia", quest = "Ex. quêtes des Maleterres", other = "Ex. farm de cuir à Feralas" }
+
+local function BuildCreate(p)
     draft.kind = draft.kind or "dg"
     -- the places are filled by kind until the player types one: tanks, healers, damage
     local PRESET = { raid = { 3, 8, 29 }, dg = { 1, 1, 3 }, quest = { 0, 0, 5 }, other = { 0, 0, 5 } }
     local placesTouched = false
-    -- the start time from the day and the hour typed; nil when the hour cannot be read
     local function ParseWhen()
-        local hh, mm = (ui.hour:GetText() or ""):match("^%s*(%d%d?)[:hH]?(%d?%d?)%s*$")
-        hh, mm = tonumber(hh), tonumber(mm ~= "" and mm or "0")
-        if not hh or hh > 23 or not mm or mm > 59 then return nil end
+        local hh, mm = ParseHour(ui.hour:GetText())
+        if not hh then return nil end
         return DayStart(time()) + draft.day * 86400 + hh * 3600 + mm * 60
+    end
+    local function Relayout()
+        if current == "create" and win and win:IsShown() and ui.LayoutCreate then win:FitHeight(ui.LayoutCreate()) end
     end
     -- what will be published, read back above the button
     local function Recap()
@@ -1002,50 +1315,66 @@ local function BuildCreate(p)
         local title = ui.title:GetText() or ""
         local when = ParseWhen()
         if title:gsub("%s", "") ~= "" and when then
-            ui.recap:SetText(string.format(L("Sera publié : %s, %s"), title, When(when)))
+            ui.recap:SetText(string.format(L("Sera publié : %s, %s."), title, When(when, true)))
         else
             ui.recap:SetText("")
         end
     end
-    -- the kind, then (dungeon or raid) one button that opens the picker with the pictures
-    ui.pick = S.Button(p, "", W - 2 * PAD, 34, "secondary", function() WP.OpenEventPicker() end)
-    ui.pick.icon = ui.pick:CreateTexture(nil, "ARTWORK")
-    ui.pick.icon:SetSize(22, 22); ui.pick.icon:SetPoint("LEFT", 8, 0); ui.pick.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    ui.pick.arrow = ui.pick:CreateTexture(nil, "ARTWORK")
-    ui.pick.arrow:SetSize(16, 16); ui.pick.arrow:SetPoint("RIGHT", -10, 0)
-    ui.pick.arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
-    -- the label between the icon and the arrow: 40 px kept on each side
-    ui.pick.label:ClearAllPoints(); ui.pick.label:SetPoint("CENTER", 0, 0)
-    ui.pickHint = S.Text(p, 12, C.muted)
-    ui.pickHint:SetWidth(W - 2 * PAD); ui.pickHint:SetJustifyH("LEFT")
-    ui.pickHint:SetText(L("Écris ce que tu organises dans Quoi, juste en dessous."))
+    -- the kind
+    ui.kindLabel = FieldLabel(p, L("Type"))
+    -- dungeon or raid: one button opens the picker with the pictures
+    ui.pick = S.Button(p, "", CW, 32, "secondary", function() WP.OpenEventPicker() end, function()
+        local names = PickedNames()
+        local lines = { draft.kind == "raid" and L("Choisir les raids") or L("Choisir les donjons") }
+        for _, n in ipairs(names) do lines[#lines + 1] = n end
+        lines[#lines + 1] = draft.kind == "raid" and L("Clic : choisir les raids") or L("Clic : choisir les donjons")
+        return lines
+    end)
+    ui.pick.thing = ui.pick.content:CreateTexture(nil, "ARTWORK")
+    ui.pick.thing:SetSize(20, 20); ui.pick.thing:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    ui.pick.next = S.Icon(ui.pick.content, "chevron_right", 16, "ARTWORK", C.muted)
+    ui.pick.label:SetJustifyH("LEFT")
+    function ui.pick:CustomLayout(dy)
+        self.thing:ClearAllPoints(); self.thing:SetPoint("LEFT", self.content, "LEFT", 8, dy)
+        self.next:ClearAllPoints(); self.next:SetPoint("RIGHT", self.content, "RIGHT", -10, dy)
+        self.label:ClearAllPoints(); self.label:SetPoint("LEFT", self.content, "LEFT", 36, dy)
+    end
+    ui.pick:Fit()
     local function PickUpdate()
         local inst = draft.kind == "dg" or draft.kind == "raid"
-        ui.pick:SetShown(inst); ui.pickHint:SetShown(not inst)
+        ui.pick:SetShown(inst)
         if not inst then return end
         local names = PickedNames()
         local lb = ui.pick.label
         if #names == 0 then
-            lb:SetWidth(W - 2 * PAD - 80); lb:SetWordWrap(false)
-            lb:SetText(draft.kind == "raid" and L("Choisir le raid") or L("Choisir le donjon"))
-            ui.pick.icon:SetTexture(draft.kind == "raid" and "Interface\\Icons\\INV_Misc_Head_Dragon_01" or "Interface\\Icons\\INV_Misc_Map_01")
+            lb:SetWidth(CW - 36 - 34); lb:SetWordWrap(false)
+            lb:SetText(draft.kind == "raid" and L("Choisir les raids") or L("Choisir les donjons"))
+            S.Painted(ui.pick.thing, draft.kind == "raid" and "Interface\\Icons\\INV_Misc_Head_Dragon_01" or "Interface\\Icons\\INV_Misc_Map_01")
         else
-            FitNames(lb, names, W - 2 * PAD - 80)
+            FitNames(lb, names, CW - 36 - 34)
             local first
             for _, e in ipairs(Instances(draft.kind)) do if picked[e[1]] then first = e[1]; break end end
             local d = first and root.D and root.D[first]
-            ui.pick.icon:SetTexture(d and d.icon or "Interface\\Icons\\INV_Misc_Map_01")
+            S.Painted(ui.pick.thing, d and d.icon or "Interface\\Icons\\INV_Misc_Map_01")
         end
     end
-    -- the picker's "Valider": the title from the names, like the chips did
+    -- the picker's main button: the title from the names. "Continue without" keeps a name the player
+    -- typed; it only empties a name that an earlier pick built.
+    local lastBuilt = ""
     ui.onPicked = function()
-        ui.title:SetText(PickedTitle())
+        local t = PickedTitle()
+        local cur = ui.title:GetText() or ""
+        if t ~= "" or cur == "" or cur == lastBuilt then ui.title:SetText(t) end
+        lastBuilt = t
+        ui.title:SetError(nil)
         PickUpdate()
         Recap()
+        Relayout()
     end
-    local kind = S.Segmented(p, { { "dg", L("Donjon") }, { "raid", L("Raid") }, { "quest", L("Quête") }, { "other", L("Autre") } },
+    ui.kind = S.Segmented(p, { { "dg", L("Donjon") }, { "raid", L("Raid") }, { "quest", L("Quête") }, { "other", L("Autre") } },
         function() return draft.kind end, function(v)
-            draft.kind = v; wipe(picked); ui.title:SetText("")
+            draft.kind = v; wipe(picked); ui.title:SetText(""); lastBuilt = ""
+            ui.title:SetPlaceholder(L(PLACEHOLDER[v]))
             if picker then picker:Hide() end
             PickUpdate()
             if not placesTouched and PRESET[v] then
@@ -1055,131 +1384,180 @@ local function BuildCreate(p)
                 end
             end
             Recap()
+            Relayout()
         end, 28)
-    kind:SetPoint("TOPLEFT", PAD, y); y = y - 38
-    ui.pick:SetPoint("TOPLEFT", PAD, y)
-    ui.pickHint:ClearAllPoints(); ui.pickHint:SetPoint("TOPLEFT", PAD, y - 10)
-    y = y - 46
-    Label(L("Quoi"))
-    ui.title = Box(p, W - 2 * PAD, L("Zul'Farrak, Onyxia, farm de cuir..."))
-    ui.title:SetPoint("TOPLEFT", PAD, y); ui.title:SetMaxLetters(60); y = y - 40
-    ui.title:HookScript("OnTextChanged", function() Recap() end)
-    PickUpdate()
-    Label(L("Jour"))
-    local function DaySet(v) draft.day = v; Recap() end
-    ui.day = S.Segmented(p, DayChoices(), function() return draft.day end, DaySet, 28)
-    if (ui.day:GetWidth() or 0) > W - 2 * PAD then
-        -- the day numbers do not fit seven times: the day names alone
-        ui.day:Hide()
-        ui.day = S.Segmented(p, DayChoices(true), function() return draft.day end, DaySet, 28)
-    end
-    ui.day:SetPoint("TOPLEFT", PAD, y); y = y - 40
-    -- the hour (four usual ones a click away) on the left, the places per role on the right
-    local PX = PAD + 258
-    Label(L("Heure"), PAD, true); Label(L("Places"), PX)
-    ui.hour = Box(p, 60, "20:30"); ui.hour:SetPoint("TOPLEFT", PAD, y); ui.hour:SetMaxLetters(5)
-    ui.hour:SetText("21:00")
-    ui.hour:HookScript("OnTextChanged", function() Recap() end)
-    for i, hv in ipairs({ "20:00", "20:30", "21:00", "21:30" }) do
-        local hb = S.Button(p, hv, 44, 28, "secondary", function() ui.hour:SetText(hv); Recap() end)
-        hb:SetPoint("TOPLEFT", PAD + 66 + (i - 1) * 46, y)
-    end
-    local x = PX
-    for _, role in ipairs(ROLES) do
-        local t = S.Text(p, 13, C.text); t:SetPoint("TOPLEFT", x, y - 4); t:SetText(RoleIcon(role, 20))
-        local b = Box(p, 44, nil, true); b:SetPoint("TOPLEFT", x + 24, y)
-        b:SetText(tostring(draft[role])); ui["n_" .. role] = b
-        b:HookScript("OnTextChanged", function(_, user) if user then placesTouched = true end end)
-        local rn = S.Text(p, 11, C.muted); rn:SetPoint("TOPLEFT", x, y - 30); rn:SetText(L(ROLE_LABEL[role]))
-        x = x + 88
-    end
-    y = y - 54
-    Label(L("Note"))
-    ui.note = Box(p, W - 2 * PAD, nil); ui.note:SetPoint("TOPLEFT", PAD, y); ui.note:SetMaxLetters(120); y = y - 40
-    ui.err = S.Text(p, 12, C.danger); ui.err:SetPoint("BOTTOMLEFT", PAD, PAD + 62); ui.err:SetPoint("RIGHT", -PAD, 0)
-    ui.err:SetJustifyH("LEFT"); ui.err:SetWordWrap(false)
-    ui.recap = S.Text(p, 12, C.dim); ui.recap:SetPoint("BOTTOMLEFT", PAD, PAD + 44); ui.recap:SetPoint("RIGHT", -PAD, 0)
-    ui.recap:SetJustifyH("LEFT"); ui.recap:SetWordWrap(false)
-    local go = S.Button(p, L("Publier l'événement"), W - 2 * PAD, 36, "primary", function()
-        local title = ui.title:GetText()
-        if not title or title:gsub("%s", "") == "" then ui.err:SetText(L("Donne un nom à l'événement.")); return end
-        local when = ParseWhen()
-        if not when then ui.err:SetText(L("Heure invalide : écris par exemple 20:30.")); return end
-        if when < time() - 60 then
-            ui.err:SetText(draft.day == 0 and L("Cette heure est déjà passée aujourd'hui. Choisis Demain.") or L("Cette heure est déjà passée."))
-            return
+    -- the name
+    ui.title = S.Input(p, CW, { label = L("Nom de l'événement"), placeholder = L(PLACEHOLDER[draft.kind]),
+        onChange = function() ui.title:SetError(nil); Recap(); Relayout() end })
+    ui.title:SetMaxLetters(60)
+    -- the day
+    ui.dayLabel = FieldLabel(p, L("Jour"))
+    local function DaySet(v) draft.day = v; ui.hour:SetError(nil); Recap(); Relayout() end
+    -- built again after midnight (WP.RefreshEvents): "Demain" picked yesterday is "Aujourd'hui" now
+    function ui.MakeDay()
+        local today = DayStart(time())
+        if ui.dayBuiltFor and ui.dayBuiltFor ~= today then
+            draft.day = math.max(0, draft.day - math.floor((today - ui.dayBuiltFor) / 86400 + 0.5))
         end
+        ui.dayBuiltFor = today
+        if ui.day then ui.day:Hide() end
+        ui.day = S.Segmented(p, DayChoices(), function() return draft.day end, DaySet, 28)
+        if (Num(ui.day:GetWidth()) or 0) > CW then
+            -- the day numbers do not fit seven times: the day names alone
+            ui.day:Hide()
+            ui.day = S.Segmented(p, DayChoices(true), function() return draft.day end, DaySet, 28)
+        end
+        ui.day:SetMaxWidth(CW)
+        ui.day:Update()
+    end
+    ui.MakeDay()
+    -- the hour, and four usual ones a click away
+    ui.hour = S.Input(p, 88, { label = L("Heure"), placeholder = Clock(20, 30),
+        onChange = function() ui.hour:SetError(nil); Recap(); Relayout() end })
+    ui.hour:SetMaxLetters(8)
+    ui.hour:SetText(Clock(21, 0))
+    ui.quick = {}
+    for i, hv in ipairs({ { 20, 0 }, { 20, 30 }, { 21, 0 }, { 21, 30 } }) do
+        local txt = Clock(hv[1], hv[2])
+        local hb = S.Button(p, txt, 52, 28, "secondary", function()
+            ui.hour:SetText(txt); ui.hour:SetError(nil); Recap(); Relayout()
+        end)
+        if i == 1 then hb:SetPoint("LEFT", ui.hour, "RIGHT", 8, 0) else hb:SetPoint("LEFT", ui.quick[i - 1], "RIGHT", 4, 0) end
+        ui.quick[i] = hb
+    end
+    -- the places per role
+    local placeLabel = { tank = "Places tank", heal = "Places soigneur", dps = "Places DPS" }
+    for _, role in ipairs(ROLES) do
+        local b = S.Input(p, 56, { label = S.RoleMarkup(role, 12) .. " " .. L(placeLabel[role]),
+            onChange = function() placesTouched = true end })
+        b:SetNumeric(true); b:SetMaxLetters(2)
+        b:SetText(tostring(draft[role]))
+        ui["n_" .. role] = b
+    end
+    -- the note
+    ui.note = S.Input(p, CW, { label = L("Note (facultatif)"), placeholder = L("Ex. niveau 45 minimum, rendez-vous à Gadgetzan") })
+    ui.note:SetMaxLetters(120)
+    ui.recap = S.Text(p, F.label, C.text)
+    ui.go = S.Button(p, L("Publier l'événement"), 0, 32, "primary", function()
+        local title = ui.title:GetText()
+        local bad = false
+        if not title or title:gsub("%s", "") == "" then ui.title:SetError(L("Donne un nom à l'événement, par exemple Zul'Farrak.")); bad = true end
+        local when = ParseWhen()
+        if not when then
+            ui.hour:SetError(L("Heure invalide : écris par exemple 20:30.")); bad = true
+        elseif when < time() - 60 then
+            ui.hour:SetError(draft.day == 0 and L("Cette heure est déjà passée aujourd'hui : choisis Demain ou une heure plus tard.")
+                or L("Cette heure est déjà passée.")); bad = true
+        end
+        if bad then Relayout(); return end
         local function N(role) return tonumber(ui["n_" .. role]:GetText()) or 0 end
         WP.CreateEvent(title, when, N("tank"), N("heal"), N("dps"), ui.note:GetText())
-        ui.err:SetText(""); ui.title:SetText(""); ui.note:SetText(""); wipe(picked); PickUpdate()
+        ui.title:SetText(""); ui.note:SetText(""); wipe(picked); lastBuilt = ""; PickUpdate()
+        ui.title:SetError(nil); ui.hour:SetError(nil)
         placesTouched = false
         Recap()
         WP.ShowEventsTab("upcoming")
     end)
-    go:SetPoint("BOTTOMLEFT", PAD, PAD)
+    -- an error sentence under a narrow field spans the whole form
+    local function ErrH(box)
+        if not box.err:IsShown() then return 0 end
+        return 4 + S.FitText(box.err, 0, CW, box)
+    end
+    function ui.LayoutCreate()
+        local y = 12
+        Place(ui.kindLabel, PAD, y); y = y + LBL
+        Place(ui.kind, PAD, y); y = y + 28 + 12
+        if ui.pick:IsShown() then Place(ui.pick, PAD, y); y = y + 32 + 12 end
+        y = y + LBL
+        Place(ui.title, PAD, y); y = y + 28 + ErrH(ui.title) + 12
+        Place(ui.dayLabel, PAD, y); y = y + LBL
+        Place(ui.day, PAD, y); y = y + 28 + 12
+        y = y + LBL
+        Place(ui.hour, PAD, y); y = y + 28 + ErrH(ui.hour) + 12
+        y = y + LBL
+        for i, role in ipairs(ROLES) do Place(ui["n_" .. role], PAD + (i - 1) * 132, y) end
+        y = y + 28 + 12
+        y = y + LBL
+        Place(ui.note, PAD, y); y = y + 28 + 12
+        local recap = ui.recap:GetText()
+        if recap and recap ~= "" then
+            ui.recap:Show()
+            Place(ui.recap, PAD, y)
+            y = y + S.FitText(ui.recap, 2, CW, p) + 8
+        else
+            ui.recap:Hide()
+        end
+        Place(ui.go, PAD, y); y = y + 32
+        return y - 12
+    end
+    ui.recapNow = Recap
+    PickUpdate()
     Recap()
 end
 
+-- ---------------------------------------------------------------- Group now
 local function BuildNow(p)
-    local t = S.Text(p, 14, C.text, true); t:SetPoint("TOPLEFT", PAD, -16); t:SetText(L("Je cherche un groupe"))
-    ui.lookSwitch = S.Switch(p, function() return WP.IsLooking() ~= nil end, function(v)
-        if v then WP.SetLooking(MyRole(), ui.what:GetText()) else WP.SetLooking(nil) end
-    end)
-    ui.lookSwitch:SetPoint("TOPRIGHT", -PAD, -12)
-    -- what the switch does, in words
-    ui.lookState = S.Text(p, 12, C.muted); ui.lookState:SetPoint("TOPLEFT", PAD, -36); ui.lookState:SetPoint("RIGHT", -PAD - 50, 0)
-    ui.lookState:SetJustifyH("LEFT"); ui.lookState:SetWordWrap(false)
-    local rl = S.Text(p, 13, C.dim); rl:SetPoint("TOPLEFT", PAD, -70); rl:SetText(L("Mon rôle"))
+    ui.lookRow = SettingRow(p, L("Je cherche un groupe"),
+        L("Les membres qui ont WL Helper te voient dans leur liste. Ta recherche s'arrête seule quand ton groupe est complet."),
+        function() return WP.IsLooking() ~= nil end,
+        function(v) if v then WP.SetLooking(MyRole(), ui.what:GetText()) else WP.SetLooking(nil) end end, true)
+    ui.roleLabel = FieldLabel(p, L("Mon rôle"))
     ui.lookSeg = S.Segmented(p, { { "tank", RoleText("tank", 14) }, { "heal", RoleText("heal", 14) }, { "dps", RoleText("dps", 14) } },
         function() return MyRole() end, function(v)
             WLWritsCharDB.lfgRole = v
             if WP.IsLooking() then WP.SetLooking(v, ui.what:GetText()) end
         end, 28)
-    ui.lookSeg:SetPoint("TOPLEFT", PAD + 80, -64)
-    ui.what = Box(p, W - 2 * PAD, L("Pour quoi ? (ex. Zul'Farrak, quêtes Maleterres)")); ui.what:SetPoint("TOPLEFT", PAD, -104); ui.what:SetMaxLetters(80)
-    ui.what:SetScript("OnEnterPressed", function(self)
-        self:ClearFocus()
-        if WP.IsLooking() then WP.SetLooking(MyRole(), self:GetText()) end
-    end)
+    ui.what = S.Input(p, CW, { label = L("Pour quoi ?"), placeholder = L("Ex. Zul'Farrak, quêtes des Maleterres"),
+        onEnter = function(text) if WP.IsLooking() then WP.SetLooking(MyRole(), text) end end })
+    ui.what:SetMaxLetters(80)
     -- the text counts without Enter too (only sent when it changed)
-    ui.what:SetScript("OnEditFocusLost", function(self)
+    ui.what:HookScript("OnEditFocusLost", function(self)
         if WP.IsLooking() then
             local _, w = WP.IsLooking()
             if (w or "") ~= Clean(self:GetText(), 80) then WP.SetLooking(MyRole(), self:GetText()) end
         end
     end)
-    ui.looking = List(p, -146, 40, LookRow, 46)
-    ui.noLooking = S.Text(ui.looking.content, 13, C.dim); ui.noLooking:SetPoint("TOPLEFT", 2, -8); ui.noLooking:SetText(L("Personne ne cherche de groupe en ce moment."))
-    local note = S.Text(p, 12, C.muted); note:SetPoint("BOTTOMLEFT", PAD, 14); note:SetPoint("RIGHT", -PAD, 0); note:SetJustifyH("LEFT"); note:SetWordWrap(true)
-    note:SetText(L("Seuls les membres qui ont WL Helper voient les événements et les recherches de groupe."))
+    ui.lookHead = S.SectionHeader(p, L("Membres qui cherchent un groupe"))
+    ui.looking = List(p, LookRow)
+    ui.noLooking = S.EmptyState(p, "group", L("Personne ne cherche de groupe"),
+        L("Quand un membre allume « Je cherche un groupe », il apparaît ici avec son rôle."))
+    ui.noLooking:Hide()
+end
+
+local function InfoTip()
+    return { L("LFG"), L("Seuls les membres qui ont WL Helper voient les événements et les recherches de groupe."),
+        L("WL Helper n'envoie jamais de message privé : tout passe par le canal de la guilde.") }
 end
 
 local function Build()
-    win = S.Window("WLHelperEvents", W, H, L("Événements"), GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "eventsPos")
-    tabs = S.Tabs(win, { { "upcoming", L("À venir") }, { "create", L("Créer") }, { "now", L("Groupe maintenant") } },
+    win = S.Window("WLHelperEvents", W, 480, L("LFG"), GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "eventsPos",
+        { header = S.HEADER_H, minH = 240 })
+    win:AddHeaderButton(S.IconButton(win.header, "info", 28, InfoTip))
+    tabs = S.Tabs(win, { { "upcoming", L("Agenda") }, { "create", L("Créer") }, { "now", L("Groupe maintenant") } },
         function() return current end, function(k) WP.ShowEventsTab(k) end, function(k)
             if k == "upcoming" then local n = #WP.EventList(); return n > 0 and n or nil end
-            if k == "now" then local n = #WP.LFGList(); return n > 0 and n or nil end
+            if k == "now" then local n = WP.LFGCount(true); return n > 0 and n or nil end
         end)
-    tabs:SetPoint("TOPLEFT", 1, -39); tabs:SetPoint("TOPRIGHT", -1, -39)
+    tabs:SetPoint("TOPLEFT", 0, -(S.HEADER_H + 1)); tabs:SetPoint("TOPRIGHT", 0, -(S.HEADER_H + 1))
     for _, k in ipairs({ "upcoming", "create", "now" }) do
         local p = CreateFrame("Frame", nil, win)
-        p:SetPoint("TOPLEFT", 0, -76); p:SetPoint("BOTTOMRIGHT")
+        p:SetPoint("TOPLEFT", 0, -win:ContentTop()); p:SetPoint("BOTTOMRIGHT")
         p:Hide(); pages[k] = p
     end
-    ui.events = List(pages.upcoming, -12, 44, EventCard, 80)
-    ui.noEvents = S.Text(ui.events.content, 13, C.dim); ui.noEvents:SetPoint("TOPLEFT", 2, -8); ui.noEvents:SetText(L("Aucun événement prévu. Crée le premier dans l'onglet Créer."))
-    ui.createFirst = S.Button(ui.events.content, L("Créer un événement"), 220, 30, "primary", function() WP.ShowEventsTab("create") end)
-    ui.createFirst:SetPoint("TOPLEFT", 2, -32)
-    -- the auto-accept setting, where the events are
-    ui.autoAccept = S.Switch(pages.upcoming, function() return WLWritsDB.eventsAutoAccept ~= false end, function(v) WLWritsDB.eventsAutoAccept = v end)
-    ui.autoAccept:SetPoint("BOTTOMLEFT", PAD, 14)
-    local st = S.Text(pages.upcoming, 12, C.dim)
-    st:SetPoint("LEFT", ui.autoAccept, "RIGHT", 8, 0); st:SetPoint("RIGHT", pages.upcoming, "RIGHT", -PAD, 0)
-    st:SetJustifyH("LEFT"); st:SetWordWrap(false)
-    st:SetText(L("Accepter seul l'invitation de l'organisateur quand je suis inscrit"))
+    -- Agenda
+    ui.events = List(pages.upcoming, EventCard)
+    ui.noEvents = S.EmptyState(pages.upcoming, "calendar", L("Aucun événement prévu"),
+        L("Les donjons et raids prévus par la guilde apparaîtront ici."), L("Créer un événement"),
+        function() WP.ShowEventsTab("create") end, "primary")
+    ui.noEvents:Hide()
+    ui.autoRow = SettingRow(ui.events.content, L("Accepter l'invitation de l'organisateur"),
+        L("Quand tu es inscrit, son invitation est acceptée pour toi, de 30 min avant le début à 30 min après."),
+        function() return WLWritsDB.eventsAutoAccept ~= false end, function(v) WLWritsDB.eventsAutoAccept = v end)
     BuildCreate(pages.create)
     BuildNow(pages.now)
+    -- the picker belongs to the Create tab: it goes when the tab or the window goes
+    pages.create:HookScript("OnHide", function() if picker then picker:Hide() end end)
+    win:HookScript("OnHide", function() if picker then picker:Hide() end end)
     win:SetScript("OnShow", function() WP.AskEvents(); WP.RefreshEvents() end)
 end
 
@@ -1187,13 +1565,21 @@ function WP.ShowEventsTab(k)
     if not win then Build() end
     current = k
     for key, pg in pairs(pages) do pg:SetShown(key == k) end
+    win.subtitle:SetText(GetGuildInfo and GetGuildInfo("player") or "")
     win:Show(); win:Raise()
     WP.RefreshEvents()
+    -- wrapped text measures right only once its width is applied: once more on the next frame
+    if C_Timer and C_Timer.After then C_Timer.After(0, function() WP.RefreshEvents() end) end
 end
 function WP.RefreshEvents()
     if not (win and win:IsShown()) then return end
     tabs:Update()
-    if current == "upcoming" then RenderUpcoming() elseif current == "now" then RenderNow() end
+    if current == "upcoming" then RenderUpcoming()
+    elseif current == "now" then RenderNow()
+    elseif ui.LayoutCreate then
+        if ui.MakeDay and ui.dayBuiltFor ~= DayStart(time()) then ui.MakeDay(); if ui.recapNow then ui.recapNow() end end
+        win:FitHeight(ui.LayoutCreate())
+    end
 end
 function WP.ToggleEvents()
     if win and win:IsShown() then win:Hide(); return end
@@ -1236,7 +1622,7 @@ ev:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
     elseif e == "GROUP_ROSTER_UPDATE" then
         if On() and WP.IsLooking() and ((IsInRaid and IsInRaid()) or (GetNumSubgroupMembers and GetNumSubgroupMembers() >= 4)) then
             WP.SetLooking(nil)
-            WP.Print(L("Ton groupe est complet : tu ne cherches plus de groupe."))
+            Say(L("Ton groupe est complet : ta recherche de groupe s'arrête."))
         end
     elseif e == "PLAYER_LOGOUT" then
         -- sent at once: the queue (one line a second) would not run any more

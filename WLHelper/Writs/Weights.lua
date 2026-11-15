@@ -2,7 +2,7 @@
 --
 -- One table per class and spec, written for levelling and dungeons in Classic (values relative to the
 -- spec's main stat = 1; a % of crit or hit is worth about a dozen points of it). The spec is the
--- talent tree with the most points, or the one picked in Settings > Bags. An item's score is the sum
+-- talent tree with the most points, or the one picked in Settings > Upgrades. An item's score is the sum
 -- of its stats times their weights, plus the weapon's damage per second for the slots that use it;
 -- the gain is its score against what you wear in the same slot (the weaker of two rings or trinkets).
 local ADDON, root = ...

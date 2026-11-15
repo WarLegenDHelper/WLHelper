@@ -84,5 +84,72 @@ Changes:
     (`result.other`), and a feral druid in caster form keeps the last feral form seen
     (cat or bear) instead of falling back to cat.
 
-With no talent data, no hit on the character and no enchant, the scores are the same
-as Geared Forever 1.1's.
+### Scoring changes, version 2 (2026-11-15)
+
+Also made by WaR LegenD on **2026-11-15**, marked "WL Helper change (v2)" in `Engine.lua`
+and `Api.lua`. `WLHelperGear.SetOptions({ neutral = true })` turns all of them off.
+
+14. **Proc and use effects** (`PROCS` table in `Engine.lua`): Hand of Justice, Earthstrike,
+    Ironfoe, Flurry Axe, Thrash Blade, Annihilator, Arcanite Champion, Fiery War Axe, Teebu's
+    Blazing Longsword, Barovian Family Sword, Skullforge Reaver, Darkmoon Card: Blue Dragon,
+    The Eye of Divinity, Hazza'rah's Charm of Healing, Talisman of Ascendance and Talisman of
+    Ephemeral Power get their effect as average stats or as a share of melee damage, in
+    `Best` lists and comparisons. Values follow vanilla mechanics, on the low side.
+15. **Use lines read from the tooltip** in `Compare` and `Score` for items not in that table
+    ("Use: Increases attack power by 200 for 20 sec. (2 Min Cooldown)" = amount x duration /
+    cooldown x 0.8). Proc lines that can't be valued are reported ("proc not counted").
+16. **Worn items with no score** (use or proc trinkets) are no longer reported as an empty
+    slot: `Compare` returns `unscored = true` and no percent, or compares against the other
+    ring or trinket slot when that one has a score.
+17. **Proc and percent enchants**: Crusader, Fiery Weapon, Lifestealing, Icy Chill, Iron
+    Counterweight and Biznicks Accurascope on worn items are counted by enchant ID; "+2% hit",
+    "attack speed by 3%" and similar lines become rating (10 hit, 10 haste, 14 crit, 12 dodge,
+    15 parry, 5 block = 1%); scope "+N Damage" counts as weapon damage.
+18. **Set bonuses** in `Compare`: the set (GetItemInfo setID) and its "(N) Set:" lines are read;
+    a bonus the new item completes is added to it, a bonus it breaks is added to what you wear.
+19. **Hit caps split by kind**: below raid level spells cap at 5% and melee at 6%; the raid caps
+    (17% / 8%) apply at level 60 once WoW Forever's raids open (December 9, 2026), or when
+    forced with `SetOptions({ raid = true })` (58+). Before, every 58+ character used raid caps.
+20. **Tank defense cap**: for your own class at 58+, with the defense read from the game
+    (`UnitDefense`, combat rating), defense below the crit-immunity cap (440 at 60) is worth
+    about twice its avoidance value, above it only the avoidance part; item defense is scaled
+    by the rating-to-skill ratio when the client gives one. No reading: upstream's value.
+21. **Bear tanks**: no parry value, and defense counts only miss and dodge.
+22. **Random suffixes**: the same base item with another suffix is no longer reported as the
+    item you wear.
+23. **API**: `Compare` returns `notes` (effects counted, set bonuses, enchant counted),
+    `unscored`, `setGain` and `setLost`; `Score` returns `details.notes`; `Weights` returns
+    `hitCap` and `defense`; new `SetOptions` / `Options`.
+
+### Scoring fixes, version 3 (2026-11-15)
+
+Also made by WaR LegenD on **2026-11-15**, marked "WL Helper change (v3)" in `Engine.lua`
+and `Api.lua`. `SetOptions({ neutral = true })` turns them off as well.
+
+24. **Use lines are not worn stats**: an item read from its link no longer takes the spell
+    power of a "Use:" line ("by up to 175 for 15 sec") as permanent spell power. Talisman
+    of Ephemeral Power counted 175 + 23 spell power; it now counts its 23 average only.
+25. **Cooldowns**: "(1 Min, 30 Sec Cooldown)" is 90 s (was 60 s); French tooltips
+    ("Utiliser :" with a normal or no-break space, "(Recharge : 2 min)", "1 min 30 s") are read.
+26. **Percent lines**: hit needs "chance to hit" or "+N% hit"; "chance on hit" lines are procs,
+    not stats. Spell hit, spell crit and casting speed count only for casters and healers,
+    melee hit, crit and attack speed only for the other specs.
+27. **Set info**: "no set" is remembered only once the item info is loaded, so set bonuses
+    are found for items seen right after login.
+28. **Compare**: `score` now includes `setGain` like `old` includes `setLost`, so
+    `(score - old) / old` is the percent.
+29. **Tanks**: extra-attack procs are worth half their damage share, like haste.
+30. **Defense cap**: the below-cap value (about twice the avoidance value) is a cap-priority
+    heuristic, not a mean-damage derivation. Data.lua defense is skill points and is no longer
+    scaled; only defense rating read from a link is turned into skill points (ratio from the
+    client). To be checked in game.
+31. **Random suffixes**: an item with no link (Data.lua) is compared by ID as before.
+32. **Raid caps**: inside a raid instance (`IsInInstance`) the raid hit caps apply. Outside,
+    the automatic switch still uses a fixed date (December 9, 2026) and the client date; if
+    WoW Forever moves the raid opening, use `SetOptions({ raid = true })`, which is not saved
+    between sessions.
+33. **Speed**: a tooltip not loaded yet is not scanned again for 1 second, and the worn set
+    items are read once per frame instead of once per `Compare` section.
+
+With no talent data, no hit on the character and no enchant, and with
+`SetOptions({ neutral = true })`, the scores are the same as Geared Forever 1.1's.

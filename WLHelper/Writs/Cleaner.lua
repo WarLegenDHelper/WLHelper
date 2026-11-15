@@ -15,30 +15,36 @@ ns.AddEnglish({
     ["Objet rare : à détruire toi-même"] = "Rare item: destroy it yourself",
     ["Quête inconnue dans ton journal : à détruire toi-même"] = "Unknown quest in your log: destroy it yourself",
     ["Pas lié à une quête rendue : à détruire toi-même si tu es sûr"] = "Not tied to a turned-in quest: destroy it yourself if you are sure",
-    ["Objets de quête qu'aucune quête de ton journal ne demande.\nCochés : sans risque. Orange : lis la raison avant de cocher. Gris : objets rares ou sans quête connue, à jeter toi-même depuis tes sacs."] =
-        "Quest items no quest in your log asks for.\nTicked: safe. Orange: read the reason before ticking. Grey: rare items or no known quest, throw them away yourself from your bags.",
-    ["Rien que l'addon puisse détruire"] = "Nothing the addon can destroy",
-    ["Objets de quête inutiles"] = "Useless quest items",
+    ["Sacs"] = "Bags",
+    ["Objets de quête qui ne servent plus"] = "Quest items you no longer need",
+    ["Aucune quête de ton journal n'a besoin de ces objets. Coche ceux à détruire : le jeu en détruit un par clic."] =
+        "No quest in your log needs these items. Tick the ones to destroy: the game destroys one per click.",
+    ["Tes sacs sont propres"] = "Your bags are clean",
+    ["Les objets de quête qui ne servent plus apparaîtront ici."] = "Quest items you no longer need will show up here.",
     ["Quête rendue : %s"] = "Quest turned in: %s",
-    ["Aucune quête ne le demande"] = "No quest asks for it",
     ["Peut servir à une quête suivante"] = "May be needed for a later quest",
-    ["Détruire : %s"] = "Destroy: %s",
-    ["Détruire : %s (1 sur %d)"] = "Destroy: %s (1 of %d)",
-    ["Fermer"] = "Close",
-    ["Sans risque (%d)"] = "Safe (%d)",
-    ["À vérifier (%d)"] = "Check first (%d)",
-    ["À jeter toi-même (%d)"] = "Throw away yourself (%d)",
+    ["Sans risque"] = "Safe",
+    ["À vérifier"] = "Check first",
+    ["À détruire toi-même"] = "Destroy by hand",
     ["Quête déjà rendue"] = "Quest already turned in",
-    ["%s est sur ton curseur. Clique dans le décor (hors des fenêtres), puis sur Oui."] = "%s is on your cursor. Click in the world (outside any window), then Yes.",
+    ["Détruire"] = "Destroy",
+    ["Détruire l'objet coché"] = "Destroy the ticked item",
+    ["Détruire le suivant (%d cochés)"] = "Destroy the next one (%d ticked)",
+    ["Coche au moins un objet."] = "Tick at least one item.",
+    ["Ces objets se détruisent à la main, depuis tes sacs."] = "These items are destroyed by hand, from your bags.",
+    ["Le jeu détruit un objet par clic : %s d'abord."] = "The game destroys one item per click: %s first.",
+    ["Clic : le prendre sur le curseur, puis confirmer dans le décor"] = "Click: put it on the cursor, then confirm in the world",
+    ["Clic : le cocher"] = "Click: tick it",
+    ["Clic : le décocher"] = "Click: untick it",
+    ["À détruire toi-même, depuis tes sacs."] = "Destroy it yourself, from your bags.",
+    ["%s est sur ton curseur. Clique dans le décor, hors des fenêtres, puis confirme."] = "%s is on your cursor. Click in the world, outside any window, then confirm.",
+    ["%s est sur ton curseur : clique dans le décor (hors des fenêtres), puis confirme pour le détruire."] =
+        "%s is on your cursor: click in the world (outside any window), then confirm to destroy it.",
     ["Nettoyer"] = "Clean up",
-    ["1 objet de quête ne sert plus et encombre tes sacs. %s"] = "1 quest item is no longer needed and clutters your bags. %s",
-    ["%d objets de quête ne servent plus et encombrent tes sacs. %s"] = "%d quest items are no longer needed and clutter your bags. %s",
-    ["Rien à jeter : tes sacs sont propres."] = "Nothing to throw away: your bags are clean.",
-    ["impossible en combat."] = "not possible in combat.",
-    ["%d pile(s) détruite(s)."] = "%d stack(s) destroyed.",
-    ["%s détruit."] = "%s destroyed.",
-    ["%s est sur ton curseur : clique dans le monde (hors des fenêtres), puis confirme pour le détruire."] = "%s is on your cursor: click in the world (outside any window), then confirm to destroy it.",
-    ["Coche ce que tu veux détruire"] = "Tick what you want to destroy",
+    ["1 objet de quête ne sert plus et prend une place dans tes sacs. Clique sur %s pour le voir."] =
+        "1 quest item is no longer needed and takes a slot in your bags. Click %s to see it.",
+    ["%d objets de quête ne servent plus et prennent de la place dans tes sacs. Clique sur %s pour les voir."] =
+        "%d quest items are no longer needed and take room in your bags. Click %s to see them.",
     ["À garder : invoque Gahz'rilla au gong de Zul'Farrak (quête « Gahz'rilla »)"] =
         "Keep it: summons Gahz'rilla at the gong in Zul'Farrak (quest \"Gahz'rilla\")",
     ["À garder : se change en Mallet of Zul'Farrak à l'autel de Hakkar"] =
@@ -52,7 +58,6 @@ local C = S.C
 
 local QUEST_CLASS = 12               -- Enum.ItemClass.Questitem
 local MANUAL_QUALITY = 3             -- rare and up: the game asks to type DELETE
-local ROW_H, PAD = 56, 14
 local COIN_POUCHES = { 284583, 284584, 284585, 284586 }
 
 local function safe(f, ...)
@@ -292,7 +297,6 @@ local dirty = true
 local function NumBags() return NUM_BAG_SLOTS or 4 end
 -- 1 safe (checked), 2 check first (amber), 3 throw away yourself (grey)
 local function rank(e) return e.manual and 3 or e.amber and 2 or 1 end
-local RANK_TITLE = { "Sans risque (%d)", "À vérifier (%d)", "À jeter toi-même (%d)" }
 
 local function Scan()
     if not (C_Container and C_Container.GetContainerItemInfo and C_Item and C_Item.GetItemInfoInstant) then
@@ -392,7 +396,7 @@ end
 local Refresh
 local win
 local function Destroy()
-    if InCombatLockdown() then WP.Print(L("impossible en combat.")); return end
+    if InCombatLockdown() then WP.Print(L("Impossible en combat : réessaie une fois le combat fini."), true); return end
     -- Bags or quest log changed since the list was drawn: show the fresh list, destroy nothing.
     if dirty then
         Refresh(true)
@@ -418,10 +422,11 @@ local function Destroy()
         end
     end
     if name then
-        WP.Print(string.format(L("%s est sur ton curseur : clique dans le monde (hors des fenêtres), puis confirme pour le détruire."), name))
+        WP.Print(string.format(L("%s est sur ton curseur : clique dans le décor (hors des fenêtres), puis confirme pour le détruire."), name))
         if win and win.step then
-            win.step:SetText(string.format(L("%s est sur ton curseur. Clique dans le décor (hors des fenêtres), puis sur Oui."), name))
+            win.step:SetText(string.format(L("%s est sur ton curseur. Clique dans le décor, hors des fenêtres, puis confirme."), name), "warn")
             win.step:Show()
+            if win.Fit then win.Fit() end
         end
     end
     dirty = true
@@ -429,18 +434,30 @@ local function Destroy()
 end
 
 -- ---------------------------------------------------------------- window
+-- Sacs (Bags), 420 wide: one sentence, the list grouped by risk under section headers, the step in
+-- progress as a banner, and the one action. The window fits its content (scrolls past 80 % of the
+-- screen height).
 
-local rows, offset = {}, 0
-local heads = {}            -- group titles, a pool of font strings
-local HEAD_H = 24
+local W, INSET = 420, 16
+local LIST_W = W - 2 * INSET
+local rows = {}
+local heads = {}            -- section headers, pooled
+local RANK_TITLE = { "Sans risque", "À vérifier", "À détruire toi-même" }
+
+local function num(v) return type(v) == "number" and not (root.IsSecret and root.IsSecret(v)) and v or nil end
+
+-- The entry Destroy picks up next: the first checked one.
+local function FirstChecked()
+    for _, e in ipairs(entries) do if IsChecked(e) then return e end end
+end
 
 local function Paint(row, e)
     local on = IsChecked(e)
     row.box:SetShown(not e.manual)
-    row.fill:SetColorTexture(C.brand[1], C.brand[2], C.brand[3], on and 1 or 0)
-    row.boxBorder(on and C.brand or { 0.353, 0.373, 0.400 })
+    row.boxFill:SetAlpha(on and 1 or 0)
+    row.boxBorder(on and C.accent or C.btnEdge, on and 1 or nil)
     row.check:SetShown(on)
-    row.icon:SetTexture(S.ItemIcon(e.id))
+    S.Painted(row.icon, S.ItemIcon(e.id))
     row.icon:SetDesaturated(e.manual and true or false)
     local q = S.QualityColor(e.id)
     if e.quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[e.quality] then
@@ -448,72 +465,90 @@ local function Paint(row, e)
     end
     row.name:SetText((e.name or "?") .. (e.count > 1 and (" x" .. e.count) or ""))
     row.name:SetTextColor(q[1], q[2], q[3])
-    local rc = (e.amber or e.keep) and C.warn or e.manual and C.muted or C.dim
+    local rc = e.amber and C.warn or C.muted
     row.reason:SetText(e.reason or "")
     row.reason:SetTextColor(rc[1], rc[2], rc[3])
+    -- the row the next click destroys carries the selection fill
+    row.sel:SetShown(FirstChecked() == e)
+end
+
+-- Measured row: name (12, wraps to 2 lines) and reason (11, wraps to 2 lines) right of the icon.
+local function FitRow(row)
+    local textW = LIST_W - 60 - 12
+    local h = 6 + S.FitText(row.name, 2, textW, row)
+    h = math.max(h, 6 + S.F.label + 2)
+    row.reason:ClearAllPoints(); row.reason:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
+    local rh = S.FitText(row.reason, 2, textW, row)
+    h = h + 3 + math.max(rh, S.F.meta + 2) + 8
+    h = math.max(36, math.ceil(h))
+    row:SetHeight(h)
+    return h
 end
 
 local function MakeRow(parent)
     local row = CreateFrame("Button", nil, parent)
-    row:SetHeight(ROW_H)
-    local hl = S.Solid(row, "BACKGROUND", C.hover, 0)
-    hl:SetAllPoints()
-    local line = S.Solid(row, "BORDER", C.divider)
-    line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); line:SetHeight(1)
+    row.wlOwned = true
+    row:SetHeight(44)
+    row.bg = S.Solid(row, "BACKGROUND", C.cardFill); row.bg:SetAllPoints()
+    row.sel = S.Solid(row, "BACKGROUND", C.selFill); row.sel:SetAllPoints(); row.sel:Hide()
+    row.hl = S.Solid(row, "BORDER", C.hoverFill); row.hl:SetAllPoints(); row.hl:SetAlpha(0)
+    row.press = S.Solid(row, "BORDER", C.pressFill); row.press:SetAllPoints(); row.press:Hide()
 
+    -- the tick box: 16 px, 1 px edge; ticked: accent fill and the HD check
     row.box = CreateFrame("Frame", nil, row)
-    row.box:SetSize(16, 16); row.box:SetPoint("LEFT", 0, 0)
-    row.fill = S.Solid(row.box, "BACKGROUND", C.brand, 0)
-    row.fill:SetAllPoints()
-    row.boxBorder = S.Border(row.box, C.border)
-    row.check = S.Glyph(row.box, "check", 10, { 1, 1, 1 })   -- a drawn white tick
+    row.box:SetSize(16, 16); row.box:SetPoint("TOPLEFT", 8, -8)
+    row.boxFill = S.Solid(row.box, "BACKGROUND", C.accent); row.boxFill:SetAllPoints(); row.boxFill:SetAlpha(0)
+    row.boxBorder = S.Border(row.box, C.btnEdge)
+    row.check = S.Icon(row.box, "check", 14, "ARTWORK", C.fg)
     row.check:SetPoint("CENTER")
 
-    local iconHolder = CreateFrame("Frame", nil, row)
-    iconHolder:SetSize(22, 22); iconHolder:SetPoint("LEFT", 26, 0)
-    row.icon = iconHolder:CreateTexture(nil, "ARTWORK")
-    row.icon:SetPoint("TOPLEFT", 1, -1); row.icon:SetPoint("BOTTOMRIGHT", -1, 1)
-    row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    S.Border(iconHolder, { 0.314, 0.337, 0.365 })
+    local holder = CreateFrame("Frame", nil, row)
+    holder:SetSize(20, 20); holder:SetPoint("TOPLEFT", 32, -6)
+    row.icon = holder:CreateTexture(nil, "ARTWORK"); row.icon:SetAllPoints()
+    S.Border(holder, C.cardEdge)
 
-    row.name = S.Text(row, 15, C.text)
-    row.name:SetPoint("TOPLEFT", 58, -7); row.name:SetPoint("TOPRIGHT", -4, -7)
-    row.name:SetJustifyH("LEFT")
-    row.reason = S.Text(row, 13, C.dim)
-    row.reason:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3); row.reason:SetPoint("RIGHT", -4, 0)
+    row.name = S.Text(row, S.F.label, C.fg)
+    row.name:SetPoint("TOPLEFT", 60, -6)
+    row.name:SetJustifyH("LEFT"); row.name:SetJustifyV("TOP")
+    row.reason = S.Text(row, S.F.meta, C.muted)
     row.reason:SetJustifyH("LEFT"); row.reason:SetJustifyV("TOP")
-    -- the reason may take two lines: never cut with "..."
-    row.reason:SetWordWrap(true); if row.reason.SetMaxLines then row.reason:SetMaxLines(2) end
 
     row:SetScript("OnEnter", function(self)
-        hl:SetColorTexture(C.hover[1], C.hover[2], C.hover[3], 1)
-        local s = self.entry and self.entry.slots[1]
+        root.Tween(self, self.hov or 0, 1, 0.10, function(v) self.hov = v; self.hl:SetAlpha(v) end)
+        local e = self.entry
+        local s = e and e.slots[1]
         if s then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             safe(GameTooltip.SetBagItem, GameTooltip, s[1], s[2])
+            local c = C.accentSoft
+            if e.manual then
+                GameTooltip:AddLine(L("À détruire toi-même, depuis tes sacs."), C.warn[1], C.warn[2], C.warn[3], true)
+            else
+                GameTooltip:AddLine(IsChecked(e) and L("Clic : le décocher") or L("Clic : le cocher"), c[1], c[2], c[3], true)
+            end
             GameTooltip:Show()
         end
     end)
-    row:SetScript("OnLeave", function() hl:SetColorTexture(C.hover[1], C.hover[2], C.hover[3], 0); GameTooltip:Hide() end)
+    row:SetScript("OnLeave", function(self)
+        root.Tween(self, self.hov or 0, 0, 0.10, function(v) self.hov = v; self.hl:SetAlpha(v) end)
+        GameTooltip:Hide()
+    end)
+    row:SetScript("OnMouseDown", function(self) if self.entry and not self.entry.manual then self.press:Show() end end)
+    row:SetScript("OnMouseUp", function(self) self.press:Hide() end)
     row:SetScript("OnClick", function(self)
         local e = self.entry
         if not e or e.manual then return end
         userChecked[e.id] = not IsChecked(e)
-        Paint(self, e)
+        for _, r in ipairs(rows) do if r:IsShown() and r.entry then Paint(r, r.entry) end end
         win.UpdateFooter()
     end)
     return row
 end
 
-local function Layout()
-    local viewH = win.list:GetHeight()
-    local h = win.contentH or #entries * ROW_H
-    local maxOff = math.max(0, h - viewH)
-    offset = math.max(0, math.min(offset, maxOff))
-    win.content:ClearAllPoints()
-    win.content:SetPoint("TOPLEFT", 0, offset)
-    win.content:SetPoint("TOPRIGHT", 0, offset)
-    win.content:SetHeight(math.max(1, h))
+local function CheckedCount()
+    local n = 0
+    for _, e in ipairs(entries) do if IsChecked(e) then n = n + 1 end end
+    return n
 end
 
 Refresh = function(rescan)
@@ -524,120 +559,118 @@ Refresh = function(rescan)
     if kind ~= "item" and win.step then win.step:Hide() end
     local count = { 0, 0, 0 }
     for _, e in ipairs(entries) do count[rank(e)] = count[rank(e)] + 1 end
+    local child = win.list.child
     local y, lastRank, k = 0, nil, 0
     for i, e in ipairs(entries) do
         local r = rank(e)
         if r ~= lastRank then
-            -- a title above each group: "Safe (3)", "Check first (1)"...
+            -- a section header above each group: "Sans risque 3", "À vérifier 1"...
             lastRank, k = r, k + 1
             local h = heads[k]
-            if not h then
-                h = S.Text(win.content, 13, C.muted)
-                h:SetJustifyH("LEFT")
-                heads[k] = h
-            end
+            if not h then h = S.SectionHeader(child, ""); heads[k] = h end
+            if k > 1 then y = y + 8 end
             h:ClearAllPoints()
-            h:SetPoint("TOPLEFT", 0, -y - 6)
-            h:SetText(string.format(L(RANK_TITLE[r]), count[r]))
+            h:SetPoint("TOPLEFT", 0, -y); h:SetPoint("TOPRIGHT", 0, -y)
+            h:Set(L(RANK_TITLE[r]), count[r])
             h:Show()
-            y = y + HEAD_H
+            y = y + 32 + 4
         end
         local row = rows[i]
-        if not row then
-            row = MakeRow(win.content)
-            rows[i] = row
-        end
+        if not row then row = MakeRow(child); rows[i] = row end
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", 0, -y)
-        row:SetPoint("TOPRIGHT", 0, -y)
-        y = y + ROW_H
+        row:SetPoint("TOPLEFT", 0, -y); row:SetPoint("TOPRIGHT", 0, -y)
         row.entry = e
         Paint(row, e)
         row:Show()
+        y = y + FitRow(row) + 2
     end
     for i = #entries + 1, #rows do rows[i]:Hide(); rows[i].entry = nil end
     for i = k + 1, #heads do heads[i]:Hide() end
-    win.contentH = y
+    win.listH = y
+    win.list:SetShown(#entries > 0)
     win.empty:SetShown(#entries == 0)
-    Layout()
     win.UpdateFooter()
-end
-
-local function CheckedCount()
-    local n = 0
-    for _, e in ipairs(entries) do if IsChecked(e) then n = n + 1 end end
-    return n
+    win.Fit()
 end
 
 local function Build()
-    win = S.Window("WLHelperCleaner", 460, 500, L("Objets de quête inutiles"), nil, WLWritsDB, "cleanerPos")
+    win = S.Window("WLHelperCleaner", W, 300, L("Sacs"), L("Objets de quête qui ne servent plus"), WLWritsDB, "cleanerPos",
+        { header = S.HEADER_H, minH = 160 })
+    local top = win:ContentTop() + 12
 
-    local intro = S.Text(win, 14, C.dim)
-    intro:SetWordWrap(true)
-    intro:SetJustifyH("LEFT"); intro:SetJustifyV("TOP")
-    intro:SetPoint("TOPLEFT", PAD, -38 - PAD)
-    intro:SetWidth(460 - 2 * PAD)
-    intro:SetText(L("Objets de quête qu'aucune quête de ton journal ne demande.\nCochés : sans risque. Orange : lis la raison avant de cocher. Gris : objets rares ou sans quête connue, à jeter toi-même depuis tes sacs."))
+    win.intro = S.Text(win, S.F.body, C.text)
+    win.intro:SetPoint("TOPLEFT", INSET, -top)
+    win.intro:SetJustifyH("LEFT"); win.intro:SetJustifyV("TOP")
+    win.intro:SetText(L("Aucune quête de ton journal n'a besoin de ces objets. Coche ceux à détruire : le jeu en détruit un par clic."))
 
-    local footer = CreateFrame("Frame", nil, win)
-    footer:SetPoint("BOTTOMLEFT", 1, 1); footer:SetPoint("BOTTOMRIGHT", -1, 1); footer:SetHeight(84)
-    local fline = S.Solid(footer, "BORDER", C.divider)
-    fline:SetPoint("TOPLEFT"); fline:SetPoint("TOPRIGHT"); fline:SetHeight(1)
+    win.list = S.ScrollArea(win)
+    win.empty = S.EmptyState(win, "bag", L("Tes sacs sont propres"),
+        L("Les objets de quête qui ne servent plus apparaîtront ici."))
+    win.empty:ClearAllPoints(); win.empty:SetPoint("TOP", win, "TOP", 0, -(top + 12))
+    win.empty:Hide()
 
-    local cancelW = 90
-    local cancel = S.Button(footer, L("Fermer"), cancelW, 36, "secondary", function() win:Hide() end)
-    cancel:SetPoint("TOPRIGHT", -(PAD - 1), -12)
-    local destroy = S.Button(footer, "", 460 - 2 * PAD - 8 - cancelW, 36, "primary", Destroy)
-    destroy:SetPoint("TOPLEFT", PAD - 1, -12)
-    -- a long item name is cut instead of overflowing the button
-    destroy.label:SetWordWrap(false)
-    destroy.label:SetWidth(460 - 2 * PAD - 8 - cancelW - 16)
-
-    -- the step in progress, under the buttons: what to do with the item on the cursor
-    win.step = S.Text(footer, 13, C.warn)
-    win.step:SetPoint("BOTTOMLEFT", PAD, 8)
-    win.step:SetWidth(460 - 2 * PAD)
-    win.step:SetJustifyH("LEFT")
-    win.step:SetWordWrap(true)
+    -- the step in progress (an item on the cursor): a warning banner above the button
+    win.step = S.Banner(win, "warn", "")
     win.step:Hide()
+
+    -- destructive, so never primary: the danger button with the trash icon; the game's own box
+    -- asks for the confirmation once the stack is on the cursor
+    local destroy = S.Button(win, "", 0, 32, "danger", Destroy, function()
+        local first = FirstChecked()
+        if not first then return nil end
+        return { win.destroy:GetText(), string.format(L("Le jeu détruit un objet par clic : %s d'abord."), first.name or "?"),
+            L("Clic : le prendre sur le curseur, puis confirmer dans le décor") }
+    end)
+    destroy:SetIcon("trash")
+    win.destroy = destroy
+
+    function win.Fit()
+        local introH = S.FitText(win.intro, 0, LIST_W, win)
+        if introH < S.F.body then introH = S.F.body + 2 end
+        local listTop = top + introH + 12
+        local bottom = 12 + 32
+        local stepH = 0
+        if win.step:IsShown() then stepH = win.step:Fit(LIST_W) end
+        local content
+        if #entries == 0 then
+            win.intro:Hide()
+            content = win.empty:Fit() + 12
+            destroy:Hide()
+            win.step:Hide()
+            win:FitHeight(content)
+            return
+        end
+        win.intro:Show(); destroy:Show()
+        content = introH + 12 + (win.listH or 0) + 12 + (stepH > 0 and (stepH + 8) or 0) + 32
+        win:FitHeight(content)
+        -- the list takes what is left between the sentence and the bottom row (scrolls when capped)
+        if stepH > 0 then
+            win.step:ClearAllPoints()
+            win.step:SetPoint("BOTTOMLEFT", INSET, bottom + 8); win.step:SetPoint("BOTTOMRIGHT", -INSET, bottom + 8)
+            bottom = bottom + 8 + stepH
+        end
+        win.list:ClearAllPoints()
+        win.list:SetPoint("TOPLEFT", INSET, -listTop)
+        win.list:SetPoint("BOTTOMRIGHT", -INSET, bottom + 12)
+        win.list.child:SetWidth(LIST_W)
+        win.list:SetContentHeight(win.listH or 0)
+        destroy:ClearAllPoints(); destroy:SetPoint("BOTTOMLEFT", INSET, 12)
+    end
 
     function win.UpdateFooter()
         local n = CheckedCount()
-        -- the first checked entry is the one Destroy picks up: name it
-        local first
-        for _, e in ipairs(entries) do if IsChecked(e) then first = e.name or "?"; break end end
-        if n == 0 then destroy.label:SetText(L("Coche ce que tu veux détruire"))
-        elseif n == 1 then destroy.label:SetText(string.format(L("Détruire : %s"), first))
-        else destroy.label:SetText(string.format(L("Détruire : %s (1 sur %d)"), first, n)) end
-        destroy:SetEnabled(n > 0)
-        -- only greyed items: nothing to tick, say it instead of "tick what you want"
+        if n == 0 then destroy:SetText(L("Détruire"))
+        elseif n == 1 then destroy:SetText(L("Détruire l'objet coché"))
+        else destroy:SetText(string.format(L("Détruire le suivant (%d cochés)"), n)) end
         local any = false
         for _, e in ipairs(entries) do if not e.manual then any = true end end
-        if n == 0 and not any and #entries > 0 then destroy.label:SetText(L("Rien que l'addon puisse détruire")) end
-        destroy.Paint(false)
+        destroy:SetDisabledReason((not any and #entries > 0) and L("Ces objets se détruisent à la main, depuis tes sacs.")
+            or L("Coche au moins un objet."))
+        destroy:SetEnabled(n > 0)
+        destroy.Paint()
     end
 
-    -- Clipped list, scrolled one row per wheel tick.
-    local list = CreateFrame("Frame", nil, win)
-    list:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -PAD)
-    list:SetPoint("RIGHT", win, "RIGHT", -PAD, 0)
-    list:SetPoint("BOTTOM", footer, "TOP", 0, 0)
-    list:SetClipsChildren(true)
-    list:EnableMouseWheel(true)
-    list:SetScript("OnMouseWheel", function(_, delta)
-        offset = offset - delta * ROW_H
-        Layout()
-    end)
-    list:SetScript("OnSizeChanged", function() if win:IsShown() then Layout() end end)
-    win.list = list
-    win.content = CreateFrame("Frame", nil, list)
-
-    win.empty = S.Text(list, 14, C.dim)
-    win.empty:SetPoint("CENTER", 0, 10)
-    win.empty:SetText(L("Rien à jeter : tes sacs sont propres."))
-    win.empty:Hide()
-
-    win:SetScript("OnShow", function() offset = 0; win.step:Hide(); Refresh(true) end)
+    win:SetScript("OnShow", function() win.list:ScrollTo(0, true); win.step:Hide(); Refresh(true) end)
 end
 
 -- ---------------------------------------------------------------- events
@@ -653,11 +686,11 @@ local function Announce(force)
     if n == 0 then lastAnnounced = 0; return end
     if not force and n == lastAnnounced then return end
     lastAnnounced = n
-    local link = "|cff6fdc8c|H" .. CLEAN_LINK .. "|h[" .. L("Nettoyer") .. "]|h|r"
+    local link = S.Hex(C.accentSoft) .. "|H" .. CLEAN_LINK .. "|h[" .. L("Nettoyer") .. "]|h|r"
     if n == 1 then
-        WP.Print(string.format(L("1 objet de quête ne sert plus et encombre tes sacs. %s"), link))
+        WP.Print(string.format(L("1 objet de quête ne sert plus et prend une place dans tes sacs. Clique sur %s pour le voir."), link), true)
     else
-        WP.Print(string.format(L("%d objets de quête ne servent plus et encombrent tes sacs. %s"), n, link))
+        WP.Print(string.format(L("%d objets de quête ne servent plus et prennent de la place dans tes sacs. Clique sur %s pour les voir."), n, link), true)
     end
 end
 

@@ -15,6 +15,47 @@ local L = ns.L
 local GPS = {}
 WP.GPS = GPS
 
+ns.AddEnglish({
+    ["Va au maître de vol de %s"] = "Go to the flight master at %s",
+    ["Va au bateau pour %s"] = "Go to the boat to %s",
+    ["Va au zeppelin pour %s"] = "Go to the zeppelin to %s",
+    ["Rejoins %s"] = "Go to %s",
+    ["Prends le vol pour %s"] = "Take the flight to %s",
+    ["Prends le bateau pour %s"] = "Take the boat to %s",
+    ["Prends le zeppelin pour %s"] = "Take the zeppelin to %s",
+    ["Téléportation : %s"] = "Teleport: %s",
+    ["Puis le maître de vol de %s"] = "Then the flight master at %s",
+    ["Puis le bateau pour %s"] = "Then the boat to %s",
+    ["Puis le zeppelin pour %s"] = "Then the zeppelin to %s",
+    ["Puis le vol pour %s"] = "Then the flight to %s",
+    ["Puis la téléportation : %s"] = "Then teleport: %s",
+    ["Puis %s"] = "Then %s",
+    ["Lieu de remise inconnu pour %s : ouvre l'enveloppe pour voir sa quête."] = "Turn-in spot unknown for %s: open the envelope to see its quest.",
+    ["Impossible de guider vers ce point : la carte de cette zone n'est pas lisible."] = "Can't guide you there: this zone's map can't be read.",
+    ["Le GPS ne connaît pas encore tes points de vol : parle à un maître de vol pour qu'il les apprenne."] =
+        "The GPS doesn't know your flight paths yet: talk to a flight master so it can learn them.",
+    ["Tournée GPS terminée : plus aucun writ prêt à rendre."] = "GPS tour finished: no writ left to turn in.",
+    ["GPS : en route vers %s (%s %.0f, %.0f) pour rendre %s."] = "GPS: on the way to %s (%s %.0f, %.0f) to turn in %s.",
+    ["le lieu de remise"] = "the turn-in spot",
+    ["C'est le dernier writ à rendre."] = "It's the last writ to turn in.",
+    ["%d writs à rendre en tout."] = "%d writs to turn in altogether.",
+    ["Ouvre son enveloppe avant d'arriver."] = "Open its envelope before you get there.",
+})
+
+-- "Brackenwall Village, Dustwallow Marsh" -> "Brackenwall Village": the place without its zone, for
+-- the lines that must stay short (the full name stays in the arrow's tooltip).
+function GPS.ShortPlace(name)
+    if type(name) ~= "string" then return name or "?" end
+    return name:match("^(.-),%s") or name
+end
+-- First letter in capital (also an accented one), for a name that starts a line.
+local function UpperFirst(s)
+    if type(s) ~= "string" or s == "" then return s or "" end
+    if s:sub(1, 2) == "\195\169" then return "\195\137" .. s:sub(3) end
+    return (s:gsub("^%l", string.upper))
+end
+GPS.UpperFirst = UpperFirst
+
 -- Zeppelins and boats: both ends (uiMapID, x, y in percent), what it is, who may take it.
 local LINKS = {
     { a = { 1420, 60.70, 58.76 }, b = { 1411, 50.82, 13.81 }, mode = "zeppelin", side = "Horde", nameA = "Undercity", nameB = "Orgrimmar" },
@@ -280,21 +321,46 @@ end
 
 local state = {}   -- dest, source, legs, eta, plannedAt
 
-function GPS.Describe(leg)
+-- One leg in words ("Prends le vol pour Brackenwall Village"). full: keep the zone after a flight
+-- master's name (for the tooltip); the arrow's lines use the short place.
+function GPS.Describe(leg, full)
     if not leg then return "" end
     local to = leg.to
+    local function P(n) return full and (n or "?") or GPS.ShortPlace(n) end
     if leg.kind == "ride" then
-        if to.kind == "taxi" then return string.format(L("Maître de vol, %s"), to.name) end
+        if to.kind == "taxi" then return string.format(L("Va au maître de vol de %s"), P(to.name)) end
         if to.kind == "dock" then
-            return string.format(to.link.mode == "boat" and L("Bateau pour %s") or L("Zeppelin pour %s"), to.other.name)
+            return string.format(to.link.mode == "boat" and L("Va au bateau pour %s") or L("Va au zeppelin pour %s"), P(to.other.name))
         end
-        return to.name or "?"
+        return string.format(L("Rejoins %s"), UpperFirst(to.name or "?"))
     elseif leg.kind == "fly" then
-        return string.format(L("Prends le vol pour %s"), to.name)
+        return string.format(L("Prends le vol pour %s"), P(to.name))
     elseif leg.kind == "link" then
-        return string.format(leg.from.link.mode == "boat" and L("Prends le bateau pour %s") or L("Prends le zeppelin pour %s"), to.name)
+        return string.format(leg.from.link.mode == "boat" and L("Prends le bateau pour %s") or L("Prends le zeppelin pour %s"), P(to.name))
     elseif leg.kind == "teleport" then
-        return string.format(L("Téléportation : %s"), to.name)
+        return string.format(L("Téléportation : %s"), P(to.name))
+    end
+    return ""
+end
+
+-- The leg after the current one, as a line of its own: "Puis Tabetha", "Puis le vol pour Ratchet".
+-- Names keep their capital letter.
+function GPS.DescribeNext(leg)
+    if not leg then return "" end
+    local to = leg.to
+    local P = GPS.ShortPlace
+    if leg.kind == "ride" then
+        if to.kind == "taxi" then return string.format(L("Puis le maître de vol de %s"), P(to.name)) end
+        if to.kind == "dock" then
+            return string.format(to.link.mode == "boat" and L("Puis le bateau pour %s") or L("Puis le zeppelin pour %s"), P(to.other.name))
+        end
+        return string.format(L("Puis %s"), UpperFirst(to.name or "?"))
+    elseif leg.kind == "fly" then
+        return string.format(L("Puis le vol pour %s"), P(to.name))
+    elseif leg.kind == "link" then
+        return string.format(leg.from.link.mode == "boat" and L("Puis le bateau pour %s") or L("Puis le zeppelin pour %s"), P(to.name))
+    elseif leg.kind == "teleport" then
+        return string.format(L("Puis la téléportation : %s"), P(to.name))
     end
     return ""
 end
@@ -374,12 +440,12 @@ end
 -- Guides you to a writ's turn-in spot (the Comptoir).
 function GPS.Go(w)
     if not (w and w.map) then
-        if w then WP.Print(L("lieu de remise inconnu pour ") .. WP.ItemName(w.writ, w.writName)) end
+        if w then WP.Print(string.format(L("Lieu de remise inconnu pour %s : ouvre l'enveloppe pour voir sa quête."), WP.ItemName(w.writ, w.writName))) end
         return
     end
     local dest = Point(w.map, w.x, w.y, { kind = "dest", name = w.npcName or WP.ItemName(w.item, w.itemName), writ = w })
     if not dest then
-        WP.Print(L("impossible de poser un point sur cette carte."))
+        WP.Print(L("Impossible de guider vers ce point : la carte de cette zone n'est pas lisible."))
         return
     end
     Start(dest, "writs")
@@ -388,7 +454,7 @@ function GPS.Go(w)
         -- remembered so GPS.Stop clears this pin (and not one the player placed since)
         state.pin = { map = w.map, x = w.x / 100, y = w.y / 100 }
     end
-    if GPS.KnownFlights() == 0 then WP.Print(L("ouvre une carte de vol une fois : le GPS apprendra tes points de vol.")) end
+    if GPS.KnownFlights() == 0 then WP.Print(L("Le GPS ne connaît pas encore tes points de vol : parle à un maître de vol pour qu'il les apprenne.")) end
 end
 
 -- Guides you to any point (the dungeon guide's steps): map, x, y in percent, a label. The same point
@@ -614,15 +680,17 @@ function WP.GoNext()
     if not stop then
         WLWritsCharDB.gps = false
         GPS.Stop("writs")
-        WP.Print(L("GPS : aucun writ prêt à rendre, tournée terminée."))
+        WP.Print(L("Tournée GPS terminée : plus aucun writ prêt à rendre."))
         if WP.OnGPSChanged then WP.OnGPSChanged() end
         return
     end
     local w = stop.w
     GPS.Go(w)
-    WP.Print(string.format(L("GPS : %s, %s %.0f %.0f%s (%d à rendre)%s"), WP.ItemName(w.item, w.itemName),
-        WP.ZoneName(w.map), w.x, w.y, w.npcName and (" - " .. w.npcName) or "", count,
-        stop.state == "bag" and L(" · ouvre l'enveloppe d'abord") or ""))
+    local msg = string.format(L("GPS : en route vers %s (%s %.0f, %.0f) pour rendre %s."), w.npcName or L("le lieu de remise"),
+        WP.ZoneName(w.map), w.x, w.y, WP.ItemName(w.item, w.itemName))
+    msg = msg .. " " .. (count == 1 and L("C'est le dernier writ à rendre.") or string.format(L("%d writs à rendre en tout."), count))
+    if stop.state == "bag" then msg = msg .. " " .. L("Ouvre son enveloppe avant d'arriver.") end
+    WP.Print(msg)
 end
 
 function WP.ToggleGPS()

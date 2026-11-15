@@ -15,7 +15,13 @@ local S = {}
 WP.Scan = S
 
 ns.AddEnglish({
-    ["%s : plus en vente, je passe au suivant."] = "%s: no longer for sale, moving on.",
+    ["%s n'est plus en vente : on passe à l'objet suivant."] = "%s is no longer for sale: moving on to the next item.",
+    ["Scan terminé : %d objets, dont %d en vente."] = "Scan finished: %d items, %d of them for sale.",
+    ["Scan terminé : 1 objet, %d en vente."] = "Scan finished: 1 item, %d for sale.",
+    ["Un scan est déjà en cours : attends qu'il finisse ou arrête-le."] = "A scan is already running: wait for it to finish or stop it.",
+    ["L'hôtel des ventes est fermé : parle à un commissaire-priseur, puis recommence."] = "The auction house is closed: talk to an auctioneer, then try again.",
+    ["Le scan de l'HV n'est pas disponible sur ce client."] = "The AH scan is not available on this client.",
+    ["Rien à scanner."] = "Nothing to scan.",
 })
 
 local BATCH = 20      -- item keys per request
@@ -71,7 +77,10 @@ local function Finish()
     state = nil
     Changed()
     if WP.RefreshSoon then WP.RefreshSoon() end
-    if st then WP.Print(string.format(L("scan terminé : %d objets, %d en vente."), st.total, st.listed)) end
+    if st then
+        WP.Print(st.total == 1 and string.format(L("Scan terminé : 1 objet, %d en vente."), st.listed)
+            or string.format(L("Scan terminé : %d objets, dont %d en vente."), st.total, st.listed))
+    end
 end
 
 local SendNext
@@ -159,14 +168,14 @@ end
 
 -- Scans the given item IDs (duplicates removed). The auction house must be open.
 function S.Start(ids)
-    if state then WP.Print(L("un scan est déjà en cours.")); return end
-    if not WP.AuctionHouseOpen() then WP.Print(L("ouvre l'hôtel des ventes d'abord.")); return end
-    if not Available() then WP.Print(L("le scan n'est pas disponible sur ce client.")); return end
+    if state then WP.Print(L("Un scan est déjà en cours : attends qu'il finisse ou arrête-le."), true); return end
+    if not WP.AuctionHouseOpen() then WP.Print(L("L'hôtel des ventes est fermé : parle à un commissaire-priseur, puis recommence."), true); return end
+    if not Available() then WP.Print(L("Le scan de l'HV n'est pas disponible sur ce client."), true); return end
     local queue, seen = {}, {}
     for _, id in ipairs(ids) do
         if id and not seen[id] then seen[id] = true; queue[#queue + 1] = id end
     end
-    if #queue == 0 then WP.Print(L("rien à chercher.")); return end
+    if #queue == 0 then WP.Print(L("Rien à scanner."), true); return end
     state = { queue = queue, pos = 1, total = #queue, done = 0, listed = 0 }
     Changed()
     SendNext()
@@ -200,7 +209,7 @@ OpenNext = function(item)
     if not item then queueTotal, queuePos = 0, 0; QueueChanged(); return end
     local _, q, age = S.Get(item.id)
     if q == 0 and age and age < 1800 then
-        WP.Print(string.format(L("%s : plus en vente, je passe au suivant."), WP.ItemName(item.id) or "?"))
+        WP.Print(string.format(L("%s n'est plus en vente : on passe à l'objet suivant."), WP.ItemName(item.id) or "?"))
         queuePos = queuePos + 1
         local nxt = table.remove(queue, 1)
         if not nxt then queueTotal, queuePos = 0, 0 end
@@ -250,7 +259,7 @@ end)
 function S.OpenToBuy(id, quantity)
     local ah = AuctionHouseFrame
     if not (ah and ah:IsShown() and ah.SelectBrowseResult and api and api.MakeItemKey) then
-        WP.Print(L("ouvre l'hôtel des ventes d'abord."))
+        WP.Print(L("L'hôtel des ventes est fermé : parle à un commissaire-priseur, puis recommence."), true)
         return
     end
     local ok, key = pcall(api.MakeItemKey, id)

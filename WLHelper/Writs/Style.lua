@@ -1,48 +1,50 @@
--- Writs/Style.lua: WL Helper's look, shared by the Comptoir, the GPS arrow, the options and the bag
--- cleaner. War Legend colours (red #CE1918 for actions), fixed colour meanings, and the widgets
--- every screen is built from. Text goes through the guide's theme (Theme.lua) so fonts follow it.
+-- Writs/Style.lua: WL Helper's components, shared by every window (the Writs modules, the home page,
+-- the options, the GPS, and the guide through root.S). The tokens, the HD icons, the pixel borders,
+-- the text helpers and the tooltip live in Theme.lua; here are the widgets built from them:
+-- window, tabs, buttons, segmented, switch, input, card, list row, section header, empty state,
+-- banner, toast, pill, counter, dropdown. Colours come only from the token table (S.C = root.Tok).
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
 
 local S = {}
 ns.S = S
+root.S = S      -- the guide (UI.lua, Picker.lua, Journal.lua, Nav.lua) uses the same components
+root.UI = S
 
--- ---------------------------------------------------------------- tokens
--- One meaning per colour: brand = action; ready = done / ready; warn = something to do;
--- info = an alternative (teleport, an item you craft); danger = blocked.
-S.C = {
-    bg      = { 0.051, 0.055, 0.063, 0.97 },
-    header  = { 0.031, 0.035, 0.043, 0.98 },
-    card    = { 0.082, 0.090, 0.102, 1 },
-    border  = { 0.141, 0.153, 0.173, 1 },
-    divider = { 0.110, 0.122, 0.137, 1 },
-    hover   = { 0.102, 0.114, 0.129, 1 },
-    text    = { 0.925, 0.925, 0.937 },
-    dim     = { 0.627, 0.651, 0.682 },
-    muted   = { 0.553, 0.576, 0.608 },
-    brand   = { 0.808, 0.098, 0.094 },
-    brandHi = { 0.886, 0.188, 0.165 },
-    brandBg = { 0.165, 0.071, 0.075 },
-    brandSoft = { 1, 0.561, 0.525 },
-    ready   = { 0.435, 0.863, 0.549 },
-    warn    = { 0.949, 0.757, 0.306 },
-    info    = { 0.486, 0.769, 1 },
-    danger  = { 0.886, 0.322, 0.290 },
-}
-S.LOGO = "Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64"
+local T = root.Tok
+S.C = T
+S.F = root.F
+S.SP = root.SP
+S.LOGO = root.LOGO
+S.Hex = root.Hex
+S.State = root.State
+S.Tween = root.Tween
+S.HEADER_H = 44          -- the header of the design system
+S.LEGACY_HEADER_H = 38   -- windows that still place their content under a 38 px header
+S.TABS_H = 32
+S.FOOTER_H = 24
+S.windows = root.windows
 
-function S.Hex(c)
-    local function b(v) return math.floor(math.max(0, math.min(1, v)) * 255 + 0.5) end
-    return string.format("|cff%02x%02x%02x", b(c[1]), b(c[2]), b(c[3]))
-end
+local function L(s) return ns.L and ns.L(s) or s end
+local function secret(v) return root.IsSecret and root.IsSecret(v) end
+local function num(v) return type(v) == "number" and not secret(v) and v or nil end
 
 -- ---------------------------------------------------------------- primitives
 
+-- S.Text(parent, size, color, bold): wraps to 2 lines by default (the container grows with it).
+-- fs:SetWordWrap(true) makes it a paragraph (no line limit); fs:SetWordWrap(false) a single line
+-- (use S.ClampLabel then, so the full text is in the tooltip).
 function S.Text(parent, size, color, bold)
-    local fs = root.Text and root.Text(parent, size, color or S.C.text, bold) or parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local fs = root.Text(parent, size, color or T.text, bold)
     fs:SetJustifyV("MIDDLE")
-    fs:SetWordWrap(false)
+    fs:SetWordWrap(true)
+    if fs.SetMaxLines then fs:SetMaxLines(2) end
+    local wrap = fs.SetWordWrap
+    fs.SetWordWrap = function(self, on)
+        wrap(self, on)
+        if on and self.SetMaxLines then self:SetMaxLines(0) end
+    end
     return fs
 end
 
@@ -52,22 +54,23 @@ function S.Solid(parent, layer, c, a)
     return t
 end
 
--- One-pixel border; returns a setter for its colour.
+-- One physical pixel border; returns a setter setter(color, alpha).
 function S.Border(frame, c, a)
-    local edges = {}
-    for i, p in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" }, { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
-        local t = S.Solid(frame, "BORDER", c, a)
-        t:SetPoint(p[1]); t:SetPoint(p[2])
-        if i <= 2 then t:SetHeight(1) else t:SetWidth(1) end
-        edges[i] = t
-    end
-    return function(c2, a2) for _, t in ipairs(edges) do t:SetColorTexture(c2[1], c2[2], c2[3], a2 or 1) end end
+    local set = root.Outline(frame, c or T.cardEdge, a)
+    return set
 end
+
+-- A 1 px divider (white 0.06) anchored by the caller.
+function S.Rule(parent, c) return root.Rule(parent, c or T.divider) end
 
 function S.Tip(owner, lines)
     if root.ShowTip then root.ShowTip(owner, lines) end
 end
 function S.HideTip() GameTooltip:Hide() end
+
+S.FitText = root.FitText        -- S.FitText(fs, maxLines, width, owner) -> height
+S.ClampLabel = root.ClampLabel  -- S.ClampLabel(fs, fullText, owner)
+S.IsCut = root.IsCut
 
 -- ---------------------------------------------------------------- money, items, levels
 
@@ -96,7 +99,7 @@ function S.QualityColor(id)
     local ok, q = pcall(f or function() return nil end, id)
     local c = ok and q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
     if c then return { c.r, c.g, c.b } end
-    return S.C.text
+    return T.fg
 end
 
 -- A zone level range coloured like the game colours quests against your level.
@@ -105,13 +108,20 @@ function S.LevelColor(level)
         local ok, c = pcall(GetQuestDifficultyColor, level)
         if ok and c then return { c.r, c.g, c.b } end
     end
-    return S.C.dim
+    return T.muted
 end
 
 -- ---------------------------------------------------------------- icons
+
+-- HD interface icons: S.HDIcon(tex, name, color) on an existing texture, S.Icon(parent, name, size,
+-- layer, color) for a new one. Names: Media/Icons/<name>.tga (check, close, gear, pin...).
+S.HDIcon = root.SetHDIcon
+S.Icon = root.Icon
+S.IconPath = root.IconPath
+S.Painted = root.SetPainted   -- S.Painted(tex, path, size): game icon cropped 0.08-0.92, 48 px max
+
 -- Modern art where this client has it: the first atlas of the list that exists; otherwise a file
 -- every client has, with its own texture coordinates. A missing atlas never shows a green square.
-
 local function TryAtlas(tex, name)
     if not (tex.SetAtlas and name) then return false end
     local ok, res = pcall(tex.SetAtlas, tex, name, false)
@@ -127,7 +137,9 @@ function S.SetIcon(tex, atlases, path, coords)
         if TryAtlas(tex, a) then return true end
     end
     tex:SetTexture(path)
-    if coords then tex:SetTexCoord(coords[1], coords[2], coords[3], coords[4]) else tex:SetTexCoord(0, 1, 0, 1) end
+    if coords then tex:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+    elseif type(path) == "string" and path:find("^Interface\\Icons\\") then tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    else tex:SetTexCoord(0, 1, 0, 1) end
     return false
 end
 
@@ -139,10 +151,13 @@ function S.HasAtlas(name)
 end
 
 local CIRCLES = "Interface\\TargetingFrame\\UI-Classes-Circles"
--- The class's icon: the modern square one, else the old circle sheet. False when neither is known.
+-- The class's icon: the modern square one (cropped 0.02), else the old circle sheet.
 function S.ClassIcon(tex, class)
     if not class then return false end
-    if TryAtlas(tex, "classicon-" .. class:lower()) then return true end
+    if TryAtlas(tex, "classicon-" .. class:lower()) then
+        tex:SetTexCoord(0.02, 0.98, 0.02, 0.98)
+        return true
+    end
     local tc = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
     if not tc then return false end
     tex:SetTexture(CIRCLES); tex:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
@@ -170,214 +185,551 @@ function S.RoleMarkup(role, size)
         if S.HasAtlas(a) then return string.format("|A:%s:%d:%d|a", a, size, size) end
     end
     local px = ROLE_PX[role]
-    return string.format("|T%s:%d:%d:0:0:64:64:%d:%d:%d:%d|t", ROLE_SHEET, size, size, px[1], px[2], px[3], px[4])
+    return string.format("|T%s:%d:%d:0:-1:64:64:%d:%d:%d:%d|t", ROLE_SHEET, size, size, px[1], px[2], px[3], px[4])
 end
 
--- Drawn glyphs: a close cross, chevrons and a tick made of two crisp lines (no font glyph, no
--- blown-up 16 px texture). g:SetKind("x" | "right" | "left" | "down" | "up" | "check"), g:SetColor(c, a).
-local GLYPH = {
-    x     = function(r) return { { -r, r, r, -r }, { -r, -r, r, r } } end,
-    right = function(r) return { { -r * 0.45, r, r * 0.45, 0 }, { r * 0.45, 0, -r * 0.45, -r } } end,
-    left  = function(r) return { { r * 0.45, r, -r * 0.45, 0 }, { -r * 0.45, 0, r * 0.45, -r } } end,
-    down  = function(r) return { { -r, r * 0.45, 0, -r * 0.45 }, { 0, -r * 0.45, r, r * 0.45 } } end,
-    up    = function(r) return { { -r, -r * 0.45, 0, r * 0.45 }, { 0, r * 0.45, r, -r * 0.45 } } end,
-    check = function(r) return { { -r, 0, -r * 0.3, -r * 0.7 }, { -r * 0.3, -r * 0.7, r, r * 0.75 } } end,
-}
--- when this client cannot draw lines: the old textures, same meaning
-local GLYPH_FALLBACK = {
-    x = "Interface\\Buttons\\UI-StopButton", check = "Interface\\Buttons\\UI-CheckBox-Check",
-    right = "Interface\\Buttons\\UI-PlusButton-Up", left = "Interface\\Buttons\\UI-PlusButton-Up",
-    down = "Interface\\Buttons\\UI-MinusButton-Up", up = "Interface\\Buttons\\UI-MinusButton-Up",
-}
+-- An HD icon as text markup, at the font size (e.g. inside a sentence).
+function S.IconMarkup(name, size, color)
+    size = size or 14
+    local c = color or T.muted
+    local function b(v) return math.floor(v * 255 + 0.5) end
+    return string.format("|T%s:%d:%d:0:-1:128:128:0:128:0:128:%d:%d:%d|t", root.IconPath(name), size, size, b(c[1]), b(c[2]), b(c[3]))
+end
 
-function S.Glyph(parent, kind, size, color, thickness)
+-- S.Glyph(parent, kind, size, color): an HD icon in a small frame (older name; kinds "x", "right",
+-- "left", "down", "up", "check"). g:SetKind(kind), g:SetColor(c, a).
+local GLYPH_HD = { x = "close", right = "chevron_right", left = "chevron_left", down = "chevron_down",
+    up = "chevron_up", check = "check", plus = "plus", minus = "minus" }
+function S.Glyph(parent, kind, size, color)
     local g = CreateFrame("Frame", nil, parent)
     size = size or 12
     g:SetSize(size, size)
-    g.th = thickness or (size >= 12 and 2 or 1.5)
-    local l1 = g.CreateLine and g:CreateLine(nil, "ARTWORK")
-    if l1 and l1.SetStartPoint and l1.SetEndPoint and l1.SetThickness then
-        g.lines = { l1, g:CreateLine(nil, "ARTWORK") }
-        for _, l in ipairs(g.lines) do l:SetThickness(g.th) end
-    else
-        if l1 and l1.Hide then l1:Hide() end
-        g.tex = g:CreateTexture(nil, "ARTWORK")
-        g.tex:SetAllPoints()
-    end
+    g.tex = g:CreateTexture(nil, "ARTWORK")
+    -- the HD art has a margin: drawn a little larger than the box it sits in, centred on it
+    local s = math.max(12, math.floor(size * 1.3 / 2 + 0.5) * 2)
+    g.tex:SetSize(s, s); g.tex:SetPoint("CENTER")
     function g:SetColor(c, a)
         self.c, self.a = c, a
-        if self.lines then
-            for _, l in ipairs(self.lines) do l:SetColorTexture(c[1], c[2], c[3], a or 1) end
-        else
-            self.tex:SetVertexColor(c[1], c[2], c[3], a or 1)
-        end
+        self.tex:SetVertexColor(c[1], c[2], c[3], a or c[4] or 1)
     end
     function g:SetKind(k)
-        if not GLYPH[k] then k = "x" end
-        if self.kind == k then return end
-        self.kind = k
-        if self.lines then
-            local r = size / 2 - self.th / 2
-            local e = self.th * 0.35   -- each stroke a little longer: no notch where two meet
-            for i, s in ipairs(GLYPH[k](r)) do
-                local dx, dy = s[3] - s[1], s[4] - s[2]
-                local len = math.sqrt(dx * dx + dy * dy)
-                local ux, uy = len > 0 and dx / len or 0, len > 0 and dy / len or 0
-                local l = self.lines[i]
-                l:SetStartPoint("CENTER", self, s[1] - ux * e, s[2] - uy * e)
-                l:SetEndPoint("CENTER", self, s[3] + ux * e, s[4] + uy * e)
-            end
-        else
-            self.tex:SetTexture(GLYPH_FALLBACK[k])
-            self.tex:SetDesaturated(k == "check")
-        end
+        local name = GLYPH_HD[k] or (root.HD_NAMES[k] and k) or "close"
+        if self.kind == name then return end
+        self.kind = name
+        root.SetHDIcon(self.tex, name, self.c or T.muted, self.a)
     end
     g:SetKind(kind or "x")
-    g:SetColor(color or S.C.dim)
+    g:SetColor(color or T.muted)
     return g
 end
 
--- A close button: a drawn cross, dim, white with a soft square under the mouse.
-function S.CloseButton(parent, size, onClick, tip, glyphSize)
-    local C = S.C
-    size = size or 24
+-- ---------------------------------------------------------------- icon buttons
+
+-- Stock low-resolution textures some windows still pass: their HD equivalent.
+local STOCK_HD = {
+    ["Interface\\Buttons\\UI-StopButton"] = "close", ["Interface\\Buttons\\UI-OptionsButton"] = "gear",
+    ["Interface\\Buttons\\UI-RefreshButton"] = "refresh", ["Interface\\Buttons\\UI-MinusButton-Up"] = "minus",
+    ["Interface\\Buttons\\UI-PlusButton-Up"] = "plus", ["Interface\\Buttons\\UI-CheckBox-Check"] = "check",
+    ["Interface\\Buttons\\UI-Panel-MinimizeButton-Up"] = "close", ["Interface\\Common\\VoiceChat-Speaker"] = "info",
+}
+local function HDNameFor(texture)
+    if type(texture) == "string" then
+        if root.HD_NAMES[texture] then return texture end
+        return STOCK_HD[texture]
+    elseif type(texture) == "table" then
+        if texture.hd then return texture.hd end
+        for _, a in ipairs(texture.atlases or {}) do
+            local l = a:lower()
+            if l:find("setting") or l:find("gear") or l:find("cog") then return "gear" end
+            if l:find("refresh") then return "refresh" end
+        end
+        if texture.path then return STOCK_HD[texture.path] end
+    end
+end
+S.HDNameFor = HDNameFor
+
+-- S.IconButton(parent, texture, size, tip, onClick): an HD icon (18 px in a 28 hit area, 16 in 24)
+-- with a soft square under the mouse. texture: an HD icon name ("gear"), a file path, or
+-- { atlases = { ... }, path = file }. b:SetIcon(name), b:SetToggled(on).
+function S.IconButton(parent, texture, size, tip, onClick)
+    size = size or 28
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(size, size)
-    local inset = size >= 28 and 4 or 1
-    local hl = S.Solid(b, "BACKGROUND", { 1, 1, 1 }, 0)
-    hl:SetPoint("TOPLEFT", inset, -inset); hl:SetPoint("BOTTOMRIGHT", -inset, inset)
-    b.glyph = S.Glyph(b, "x", glyphSize or math.max(8, math.floor(size * 0.36 + 0.5)), C.dim)
-    b.glyph:SetPoint("CENTER")
+    b.wlOwned = true
+    local iconSize = size >= 28 and 18 or (size >= 24 and 16 or math.max(12, size - 6))
+    b.hl = S.Solid(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
+    b.press = S.Solid(b, "BORDER", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetSize(iconSize, iconSize)
+    b.icon:SetPoint("CENTER")
+    local hd = HDNameFor(texture)
+    b.hd = hd
+    if hd then root.SetHDIcon(b.icon, hd, T.muted)
+    elseif type(texture) == "table" then S.SetIcon(b.icon, texture.atlases, texture.path, texture.coords)
+    elseif texture then b.icon:SetTexture(texture) end
+    local function Paint()
+        local hov = b.hov or 0
+        local enabled = b:IsEnabled() ~= false
+        b:SetAlpha(enabled and 1 or T.disabledAlpha)
+        b.hl:SetAlpha(enabled and hov or 0)
+        local c = b.toggled and T.accentSoft or (hov > 0.5 and T.fg or T.muted)
+        if b.tint then c = b.tint end
+        if hd or b.hd then b.icon:SetVertexColor(c[1], c[2], c[3])
+        else local v = 0.75 + 0.25 * hov; b.icon:SetVertexColor(v, v, v) end
+    end
+    b.Paint = Paint
+    function b:SetIcon(name, color)
+        self.hd = name; hd = name; self.tint = color
+        root.SetHDIcon(self.icon, name, color or T.muted); Paint()
+    end
+    function b:SetToggled(on) self.toggled = on and true or nil; Paint() end
+    function b:ApplyState(state)
+        if state == "disabled" then self:Disable() elseif state == "selected" then self:SetToggled(true)
+        else self:Enable(); self:SetToggled(false) end
+        Paint()
+    end
     b:SetScript("OnEnter", function(self)
-        hl:SetColorTexture(1, 1, 1, 0.08); self.glyph:SetColor({ 1, 1, 1 })
-        if tip then S.Tip(self, tip) end
+        if self:IsEnabled() ~= false then root.Tween(self, self.hov or 0, 1, 0.10, function(v) self.hov = v; Paint() end) end
+        local t = type(tip) == "function" and tip() or tip
+        if t then S.Tip(self, t) end
     end)
     b:SetScript("OnLeave", function(self)
-        hl:SetColorTexture(1, 1, 1, 0); self.glyph:SetColor(C.dim)
-        if tip then S.HideTip() end
+        root.Tween(self, self.hov or 0, 0, 0.10, function(v) self.hov = v; Paint() end)
+        S.HideTip()
     end)
-    if onClick then b:SetScript("OnClick", onClick) end
+    b:SetScript("OnMouseDown", function(self)
+        if self:IsEnabled() == false then return end
+        self.press:Show(); self.icon:SetPoint("CENTER", 0, -1)
+    end)
+    b:SetScript("OnMouseUp", function(self) self.press:Hide(); self.icon:SetPoint("CENTER", 0, 0) end)
+    b:SetScript("OnEnable", Paint)
+    b:SetScript("OnDisable", Paint)
+    b:SetScript("OnClick", onClick)
+    Paint()
     return b
 end
 
--- ---------------------------------------------------------------- widgets
+-- A close button: the HD cross. size is the hit area (28 in a header).
+function S.CloseButton(parent, size, onClick, tip)
+    local b = S.IconButton(parent, "close", size or 28,
+        tip or { L("Fermer"), L("Clic : fermer la fenêtre") }, onClick)
+    b.glyph = { SetColor = function(_, c) b.tint = c; b.Paint() end, SetKind = function() end }
+    return b
+end
 
--- Buttons: "primary" (filled red, one per screen), "secondary" (outlined), "ghost" (text only),
--- "warn" (amber outline), "info" (blue, for an alternative).
+-- ---------------------------------------------------------------- buttons
+
+-- S.Button(parent, label, width, height, kind, onClick, tip)
+-- kind: "primary" (accent fill, the one main action of a view), "secondary" (default), "ghost"
+-- (link text), "danger" (destructive, two-step with b:SetConfirm), "warn" and "info" (older names:
+-- a secondary button). The button is never narrower than its label: width is a minimum.
+-- b:SetText(t), b:SetIcon(name), b:SetKind(kind), b:SetConfirm(text), b:Flash(text),
+-- b:SetDisabledReason(text), b:SetChevron(on).
 function S.Button(parent, label, width, height, kind, onClick, tip)
     kind = kind or "secondary"
-    local C = S.C
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(width, height or 30)
-    local fill = S.Solid(b, "BACKGROUND", C.brand, 0)
-    fill:SetAllPoints()
-    local border = S.Border(b, C.border)
-    b.label = S.Text(b, 13, C.text, kind == "primary")
-    b.label:SetPoint("CENTER")
+    height = height or 28
+    b.wlOwned = true
+    b.kind = kind
+    b.minW = width or 0
+    local setW = b.SetWidth
+    setW(b, math.max(b.minW, 1)); b:SetHeight(height)
+    b.fill = S.Solid(b, "BACKGROUND", T.btnFill); b.fill:SetAllPoints()
+    b.press = S.Solid(b, "BORDER", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
+    b.border = S.Border(b, T.btnEdge)
+    b.content = CreateFrame("Frame", nil, b)
+    b.content:SetAllPoints()
+    b.label = S.Text(b.content, root.F.label, T.fg, false)
     b.label:SetJustifyH("CENTER")
-    b.label:SetText(label or "")
-    local function paint(hover)
-        local enabled = b:IsEnabled()
-        if kind == "primary" then
-            local c = enabled and (hover and C.brandHi or C.brand) or C.divider
-            fill:SetColorTexture(c[1], c[2], c[3], 1); border(c)
-            b.label:SetTextColor(1, 1, 1, enabled and 1 or 0.4)
-        elseif kind == "warn" then
-            fill:SetColorTexture(C.warn[1], C.warn[2], C.warn[3], hover and 0.12 or 0)
-            border(C.warn, enabled and 0.45 or 0.2); b.label:SetTextColor(C.warn[1], C.warn[2], C.warn[3], enabled and 1 or 0.4)
-        elseif kind == "info" then
-            fill:SetColorTexture(0.086, 0.196, 0.290, 1)
-            border({ 0.169, 0.353, 0.502 }); b.label:SetTextColor(0.85, 0.93, 1, enabled and 1 or 0.4)
-        elseif kind == "ghost" then
-            fill:SetColorTexture(1, 1, 1, hover and 0.05 or 0); border(C.border, 0)
-            b.label:SetTextColor(C.dim[1], C.dim[2], C.dim[3], enabled and 1 or 0.4)
+    b.label:SetWordWrap(false)
+    if b.label.SetMaxLines then b.label:SetMaxLines(1) end
+    b.icon = b.content:CreateTexture(nil, "ARTWORK")
+    b.icon:SetSize(16, 16); b.icon:Hide()
+    b.chev = b.content:CreateTexture(nil, "ARTWORK")
+    b.chev:SetSize(10, 10); b.chev:Hide()
+    b.under = S.Solid(b.content, "ARTWORK", T.fg)
+    b.under:SetPoint("TOPLEFT", b.label, "BOTTOMLEFT", 0, -1)
+    b.under:SetPoint("TOPRIGHT", b.label, "BOTTOMRIGHT", 0, -1)
+    root.PixelLine(b.content, b.under, true)
+    b.under:Hide()
+
+    local labelSet = b.label.SetText
+    local function Need()
+        local ok, sw = pcall(b.label.GetStringWidth, b.label)
+        sw = ok and num(sw) or 0
+        local w = math.ceil(sw) + 24
+        if b.icon:IsShown() then w = w + 16 + 6 end
+        if b.chev:IsShown() then w = w + 10 + 4 end
+        return w + (b.extraW or 0)
+    end
+    local function Layout()
+        local dy = b.pressed and -1 or 0
+        if b.CustomLayout then b:CustomLayout(dy) return end
+        local iconW = b.icon:IsShown() and 22 or 0
+        local chevW = b.chev:IsShown() and 14 or 0
+        b.label:ClearAllPoints()
+        b.label:SetPoint("CENTER", b.content, "CENTER", (iconW - chevW) / 2, dy)
+        b.icon:ClearAllPoints(); b.icon:SetPoint("RIGHT", b.label, "LEFT", -6, 0)
+        b.chev:ClearAllPoints(); b.chev:SetPoint("LEFT", b.label, "RIGHT", 4, 0)
+    end
+    function b:Fit()
+        setW(self, math.max(self.minW or 0, Need()))
+        Layout()
+    end
+    -- the caller's width is a minimum: the label always fits
+    b.SetWidth = function(self, w) self.minW = w or 0; self:Fit() end
+    b.SetSize = function(self, w, hh) self:SetHeight(hh); self:SetWidth(w) end
+    local function Paint()
+        local hov = b.hov or 0
+        local enabled = b:IsEnabled() ~= false
+        if not enabled then hov = 0 end
+        local k = b.kind
+        b:SetAlpha(enabled and 1 or T.disabledAlpha)
+        b.press:SetShown(b.pressed and k ~= "primary" and k ~= "ghost")
+        b.under:SetShown(k == "ghost" and hov > 0.5)
+        if k == "primary" then
+            local c = b.pressed and T.accentPress or (hov > 0.5 and T.accentHover or T.accent)
+            b.fill:SetColorTexture(c[1], c[2], c[3], 1)
+            b.border(c, 0)
+            b.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3], 1)
+            b.icon:SetVertexColor(T.fg[1], T.fg[2], T.fg[3])
+        elseif k == "ghost" then
+            b.fill:SetColorTexture(1, 1, 1, 0)
+            b.border(T.btnEdge, 0)
+            local c = hov > 0.5 and T.fg or T.accentSoft
+            b.label:SetTextColor(c[1], c[2], c[3], 1)
+            b.icon:SetVertexColor(c[1], c[2], c[3]); b.chev:SetVertexColor(c[1], c[2], c[3])
         else
-            fill:SetColorTexture(1, 1, 1, hover and 0.05 or 0)
-            border(hover and C.dim or { 0.227, 0.243, 0.267 }); b.label:SetTextColor(C.text[1], C.text[2], C.text[3], enabled and 1 or 0.4)
+            local text, edge, edgeA = T.fg, T.btnEdge, T.btnEdge[4] + (T.btnEdgeHover[4] - T.btnEdge[4]) * hov
+            if k == "danger" then
+                text = T.bad
+                if b.armed then edge, edgeA = T.bad, 1 elseif hov > 0 then edge, edgeA = T.bad, 0.6 * hov + T.btnEdge[4] * (1 - hov) end
+            elseif k == "warn" then
+                text, edge, edgeA = T.warn, T.warn, 0.45
+            end
+            b.fill:SetColorTexture(1, 1, 1, T.btnFill[4] + T.hoverFill[4] * hov)
+            b.border(edge, edgeA)
+            local a = (k == "danger" or k == "warn") and 1 or (0.85 + 0.15 * hov)
+            b.label:SetTextColor(text[1], text[2], text[3], a)
+            local ic = b.flashing and T.ok or text
+            b.icon:SetVertexColor(ic[1], ic[2], ic[3])
         end
     end
-    b.Paint = paint
+    b.Paint = Paint
+    function b:SetText(t)
+        labelSet(self.label, t or "")
+        self:Fit()
+    end
+    b.label.SetText = function(_, t) b:SetText(t) end
+    function b:GetText() return self.label:GetText() end
+    function b:SetKind(k) self.kind = (k == "info") and "secondary" or (k or "secondary"); Paint() end
+    function b:SetIcon(name)
+        if name then root.SetHDIcon(self.icon, name, T.fg); self.icon:Show() else self.icon:Hide() end
+        self:Fit(); Paint()
+    end
+    function b:SetChevron(on)
+        if on then root.SetHDIcon(self.chev, "chevron_right", T.accentSoft); self.chev:Show() else self.chev:Hide() end
+        self:Fit(); Paint()
+    end
+    function b:SetDisabledReason(text) self.disabledReason = text end
+    -- destructive pattern: the first click asks (label becomes `text`), the second acts; back by itself after 4 s
+    function b:SetConfirm(text) self.confirmText = text end
+    function b:Disarm()
+        if not self.armed then return end
+        self.armed = nil
+        self:SetText(self.normalText)
+        Paint()
+    end
+    -- feedback in place: check icon + past tense for 2 s, then the normal label again
+    function b:Flash(text, seconds)
+        local normal, normalIcon = self:GetText(), self.icon:IsShown() and self.icon.wlIcon or nil
+        self.flashing = true
+        root.SetHDIcon(self.icon, "check", T.ok); self.icon:Show()
+        self:SetText(text); Paint()
+        local token = {}
+        self.flashToken = token
+        C_Timer.After(seconds or 2, function()
+            if self.flashToken ~= token then return end
+            self.flashing = nil
+            if normalIcon then self:SetIcon(normalIcon) else self.icon:Hide() end
+            self:SetText(normal); Paint()
+        end)
+    end
+    function b:ApplyState(state)
+        if state == "disabled" then self:Disable() else self:Enable() end
+        Paint()
+    end
     b:SetScript("OnEnter", function(self)
-        paint(true)
-        if tip then S.Tip(self, type(tip) == "function" and tip() or tip) end
+        if self:IsEnabled() ~= false then root.Tween(self, self.hov or 0, 1, 0.10, function(v) self.hov = v; Paint() end) end
+        local t = type(tip) == "function" and tip() or tip
+        if t then S.Tip(self, t)
+        elseif self:IsEnabled() == false and self.disabledReason then S.Tip(self, { self:GetText() })
+        elseif self.wlClamped then local cut = root.CutLines(self); if #cut > 0 then S.Tip(self, cut) end end
     end)
-    b:SetScript("OnLeave", function() paint(false); if tip then S.HideTip() end end)
-    b:SetScript("OnEnable", function() paint(false) end)
-    b:SetScript("OnDisable", function() paint(false) end)
-    if onClick then b:SetScript("OnClick", onClick) end
-    paint(false)
+    b:SetScript("OnLeave", function(self)
+        root.Tween(self, self.hov or 0, 0, 0.10, function(v) self.hov = v; Paint() end)
+        S.HideTip()
+    end)
+    b:SetScript("OnMouseDown", function(self)
+        if self:IsEnabled() == false then return end
+        self.pressed = true; Layout(); Paint()
+    end)
+    b:SetScript("OnMouseUp", function(self) self.pressed = false; Layout(); Paint() end)
+    b:SetScript("OnEnable", function() Paint() end)
+    b:SetScript("OnDisable", function() b.pressed = false; Paint() end)
+    if onClick then
+        b:SetScript("OnClick", function(self, ...)
+            if self.confirmText and not self.armed then
+                self.armed = true
+                self.normalText = self:GetText()
+                self:SetText(self.confirmText)
+                Paint()
+                local token = {}
+                self.armToken = token
+                C_Timer.After(4, function() if self.armToken == token then self:Disarm() end end)
+                return
+            end
+            if self.armed then self.armToken = nil; self:Disarm() end
+            onClick(self, ...)
+        end)
+    end
+    if kind == "info" then b.kind = "secondary" end
+    b:SetText(label or "")
+    Paint()
     return b
 end
 
--- Switch bound to get() / set(v).
+-- ---------------------------------------------------------------- switch
+
+-- Switch bound to get() / set(v): 40 x 20, round track, round knob that slides.
+-- b:AttachRow(row) makes the whole settings row the click target.
+local DOT_L, DOT_R, DOT_T, DOT_B = 0.22, 0.78, 0.26, 0.82   -- the dot art inside its 128 px canvas
 function S.Switch(parent, get, set, label)
-    local C = S.C
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(38, 22)
-    local track = S.Solid(b, "BACKGROUND", C.border)
-    track:SetAllPoints()
-    local knob = S.Solid(b, "ARTWORK", C.dim)
-    knob:SetSize(18, 18)
+    b:SetSize(40, 20)
+    b.wlOwned = true
+    local function Piece(layer)
+        local t = b:CreateTexture(nil, layer or "BACKGROUND")
+        root.SetHDIcon(t, "dot", T.trackOff)
+        return t
+    end
+    local capL, capR = Piece(), Piece()
+    capL:SetSize(10, 20); capL:SetPoint("LEFT"); capL:SetTexCoord(DOT_L, 0.5, DOT_T, DOT_B)
+    capR:SetSize(10, 20); capR:SetPoint("RIGHT"); capR:SetTexCoord(0.5, DOT_R, DOT_T, DOT_B)
+    -- the bar is the dot's middle column stretched: same shading as the round caps
+    local bar = Piece()
+    bar:SetTexCoord(0.49, 0.51, DOT_T, DOT_B)
+    bar:SetPoint("TOPLEFT", 10, 0); bar:SetPoint("BOTTOMRIGHT", -10, 0)
+    local knob = Piece("ARTWORK")
+    knob:SetSize(16, 16); knob:SetTexCoord(DOT_L, DOT_R, DOT_T, DOT_B)
+    b.track, b.knob = { capL, capR, bar }, knob
+    local function Paint()
+        local on = b.on
+        local c, a = on and T.accent or T.trackOff, on and 0.85 or 0.65
+        for _, t in ipairs(b.track) do t:SetVertexColor(c[1], c[2], c[3], a) end
+        local k = (on and 1 or 0.55) + ((b.hov and b:IsEnabled() ~= false) and 0.15 or 0)
+        knob:SetVertexColor(1, 1, 1, math.min(1, k))
+        b:SetAlpha(b:IsEnabled() ~= false and 1 or T.disabledAlpha)
+    end
+    local function PlaceKnob(x) knob:ClearAllPoints(); knob:SetPoint("CENTER", b, "LEFT", x, 0) end
     function b:Update()
         local on = get() and true or false
-        track:SetColorTexture(on and C.brand[1] or 0.18, on and C.brand[2] or 0.196, on and C.brand[3] or 0.22, 1)
-        knob:SetColorTexture(on and 1 or C.dim[1], on and 1 or C.dim[2], on and 1 or C.dim[3], 1)
-        knob:ClearAllPoints()
-        knob:SetPoint(on and "RIGHT" or "LEFT", on and -2 or 2, 0)
+        local to = on and 30 or 10
+        local from = self.kx or to
+        self.on = on
+        Paint()
+        root.Tween(knob, from, to, 0.08, function(v) self.kx = v; PlaceKnob(v) end)
     end
-    b:SetScript("OnClick", function(self) set(not get()); self:Update() end)
-    if label then
-        b:SetScript("OnEnter", function(self) S.Tip(self, { label }) end)
-        b:SetScript("OnLeave", S.HideTip)
+    function b:ApplyState(state)
+        if state == "disabled" then self:Disable() else self:Enable() end
+        Paint()
     end
+    function b:AttachRow(row)
+        if not row then return end
+        if row.EnableMouse then row:EnableMouse(true) end
+        if row.HookScript then
+            row:HookScript("OnMouseUp", function(_, button)
+                if button ~= "RightButton" and b:IsEnabled() ~= false and b:IsVisible() then b:Click() end
+            end)
+            row:HookScript("OnEnter", function() b.hov = true; Paint() end)
+            row:HookScript("OnLeave", function() b.hov = nil; Paint() end)
+        end
+    end
+    b:SetScript("OnClick", function(self)
+        if PlaySound then PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856) end
+        set(not get()); self:Update()
+    end)
+    b:SetScript("OnEnter", function(self) self.hov = true; Paint(); if label then S.Tip(self, type(label) == "table" and label or { label }) end end)
+    b:SetScript("OnLeave", function(self) self.hov = nil; Paint(); S.HideTip() end)
+    b:SetScript("OnEnable", Paint)
+    b:SetScript("OnDisable", Paint)
     b:Update()
     return b
 end
 
--- Segmented choice: options = { { value, label, disabled }, ... }.
+-- ---------------------------------------------------------------- dropdown
+
+local openList
+-- S.Dropdown(parent, options, get, set, width): options = { { value, label }, ... }.
+-- Trigger: a secondary button showing the current value and a chevron; list: up to 10 rows.
+function S.Dropdown(parent, options, get, set, width)
+    local d = S.Button(parent, "", width or 120, 28, "secondary")
+    d.options = options
+    d.arrow = d.content:CreateTexture(nil, "ARTWORK")
+    d.arrow:SetSize(12, 12); d.arrow:SetPoint("RIGHT", -8, 0)
+    root.SetHDIcon(d.arrow, "chevron_down", T.muted)
+    d.extraW = 12 + 4 - 4   -- the chevron, its gap; the label's left inset is 8 instead of 12
+    d.label:SetJustifyH("LEFT")
+    function d:CustomLayout(dy)
+        self.label:ClearAllPoints()
+        self.label:SetPoint("LEFT", self.content, "LEFT", 8, dy)
+        self.label:SetPoint("RIGHT", self.arrow, "LEFT", -4, dy)
+    end
+    local function LabelOf(v)
+        for _, o in ipairs(d.options) do if o[1] == v then return o[2] end end
+        return ""
+    end
+    function d:Update() self:SetText(LabelOf(get())) end
+    local list
+    local function Close() if list then list:Hide() end; if openList == list then openList = nil end end
+    local function Open()
+        if openList and openList ~= list then openList:Hide() end
+        if not list then
+            list = CreateFrame("Frame", nil, d)
+            list:SetFrameStrata("DIALOG")
+            S.Solid(list, "BACKGROUND", T.panel, 0.98):SetAllPoints()
+            S.Border(list, T.cardEdge)
+            list.rows = {}
+            list.off = 0
+            list:EnableMouseWheel(true)
+            list:SetScript("OnMouseWheel", function(self, delta)
+                local max = math.max(0, #d.options - 10)
+                self.off = math.max(0, math.min(max, self.off - delta))
+                self:Fill()
+            end)
+            function list:Fill()
+                local n = math.min(10, #d.options)
+                local cur = get()
+                for i = 1, n do
+                    local r = self.rows[i]
+                    if not r then
+                        r = CreateFrame("Button", nil, self)
+                        r:SetHeight(24)
+                        r:SetPoint("TOPLEFT", 1, -1 - (i - 1) * 24); r:SetPoint("TOPRIGHT", -1, -1 - (i - 1) * 24)
+                        r.hl = S.Solid(r, "BACKGROUND", T.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
+                        r.check = root.Icon(r, "check", 12, "ARTWORK", T.accentSoft); r.check:SetPoint("LEFT", 8, 0)
+                        r.text = S.Text(r, root.F.label, T.fg); r.text:SetPoint("LEFT", 26, 0); r.text:SetPoint("RIGHT", -8, 0)
+                        r.text:SetJustifyH("LEFT"); S.ClampLabel(r.text, nil, r)
+                        r:SetScript("OnEnter", function(self) self.hl:SetAlpha(1) end)
+                        r:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); S.HideTip() end)
+                        r:SetScript("OnClick", function(self) set(self.value); d:Update(); Close() end)
+                        self.rows[i] = r
+                    end
+                    local o = d.options[i + self.off]
+                    r.value = o and o[1]
+                    r.text:SetText(o and o[2] or "")
+                    r.check:SetShown(o ~= nil and o[1] == cur)
+                    r:Show()
+                end
+                for i = n + 1, #self.rows do self.rows[i]:Hide() end
+                self:SetHeight(n * 24 + 2)
+            end
+        end
+        list:ClearAllPoints()
+        list:SetPoint("TOPLEFT", d, "BOTTOMLEFT", 0, -2)
+        list:SetWidth(math.max(d:GetWidth() or 120, 120))
+        list:Fill()
+        list:Show()
+        openList = list
+    end
+    d:SetScript("OnClick", function() if list and list:IsShown() then Close() else Open() end end)
+    d:HookScript("OnHide", Close)
+    d:Update()
+    return d
+end
+
+-- ---------------------------------------------------------------- segmented
+
+-- Segmented choice: options = { { value, label, disabled }, ... }. Height 28, segments touch,
+-- the selected one has the selection fill and a 1 px accent border. holder:SetMaxWidth(w): when
+-- the labels need more than w, the control becomes a dropdown instead of cutting them.
 function S.Segmented(parent, options, get, set, height)
-    local C = S.C
+    height = height or 28
     local holder = CreateFrame("Frame", nil, parent)
-    holder:SetHeight(height or 30)
-    S.Border(holder, { 0.18, 0.196, 0.22 })
-    local buttons, x = {}, 0
+    holder:SetHeight(height)
+    holder.wlOwned = true
+    holder.border = S.Border(holder, T.btnEdge)
+    local buttons, seps = {}, {}
     for i, o in ipairs(options) do
         local b = CreateFrame("Button", nil, holder)
-        b:SetHeight(height or 30)
-        b.fill = S.Solid(b, "BACKGROUND", C.brandBg, 0)
-        b.fill:SetAllPoints()
-        b.label = S.Text(b, 13, C.text, false)
+        b:SetHeight(height)
+        b.fill = S.Solid(b, "BACKGROUND", T.selFill); b.fill:SetAllPoints(); b.fill:SetAlpha(0)
+        b.hl = S.Solid(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
+        b.sel = S.Border(b, T.accent, 0)
+        b.label = S.Text(b, root.F.label, T.muted, false)
         b.label:SetPoint("CENTER")
+        b.label:SetWordWrap(false)
         b.label:SetText(o[2])
-        local w = b.label:GetStringWidth() + 28
-        b:SetWidth(w)
-        b:SetPoint("LEFT", x, 0)
-        x = x + w
-        if i < #options then
-            local sep = S.Solid(holder, "BORDER", { 0.18, 0.196, 0.22 })
-            sep:SetPoint("TOPLEFT", x, 0); sep:SetPoint("BOTTOMLEFT", x, 0); sep:SetWidth(1)
-        end
         b.value, b.disabled = o[1], o[3]
         b:SetScript("OnClick", function(self)
             if self.disabled then return end
             set(self.value); holder:Update()
         end)
+        b:SetScript("OnEnter", function(self) self.hover = true; holder:Update(); if self.tip then S.Tip(self, self.tip) end end)
+        b:SetScript("OnLeave", function(self) self.hover = nil; holder:Update(); S.HideTip() end)
         buttons[i] = b
+        if i < #options then
+            local sep = S.Solid(holder, "BORDER", T.divider)
+            sep:SetWidth(1); root.PixelLine(holder, sep, false)
+            seps[i] = sep
+        end
     end
-    holder:SetWidth(x)
+    holder.buttons = buttons
+    local function Layout()
+        local x = 0
+        for i, b in ipairs(buttons) do
+            local ok, sw = pcall(b.label.GetStringWidth, b.label)
+            local w = math.max(56, math.ceil((ok and num(sw)) or 0) + 32)
+            b:SetWidth(w)
+            b:ClearAllPoints(); b:SetPoint("LEFT", x, 0)
+            x = x + w
+            if seps[i] then seps[i]:ClearAllPoints(); seps[i]:SetPoint("TOPLEFT", x, 0); seps[i]:SetPoint("BOTTOMLEFT", x, 0) end
+        end
+        return x
+    end
+    holder.natural = Layout()
+    holder:SetWidth(holder.natural)
     function holder:Update()
+        if self.dropdown and self.dropdown:IsShown() then self.dropdown:Update() return end
         local cur = get()
         for _, b in ipairs(buttons) do
             local on = b.value == cur
-            b.fill:SetColorTexture(C.brandBg[1], C.brandBg[2], C.brandBg[3], on and 1 or 0)
-            if b.disabled then b.label:SetTextColor(0.37, 0.4, 0.43)
-            elseif on then b.label:SetTextColor(C.brandSoft[1], C.brandSoft[2], C.brandSoft[3])
-            else b.label:SetTextColor(C.text[1], C.text[2], C.text[3]) end
+            b.fill:SetAlpha(on and 1 or 0)
+            b.hl:SetAlpha((b.hover and not on and not b.disabled) and 1 or 0)
+            b.sel(T.accent, on and 1 or 0)
+            local c = b.disabled and T.faint or ((on or b.hover) and T.fg or T.muted)
+            b.label:SetTextColor(c[1], c[2], c[3])
         end
     end
     function holder:SetDisabled(value, disabled)
         for _, b in ipairs(buttons) do if b.value == value then b.disabled = disabled end end
         holder:Update()
+    end
+    function holder:SetMaxWidth(w)
+        self.maxW = w
+        local tooWide = w and self.natural > w
+        if tooWide and not self.dropdown then
+            local opts = {}
+            for _, o in ipairs(options) do if not o[3] then opts[#opts + 1] = { o[1], o[2] } end end
+            self.dropdown = S.Dropdown(self, opts, get, function(v) set(v) end, math.min(w, 200))
+            self.dropdown:SetPoint("LEFT")
+        end
+        for _, b in ipairs(buttons) do b:SetShown(not tooWide) end
+        for _, s in pairs(seps) do s:SetShown(not tooWide) end
+        if self.dropdown then self.dropdown:SetShown(tooWide and true or false) end
+        self.border(T.btnEdge, tooWide and 0 or nil)
+        self:SetWidth(tooWide and self.dropdown:GetWidth() or self.natural)
+        self:Update()
     end
     holder:Update()
     return holder
@@ -385,22 +737,23 @@ end
 
 -- Slider (min, max, step) bound to get() / set(v); fmt(v) gives the value text.
 function S.Slider(parent, min, max, step, get, set, fmt, width)
-    local C = S.C
     local s = CreateFrame("Slider", nil, parent)
     s:SetSize(width or 180, 16)
     s:SetOrientation("HORIZONTAL")
     s:SetMinMaxValues(min, max)
     s:SetValueStep(step)
     if s.SetObeyStepOnDrag then s:SetObeyStepOnDrag(true) end
-    local track = S.Solid(s, "BACKGROUND", C.border)
+    local track = S.Solid(s, "BACKGROUND", T.trackOff)
     track:SetPoint("LEFT"); track:SetPoint("RIGHT"); track:SetHeight(4)
     local thumb = s:CreateTexture(nil, "ARTWORK")
-    thumb:SetColorTexture(C.brand[1], C.brand[2], C.brand[3], 1)
-    thumb:SetSize(10, 16)
+    root.SetHDIcon(thumb, "dot", { 1, 1, 1 })
+    thumb:SetTexCoord(DOT_L, DOT_R, DOT_T, DOT_B)
+    thumb:SetSize(14, 14)
     s:SetThumbTexture(thumb)
-    s.value = S.Text(parent, 13, C.dim)
-    s.value:SetPoint("LEFT", s, "RIGHT", 10, 0)
+    s.value = S.Text(parent, root.F.label, T.muted)
+    s.value:SetPoint("LEFT", s, "RIGHT", 12, 0)
     s.value:SetWidth(48)
+    s.value:SetWordWrap(false)
     s:SetScript("OnValueChanged", function(self, v)
         v = math.floor(v / step + 0.5) * step
         set(v)
@@ -411,171 +764,938 @@ function S.Slider(parent, min, max, step, get, set, fmt, width)
     return s
 end
 
--- Tabs: list = { { key, label }, ... }; badge(key) may return a number to show.
+-- ---------------------------------------------------------------- badges, counters, pills
+
+-- Counter (a number on a tab or an icon): neutral; accent only when it counts things to act on now.
+function S.Counter(parent)
+    local c = CreateFrame("Frame", nil, parent)
+    c:SetSize(18, 16)
+    c.bg = S.Solid(c, "BACKGROUND", { 1, 1, 1, 0.10 }); c.bg:SetAllPoints()
+    c.text = S.Text(c, root.F.foot, T.fg, true)
+    c.text:SetPoint("CENTER"); c.text:SetWordWrap(false)
+    function c:SetCount(n, urgent)
+        if not n or n == 0 then self:Hide() return end
+        self.text:SetText(n)
+        if urgent then self.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1)
+        else self.bg:SetColorTexture(1, 1, 1, 0.10) end
+        local ok, sw = pcall(self.text.GetStringWidth, self.text)
+        self:SetWidth(math.max(18, math.ceil((ok and num(sw)) or 0) + 8))
+        self:Show()
+    end
+    c:Hide()
+    return c
+end
+
+-- Pill: words, never codes ("Dans le sac", "En cours"). S.Pill(parent, text, color, icon);
+-- p:Set(text, color, icon). Single line; the widest it may be is p.maxW (full text in its tooltip).
+function S.Pill(parent, text, color, icon)
+    local p = root.Chip(parent)
+    p.icon = p:CreateTexture(nil, "ARTWORK")
+    p.icon:SetSize(12, 12); p.icon:SetPoint("LEFT", 4, 0); p.icon:Hide()
+    function p:Set(t, col, iconName)
+        if not t then self:Hide() return end
+        col = col or T.fg
+        local neutral = (col == T.fg)
+        if iconName then root.SetHDIcon(self.icon, iconName, col); self.icon:Show() else self.icon:Hide() end
+        self.text:ClearAllPoints()
+        self.text:SetPoint("LEFT", iconName and 20 or 6, 0)
+        root.SetChip(self, t, col, self.maxW and (self.maxW - (iconName and 14 or 0)) or nil)
+        if neutral then self.bg:SetColorTexture(1, 1, 1, 0.10); self.border({ 1, 1, 1 }, 0.20) end
+        if iconName then self:SetWidth(self:GetWidth() + 14) end
+    end
+    if text then p:Set(text, color, icon) else p:Hide() end
+    return p
+end
+S.Badge = S.Pill
+
+-- ---------------------------------------------------------------- tabs
+
+-- Tabs: list = { { key, label }, ... }; badge(key) may return a number (and true when it counts
+-- things to act on now). Bar 32 px; tabs from x = 16, 4 apart; active: fill + 2 px accent underline.
+-- When the tabs do not fit, the widest shrink first (down to 56) and show their full label in
+-- the tooltip. bar:Update().
 function S.Tabs(parent, list, get, set, badge)
-    local C = S.C
     local bar = CreateFrame("Frame", nil, parent)
-    bar:SetHeight(36)
-    local line = S.Solid(bar, "BORDER", C.divider)
-    line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); line:SetHeight(1)
-    local tabs, x = {}, 10
+    bar:SetHeight(S.TABS_H)
+    bar.wlOwned = true
+    parent.wlTabs = bar
+    local line = S.Solid(bar, "BORDER", T.divider)
+    line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); root.PixelLine(bar, line, true)
+    local tabs = {}
+    bar.tabs = tabs
     for i, t in ipairs(list) do
         local b = CreateFrame("Button", nil, bar)
-        b:SetHeight(36)
-        b.label = S.Text(b, 14, C.dim)
-        b.label:SetPoint("LEFT", 10, 0)
+        b:SetHeight(S.TABS_H)
+        b.fill = S.Solid(b, "BACKGROUND", T.tabFill); b.fill:SetAllPoints(); b.fill:SetAlpha(0)
+        b.hl = S.Solid(b, "BACKGROUND", T.tabHover); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
+        b.label = S.Text(b, root.F.label, T.muted)
+        b.label:SetPoint("LEFT", 12, 0)
         b.label:SetText(t[2])
-        b.badge = CreateFrame("Frame", nil, b)
-        b.badge:SetSize(18, 16)
-        b.badge:SetPoint("LEFT", b.label, "RIGHT", 6, 0)
-        S.Solid(b.badge, "BACKGROUND", C.brandBg):SetAllPoints()
-        b.badge.text = S.Text(b.badge, 11, C.brandSoft, true)
-        b.badge.text:SetPoint("CENTER")
-        b.under = S.Solid(b, "ARTWORK", C.brand)
-        b.under:SetPoint("BOTTOMLEFT"); b.under:SetPoint("BOTTOMRIGHT"); b.under:SetHeight(2)
+        S.ClampLabel(b.label, t[2], b)
+        b.badge = S.Counter(b)
+        b.badge:SetPoint("LEFT", b.label, "RIGHT", 4, 0)
+        b.under = S.Solid(b, "ARTWORK", T.accent)
+        b.under:SetHeight(2)
         b.key = t[1]
         b:SetScript("OnClick", function(self) set(self.key) end)
+        b:SetScript("OnEnter", function(self)
+            self.hover = true; bar:Paint()
+            local cut = root.CutLines(self)
+            if #cut > 0 then S.Tip(self, cut) end
+        end)
+        b:SetScript("OnLeave", function(self) self.hover = nil; bar:Paint(); S.HideTip() end)
         tabs[i] = b
     end
-    function bar:Update()
-        local cur, x = get(), 10
+    function bar:Paint()
+        local cur = get()
         for _, b in ipairs(tabs) do
             local on = b.key == cur
-            b.label:SetTextColor(on and C.text[1] or C.dim[1], on and C.text[2] or C.dim[2], on and C.text[3] or C.dim[3])
+            local c = (on or b.hover) and T.fg or T.muted
+            b.label:SetTextColor(c[1], c[2], c[3])
+            b.fill:SetAlpha(on and 1 or 0)
+            b.hl:SetAlpha((b.hover and not on) and 1 or 0)
             b.under:SetShown(on)
-            local n = badge and badge(b.key)
-            if n and n > 0 then b.badge.text:SetText(n); b.badge:SetWidth(b.badge.text:GetStringWidth() + 10); b.badge:Show()
-            else b.badge:Hide() end
-            local w = b.label:GetStringWidth() + 20 + (b.badge:IsShown() and b.badge:GetWidth() + 6 or 0)
-            b:SetWidth(w)
-            b:ClearAllPoints(); b:SetPoint("LEFT", x, 0)
-            x = x + w
         end
+    end
+    function bar:Update()
+        local x = 16
+        local widths, natural = {}, {}
+        for i, b in ipairs(tabs) do
+            local n, urgent = nil, nil
+            if badge then n, urgent = badge(b.key) end
+            if type(n) == "number" and n > 0 then b.badge:SetCount(n, urgent) else b.badge:Hide() end
+            local ok, sw = pcall(b.label.GetStringWidth, b.label)
+            sw = math.ceil((ok and num(sw)) or 0)
+            b.textW = sw
+            local extra = b.badge:IsShown() and (b.badge:GetWidth() + 4) or 0
+            natural[i] = sw
+            widths[i] = math.max(56, sw + 24 + extra)
+        end
+        -- shrink the widest first when the bar is too narrow
+        local avail = num(self:GetWidth())
+        if avail and avail > 0 then
+            local total = 16 + 4 * math.max(0, #tabs - 1)
+            for _, w in ipairs(widths) do total = total + w end
+            local guard = 0
+            while total > avail - 16 and guard < 200 do
+                guard = guard + 1
+                local wi, ww = nil, 56
+                for i, w in ipairs(widths) do if w > ww then wi, ww = i, w end end
+                if not wi then break end
+                local cut = math.min(ww - 56, total - (avail - 16))
+                if cut <= 0 then break end
+                widths[wi] = ww - cut; total = total - cut
+            end
+        end
+        for i, b in ipairs(tabs) do
+            local w = widths[i]
+            local extra = b.badge:IsShown() and (b.badge:GetWidth() + 4) or 0
+            local labelW = math.min(natural[i], w - 24 - extra)
+            b.label:SetWidth(math.max(1, labelW + 1))
+            b:SetWidth(w)
+            b:ClearAllPoints(); b:SetPoint("TOPLEFT", x, 0)
+            -- 2 px underline as wide as the text + 12, centred under it, on the bar's divider
+            b.under:ClearAllPoints()
+            b.under:SetWidth(math.min(w, labelW + 12))
+            b.under:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 6, 0)
+            x = x + w + 4
+        end
+        self:Paint()
     end
     bar:Update()
     return bar
 end
 
--- "‹ Accueil": a drawn arrow (no special character: every font shows it) and the word, framed.
--- Used by every window's header, the dungeon guide and the picker.
-function S.HomeButton(parent, onClick)
-    -- the hearthstone: "home" in WoW's own picture language; no frame, it lights up under the mouse
-    local C = S.C
-    local b = CreateFrame("Button", nil, parent)
-    b:SetHeight(24)
-    local fill = S.Solid(b, "BACKGROUND", { 1, 1, 1 }, 0); fill:SetAllPoints()
-    local icon = b:CreateTexture(nil, "ARTWORK")
-    icon:SetTexture("Interface\\Icons\\INV_Misc_Rune_01")
-    icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
-    icon:SetSize(16, 16); icon:SetPoint("LEFT", 6, 0)
-    icon:SetDesaturated(true); icon:SetAlpha(0.8)
-    local label = S.Text(b, 12, C.dim, true)
-    label:SetPoint("LEFT", icon, "RIGHT", 6, 0)
-    label:SetText(ns.L and ns.L("Accueil") or "Home")
-    b:SetWidth(label:GetStringWidth() + 36)
-    b:SetScript("OnEnter", function(self)
-        fill:SetColorTexture(1, 1, 1, 0.06); icon:SetDesaturated(false); icon:SetAlpha(1); label:SetTextColor(1, 1, 1)
-        S.Tip(self, { ns.L and ns.L("Retour à l'accueil") or "Back to home" })
+-- ---------------------------------------------------------------- section header
+
+-- Section header (32 px, 24 when tight): label 13 fg, optional count 11 muted, optional ghost link
+-- at the right, 1 px divider at the bottom. h:Set(label, count).
+function S.SectionHeader(parent, label, count, linkLabel, onLink, tight)
+    local h = CreateFrame("Frame", nil, parent)
+    h:SetHeight(tight and 24 or 32)
+    h.label = S.Text(h, root.F.body, T.fg)
+    h.label:SetPoint("BOTTOMLEFT", 0, 6)
+    h.label:SetWordWrap(false)
+    S.ClampLabel(h.label, nil, h)
+    h.count = S.Text(h, root.F.meta, T.muted)
+    h.count:SetPoint("BOTTOMLEFT", h.label, "BOTTOMRIGHT", 6, 0)
+    h.count:SetWordWrap(false)
+    h.rule = S.Rule(h)
+    h.rule:SetPoint("BOTTOMLEFT"); h.rule:SetPoint("BOTTOMRIGHT")
+    if linkLabel then
+        h.link = S.Button(h, linkLabel, 0, 24, "ghost", onLink)
+        h.link:SetPoint("BOTTOMRIGHT", 0, 2)
+        h.label:SetPoint("RIGHT", h.link, "LEFT", -12, 0)
+    end
+    function h:Set(text, n)
+        self.label:SetText(text or "")
+        if n then self.count:SetText(n); self.count:Show() else self.count:Hide() end
+    end
+    h:Set(label, count)
+    return h
+end
+
+-- Older section label (options): 13 fg, sentence case.
+function S.Section(parent, text)
+    local fs = S.Text(parent, root.F.body, T.fg)
+    fs:SetWordWrap(false)
+    fs:SetText(text or "")
+    return fs
+end
+
+-- ---------------------------------------------------------------- card
+
+-- S.Card(parent, opts): cardFill + 1 px cardEdge, pad 12 (16 for a settings group).
+-- opts: pad, icon (painted path, 32 px), title, line1 (13 text), line2 (11 muted), pill, pillColor,
+-- onClick (adds the hover fill and a chevron), tip (lines or function).
+-- c:SetContent(opts) and c:Fit(width) -> measured height.
+function S.Card(parent, opts)
+    opts = opts or {}
+    local clickable = opts.onClick ~= nil
+    local c = CreateFrame(clickable and "Button" or "Frame", nil, parent)
+    c.wlOwned = true
+    c.pad = opts.pad or 12
+    c.bg = S.Solid(c, "BACKGROUND", T.cardFill); c.bg:SetAllPoints()
+    c.hl = S.Solid(c, "BACKGROUND", T.hoverFill); c.hl:SetAllPoints(); c.hl:SetAlpha(0)
+    c.edge = S.Border(c, T.cardEdge)
+    c.iconFrame = CreateFrame("Frame", nil, c)
+    c.iconFrame:SetSize(32, 32)
+    c.icon = c.iconFrame:CreateTexture(nil, "ARTWORK"); c.icon:SetAllPoints()
+    S.Border(c.iconFrame, T.cardEdge)
+    c.iconFrame:Hide()
+    c.title = S.Text(c, root.F.heading, T.fg)
+    c.title:SetJustifyH("LEFT"); c.title:SetJustifyV("TOP")
+    c.line1 = S.Text(c, root.F.body, T.text)
+    c.line1:SetJustifyH("LEFT"); c.line1:SetJustifyV("TOP")
+    c.line2 = S.Text(c, root.F.meta, T.muted)
+    c.line2:SetJustifyH("LEFT"); c.line2:SetJustifyV("TOP")
+    c.pill = S.Pill(c)
+    if clickable then
+        c.chev = root.Icon(c, "chevron_right", 16, "ARTWORK", T.muted)
+        c.chev:SetPoint("RIGHT", -c.pad, 0)
+        c:SetScript("OnClick", opts.onClick)
+        c:SetScript("OnMouseDown", function(self) self.hl:SetColorTexture(T.pressFill[1], T.pressFill[2], T.pressFill[3], T.pressFill[4]) end)
+        c:SetScript("OnMouseUp", function(self) self.hl:SetColorTexture(T.hoverFill[1], T.hoverFill[2], T.hoverFill[3], T.hoverFill[4]) end)
+    end
+    c:SetScript("OnEnter", function(self)
+        if clickable then
+            root.Tween(self, self.hov or 0, 1, 0.10, function(v) self.hov = v; self.hl:SetAlpha(v) end)
+            self.chev:SetVertexColor(T.fg[1], T.fg[2], T.fg[3])
+        end
+        local t = type(self.tip) == "function" and self.tip() or self.tip
+        if t then S.Tip(self, t) else local cut = root.CutLines(self); if #cut > 0 then S.Tip(self, cut) end end
     end)
-    b:SetScript("OnLeave", function()
-        fill:SetColorTexture(1, 1, 1, 0); icon:SetDesaturated(true); icon:SetAlpha(0.8)
-        label:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
+    c:SetScript("OnLeave", function(self)
+        if clickable then
+            root.Tween(self, self.hov or 0, 0, 0.10, function(v) self.hov = v; self.hl:SetAlpha(v) end)
+            self.chev:SetVertexColor(T.muted[1], T.muted[2], T.muted[3])
+        end
         S.HideTip()
     end)
-    b:SetScript("OnClick", onClick)
-    b.label = label
+    function c:SetContent(o)
+        o = o or {}
+        if o.icon then S.Painted(self.icon, o.icon); self.iconFrame:Show() else self.iconFrame:Hide() end
+        self.title:SetText(o.title or ""); self.title:SetShown(o.title ~= nil)
+        self.line1:SetText(o.line1 or ""); self.line1:SetShown(o.line1 ~= nil)
+        self.line2:SetText(o.line2 or ""); self.line2:SetShown(o.line2 ~= nil)
+        if o.pill then self.pill:Set(o.pill, o.pillColor, o.pillIcon) else self.pill:Hide() end
+        if o.tip ~= nil then self.tip = o.tip end
+    end
+    function c:Fit(width)
+        width = width or num(self:GetWidth()) or 0
+        local pad = self.pad
+        local x = pad + (self.iconFrame:IsShown() and 40 or 0)
+        local right = pad + (self.chev and 24 or 0)
+        local textW = math.max(40, width - x - right)
+        self.iconFrame:ClearAllPoints(); self.iconFrame:SetPoint("TOPLEFT", pad, -pad)
+        local pillW = self.pill:IsShown() and (num(self.pill:GetWidth()) or 0) + 8 or 0
+        self.pill:ClearAllPoints(); self.pill:SetPoint("TOPRIGHT", -right, -pad)
+        local y = pad
+        local h = 0
+        if self.title:IsShown() then
+            self.title:ClearAllPoints(); self.title:SetPoint("TOPLEFT", x, -y)
+            h = root.FitText(self.title, 2, textW - pillW, self)
+            y = y + h
+        end
+        if self.line1:IsShown() then
+            if y > pad then y = y + 4 end
+            self.line1:ClearAllPoints(); self.line1:SetPoint("TOPLEFT", x, -y)
+            y = y + root.FitText(self.line1, 2, textW, self)
+        end
+        if self.line2:IsShown() then
+            if y > pad then y = y + 3 end
+            self.line2:ClearAllPoints(); self.line2:SetPoint("TOPLEFT", x, -y)
+            y = y + root.FitText(self.line2, 2, textW, self)
+        end
+        local inner = math.max(y - pad, self.iconFrame:IsShown() and 32 or 0)
+        local total = pad + inner + pad
+        self:SetHeight(total)
+        return total
+    end
+    c.tip = opts.tip
+    c:SetContent(opts)
+    return c
+end
+
+-- ---------------------------------------------------------------- list row
+
+-- S.ListRow(parent, opts): opts.density "dense" (min 36, name 12) or "reading" (min 44, name 13),
+-- opts.onClick, opts.tip, opts.zebra (index: black 0.10 / 0.18 fill instead of cardFill).
+-- row:Set{ icon = path | hd = name, name, nameColor, detail, value, unit, rank }
+-- row:AddAction(iconName, tip, onClick), row:SetSelected(on), row:Fit(width) -> measured height.
+function S.ListRow(parent, opts)
+    opts = opts or {}
+    local reading = opts.density == "reading"
+    local r = CreateFrame("Button", nil, parent)
+    r.wlOwned = true
+    r.minH = reading and 44 or 36
+    r.bg = S.Solid(r, "BACKGROUND", T.cardFill); r.bg:SetAllPoints()
+    if opts.zebra then
+        local z = (opts.zebra % 2 == 0) and T.zebraB or T.zebraA
+        r.bg:SetColorTexture(z[1], z[2], z[3], z[4])
+    end
+    r.sel = S.Solid(r, "BACKGROUND", T.selFill); r.sel:SetAllPoints(); r.sel:Hide()
+    r.hl = S.Solid(r, "BORDER", T.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
+    r.press = S.Solid(r, "BORDER", T.pressFill); r.press:SetAllPoints(); r.press:Hide()
+    r.rank = S.Text(r, root.F.label, T.muted, true)
+    r.rank:SetWordWrap(false); r.rank:SetJustifyH("CENTER"); r.rank:SetWidth(24); r.rank:Hide()
+    r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:Hide()
+    r.name = S.Text(r, reading and root.F.body or root.F.label, T.fg)
+    r.name:SetJustifyH("LEFT"); r.name:SetJustifyV("TOP")
+    r.detail = S.Text(r, root.F.meta, T.muted)
+    r.detail:SetJustifyH("LEFT"); r.detail:SetJustifyV("TOP")
+    r.value = S.Text(r, root.F.label, T.fg)
+    r.value:SetJustifyH("RIGHT"); S.ClampLabel(r.value, nil, r)
+    r.unit = S.Text(r, root.F.meta, T.muted)
+    r.unit:SetWordWrap(false)
+    r.actions = {}
+    function r:AddAction(iconName, tip, onClick)
+        local a = S.IconButton(self, iconName, 24, tip, onClick)
+        a.icon:SetSize(16, 16)
+        a:SetAlpha(0.6)
+        self.actions[#self.actions + 1] = a
+        return a
+    end
+    local function Hover(on)
+        root.Tween(r, r.hov or 0, on and 1 or 0, 0.10, function(v) r.hov = v; r.hl:SetAlpha(v) end)
+        for _, a in ipairs(r.actions) do a:SetAlpha(on and 1 or 0.6) end
+    end
+    r:SetScript("OnEnter", function(self)
+        Hover(true)
+        local t = type(self.tip) == "function" and self.tip(self) or self.tip
+        if t then S.Tip(self, t) else local cut = root.CutLines(self); if #cut > 0 then S.Tip(self, cut) end end
+    end)
+    r:SetScript("OnLeave", function() Hover(false); S.HideTip() end)
+    r:SetScript("OnMouseDown", function(self) self.press:Show() end)
+    r:SetScript("OnMouseUp", function(self) self.press:Hide() end)
+    if opts.onClick then r:SetScript("OnClick", opts.onClick) end
+    r.tip = opts.tip
+    function r:SetSelected(on) self.selected = on and true or nil; self.sel:SetShown(on and true or false) end
+    function r:ApplyState(state) self:SetSelected(state == "selected") end
+    function r:Set(o)
+        o = o or {}
+        local iconSize = reading and 30 or 20
+        if o.hd then
+            self.icon:SetSize(16, 16); root.SetHDIcon(self.icon, o.hd, o.hdColor or T.muted); self.icon:Show()
+        elseif o.icon then
+            self.icon:SetSize(o.iconSize or iconSize, o.iconSize or iconSize); S.Painted(self.icon, o.icon); self.icon:SetVertexColor(1, 1, 1); self.icon:Show()
+        else self.icon:Hide() end
+        if o.rank then
+            self.rank:SetText(o.rank)
+            local c = (type(o.rank) == "number" and o.rank <= 3) and T.gold or T.muted
+            self.rank:SetTextColor(c[1], c[2], c[3]); self.rank:Show()
+        else self.rank:Hide() end
+        self.name:SetText(o.name or "")
+        local nc = o.nameColor or T.fg
+        self.name:SetTextColor(nc[1], nc[2], nc[3])
+        self.detail:SetText(o.detail or ""); self.detail:SetShown(o.detail ~= nil and o.detail ~= "")
+        self.value:SetText(o.value or ""); self.value:SetShown(o.value ~= nil)
+        self.unit:SetText(o.unit or ""); self.unit:SetShown(o.unit ~= nil)
+        if o.tip ~= nil then self.tip = o.tip end
+    end
+    function r:Fit(width)
+        width = width or num(self:GetWidth()) or 0
+        local x = 8
+        if self.rank:IsShown() then self.rank:ClearAllPoints(); self.rank:SetPoint("TOPLEFT", x, -6); x = x + 24 + 4 end
+        if self.icon:IsShown() then
+            self.icon:ClearAllPoints(); self.icon:SetPoint("TOPLEFT", x, -6)
+            x = x + (num(self.icon:GetWidth()) or 20) + 8
+        end
+        local right = 12
+        for i = #self.actions, 1, -1 do
+            local a = self.actions[i]
+            if a:IsShown() then
+                a:ClearAllPoints(); a:SetPoint("RIGHT", -right + 4, 0)
+                right = right + 24
+            end
+        end
+        if self.unit:IsShown() then
+            self.unit:ClearAllPoints(); self.unit:SetPoint("TOPRIGHT", -right, -7)
+            local ok, uw = pcall(self.unit.GetStringWidth, self.unit)
+            right = right + math.ceil((ok and num(uw)) or 0) + 4
+        end
+        if self.value:IsShown() then
+            local vw = self.valueW or 64
+            self.value:ClearAllPoints(); self.value:SetPoint("TOPRIGHT", -right, -6); self.value:SetWidth(vw)
+            right = right + vw + 8
+        end
+        local textW = math.max(40, width - x - right)
+        self.name:ClearAllPoints(); self.name:SetPoint("TOPLEFT", x, -6)
+        local h = 6 + root.FitText(self.name, 2, textW, self)
+        if self.detail:IsShown() then
+            self.detail:ClearAllPoints(); self.detail:SetPoint("TOPLEFT", self.name, "BOTTOMLEFT", 0, -3)
+            h = h + 3 + root.FitText(self.detail, 2, textW, self)
+        end
+        h = math.max(self.minH, math.ceil(h + 8))
+        self:SetHeight(h)
+        return h
+    end
+    return r
+end
+
+-- ---------------------------------------------------------------- empty state
+
+-- S.EmptyState(parent, iconName, title, text, buttonLabel, onClick, kind): one block centred
+-- 24 px under the top of `parent`: HD icon 32 muted, title 14 fg (the fact), an optional sentence
+-- 12 muted (why, or what will show up here), and the one action (primary unless kind says
+-- otherwise). e:Set(...) with the same arguments; e:Fit() -> block height (for f:FitHeight).
+function S.EmptyState(parent, iconName, title, text, buttonLabel, onClick, kind)
+    local e = CreateFrame("Frame", nil, parent)
+    e.wlOwned = true
+    e.wrapW = 320
+    e:SetWidth(e.wrapW)
+    e:SetPoint("TOP", parent, "TOP", 0, -24)
+    e.icon = root.Icon(e, iconName or "info", 32, "ARTWORK", T.muted)
+    e.icon:SetPoint("TOP", 0, 0)
+    e.title = S.Text(e, root.F.heading, T.fg)
+    e.title:SetJustifyH("CENTER"); e.title:SetJustifyV("TOP")
+    e.text = S.Text(e, root.F.label, T.muted)
+    e.text:SetJustifyH("CENTER"); e.text:SetJustifyV("TOP")
+    e.button = S.Button(e, "", 0, 28, kind or "primary", function(...) if e.onClick then e.onClick(...) end end)
+    function e:Set(icon, t, s, label, click, k)
+        if icon then root.SetHDIcon(self.icon, icon, T.muted) end
+        self.title:SetText(t or "")
+        self.text:SetText(s or ""); self.text:SetShown(s ~= nil and s ~= "")
+        self.onClick = click
+        if k then self.button:SetKind(k) end
+        if label then self.button:SetText(label); self.button:Show() else self.button:Hide() end
+        return self:Fit()
+    end
+    -- wrap width: 320, or less when the content area is narrower
+    function e:SetWrapWidth(w) self.wrapW = math.min(320, w); self:SetWidth(self.wrapW); return self:Fit() end
+    function e:Fit()
+        local w = self.wrapW
+        local y = 32 + 8
+        self.title:ClearAllPoints(); self.title:SetPoint("TOP", 0, -y)
+        y = y + root.FitText(self.title, 2, w, self)
+        if self.text:IsShown() then
+            y = y + 4
+            self.text:ClearAllPoints(); self.text:SetPoint("TOP", 0, -y)
+            y = y + root.FitText(self.text, 0, w, self)
+        end
+        if self.button:IsShown() then
+            y = y + 12
+            self.button:ClearAllPoints(); self.button:SetPoint("TOP", 0, -y)
+            y = y + 28
+        end
+        y = math.ceil(y)
+        self:SetHeight(y)
+        self.blockH = y
+        return y
+    end
+    e:Set(iconName, title, text, buttonLabel, onClick)
+    return e
+end
+
+-- ---------------------------------------------------------------- banner and toast
+
+local SEMANTIC_ICON = { info = "info", warn = "warning", ok = "check", bad = "warning" }
+
+-- S.Banner(parent, kind, text, linkLabel, onLink, dismissible): inside a window, under the tabs.
+-- kind: "info" | "warn" | "ok" | "bad". b:SetText(text, kind), b:Fit(width) -> height.
+function S.Banner(parent, kind, text, linkLabel, onLink, dismissible)
+    local b = CreateFrame("Frame", nil, parent)
+    b.wlOwned = true
+    b.base = S.Solid(b, "BACKGROUND", T.cardFill); b.base:SetAllPoints()
+    b.tint = S.Solid(b, "BACKGROUND", T.info, 0.16); b.tint:SetAllPoints()
+    b.edge = S.Border(b, T.info, 0.4)
+    b.icon = root.Icon(b, "info", 16, "ARTWORK", T.info)
+    b.icon:SetPoint("TOPLEFT", 12, -8)
+    b.text = S.Text(b, root.F.label, T.fg)
+    b.text:SetJustifyH("LEFT"); b.text:SetJustifyV("TOP")
+    b.text:SetPoint("TOPLEFT", b.icon, "TOPRIGHT", 8, 0)
+    if linkLabel then
+        b.link = S.Button(b, linkLabel, 0, 24, "ghost", onLink)
+        b.link:SetPoint("RIGHT", dismissible and -32 or -12, 0)
+    end
+    if dismissible then
+        b.close = S.IconButton(b, "close", 20, { L("Masquer ce message"), L("Clic : masquer ce message") }, function()
+            b:Hide(); if b.onDismiss then b.onDismiss() end
+        end)
+        b.close.icon:SetSize(12, 12)
+        b.close:SetPoint("TOPRIGHT", -6, -6)
+    end
+    function b:SetText(t, k)
+        k = k or self.kind or "info"
+        self.kind = k
+        local c = T[k] or T.info
+        self.tint:SetColorTexture(c[1], c[2], c[3], 0.16)
+        self.edge(c, 0.4)
+        root.SetHDIcon(self.icon, SEMANTIC_ICON[k] or "info", c)
+        self.text:SetText(t or "")
+    end
+    function b:Fit(width)
+        width = width or num(self:GetWidth()) or 0
+        local right = 12 + (self.link and ((num(self.link:GetWidth()) or 0) + 8) or 0) + (self.close and 20 or 0)
+        local th = root.FitText(self.text, 0, math.max(40, width - 12 - 16 - 8 - right), self)
+        local h = math.ceil(math.max(16, th) + 16)
+        self:SetHeight(h)
+        return h
+    end
+    b:SetText(text, kind)
     return b
 end
 
--- A window with WL Helper's header: logo, title, subtitle, close; moves with the header, saved
--- position under db[posKey], Escape closes it.
-function S.Window(name, width, height, title, subtitle, db, posKey)
-    local C = S.C
+local toastPool, toastShown = {}, {}
+local function RestackToasts()
+    local y = -120
+    for _, t in ipairs(toastShown) do
+        t:ClearAllPoints(); t:SetPoint("TOP", UIParent, "TOP", 0, y)
+        y = y - (num(t:GetHeight()) or 40) - 6
+    end
+end
+local function DropToast(t)
+    for i, x in ipairs(toastShown) do if x == t then table.remove(toastShown, i) break end end
+    t:Hide()
+    toastPool[#toastPool + 1] = t
+    RestackToasts()
+end
+-- S.Toast(text, sub, kind, linkLabel, onLink): top centre, 4 s (6 with a link), at most 2.
+-- Never a replacement for the in-place confirmation on the button that acted.
+function S.Toast(text, sub, kind, linkLabel, onLink)
+    local t = table.remove(toastPool)
+    if not t then
+        t = CreateFrame("Frame", nil, UIParent)
+        t.wlOwned = true
+        t:SetFrameStrata("DIALOG")
+        t:SetWidth(320)
+        S.Solid(t, "BACKGROUND", T.panel, 0.96):SetAllPoints()
+        S.Border(t, T.cardEdge)
+        t.icon = root.Icon(t, "info", 16, "ARTWORK", T.info)
+        t.icon:SetPoint("TOPLEFT", 10, -10)
+        t.text = S.Text(t, root.F.label, T.fg)
+        t.text:SetJustifyH("LEFT"); t.text:SetJustifyV("TOP")
+        t.text:SetPoint("TOPLEFT", t.icon, "TOPRIGHT", 8, 0)
+        t.sub = S.Text(t, root.F.meta, T.muted)
+        t.sub:SetJustifyH("LEFT"); t.sub:SetJustifyV("TOP")
+        t.sub:SetPoint("TOPLEFT", t.text, "BOTTOMLEFT", 0, -3)
+        t.link = S.Button(t, "", 0, 24, "ghost")
+        t.link:SetPoint("BOTTOMRIGHT", -6, 6)
+    end
+    while #toastShown >= 2 do DropToast(toastShown[1]) end
+    kind = kind or "info"
+    local c = T[kind] or T.info
+    root.SetHDIcon(t.icon, SEMANTIC_ICON[kind] or "info", c)
+    t.text:SetText(text or "")
+    local th = root.FitText(t.text, 2, 320 - 10 - 16 - 8 - 10, t)
+    local h = 10 + th
+    if sub then
+        t.sub:SetText(sub); t.sub:Show()
+        h = h + 3 + root.FitText(t.sub, 1, 320 - 10 - 16 - 8 - 10, t)
+    else t.sub:Hide() end
+    if linkLabel then
+        t.link:SetText(linkLabel); t.link:SetScript("OnClick", function() if onLink then onLink() end; DropToast(t) end)
+        t.link:Show(); h = h + 4 + 24
+    else t.link:Hide() end
+    t:SetHeight(math.max(36, math.ceil(h + 10)))
+    toastShown[#toastShown + 1] = t
+    RestackToasts()
+    t:SetAlpha(0); t:Show()
+    root.Tween(t, 0, 1, 0.15, function(v) t:SetAlpha(v) end)
+    local token = {}
+    t.token = token
+    C_Timer.After(linkLabel and 6 or 4, function()
+        if t.token ~= token then return end
+        root.Tween(t, 1, 0, 0.15, function(v)
+            t:SetAlpha(v)
+            if v <= 0 and t.token == token then DropToast(t) end
+        end)
+    end)
+    return t
+end
+
+-- ---------------------------------------------------------------- input
+
+-- S.Input(parent, width, opts): an edit box 28 high, panel fill, 1 px line border (accent when
+-- focused). opts: search (HD search icon + clear button), placeholder ("Ex. Zul'Farrak"), label
+-- (11 muted above), onChange(text), onEnter(text). box:SetError(text) shows one sentence under it.
+function S.Input(parent, width, opts)
+    opts = opts or {}
+    local eb = CreateFrame("EditBox", nil, parent)
+    eb.wlOwned = true
+    eb:SetSize(width or 200, 28)
+    eb:SetAutoFocus(false)
+    local ok = pcall(eb.SetFont, eb, T.font or STANDARD_TEXT_FONT, root.F.label, "")
+    if not ok and eb.SetFontObject then eb:SetFontObject("ChatFontNormal") end
+    eb:SetTextColor(T.fg[1], T.fg[2], T.fg[3])
+    S.Solid(eb, "BACKGROUND", T.panel, 1):SetAllPoints()
+    eb.border = S.Border(eb, T.line)
+    local left, right = 8, 8
+    if opts.search then
+        eb.searchIcon = root.Icon(eb, "search", 14, "ARTWORK", T.muted)
+        eb.searchIcon:SetPoint("LEFT", 8, 0)
+        left = 28
+        eb.clear = S.IconButton(eb, "close", 20, { L("Effacer"), L("Clic : effacer la recherche") }, function()
+            eb:SetText(""); eb:ClearFocus()
+            if opts.onChange then opts.onChange("") end
+        end)
+        eb.clear.icon:SetSize(12, 12)
+        eb.clear:SetPoint("RIGHT", -4, 0)
+        eb.clear:Hide()
+        right = 24
+    end
+    eb:SetTextInsets(left, right, 0, 0)
+    eb.placeholder = S.Text(eb, root.F.label, T.faint)
+    eb.placeholder:SetPoint("LEFT", left, 0); eb.placeholder:SetPoint("RIGHT", -right, 0)
+    eb.placeholder:SetJustifyH("LEFT")
+    S.ClampLabel(eb.placeholder, opts.placeholder or "", eb)
+    eb.placeholder:SetText(opts.placeholder or "")
+    if opts.label then
+        eb.label = S.Text(parent, root.F.meta, T.muted)
+        eb.label:SetPoint("BOTTOMLEFT", eb, "TOPLEFT", 0, 4)
+        eb.label:SetText(opts.label)
+    end
+    eb.err = S.Text(parent, root.F.meta, T.bad)
+    eb.err:SetPoint("TOPLEFT", eb, "BOTTOMLEFT", 0, -4)
+    eb.err:SetJustifyH("LEFT")
+    eb.err:Hide()
+    local function Paint()
+        local focused = eb.focused
+        local bad = eb.err:IsShown()
+        eb.border(bad and T.bad or (focused and T.accent or T.line), 1)
+        if eb.searchIcon then
+            local c = focused and T.fg or T.muted
+            eb.searchIcon:SetVertexColor(c[1], c[2], c[3])
+        end
+        local t = eb:GetText() or ""
+        eb.placeholder:SetShown(t == "")
+        if eb.clear then eb.clear:SetShown(t ~= "") end
+    end
+    eb.Paint = Paint
+    function eb:SetError(text)
+        if text and text ~= "" then
+            self.err:SetText(text); self.err:SetWidth(num(self:GetWidth()) or 200); self.err:Show()
+        else self.err:Hide() end
+        Paint()
+    end
+    function eb:SetPlaceholder(text) self.placeholder:SetText(text or ""); self.placeholder.wlFull = text end
+    eb:SetScript("OnEditFocusGained", function(self) self.focused = true; Paint() end)
+    eb:SetScript("OnEditFocusLost", function(self) self.focused = nil; Paint() end)
+    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnEnterPressed", function(self)
+        if opts.onEnter then opts.onEnter(self:GetText() or "") end
+        self:ClearFocus()
+    end)
+    eb:SetScript("OnTextChanged", function(self, user)
+        Paint()
+        if user and opts.onChange then opts.onChange(self:GetText() or "") end
+    end)
+    Paint()
+    return eb
+end
+
+-- ---------------------------------------------------------------- scroll area
+
+-- S.ScrollArea(parent): a scroll frame with a thin overlay bar (only shown when something
+-- overflows: 4 px, inset 2 from the right and 4 from the top and bottom, thumb white 0.27, 0.45
+-- on hover or drag, 30 px minimum). Wheel step 48 px, smoothed. Put the content in sa.child and
+-- call sa:SetContentHeight(h) after each render. sa:ScrollTo(y), sa:GetScroll().
+function S.ScrollArea(parent)
+    local sa = CreateFrame("ScrollFrame", nil, parent)
+    sa.wlOwned = true
+    sa.child = CreateFrame("Frame", nil, sa)
+    sa.child:SetSize(1, 1)
+    sa:SetScrollChild(sa.child)
+    sa.contentH, sa.target, sa.cur = 0, 0, 0
+    local bar = CreateFrame("Frame", nil, sa)
+    bar:SetWidth(4)
+    bar:SetPoint("TOPRIGHT", sa, "TOPRIGHT", -2, -4)
+    bar:SetPoint("BOTTOMRIGHT", sa, "BOTTOMRIGHT", -2, 4)
+    bar:SetFrameLevel((sa:GetFrameLevel() or 1) + 5)
+    S.Solid(bar, "BACKGROUND", { 1, 1, 1, 0.02 }):SetAllPoints()
+    local thumb = CreateFrame("Frame", nil, bar)
+    thumb:SetWidth(4)
+    thumb:EnableMouse(true)
+    thumb.tex = S.Solid(thumb, "ARTWORK", { 1, 1, 1, 0.27 }); thumb.tex:SetAllPoints()
+    sa.bar, sa.thumb = bar, thumb
+    local function ViewH() return num(sa:GetHeight()) or 0 end
+    local function MaxScroll() return math.max(0, sa.contentH - ViewH()) end
+    local function PaintThumb()
+        local a = (thumb.hover or thumb.drag) and 0.45 or 0.27
+        thumb.tex:SetColorTexture(1, 1, 1, a)
+    end
+    local function PlaceThumb()
+        local max = MaxScroll()
+        if max <= 0 then bar:Hide(); return end
+        bar:Show()
+        local trackH = num(bar:GetHeight()) or 0
+        local th = math.max(30, trackH * ViewH() / math.max(1, sa.contentH))
+        th = math.min(th, trackH)
+        thumb:SetHeight(th)
+        local y = (trackH - th) * (sa.cur / max)
+        thumb:ClearAllPoints(); thumb:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, -y)
+    end
+    local function Apply(y)
+        sa.cur = y
+        sa:SetVerticalScroll(y)
+        PlaceThumb()
+    end
+    -- smoothed wheel: lerp toward the target (speed 12), stopped when it arrives
+    local function Step(_, elapsed)
+        local d = sa.target - sa.cur
+        if math.abs(d) < 0.5 then Apply(sa.target); sa:SetScript("OnUpdate", nil); return end
+        Apply(sa.cur + d * math.min(1, (elapsed or 0.016) * 12))
+    end
+    function sa:ScrollTo(y, instant)
+        self.target = math.max(0, math.min(MaxScroll(), y or 0))
+        if instant then Apply(self.target); self:SetScript("OnUpdate", nil)
+        else self:SetScript("OnUpdate", Step) end
+    end
+    function sa:GetScroll() return self.cur end
+    function sa:SetContentHeight(h)
+        self.contentH = math.max(0, h or 0)
+        self.child:SetHeight(math.max(1, self.contentH))
+        self.child:SetWidth(math.max(1, num(self:GetWidth()) or 1))
+        if self.target > MaxScroll() then self:ScrollTo(MaxScroll(), true) else PlaceThumb() end
+    end
+    sa:EnableMouseWheel(true)
+    sa:SetScript("OnMouseWheel", function(self, delta) self:ScrollTo(self.target - delta * 48) end)
+    sa:SetScript("OnSizeChanged", function(self, w)
+        if num(w) then self.child:SetWidth(math.max(1, w)) end
+        PlaceThumb()
+    end)
+    thumb:SetScript("OnEnter", function(self) self.hover = true; PaintThumb() end)
+    thumb:SetScript("OnLeave", function(self) self.hover = nil; PaintThumb() end)
+    thumb:SetScript("OnMouseDown", function(self)
+        local _, cy = GetCursorPosition()
+        local scale = num(bar:GetEffectiveScale()) or 1
+        self.drag = { y = (num(cy) or 0) / scale, from = sa.cur }
+        PaintThumb()
+        self:SetScript("OnUpdate", function()
+            local d = self.drag
+            if not d then return end
+            local _, y2 = GetCursorPosition()
+            local trackH = (num(bar:GetHeight()) or 0) - (num(self:GetHeight()) or 0)
+            if trackH <= 0 then return end
+            local dy = d.y - (num(y2) or 0) / scale
+            sa:ScrollTo(d.from + dy / trackH * MaxScroll(), true)
+        end)
+    end)
+    thumb:SetScript("OnMouseUp", function(self) self.drag = nil; self:SetScript("OnUpdate", nil); PaintThumb() end)
+    bar:Hide()
+    return sa
+end
+
+-- Sizes a window to its content (f:FitHeight for S.Window, the same formula for older frames).
+S.FitWindow = root.FitWindow
+
+-- ---------------------------------------------------------------- window
+
+-- The home button: the HD house, 28 x 28, no word next to it.
+function S.HomeButton(parent, onClick)
+    local b = S.IconButton(parent, "home", 28, { L("Accueil"), L("Clic : revenir à l'accueil") }, onClick)
+    return b
+end
+
+-- Windows that are the home page or small popups: no home button.
+local NO_BACK = { WLHelperHome = true, WLHelperDecline = true, WLHelperWelcome = true, WLHelperOrderMsg = true }
+
+-- Converts the window's anchor to TOPLEFT so a new height grows downward (the header stays put).
+local function KeepTop(f)
+    local p = f:GetPoint()
+    if p == "TOPLEFT" then return end
+    local l, t = num(f:GetLeft()), num(f:GetTop())
+    if not (l and t) then return end
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
+end
+
+-- Lowest visible point of the window's content (not anchored to the window's bottom), for
+-- windows that do not give their content height.
+local function MeasureBottom(f)
+    local top, bottom = num(f:GetTop()), num(f:GetBottom())
+    if not (top and bottom) then return nil end
+    local lowest = top
+    local function consider(obj)
+        if obj == f.footer or (obj.IsShown and not obj:IsShown()) then return end
+        local b = num(obj:GetBottom())
+        if b and b > bottom + 0.5 and b < lowest then lowest = b end
+    end
+    for _, c in ipairs({ f:GetChildren() }) do consider(c) end
+    for _, r in ipairs({ f:GetRegions() }) do consider(r) end
+    return top - lowest
+end
+
+-- S.Window(name, width, height, title, subtitle, db, posKey, opts)
+-- opts: header (44 for the design-system header; 38 by default for windows not migrated yet),
+-- footer (true: a 24 px footer with f.footer.note and f.footer.status), minH, strata, noHome.
+-- f:FitHeight(contentH) sizes the window to its content (measured when contentH is nil);
+-- f:FitHeightLater(contentH) does it on the next frame (after wrapped text got its width).
+-- f:AddHeaderButton(btn) puts an icon in the right cluster; f:SetFooter(note, status).
+-- f:ContentTop() is the y of the content area (under the header and the tabs).
+function S.Window(name, width, height, title, subtitle, db, posKey, opts)
+    opts = opts or {}
     local f = CreateFrame("Frame", name, UIParent)
     f:SetSize(width, height)
-    f:SetFrameStrata("HIGH")
+    f:SetFrameStrata(opts.strata or "MEDIUM")
     f:SetClampedToScreen(true)
     f:SetMovable(true)
     f:EnableMouse(true)
-    local pos = db and db[posKey]
+    f.wlDb, f.wlPosKey = db, posKey
+    local pos = db and posKey and db[posKey]
     if pos then f:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4]) else f:SetPoint("CENTER") end
-    tinsert(UISpecialFrames, name)
-    S.Solid(f, "BACKGROUND", C.bg):SetAllPoints()
-    S.Border(f, C.border)
+    if name then tinsert(UISpecialFrames, name) end
+    root.RegisterWindow(f)
+    S.Solid(f, "BACKGROUND", T.bg):SetAllPoints()
+    S.Border(f, T.cardEdge)
 
+    local HH = opts.header or S.LEGACY_HEADER_H
+    f.headerH = HH
+    f.minH = opts.minH or 200
     local h = CreateFrame("Frame", nil, f)
-    h:SetPoint("TOPLEFT", 1, -1); h:SetPoint("TOPRIGHT", -1, -1); h:SetHeight(38)
-    S.Solid(h, "BACKGROUND", C.header):SetAllPoints()
-    local line = S.Solid(h, "BORDER", C.divider)
-    line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); line:SetHeight(1)
+    h:SetPoint("TOPLEFT", 0, 0); h:SetPoint("TOPRIGHT", 0, 0); h:SetHeight(HH)
+    local rule = S.Solid(f, "BORDER", T.line)
+    rule:SetPoint("TOPLEFT", 0, -HH); rule:SetPoint("TOPRIGHT", 0, -HH)
+    root.PixelLine(f, rule, true)
+    f.headerRule = rule
     h:EnableMouse(true)
     h:RegisterForDrag("LeftButton")
+    h:SetScript("OnMouseDown", function() f:Raise() end)
     h:SetScript("OnDragStart", function() f:StartMoving() end)
     h:SetScript("OnDragStop", function()
         f:StopMovingOrSizing()
-        if db then local p, _, rp, x, y = f:GetPoint(); db[posKey] = { p, rp, x, y } end
+        KeepTop(f)
+        if db and posKey then local p, _, rp, x, y = f:GetPoint(); db[posKey] = { p, rp, x, y } end
     end)
-    -- back to the home page: "‹" and the logo, in every window but the home page and the small popups
-    local NO_BACK = { WLHelperHome = true, WLHelperDecline = true, WLHelperWelcome = true }
-    local logoX = 9
     local function GoHome()
         f:Hide()
         local WP = ns.WP
         if WP and WP.OpenHome then WP.OpenHome() end
     end
-    local function HomeTip(self) S.Tip(self, { ns.L and ns.L("Retour à l'accueil") or "Home" }) end
-    if not NO_BACK[name or ""] then
+    local midY = -math.floor((HH - 28) / 2)
+    local logoX = 8
+    if not (NO_BACK[name or ""] or opts.noHome) then
         f.back = S.HomeButton(h, GoHome)
-        f.back:SetPoint("LEFT", 6, 0)
-        logoX = nil
+        f.back:SetPoint("TOPLEFT", 8, midY)
+        logoX = 40
     end
     local logo = h:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(20, 20); logo:SetTexture(S.LOGO)
-    if logoX then logo:SetPoint("LEFT", logoX, 0) else logo:SetPoint("LEFT", f.back, "RIGHT", 10, 0) end
-    if not NO_BACK[name or ""] then
-        local lb = CreateFrame("Button", nil, h)
-        lb:SetAllPoints(logo)
-        lb:SetScript("OnClick", GoHome)
-        lb:SetScript("OnEnter", HomeTip); lb:SetScript("OnLeave", S.HideTip)
-    end
-    f.title = S.Text(h, 15, C.text, true)
-    f.title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
-    f.title:SetText(title or "")
-    f.subtitle = S.Text(h, 13, C.dim)
-    f.subtitle:SetPoint("LEFT", f.title, "RIGHT", 8, 0)
-    f.subtitle:SetText(subtitle or "")
-    local close = S.CloseButton(h, 32, function() f:Hide() end, nil, 11)
-    close:SetPoint("RIGHT", -2, 0)
+    logo:SetSize(28, 28); logo:SetTexture(S.LOGO)
+    logo:SetPoint("TOPLEFT", logoX, midY)
+    f.logo = logo
+    f.title = S.Text(h, root.F.title, T.fg, true)
+    f.title:SetJustifyH("LEFT")
+    S.ClampLabel(f.title, nil, h)
+    f.subtitle = S.Text(h, root.F.meta, T.muted)
+    f.subtitle:SetJustifyH("LEFT")
+    S.ClampLabel(f.subtitle, nil, h)
+    local close = S.CloseButton(h, 28, function() f:Hide() end)
+    close:SetPoint("TOPRIGHT", -8, midY)
     f.header, f.close = h, close
+    f.rightIcons = { close }
+    local function TitleRight()
+        -- the right cluster plus one free slot for icons that older windows place themselves
+        local n = #f.rightIcons + (f.legacySlot ~= false and 1 or 0)
+        return -(8 + n * 28 + (n - 1) * 4 + 8)
+    end
+    local function LayoutTitle()
+        local sub = f.subtitle:GetText()
+        local hasSub = type(sub) == "string" and sub ~= ""
+        f.title:ClearAllPoints(); f.subtitle:ClearAllPoints()
+        local x = logoX + 28 + 8
+        if hasSub then
+            local top = math.max(3, math.floor((HH - 32) / 2))
+            f.title:SetPoint("TOPLEFT", h, "TOPLEFT", x, -top)
+            f.title:SetPoint("TOPRIGHT", h, "TOPRIGHT", TitleRight(), -top)
+            f.subtitle:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -2)
+            f.subtitle:SetPoint("TOPRIGHT", f.title, "BOTTOMRIGHT", 0, -2)
+            f.subtitle:Show()
+        else
+            f.title:SetPoint("LEFT", h, "LEFT", x, 0)
+            f.title:SetPoint("RIGHT", h, "RIGHT", TitleRight(), 0)
+            f.subtitle:Hide()
+        end
+    end
+    local tset, sset = f.title.SetText, f.subtitle.SetText
+    f.title.SetText = function(self, t) tset(self, t); LayoutTitle() end
+    f.subtitle.SetText = function(self, t) sset(self, t); LayoutTitle() end
+    f.title:SetText(title or "")
+    f.subtitle:SetText(subtitle or "")
+    function f:AddHeaderButton(btn)
+        local last = self.rightIcons[#self.rightIcons]
+        btn:ClearAllPoints()
+        btn:SetPoint("RIGHT", last, "LEFT", -4, 0)
+        table.insert(self.rightIcons, btn)
+        self.legacySlot = false
+        LayoutTitle()
+        return btn
+    end
+
+    if opts.footer then
+        local ft = CreateFrame("Frame", nil, f)
+        ft:SetHeight(S.FOOTER_H)
+        ft:SetPoint("BOTTOMLEFT", 0, 0); ft:SetPoint("BOTTOMRIGHT", 0, 0)
+        ft.note = S.Text(ft, root.F.foot, T.muted)
+        ft.note:SetPoint("LEFT", 16, 0); ft.note:SetJustifyH("LEFT")
+        ft.status = S.Text(ft, root.F.foot, T.muted)
+        ft.status:SetPoint("RIGHT", -16, 0); ft.status:SetJustifyH("RIGHT")
+        ft.status:SetWordWrap(false)
+        ft.note:SetPoint("RIGHT", ft.status, "LEFT", -12, 0)
+        S.ClampLabel(ft.note, nil, ft)
+        f.footer = ft
+    end
+    function f:SetFooter(note, status)
+        if not self.footer then return end
+        self.footer.note:SetText(note or "")
+        self.footer.status:SetText(status or "")
+        self.footer:SetShown((note and note ~= "") or (status and status ~= "") or self.footer.button ~= nil)
+    end
+
+    function f:ContentTop()
+        local y = self.headerH + 1
+        if self.wlTabs and self.wlTabs:IsShown() then y = y + S.TABS_H + 1 end
+        return y
+    end
+    function f:FitHeight(contentH)
+        if contentH == nil and self.Measure then contentH = self:Measure() end
+        local footH = (self.footer and self.footer:IsShown()) and S.FOOTER_H or 0
+        local hgt
+        if contentH then
+            hgt = self:ContentTop() + 12 + contentH + 12 + footH
+        else
+            local used = MeasureBottom(self)
+            if not used then return nil end
+            hgt = used + 12 + footH
+        end
+        local maxH = math.floor((num(UIParent:GetHeight()) or 768) * 0.80)
+        local minH = self.minH or 200
+        hgt = math.min(math.max(math.ceil(hgt), minH), math.max(maxH, minH))
+        KeepTop(self)
+        self:SetHeight(hgt)
+        self.overflow = contentH and (self:ContentTop() + 24 + contentH + footH > hgt) or nil
+        return hgt
+    end
+    function f:FitHeightLater(contentH)
+        local fn = function() if self:IsShown() then self:FitHeight(contentH) end end
+        if C_Timer and C_Timer.After then C_Timer.After(0, fn) else fn() end
+    end
+
     -- Two windows open at once must not mix: the one clicked or opened last comes on top, whole.
     f:SetToplevel(true)
     local raiser = CreateFrame("Frame", nil, f)
     raiser:SetScript("OnShow", function() f:Raise() end)
     f:Hide()
     return f
-end
-
--- A small icon button (header actions). texture: a file path, or { atlases = { ... }, path = file }.
-function S.IconButton(parent, texture, size, tip, onClick)
-    local b = CreateFrame("Button", nil, parent)
-    b:SetSize(size or 28, size or 28)
-    b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetSize((size or 28) - 12, (size or 28) - 12)
-    b.icon:SetPoint("CENTER")
-    if type(texture) == "table" then S.SetIcon(b.icon, texture.atlases, texture.path, texture.coords)
-    else b.icon:SetTexture(texture) end
-    b.icon:SetVertexColor(S.C.dim[1], S.C.dim[2], S.C.dim[3])
-    b:SetScript("OnEnter", function(self) self.icon:SetVertexColor(1, 1, 1); if tip then S.Tip(self, tip) end end)
-    b:SetScript("OnLeave", function(self) self.icon:SetVertexColor(S.C.dim[1], S.C.dim[2], S.C.dim[3]); S.HideTip() end)
-    b:SetScript("OnClick", onClick)
-    return b
-end
-
--- Section label in option pages (the only place uppercase labels are used).
-function S.Section(parent, text)
-    local fs = S.Text(parent, 12, S.C.dim, true)
-    fs:SetText(root.Upper and root.Upper(text) or text:upper())
-    return fs
 end
 
 -- Strings other modules add to the English table (they write their own French keys).

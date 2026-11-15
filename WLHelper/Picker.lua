@@ -1,12 +1,26 @@
--- Sélecteur de donjons : cartes avec image, niveau, progression ; plusieurs donjons = une route perso.
+-- Choisir les donjons : cartes avec image, niveau, progression ; plusieurs donjons = une route.
+-- Built with the design system (docs/DESIGN.md): header 44, tabs, a 640 px window that fits its
+-- cards, a footer with the one main action.
 local ADDON, ns = ...
 local L, T = ns.L, ns.T_
-local Text, Tex, Button, Hex = ns.Text, ns.Tex, ns.Button, ns.Hex
+local Text, Tex, Hex = ns.Text, ns.Tex, ns.Hex
 
 local p, qp
--- two columns of wide cards, the dungeon's picture in full
-local COLS, CW, CH, GAP = 2, 384, 132, 10
-local PW = COLS * CW + (COLS - 1) * GAP + 28
+-- two columns of picture cards inside a 640 window (inset 16, 12 between cards)
+local PW, PAD, GAP = 640, 16, 12
+local COLS = 2
+local CW = math.floor((PW - 2 * PAD - (COLS - 1) * GAP) / COLS)
+local CH = 124   -- room for a 2-line name on top and a 2-line level line at the bottom
+local HEADER = 44
+
+-- The design system (Writs/Style.lua) is required: a clear error rather than a nil index later.
+local function SW()
+  local S = ns.Writs and ns.Writs.S
+  if not S then error("WL Helper: Writs/Style.lua missing") end
+  return S
+end
+local function num(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) and v or nil end
+local function ScreenCap() return math.floor((num(UIParent:GetHeight()) or 768) * 0.80) end
 
 -- The game's own loading screens (files of the client, nothing shipped with the addon).
 -- Sure ones first (also used by Forever Dungeon Journal); the others are tried and dropped when the
@@ -46,28 +60,17 @@ local function Art(tex, d, c)
   if GAME_ART[key] then tex:SetTexture(GAME_ART[key]); tex:SetTexCoord(0.02, 0.98, 0.26, 0.74); return true end
   if MAYBE_ART[key] and TrySet(tex, LS .. MAYBE_ART[key]) then tex:SetTexCoord(0.02, 0.98, 0.26, 0.74); return true end
   if d.nart then tex:SetTexture(d.nart); tex:SetTexCoord(0, 1, 0.3, 0.7); return true end
-  -- no picture: a dark card with the dungeon's icon (not a stretched icon)
-  tex:SetColorTexture(0.10, 0.11, 0.13, 1)
-  if c then c.bigIcon:SetTexture(d.icon or "Interface\\Icons\\INV_Misc_Map_01"); c.bigIcon:Show() end
+  -- no picture: a dark card with the dungeon's painted icon (not a stretched icon)
+  tex:SetColorTexture(T.panel[1], T.panel[2], T.panel[3], 1)
+  if c then ns.SetPainted(c.bigIcon, d.icon or "Interface\\Icons\\INV_Misc_Map_01", 40); c.bigIcon:Show() end
   return false
 end
 -- the same picture for other windows (the Events page's dungeon picker): the texture, the dungeon's
 -- key and, optionally, a texture that shows the dungeon's icon when there is no picture
 function ns.DungeonArt(tex, dkey, bigIcon)
   local d = ns.D and ns.D[dkey]
-  if not d then tex:SetColorTexture(0.10, 0.11, 0.13, 1); if bigIcon then bigIcon:Hide() end; return false end
+  if not d then tex:SetColorTexture(T.panel[1], T.panel[2], T.panel[3], 1); if bigIcon then bigIcon:Hide() end; return false end
   return Art(tex, d, bigIcon and { bigIcon = bigIcon } or nil)
-end
-
--- a shade from transparent to dark, top or bottom of the card
-local function Gradient(tex, fromTop, a)
-  if tex.SetGradient and CreateColor then
-    local dark, clear = CreateColor(0, 0, 0, a), CreateColor(0, 0, 0, 0)
-    if pcall(tex.SetGradient, tex, "VERTICAL", fromTop and clear or dark, fromTop and dark or clear) then return end
-  end
-  if tex.SetGradientAlpha then
-    if fromTop then tex:SetGradientAlpha("VERTICAL", 0, 0, 0, 0, 0, 0, 0, a) else tex:SetGradientAlpha("VERTICAL", 0, 0, 0, a, 0, 0, 0, 0) end
-  else tex:SetAlpha(a * 0.6) end
 end
 
 local function Counts(dkey)
@@ -85,6 +88,7 @@ local function LevelOK(d)
 end
 
 local function Selected() return WLDTDB.sel end
+local function SelCount() local n = 0; for _ in pairs(Selected()) do n = n + 1 end; return n end
 
 -- Quêtes de classe : une carte par quête (liées aux donjons), créées à la volée
 function ns.EnsureClassCards()
@@ -124,48 +128,38 @@ ns.SetClassIcon = SetClassIcon
 
 local Render
 
+-- A card: the dungeon's picture, a dark band behind each line of text (the picture stays bright),
+-- the name alone on top (full width, up to 2 lines), the quests and the level in the bottom band,
+-- a 1 px accent border and a "Picked" pill when it is in the route, a thin bar of the quests done.
 local function MakeCard(parent)
+  local S = SW()
   local c = CreateFrame("Button", nil, parent)
   c:SetSize(CW, CH)
   c:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  ns.Flat(c, { 0.08, 0.085, 0.095, 1 })
+  ns.Flat(c, T.panel, T.cardEdge)
   c.art = c:CreateTexture(nil, "ARTWORK"); c.art:SetPoint("TOPLEFT", 1, -1); c.art:SetPoint("BOTTOMRIGHT", -1, 1)
-  -- the picture stays bright: a light veil (darker for "later"), dark bands behind the texts only
   c.shade = c:CreateTexture(nil, "ARTWORK", nil, 2); c.shade:SetPoint("TOPLEFT", 1, -1); c.shade:SetPoint("BOTTOMRIGHT", -1, 1)
   c.shade:SetColorTexture(0, 0, 0, 0.15)
-  c.topBand = c:CreateTexture(nil, "ARTWORK", nil, 3); c.topBand:SetPoint("TOPLEFT", 1, -1); c.topBand:SetPoint("TOPRIGHT", -1, -1); c.topBand:SetHeight(52)
-  c.topBand:SetColorTexture(1, 1, 1, 1); Gradient(c.topBand, true, 0.8)
-  c.botBand = c:CreateTexture(nil, "ARTWORK", nil, 3); c.botBand:SetPoint("BOTTOMLEFT", 1, 1); c.botBand:SetPoint("BOTTOMRIGHT", -1, 1); c.botBand:SetHeight(40)
-  c.botBand:SetColorTexture(1, 1, 1, 1); Gradient(c.botBand, false, 0.85)
-  c.hl = Tex(c, "HIGHLIGHT", { 1, 1, 1, 0.07 }); c.hl:SetAllPoints()
-  c.selBorder = {}
-  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
-    local e = c:CreateTexture(nil, "OVERLAY")
-    if side == "TOP" or side == "BOTTOM" then e:SetPoint(side .. "LEFT"); e:SetPoint(side .. "RIGHT"); e:SetHeight(2)
-    else e:SetPoint("TOP" .. side); e:SetPoint("BOTTOM" .. side); e:SetWidth(2) end
-    ns.Accent(e); c.selBorder[side] = e
-  end
-  -- ticked for the route: red border and a check box tick; every quest done: a green check
-  -- top: name on the left; quests on the right (faction emblem, "5/6 quests", green check once all done)
-  c.name = Text(c, 17, T.text, true); c.name:SetPoint("TOPLEFT", 12, -10); c.name:SetPoint("RIGHT", c, "RIGHT", -150, 0)
-  c.name:SetWordWrap(false); c.name:SetJustifyH("LEFT"); c.name:SetShadowOffset(1, -1); c.name:SetShadowColor(0, 0, 0, 1)
-  c.info = Text(c, 13, { 1, 0.82, 0.45 }, true); c.info:SetPoint("TOPRIGHT", -12, -12); c.info:SetJustifyH("RIGHT")
-  c.info:SetShadowOffset(1, -1); c.info:SetShadowColor(0, 0, 0, 1)
-  c.faction = c:CreateTexture(nil, "OVERLAY"); c.faction:SetSize(24, 24); c.faction:SetPoint("RIGHT", c.info, "LEFT", -2, -1)
-  c.faction:SetTexture("Interface\\TargetingFrame\\UI-PVP-Horde"); c.faction:SetTexCoord(0.06, 0.62, 0.02, 0.6)
-  c.doneMark = c:CreateTexture(nil, "OVERLAY"); c.doneMark:SetSize(24, 24); c.doneMark:SetPoint("RIGHT", c.faction, "LEFT", -2, 1)
-  c.doneMark:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-Ready")
-  c.cicon = c:CreateTexture(nil, "OVERLAY"); c.cicon:SetSize(22, 22); c.cicon:SetPoint("TOPLEFT", c.name, "BOTTOMLEFT", 0, -4)
-  -- bottom: levels on the left, "Picked" on the right when ticked for the route
-  c.lvl = Text(c, 12, T.text, true); c.lvl:SetPoint("BOTTOMLEFT", 12, 11)
-  c.lvl:SetShadowOffset(1, -1); c.lvl:SetShadowColor(0, 0, 0, 1)
-  c.check = c:CreateTexture(nil, "OVERLAY"); c.check:SetSize(22, 22); c.check:SetPoint("BOTTOMRIGHT", -8, 6)
-  c.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-  c.picked = Text(c, 12, T.text, true); c.picked:SetPoint("RIGHT", c.check, "LEFT", 0, 1)
-  -- the level line stops before "Picked" (it ends in "..." rather than running under it)
-  c.lvl:SetPoint("RIGHT", c.picked, "LEFT", -8, 0); c.lvl:SetWordWrap(false); c.lvl:SetJustifyH("LEFT")
-  c.bar = Tex(c, "OVERLAY", T.accent); c.bar:SetPoint("BOTTOMLEFT", 1, 1); c.bar:SetHeight(3); ns.Accent(c.bar)
-  c.bigIcon = c:CreateTexture(nil, "ARTWORK", nil, 1); c.bigIcon:SetSize(48, 48); c.bigIcon:SetPoint("CENTER", 0, -4); c.bigIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.bigIcon:Hide()
+  c.topBand = c:CreateTexture(nil, "ARTWORK", nil, 3); c.topBand:SetPoint("TOPLEFT", 1, -1); c.topBand:SetPoint("TOPRIGHT", -1, -1); c.topBand:SetHeight(36)
+  c.topBand:SetColorTexture(0, 0, 0, 0.55)
+  c.botBand = c:CreateTexture(nil, "ARTWORK", nil, 3); c.botBand:SetPoint("BOTTOMLEFT", 1, 1); c.botBand:SetPoint("BOTTOMRIGHT", -1, 1); c.botBand:SetHeight(30)
+  c.botBand:SetColorTexture(0, 0, 0, 0.55)
+  c.hl = Tex(c, "HIGHLIGHT", T.hoverFill); c.hl:SetAllPoints()
+  c.press = Tex(c, "OVERLAY", T.pressFill); c.press:SetAllPoints(); c.press:Hide()
+  c.selEdge = ns.Outline(c, T.accent, 0, "OVERLAY")
+  -- text drawn over a picture keeps a shadow
+  c.wlWorld = true
+  -- the name has the whole top line; the check of a finished dungeon sits at the card's right edge
+  c.doneMark = ns.Icon(c, "check", 14, "OVERLAY", T.ok); c.doneMark:SetPoint("TOPRIGHT", -12, -12)
+  c.name = Text(c, ns.F.heading, T.fg, false, "SHADOW"); c.name:SetPoint("TOPLEFT", 12, -10)
+  c.name:SetJustifyH("LEFT")
+  c.cicon = c:CreateTexture(nil, "OVERLAY"); c.cicon:SetSize(20, 20); c.cicon:SetPoint("TOPLEFT", 12, -42)
+  -- bottom band: the level line (bottom left), the "Picked" pill (bottom right), the quests above them
+  c.picked = S.Pill(c); c.picked:SetPoint("BOTTOMRIGHT", -8, 6)
+  c.lvl = Text(c, ns.F.meta, T.text, false, "SHADOW"); c.lvl:SetPoint("BOTTOMLEFT", 12, 10); c.lvl:SetJustifyH("LEFT")
+  c.info = Text(c, ns.F.label, T.fg, false, "SHADOW"); c.info:SetPoint("BOTTOMLEFT", c.lvl, "TOPLEFT", 0, 3); c.info:SetJustifyH("LEFT")
+  c.bar = Tex(c, "OVERLAY", T.ok); c.bar:SetPoint("BOTTOMLEFT", 1, 1); c.bar:SetHeight(2)
+  c.bigIcon = c:CreateTexture(nil, "ARTWORK", nil, 1); c.bigIcon:SetSize(40, 40); c.bigIcon:SetPoint("CENTER", 0, -2); c.bigIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.bigIcon:Hide()
   c.dicon = c:CreateTexture(nil, "OVERLAY"); c.dicon:Hide()
   c:SetScript("OnClick", function(self, btn)
     if btn == "RightButton" then ns.OpenQuests(self.dkey) return end
@@ -176,84 +170,112 @@ local function MakeCard(parent)
   c:SetScript("OnDoubleClick", function(self)
     wipe(Selected()); Selected()[self.dkey] = true; ns.StartGuide()
   end)
+  c:SetScript("OnMouseDown", function(self) self.press:Show() end)
+  c:SetScript("OnMouseUp", function(self) self.press:Hide() end)
   c:SetScript("OnEnter", function(self)
     local d = ns.D[self.dkey]
     local n, done = Counts(self.dkey)
-    local lines = { ns.DName(self.dkey), { (GetLocale and GetLocale() == "frFR" and d.locf) or ns.T(d.loc) or "", 0.7, 0.7, 0.7 },
-      { L.PICK_QUESTS:format(n) .. "  ·  " .. L.PICK_DONE:format(done), 0.9, 0.9, 0.9 } }
-    if d.cq and d.home then table.insert(lines, { L.CQ_IN:format(ns.DName(d.home)), T.accent[1], T.accent[2], T.accent[3] }) end
-    if d.ed then table.insert(lines, { ns.T(d.ed), 0.85, 0.85, 0.85 }) end
-    for _, k in ipairs(ns.KeyLines and ns.KeyLines(self.dkey) or {}) do table.insert(lines, { k[1], 0.9, 0.9, 0.9 }) end
-    table.insert(lines, { " ", 1, 1, 1 })
-    table.insert(lines, { L.PICK_HINT, T.accent[1], T.accent[2], T.accent[3] })
-    table.insert(lines, { L.PICK_RCLICK, 0.6, 0.6, 0.6 })
+    local lines = { ns.DName(self.dkey), (GetLocale and GetLocale() == "frFR" and d.locf) or ns.T(d.loc) or "",
+      ns.Plural(n, "PICK_QUESTS1", "PICK_QUESTS", n) .. "  ·  " .. ns.Plural(done, "PICK_DONE1", "PICK_DONE", done) }
+    if d.cq and d.home then table.insert(lines, L.CQ_IN:format(ns.DName(d.home))) end
+    if d.ed then table.insert(lines, ns.T(d.ed)) end
+    for _, k in ipairs(ns.KeyLines and ns.KeyLines(self.dkey) or {}) do table.insert(lines, k[1]) end
+    table.insert(lines, L.PICK_CLICK)
+    table.insert(lines, L.PICK_RCLICK)
+    table.insert(lines, L.PICK_DCLICK)
     ns.ShowTip(self, lines)
   end)
   c:SetScript("OnLeave", ns.HideTip)
   return c
 end
 
+-- An empty tab: icon, the fact, why (no button: the filter above is the action).
+local function MakeEmpty(parent)
+  local e = CreateFrame("Frame", nil, parent)
+  e:SetWidth(320)
+  e.icon = ns.Icon(e, "portal", 32, "ARTWORK", T.muted); e.icon:SetPoint("TOP", 0, 0)
+  e.title = Text(e, ns.F.heading, T.fg); e.title:SetJustifyH("CENTER"); e.title:SetPoint("TOP", 0, -40)
+  e.text = Text(e, ns.F.label, T.muted); e.text:SetJustifyH("CENTER")
+  function e:Set(t, s)
+    self.title:SetText(t); self.text:SetText(s or "")
+    local y = 40 + ns.FitText(self.title, 2, 320, self)
+    self.text:ClearAllPoints(); self.text:SetPoint("TOP", 0, -(y + 4))
+    y = y + 4 + ns.FitText(self.text, 0, 320, self)
+    self:SetHeight(y)
+    return y
+  end
+  return e
+end
+
 local function Build()
+  local S = SW()
   p = CreateFrame("Frame", "WLDTPicker", UIParent)
-  p:SetSize(PW, 640); p:SetPoint("CENTER"); p:SetFrameStrata("HIGH")
+  p.wlOwned = true
+  p:SetSize(PW, 400); p:SetPoint("CENTER"); p:SetFrameStrata("HIGH")
   p:SetMovable(true); p:EnableMouse(true); p:SetClampedToScreen(true); p:SetToplevel(true)
-  ns.Flat(p, T.bg)
+  ns.Flat(p, T.bg, T.cardEdge)
+  p:SetScript("OnMouseDown", function(self) self:Raise() end)
   local h = CreateFrame("Frame", nil, p)
-  h:SetPoint("TOPLEFT", 1, -1); h:SetPoint("TOPRIGHT", -1, -1); h:SetHeight(32)
-  h.bg = Tex(h, "BACKGROUND", T.header); h.bg:SetAllPoints()
-  h.line = Tex(h, "ARTWORK", T.accent); h.line:SetPoint("BOTTOMLEFT"); h.line:SetPoint("BOTTOMRIGHT"); h.line:SetHeight(1); ns.Accent(h.line, 0.6)
+  h:SetPoint("TOPLEFT", 0, 0); h:SetPoint("TOPRIGHT", 0, 0); h:SetHeight(HEADER)
   h:EnableMouse(true); h:RegisterForDrag("LeftButton")
+  h:SetScript("OnMouseDown", function() p:Raise() end)
   h:SetScript("OnDragStart", function() p:StartMoving() end)
   h:SetScript("OnDragStop", function() p:StopMovingOrSizing() end)
-  -- "‹" and the logo: back to WL Helper's home page
+  h.rule = ns.Rule(p, T.line); h.rule:SetPoint("TOPLEFT", 0, -HEADER); h.rule:SetPoint("TOPRIGHT", 0, -HEADER)
   local function GoHome()
     p:Hide()
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.OpenHome then WP.OpenHome() end
   end
-  local SW = ns.Writs and ns.Writs.S
-  local back = SW and SW.HomeButton and SW.HomeButton(h, GoHome)
-  if back then back:SetPoint("LEFT", 6, 0) end
-  h.logo = h:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(26, 26)
-  if back then h.logo:SetPoint("LEFT", back, "RIGHT", 6, -1) else h.logo:SetPoint("LEFT", 6, -1) end
-  h.logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64")
-  local lb = CreateFrame("Button", nil, h); lb:SetAllPoints(h.logo); lb:SetScript("OnClick", GoHome)
-  lb:SetScript("OnEnter", function(self) ns.ShowTip(self, { L.BACK_HOME }) end); lb:SetScript("OnLeave", ns.HideTip)
-  h.title = Text(h, 14, T.text, true); h.title:SetPoint("LEFT", h.logo, "RIGHT", 6, 1); h.title:SetText(L.TITLE)
-  p.tabs = {}
-  local prevTab
-  for _, t in ipairs({ { "dg", L.TAB_DG }, { "raid", L.TAB_RAID }, { "cls", L.TAB_CLS } }) do
-    local b = Button(h, 104, 22, t[2], function() WLDTDB.tab = t[1]; p.sf.off = 0; p.sf:SetVerticalScroll(0); Render() end)
-    if prevTab then b:SetPoint("LEFT", prevTab, "RIGHT", 4, 0) else b:SetPoint("LEFT", h.title, "RIGHT", 16, 0) end
-    b.tabKey = t[1]; table.insert(p.tabs, b); prevTab = b
-  end
-  local close = Button(h, 22, 20, "x", function() p:Hide() end); close:SetPoint("RIGHT", -5, 0)
-  p.allBtn = Button(h, 60, 20, L.PICK_ALL, function() WLDTDB.pickAll = true; Render() end); p.allBtn:SetPoint("RIGHT", close, "LEFT", -6, 0)
-  p.mineBtn = Button(h, 90, 20, L.PICK_MINE, function() WLDTDB.pickAll = false; Render() end); p.mineBtn:SetPoint("RIGHT", p.allBtn, "LEFT", -4, 0)
-  p.hint = Text(p, 12, T.dim); p.hint:SetPoint("TOPLEFT", 14, -42); p.hint:SetWidth(PW - 28); p.hint:SetText(L.PICK_HINT)
+  p.back = S.HomeButton(h, GoHome); p.back:SetPoint("TOPLEFT", 8, -8)
+  h.logo = h:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(28, 28); h.logo:SetPoint("TOPLEFT", 40, -8)
+  h.logo:SetTexture(ns.LOGO or ("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64"))
+  h.title = Text(h, ns.F.title, T.fg); h.title:SetPoint("LEFT", h, "LEFT", 76, 0); h.title:SetPoint("RIGHT", h, "RIGHT", -48, 0)
+  h.title:SetJustifyV("MIDDLE"); h.title:SetText(L.PICK_T)
+  ns.ClampLabel(h.title, nil, h)
+  local close = S.CloseButton(h, 28, function() p:Hide() end)
+  close:SetPoint("TOPRIGHT", -8, -8)
 
-  local sf = CreateFrame("ScrollFrame", nil, p)
-  sf:SetPoint("TOPLEFT", 14, -64); sf:SetPoint("BOTTOMRIGHT", -14, 52)
-  local grid = CreateFrame("Frame", nil, sf); grid:SetSize(PW - 28, 100); sf:SetScrollChild(grid)
-  sf:EnableMouseWheel(true)
-  sf:SetScript("OnMouseWheel", function(self, delta)
-    local max = math.max(0, grid:GetHeight() - self:GetHeight())
-    self.off = math.max(0, math.min(max, (self.off or 0) - delta * 60)); self:SetVerticalScroll(self.off)
-  end)
-  p.sf, p.grid, p.cards = sf, grid, {}
+  -- tabs (dungeons, raids, class quests) with the level filter at the right of the same bar
+  p.tabBar = S.Tabs(p, { { "dg", L.TAB_DG }, { "raid", L.TAB_RAID }, { "cls", L.TAB_CLS } },
+    function() return CurTab() end,
+    function(k) WLDTDB.tab = k; if p.sa then p.sa:ScrollTo(0, true) end; Render() end)
+  p.tabBar:SetPoint("TOPLEFT", 0, -(HEADER + 1)); p.tabBar:SetPoint("TOPRIGHT", 0, -(HEADER + 1))
+  p.tabs = p.tabBar.tabs
+  p.filter = S.Segmented(p.tabBar, { { false, L.PICK_MINE }, { true, L.PICK_ALL } },
+    function() return WLDTDB.pickAll and true or false end,
+    function(v) WLDTDB.pickAll = v and true or false; Render() end, 24)
+  p.filter:SetPoint("RIGHT", -PAD, 0)
+  p.hint = Text(p, ns.F.label, T.muted)
+  p.hint:SetPoint("TOPLEFT", PAD, -(HEADER + 1 + 32 + 12))
 
-  p.selText = Text(p, 12, T.text, true); p.selText:SetPoint("BOTTOMLEFT", 14, 20)
-  p.go = Button(p, 150, 28, L.PICK_GO, function() ns.StartGuide() end); p.go:SetPoint("BOTTOMRIGHT", -14, 12); ns.Primary(p.go)
-  p.none = Button(p, 120, 28, L.PICK_NONE, function() wipe(Selected()); Render() end); p.none:SetPoint("RIGHT", p.go, "LEFT", -8, 0)
+  p.sa = S.ScrollArea(p)
+  p.grid = p.sa.child
+  p.sf = p.sa   -- older name
+  p.cards = {}
+  p.empty = MakeEmpty(p.grid); p.empty:SetPoint("TOP", p.grid, "TOP", 0, -24); p.empty:Hide()
+
+  -- footer: what is picked, then clear and the one main action
+  p.foot = CreateFrame("Frame", nil, p); p.foot:SetHeight(32)
+  p.go = S.Button(p.foot, L.PICK_GO, 0, 32, "primary", function() ns.StartGuide() end)
+  p.go:SetPoint("RIGHT", 0, 0)
+  p.go:SetDisabledReason(L.PICK_GO_WHY)
+  p.none = S.Button(p.foot, L.PICK_NONE, 0, 28, "secondary", function() wipe(Selected()); Render() end)
+  p.none:SetPoint("RIGHT", p.go, "LEFT", -8, 0)
+  p.selText = Text(p.foot, ns.F.body, T.text); p.selText:SetPoint("LEFT", 0, 0); p.selText:SetPoint("RIGHT", p.none, "LEFT", -12, 0)
+  p.selText:SetJustifyV("MIDDLE")
+  ns.ClampLabel(p.selText, nil, p.foot)
   tinsert(UISpecialFrames, "WLDTPicker")
+  if ns.RegisterWindow then ns.RegisterWindow(p) end
   p:Hide()
 end
 
 Render = function()
   if not p then return end
   ns.EnsureClassCards()
-  -- Sections, in this order: to do at your level, later (too high), done, then (All) no Horde quest.
-  -- "My level" shows the first and the done ones; "All" shows every section.
+  local S = SW()
+  -- Sections, in this order: to do at your level, later (too high), below, done, coming soon,
+  -- then (All) no quest. "My level" shows the first, done and coming soon; "All" every section.
   local tab = CurTab()
   local secs = { todo = {}, later = {}, below = {}, done = {}, noq = {}, upcoming = {} }
   local list = {}
@@ -272,81 +294,115 @@ Render = function()
       if show then table.insert(secs[sec], k); table.insert(list, k) end
     end
   end
-  for _, b in ipairs(p.tabs) do
-    local on = b.tabKey == tab
-    b.label:SetTextColor(unpack(on and T.accent or T.dim))
-    if b.under then b.under:SetShown(on) else
-      b.under = Tex(b, "OVERLAY", T.accent); b.under:SetPoint("BOTTOMLEFT", 4, 1); b.under:SetPoint("BOTTOMRIGHT", -4, 1); b.under:SetHeight(2); ns.Accent(b.under); b.under:SetShown(on)
-    end
-  end
+  p.tabBar:Update()
+  p.filter:Update()
+  local contentW = PW - 2 * PAD
   p.hint:SetText(tab == "cls" and L.PICK_HINT_CLS or tab == "raid" and L.PICK_HINT_RAID or L.PICK_HINT)
-  p.empty = p.empty or Text(p.grid, 13, T.dim)
-  p.empty:SetPoint("TOP", 0, -40); p.empty:SetText(#list == 0 and (tab == "cls" and L.PICK_EMPTY_CLS or L.PICK_EMPTY) or "")
+  local hintH = ns.FitText(p.hint, 0, contentW, p)
+  local top = HEADER + 1 + 32 + 12 + hintH + 12
   local function byLevel(a, b)
     local la, lb = ns.D[a].lvl and ns.D[a].lvl[1] or 0, ns.D[b].lvl and ns.D[b].lvl[1] or 0
     if la ~= lb then return la < lb end
     return a < b
   end
   p.heads = p.heads or {}
-  for _, h in ipairs(p.heads) do h:Hide() end
+  for _, hd in ipairs(p.heads) do hd:Hide() end
   local i, y, hi = 0, 0, 0
   for _, s in ipairs({ { "todo", L.SEC_TODO }, { "later", L.SEC_LATER }, { "below", L.SEC_BELOW }, { "done", L.SEC_DONE }, { "upcoming", L.SEC_UP }, { "noq", L.SEC_NOQ } }) do
     local keys = secs[s[1]]
     if #keys > 0 then
       table.sort(keys, byLevel)
       hi = hi + 1
-      local h = p.heads[hi] or Text(p.grid, 12, T.dim, true); p.heads[hi] = h
-      h:ClearAllPoints(); h:SetPoint("TOPLEFT", 2, -y)
-      h:SetText(ns.Upper(s[2]) .. "  ·  " .. #keys); h:Show()
-      y = y + 22
+      local hd = p.heads[hi] or S.SectionHeader(p.grid, s[2], #keys); p.heads[hi] = hd
+      hd:Set(s[2], #keys)
+      -- 16 above a section header (8 left by the cards above + 8), 0 above the first one
+      if hi > 1 then y = y + 8 end
+      hd:ClearAllPoints(); hd:SetPoint("TOPLEFT", p.grid, "TOPLEFT", 0, -y); hd:SetWidth(contentW); hd:Show()
+      y = y + 32 + 8
       for j, k in ipairs(keys) do
         i = i + 1
         local c = p.cards[i] or MakeCard(p.grid); p.cards[i] = c
         local col, row = (j - 1) % COLS, math.floor((j - 1) / COLS)
-        c:ClearAllPoints(); c:SetPoint("TOPLEFT", col * (CW + GAP), -(y + row * (CH + GAP)))
+        c:ClearAllPoints(); c:SetPoint("TOPLEFT", p.grid, "TOPLEFT", col * (CW + GAP), -(y + row * (CH + GAP)))
         c.section = s[1]
         local d = ns.D[k]
-    c.dkey = k
-    Art(c.art, d, c)
-    c.dicon:Hide()
-    if d.cq then SetClassIcon(c.cicon, (d.cq:match("^[^,]+"))) else c.cicon:Hide() end
-    c.name:SetText(ns.DName(k))
-    local soon = d.up and time() < d.up
-    local n, done = Counts(k)
-    local finished = n > 0 and done >= n
-    -- an upcoming raid without quests shows its opening date at the top, so the level line stays short
-    local dateTop = soon and n == 0
-    c.lvl:SetText((d.raid and (L.RAID .. (d.size and (" " .. L.PICK_SIZE:format(d.size)) or "") .. "  ·  ") or "")
-      .. (d.lvl and d.lvl[1] and (L.PICK_LV:format(d.lvl[1], d.lvl[2] or d.lvl[1])) or "")
-      .. ((soon and not dateTop) and ("  ·  " .. L.PICK_OPENS:format(date(L.PICK_DATE, d.up))) or ""))
-    c.info:SetText(n > 0 and L.PICK_QN:format(done, n)
-      or (dateTop and (L.PICK_SOON .. " · " .. date(L.PICK_DATE, d.up))) or L.PICK_NOQ)
-    local horde = UnitFactionGroup("player") ~= "Alliance"
-    c.faction:SetTexture(horde and "Interface\\TargetingFrame\\UI-PVP-Horde" or "Interface\\TargetingFrame\\UI-PVP-Alliance")
-    c.faction:SetShown(n > 0)
-    c.bar:SetWidth(math.max(1, (CW - 2) * (n > 0 and done / n or 0)))
-    if finished then c.bar:SetColorTexture(0.35, 0.86, 0.48, 1) else c.bar:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1) end
-    c.doneMark:SetShown(finished)
-    c.lvl:SetTextColor(unpack(c.section == "later" and T.dim or T.text))
-    local sel = Selected()[k] and true or false
-    c.check:SetShown(sel)
-    c.picked:SetText(sel and L.PICK_PICKED or "")
-    for _, e in pairs(c.selBorder) do e:SetShown(sel) end
-    -- later (too high) and done: greyed; to do: the picture as it is
-    c.art:SetDesaturated(c.section == "later" or c.section == "below" or c.section == "noq" or c.section == "upcoming")
-    c.shade:SetColorTexture(0, 0, 0, (c.section == "todo" or sel) and 0.12 or 0.45)
-    c:Show()
+        c.dkey = k
+        Art(c.art, d, c)
+        c.dicon:Hide()
+        if d.cq then SetClassIcon(c.cicon, (d.cq:match("^[^,]+"))) else c.cicon:Hide() end
+        c.name:SetText(ns.DName(k))
+        local soon = d.up and time() < d.up
+        local n, done = Counts(k)
+        local finished = n > 0 and done >= n
+        -- the name wraps to 2 lines over the whole width (less the check); the band follows it
+        local nameH = ns.FitText(c.name, 2, CW - 24 - (finished and 18 or 0), c)
+        if nameH < 14 then nameH = 17 end
+        local topH = 10 + nameH + 8
+        c.topBand:SetHeight(topH)
+        c.cicon:ClearAllPoints(); c.cicon:SetPoint("TOPLEFT", 12, -(topH + 6))
+        -- a coming raid without quests shows its opening date on the quests line, so the level line stays short
+        local dateTop = soon and n == 0
+        local parts = {}
+        if d.raid then table.insert(parts, L.RAID .. (d.size and (" · " .. L.PICK_SIZE:format(d.size)) or "")) end
+        if d.lvl and d.lvl[1] then
+          local lo, hi2 = d.lvl[1], d.lvl[2] or d.lvl[1]
+          table.insert(parts, lo == hi2 and L.PICK_LV1:format(lo) or L.PICK_LV:format(lo, hi2))
+        end
+        if soon and not dateTop then table.insert(parts, L.PICK_OPENS:format(date(L.PICK_DATE, d.up))) end
+        c.lvl:SetText(table.concat(parts, "  ·  "))
+        c.info:SetText(n > 0 and ns.Plural(n, "PICK_QN1", "PICK_QN", done, n)
+          or (dateTop and (L.PICK_SOON .. " · " .. date(L.PICK_DATE, d.up))) or L.PICK_NOQ)
+        c.bar:SetWidth(math.max(1, (CW - 2) * (n > 0 and done / n or 0)))
+        c.bar:SetShown(n > 0 and done > 0)
+        c.doneMark:SetShown(finished)
+        local lc = (c.section == "later" or c.section == "below") and T.muted or T.text
+        c.lvl:SetTextColor(lc[1], lc[2], lc[3])
+        local sel = Selected()[k] and true or false
+        if sel then c.picked:Set(L.PICK_PICKED, T.accentSoft, "check"); c.picked:Show() else c.picked:Hide() end
+        -- the level line leaves room for the pill only while it shows; it wraps to 2 lines
+        local pillW = sel and ((num(c.picked:GetWidth()) or 80) + 8) or 0
+        local lvlH = ns.FitText(c.lvl, 2, CW - 24 - pillW, c)
+        if lvlH < 11 then lvlH = 13 end
+        local infoH = ns.FitText(c.info, 1, CW - 24, c)
+        if infoH < 12 then infoH = 15 end
+        c.botBand:SetHeight(math.max(30, 10 + lvlH + 3 + infoH + 6))
+        c.selEdge(T.accent, sel and 1 or 0)
+        -- later, below, no quest, coming soon: greyed; to do and done: the picture as it is
+        c.art:SetDesaturated(c.section == "later" or c.section == "below" or c.section == "noq" or c.section == "upcoming")
+        c.shade:SetColorTexture(0, 0, 0, (c.section == "todo" or c.section == "done" or sel) and 0.12 or 0.45)
+        c:Show()
       end
-      y = y + math.ceil(#keys / COLS) * (CH + GAP) + 8
+      y = y + math.ceil(#keys / COLS) * (CH + GAP) - GAP + 8
     end
   end
   for j = i + 1, #p.cards do p.cards[j]:Hide() end
-  p.grid:SetHeight(math.max(10, y))
-  local ns_ = 0; for _ in pairs(Selected()) do ns_ = ns_ + 1 end
-  p.selText:SetText(L.PICK_SEL:format(ns_))
-  p.go:SetEnabled(ns_ > 0)
-  p.mineBtn.label:SetTextColor(unpack(WLDTDB.pickAll and T.dim or T.accent))
-  p.allBtn.label:SetTextColor(unpack(WLDTDB.pickAll and T.accent or T.dim))
+  if #list == 0 then
+    local eh = (tab == "cls") and p.empty:Set(L.PICK_EMPTY_CLS_T, L.PICK_EMPTY_CLS) or p.empty:Set(L.PICK_EMPTY_T, L.PICK_EMPTY)
+    p.empty:Show()
+    y = 24 + eh + 24
+  else p.empty:Hide() end
+  local gridH = math.max(10, y)
+  -- the window fits the cards, up to 80 % of the screen; the grid scrolls past that
+  local footH = 12 + 32 + PAD
+  local cap = math.max(160, ScreenCap() - top - footH)
+  local viewH = math.min(gridH, cap)
+  p.sa:ClearAllPoints()
+  p.sa:SetPoint("TOPLEFT", PAD, -top); p.sa:SetPoint("TOPRIGHT", -PAD, -top); p.sa:SetHeight(viewH)
+  p.grid:SetWidth(contentW)
+  p.sa:SetContentHeight(gridH)
+  p.foot:ClearAllPoints()
+  p.foot:SetPoint("TOPLEFT", p.sa, "BOTTOMLEFT", 0, -12); p.foot:SetPoint("TOPRIGHT", p.sa, "BOTTOMRIGHT", 0, -12)
+  -- keep the top edge where it is: the window grows downward
+  local l, t = num(p:GetLeft()), num(p:GetTop())
+  if l and t and p:GetPoint() ~= "TOPLEFT" then p:ClearAllPoints(); p:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t) end
+  p:SetHeight(top + viewH + footH)
+
+  local nSel = SelCount()
+  p.selText:SetText(nSel == 0 and L.PICK_SEL0 or ns.Plural(nSel, "PICK_SEL1", "PICK_SEL", nSel))
+  p.go:SetText(nSel == 0 and L.PICK_GO or ns.Plural(nSel, "PICK_GO1", "PICK_GON", nSel))
+  if p.go.SetIcon then p.go:SetIcon("pin") end
+  p.go:SetEnabled(nSel > 0)
+  p.none:SetEnabled(nSel > 0)
 end
 ns.RenderPicker = function() if p and p:IsShown() then Render() end end
 
@@ -370,48 +426,62 @@ end
 function ns.HidePicker() if p then p:Hide() end end
 
 -- =====================================================================
---  Choix des quêtes d'un donjon
+--  Choix des quêtes d'un donjon : une liste à cocher (cases dessinées, coche HD)
 -- =====================================================================
-local QROWS = 22
+local QROWS, QH, QW = 22, 28, 420
 local function BuildQuests()
+  local S = SW()
   qp = CreateFrame("Frame", "WLDTQuestPicker", UIParent)
-  qp:SetSize(460, 40 + 18 + QROWS * 22 + 16); qp:SetFrameStrata("DIALOG"); qp:SetPoint("CENTER", 120, 0)
-  qp:SetMovable(true); qp:EnableMouse(true); qp:SetClampedToScreen(true)
-  ns.Flat(qp, T.bg)
+  qp.wlOwned = true
+  qp:SetSize(QW, 200); qp:SetFrameStrata("DIALOG"); qp:SetPoint("CENTER", 120, 0)
+  qp:SetMovable(true); qp:EnableMouse(true); qp:SetClampedToScreen(true); qp:SetToplevel(true)
+  ns.Flat(qp, T.bg, T.cardEdge)
   local h = CreateFrame("Frame", nil, qp)
-  h:SetPoint("TOPLEFT", 1, -1); h:SetPoint("TOPRIGHT", -1, -1); h:SetHeight(30)
-  h.bg = Tex(h, "BACKGROUND", T.header); h.bg:SetAllPoints()
+  h:SetPoint("TOPLEFT", 0, 0); h:SetPoint("TOPRIGHT", 0, 0); h:SetHeight(HEADER)
   h:EnableMouse(true); h:RegisterForDrag("LeftButton")
   h:SetScript("OnDragStart", function() qp:StartMoving() end); h:SetScript("OnDragStop", function() qp:StopMovingOrSizing() end)
-  qp.title = Text(h, 12, T.text, true); qp.title:SetPoint("LEFT", 10, 0); qp.title:SetWidth(400); qp.title:SetWordWrap(false)
-  local close = Button(h, 22, 20, "x", function() qp:Hide() end); close:SetPoint("RIGHT", -4, 0)
-  qp.hint = Text(qp, 11, T.dim); qp.hint:SetPoint("TOPLEFT", 10, -34); qp.hint:SetWidth(440); qp.hint:SetWordWrap(true)
+  h.rule = ns.Rule(qp, T.line); h.rule:SetPoint("TOPLEFT", 0, -HEADER); h.rule:SetPoint("TOPRIGHT", 0, -HEADER)
+  qp.title = Text(h, ns.F.title, T.fg); qp.title:SetPoint("LEFT", PAD, 0); qp.title:SetPoint("RIGHT", -48, 0); qp.title:SetJustifyV("MIDDLE")
+  ns.ClampLabel(qp.title, nil, h)
+  local close = S.CloseButton(h, 28, function() qp:Hide() end); close:SetPoint("TOPRIGHT", -8, -8)
+  qp.hint = Text(qp, ns.F.label, T.muted); qp.hint:SetPoint("TOPLEFT", PAD, -(HEADER + 1 + 12))
   qp.hint:SetJustifyH("LEFT"); qp.hint:SetText(L.PICK_CUSTOM_H)
   qp.rows = {}
   for r = 1, QROWS do
     local row = CreateFrame("Button", nil, qp)
-    row:SetHeight(22); row:SetPoint("TOPLEFT", 8, -52 - (r - 1) * 22); row:SetPoint("TOPRIGHT", -8, -52 - (r - 1) * 22)
-    row.hl = Tex(row, "HIGHLIGHT", { 1, 1, 1, 0.06 }); row.hl:SetAllPoints()
-    row.box = Tex(row, "ARTWORK", { 0.2, 0.2, 0.22 }); row.box:SetSize(14, 14); row.box:SetPoint("LEFT", 4, 0)
-    row.tick = Tex(row, "OVERLAY", T.accent); row.tick:SetSize(8, 8); row.tick:SetPoint("CENTER", row.box); ns.Accent(row.tick)
-    row.lvl = Text(row, 11, T.dim, true); row.lvl:SetPoint("LEFT", 24, 0); row.lvl:SetWidth(26); row.lvl:SetJustifyV("MIDDLE")
-    row.txt = Text(row, 12, T.text); row.txt:SetPoint("LEFT", 52, 0); row.txt:SetPoint("RIGHT", -4, 0); row.txt:SetWordWrap(false); row.txt:SetJustifyV("MIDDLE")
+    row:SetHeight(QH)
+    row.hl = Tex(row, "HIGHLIGHT", T.hoverFill); row.hl:SetAllPoints()
+    row.press = Tex(row, "ARTWORK", T.pressFill); row.press:SetAllPoints(); row.press:Hide()
+    -- a drawn check box: panel fill, 1 px edge (accent when ticked), the HD check inside
+    row.boxF = CreateFrame("Frame", nil, row); row.boxF:SetSize(16, 16); row.boxF:SetPoint("LEFT", 8, 0)
+    row.box = Tex(row.boxF, "BACKGROUND", T.panel); row.box:SetAllPoints()
+    row.boxEdge = ns.Outline(row.boxF, T.btnEdge)
+    row.tick = ns.Icon(row.boxF, "check", 12, "ARTWORK", T.fg); row.tick:SetPoint("CENTER")
+    row.lvl = Text(row, ns.F.meta, T.muted); row.lvl:SetPoint("LEFT", 32, 0); row.lvl:SetWidth(24); row.lvl:SetJustifyV("MIDDLE")
+    row.txt = Text(row, ns.F.label, T.fg); row.txt:SetPoint("LEFT", 60, 0); row.txt:SetPoint("RIGHT", -8, 0); row.txt:SetJustifyV("MIDDLE")
     row:SetScript("OnClick", function(self)
       WLDTDB.off[self.qid] = not WLDTDB.off[self.qid] or nil
       ns.OpenQuests(qp.dkey, true)
     end)
+    row:SetScript("OnMouseDown", function(self) self.press:Show() end)
+    row:SetScript("OnMouseUp", function(self) self.press:Hide() end)
     row:SetScript("OnEnter", function(self)
       local q = ns.Q[self.qid]
       local lines = { ns.QName(self.qid) }
       local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
-      if obj then table.insert(lines, { obj, 0.9, 0.9, 0.9 }) end
-      if q.p and #q.p > 0 then table.insert(lines, { L.PRE .. " : " .. #q.p, 0.7, 0.7, 0.7 }) end
-      if q.ne then table.insert(lines, { ns.T(q.ne), 1, 0.82, 0.5 }) end
+      if obj then table.insert(lines, obj) end
+      if q.p and #q.p > 0 then table.insert(lines, L.PRE .. L.COLON .. #q.p) end
+      if q.ne then table.insert(lines, ns.T(q.ne)) end
+      if WLDTDB.off[self.qid] then table.insert(lines, L.PICK_QOFF) end
+      table.insert(lines, L.PICK_QCLICK)
       ns.ShowTip(self, lines)
     end)
     row:SetScript("OnLeave", ns.HideTip)
+    ns.ClampLabel(row.txt, nil, row)
     qp.rows[r] = row
   end
+  tinsert(UISpecialFrames, "WLDTQuestPicker")
+  if ns.RegisterWindow then ns.RegisterWindow(qp) end
   qp:Hide()
 end
 
@@ -420,7 +490,10 @@ function ns.OpenQuests(dkey, keep)
   local _, cls = UnitClass("player")
   qp.dkey = dkey
   qp.title:SetText(L.PICK_CUSTOM_T:format(ns.DName(dkey))); qp.hint:SetText(L.PICK_CUSTOM_H)
+  local hintH = ns.FitText(qp.hint, 0, QW - 2 * PAD, qp)
+  local top = HEADER + 1 + 12 + hintH + 8
   local qs = ns.DungeonQuests(dkey, cls)
+  local shown = 0
   for r, row in ipairs(qp.rows) do
     local qid = qs[r]
     if qid then
@@ -428,15 +501,20 @@ function ns.OpenQuests(dkey, keep)
       row.qid = qid
       row.lvl:SetText(q.l or "")
       local tag = ""
-      if q.c then local cn, cc = ns.ClassInfo(q.c:match("^[^,]+")); tag = "  " .. Hex(cc) .. "(" .. cn .. ")|r" end
-      if ns.IsDone(qid) then tag = tag .. "  |cff59e67a" .. L.S_DONE .. "|r" end
+      if q.c then local cn, cc = ns.ClassInfo(q.c:match("^[^,]+")); tag = "  " .. Hex(cc) .. cn .. "|r" end
+      if ns.IsDone(qid) then tag = tag .. "  " .. Hex(T.ok) .. L.S_DONE .. "|r" end
       row.txt:SetText(ns.QName(qid) .. tag)
       local on = not WLDTDB.off[qid]
       row.tick:SetShown(on)
-      row.txt:SetTextColor(unpack(on and T.text or T.dim))
+      row.boxEdge(on and T.accent or T.btnEdge)
+      local tc = on and T.fg or T.muted
+      row.txt:SetTextColor(tc[1], tc[2], tc[3])
+      row:ClearAllPoints()
+      row:SetPoint("TOPLEFT", 8, -(top + (r - 1) * QH)); row:SetPoint("TOPRIGHT", -8, -(top + (r - 1) * QH))
       row:Show()
+      shown = shown + 1
     else row:Hide() end
   end
-  qp:SetHeight(40 + 18 + math.max(1, math.min(#qs, QROWS)) * 22 + 12)
-  qp:Show()
+  qp:SetHeight(top + math.max(1, shown) * QH + 12)
+  qp:Show(); qp:Raise()
 end

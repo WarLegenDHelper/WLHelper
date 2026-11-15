@@ -105,9 +105,10 @@ local function BuildMinimap()
   b:SetSize(32, 32); b:SetFrameStrata("MEDIUM"); b:SetFrameLevel(8)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp"); b:RegisterForDrag("LeftButton")
   b.bg = b:CreateTexture(nil, "BACKGROUND"); b.bg:SetSize(22, 22); b.bg:SetPoint("CENTER")
-  b.bg:SetColorTexture(0.05, 0.06, 0.07, 0.95)
+  b.bg:SetColorTexture(T.bg[1], T.bg[2], T.bg[3], 0.95)
+  -- the guild mark, on the game's round minimap-button frame
   b.icon = b:CreateTexture(nil, "ARTWORK"); b.icon:SetSize(20, 20); b.icon:SetPoint("CENTER")
-  b.icon:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64")   -- the War Legend skull
+  b.icon:SetTexture(ns.LOGO or ("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64"))
   b.ring = b:CreateTexture(nil, "OVERLAY"); b.ring:SetSize(54, 54); b.ring:SetPoint("TOPLEFT")
   b.ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
   b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
@@ -138,7 +139,7 @@ local function BuildMinimap()
   b:SetScript("OnEnter", function(self)
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.MinimapTooltip then WP.MinimapTooltip(self)
-    else ns.ShowTip(self, { "WL Helper", { L.MM_TT3, 0.6, 0.6, 0.6 } }) end
+    else ns.ShowTip(self, { "WL Helper", L.MM_TT1, L.MM_TT3 }) end
   end)
   b:SetScript("OnLeave", ns.HideTip)
   b:SetShown(not WLDTDB.hideMinimap)

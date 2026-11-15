@@ -12,16 +12,24 @@ local L = ns.L
 local S = ns.S
 
 ns.AddEnglish({
-    ["Writs : %d prêts à rendre, %d enveloppes à ouvrir. Tape /wlh trade."] = "Writs: %d ready to hand in, %d envelopes to open. Type /wlh trade.",
-    ["Writs : %d prêts à rendre. Tape /wlh trade."] = "Writs: %d ready to hand in. Type /wlh trade.",
+    ["1 writ prêt à rendre"] = "1 writ ready to turn in",
+    ["%d writs prêts à rendre"] = "%d writs ready to turn in",
+    ["1 enveloppe à ouvrir"] = "1 envelope to open",
+    ["%d enveloppes à ouvrir"] = "%d envelopes to open",
     ["WL Helper : writ %s, %d points de réputation"] = "WL Helper: %s writ, %d reputation",
+    ["Objet demandé : %s, dans tes sacs"] = "Requested item: %s, in your bags",
+    ["Objet demandé : %s, environ %s à l'HV"] = "Requested item: %s, about %s at the AH",
     ["Objet demandé : %s"] = "Requested item: %s",
-    ["dans tes sacs"] = "in your bags",
     ["À rendre à %s, %s %.0f, %.0f"] = "Turn in to %s, %s %.0f, %.0f",
-    ["À rendre en %s %.0f, %.0f"] = "Turn in at %s %.0f, %.0f",
+    ["À rendre : %s %.0f, %.0f"] = "Turn in: %s %.0f, %.0f",
+    ["Tu as %s et %s. Tape /wlh trade pour ouvrir les Writs."] = "You have %s and %s. Type /wlh trade to open the trading post.",
+    ["Tu as %s. Tape /wlh trade gps pour lancer la tournée."] = "You have %s. Type /wlh trade gps to start the tour.",
+    ["Tu as %s. Tape /wlh trade pour ouvrir les Writs."] = "You have %s. Type /wlh trade to open the trading post.",
     ["Déjà rendu aujourd'hui"] = "Already turned in today",
     ["Réservé à l'autre faction"] = "Other faction only",
 })
+
+local function Count(n, one, many) return n == 1 and L(one) or string.format(L(many), n) end
 
 local function On(key)
     local c = WLWritsDB and WLWritsDB.comfort
@@ -130,8 +138,11 @@ f:SetScript("OnEvent", function(_, event, a1, a2)
                 for _, r in ipairs(WP.Rows()) do
                     if r.state == "ready" then ready = ready + 1 elseif r.state == "bag" then bag = bag + 1 end
                 end
-                if bag > 0 then WP.Print(string.format(L("Writs : %d prêts à rendre, %d enveloppes à ouvrir. Tape /wlh trade."), ready, bag))
-                elseif ready > 0 then WP.Print(string.format(L("Writs : %d prêts à rendre. Tape /wlh trade."), ready)) end
+                local r = Count(ready, "1 writ prêt à rendre", "%d writs prêts à rendre")
+                local b = Count(bag, "1 enveloppe à ouvrir", "%d enveloppes à ouvrir")
+                if ready > 0 and bag > 0 then WP.Print(string.format(L("Tu as %s et %s. Tape /wlh trade pour ouvrir les Writs."), r, b), true)
+                elseif ready > 0 then WP.Print(string.format(L("Tu as %s. Tape /wlh trade gps pour lancer la tournée."), r), true)
+                elseif bag > 0 then WP.Print(string.format(L("Tu as %s. Tape /wlh trade pour ouvrir les Writs."), b), true) end
             end)
         end
     end
@@ -147,25 +158,26 @@ local function AddLines(tooltip, itemID)
     local mySide = UnitFactionGroup("player") == "Alliance" and 1 or 2
     local C = S.C
     tooltip:AddLine(" ")
-    tooltip:AddLine(string.format(L("WL Helper : writ %s, %d points de réputation"), WP.Tier(w.tier), w.rep), C.brandSoft[1], C.brandSoft[2], C.brandSoft[3])
+    tooltip:AddLine(string.format(L("WL Helper : writ %s, %d points de réputation"), WP.Tier(w.tier), w.rep), C.accentSoft[1], C.accentSoft[2], C.accentSoft[3])
     if w.side and w.side ~= mySide then
-        tooltip:AddLine(L("Réservé à l'autre faction"), C.danger[1], C.danger[2], C.danger[3])
+        tooltip:AddLine(L("Réservé à l'autre faction"), C.bad[1], C.bad[2], C.bad[3])
         return
     end
     local have = (C_Item and C_Item.GetItemCount and C_Item.GetItemCount(w.item)) or 0
     local need = w.count or 1
-    local item = WP.ItemName(w.item, w.itemName) .. (need > 1 and (" ×" .. need) or "")
+    local item = WP.ItemName(w.item, w.itemName) .. (need > 1 and (" x" .. need) or "")
     if have >= need then
-        tooltip:AddLine(string.format(L("Objet demandé : %s"), item) .. " · " .. L("dans tes sacs"), C.ready[1], C.ready[2], C.ready[3])
+        tooltip:AddLine(string.format(L("Objet demandé : %s, dans tes sacs"), item), C.ok[1], C.ok[2], C.ok[3], true)
     else
         local price = WP.Price(w.item, w.snapItem)
-        tooltip:AddLine(string.format(L("Objet demandé : %s"), item) .. (price and (" · " .. S.Money(price * (need - have))) or ""), C.text[1], C.text[2], C.text[3])
+        tooltip:AddLine(price and string.format(L("Objet demandé : %s, environ %s à l'HV"), item, S.Money(price * (need - have)))
+            or string.format(L("Objet demandé : %s"), item), C.text[1], C.text[2], C.text[3], true)
     end
     if w.map then
         if w.npcName then
-            tooltip:AddLine(string.format(L("À rendre à %s, %s %.0f, %.0f"), w.npcName, WP.ZoneName(w.map), w.x, w.y), C.dim[1], C.dim[2], C.dim[3])
+            tooltip:AddLine(string.format(L("À rendre à %s, %s %.0f, %.0f"), w.npcName, WP.ZoneName(w.map), w.x, w.y), C.muted[1], C.muted[2], C.muted[3], true)
         else
-            tooltip:AddLine(string.format(L("À rendre en %s %.0f, %.0f"), WP.ZoneName(w.map), w.x, w.y), C.dim[1], C.dim[2], C.dim[3])
+            tooltip:AddLine(string.format(L("À rendre : %s %.0f, %.0f"), WP.ZoneName(w.map), w.x, w.y), C.muted[1], C.muted[2], C.muted[3], true)
         end
     end
     if w.quest and WP.State(w) == "done" then

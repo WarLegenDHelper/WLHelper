@@ -3,11 +3,11 @@ local ADDON, ns = ...
 local L, T = ns.L, ns.T_
 local Text, Tex, Button, Hex = ns.Text, ns.Tex, ns.Button, ns.Hex
 
-local W, PAD, MAXROWS = 480, 14, 30
-local CARD_MAX = 470
-local W0, CARD0 = 480, 470
-local LISTW, LISTROWS, LISTH = 270, 30, 20
-local LISTBTN_W, READY_W = 64, 112   -- "Steps" button by the progress bar, "Check-list" button in the footer
+-- 520: the design system's two-column width; the grip changes it between 420 and 640.
+local W, PAD, MAXROWS = 520, 16, 30
+local CARD_MAX = 2000                 -- the card's height cap (older saves); the screen cap applies first
+local W0, CARD0 = 520, 2000
+local LISTW, LISTROWS, LISTH = 272, 30, 28
 local f
 ns.route = nil   -- { steps = {...}, sel = {...} }
 
@@ -44,27 +44,30 @@ end
 ns.GuideSetIcon = SetIcon
 ns.SetIcon = ns.SetIcon or SetIcon
 
--- the guide's icons by meaning (atlas names first, then the sure file)
+-- the guide's icons by meaning: HD interface icons (Media/Icons) tinted with a token, and the
+-- game's own quest marks (a "thing" of the game, like a painted icon)
 local ICON = {
-  done  = { { "common-icon-checkmark", "checkmark-minimal" }, "Interface\\RAIDFRAME\\ReadyCheck-Ready" },
+  done  = { hd = "check", c = T.ok },
   take  = { { "QuestNormal" }, "Interface\\GossipFrame\\AvailableQuestIcon" },
   turn  = { { "QuestTurnin" }, "Interface\\GossipFrame\\ActiveQuestIcon" },
-  boss  = { { "DungeonSkull" }, "Interface\\TargetingFrame\\UI-TargetingFrame-Skull" },
-  map   = { nil, "Interface\\Icons\\INV_Misc_Map_01", true },
-  check = { nil, "Interface\\Icons\\INV_Misc_Note_01", true },
-  pin   = { { "Waypoint-MapPin-ChatIcon" }, "Interface\\Icons\\INV_Misc_Map_01", true },
-  miss  = { { "QuestNormal" }, "Interface\\GossipFrame\\AvailableQuestIcon" },
-  nokey = { { "common-icon-redx" }, "Interface\\RAIDFRAME\\ReadyCheck-NotReady" },
-  gear  = { { "QuestLog-icon-setting", "GM-icon-settings" }, "Interface\\Buttons\\UI-OptionsButton" },
+  boss  = { hd = "skull", c = T.fg },     -- neutral: red stays for blocked lines
+  map   = { hd = "flag", c = T.info },
+  check = { hd = "flag", c = T.muted },
+  pin   = { hd = "pin", c = T.fg },
+  miss  = { hd = "warning", c = T.warn },
+  nokey = { hd = "warning", c = T.bad },
+  gear  = { hd = "gear", c = T.muted },
 }
 local function Icon(tex, name)
   local d = ICON[name]
+  if d.hd then ns.SetHDIcon(tex, d.hd, d.c); return true end
   tex:SetVertexColor(1, 1, 1)
   return SetIcon(tex, d[1], d[2], d[3])
 end
 ns.GuideIcon = Icon
 
-function ns.Print(msg) print("|cffce1918WL Helper|r " .. tostring(msg)) end
+-- Chat lines carry the addon tag once, then one sentence (design system 5.4).
+function ns.Print(msg) print("|cffce1918WL|r " .. tostring(msg)) end
 
 -- =====================================================================
 --  État des étapes
@@ -263,10 +266,10 @@ local function StepTitle(st, noZone)
   end
   if st.ins then
     local dn = ns.DName(st.ins)
-    if st.inner then return ns.Upper(dn) end
+    if st.inner then return dn end
     local allOuter = true
     for _, n in ipairs(st.acts) do if n.kind ~= "c" or n.outer == false then allOuter = false end end
-    return allOuter and L.INSIDE_OUTER_T:format(dn) or ns.Upper(dn)
+    return allOuter and L.INSIDE_OUTER_T:format(dn) or dn
   end
   local names, seen = {}, {}
   for _, n in ipairs(st.acts) do
@@ -274,35 +277,56 @@ local function StepTitle(st, noZone)
     if nm and not seen[nm] then seen[nm] = true; table.insert(names, nm) end
   end
   local zone = st.loc and ZoneName(st.loc.m) or ""
+  -- every name: the card's title wraps, the list row shows the full title in its tooltip
   local who = table.concat(names, ", ")
-  if #who > 60 then who = who:sub(1, 57) .. "..." end
-  if zone ~= "" and not noZone then return zone .. " : " .. who end
+  if zone ~= "" and not noZone then return zone .. L.COLON .. who end
   return who
 end
 ns.StepTitle = StepTitle
 
 -- =====================================================================
---  Fenêtre
+--  Fenêtre (design system: header 44, content inset 16, card, footer that sticks to the content)
 -- =====================================================================
 local KTAG = { a = "TAKE", c = "DO", o = "OUTSIDE", t = "TURNIN", h = "HAVE", i = "ITEM" }
 local SLABEL = { none = "S_NONE", on = "S_ON", ready = "S_READY", done = "S_DONE" }
-local SCOL = { none = "|cffff9933", on = "|cff66b3ff", ready = "|cff59e67a", done = "|cff59e67a" }
+-- a quest's state and a line's kind, each in one token colour (design system 5.5)
+local SCOL = { none = T.warn, on = T.fg, ready = T.ok, done = T.ok }   -- "in progress" is neutral; info is the info icon only
+local KCOL = { a = T.gold, c = T.fg, o = T.fg, t = T.ok, h = T.fg, i = T.muted }
 
+local HEADER, GAP, CI = 44, 12, 12           -- header, gap between blocks, card padding
+local FOOT_H, FOOT_SMALL = 68, 32           -- footer: big button + row of buttons / big button only
 local Render
 
--- Moves the scrollbar thumb to the current scroll offset (no full Render while scrolling).
-local function PositionThumb()
-  local holder = f and f.holder
-  if not holder or not holder.sbar or not f.scroll then return end
-  local over = holder.over or 0
-  if over <= 0 then return end
-  local hh = holder:GetHeight()
-  local off = (f.scroll.offset or 0) / over
-  holder.sbar:ClearAllPoints()
-  holder.sbar:SetPoint("TOPRIGHT", 0, -2 - (hh - holder.sbar:GetHeight() - 4) * math.min(1, off))
+local function num(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) and v or nil end
+local function ScreenCap() return math.floor((num(UIParent:GetHeight()) or 768) * 0.80) end
+local function CardW() return W - 2 * PAD - 2 end      -- inside the card's 1 px edge
+local function TextW() return CardW() - 2 * CI end
+-- y of the content under the header, with or without the progress row (24) and bar (4)
+local function TopBase(hasRoute) return HEADER + 1 + GAP + (hasRoute and (24 + 6 + 4 + GAP) or 0) end
+-- The design system (Writs/Style.lua) is required: without it the guide stops with a clear error
+-- instead of half-built widgets.
+local function SW()
+  local S = ns.Writs and ns.Writs.S
+  if not S then error("WL Helper: Writs/Style.lua missing") end
+  return S
 end
 
--- The step's points on the map and the arrow (the big button, the "..." menu, the key binding).
+-- An HD icon button (header, footer).
+local function IconBtn(parent, icon, tip, onClick)
+  return SW().IconButton(parent, icon, 28, tip, onClick)
+end
+-- A labelled button (secondary unless kind says "primary"), never narrower than its words.
+local function LabelBtn(parent, label, h, kind, onClick, tip)
+  return SW().Button(parent, label, 0, h, kind or "secondary", onClick, tip)
+end
+local function Pill(parent)
+  return SW().Pill(parent)
+end
+
+-- A text's size from the type scale (kept when the looks change: ns.ApplyLooks reads fs._size).
+local function Size(fs, size) if fs._size ~= size then fs._size = size; ns.SetFont(fs) end end
+
+-- The step's points on the map and the arrow (the big button, the Actions menu, the key binding).
 -- Without TomTom, a second press goes to the step's next point.
 function ns.PlacePoints()
   if not f then return end
@@ -315,14 +339,13 @@ function ns.PlacePoints()
   f.wpKey = key
   ns.SetPoints(pts, false, f.wpIdx); Render()
 end
--- "Go there": the arrow comes back on if it was turned off
+-- "Guide me to the step": the arrow comes back on if it was turned off
 local function GoPoints()
   if WLDTDB.arrow == false then WLDTDB.arrow = true end
   ns.PlacePoints()
 end
 local function GoBack() if f and f.auto then ns.GoTo(f.auto) end end
-local function onoff(v) return " : " .. (v and L.ON or L.OFF) end
-
+local function ScrollTop() if f and f.scroll and f.scroll.ScrollTo then f.scroll:ScrollTo(0, true) end end
 
 function ns.GoTo(i)
   if ns.GuideOn and not ns.GuideOn() then return end
@@ -330,7 +353,7 @@ function ns.GoTo(i)
   if n == 0 then return end
   -- every step done: one more place after the last step, the "route finished" card
   f.view = math.max(1, math.min(RouteFinished() and FinIndex() or n, i))
-  f.scroll.offset = 0
+  ScrollTop()
   if f.menu then f.menu:Hide() end
   Render()
 end
@@ -374,23 +397,23 @@ local function ObjectiveLines(n, log)
     if log then
       local a, b, fin = LiveCount(log, n.q, pos[o], o.n, #(q.o or {}))
       if a and b then
-        s = (fin and "|cff59e67a" or "|cffffffff") .. a .. "/" .. b .. "|r  " .. (o.n or "")
+        s = Hex(fin and T.ok or T.fg) .. a .. "/" .. b .. "|r  " .. (o.n or "")
       end
     end
     if o.src and o.src[1] then
       local srcs = {}
       for _, x in ipairs(o.src) do
-        table.insert(srcs, x[1] .. ((x[2] and x[2] > 0 and x[2] < 100) and (" " .. math.floor(x[2] + 0.5) .. "%") or ""))
+        table.insert(srcs, x[1] .. ((x[2] and x[2] > 0 and x[2] < 100) and (" " .. math.floor(x[2] + 0.5) .. " %") or ""))
       end
-      s = s .. "  |cff9a9a9a(" .. L.TT_DROPS:format(table.concat(srcs, ", ")) .. ")|r"
+      s = s .. "  " .. Hex(T.muted) .. "(" .. L.TT_DROPS:format(table.concat(srcs, ", ")) .. ")|r"
     end
     if s ~= "" then table.insert(lines, s) end
   end
   return lines
 end
 
--- the game's own icon for each kind of line (modern atlas when there is one)
-local KICON = { a = "take", t = "turn", c = "boss", o = "map", h = "miss" }
+-- the game's own icon for each kind of line (quest marks), HD icons for the rest
+local KICON = { a = "take", t = "turn", c = "boss", o = "map", h = "take" }
 local function SetKindIcon(tex, nd)
   if nd.kind == "i" then
     local id = nd.items and nd.items[1]
@@ -403,36 +426,55 @@ local function SetKindIcon(tex, nd)
   return true
 end
 
+-- =====================================================================
+--  Step list (beside the guide): one dense row per step, the step on screen selected.
+-- =====================================================================
 local function BuildList()
   local l = CreateFrame("Frame", nil, f)
+  l.wlOwned = true
   l:SetWidth(LISTW)
-  l:SetPoint("TOPRIGHT", f, "TOPLEFT", -4, 0); l:SetPoint("BOTTOMRIGHT", f, "BOTTOMLEFT", -4, 0)
-  ns.Flat(l, T.bg)
-  l.head = Tex(l, "ARTWORK", T.header); l.head:SetPoint("TOPLEFT", 1, -1); l.head:SetPoint("TOPRIGHT", -1, -1); l.head:SetHeight(28)
-  l.title = Text(l, 12, T.dim, true); l.title:SetPoint("LEFT", l.head, "LEFT", 10, 0); l.title:SetText(L.STEPS)
+  -- its own height (its rows), top-aligned with the guide
+  l:SetPoint("TOPRIGHT", f, "TOPLEFT", -4, 0); l:SetHeight(200)
+  ns.Flat(l, T.bg, T.cardEdge)
+  l.head = CreateFrame("Frame", nil, l)
+  l.head:SetPoint("TOPLEFT"); l.head:SetPoint("TOPRIGHT"); l.head:SetHeight(HEADER)
+  l.title = Text(l.head, ns.F.heading, T.fg); l.title:SetPoint("LEFT", 16, 0); l.title:SetPoint("RIGHT", -12, 0); l.title:SetJustifyV("MIDDLE")
+  l.title:SetText(L.STEPS)
+  ns.ClampLabel(l.title, nil, l.head)
+  l.rule = ns.Rule(l, T.line); l.rule:SetPoint("TOPLEFT", 0, -HEADER); l.rule:SetPoint("TOPRIGHT", 0, -HEADER)
   l.rows, l.offset = {}, 0
   for r = 1, LISTROWS do
     local row = CreateFrame("Button", nil, l)
     row:SetHeight(LISTH)
-    row:SetPoint("TOPLEFT", 1, -30 - (r - 1) * LISTH); row:SetPoint("TOPRIGHT", -1, -30 - (r - 1) * LISTH)
-    row.sel = Tex(row, "BACKGROUND", { 1, 1, 1, 0.06 }); row.sel:SetAllPoints()
-    row.bar = Tex(row, "ARTWORK", T.accent); row.bar:SetPoint("TOPLEFT"); row.bar:SetPoint("BOTTOMLEFT"); row.bar:SetWidth(2); ns.Accent(row.bar); row.bar:SetAlpha(0)
-    row.hl = Tex(row, "HIGHLIGHT", { 1, 1, 1, 0.05 }); row.hl:SetAllPoints()
-    -- the dungeon's colour as a thin edge (open step), a check mark once the step is done
-    row.edge = Tex(row, "ARTWORK", { 1, 1, 1 }); row.edge:SetWidth(3); row.edge:SetAlpha(0); row.edge:SetPoint("TOPLEFT", 9, -4); row.edge:SetPoint("BOTTOMLEFT", 9, 4)
-    row.check = row:CreateTexture(nil, "OVERLAY"); row.check:SetSize(14, 14); row.check:SetPoint("LEFT", 4, 0)
-    Icon(row.check, "done")
-    row.num = Text(row, 11, T.dim); row.num:SetPoint("LEFT", 22, 0); row.num:SetWidth(24); row.num:SetJustifyH("RIGHT"); row.num:SetJustifyV("MIDDLE")
-    -- the step's kind at a glance: check-list, boss, dungeon, quest giver, item...
-    row.kind = row:CreateTexture(nil, "ARTWORK"); row.kind:SetSize(14, 14); row.kind:SetPoint("LEFT", 50, 0)
-    row.txt = Text(row, 12, T.text); row.txt:SetPoint("LEFT", 68, 0); row.txt:SetPoint("RIGHT", -6, 0)
-    row.txt:SetWordWrap(false); row.txt:SetJustifyV("MIDDLE")
+    local y = -(HEADER + 1 + 4 + (r - 1) * LISTH)
+    row:SetPoint("TOPLEFT", 4, y); row:SetPoint("TOPRIGHT", -4, y)
+    row.sel = Tex(row, "BACKGROUND", T.selFill); row.sel:SetAllPoints(); row.sel:Hide()
+    row.hl = Tex(row, "HIGHLIGHT", T.hoverFill); row.hl:SetAllPoints()
+    row.press = Tex(row, "ARTWORK", T.pressFill); row.press:SetAllPoints(); row.press:Hide()
+    -- done: a check; the current step: a chevron; nothing else (no coloured edge)
+    row.check = ns.Icon(row, "check", 14, "OVERLAY", T.ok); row.check:SetPoint("LEFT", 6, 0)
+    row.num = Text(row, ns.F.meta, T.muted); row.num:SetPoint("LEFT", 22, 0); row.num:SetWidth(24); row.num:SetJustifyH("RIGHT"); row.num:SetJustifyV("MIDDLE")
+    row.kind = row:CreateTexture(nil, "ARTWORK"); row.kind:SetSize(16, 16); row.kind:SetPoint("LEFT", 52, 0)
+    row.txt = Text(row, ns.F.label, T.text); row.txt:SetPoint("LEFT", 76, 0); row.txt:SetPoint("RIGHT", -8, 0); row.txt:SetJustifyV("MIDDLE")
     row:SetScript("OnClick", function(self) ns.GoTo(self.i) end)
+    row:SetScript("OnMouseDown", function(self) self.press:Show() end)
+    row:SetScript("OnMouseUp", function(self) self.press:Hide() end)
+    row:SetScript("OnEnter", function(self)
+      local st = Steps()[self.i]; if not st then return end
+      local lines = { StepTitle(st) }
+      if self.state then table.insert(lines, self.state) end
+      table.insert(lines, L.TT_LISTROW)
+      ns.ShowTip(self, lines)
+    end)
+    row:SetScript("OnLeave", ns.HideTip)
+    -- one line: a long step name shows in full in the row's tooltip
+    ns.ClampLabel(row.txt, nil, row)
     l.rows[r] = row
   end
-  -- more steps than rows: says how many are above / below (the wheel scrolls)
-  l.hint = Text(l, 10, T.dim); l.hint:SetPoint("BOTTOMLEFT", 10, 5); l.hint:SetPoint("BOTTOMRIGHT", -10, 5)
-  l.hint:SetWordWrap(false); l.hint:SetJustifyV("MIDDLE"); l.hint:Hide()
+  -- more steps than rows: how many are above / below (the wheel scrolls)
+  l.hint = Text(l, ns.F.foot, T.muted); l.hint:SetPoint("BOTTOMLEFT", 16, 8); l.hint:SetPoint("BOTTOMRIGHT", -12, 8)
+  l.hint:SetJustifyV("MIDDLE"); l.hint:Hide()
+  ns.ClampLabel(l.hint, nil, l)
   l:EnableMouseWheel(true)
   l:SetScript("OnMouseWheel", function(self, delta)
     local max = math.max(0, #Steps() - (self.visible or 1))
@@ -442,15 +484,24 @@ local function BuildList()
   f.list = l
 end
 
+local function ListKindIcon(tex, st)
+  if st.gate then ns.SetHDIcon(tex, "flag", T.muted)
+  elseif st.split and st.bossIdx and st.bossIdx >= 1 and st.bossIdx <= 998 then Icon(tex, "boss")
+  elseif st.ins then tex:SetVertexColor(1, 1, 1); ns.SetPainted(tex, (ns.D[st.ins] and ns.D[st.ins].icon) or "Interface\\Icons\\INV_Misc_Map_01")
+  else
+    local has, itemNode = {}, nil
+    for _, nd in ipairs(st.acts) do has[nd.kind] = true; if nd.kind == "i" and not itemNode then itemNode = nd end end
+    if has.a then Icon(tex, "take") elseif itemNode then SetKindIcon(tex, itemNode) elseif has.o then Icon(tex, "map") else Icon(tex, "turn") end
+  end
+end
+
 local function RenderList(log)
   local l = f.list
   if not l:IsShown() then return end
   local steps = Steps()
-  local rowsH = f:GetHeight() - 34
-  local avail = math.max(1, math.floor(rowsH / LISTH))
-  -- not everything fits: one line at the bottom is kept for "n above / n below"
-  if #steps > math.min(avail, LISTROWS) then avail = math.max(1, math.floor((rowsH - 18) / LISTH)) end
-  l.visible = math.min(avail, LISTROWS)
+  -- as many rows as steps, up to what the screen holds (at least 10); the wheel scrolls the rest
+  local avail = math.max(10, math.floor((ScreenCap() - (HEADER + 1 + 4) - 8 - 20) / LISTH))
+  l.visible = math.max(1, math.min(avail, LISTROWS, #steps))
   local max = math.max(0, #steps - l.visible)
   -- the step on screen stays in the list when it changes (done steps above stay reachable with the wheel)
   if f.view ~= l.lastView then
@@ -467,74 +518,68 @@ local function RenderList(log)
   local doneCount = 0
   for k = 1, #steps do if IsStepDone(log, k) then doneCount = doneCount + 1 end end
   l.title:SetText(L.STEPS_N:format(doneCount, #steps))
+  l:SetHeight(HEADER + 1 + 4 + l.visible * LISTH + (l.hint:IsShown() and 20 or 0) + 8)
   for r, row in ipairs(l.rows) do
     local i = l.offset + r
     local st = steps[i]
     if st and r <= l.visible then
       row.i = i; row:Show()
       local done = IsStepDone(log, i)
+      local cur = (i == f.auto)
       row.num:SetText(i)
       row.txt:SetText(StepTitle(st))
-      row.kind:SetVertexColor(1, 1, 1)
-      if st.gate then Icon(row.kind, "check")
-      elseif st.split and st.bossIdx and st.bossIdx >= 1 and st.bossIdx <= 998 then Icon(row.kind, "boss")
-      elseif st.ins then SetIcon(row.kind, nil, (ns.D[st.ins] and ns.D[st.ins].icon) or "Interface\\Icons\\INV_Misc_Map_01", true)
-      else
-        local has, itemNode = {}, nil
-        for _, nd in ipairs(st.acts) do has[nd.kind] = true; if nd.kind == "i" and not itemNode then itemNode = nd end end
-        if has.a then Icon(row.kind, "take") elseif itemNode then SetKindIcon(row.kind, itemNode) elseif has.o then Icon(row.kind, "map") else Icon(row.kind, "turn") end
-      end
+      ListKindIcon(row.kind, st)
       row.kind:SetAlpha(done and 0.45 or 1)
-      row.sel:SetShown(i == f.view); row.bar:SetShown(i == f.auto)
-      row.check:SetShown(done); row.edge:SetShown(not done)
-      local c = DColor(st.d or st.gate or st.ins)
-      row.edge:SetColorTexture(c[1], c[2], c[3], 1)
-      row.num:SetTextColor(unpack(done and { 0.35, 0.9, 0.48 } or T.dim))
-      row.txt:SetTextColor(unpack(done and T.dim or T.text))
+      row.sel:SetShown(i == f.view)
+      if done then ns.SetHDIcon(row.check, "check", T.ok); row.check:Show()
+      elseif cur then ns.SetHDIcon(row.check, "chevron_right", T.accentSoft); row.check:Show()
+      else row.check:Hide() end
+      local nc = cur and T.accentSoft or T.muted
+      row.num:SetTextColor(nc[1], nc[2], nc[3])
+      local tc = (i == f.view) and T.fg or (done and T.muted or T.text)
+      row.txt:SetTextColor(tc[1], tc[2], tc[3])
+      row.state = done and L.B_DONE or (cur and L.B_CUR) or ((f.auto and i < f.auto) and L.B_LATE) or L.B_NEXT
     else
       row:Hide()
     end
   end
 end
 
-
-local function MakeRow(parent, CW)
+-- =====================================================================
+--  A line of the step card: icon, kind, quest name, state or NPC, GPS button, detail lines.
+-- =====================================================================
+local ROW_NAME_X = 100
+local function MakeRow(parent)
   local row = CreateFrame("Button", nil, parent)
-  row:SetWidth(CW + 8)
-  row.hl = Tex(row, "HIGHLIGHT", { 1, 1, 1, 0.05 }); row.hl:SetAllPoints()
-  row.wpOn = Tex(row, "BACKGROUND", T.accent); row.wpOn:SetAllPoints(); ns.Accent(row.wpOn, 0.10)
-  row.wpBar = Tex(row, "ARTWORK", T.accent); row.wpBar:SetPoint("TOPLEFT"); row.wpBar:SetPoint("BOTTOMLEFT"); row.wpBar:SetWidth(2); ns.Accent(row.wpBar); row.wpBar:SetAlpha(0)
-  row.icon = row:CreateTexture(nil, "ARTWORK"); row.icon:SetSize(16, 16); row.icon:SetPoint("TOPLEFT", 2, -4)
-  Icon(row.icon, "done")
-  row.kicon = row:CreateTexture(nil, "ARTWORK", nil, 1); row.kicon:SetSize(16, 16); row.kicon:SetPoint("TOPLEFT", 2, -4)
-  row.tag = Text(row, 10, T.text, true); row.tag:SetPoint("TOPLEFT", 22, -6); row.tag:SetWidth(70); row.tag:SetWordWrap(false)
-  row.name = Text(row, 13, T.text); row.name:SetPoint("TOPLEFT", 94, -4); row.name:SetWordWrap(false)
-  row.npc = Text(row, 12, T.dim); row.npc:SetJustifyH("RIGHT"); row.npc:SetWordWrap(false)
-  row.sub = Text(row, 12, T.dim); row.sub:SetPoint("TOPLEFT", 94, -24); row.sub:SetWidth(CW - 90); row.sub:SetSpacing(3)
-  row.sep = Tex(row, "BACKGROUND", { 1, 1, 1, 0.05 }); row.sep:SetPoint("BOTTOMLEFT", 4, -4); row.sep:SetPoint("BOTTOMRIGHT", -4, -4); row.sep:SetHeight(1)
-  -- les boutons sécurisés (cibler / objet) sont dans la barre d'actions, hors de cette fenêtre,
-  -- pour que la fenêtre reste utilisable en combat
-  -- GPS
-  local gb = CreateFrame("Button", nil, row)
-  gb:SetSize(54, 20)
-  gb.bg = Tex(gb, "BACKGROUND", { 1, 1, 1, 0.08 }); gb.bg:SetAllPoints()
-  ns.Flat(gb, { 0, 0, 0, 0 }, { 1, 1, 1, 0.18 })
-  gb.icon = gb:CreateTexture(nil, "ARTWORK"); gb.icon:SetSize(14, 14); gb.icon:SetPoint("LEFT", 5, 0)
-  -- a map pin, like a point on a phone map (the game's own drawing, a map icon if it has none)
-  Icon(gb.icon, "pin")
-  gb.text = Text(gb, 11, T.text, true); gb.text:SetPoint("LEFT", gb.icon, "RIGHT", 3, 0); gb.text:SetText("GPS")
-  gb.hl = Tex(gb, "HIGHLIGHT", { 1, 1, 1, 0.15 }); gb.hl:SetAllPoints()
+  row.wpOn = Tex(row, "BACKGROUND", T.selFill); row.wpOn:SetAllPoints(); row.wpOn:Hide()
+  row.hl = Tex(row, "HIGHLIGHT", T.hoverFill); row.hl:SetAllPoints()
+  row.press = Tex(row, "ARTWORK", T.pressFill); row.press:SetAllPoints(); row.press:Hide()
+  row.icon = ns.Icon(row, "check", 16, "ARTWORK", T.ok); row.icon:SetPoint("TOPLEFT", 8, -9)
+  row.kicon = row:CreateTexture(nil, "ARTWORK", nil, 1); row.kicon:SetSize(16, 16); row.kicon:SetPoint("TOPLEFT", 8, -9)
+  row.tag = Text(row, ns.F.meta, T.muted); row.tag:SetPoint("TOPLEFT", 32, -12); row.tag:SetWidth(ROW_NAME_X - 32 - 6)
+  row.name = Text(row, ns.F.body, T.fg); row.name:SetPoint("TOPLEFT", ROW_NAME_X, -10)
+  row.npc = Text(row, ns.F.meta, T.muted); row.npc:SetJustifyH("RIGHT")
+  row.sub = Text(row, ns.F.meta, T.muted); row.sub:SetPoint("TOPLEFT", ROW_NAME_X, -28); row.sub:SetSpacing(3)   -- placed in Render
+  row.sep = ns.Rule(row, T.divider); row.sep:SetPoint("BOTTOMLEFT", 8, 0); row.sep:SetPoint("BOTTOMRIGHT", -8, 0)
+  -- the secure buttons (target / item) live in the action bar outside this window, so the window
+  -- stays usable in combat. GPS: a secondary button with the pin.
+  local gb
+  gb = LabelBtn(row, "GPS", 24, "secondary", function(self) local n = self.row.node; if n and n.loc then ns.SetOne(n) end end,
+    function()
+      local n = gb and gb.row and gb.row.node
+      if not (n and n.loc) then return nil end
+      return { L.TT_GPS:format(n.npc or ns.QName(n.q), n.loc.x, n.loc.y), L.TT_GPS_CLICK }
+    end)
+  if gb.SetIcon then gb:SetIcon("pin") end
   gb.row = row
-  gb:SetScript("OnClick", function(self) local n = self.row.node; if n and n.loc then ns.SetOne(n) end end)
-  gb:SetScript("OnEnter", function(self)
-    local n = self.row.node
-    if n and n.loc then ns.ShowTip(self, { "GPS", L.TT_GPS:format(n.npc or ns.QName(n.q), n.loc.x, n.loc.y) }) end
-  end)
-  gb:SetScript("OnLeave", ns.HideTip)
   row.gb = gb
   row:SetScript("OnClick", function(self) local n = self.node; if n and n.loc then ns.SetOne(n) end end)
+  row:SetScript("OnMouseDown", function(self) if self.node and self.node.loc then self.press:Show() end end)
+  row:SetScript("OnMouseUp", function(self) self.press:Hide() end)
   row:SetScript("OnEnter", function(self) ns.RowTip(self) end)
   row:SetScript("OnLeave", ns.HideTip)
+  ns.ClampLabel(row.tag, nil, row)
+  ns.ClampLabel(row.npc, nil, row)
   return row
 end
 
@@ -543,253 +588,265 @@ function ns.SetOne(n)
   Render()
 end
 
+-- A quest line's tooltip: name, facts (muted), the state colours of the design system, the mouse line.
 function ns.RowTip(row)
-  local n = row.node; if not n then return end
+  local n = row.node
+  if not n then
+    -- a boss header: its name and tip (cut labels first)
+    if row.bossName then ns.ShowTip(row, { row.bossName, row.bossTip }) end
+    return
+  end
   local q = ns.Q[n.q] or {}
   local lines = { ns.QName(n.q) }
-  if GetLocale and GetLocale() == "frFR" and q.n then table.insert(lines, { q.n, 0.6, 0.6, 0.6 })
-  elseif ns.lang == "fr" and q.nf then table.insert(lines, { q.nf, 0.6, 0.6, 0.6 }) end
-  local kc = T.kind[n.kind] or T.text
+  if GetLocale and GetLocale() == "frFR" and q.n then table.insert(lines, q.n)
+  elseif ns.lang == "fr" and q.nf then table.insert(lines, q.nf) end
+  local kc = KCOL[n.kind] or T.text
   local kt = ({ a = L.TT_TAKE, c = L.TT_DO, o = L.TT_OUT, t = L.TT_TURN, h = L.TT_HAVE, i = L.TT_ITEM })[n.kind]
-  table.insert(lines, { kt, kc[1], kc[2], kc[3] })
-  if n.pre then table.insert(lines, { L.PRE, 0.75, 0.75, 0.75 }) end
-  table.insert(lines, n.ins and { L.TT_INSIDE, 1, 0.45, 0.45 } or { L.TT_OUTSIDE, 0.75, 0.78, 0.82 })
+  if kt then table.insert(lines, { kt, kc[1], kc[2], kc[3] }) end
+  if n.pre then table.insert(lines, L.PRE) end
+  table.insert(lines, n.ins and L.TT_INSIDE or L.TT_OUTSIDE)
   if q.c then
     for tok in q.c:gmatch("[^,]+") do local cn, cc = ns.ClassInfo(tok); table.insert(lines, { L.CLASSQ:format(cn), cc[1], cc[2], cc[3] }) end
   end
   if n.npc then table.insert(lines, n.npc) end
-  if n.loc then table.insert(lines, { ("%s  %.1f, %.1f"):format(ZoneName(n.loc.m), n.loc.x, n.loc.y), 0.6, 0.6, 0.6 }) end
+  if n.loc then table.insert(lines, ("%s  %.1f, %.1f"):format(ZoneName(n.loc.m), n.loc.x, n.loc.y)) end
   local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
-  if obj then table.insert(lines, { obj, 0.95, 0.95, 0.95 }) end
-  for _, s in ipairs(ObjectiveLines(n, ns.LogEntries())) do table.insert(lines, { "- " .. s, 0.8, 0.8, 0.8 }) end
-  if q.ne then table.insert(lines, { ns.T(q.ne), 1, 0.82, 0.5 }) end
+  if obj then table.insert(lines, { obj, T.text[1], T.text[2], T.text[3] }) end
+  for _, s in ipairs(ObjectiveLines(n, ns.LogEntries())) do table.insert(lines, "- " .. s) end
+  if q.ne then table.insert(lines, ns.T(q.ne)) end
   for _, r in ipairs(q.req or {}) do
-    if r[3] then table.insert(lines, { r[1] .. " : " .. ns.T(r[3]), 1, 0.82, 0.5 }) end
+    if r[3] then table.insert(lines, r[1] .. L.COLON .. ns.T(r[3])) end
   end
-  if q.si then table.insert(lines, { q.si .. (q.sih and (" : " .. ns.T(q.sih)) or ""), 1, 0.82, 0.5 }) end
-  if q.pi then table.insert(lines, { q.pi .. (q.pih and (" : " .. ns.T(q.pih)) or ""), 1, 0.82, 0.5 }) end
+  if q.si then table.insert(lines, q.si .. (q.sih and (L.COLON .. ns.T(q.sih)) or "")) end
+  if q.pi then table.insert(lines, q.pi .. (q.pih and (L.COLON .. ns.T(q.pih)) or "")) end
   local rw = q.rw and q.rw ~= "" and q.rw or nil
   if q.ri and q.ri[1] then rw = (rw and (rw .. " ; ") or "") .. table.concat(q.ri, q.rc and " / " or ", ") end
-  if rw then table.insert(lines, { L.TT_REWARD:format(rw), 0.4, 0.85, 0.45 }) end
-  if q.xp and q.xp > 0 then table.insert(lines, { L.TT_XP:format(q.xp), 0.6, 0.6, 1 }) end
+  if rw then table.insert(lines, { L.TT_REWARD:format(rw), T.gold[1], T.gold[2], T.gold[3] }) end
+  if q.xp and q.xp > 0 then table.insert(lines, L.TT_XP:format(q.xp)) end
   local pb = n.kind == "a" and ns.PrereqProblem(n.q)
-  if pb then table.insert(lines, { L.BLOCKED:format(pb), 1, 0.35, 0.35 }) end
-  if q.conf then table.insert(lines, { L.TT_CONFLICT, 0.55, 0.55, 0.55 }) end
-  table.insert(lines, { " ", 1, 1, 1 })
-  table.insert(lines, n.loc and { L.TT_CLICK, T.accent[1], T.accent[2], T.accent[3] } or { L.TT_NOPOINT, 0.5, 0.5, 0.5 })
+  if pb then table.insert(lines, { L.BLOCKED:format(pb), T.bad[1], T.bad[2], T.bad[3] }) end
+  if q.conf then table.insert(lines, L.TT_CONFLICT) end
+  table.insert(lines, n.loc and L.TT_CLICK or (n.ins and L.TT_NOPOINT or L.TT_NOPOINT_UNK))
   ns.ShowTip(row, lines)
 end
 
+-- =====================================================================
+--  Build
+-- =====================================================================
 local function Build()
   f = CreateFrame("Frame", "WLDTFrame", UIParent)
+  f.wlOwned = true
   f:SetSize(W, 300); f:SetFrameStrata("MEDIUM")
   local pos = WLDTDB.pos
   if pos then f:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4]) else f:SetPoint("RIGHT", -60, 40) end
   f:SetMovable(true); f:EnableMouse(true); f:SetClampedToScreen(true)
-  ns.Flat(f, T.bg)
+  ns.Flat(f, T.bg, T.cardEdge)
+  f:SetScript("OnMouseDown", function(self) self:Raise() end)
 
+  -- header: home, logo, title + the route as subtitle, then pick / settings / collapse / close
   local h = CreateFrame("Frame", nil, f)
-  h:SetPoint("TOPLEFT", 1, -1); h:SetPoint("TOPRIGHT", -1, -1); h:SetHeight(30)
-  h.bg = Tex(h, "BACKGROUND", T.header); h.bg:SetAllPoints()
-  h.line = Tex(h, "ARTWORK", T.accent); h.line:SetPoint("BOTTOMLEFT"); h.line:SetPoint("BOTTOMRIGHT"); h.line:SetHeight(1); ns.Accent(h.line, 0.6)
+  h:SetPoint("TOPLEFT", 0, 0); h:SetPoint("TOPRIGHT", 0, 0); h:SetHeight(HEADER)
   h:EnableMouse(true); h:RegisterForDrag("LeftButton")
+  h:SetScript("OnMouseDown", function() f:Raise() end)
   h:SetScript("OnDragStart", function() f:StartMoving() end)
   h:SetScript("OnDragStop", function()
     f:StopMovingOrSizing()
     ns.PinTopLeft()
     if ns.UpdateActionBar then ns.UpdateActionBar() end
   end)
-  h.mark = Tex(h, "ARTWORK", T.accent); h.mark:SetSize(3, 15); h.mark:SetPoint("LEFT", 10, 0); ns.Accent(h.mark); h.mark:Hide()
-  -- back to WL Helper's home, logo, "Dungeons" and the route's dungeons
-  -- the logo is the way home (WL Helper's home page)
-  f.homeBtn = CreateFrame("Button", nil, h)
-  f.homeBtn:SetSize(24, 24); f.homeBtn:SetPoint("LEFT", 4, 0)
-  -- "‹ Accueil", the same button as in every WL Helper window
-  local SW = ns.Writs and ns.Writs.S
-  if SW and SW.HomeButton then
-    f.homeLabel = SW.HomeButton(h, function()
-      local WP = ns.Writs and ns.Writs.WP
-      if WP and WP.OpenHome then WP.OpenHome() end
-    end)
-    f.homeLabel:SetPoint("LEFT", 6, 0)
-    f.homeBtn:ClearAllPoints(); f.homeBtn:SetPoint("LEFT", f.homeLabel, "RIGHT", 6, 0)
-  end
-  f.homeBtn:SetScript("OnClick", function()
+  h.rule = ns.Rule(f, T.line); h.rule:SetPoint("TOPLEFT", 0, -HEADER); h.rule:SetPoint("TOPRIGHT", 0, -HEADER)
+  local function GoHome()
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.OpenHome then WP.OpenHome() end
-  end)
-  f.homeBtn:SetScript("OnEnter", function(self) ns.ShowTip(self, { L.HOME }) end)
-  f.homeBtn:SetScript("OnLeave", ns.HideTip)
-  h.logo = f.homeBtn:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(20, 20); h.logo:SetPoint("CENTER")
-  h.logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64")
-  local hl = f.homeBtn:CreateTexture(nil, "HIGHLIGHT"); hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.08)
-  h.title = Text(h, 14, T.text, true); h.title:SetPoint("LEFT", f.homeBtn, "RIGHT", 6, 0); h.title:SetText(L.DUNGEONS)
-  h.sub = Text(h, 12, T.dim); h.sub:SetPoint("LEFT", h.title, "RIGHT", 8, 0); h.sub:SetWordWrap(false); h.sub:SetJustifyH("LEFT")
+  end
+  f.homeBtn = IconBtn(h, "home", { L.HOME, L.TT_HOME }, GoHome)
+  f.homeBtn:SetPoint("TOPLEFT", 8, -8)
+  h.logo = h:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(28, 28); h.logo:SetPoint("TOPLEFT", 40, -8)
+  h.logo:SetTexture(ns.LOGO or ("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64"))
+  h.title = Text(h, ns.F.title, T.fg); h.title:SetText(L.DUNGEONS)
+  h.sub = Text(h, ns.F.meta, T.muted)
+  ns.ClampLabel(h.title, nil, h); ns.ClampLabel(h.sub, nil, h)
   f.header = h
-  local close = Button(h, 22, 20, "x", function() f:Hide(); WLDTDB.hidden = true; ns.SetArrow(nil); if ns.UpdateActionBar then ns.UpdateActionBar() end end, function() return { L.TT_HCLOSE } end)
-  close:SetPoint("RIGHT", -4, 0)
-  f.miniBtn = Button(h, 22, 20, "-", function() f.mini = not f.mini; WLDTDB.mini = f.mini; Render() end, function() return { L.TT_HMIN } end)
+  local close = IconBtn(h, "close", function() return { L.TT_HCLOSE, L.TT_HCLOSE2, L.TT_HCLOSE_CLICK } end,
+    function() f:Hide(); WLDTDB.hidden = true; ns.SetArrow(nil); if ns.UpdateActionBar then ns.UpdateActionBar() end end)
+  close:SetPoint("TOPRIGHT", -8, -8)
+  f.closeBtn = close
+  f.miniBtn = IconBtn(h, "minus", function()
+    if f.mini then return { L.TT_HMAX, L.TT_HMAX_CLICK } end
+    return { L.TT_HMIN, L.TT_HMIN_CLICK }
+  end, function() f.mini = not f.mini; WLDTDB.mini = f.mini; Render() end)
   f.miniBtn:SetPoint("RIGHT", close, "LEFT", -4, 0)
-  f.gearBtn = Button(h, 22, 20, "", function()
+  f.gearBtn = IconBtn(h, "gear", { L.SETTINGS, L.TT_SETTINGS }, function()
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.OpenOptions then WP.OpenOptions("dungeons") end
-  end, function() return { L.SETTINGS } end)
+  end)
   f.gearBtn:SetPoint("RIGHT", f.miniBtn, "LEFT", -4, 0)
-  local gear = f.gearBtn:CreateTexture(nil, "ARTWORK"); gear:SetSize(14, 14); gear:SetPoint("CENTER")
-  Icon(gear, "gear"); gear:SetVertexColor(0.8, 0.82, 0.85)
-  f.pickBtn = Button(h, 64, 20, L.PICK, function() ns.TogglePicker() end, function() return { L.TT_HPICK } end)
-  -- the route's full names stop before the header buttons ("..." when too long)
-  h.sub:SetPoint("RIGHT", f.pickBtn, "LEFT", -8, 0)
+  f.pickBtn = IconBtn(h, "portal", { L.TT_HPICK, L.TT_PICKBTN }, function() ns.TogglePicker() end)
   f.pickBtn:SetPoint("RIGHT", f.gearBtn, "LEFT", -4, 0)
-  h.sub:SetPoint("RIGHT", f.pickBtn, "LEFT", -8, 0)
+  -- title and subtitle stop before the four header icons (full text in the header's tooltip)
+  function f.LayoutTitle(hasSub)
+    h.title:ClearAllPoints(); h.sub:ClearAllPoints()
+    local right = -(8 + 4 * 28 + 3 * 4 + 8)
+    if hasSub then
+      h.title:SetPoint("TOPLEFT", 76, -7); h.title:SetPoint("TOPRIGHT", right, -7)
+      h.sub:SetPoint("TOPLEFT", h.title, "BOTTOMLEFT", 0, -2); h.sub:SetPoint("TOPRIGHT", h.title, "BOTTOMRIGHT", 0, -2)
+      h.sub:Show()
+    else
+      h.title:SetPoint("LEFT", h, "LEFT", 76, 0); h.title:SetPoint("RIGHT", h, "RIGHT", right, 0)
+      h.sub:Hide()
+    end
+  end
+  f.LayoutTitle(false)
 
-  -- "Steps": the list of every step, done ones included (open by default)
-  f.listToggle = Button(f, LISTBTN_W, 18, L.LIST, function()
+  -- progress: "Step 3 / 26 · 23 left", the percentage, the step list button, a thin bar
+  local y0 = HEADER + 1 + GAP
+  f.prog = CreateFrame("Frame", nil, f)
+  f.prog:SetPoint("TOPLEFT", PAD, -y0); f.prog:SetPoint("TOPRIGHT", -PAD, -y0); f.prog:SetHeight(24)
+  f.listToggle = LabelBtn(f.prog, L.LIST, 24, "secondary", function()
     f.list:SetShown(not f.list:IsShown()); WLDTDB.list = f.list:IsShown(); Render()
   end, function() return { L.M_LIST, L.TT_HLIST } end)
-  f.listToggle:SetPoint("TOPRIGHT", -PAD, -35)
-  f.listToggle.label._size = 11; ns.SetFont(f.listToggle.label)
-  f.progLabel = Text(f, 11, T.dim, true); f.progLabel:SetPoint("TOPLEFT", PAD, -40); f.progLabel:SetWordWrap(false); f.progLabel:SetWidth(W - 2 * PAD - 60 - LISTBTN_W - 8)
-  f.progPct = Text(f, 11, T.text, true); f.progPct:SetPoint("TOPRIGHT", f.listToggle, "TOPLEFT", -8, -5); f.progPct:SetJustifyH("RIGHT")
+  if f.listToggle.SetIcon then f.listToggle:SetIcon("chevron_left") end
+  f.listToggle:SetPoint("RIGHT", 0, 0)
+  f.progPct = Text(f.prog, ns.F.meta, T.muted); f.progPct:SetPoint("RIGHT", f.listToggle, "LEFT", -12, 0); f.progPct:SetJustifyH("RIGHT"); f.progPct:SetJustifyV("MIDDLE")
+  ns.ClampLabel(f.progPct, nil, f.prog)
+  f.progLabel = Text(f.prog, ns.F.body, T.text); f.progLabel:SetPoint("LEFT", 0, 0); f.progLabel:SetPoint("RIGHT", f.progPct, "LEFT", -12, 0); f.progLabel:SetJustifyV("MIDDLE")
+  ns.ClampLabel(f.progLabel, nil, f.prog)
   local bar = CreateFrame("StatusBar", nil, f)
-  bar:SetPoint("TOPLEFT", PAD, -57); bar:SetPoint("TOPRIGHT", -PAD, -57); bar:SetHeight(4)
+  bar:SetPoint("TOPLEFT", PAD, -(y0 + 24 + 6)); bar:SetPoint("TOPRIGHT", -PAD, -(y0 + 24 + 6)); bar:SetHeight(4)
   bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-  bar.bg = Tex(bar, "BACKGROUND", { 1, 1, 1, 0.08 }); bar.bg:SetAllPoints()
+  bar.bg = Tex(bar, "BACKGROUND", T.divider); bar.bg:SetAllPoints()
   bar:SetMinMaxValues(0, 1)
   f.bar = bar
+
   -- inside a dungeon that is not in the route: one click adds it (Main.lua sets ns.instOffer)
-  f.instBtn = Button(f, W - 2 * PAD, 22, "", function()
+  f.instBtn = LabelBtn(f, "", 28, "secondary", function()
     local k = ns.instOffer; if not k then return end
     ns.instOffer = nil; ns.instIn = k; WLDTDB.sel[k] = true; ns.Assemble(true); f.auto, f.sig = nil, nil; ns.Refresh(true)
     for i, st in ipairs(ns.route and ns.route.steps or {}) do if st.ins == k and not st.gate then ns.GoTo(i) break end end
   end)
-  ns.Primary(f.instBtn); f.instBtn:SetPoint("TOPLEFT", PAD, -66); f.instBtn:Hide()
-  f.instBtn.label:ClearAllPoints(); f.instBtn.label:SetPoint("LEFT", 8, 0); f.instBtn.label:SetPoint("RIGHT", -8, 0); f.instBtn.label:SetWordWrap(false)
+  if f.instBtn.SetIcon then f.instBtn:SetIcon("plus") end
+  f.instBtn:Hide()
 
-  -- inside one of the route's dungeons: a band above the card says so ("INSIDE THE DUNGEON: ZF"),
+  -- inside one of the route's dungeons: a band above the card says so ("Inside the dungeon: ZF"),
   -- with its icon, where you are in its steps, the quests finished here and the next boss.
   -- A click shows the first open step inside. Leaving the instance hides it.
   local band = CreateFrame("Button", nil, f)
-  band:SetPoint("TOPLEFT", PAD, -66); band:SetPoint("TOPRIGHT", -PAD, -66); band:SetHeight(44)
-  band.bg = band:CreateTexture(nil, "BACKGROUND"); band.bg:SetAllPoints()
-  band.edge = band:CreateTexture(nil, "ARTWORK"); band.edge:SetPoint("TOPLEFT"); band.edge:SetPoint("BOTTOMLEFT"); band.edge:SetWidth(3); band.edge:SetAlpha(0)
-  band.hl = Tex(band, "HIGHLIGHT", { 1, 1, 1, 0.05 }); band.hl:SetAllPoints()
-  band.icon = band:CreateTexture(nil, "ARTWORK"); band.icon:SetSize(32, 32); band.icon:SetPoint("TOPLEFT", 9, -6)
-  band.title = Text(band, 13, T.text, true); band.title:SetPoint("TOPLEFT", 48, -7); band.title:SetWidth(W - 2 * PAD - 56)
-  band.sub = Text(band, 11, { 0.86, 0.87, 0.90 }); band.sub:SetPoint("TOPLEFT", band.title, "BOTTOMLEFT", 0, -3); band.sub:SetWidth(W - 2 * PAD - 56); band.sub:SetSpacing(2)
+  band:SetHeight(56)
+  band.bg = Tex(band, "BACKGROUND", T.cardFill); band.bg:SetAllPoints()
+  band.tint = Tex(band, "BACKGROUND", { T.info[1], T.info[2], T.info[3], 0.10 }); band.tint:SetAllPoints()
+  band.edge = ns.Outline(band, T.info, 0.4)
+  band.hl = Tex(band, "HIGHLIGHT", T.hoverFill); band.hl:SetAllPoints()
+  band.icon = band:CreateTexture(nil, "ARTWORK"); band.icon:SetSize(32, 32); band.icon:SetPoint("TOPLEFT", 12, -12)
+  band.title = Text(band, ns.F.heading, T.fg); band.title:SetPoint("TOPLEFT", 56, -10)
+  band.sub = Text(band, ns.F.meta, T.text); band.sub:SetPoint("TOPLEFT", band.title, "BOTTOMLEFT", 0, -3); band.sub:SetSpacing(3)
+  band.chev = ns.Icon(band, "chevron_right", 16, "ARTWORK", T.muted); band.chev:SetPoint("RIGHT", -12, 0)
   band:SetScript("OnClick", function(self) if self.go then ns.GoTo(self.go) end end)
-  band:SetScript("OnEnter", function(self) ns.ShowTip(self, { self.title:GetText() or "", L.INB_TT }) end)
-  band:SetScript("OnLeave", ns.HideTip)
+  band:SetScript("OnEnter", function(self) self.chev:SetVertexColor(T.fg[1], T.fg[2], T.fg[3]); ns.ShowTip(self, { self.title:GetText() or "", L.INB_TT, L.INB_BACK }) end)
+  band:SetScript("OnLeave", function(self) self.chev:SetVertexColor(T.muted[1], T.muted[2], T.muted[3]); ns.HideTip() end)
   band:Hide()
   f.inBand = band
 
-  -- carte avec défilement
+  -- the step card: card fill, 1 px edge, scrolls inside itself only when the screen is too short
   local holder = CreateFrame("Frame", nil, f)
-  holder:SetPoint("TOPLEFT", PAD, -70); holder:SetPoint("TOPRIGHT", -PAD, -70)
-  ns.Flat(holder, T.card, { 1, 1, 1, 0.06 })
-  holder.stripe = Tex(holder, "ARTWORK", T.accent); holder.stripe:SetPoint("TOPLEFT", 1, -1); holder.stripe:SetPoint("BOTTOMLEFT", 1, 1); holder.stripe:SetWidth(3); holder.stripe:SetAlpha(0)
-  local sf = CreateFrame("ScrollFrame", nil, holder)
-  sf:SetPoint("TOPLEFT", 4, -1); sf:SetPoint("BOTTOMRIGHT", -6, 1)
-  local card = CreateFrame("Frame", nil, sf)
-  card:SetWidth(W - 2 * PAD - 10); card:SetHeight(100)
-  sf:SetScrollChild(card)
-  sf.offset = 0
-  sf:EnableMouseWheel(true)
-  sf:SetScript("OnMouseWheel", function(self, delta)
-    local max = math.max(0, card:GetHeight() - self:GetHeight())
-    self.offset = math.max(0, math.min(max, (self.offset or 0) - delta * 40))
-    self:SetVerticalScroll(self.offset)
-    PositionThumb()
-  end)
-  -- barre de défilement : poignée qu'on peut tirer (la molette marche aussi)
-  local sb = CreateFrame("Button", nil, holder)
-  sb:SetWidth(10); sb:SetFrameLevel((holder:GetFrameLevel() or 1) + 5)
-  sb.tex = Tex(sb, "OVERLAY", T.accent); sb.tex:SetPoint("TOPRIGHT", -1, 0); sb.tex:SetPoint("BOTTOMRIGHT", -1, 0); sb.tex:SetWidth(4); ns.Accent(sb.tex, 0.7)
-  sb:SetScript("OnEnter", function(self) self.tex:SetAlpha(1) end)
-  sb:SetScript("OnLeave", function(self) self.tex:SetAlpha(0.7) end)
-  sb:SetScript("OnMouseDown", function(self)
-    local sc = self:GetEffectiveScale()
-    local _, cy = GetCursorPosition()
-    self.drag = { cy / sc, sf.offset or 0 }
-    self:SetScript("OnUpdate", function(me)
-      local _, y2 = GetCursorPosition(); y2 = y2 / sc
-      local over, track = holder.over or 0, holder.track or 1
-      if over <= 0 or track <= 0 then return end
-      local off = me.drag[2] + (me.drag[1] - y2) * over / track
-      sf.offset = math.max(0, math.min(over, off)); sf:SetVerticalScroll(sf.offset)
-      PositionThumb()
-    end)
-  end)
-  sb:SetScript("OnMouseUp", function(self) self:SetScript("OnUpdate", nil) end)
-  holder.sbar = sb
+  ns.Flat(holder, T.cardFill, T.cardEdge)
+  local S = SW()
+  local sa = S.ScrollArea(holder)
+  sa:SetPoint("TOPLEFT", 1, -1); sa:SetPoint("BOTTOMRIGHT", -1, 1)
+  local card = sa.child
+  card:SetWidth(CardW())
   card.fade = card:CreateAnimationGroup()
-  local an = card.fade:CreateAnimation("Alpha"); an:SetFromAlpha(0.25); an:SetToAlpha(1); an:SetDuration(0.2); an:SetSmoothing("OUT")
-  f.holder, f.scroll, f.card = holder, sf, card
-  local CW = W - 2 * PAD - 40
+  local an = card.fade:CreateAnimation("Alpha"); an:SetFromAlpha(0.4); an:SetToAlpha(1); an:SetDuration(0.15); an:SetSmoothing("OUT")
+  f.holder, f.scroll, f.card = holder, sa, card
 
-  card.zone = Text(card, 11, T.dim, true); card.zone:SetPoint("TOPLEFT", 14, -10); card.zone:SetWordWrap(false); card.zone:SetWidth(CW - 90)
-  card.badge = Text(card, 11, T.text, true); card.badge:SetPoint("TOPRIGHT", -10, -10); card.badge:SetJustifyH("RIGHT")
-  -- portrait 3D du boss (modèle du journal de Naowh)
+  -- top line: where the step happens, the class (class quests), and the step's state on the right
+  card.where = Pill(card)
+  card.clsChip = Pill(card)
+  card.badgePill = Pill(card)
+  card.badge = card.badgePill.text
+  card.zone = card.where.text   -- older name
+  -- 3D portrait of the boss (the dungeon journal's model)
   card.modelBg = card:CreateTexture(nil, "BACKGROUND"); card.modelBg:SetColorTexture(0, 0, 0, 0.35)
-  card.modelBg:SetSize(76, 76); card.modelBg:SetPoint("TOPRIGHT", -8, -26); card.modelBg:Hide()
+  card.modelBg:SetSize(76, 76); card.modelBg:Hide()
   card.model = CreateFrame("PlayerModel", nil, card)
   card.model:SetSize(74, 74); card.model:SetPoint("CENTER", card.modelBg, "CENTER"); card.model:Hide()
-  card.where = ns.Chip(card); card.where:SetPoint("TOPLEFT", card.zone, "BOTTOMLEFT", 0, -6)
-  card.clsChip = ns.Chip(card); card.clsChip:SetPoint("LEFT", card.where, "RIGHT", 6, 0)
-  card.title = Text(card, 18, T.text, true); card.title:SetPoint("TOPLEFT", card.where, "BOTTOMLEFT", 0, -8); card.title:SetWidth(CW)
-  card.travel = Text(card, 12, T.accent); card.travel:SetPoint("TOPLEFT", card.title, "BOTTOMLEFT", 0, -6); card.travel:SetWidth(CW)
-  card.readyBg = card:CreateTexture(nil, "ARTWORK")
-  -- check-list status: an icon (check mark / quest to take / no key) and three lines (state, why, what next)
-  card.readyIcon = card:CreateTexture(nil, "OVERLAY"); card.readyIcon:SetSize(20, 20)
-  card.ready = Text(card, 13, T.text, true); card.ready:SetWidth(CW - 12 - 26); card.ready:SetSpacing(3)
-  card.note = Text(card, 13, { 0.86, 0.87, 0.90 }); card.note:SetWidth(CW); card.note:SetSpacing(3)
+  -- empty, finished: one centred block (icon 32, title, sentence)
+  card.bigIcon = ns.Icon(card, "portal", 32, "ARTWORK", T.muted); card.bigIcon:Hide()
+  card.title = Text(card, ns.F.title, T.fg)
+  card.travelIcon = ns.Icon(card, "info", 14, "ARTWORK", T.info); card.travelIcon:Hide()
+  card.travel = Text(card, ns.F.label, T.text)
+  -- check-list status: a banner (tint of its colour, 1 px edge, HD icon) with state, why, what next
+  card.readyBox = CreateFrame("Frame", nil, card)
+  card.readyBg = Tex(card.readyBox, "BACKGROUND", { T.ok[1], T.ok[2], T.ok[3], 0.16 }); card.readyBg:SetAllPoints()
+  card.readyEdge = ns.Outline(card.readyBox, T.ok, 0.4)
+  card.readyIcon = ns.Icon(card.readyBox, "check", 16, "ARTWORK", T.ok); card.readyIcon:SetPoint("TOPLEFT", 12, -10)
+  card.ready = Text(card.readyBox, ns.F.label, T.fg); card.ready:SetPoint("TOPLEFT", 36, -10); card.ready:SetSpacing(3)
+  card.readyBox:Hide()
+  card.note = Text(card, ns.F.label, T.text); card.note:SetSpacing(3)
   -- under the rows (check-list: key, entrance, group)
-  card.after = Text(card, 13, { 0.86, 0.87, 0.90 }); card.after:SetWidth(CW); card.after:SetSpacing(3); card.after:Hide()
+  card.after = Text(card, ns.F.label, T.text); card.after:SetSpacing(3); card.after:Hide()
   card.rows = {}
-  for r = 1, MAXROWS do card.rows[r] = MakeRow(card, CW) end
-  f.footBig, f.footSmall = {}, {}
+  for r = 1, MAXROWS do card.rows[r] = MakeRow(card) end
+  card.shareBtn = LabelBtn(card, L.SHARE_SHORT, 28, "secondary", function() ns.ShareQuests() end, function() return { L.M_SHARE, L.TT_FSHARE } end)
+  if card.shareBtn.SetIcon then card.shareBtn:SetIcon("group") end
+  card.shareBtn:Hide()
 
+  -- footer, under the card: the one main action, then previous / next / check-list / actions
   local foot = CreateFrame("Frame", nil, f)
-  foot:SetPoint("BOTTOMLEFT", PAD, PAD); foot:SetPoint("BOTTOMRIGHT", -PAD, PAD); foot:SetHeight(56)
+  foot:SetHeight(FOOT_H)
   f.foot = foot
-  -- one big button for what the step needs, then previous / next / more
-  f.go = Button(foot, W - PAD * 2, 26, L.GO, function(self) if self.action then self.action() end end)
-  f.go:SetPoint("TOPLEFT"); ns.Primary(f.go)
-  f.prev = Button(foot, 44, 24, "<", function() ns.GoTo(f.view - 1) end, function() return { L.B_PREV } end)
+  f.go = LabelBtn(foot, L.GO, 32, "primary", function(self) if self.action then self.action() end end)
+  f.prev = IconBtn(foot, "chevron_left", { L.B_PREV, L.TT_PREV_CLICK }, function() ns.GoTo(f.view - 1) end)
+  f.prev.edge = ns.Outline(f.prev, T.btnEdge)
   f.prev:SetPoint("BOTTOMLEFT")
-  f.moreBtn = Button(foot, 44, 24, "...", function() f.menu:SetShown(not f.menu:IsShown()) end, function() return { L.MORE } end)
+  f.moreBtn = LabelBtn(foot, L.MORE_BTN, 28, "secondary", function() f.menu:SetShown(not f.menu:IsShown()) end,
+    function() return { L.MORE, L.TT_MORE } end)
+  if f.moreBtn.SetIcon then f.moreBtn:SetIcon("chevron_up") end
   f.moreBtn:SetPoint("BOTTOMRIGHT")
-  -- prev (44) + next + Check-list (READY_W) + "..." (44), 4 px apart, fill the footer
-  f.next = Button(foot, W - PAD * 2 - 100 - READY_W, 24, L.NEXT2, function() ns.GoTo(f.view + 1) end, function() return { L.NEXT2, L.TT_NEXT } end)
+  f.next = LabelBtn(foot, L.NEXT2, 28, "secondary", function() ns.GoTo(f.view + 1) end, function() return { L.NEXT2, L.TT_NEXT, L.TT_NEXT_CLICK } end)
+  if f.next.SetIcon then f.next:SetIcon("chevron_right") end
   f.next:SetPoint("LEFT", f.prev, "RIGHT", 4, 0)
-  -- "Check-list": straight to the before-entering check of the dungeon on screen (quests to take, key).
-  -- Its icon tells the state: check mark = ready, quest mark = something to take first.
-  f.readyBtn = Button(foot, READY_W, 24, L.B_READY, function() if ns.GoReady then ns.GoReady() end end, function()
+  -- "Checklist": straight to the before-entering check of the dungeon on screen (quests to take, key).
+  -- Its icon tells the state (check = ready, warning = something first); its tooltip says it in words.
+  f.readyBtn = LabelBtn(foot, L.B_READY, 28, "secondary", function() if ns.GoReady then ns.GoReady() end end, function()
     local t = { L.B_READY_T, L.TT_READY }
     if f.readyTip then table.insert(t, f.readyTip) end
+    table.insert(t, L.TT_READY_CLICK)
     return t
   end)
+  if f.readyBtn.SetIcon then f.readyBtn:SetIcon("check") end
   f.readyBtn:SetPoint("RIGHT", f.moreBtn, "LEFT", -4, 0)
-  f.readyBtn.icon = f.readyBtn:CreateTexture(nil, "ARTWORK"); f.readyBtn.icon:SetSize(14, 14); f.readyBtn.icon:SetPoint("LEFT", 8, 0)
-  Icon(f.readyBtn.icon, "check")
-  f.readyBtn.label:ClearAllPoints(); f.readyBtn.label:SetPoint("LEFT", 26, 0); f.readyBtn.label:SetPoint("RIGHT", -6, 0)
 
-  -- the "..." menu: everything that used to be a row of small buttons
+  -- the Actions menu: everything that used to be a row of small buttons. Toggles show a check.
   local menu = CreateFrame("Frame", nil, f)
-  menu:SetSize(230, 10); menu:SetFrameStrata("FULLSCREEN_DIALOG"); menu:SetToplevel(true); menu:SetPoint("BOTTOMRIGHT", f.moreBtn, "TOPRIGHT", 0, 4)
-  ns.Flat(menu, { 0.08, 0.09, 0.1, 0.98 }, { 1, 1, 1, 0.12 })
+  menu:SetSize(256, 10); menu:SetFrameStrata("FULLSCREEN_DIALOG"); menu:SetToplevel(true); menu:SetPoint("BOTTOMRIGHT", f.moreBtn, "TOPRIGHT", 0, 4)
+  ns.Flat(menu, { T.panel[1], T.panel[2], T.panel[3], 0.98 }, T.cardEdge)
   menu:EnableMouse(true); menu:Hide()
   f.menu = menu
   local items = {}
   local function Item(onClick, tip)
-    local b = Button(menu, 222, 24, "", function(...) onClick(...); menu:Hide() end, tip)
-    b.label:ClearAllPoints(); b.label:SetPoint("LEFT", 8, 0); b.label:SetJustifyH("LEFT")
-    b:SetPoint("TOPLEFT", 4, -4 - #items * 26)
+    local b = CreateFrame("Button", nil, menu)
+    b:SetHeight(24)
+    local y = -4 - #items * 24
+    b:SetPoint("TOPLEFT", 4, y); b:SetPoint("TOPRIGHT", -4, y)
+    b.hl = Tex(b, "HIGHLIGHT", T.hoverFill); b.hl:SetAllPoints()
+    b.press = Tex(b, "ARTWORK", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
+    b.check = ns.Icon(b, "check", 12, "ARTWORK", T.accentSoft); b.check:SetPoint("LEFT", 8, 0); b.check:Hide()
+    b.label = Text(b, ns.F.label, T.fg); b.label:SetPoint("LEFT", 26, 0); b.label:SetPoint("RIGHT", -8, 0); b.label:SetJustifyV("MIDDLE")
+    b:SetScript("OnClick", function(...) onClick(...); menu:Hide() end)
+    b:SetScript("OnMouseDown", function(self) if self:IsEnabled() ~= false then self.press:Show() end end)
+    b:SetScript("OnMouseUp", function(self) self.press:Hide() end)
+    b:SetScript("OnEnter", function(self) ns.ShowTip(self, tip()) end)
+    b:SetScript("OnLeave", ns.HideTip)
+    b:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
+    b:SetScript("OnDisable", function(self) self:SetAlpha(T.disabledAlpha) end)
+    ns.ClampLabel(b.label, nil, b)
+    function b:SetOn(on) self.check:SetShown(on and true or false) end
     items[#items + 1] = b
-    menu:SetHeight(8 + #items * 26)
+    menu:SetHeight(8 + #items * 24)
     return b
   end
   f.share = Item(ns.ShareQuests, function() return { L.M_SHARE, L.TT_FSHARE } end)
+  f.share.disabledReason = L.NOGROUP_TIP
   f.recalc = Item(function() ns.Recalc() end, function() return { L.M_RECALC, L.RECALC_TT } end)
   f.way = Item(function() ns.PlacePoints() end, function() return { L.M_POINTS, L.TT_FPOINTS } end)
   f.done = Item(function()
@@ -800,6 +857,7 @@ local function Build()
   f.autoBtn = Item(function() WLDTDB.autoWay = not WLDTDB.autoWay; f.sig = nil; ns.Refresh() end, function() return { L.M_AUTO, L.TT_FAUTO } end)
   f.listBtn = Item(function() f.list:SetShown(not f.list:IsShown()); WLDTDB.list = f.list:IsShown(); Render() end, function() return { L.M_LIST, L.TT_HLIST } end)
   f.journal = Item(function() if ns.OpenJournal then ns.OpenJournal() end end, function() return { L.M_JOURNAL, L.TT_JOURNAL } end)
+  f.journal.disabledReason = L.NOJOURNAL_TIP
   f:HookScript("OnHide", function() menu:Hide() end)
   -- closes once the mouse has been away from it (and its button) for a moment
   menu:SetScript("OnUpdate", function(self, dt)
@@ -812,68 +870,66 @@ local function Build()
   f.footBig = { f.go }
   f.footSmall = {}
 
-  -- poignée de redimensionnement (coin bas-droit)
+  -- width grip (bottom-right corner): the height always follows the content
   local grip = CreateFrame("Button", nil, f)
-  grip:SetSize(14, 14); grip:SetPoint("BOTTOMRIGHT", 0, 0); grip:SetFrameLevel((f:GetFrameLevel() or 1) + 10)
-  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-  grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-  grip:SetScript("OnEnter", function(self) ns.ShowTip(self, { L.TT_RESIZE }) end)
-  grip:SetScript("OnLeave", ns.HideTip)
+  grip:SetSize(16, 16); grip:SetPoint("BOTTOMRIGHT", 0, 0); grip:SetFrameLevel((f:GetFrameLevel() or 1) + 10)
+  grip.icon = ns.Icon(grip, "chevron_right", 12, "OVERLAY", T.faint); grip.icon:SetPoint("CENTER", 1, -1)
+  if grip.icon.SetRotation then pcall(grip.icon.SetRotation, grip.icon, -math.pi / 4) end
+  grip:SetScript("OnEnter", function(self) self.icon:SetVertexColor(T.fg[1], T.fg[2], T.fg[3]); ns.ShowTip(self, { L.TT_RESIZE, L.TT_RESIZE2, L.TT_RESIZE3 }) end)
+  grip:SetScript("OnLeave", function(self) self.icon:SetVertexColor(T.faint[1], T.faint[2], T.faint[3]); ns.HideTip() end)
   grip:SetScript("OnMouseDown", function(self)
     ns.PinTopLeft()
     local sc = f:GetEffectiveScale()
-    local cx, cy = GetCursorPosition()
-    self.start = { cx / sc, cy / sc, W, CARD_MAX }
+    local cx = GetCursorPosition()
+    self.start = { cx / sc, W }
     self:SetScript("OnUpdate", function(me)
-      local x, y = GetCursorPosition()
-      x, y = x / sc, y / sc
-      local nw = math.floor(math.max(380, math.min(900, me.start[3] + (x - me.start[1]))))
-      local nh = math.floor(math.max(160, math.min(1000, me.start[4] - (y - me.start[2]))))
-      if nw ~= W or nh ~= CARD_MAX then ns.Relayout(nw, nh); Render() end
+      local x = GetCursorPosition()
+      x = x / sc
+      local nw = math.floor(math.max(420, math.min(640, me.start[2] + (x - me.start[1]))))
+      if nw ~= W then ns.Relayout(nw); Render() end
     end)
   end)
   grip:SetScript("OnMouseUp", function(self)
     self:SetScript("OnUpdate", nil)
-    WLDTDB.size = { W, CARD_MAX }
+    WLDTDB.size = { W }   -- the width only: the height always follows the content
   end)
   grip:SetScript("OnDoubleClick", function()
     ns.Relayout(W0, CARD0); WLDTDB.size = nil; Render()
   end)
   f.grip = grip
 
-  f.miniText = Text(f, 13, T.text, true); f.miniText:SetPoint("TOPLEFT", PAD, -40); f.miniText:SetPoint("TOPRIGHT", -PAD, -40); f.miniText:SetWordWrap(false)
+  -- collapsed: one line with the step on screen
+  f.miniRow = CreateFrame("Frame", nil, f)
+  f.miniRow:SetPoint("TOPLEFT", PAD, -(HEADER + 1 + 8)); f.miniRow:SetPoint("TOPRIGHT", -PAD, -(HEADER + 1 + 8)); f.miniRow:SetHeight(24)
+  f.miniText = Text(f.miniRow, ns.F.body, T.fg); f.miniText:SetPoint("LEFT"); f.miniText:SetPoint("RIGHT"); f.miniText:SetJustifyV("MIDDLE")
+  ns.ClampLabel(f.miniText, nil, f.miniRow)
   BuildList()
   f:SetScript("OnShow", function() ns.Refresh() end)
   f.mini = WLDTDB.mini
   f.list:SetShown(WLDTDB.list ~= false)
   -- a new frame is visible: closed at first; Main.lua reopens it at login if it was open before.
-  -- Every way of opening or closing it (x, Escape, /wlh, home, minimap) is remembered here,
+  -- Every way of opening or closing it (close, Escape, /wlh, home, minimap) is remembered here,
   -- except when the Dungeons module is switched off (ns.quietHide), which is not your choice.
   f:Hide()
   f:HookScript("OnShow", function() WLDTDB.hidden = false end)
   f:HookScript("OnHide", function() if not ns.quietHide then WLDTDB.hidden = true end end)
   ns.frame = f
-  if WLDTDB.size then ns.Relayout(WLDTDB.size[1], WLDTDB.size[2]) end
+  if ns.RegisterWindow then ns.RegisterWindow(f) end
+  -- older saves kept a card height that capped the card for good: only the width is kept now
+  if WLDTDB.size then WLDTDB.size[2] = nil; ns.Relayout(WLDTDB.size[1]) end
+  -- Escape closes the guide like every window (OnHide above remembers it)
+  tinsert(UISpecialFrames, "WLDTFrame")
 end
 ns.BuildMain = Build
 
--- Largeur / hauteur de la fenêtre (poignée en bas à droite)
+-- Width of the guide (the grip in the bottom-right corner). The height follows the content;
+-- nh caps the card's height when given (the reset only; saves keep the width alone).
 function ns.Relayout(nw, nh)
-  W, CARD_MAX = nw, nh
+  W = math.max(420, math.min(640, nw or W0))
+  if nh then CARD_MAX = math.max(160, nh) end
   if not f then return end
-  local card = f.card
-  local CW = W - 2 * PAD - 40
   f:SetWidth(W)
-  card:SetWidth(W - 2 * PAD - 10)
-  card.zone:SetWidth(CW - 90); card.title:SetWidth(CW); card.travel:SetWidth(CW)
-  card.ready:SetWidth(CW - 12 - 26); card.note:SetWidth(CW); card.after:SetWidth(CW)
-  for _, row in ipairs(card.rows) do row:SetWidth(CW + 8); row.sub:SetWidth(CW - 90) end
-  f.go:SetWidth(W - PAD * 2)
-  f.next:SetWidth(W - PAD * 2 - 100 - READY_W)
-  f.progLabel:SetWidth(W - 2 * PAD - 60 - LISTBTN_W - 8)
-  if f.inBand then f.inBand.title:SetWidth(W - 2 * PAD - 56); f.inBand.sub:SetWidth(W - 2 * PAD - 56) end
-  if f.instBtn then f.instBtn:SetWidth(W - 2 * PAD) end
+  f.card:SetWidth(CardW())
 end
 
 -- =====================================================================
@@ -882,8 +938,8 @@ end
 local function SetSecureRow() end
 
 -- =====================================================================
---  Ordre dans le donjon : objectifs rangés boss par boss, dans l'ordre du journal de Naowh
---  (« Pendant tout le donjon » en premier pour le butin des trash). Une ligne par objectif.
+--  Ordre dans le donjon : objectifs rangés boss par boss, dans l'ordre du journal de donjon
+--  (« Partout » en premier pour le butin des monstres). Une ligne par objectif.
 -- =====================================================================
 -- BossOrder / ObjDone live in Engine.lua (ns.BossOrder, ns.ObjDone).
 
@@ -967,11 +1023,9 @@ end
 function ns.RenderInsideBand(k, log)
   local band = f.inBand
   local d = ns.D[k] or {}
-  local dc = DColor(k)
-  band.bg:SetColorTexture(dc[1], dc[2], dc[3], 0.14); band.edge:SetColorTexture(dc[1], dc[2], dc[3], 1)
   band.icon:SetVertexColor(1, 1, 1)
-  if d.icon then SetIcon(band.icon, nil, d.icon, true) else Icon(band.icon, "map") end
-  band.title:SetText(Hex(dc) .. L.INB_T:format(ns.Upper(ns.DName(k) or "")) .. "|r")
+  if d.icon then ns.SetPainted(band.icon, d.icon) else ns.SetHDIcon(band.icon, "portal", T.info) end
+  band.title:SetText(L.INB_T:format(ns.DName(k) or ""))
   local nIn, doneIn, firstOpen, firstIn, viewPos, openPos, nextBoss = 0, 0, nil, nil, nil, nil, nil
   local qseen, qT, qD = {}, 0, 0
   for i2, s2 in ipairs(Steps()) do
@@ -995,37 +1049,108 @@ function ns.RenderInsideBand(k, log)
   if nIn == 0 then band:Hide() return 0 end
   local lines = {}
   if doneIn == nIn then
-    table.insert(lines, "|cff59e67a" .. L.INB_DONE .. "|r")
+    table.insert(lines, Hex(T.ok) .. L.INB_DONE .. "|r")
   else
-    table.insert(lines, L.INB_STEP:format(viewPos or openPos or 1, nIn) .. "  |cff9a9a9a·|r  " .. L.INB_Q:format(qD, qT))
-    if nextBoss then table.insert(lines, "|cffff8080" .. L.INB_BOSS:format(nextBoss) .. "|r") end
-    if not viewPos then table.insert(lines, "|cffffffff" .. L.INB_BACK .. "|r") end
+    table.insert(lines, L.INB_STEP:format(viewPos or openPos or 1, nIn) .. "  " .. Hex(T.muted) .. "·|r  " .. L.INB_Q:format(qD, qT))
+    if nextBoss then table.insert(lines, L.INB_BOSS:format(nextBoss)) end
+    if not viewPos then table.insert(lines, Hex(T.accentSoft) .. L.INB_BACK .. "|r") end
   end
   band.sub:SetText(table.concat(lines, "\n"))
   band.go = firstOpen or firstIn
   band:Show()
-  local h = math.max(46, 7 + band.title:GetStringHeight() + 3 + band.sub:GetStringHeight() + 8)
+  local tw = (W - 2 * PAD) - 56 - 36
+  local th = ns.FitText(band.title, 2, tw, band)
+  local sh = ns.FitText(band.sub, 0, tw, band)
+  local h = math.max(56, math.ceil(10 + th + 3 + sh + 10))
   band:SetHeight(h)
   return h
 end
 
--- The footer's "Check-list" button: its icon says the state of the check-list it opens
--- (check mark = ready, quest mark = quests to take, red cross = no key); its tooltip says it in words.
+-- The footer's "Checklist" button: its icon says the state of the check-list it opens
+-- (check = ready, warning = quests to take or no key); its tooltip says it in words.
 function ns.RenderReadyBtn(log)
   local b = f.readyBtn
-  b.label:SetText(L.B_READY)
+  b:SetText(L.B_READY)
   local ti = ReadyTarget()
   local st = ti and Steps()[ti]
   if not st then
-    b:SetEnabled(false); Icon(b.icon, "check"); f.readyTip = { L.NO_READY, 0.6, 0.6, 0.6 }
+    b:SetEnabled(false); if b.SetIcon then b:SetIcon("check") end
+    b.disabledReason = L.NO_READY
+    f.readyTip = { L.NO_READY, T.muted[1], T.muted[2], T.muted[3] }
     return
   end
   b:SetEnabled(true)
   local miss, _, keyMissing = ReadyState(log, st)
   local dn = ns.DName(st.gate) or ""
-  if miss == 0 and not keyMissing then Icon(b.icon, "done"); f.readyTip = { L.TT_READY_OK:format(dn), 0.35, 0.9, 0.48 }
-  elseif miss == 0 then Icon(b.icon, "nokey"); f.readyTip = { L.TT_READY_KEY:format(dn), 1, 0.6, 0.2 }
-  else Icon(b.icon, "miss"); f.readyTip = { L.TT_READY_MISS:format(dn, miss), 1, 0.6, 0.2 } end
+  if miss == 0 and not keyMissing then
+    if b.SetIcon then b:SetIcon("check") end
+    f.readyTip = { L.TT_READY_OK:format(dn), T.ok[1], T.ok[2], T.ok[3] }
+  elseif miss == 0 then
+    if b.SetIcon then b:SetIcon("warning") end
+    f.readyTip = { L.TT_READY_KEY:format(dn), T.warn[1], T.warn[2], T.warn[3] }
+  else
+    if b.SetIcon then b:SetIcon("warning") end
+    f.readyTip = { ns.Plural(miss, "TT_READY_MISS1", "TT_READY_MISS", dn, miss), T.warn[1], T.warn[2], T.warn[3] }
+  end
+end
+
+-- Footer: the big button on its own line, then previous / next / checklist / actions.
+local function LayoutFoot(full, centred)
+  local CW = W - 2 * PAD
+  f.go:ClearAllPoints()
+  if centred then
+    f.go:SetPoint("TOP", f.foot, "TOP", 0, 0); f.go:SetWidth(0)
+  else
+    f.go:SetPoint("TOPLEFT", f.foot, "TOPLEFT", 0, 0); f.go:SetWidth(CW)
+  end
+  for _, b in ipairs({ f.prev, f.next, f.readyBtn, f.moreBtn }) do b:SetShown(full) end
+  if full then
+    local rw, mw = num(f.readyBtn:GetWidth()) or 100, num(f.moreBtn:GetWidth()) or 90
+    f.next:SetWidth(math.max(80, CW - 28 - rw - mw - 12))
+  end
+  local fh = full and FOOT_H or FOOT_SMALL
+  f.foot:SetHeight(fh)
+  return fh
+end
+
+-- The card's height, the footer under it, the window's height: never taller than the content.
+local function FitGuide(TOP, contentH, footH)
+  local holder = f.holder
+  local cap = math.max(120, math.min(CARD_MAX, ScreenCap() - TOP - GAP - footH - PAD))
+  local hh = math.min(math.ceil(contentH), cap)
+  holder:ClearAllPoints(); holder:SetPoint("TOPLEFT", PAD, -TOP); holder:SetPoint("TOPRIGHT", -PAD, -TOP)
+  holder:SetHeight(hh + 2)
+  f.card:SetWidth(CardW())
+  f.card:SetHeight(contentH)
+  f.scroll:SetContentHeight(contentH)
+  f.foot:ClearAllPoints()
+  f.foot:SetPoint("TOPLEFT", holder, "BOTTOMLEFT", 0, -GAP); f.foot:SetPoint("TOPRIGHT", holder, "BOTTOMRIGHT", 0, -GAP)
+  f:SetHeight(TOP + hh + 2 + GAP + footH + PAD)
+end
+
+local function HideStepParts(card)
+  card.where:Hide(); card.clsChip:Hide(); card.badgePill:Hide()
+  card.travel:Hide(); card.travelIcon:Hide(); card.readyBox:Hide(); card.after:Hide(); card.shareBtn:Hide()
+  card.model:Hide(); card.modelBg:Hide()
+  for _, row in ipairs(card.rows) do row.node = nil; row:Hide() end
+end
+
+-- An empty or finished card: one centred block (icon, title, sentence); returns its height.
+local function CentredBlock(card, icon, color, title, text)
+  local w = math.min(320, TextW())
+  card.bigIcon:ClearAllPoints(); card.bigIcon:SetPoint("TOP", card, "TOP", 0, -24)
+  ns.SetHDIcon(card.bigIcon, icon, color); card.bigIcon:Show()
+  Size(card.title, ns.F.heading); card.title:SetJustifyH("CENTER")
+  card.title:SetText(title)
+  card.title:ClearAllPoints(); card.title:SetPoint("TOP", card, "TOP", 0, -(24 + 32 + 8))
+  local y = 24 + 32 + 8 + ns.FitText(card.title, 2, w, card)
+  card.note:SetJustifyH("CENTER"); card.note:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
+  card.note:SetText(text or "")
+  if text and text ~= "" then
+    card.note:ClearAllPoints(); card.note:SetPoint("TOP", card, "TOP", 0, -(y + 4)); card.note:Show()
+    y = y + 4 + ns.FitText(card.note, 0, w, card)
+  else card.note:Hide() end
+  return y + 24
 end
 
 Render = function()
@@ -1033,48 +1158,63 @@ Render = function()
   f.pending = false
   local log = ns.LogEntries()
   local steps = Steps()
-  f.pickBtn.label:SetText(L.PICK); f.header.title:SetText(L.DUNGEONS)
-  f.header.sub:SetText(ns.route and ns.route.label or "")
-  f.miniBtn.label:SetText(f.mini and "+" or "-")
-  local card, holder = f.card, f.holder
+  local h = f.header
+  h.title:SetText(L.DUNGEONS)
+  local sub = ns.route and ns.route.label or ""
+  h.sub:SetText(sub); f.LayoutTitle(sub ~= "")
+  if f.miniBtn.SetIcon then f.miniBtn:SetIcon(f.mini and "plus" or "minus") end
+  f:SetWidth(W)
+  local card = f.card
+  local TW = TextW()
+  card.bigIcon:Hide()
+  Size(card.title, ns.F.title); card.title:SetJustifyH("LEFT")
+  card.note:SetJustifyH("LEFT"); card.note:SetTextColor(T.text[1], T.text[2], T.text[3])
+  local hasRoute = #steps > 0
   -- inside a dungeon that is not in the route: a button above the card adds it
   local offerKey = ns.instOffer
-  local offer = offerKey and ns.InstLeft and not f.mini and #steps > 0
+  local offer = offerKey and ns.InstLeft and not f.mini and hasRoute
   -- inside one of the route's dungeons: the "inside the dungeon" band (takes the offer's place)
-  local inKey = (#steps > 0 and not f.mini) and InsideKey() or nil
+  local inKey = (hasRoute and not f.mini) and InsideKey() or nil
   if inKey then offer = false end
   local bandH = inKey and ns.RenderInsideBand(inKey, log) or 0
-  local TOP = 70 + (offer and 28 or 0) + (bandH > 0 and (bandH + 6) or 0)
-  holder:ClearAllPoints(); holder:SetPoint("TOPLEFT", PAD, -TOP); holder:SetPoint("TOPRIGHT", -PAD, -TOP)
-  if offer then f.instBtn.label:SetText(L.INST_ADD:format(ns.DName(offerKey), ns.InstLeft(offerKey))); f.instBtn:Show() else f.instBtn:Hide() end
-  if bandH == 0 then f.inBand:Hide() end
-  f.listToggle:SetShown(#steps > 0 and not f.mini)
-  f.listToggle.label:SetText(L.LIST)
+  local TOP = TopBase(hasRoute)
+  if offer then
+    local nLeft = ns.InstLeft(offerKey)
+    f.instBtn:SetText(ns.Plural(nLeft, "INST_ADD1", "INST_ADD", ns.DName(offerKey), nLeft))
+    f.instBtn:ClearAllPoints(); f.instBtn:SetPoint("TOPLEFT", PAD, -TOP); f.instBtn:SetWidth(W - 2 * PAD); f.instBtn:Show()
+    TOP = TOP + 28 + 8
+  else f.instBtn:Hide() end
+  if bandH > 0 then
+    f.inBand:ClearAllPoints(); f.inBand:SetPoint("TOPLEFT", PAD, -TOP); f.inBand:SetPoint("TOPRIGHT", -PAD, -TOP)
+    TOP = TOP + bandH + 8
+  else f.inBand:Hide() end
+  f.prog:SetShown(hasRoute and not f.mini); f.bar:SetShown(hasRoute)
+  f.listToggle:SetText(L.LIST)
+  if f.listToggle.SetIcon then f.listToggle:SetIcon(f.list:IsShown() and "chevron_right" or "chevron_left") end
 
-  if #steps == 0 then
-    f.progLabel:SetText(L.NOROUTE); f.progPct:SetText("")
-    f.bar:SetValue(0)
-    card.zone:SetText(""); card.badge:SetText(""); card.where:Hide(); card.clsChip:Hide()
-    card.title:SetText(L.NOROUTE_T2); card.travel:Hide(); card.ready:Hide(); card.readyBg:Hide(); card.readyIcon:Hide(); card.after:Hide()
-    card.note:ClearAllPoints(); card.note:SetPoint("TOPLEFT", 14, -60); card.note:SetText(L.NOROUTE_TXT); card.note:Show()
-    for _, row in ipairs(card.rows) do row.node = nil; row:Hide() end
-    card:SetHeight(140); holder:SetHeight(140); holder.sbar:Hide()
-    f.foot:Show(); f:SetHeight(70 + 140 + 12 + 56 + PAD)
-    for _, b in ipairs({ f.prev, f.next, f.moreBtn, f.readyBtn }) do b:SetEnabled(false) end
-    f.readyTip = nil
-    f.menu:Hide()
-    f.go.label:SetText(L.PICK_FIRST); f.go.action = ns.ShowPicker; f.go:SetEnabled(true)
+  if not hasRoute then
+    -- no route yet: what is missing, why, and the one action (centred under the block)
+    f.miniRow:Hide(); f.holder:Show(); f.foot:Show()
+    HideStepParts(card)
+    local title, text = L.NOROUTE_T2, L.NOROUTE_TXT
+    f.go:SetText(L.PICK_FIRST); if f.go.SetIcon then f.go:SetIcon("portal") end
+    f.go.action = ns.ShowPicker; f.go:SetEnabled(true)
     if offerKey and ns.InstLeft then
-      -- no route yet, but you stand in a dungeon with quests: start its guide in one click
-      local name = ns.DName(offerKey)
-      card.title:SetText(L.INST_T:format(name)); card.note:SetText(L.INST_TXT:format(ns.InstLeft(offerKey)))
-      f.go.label:SetText(L.INST_GO:format(name))
+      -- no route, but you stand in a dungeon with quests: start its guide in one click
+      local name, nLeft = ns.DName(offerKey), ns.InstLeft(offerKey)
+      title, text = L.INST_T:format(name), ns.Plural(nLeft, "INST_TXT1", "INST_TXT", nLeft)
+      f.go:SetText(L.INST_GO); if f.go.SetIcon then f.go:SetIcon("plus") end
       f.go.action = function()
         local kk = ns.instOffer; if not kk then return end
         for k2 in pairs(WLDTDB.sel) do WLDTDB.sel[k2] = nil end; WLDTDB.sel[kk] = true; ns.instOffer = nil; ns.instIn = kk; ns.StartGuide()
       end
     end
+    local ch = CentredBlock(card, "portal", T.muted, title, text)
+    for _, b in ipairs({ f.prev, f.next, f.moreBtn, f.readyBtn }) do b:SetEnabled(false) end
+    f.readyTip = nil
+    f.menu:Hide()
     f.list:Hide()
+    FitGuide(TOP, ch, LayoutFoot(false, true))
     ns.UpdateActionBar()
     return
   end
@@ -1087,52 +1227,43 @@ Render = function()
   local n, total = 0, #steps
   for k = 1, #steps do if IsStepDone(log, k) then n = n + 1 end end
   f.bar:SetValue(total > 0 and n / total or 0)
-  f.bar:SetStatusBarColor(T.accent[1], T.accent[2], T.accent[3])
+  f.bar:SetStatusBarColor(T.ok[1], T.ok[2], T.ok[3])
   -- the route's names are already in the header: the step and what is left
   f.progLabel:SetText(L.STEP_LEFT:format(math.min(i, total), total, total - n))
-  f.progPct:SetText(("%d %%"):format(total > 0 and math.floor(n / total * 100 + 0.5) or 0))
+  f.progPct:SetText(L.PCT:format(total > 0 and math.floor(n / total * 100 + 0.5) or 0))
   -- every step done and the card after the last step on screen: the "route finished" card
-  -- ("<" and the step list still show every step, done ones included)
+  -- (previous and the step list still show every step, done ones included)
   local finished = total > 0 and n == total and (st == nil)
   if not st and not finished then f.view = total; i = total; st = steps[i]; done = IsStepDone(log, i) end
 
   if f.mini then
     f.menu:Hide()
-    holder:Hide(); f.foot:Hide(); f.progLabel:Hide(); f.progPct:Hide(); f.list:Hide(); f.listToggle:Hide()
-    if finished then f.miniText:SetText("|cff59e67a" .. L.FIN_T .. "|r")
-    else
-      local c = DColor(st.d or st.gate or st.ins)
-      f.miniText:SetText(("%s%d.|r %s"):format(Hex(c), i, StepTitle(st)))
-    end
-    f.miniText:Show()
+    f.holder:Hide(); f.foot:Hide(); f.prog:Hide(); f.list:Hide(); f.instBtn:Hide(); f.inBand:Hide()
+    if finished then f.miniText:SetText(Hex(T.ok) .. L.FIN_T .. "|r")
+    else f.miniText:SetText(("%s%d.|r %s"):format(Hex(T.muted), i, StepTitle(st))) end
+    f.miniRow:Show()
     f.bar:ClearAllPoints(); f.bar:SetPoint("BOTTOMLEFT", 1, 1); f.bar:SetPoint("BOTTOMRIGHT", -1, 1); f.bar:SetHeight(2)
-    f:SetHeight(64)
+    f:SetHeight(HEADER + 1 + 8 + 24 + 8 + 2)
     ns.UpdateActionBar()
     return
   end
-  f.miniText:Hide(); holder:Show(); f.foot:Show(); f.progLabel:Show(); f.progPct:Show()
-  f.bar:ClearAllPoints(); f.bar:SetPoint("TOPLEFT", PAD, -57); f.bar:SetPoint("TOPRIGHT", -PAD, -57); f.bar:SetHeight(4)
+  f.miniRow:Hide(); f.holder:Show(); f.foot:Show(); f.prog:Show()
+  f.bar:ClearAllPoints()
+  f.bar:SetPoint("TOPLEFT", PAD, -(HEADER + 1 + GAP + 24 + 6)); f.bar:SetPoint("TOPRIGHT", -PAD, -(HEADER + 1 + GAP + 24 + 6)); f.bar:SetHeight(4)
   f.list:SetShown(WLDTDB.list ~= false)
 
   if finished then
-    f.progLabel:SetText(L.FIN_PROG); f.progPct:SetText("100 %")
-    f.bar:SetValue(1); f.bar:SetStatusBarColor(0.35, 0.86, 0.48)
-    holder.stripe:SetColorTexture(0.35, 0.86, 0.48, 1)
-    card.zone:SetText(ns.Upper(ns.route.label or "")); card.badge:SetText(Hex({ 0.35, 0.9, 0.48 }) .. L.B_DONE .. "|r")
-    card.where:Hide(); card.clsChip:Hide(); card.travel:Hide(); card.ready:Hide(); card.readyBg:Hide(); card.readyIcon:Hide(); card.after:Hide()
-    if card.shareBtn then card.shareBtn:Hide() end
-    card.model:Hide(); card.modelBg:Hide()
-    card.title:SetWidth(W - 2 * PAD - 40); card.title:SetText(L.FIN_T)
-    card.note:ClearAllPoints(); card.note:SetPoint("TOPLEFT", 14, -60); card.note:SetText(L.FIN_TXT:format(ns.route.label or "")); card.note:Show()
-    for _, row in ipairs(card.rows) do row.node = nil; row:Hide() end
-    local fh = math.max(140, 60 + card.note:GetStringHeight() + 16)
-    card:SetHeight(fh); holder:SetHeight(fh); holder.sbar:Hide(); holder.over = 0
-    f.scroll.offset = 0; f.scroll:SetVerticalScroll(0)
+    f.progLabel:SetText(ns.Plural(#steps, "FIN_PROG1", "FIN_PROG", #steps)); f.progPct:SetText(L.PCT:format(100))
+    f.bar:SetValue(1)
+    HideStepParts(card)
+    local ch = CentredBlock(card, "check", T.ok, L.FIN_T, L.FIN_TXT:format(ns.route.label or ""))
+    ScrollTop()
     f.menu:Hide()
     f.prev:SetEnabled(true); f.next:SetEnabled(false); f.moreBtn:SetEnabled(true)
     ns.RenderReadyBtn(log)
-    f.go.label:SetText(L.PICK_MORE); f.go.action = ns.ShowPicker; f.go:SetEnabled(true)
-    f:SetHeight(TOP + fh + 12 + 56 + PAD)
+    f.go:SetText(L.PICK_MORE); if f.go.SetIcon then f.go:SetIcon("portal") end
+    f.go.action = ns.ShowPicker; f.go:SetEnabled(true)
+    FitGuide(TOP, ch, LayoutFoot(true, false))
     WLDTDB.view = i
     RenderList(log)
     ns.UpdateActionBar()
@@ -1140,13 +1271,12 @@ Render = function()
   end
 
   local dkey = st.d or st.gate or st.ins
-  local dc = DColor(dkey)
-  holder.stripe:SetColorTexture(dc[1], dc[2], dc[3], 1)
-  card.zone:SetText(("%s%s|r"):format(Hex(dc), ns.Upper(ns.DName(dkey) or "")))
-  if done then card.badge:SetText(Hex({ 0.35, 0.9, 0.48 }) .. L.B_DONE .. "|r")
-  elseif i == f.auto then card.badge:SetText(Hex(T.accent) .. L.B_CUR .. "|r")
-  elseif f.auto and i < f.auto then card.badge:SetText(Hex({ 1, 0.6, 0.2 }) .. L.B_LATE .. "|r")
-  else card.badge:SetText(Hex(T.dim) .. L.B_NEXT .. "|r") end
+  -- top line: state pill on the right, where (and class) on the left
+  if done then card.badgePill:Set(L.B_DONE, T.ok, "check")
+  elseif i == f.auto then card.badgePill:Set(L.B_CUR, T.accentSoft)
+  elseif f.auto and i < f.auto then card.badgePill:Set(L.B_LATE, T.warn)
+  else card.badgePill:Set(L.B_NEXT, T.fg) end
+  card.badgePill:ClearAllPoints(); card.badgePill:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CI, -CI)
 
   local hasModel = false
   if st.bossModel and card.model.SetDisplayInfo then
@@ -1157,35 +1287,43 @@ Render = function()
     end
     if hasModel and card.model.SetPortraitZoom then pcall(card.model.SetPortraitZoom, card.model, 0.85) end
   end
-  -- room for the chips: the card minus its margins and the boss portrait
-  local avail = card:GetWidth() - 28 - (hasModel and 84 or 0)
-  -- où
-  local dn = ns.Upper(ns.DName(dkey))
-  if st.gate then ns.SetChip(card.where, L.GATE:format(dn), dc, avail)
+  -- room for the pills: the text width minus the state pill
+  local avail = TW - (num(card.badgePill:GetWidth()) or 60) - 8
+  local dn = ns.DName(dkey) or ""
+  card.where:Show()
+  if st.gate then
+    -- the title already says "Before entering X": the pill gives the entrance's zone, or nothing
+    local zn = (st.loc and ZoneName(st.loc.m)) or ""
+    if zn ~= "" then card.where:Set(L.OUT:format(zn), T.fg) else card.where:Hide() end
   elseif st.ins then
     local allOuter = true
     for _, nd in ipairs(st.acts) do if nd.kind ~= "c" or nd.outer == false then allOuter = false end end
-    if allOuter then ns.SetChip(card.where, L.OUTER:format(dn), dc, avail) else ns.SetChip(card.where, L.IN_DUNGEON:format(dn), dc, avail) end
+    if allOuter then card.where:Set(L.OUTER:format(dn), T.fg) else card.where:Set(L.IN_DUNGEON:format(dn), T.info, "portal") end
   else
-    ns.SetChip(card.where, L.OUT:format(ns.Upper((st.loc and ZoneName(st.loc.m)) or "")), { 0.75, 0.78, 0.82 }, avail)
+    card.where:Set(L.OUT:format((st.loc and ZoneName(st.loc.m)) or ""), T.fg)
   end
+  card.where:ClearAllPoints(); card.where:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -CI)
   local cls
   local allCls = #st.acts > 0
   for _, nd in ipairs(st.acts) do local q = ns.Q[nd.q]; if not (q and q.c) then allCls = false else cls = q.c end end
+  card.clsChip:Hide()
   if allCls and cls then
     local tok = cls:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
-    local room = avail - card.where:GetWidth() - 6
-    if room >= 60 then ns.SetChip(card.clsChip, ns.ClassIconText(tok, 13) .. L.CLASSQ:format(ns.Upper(cn)), cc, room)
-    else card.clsChip:Hide() end
-  else card.clsChip:Hide() end
+    card.clsChip:Set(ns.ClassIconText(tok, 12) .. L.CLASSQ:format(cn), cc)
+    card.clsChip:ClearAllPoints(); card.clsChip:SetPoint("LEFT", card.where, "RIGHT", 6, 0)
+    -- no room on the line: the class goes into the rows' detail lines instead (never cut)
+    if (num(card.where:GetWidth()) or 0) + 6 + (num(card.clsChip:GetWidth()) or 0) > avail then card.clsChip:Hide() end
+  end
+  local y = CI + 18 + 8
 
   card.model:SetShown(hasModel); card.modelBg:SetShown(hasModel)
-  card.title:SetWidth(hasModel and (W - 2 * PAD - 40 - 84) or (W - 2 * PAD - 40))
+  if hasModel then card.modelBg:ClearAllPoints(); card.modelBg:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CI, -y) end
   card.title:SetText(StepTitle(st, not st.gate and not st.ins))
-  local y = 10 + card.zone:GetStringHeight() + 6 + 19 + 8 + card.title:GetStringHeight()
-  if hasModel then y = math.max(y, 26 + 76 + 4) end
+  card.title:ClearAllPoints(); card.title:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y)
+  y = y + ns.FitText(card.title, 0, hasModel and (TW - 84) or TW, card)
+  if hasModel then y = math.max(y, CI + 18 + 8 + 76) end
 
-  -- the check-list "before entering": one icon and three lines (state, why, what to do next).
+  -- the check-list "before entering": a banner (state, why, what next).
   -- Inside the dungeon it is over: the "inside the dungeon" band above the card takes its place.
   local checks = st.checks
   local isCL = checks and #checks > 0 and not (st.ins and InInstanceOf(st.ins))
@@ -1197,255 +1335,284 @@ Render = function()
     clMiss, clTotal = miss, tot
     local head, why, nxt, col, icon
     if miss == 0 and not keyMissing then
-      head, why, nxt, col, icon = L.CL_OK_H:format(ns.Upper(clDn)), L.CL_OK_T, L.CL_OK_NEXT, "|cff59e67a", "done"
-      card.readyBg:SetColorTexture(0.35, 0.9, 0.48, 0.12)
+      head, why, nxt, col, icon = L.CL_OK_H:format(clDn), L.CL_OK_T, L.CL_OK_NEXT, T.ok, "check"
     elseif miss == 0 then
       readyNoKey = true
-      head, why, nxt, col, icon = L.CL_KEY_H, L.CL_KEY_T:format(clDn), L.CL_KEY_NEXT, "|cffff9933", "nokey"
-      card.readyBg:SetColorTexture(1, 0.6, 0.2, 0.12)
+      head, why, nxt, col, icon = L.CL_KEY_H, L.CL_KEY_T:format(clDn), L.CL_KEY_NEXT, T.warn, "warning"
     else
       head = (miss == 1) and L.CL_MISS_H1 or L.CL_MISS_HN:format(miss)
-      why, nxt, col, icon = L.CL_MISS_T:format(clDn), L.CL_MISS_NEXT, "|cffff9933", "miss"
-      card.readyBg:SetColorTexture(1, 0.6, 0.2, 0.12)
+      why, nxt, col, icon = L.CL_MISS_T:format(clDn), L.CL_MISS_NEXT, T.warn, "warning"
     end
-    card.ready:SetText(col .. head .. "|r\n|cffd8dbe0" .. why .. "|r\n|cffffffff" .. nxt .. "|r")
-    Icon(card.readyIcon, icon)
-    card.ready:Show(); card.readyBg:Show(); card.readyIcon:Show()
-  else card.ready:Hide(); card.readyBg:Hide(); card.readyIcon:Hide() end
-  if not card.shareBtn then
-    card.shareBtn = Button(card, 96, 22, L.SHARE_SHORT, function() ns.ShareQuests() end, function() return { L.M_SHARE, L.TT_FSHARE } end)
-  end
+    card.readyBg:SetColorTexture(col[1], col[2], col[3], 0.16); card.readyEdge(col, 0.4)
+    ns.SetHDIcon(card.readyIcon, icon, col)
+    card.ready:SetText(Hex(T.fg) .. head .. "|r\n" .. Hex(T.text) .. why .. "|r\n" .. Hex(T.muted) .. nxt .. "|r")
+    card.ready:Show(); card.readyIcon:Show()
+  else card.ready:Hide(); card.readyIcon:Hide(); card.readyBox:Hide() end
 
+  card.travelIcon:Hide()
   if done and f.auto and i ~= f.auto then
     -- a finished step looked at again: say so (the big button goes back to the current one)
-    card.travel:SetText(L.DONE_VIEW); card.travel:SetTextColor(0.35, 0.9, 0.48); card.travel:Show()
-    y = y + 6 + card.travel:GetStringHeight()
+    card.travel:SetText(L.DONE_VIEW); card.travel:SetTextColor(T.text[1], T.text[2], T.text[3])
+    ns.SetHDIcon(card.travelIcon, "check", T.ok)
   elseif st.travel then
-    card.travel:SetText("> " .. L[st.travel]); card.travel:SetTextColor(T.accent[1], T.accent[2], T.accent[3]); card.travel:Show()
-    y = y + 6 + card.travel:GetStringHeight()
+    card.travel:SetText(L[st.travel]); card.travel:SetTextColor(T.text[1], T.text[2], T.text[3])
+    ns.SetHDIcon(card.travelIcon, "info", T.info)
+  else card.travel:SetText("") end
+  if card.travel:GetText() and card.travel:GetText() ~= "" then
+    y = y + 8
+    card.travelIcon:ClearAllPoints(); card.travelIcon:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -(y + 1)); card.travelIcon:Show()
+    card.travel:ClearAllPoints(); card.travel:SetPoint("TOPLEFT", card, "TOPLEFT", CI + 20, -y); card.travel:Show()
+    y = y + ns.FitText(card.travel, 0, TW - 20, card)
   else card.travel:Hide() end
   if card.ready:IsShown() then
-    card.readyIcon:ClearAllPoints(); card.readyIcon:SetPoint("TOPLEFT", 20, -(y + 14))
-    card.ready:ClearAllPoints(); card.ready:SetPoint("TOPLEFT", 46, -(y + 16))
-    card.readyBg:ClearAllPoints(); card.readyBg:SetPoint("TOPLEFT", card.readyIcon, "TOPLEFT", -6, 6); card.readyBg:SetPoint("BOTTOMRIGHT", card.ready, "BOTTOMRIGHT", 6, -6)
-    y = y + 16 + math.max(card.ready:GetStringHeight(), 18) + 6
-    if st.gate and IsInGroup() then
-      card.shareBtn:ClearAllPoints(); card.shareBtn:SetPoint("TOPLEFT", 14, -(y + 6)); card.shareBtn:Show()
-      y = y + 6 + 22
-    else card.shareBtn:Hide() end
-  else card.shareBtn:Hide() end
+    y = y + GAP
+    card.readyBox:ClearAllPoints(); card.readyBox:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.readyBox:SetWidth(TW)
+    local rh = ns.FitText(card.ready, 0, TW - 36 - 12, card.readyBox)
+    local boxH = math.ceil(10 + math.max(16, rh) + 10)
+    card.readyBox:SetHeight(boxH); card.readyBox:Show()
+    y = y + boxH
+  end
+  card.shareBtn:Hide()
   local note, after
+  -- grouped at a gate: the "Group" block under the rows ends with the share button
+  local shareAfter = st.gate and IsInGroup() and true or false
+  local H1 = Hex(T.fg)
   if st.gate then
-    -- what the check-list checks, then the quests (rows), then key / entrance / group under them
-    local acc = Hex(T.accent)
-    note = acc .. L.CL_WHAT_H .. "|r\n" .. L.CL_WHAT:format(clDn) .. "\n\n" .. acc .. L.CL_QUESTS:format(clTotal - clMiss, clTotal) .. "|r"
+    -- the quests counter over the rows (the footer button's tooltip says what the check-list
+    -- checks), then key / entrance / group under them
+    note = H1 .. L.CL_QUESTS:format(clTotal - clMiss, clTotal) .. "|r"
     local parts = {}
     local kl = ns.KeyLines and ns.KeyLines(st.gate) or {}
     if #kl > 0 then
       local t, warn = {}, false
       for _, k in ipairs(kl) do table.insert(t, k[1]); if k[3] and not k[2] then warn = true end end
-      if warn and not readyNoKey then table.insert(t, "|cffff9933" .. L.KEY_WARN .. "|r") end
-      table.insert(parts, acc .. L.CL_KEY .. "|r\n" .. table.concat(t, "\n"))
+      if warn and not readyNoKey then table.insert(t, Hex(T.warn) .. L.KEY_WARN .. "|r") end
+      table.insert(parts, H1 .. L.CL_KEY .. "|r\n" .. table.concat(t, "\n"))
     end
     local d = ns.D[st.gate]
-    if d and d.ed then table.insert(parts, acc .. L.CL_ENTRY .. "|r\n" .. ns.T(d.ed)) end
-    table.insert(parts, acc .. L.CL_GROUP .. "|r\n" .. L.GATE_N)
+    if d and d.ed then table.insert(parts, H1 .. L.CL_ENTRY .. "|r\n" .. ns.T(d.ed)) end
+    -- in a group: the header, then the share button; alone: why sharing waits
+    table.insert(parts, H1 .. L.CL_GROUP .. "|r" .. (shareAfter and "" or ("\n" .. L.GATE_N)))
     after = table.concat(parts, "\n\n")
   end
   if st.split then
-    -- blocs aérés : conseil, puis « en chemin » en liste
+    -- a tip, then "on the way" as a list
     local blocks = {}
-    local acc = Hex(T.accent)
     local tips = ns.STEP_TIPS and ns.STEP_TIPS[st.ins]
     local mine = tips and tips[(st.bossIdx == 0 and "*start") or (st.bossIdx == 999 and "*trash") or st.bossEn or ""]
     local tipLines = {}
-    if mine then table.insert(tipLines, "|cffe8eaed" .. ns.T(mine[1]) .. "|r") end
-    if st.bossTip then table.insert(tipLines, "|cffb8bcc4" .. st.bossTip .. "|r") end
-    if #tipLines > 0 then table.insert(blocks, acc .. L.H_TIP .. "|r\n" .. table.concat(tipLines, "\n\n")) end
+    if mine then table.insert(tipLines, ns.T(mine[1])) end
+    if st.bossTip then table.insert(tipLines, Hex(T.muted) .. st.bossTip .. "|r") end
+    if #tipLines > 0 then table.insert(blocks, H1 .. L.H_TIP .. "|r\n" .. table.concat(tipLines, "\n\n")) end
     if st.trash then
       local names, seen = {}, {}
-      for _, n in ipairs(st.trash) do
-        if not ns.NodeOK(log, n) then
-          local o = n.oneObj
-          local nm = o and ((o.c and o.c > 1 and (o.c .. " x ") or "") .. (o.n or "")) or ns.QName(n.q)
-          if nm ~= "" and not seen[nm] then seen[nm] = true; table.insert(names, "|cffe6c48a-  " .. nm .. "|r") end
+      for _, nd in ipairs(st.trash) do
+        if not ns.NodeOK(log, nd) then
+          local o = nd.oneObj
+          local nm = o and ((o.c and o.c > 1 and (o.c .. " x ") or "") .. (o.n or "")) or ns.QName(nd.q)
+          if nm ~= "" and not seen[nm] then seen[nm] = true; table.insert(names, "-  " .. nm) end
         end
       end
-      if #names > 0 then table.insert(blocks, acc .. L.H_ALSO .. "|r\n" .. table.concat(names, "\n")) end
+      if #names > 0 then table.insert(blocks, H1 .. L.H_ALSO .. "|r\n" .. table.concat(names, "\n")) end
     end
     if #blocks > 0 then note = table.concat(blocks, "\n\n") end
   end
   if note then
-    card.note:ClearAllPoints(); card.note:SetPoint("TOPLEFT", 14, -(y + 8)); card.note:SetText(note); card.note:Show()
-    y = y + 8 + card.note:GetStringHeight() + 6
+    y = y + GAP
+    card.note:ClearAllPoints(); card.note:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.note:SetText(note); card.note:Show()
+    y = y + ns.FitText(card.note, 0, TW, card)
   else card.note:Hide() end
-  y = y + 10
+  y = y + 8
 
-  local CW = W - 2 * PAD - 40
+  local rowW = CardW() - 8
+  local subW = rowW - ROW_NAME_X - 12
   local view = ns.StepView(st, log)
+  local mt = Hex(T.muted)
   for r, row in ipairs(card.rows) do
     local nd = view[r]
+    row:SetWidth(rowW)
     if nd and nd.kind == "b" then
-      -- en-tête de boss
+      -- boss header: skull, "Boss 2", the boss, "Done" once every line under it is done
       row.node = nil
-      row.tag:SetText(nd.bossIdx > 0 and L.BOSS_N:format(nd.bossIdx) or L.ALLDUNGEON_T); row.tag:SetTextColor(1, 0.45, 0.45); row.tag:SetAlpha(nd.allOk and 0.5 or 1)
-      row.name:SetText(nd.bossIdx > 0 and nd.bossName or L.ALLDUNGEON); row.name:SetTextColor(unpack(nd.allOk and T.dim or { 1, 0.62, 0.62 }))
-      row.npc:SetText(nd.allOk and ("|cff59e67a" .. L.S_DONE .. "|r") or ""); row.npc:ClearAllPoints(); row.npc:SetPoint("TOPRIGHT", -6, -5)
-      row.npc:SetWidth(math.min(row.npc:GetStringWidth() + 2, 150))
-      row.gb:Hide(); row.wpOn:Hide(); row.wpBar:Hide(); row.icon:Hide()
-      Icon(row.kicon, nd.bossIdx > 0 and "boss" or "map"); row.kicon:Show()
-      row.name:SetWidth(CW - 160)
-      local sub = (not nd.allOk and nd.tip) and ("|cffa8acb4" .. nd.tip .. "|r") or ""
+      row.bossName = nd.bossIdx > 0 and nd.bossName or L.ALLDUNGEON
+      row.bossTip = nd.tip
+      row.tag:SetText(nd.bossIdx > 0 and L.BOSS_N:format(nd.bossIdx) or L.ALLDUNGEON_T); row.tag:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
+      row.name:SetText(row.bossName)
+      local nc = nd.allOk and T.muted or T.fg
+      row.name:SetTextColor(nc[1], nc[2], nc[3])
+      row.npc:SetText(nd.allOk and (Hex(T.ok) .. L.S_DONE .. "|r") or "")
+      row.npc:ClearAllPoints(); row.npc:SetPoint("TOPRIGHT", row, "TOPRIGHT", -12, -12)
+      local npcW = math.min((num(row.npc:GetStringWidth()) or 0) + 2, 140)
+      row.npc:SetWidth(npcW)
+      row.gb:Hide(); row.wpOn:Hide(); row.icon:Hide()
+      if nd.bossIdx > 0 then Icon(row.kicon, "boss") else ns.SetHDIcon(row.kicon, "flag", T.muted) end
+      row.kicon:SetAlpha(nd.allOk and 0.5 or 1); row.kicon:Show()
+      local nameH = ns.FitText(row.name, 2, math.max(80, rowW - ROW_NAME_X - 12 - npcW - 8), row)
+      local sub = (not nd.allOk and nd.tip) and nd.tip or ""
       row.sub:SetText(sub); row.sub:SetShown(sub ~= "")
-      local rh = (sub ~= "") and (24 + row.sub:GetStringHeight() + 6) or 26
-      row:SetHeight(rh); row:ClearAllPoints(); row:SetPoint("TOPLEFT", 6, -y)
-      y = y + rh + 2
+      local subTop = 10 + nameH + 3
+      row.sub:ClearAllPoints(); row.sub:SetPoint("TOPLEFT", row, "TOPLEFT", ROW_NAME_X, -subTop)
+      local subH = (sub ~= "") and (ns.FitText(row.sub, 0, subW, row)) or 0
+      local rh = math.max(36, math.ceil(subTop + subH + 8))
+      row:SetHeight(rh); row:ClearAllPoints(); row:SetPoint("TOPLEFT", card, "TOPLEFT", 4, -y)
+      y = y + rh
       row:Show()
     elseif nd then
-      row.node = nd
+      row.node = nd; row.bossName = nil
       local q = ns.Q[nd.q] or {}
       local s = ns.State(log, nd.q)
       local ok = (nd.vok ~= nil) and nd.vok or ns.NodeOK(log, nd)
-      local kc = T.kind[nd.kind] or T.text
+      local kc = KCOL[nd.kind] or T.text
       row.tag:SetText(L[KTAG[nd.kind]] or ""); row.tag:SetTextColor(kc[1], kc[2], kc[3])
       row.name:SetText(nd.label or ns.QName(nd.q))
-      -- the NPC on the right, unless the step's title already names it (then the quest's state)
-      -- a check-list row keeps its state ("not taken"): its sub-line already names the giver
+      -- the NPC on the right, unless the step's title already names it (then the quest's state);
+      -- a check-list row keeps its state ("To take"): its detail line already names the giver
       local npcShort = nd.npc and not nd.ins and nd.kind ~= "h" and nd.npc:gsub(",.*$", "")
       local title = card.title:GetText() or ""
       if npcShort and title:find(npcShort, 1, true) then npcShort = nil end
-      local right = npcShort or (SCOL[s] .. L[SLABEL[s]] .. "|r")
-      -- check-list row: plainly "in your log" (green) or "to take" (orange)
-      if nd.kind == "h" then right = ok and ("|cff59e67a" .. L.CL_HAVE .. "|r") or ("|cffff9933" .. L.CL_TAKE .. "|r") end
+      local sc = SCOL[s] or T.muted
+      local right = npcShort or (Hex(sc) .. L[SLABEL[s] or "S_NONE"] .. "|r")
+      -- check-list row: plainly "In your log" (green) or "To take" (orange)
+      if nd.kind == "h" then right = ok and (Hex(T.ok) .. L.CL_HAVE .. "|r") or (Hex(T.warn) .. L.CL_TAKE .. "|r") end
       row.npc:SetText(right)
       SetSecureRow(row, nd, ok)
       row.gb:SetShown(nd.loc ~= nil)
       local isActive = nd.loc and ns.active[ns.PKey(nd.loc.m, nd.loc.x, nd.loc.y)] and not ok
-      row.wpOn:SetShown(isActive and true or false); row.wpBar:SetShown(isActive and true or false)
+      row.wpOn:SetShown(isActive and true or false)
+      local x = -12
       if nd.loc then
-        -- a map pin, like a point on a phone map; the game's own drawing, the old arrow if it has none
-        row.gb.icon:SetVertexColor(1, 1, 1)
-        -- followed: filled with the accent and "ON"; otherwise a plain button that says GPS
-        if isActive then
-          row.gb.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.85); row.gb.text:SetText(L.GPS_ON or "GPS")
-        else
-          row.gb.bg:SetColorTexture(1, 1, 1, 0.08); row.gb.text:SetText("GPS")
-        end
+        -- followed: the row is selected and the button says so
+        row.gb:SetText(isActive and (L.GPS_ON or "GPS") or "GPS")
+        row.gb:ClearAllPoints(); row.gb:SetPoint("TOPRIGHT", row, "TOPRIGHT", x, -5)
+        x = x - (num(row.gb:GetWidth()) or 60) - 8
       end
-      local x = -4
-      for _, b in ipairs({ row.gb }) do
-        if b:IsShown() then b:ClearAllPoints(); b:SetPoint("TOPRIGHT", x, -2); x = x - 58 end
-      end
-      row.npc:ClearAllPoints(); row.npc:SetPoint("TOPRIGHT", x - 2, -5)
-      local npcW = math.min(row.npc:GetStringWidth() + 2, 150)
-      row.npc:SetWidth(npcW)
-      row.name:SetWidth(math.max(80, CW - 90 - npcW + x))
+      row.npc:ClearAllPoints(); row.npc:SetPoint("TOPRIGHT", row, "TOPRIGHT", x, -12)
+      -- the name keeps 120 px at least; the NPC (or state) gets what is left, up to 140 px, and
+      -- goes to the start of the detail lines when less than 60 px would remain for it
+      local room = rowW - ROW_NAME_X + x - 8
+      local npcW = math.min((num(row.npc:GetStringWidth()) or 0) + 2, 140, math.max(0, room - 120))
+      local npcInSub = (right ~= "" and npcW < 60) and right or nil
+      row.npc:SetShown(not npcInSub)
+      if npcInSub then npcW = 0 end
+      row.npc:SetWidth(math.max(1, npcW))
+      local nameW = math.max(40, room - npcW)
       if ok then
-        row.icon:Show(); row.kicon:Hide(); row.name:SetTextColor(unpack(T.dim)); row.tag:SetAlpha(0.5)
+        row.icon:Show(); row.kicon:Hide(); row.name:SetTextColor(T.muted[1], T.muted[2], T.muted[3]); row.tag:SetAlpha(0.5)
       else
         row.icon:Hide()
+        row.kicon:SetAlpha(1)
         row.kicon:SetShown(SetKindIcon(row.kicon, nd))
-        row.name:SetTextColor(unpack(T.text)); row.tag:SetAlpha(1)
+        row.name:SetTextColor(T.fg[1], T.fg[2], T.fg[3]); row.tag:SetAlpha(1)
       end
-      -- sous-lignes
+      -- detail lines
       local parts = {}
-      local tags = ""
-      if nd.d and nd.d ~= dkey then local c2 = DColor(nd.d); tags = tags .. Hex(c2) .. "[" .. ns.DName(nd.d) .. "]|r " end
-      if nd.pre then tags = tags .. "|cffb0b0b0[" .. L.PRE .. "]|r " end
-      -- the class, unless the card's "Class quest" chip already says it
-      if q.c and not card.clsChip:IsShown() then local cn, cc = ns.ClassInfo(q.c:match("^[^,]+")); tags = tags .. ns.ClassIconText(q.c:match("^[^,]+"), 12) .. Hex(cc) .. "[" .. L.CLASS_TAG:format(cn) .. "]|r " end
-      if tags ~= "" then table.insert(parts, (tags:gsub("%s+$", ""))) end
+      local tags = {}
+      if nd.d and nd.d ~= dkey then table.insert(tags, mt .. ns.DName(nd.d) .. "|r") end
+      if nd.pre then table.insert(tags, mt .. L.PRE .. "|r") end
+      -- the class, unless the card's "Class quest" pill already says it
+      if q.c and not card.clsChip:IsShown() then
+        local tok = q.c:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
+        table.insert(tags, ns.ClassIconText(tok, 12) .. Hex(cc) .. L.CLASS_TAG:format(cn) .. "|r")
+      end
+      if #tags > 0 then table.insert(parts, table.concat(tags, mt .. "  ·  |r")) end
+      local tx = Hex(T.text)
       if not ok then
         if nd.kind == "a" and s == "none" then
           local pb = ns.PrereqProblem(nd.q)
-          if pb then table.insert(parts, "|cffff6060" .. L.BLOCKED:format(pb) .. "|r") end
+          if pb then table.insert(parts, Hex(T.bad) .. L.BLOCKED:format(pb) .. "|r") end
         end
         if nd.kind == "h" then
           local A = q.s and q.s.n or q.st
-          if A then table.insert(parts, "|cffe6c48a" .. L.GIVER:format(A) .. "|r") end
+          if A then table.insert(parts, tx .. L.GIVER:format(A) .. "|r") end
         elseif nd.kind ~= "t" then
           local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
           local lines = (nd.kind == "c" or nd.kind == "o") and ObjectiveLines(nd, log) or {}
-          if obj and (nd.kind == "a" or #lines == 0) then table.insert(parts, "|cffd8dbe0" .. obj .. "|r") end
+          if obj and (nd.kind == "a" or #lines == 0) then table.insert(parts, tx .. obj .. "|r") end
           if nd.kind == "c" or nd.kind == "o" then
-            for _, l2 in ipairs(lines) do table.insert(parts, "|cffb8bcc4- " .. l2 .. "|r") end
+            for _, l2 in ipairs(lines) do table.insert(parts, tx .. "- " .. l2 .. "|r") end
           end
-          if nd.kind == "a" and q.si then table.insert(parts, "|cffe6c48a" .. q.si .. (q.sih and (" : " .. ns.T(q.sih)) or "") .. "|r") end
-          if q.ne and (nd.firstOfQuest ~= false) and (nd.kind == "c" or nd.kind == "o" or (nd.kind == "a" and not q.o)) then table.insert(parts, "|cffe6c48a" .. ns.T(q.ne) .. "|r") end
-          if nd.extra then table.insert(parts, "|cffe6c48a" .. nd.extra .. "|r") end
+          if nd.kind == "a" and q.si then table.insert(parts, q.si .. (q.sih and (L.COLON .. ns.T(q.sih)) or "")) end
+          if q.ne and (nd.firstOfQuest ~= false) and (nd.kind == "c" or nd.kind == "o" or (nd.kind == "a" and not q.o)) then table.insert(parts, ns.T(q.ne)) end
+          if nd.extra then table.insert(parts, nd.extra) end
           if nd.kind == "c" and ns.BossLines and not nd.oneObj then
             for _, bl in ipairs(ns.BossLines(nd.q) or {}) do
-              table.insert(parts, "|cffff7070" .. L.BOSS .. " : " .. bl[1] .. "|r" .. (bl[2] and ("  |cffa8acb4" .. bl[2] .. "|r") or ""))
+              table.insert(parts, tx .. L.BOSS .. L.COLON .. bl[1] .. "|r" .. (bl[2] and ("  " .. bl[2]) or ""))
             end
           end
         end
         if nd.kind == "t" and s == "on" then
-          -- quête pas encore terminée au moment de la rendre : rappeler quoi faire
+          -- quest not finished yet when it is time to turn it in: what is left to do
           local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
-          if obj then table.insert(parts, "|cffd8dbe0" .. obj .. "|r") end
+          if obj then table.insert(parts, tx .. obj .. "|r") end
         end
         if (nd.kind == "t" and s == "on") or (nd.kind == "c" and #ObjectiveLines(nd) == 0) then
-          for _, r in ipairs(q.req or {}) do
-            table.insert(parts, "|cffb8bcc4- " .. r[1] .. (r[2] and r[2] > 1 and (" x" .. r[2]) or "") .. (r[3] and (" : " .. ns.T(r[3])) or "") .. "|r")
+          for _, r2 in ipairs(q.req or {}) do
+            table.insert(parts, "- " .. r2[1] .. (r2[2] and r2[2] > 1 and (" x" .. r2[2]) or "") .. (r2[3] and (L.COLON .. ns.T(r2[3])) or ""))
           end
         end
-        if nd.unknown then table.insert(parts, "|cff9a9a9a" .. L.TRAVEL_UNK .. "|r") end
+        if nd.unknown then table.insert(parts, L.TRAVEL_UNK) end
         if (nd.kind == "h" or nd.kind == "c" or nd.kind == "a") and ns.PartyLine and nd.firstOfQuest ~= false then
           local pl = ns.PartyLine(nd.q)
-          if pl then table.insert(parts, "|cff9fd8ff" .. pl .. "|r") end
+          if pl then table.insert(parts, Hex(T.info) .. pl .. "|r") end
         end
       end
+      if npcInSub then table.insert(parts, 1, npcInSub) end
       local sub = table.concat(parts, "\n")
+      local nameH = ns.FitText(row.name, 2, nameW, row)
       row.sub:SetText(sub); row.sub:SetShown(sub ~= "")
-      local rh = (sub ~= "") and (24 + row.sub:GetStringHeight() + 6) or 26
+      -- the detail lines start under the name, and under the GPS button (y 5 to 29) when it shows
+      local subTop = 10 + nameH + 3
+      if nd.loc then subTop = math.max(subTop, 5 + 24 + 4) end
+      row.sub:ClearAllPoints(); row.sub:SetPoint("TOPLEFT", row, "TOPLEFT", ROW_NAME_X, -subTop)
+      local subH = (sub ~= "") and (ns.FitText(row.sub, 0, subW, row)) or 0
+      local rh = math.max(36, math.ceil(subTop + subH + 8))
       row:SetHeight(rh)
-      row:ClearAllPoints(); row:SetPoint("TOPLEFT", 6, -y)
-      y = y + rh + 9
+      row:ClearAllPoints(); row:SetPoint("TOPLEFT", card, "TOPLEFT", 4, -y)
+      y = y + rh
       row:Show()
     else
-      row.node = nil; row:Hide()
+      row.node = nil; row.bossName = nil; row:Hide()
     end
   end
   if after then
-    card.after:ClearAllPoints(); card.after:SetPoint("TOPLEFT", 14, -(y + 4)); card.after:SetText(after); card.after:Show()
-    y = y + 4 + card.after:GetStringHeight() + 10
+    y = y + GAP
+    card.after:ClearAllPoints(); card.after:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.after:SetText(after); card.after:Show()
+    y = y + ns.FitText(card.after, 0, TW, card)
   else card.after:Hide() end
-  card:SetHeight(y + 6)
-  local hh = math.min(y + 8, CARD_MAX)
-  holder:SetHeight(hh)
-  local over = y + 8 - hh
-  if over > 0 then
-    local frac = hh / (y + 8)
-    holder.sbar:SetHeight(math.max(20, hh * frac))
-    holder.over, holder.track = over, hh - holder.sbar:GetHeight() - 4
-    PositionThumb()
-    holder.sbar:Show()
-  else holder.over = 0; holder.sbar:Hide(); f.scroll.offset = 0 end
-  f.scroll:SetVerticalScroll(math.min(f.scroll.offset or 0, math.max(0, over)))
+  if shareAfter then
+    y = y + 8
+    card.shareBtn:SetText(L.SHARE_SHORT)
+    card.shareBtn:ClearAllPoints(); card.shareBtn:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.shareBtn:Show()
+    y = y + 28
+  end
+  y = y + CI
 
-  -- the last step, route finished: ">" goes on to the "route finished" card
+  -- the last step, route finished: next goes on to the "route finished" card
   f.prev:SetEnabled(i > 1); f.next:SetEnabled(i < #steps or RouteFinished()); f.moreBtn:SetEnabled(true)
   ns.RenderReadyBtn(log)
   -- count the points PlacePoints cycles through: the unfinished ones, else all of them
   local np = #StepPoints(log, st, false)
   if np == 0 then np = #StepPoints(log, st, true) end
-  -- the big button: back to the current step when looking elsewhere, else "go there"
+  -- the big button: back to the current step when looking elsewhere, else "guide me there"
   local cycling = not ns.HasTomTom() and np > 1 and f.wpKey == i
   if f.auto and i ~= f.auto then
-    f.go.label:SetText(RouteFinished() and L.BACK_FIN or L.BACK_CUR); f.go.action = GoBack; f.go:SetEnabled(true)
+    f.go:SetText(RouteFinished() and L.BACK_FIN or L.BACK_CUR); if f.go.SetIcon then f.go:SetIcon("chevron_left") end
+    f.go.action = GoBack; f.go:SetEnabled(true)
   elseif np > 0 then
     local label = L.GO
-    if cycling then label = L.NEXTPOINT .. (" (%d/%d)"):format((f.wpIdx or 1) % np + 1, np)
+    if cycling then label = L.NEXTPOINT .. (" (%d / %d)"):format((f.wpIdx or 1) % np + 1, np)
     elseif st.gate and i == f.auto then
       -- the check-list: first the missing quests' givers, then the entrance
       local missLoc = 0
       for _, nd in ipairs(st.checks or {}) do if nd.loc and not ns.NodeOK(log, nd) then missLoc = missLoc + 1 end end
-      label = missLoc > 0 and L.GO_MISSING or L.GO_ENTRANCE:format(ns.DName(st.gate))
+      label = missLoc > 0 and L.GO_MISSING or L.GO_ENTRANCE
     end
-    f.go.label:SetText(label)
+    f.go:SetText(label); if f.go.SetIcon then f.go:SetIcon("pin") end
     f.go.action = GoPoints; f.go:SetEnabled(true)
   else
-    f.go.label:SetText(L.NOPOINT_S); f.go.action = nil; f.go:SetEnabled(false)
+    f.go:SetText(L.NOPOINT_S); if f.go.SetIcon then f.go:SetIcon("info") end
+    f.go.action = nil; f.go:SetEnabled(false)
+    f.go.disabledReason = L.NOPOINT
   end
   f.way:SetEnabled(np > 0)
   f.way.label:SetText(cycling and L.NEXTPOINT or L.M_POINTS)
@@ -1453,12 +1620,12 @@ Render = function()
   f.recalc.label:SetText(L.M_RECALC)
   f.done:SetEnabled(true)
   f.done.label:SetText(Manual(st) and L.M_UNSKIP or L.M_SKIP)
-  f.arrowBtn.label:SetText(L.M_ARROW .. onoff(WLDTDB.arrow ~= false))
-  f.autoBtn.label:SetText(L.M_AUTO .. onoff(WLDTDB.autoWay))
-  f.listBtn.label:SetText(L.M_LIST .. onoff(f.list:IsShown()))
+  f.arrowBtn.label:SetText(L.M_ARROW); f.arrowBtn:SetOn(WLDTDB.arrow ~= false)
+  f.autoBtn.label:SetText(L.M_AUTO); f.autoBtn:SetOn(WLDTDB.autoWay)
+  f.listBtn.label:SetText(L.M_LIST); f.listBtn:SetOn(f.list:IsShown())
   f.journal.label:SetText(L.M_JOURNAL); f.journal:SetEnabled(ns.JournalAvailable and ns.JournalAvailable() or false)
 
-  f:SetHeight(TOP + hh + 12 + 56 + PAD)
+  FitGuide(TOP, y, LayoutFoot(true, false))
   WLDTDB.view = i
   RenderList(log)
   if not f.pinned and not InCombatLockdown() then f.pinned = true; ns.PinTopLeft() end
@@ -1485,18 +1652,18 @@ function ns.Refresh(silent)
     local follow = (f.view == nil) or (f.view == f.auto)
     local was = f.auto
     f.auto = auto
-    if follow then f.view = auto; f.scroll.offset = 0 end
+    if follow then f.view = auto; ScrollTop() end
     if was and auto > was and not silent and not fin then
       PlaySound(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE or 878)
       local t = StepTitle(steps[auto])
-      if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper : " .. t, T.accent[1], T.accent[2], T.accent[3]) end
+      if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper" .. L.COLON .. t, T.fg[1], T.fg[2], T.fg[3]) end
       ns.Print(L.NEXT_STEP:format(t))
     end
   end
   if fin and not f.wasFin and not silent then
     ns.ClearPoints(); f.sig = nil
     PlaySound(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE or 878)
-    if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper : " .. L.FIN_T, 0.35, 0.9, 0.48) end
+    if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper" .. L.COLON .. L.FIN_T, T.ok[1], T.ok[2], T.ok[3]) end
     ns.Print(L.FIN_MSG:format(ns.route.label or ""))
   end
   f.wasFin = fin
@@ -1546,7 +1713,7 @@ function ns.UpdateMacro()
     table.insert(m, tail)
     body = table.concat(m, "\n")
   else
-    body = "/run print('|cffce1918WL Helper|r " .. L.MACRO_NONE:gsub("'", "\\'") .. "')"
+    body = "/run print('|cffce1918WL|r " .. L.MACRO_NONE:gsub("'", "\\'") .. "')"
   end
   if body == macroBody and GetMacroIndexByName(MACRO) > 0 then return end
   macroBody = body
@@ -1593,24 +1760,25 @@ local AB_N, AB_S = 8, 30
 local function BuildActionBar()
   abar = CreateFrame("Frame", "WLDTActionBar", UIParent)
   abar:SetSize(AB_S, AB_S); abar:SetFrameStrata("MEDIUM")
-  abar.label = Text(abar, 10, T.dim, true); abar.label:SetPoint("LEFT", 2, 0); abar.label:SetText(L.AB_LABEL)
+  abar.wlWorld = true   -- drawn over the 3D world: its text keeps a shadow
+  abar.label = Text(abar, ns.F.foot, T.muted, false, "SHADOW"); abar.label:SetPoint("LEFT", 2, 0); abar.label:SetText(L.AB_LABEL)
   abar.btns = {}
   for k = 1, AB_N do
     local b = CreateFrame("Button", "WLDTAction" .. k, abar, "SecureActionButtonTemplate")
     b:SetSize(AB_S, AB_S); b:RegisterForClicks("AnyUp", "AnyDown")
-    ns.Flat(b, { 0.06, 0.065, 0.075, 0.95 })
+    ns.Flat(b, T.panel, T.cardEdge)
     b.icon = b:CreateTexture(nil, "ARTWORK"); b.icon:SetPoint("TOPLEFT", 2, -2); b.icon:SetPoint("BOTTOMRIGHT", -2, 2)
-    b.hl = Tex(b, "HIGHLIGHT", { 1, 1, 1, 0.25 }); b.hl:SetAllPoints()
-    b.num = Text(b, 12, { 1, 1, 1 }, true, "OUTLINE"); b.num:SetPoint("BOTTOMRIGHT", -1, 1)
+    b.hl = Tex(b, "HIGHLIGHT", T.hoverFill); b.hl:SetAllPoints()
+    b.num = Text(b, ns.F.label, T.fg, true, "OUTLINE"); b.num:SetPoint("BOTTOMRIGHT", -1, 1)
     b:SetScript("OnEnter", function(self)
       local a = self.action
       if not a then return end
       if a.item then
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         if GameTooltip.SetItemByID then GameTooltip:SetItemByID(a.item) end
-        GameTooltip:AddLine(L.TT_USE, T.accent[1], T.accent[2], T.accent[3]); GameTooltip:Show()
+        GameTooltip:AddLine(L.TT_USE, T.accentSoft[1], T.accentSoft[2], T.accentSoft[3]); GameTooltip:Show()
       else
-        ns.ShowTip(self, { L.TT_TARGET, { L.TT_TARGET2:format(table.concat(a.names, " / ")), 0.85, 0.85, 0.85 }, { L.TT_RAID, 0.6, 0.6, 0.6 } })
+        ns.ShowTip(self, { L.TT_TARGET, L.TT_TARGET2:format(table.concat(a.names, " / ")), L.TT_RAID, L.TT_TARGET_CLICK })
       end
     end)
     b:SetScript("OnLeave", ns.HideTip)

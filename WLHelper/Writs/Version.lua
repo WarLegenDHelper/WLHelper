@@ -10,10 +10,18 @@ local WP = ns.WP
 local L = ns.L
 
 ns.AddEnglish({
-    ["Version %s disponible (tu as %s) : WowUp, Update sur WL Helper, puis /reload en jeu."] =
-        "Version %s available (you have %s): WowUp, Update on WL Helper, then /reload in game.",
-    ["Mise à jour %s disponible : ouvre WowUp, Update, puis /reload"] = "Update %s available: open WowUp, Update, then /reload",
+    -- the chat line, once per session
+    ["La version %s de WL Helper est sortie (tu as la %s). Mets-la à jour dans WowUp, puis tape /reload pour la charger."] =
+        "WL Helper %s is out (you have %s). Update it in WowUp, then type /reload to load it.",
+    -- the home page banner and the minimap tooltip
+    ["La version %s est sortie. Mets à jour WL Helper dans WowUp, puis tape /reload pour la charger."] =
+        "Version %s is out. Update WL Helper in WowUp, then type /reload to load it.",
 })
+
+-- The sentence that tells about a newer version (home page banner, minimap tooltip).
+function WP.UpdateText(version)
+    return string.format(L("La version %s est sortie. Mets à jour WL Helper dans WowUp, puis tape /reload pour la charger."), tostring(version))
+end
 
 local PREFIX = "WLHver"
 local CI = C_ChatInfo
@@ -72,7 +80,7 @@ local function Seen(version, channel)
         end
         if not told then
             told = true
-            WP.Print(string.format(L("Version %s disponible (tu as %s) : WowUp, Update sur WL Helper, puis /reload en jeu."), version, mine))
+            WP.Print(string.format(L("La version %s de WL Helper est sortie (tu as la %s). Mets-la à jour dans WowUp, puis tape /reload pour la charger."), version, mine))
         end
         if WP.RefreshHome then WP.RefreshHome() end
     elseif WP.NewerVersion(mine, version) then

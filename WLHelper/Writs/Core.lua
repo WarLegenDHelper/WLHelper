@@ -569,7 +569,7 @@ end
 function WP.SaveAuctionatorList(list)
     local A = Auctionator and Auctionator.API and Auctionator.API.v1
     if not (A and A.CreateShoppingList and A.ConvertToSearchString) then
-        WP.Print(L("Auctionator n'est pas chargé."))
+        WP.Print(L("Cette liste a besoin d'un addon d'hôtel des ventes, et aucun n'est chargé."), true)
         return
     end
     local strings = {}
@@ -579,10 +579,11 @@ function WP.SaveAuctionatorList(list)
             strings[#strings + 1] = s or ('"' .. e.name .. '"')
         end
     end
-    if #strings == 0 then WP.Print(L("tout est déjà acheté.")); return end
+    if #strings == 0 then WP.Print(L("Tout est déjà acheté : rien à mettre dans la liste.")); return end
     local ok, err = pcall(A.CreateShoppingList, CALLER, WP.NAME, strings)
     if ok then
-        WP.Print(string.format(L("liste Auctionator « WL Helper » créée (%d objets, avec prix plafond)."), #strings))
+        WP.Print(#strings == 1 and L("Liste d'achat « WL Helper » créée : 1 objet, avec son prix plafond.")
+            or string.format(L("Liste d'achat « WL Helper » créée : %d objets, avec leur prix plafond."), #strings))
     else
         WP.Print(tostring(err):match("Details: (.*)") or tostring(err))
     end
@@ -592,20 +593,20 @@ end
 function WP.SearchList(list)
     local A = Auctionator and Auctionator.API and Auctionator.API.v1
     if not (A and A.MultiSearchAdvanced) then
-        WP.Print(L("Auctionator n'est pas chargé."))
+        WP.Print(L("Cette recherche a besoin d'un addon d'hôtel des ventes, et aucun n'est chargé."), true)
         return
     end
     if not AuctionHouseOpen() then
-        WP.Print(L("ouvre l'hôtel des ventes d'abord."))
+        WP.Print(L("L'hôtel des ventes est fermé : parle à un commissaire-priseur, puis recommence."), true)
         return
     end
     local terms = {}
     for _, e in ipairs(list) do if not e.done then terms[#terms + 1] = SearchTerm(e) end end
-    if #terms == 0 then WP.Print(L("tout est déjà acheté.")); return end
+    if #terms == 0 then WP.Print(L("Tout est déjà acheté : rien à chercher.")); return end
     local ok, err = pcall(A.MultiSearchAdvanced, CALLER, terms)
     if not ok then
         local msg = tostring(err):match("Details: (.*)") or tostring(err)
-        if msg:find("not open", 1, true) then msg = L("ouvre l'hôtel des ventes d'abord.") end
+        if msg:find("not open", 1, true) then msg = L("L'hôtel des ventes est fermé : parle à un commissaire-priseur, puis recommence.") end
         WP.Print(msg)
     end
 end
@@ -617,7 +618,7 @@ end
 function WP.Search(rows)
     local A = Auctionator and Auctionator.API and Auctionator.API.v1
     if not (A and A.MultiSearchExact) then
-        WP.Print(L("Auctionator n'est pas chargé."))
+        WP.Print(L("Cette recherche a besoin d'un addon d'hôtel des ventes, et aucun n'est chargé."), true)
         return
     end
     local terms, seen = {}, {}
@@ -630,17 +631,17 @@ function WP.Search(rows)
         if not r.ownItem and r.state ~= "ready" then add(r.w.item, r.w.itemName) end
     end
     if #terms == 0 then
-        WP.Print(L("rien à chercher."))
+        WP.Print(L("Rien à chercher : tu as déjà tout."))
         return
     end
     if not WP.AuctionHouseOpen() then
-        WP.Print(L("ouvre l'hôtel des ventes d'abord."))
+        WP.Print(L("L'hôtel des ventes est fermé : parle à un commissaire-priseur, puis recommence."), true)
         return
     end
     local ok, err = pcall(A.MultiSearchExact, CALLER, terms)
     if not ok then
         local msg = tostring(err):match("Details: (.*)") or tostring(err)
-        if msg:find("not open", 1, true) then msg = L("ouvre l'hôtel des ventes d'abord.") end
+        if msg:find("not open", 1, true) then msg = L("L'hôtel des ventes est fermé : parle à un commissaire-priseur, puis recommence.") end
         WP.Print(msg)
     end
 end
@@ -772,16 +773,46 @@ end
 
 local REFRESH_EVENTS = { QUEST_LOG_UPDATE = true, BAG_UPDATE_DELAYED = true, UPDATE_FACTION = true }
 
-function WP.Print(msg) if root.Print then root.Print(msg) else print("WL Helper " .. tostring(msg)) end end   -- one chat prefix for the whole addon
+-- One chat prefix for the whole addon. WP.Print(msg, true) is for reminders and errors: the same
+-- sentence is then said at most once every 30 s. The result of a click (sold, thrown away, scan
+-- finished...) never passes it, so a second identical action still gets its confirmation.
+local saidAt = {}
+function WP.Print(msg, once)
+    local key = tostring(msg)
+    if once then
+        local now = GetTime and GetTime() or 0
+        if saidAt[key] and now - saidAt[key] < 30 then return end
+        for k, t in pairs(saidAt) do if now - t >= 30 then saidAt[k] = nil end end
+        saidAt[key] = now
+    end
+    if root.Print then root.Print(msg) else print("WL Helper " .. key) end
+end
 
 -- When the game blocks something WL Helper did, say which function (the game's own popup does not)
 -- and keep it for the bug form (/wlh idea, Writs/Feedback.lua).
 ns.AddEnglish({
-    ["le jeu a bloqué « %s »%s. Signale-le avec /wlh idea (bug) : la fonction est déjà dans le formulaire."] =
-        "the game blocked \"%s\"%s. Report it with /wlh idea (bug): the function is already in the form.",
+    ["Le jeu a bloqué « %s »%s. Tape /wlh idee pour le signaler : le nom de la fonction est déjà dans le formulaire."] =
+        "The game blocked \"%s\"%s. Type /wlh idea to report it: the function's name is already in the form.",
     [" en combat"] = " in combat",
-    ["  /wlh trade : ouvre ou ferme la fenêtre des Writs"] = "  /wlh trade: open or close the Writs window",
-    ["le module %s est éteint : Réglages, Général, Modules."] = "the %s module is off: Settings, General, Modules.",
+    ["Writs"] = "Writs",
+    ["Groupes"] = "Groups",
+    ["Writs, liste d'achat et remise automatique"] = "Writs, shopping list and automatic turn-in",
+    ["Commandes des Writs :"] = "Writs commands:",
+    ["  /wlh trade : ouvre ou ferme les Writs"] = "  /wlh trade: open or close the trading post",
+    ["  /wlh trade gps : lance ou arrête la tournée GPS des writs prêts à rendre"] = "  /wlh trade gps: start or stop the GPS tour of the writs ready to turn in",
+    ["  /wlh trade stop : arrête le GPS"] = "  /wlh trade stop: stop the GPS",
+    ["  /wlh trade scan : scanne les prix de la liste d'achat à l'HV"] = "  /wlh trade scan: scan the shopping list's prices at the AH",
+    ["  /wlh trade reset : oublie les bourses mesurées et la faction"] = "  /wlh trade reset: forget the measured Coin Pouches and the faction",
+    ["Le module %s est éteint. Rallume-le dans Réglages, Général, Modules."] = "The %s module is off. Turn it back on in Settings, General, Modules.",
+    ["Mesures des bourses et faction oubliées : elles seront relevées à nouveau."] = "Coin Pouch samples and faction forgotten: they will be measured again.",
+    ["Cette liste a besoin d'un addon d'hôtel des ventes, et aucun n'est chargé."] = "This list needs an auction house addon, and none is loaded.",
+    ["Cette recherche a besoin d'un addon d'hôtel des ventes, et aucun n'est chargé."] = "This search needs an auction house addon, and none is loaded.",
+    ["Tout est déjà acheté : rien à mettre dans la liste."] = "Everything is already bought: nothing to put in the list.",
+    ["Liste d'achat « WL Helper » créée : 1 objet, avec son prix plafond."] = "Shopping list \"WL Helper\" created: 1 item, with its price ceiling.",
+    ["Liste d'achat « WL Helper » créée : %d objets, avec leur prix plafond."] = "Shopping list \"WL Helper\" created: %d items, with their price ceilings.",
+    ["L'hôtel des ventes est fermé : parle à un commissaire-priseur, puis recommence."] = "The auction house is closed: talk to an auctioneer, then try again.",
+    ["Tout est déjà acheté : rien à chercher."] = "Everything is already bought: nothing to search.",
+    ["Rien à chercher : tu as déjà tout."] = "Nothing to search: you already have everything.",
 })
 local blocked = CreateFrame("Frame")
 pcall(blocked.RegisterEvent, blocked, "ADDON_ACTION_BLOCKED")
@@ -797,7 +828,7 @@ blocked:SetScript("OnEvent", function(_, _, addon, func)
     local key = tostring(func)
     if blockedSaid[key] then return end
     blockedSaid[key] = true
-    WP.Print(string.format(L("le jeu a bloqué « %s »%s. Signale-le avec /wlh idea (bug) : la fonction est déjà dans le formulaire."),
+    WP.Print(string.format(L("Le jeu a bloqué « %s »%s. Tape /wlh idee pour le signaler : le nom de la fonction est déjà dans le formulaire."),
         tostring(func), combat and L(" en combat") or ""))
 end)
 
@@ -872,12 +903,12 @@ end)
 -- The Trading Post's words come through /wlh trade (Main.lua): /wlh trade gps, scan, stop, reset.
 
 local function Help()
-    WP.Print(L("commandes :"))
+    WP.Print(L("Commandes des Writs :"))
     for _, line in ipairs({
-        L("  /wlh trade : ouvre ou ferme la fenêtre des Writs"),
-        L("  /wlh trade gps : lance ou arrête la tournée GPS (writs prêts à rendre)"),
+        L("  /wlh trade : ouvre ou ferme les Writs"),
+        L("  /wlh trade gps : lance ou arrête la tournée GPS des writs prêts à rendre"),
         L("  /wlh trade stop : arrête le GPS"),
-        L("  /wlh trade scan : scanne la liste d'achat à l'HV"),
+        L("  /wlh trade scan : scanne les prix de la liste d'achat à l'HV"),
         L("  /wlh trade reset : oublie les bourses mesurées et la faction"),
     }) do print(line) end
 end
@@ -887,11 +918,11 @@ end
 -- The GPS has no switch: the other modules use it.
 WP.MODULES = {
     { key = "dungeons", label = "Guide de quêtes", hint = "Donjons, raids et quêtes de classe : route, flèche" },
-    { key = "writs", label = "Writs & Favor", hint = "Craftsman's Writs, liste d'achat, remise auto" },
+    { key = "writs", label = "Writs", hint = "Writs, liste d'achat et remise automatique" },
     { key = "bags", label = "Sacs", hint = "Nettoyeur des objets de quête inutiles" },
     { key = "orders", label = "Commandes", hint = "Faire fabriquer par la guilde, accepter des commandes" },
     { key = "guild", label = "Guilde", hint = "Voir toute la guilde et le classement PvP" },
-    { key = "events", label = "LFG", hint = "Donjons et raids de la guilde, groupes du moment" },
+    { key = "events", label = "Groupes", hint = "Donjons et raids de la guilde, groupes du moment" },
     { key = "upgrades", label = "Améliorations", hint = "Flèche verte sur les objets meilleurs que les tiens" },
 }
 function WP.ModuleOn(key)
@@ -905,7 +936,7 @@ end
 -- Says a module is off (and where to turn it on); true when it is off.
 function WP.ModuleOff(key)
     if WP.ModuleOn(key) then return false end
-    WP.Print(string.format(L("le module %s est éteint : Réglages, Général, Modules."), WP.ModuleLabel(key)))
+    WP.Print(string.format(L("Le module %s est éteint. Rallume-le dans Réglages, Général, Modules."), WP.ModuleLabel(key)), true)
     return true
 end
 function WP.SetModule(key, on)
@@ -970,7 +1001,7 @@ function WP.Command(msg)
         local db = WLWritsDB
         db.pouchSamples, db.pouchById, db.pouchOfTier = {}, {}, {}
         WLWritsCharDB.factionID = nil
-        WP.Print(L("mesures de bourse et faction réinitialisées."))
+        WP.Print(L("Mesures des bourses et faction oubliées : elles seront relevées à nouveau."))
     else
         Help()
     end

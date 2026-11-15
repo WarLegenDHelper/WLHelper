@@ -10,7 +10,7 @@
 --
 -- API (global table WLHelperGear)
 --
---   WLHelperGear.VERSION                      "1.0.0"
+--   WLHelperGear.VERSION                      "1.1.0"
 --   WLHelperGear.UPSTREAM                     "Geared Forever 1.1"
 --
 --   WLHelperGear.Spec() -> classToken, specKey, specName, auto
@@ -72,9 +72,24 @@
 --                top = list length (default 10), quest = include quest rewards with no
 --                level requirement (default true), show = { raid = false, ... } source filter }
 --
+--   WLHelperGear.SetOptions({ neutral =, raid =, raidAuto = })   WL Helper change (v2)
+--       neutral = true: none of the v2 changes below (Geared Forever's maths plus talents,
+--       real hit and enchants). raid = true/false: raid hit caps (17% spells, 8% melee) at
+--       58+ or dungeon caps (5% / 6%); raidAuto = true: automatic (60 once raids open).
+--   WLHelperGear.Options() -> { neutral, raid }
+--
+-- Compare result, v2 fields: notes = { "effect counted: extra attacks ...", "set bonus (2)
+-- ...: +20.1", "breaks set bonus ...", "proc not counted", "your enchant counted: Crusader" },
+-- unscored = true when the item you wear has an effect with no value (pct is then nil),
+-- setGain / setLost = set bonus score added to the new item / to what you wear (v3: score
+-- includes setGain and old includes setLost, so pct = (score - old) / old).
+-- Score's details.notes: the same item notes.
+--
 -- WL Helper changes (also marked in Engine.lua): talents and real hit read from the game,
--- enchants on equipped items counted. With none of those present the numbers are
--- Geared Forever's.
+-- enchants on equipped items counted. v2 (same day): proc and use effects, set bonuses,
+-- hit caps per kind (dungeon vs raid), tank defense cap, bear avoidance, proc enchants and
+-- percent enchants, random suffixes, unscored worn items. With none of those present the
+-- numbers are Geared Forever's.
 
 local ADDON, ns = ...
 local E = ns.engine
@@ -82,7 +97,7 @@ local E = ns.engine
 local API = {}
 WLHelperGear = API
 
-API.VERSION = "1.0.0"
+API.VERSION = "1.1.0"
 API.UPSTREAM = "Geared Forever 1.1"
 
 local STAT_NAMES = {}
@@ -205,8 +220,11 @@ function API.Score(x, level)
     local lvl = PlayerLevel(level)
     local key = CurrentSpec(cls)
     local mh, oh, rg, slowBonus, w, prefer = E.Weights(cls, key, lvl)
+    local notes
+    item, notes = E.Prepare(item, type(x) == "string" and x:find("item:") and x or nil)   -- WL Helper change (v2)
     local base = E.BaseScore(item, w)
     local details = {
+        notes = notes,
         id = item.id, name = item.name, level = lvl, class = cls.token, spec = key, sections = {},
         live = item.live == true,
     }
@@ -238,6 +256,9 @@ function API.Compare(link, level)
     local lvl = PlayerLevel(level)
     local key = CurrentSpec(cls)
     local mh, oh, rg, slowBonus, w, prefer = E.Weights(cls, key, lvl)
+    -- WL Helper change (v2): use effects from the tooltip, the link for suffix and set checks.
+    local itemNotes
+    item, itemNotes = E.Prepare(item, link)
     local base = E.BaseScore(item, w)
     local results = {}
     for _, sec in ipairs(Sections(item, cls, oh)) do
@@ -247,14 +268,20 @@ function API.Compare(link, level)
             pct = r.pct, pctExact = r.pctExact, slot = r.invSlot, section = E.SECTIONS[sec],
             equippedLink = r.equippedLink, offLink = r.offLink, empty = r.empty == true,
             equipped = r.equipped == true, blocked = r.blocked, unknown = r.unknown == true,
-            canUse = E.CanUse(item, sec, cls, lvl), score = score, old = r.old,
+            -- WL Helper change (v3): score includes setGain like old includes setLost, so
+            -- score - old matches pct.
+            canUse = E.CanUse(item, sec, cls, lvl), score = r.new or score, old = r.old,
+            -- WL Helper change (v2)
+            unscored = r.unscored == true, setGain = r.setGain, setLost = r.setLost, notes = {},
         }
+        for _, n in ipairs(itemNotes or {}) do res.notes[#res.notes + 1] = n end
+        for _, n in ipairs(r.notes or {}) do res.notes[#res.notes + 1] = n end
         results[#results + 1] = res
     end
     -- Keep the better hand: worn beats everything, then an empty slot, then the higher percent.
     local function rankOf(t)
         if t.equipped then return 4 end
-        if t.canUse ~= true or t.blocked or t.unknown then return 0 end
+        if t.canUse ~= true or t.blocked or t.unknown or t.unscored then return 0 end
         if t.empty then return 3 end
         return 2
     end
@@ -290,8 +317,20 @@ function API.Weights(level)
         class = cls.token, spec = key, level = lvl, stats = stats,
         mainHand = mh, offHand = oh, ranged = rg, slowBonus = slowBonus == true, prefer = pref,
         hitHave = { melee = E.OwnedHit("melee"), ranged = E.OwnedHit("ranged"), spell = E.OwnedHit("spell") },
+        -- WL Helper change (v2): the hit caps used and the defense read.
+        hitCap = { melee = E.HitCap(lvl, false), spell = E.HitCap(lvl, true) },
+        defense = (E.OwnedDefense()),
         talents = E.ScanTalents() ~= nil,
     }
+end
+
+-- WL Helper change (v2): scoring options. { neutral = true } turns the v2 changes off;
+-- { raid = true / false } forces raid hit caps at 58+; { raidAuto = true } goes back to
+-- automatic (level 60 once raids open on December 9, 2026). Not saved.
+function API.SetOptions(t) E.SetOptions(t) end
+function API.Options()
+    local o = E.Options()
+    return { neutral = o.neutral, raid = o.raid }
 end
 
 local SECTION_BY_NAME = {}

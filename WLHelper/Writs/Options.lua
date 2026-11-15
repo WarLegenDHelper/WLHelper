@@ -1,6 +1,7 @@
--- Writs/Options.lua: WL Helper's options window (/wlh options), one place for the dungeon guide, the
--- Comptoir (Craftsman's Writs), the GPS and the bag cleaner. A 720x600 window: pages listed on the
--- left, rows of "label left, control right" on the right, built lazily the first time it opens.
+-- Writs/Options.lua: WL Helper's Settings window (/wlh options): one place for the quest guide, the
+-- trading post (Writs), the GPS, the bags and the upgrades. A 640 px window: pages listed on the
+-- left under a search box, settings cards on the right (label and description on the left, control
+-- on the right), built lazily the first time it opens. The window fits the page it shows.
 -- Also registers WL Helper in the game's own settings (Esc > Options > AddOns) and, when present,
 -- as an EllesmereUI plugin, both pointing back to this window.
 local ADDON, root = ...
@@ -8,121 +9,169 @@ root.Writs = root.Writs or {}
 local ns = root.Writs
 local L = ns.L
 local S = ns.S
-local C = S.C
+local T = S.C
+local F = root.F
 
 ns.AddEnglish({
-    -- window and pages
-    ["Options"] = "Options",
-    ["Général"] = "General", ["Donjons"] = "Dungeons", ["Writs & Favor"] = "Writs & Favor", ["GPS"] = "GPS",
-    ["Sacs"] = "Bags", ["À propos"] = "About",
-    ["Rendre les caisses automatiquement"] = "Hand in crates automatically",
-    ["en parlant à Dokimi ou à Marcy Baker"] = "when talking to Dokimi or Marcy Baker",
-    ["Clics"] = "Clicks",
-    ["Alt-clic pour inviter (chat)"] = "Alt-click to invite (chat)",
-    ["Alt-clic pour inviter (monde, portraits)"] = "Alt-click to invite (world, portraits)",
-    ["Lien [Inviter] sur les demandes"] = "[Invite] link on requests",
-    ["Clic droit pour tirer"] = "Right-click to shoot",
-    ["Touche à tenir"] = "Key to hold",
-    ["Déjà fait par %s"] = "Already done by %s",
-    ["Chercher un réglage"] = "Search settings",
+    -- window, nav and search
+    ["Réglages"] = "Settings",
+    ["Général"] = "General", ["Donjons"] = "Dungeons", ["Writs"] = "Writs", ["GPS"] = "GPS",
+    ["Sacs"] = "Bags", ["Améliorations"] = "Upgrades", ["À propos"] = "About",
+    ["Modules, clics, langue et fenêtres."] = "Modules, clicks, language and windows.",
+    ["La flèche, les alertes et les quêtes que montre le guide."] = "The guide's arrow, its alerts and the quests it shows.",
+    ["Remise des Writs, rappels, objectif et zones."] = "Writ turn-in, reminders, goal and zones.",
+    ["Itinéraire, vols, téléportations et flèche."] = "Route, flights, teleports and the arrow.",
+    ["Place dans les sacs et vente des objets gris."] = "Bag space and selling grey items.",
+    ["Calcul, spé et affichage des améliorations."] = "How upgrades are judged, the spec and the display.",
+    ["Version, crédits, contact et commandes du chat."] = "Version, credits, contact and chat commands.",
+    ["Clic : afficher ces réglages"] = "Click: show these settings",
+    ["Ex. flèche"] = "E.g. arrow",
     ["Effacer la recherche"] = "Clear search",
-    ["Aucun réglage ne correspond à « %s »."] = "No setting matches \"%s\".",
-    ["%d réglages · flèches haut / bas pour choisir, Entrée pour ouvrir"] = "%d settings · up / down arrows to choose, Enter to open",
-    ["1 réglage · Entrée pour l'ouvrir"] = "1 setting · Enter to open it",
-    ["Ce module est éteint."] = "This module is off.",
+    ["Aucun réglage pour « %s »"] = "No setting for \"%s\"",
+    ["Essaie un autre mot, en français ou en anglais."] = "Try another word, in English or in French.",
+    ["1 réglage trouvé"] = "1 setting found",
+    ["%d réglages trouvés"] = "%d settings found",
+    ["Entrée pour l'ouvrir."] = "Press Enter to open it.",
+    ["Flèches haut et bas pour choisir, Entrée pour ouvrir."] = "Up and down arrows to choose, Enter to open.",
+    ["Clic : afficher ce réglage"] = "Click: show this setting",
+    ["Clic : activer"] = "Click: turn on",
+    ["Clic : désactiver"] = "Click: turn off",
+    -- module cards
     ["Ouvrir le guide"] = "Open the guide",
-    ["Ouvrir les Writs"] = "Open Writs",
-    ["Ouvrir le nettoyeur"] = "Open the cleaner",
-    ["Writs et Faveur du marchand"] = "Writs & Merchant's Favor",
-    ["Writs et Faveur"] = "Writs & Favor",
-    ["Modules"] = "Modules",
-    ["Guide des quêtes de donjon, route, flèche"] = "Dungeon quest guide, route, arrow",
-    ["Donjons, raids et quêtes de classe : route, flèche"] = "Dungeons, raids and class quests: route, arrow",
-    ["Guide de quêtes"] = "Quest guide",
-    ["Donjons · Raids · Classe"] = "Dungeons · Raids · Class",
-    ["Craftsman's Writs, liste d'achat, remise auto"] = "Craftsman's Writs, shopping list, auto turn-in",
-    ["Nettoyeur des objets de quête inutiles"] = "Cleaner for quest items you no longer need",
-    ["Faire fabriquer par la guilde, accepter des commandes"] = "Have the guild craft for you, take orders",
-    ["Le GPS reste toujours actif : les autres modules s'en servent.\nRallumer un module est immédiat, sans /reload."] =
-        "The GPS always stays on: the other modules use it.\nTurning a module back on is immediate, no /reload.",
-    ["le module %s est éteint : Réglages › Général › Modules."] = "the %s module is off: Settings › General › Modules.",
-    ["éteint"] = "off",
-    ["Allumer"] = "Turn on",
-    ["Zones où je vais"] = "Zones I go to",
-    ["Un writ précis : clic droit dessus dans « Tous les writs »."] = "A single writ: right-click it in \"All writs\".",
-    ["Écris-nous (lien à copier dans ton navigateur)"] = "Write to us (a link to copy into your browser)",
+    ["Ouvrir les Writs"] = "Open the Writs window",
+    ["Allumer le module"] = "Turn the module on",
+    ["Éteint : il ne montre plus rien. Tes réglages sont gardés."] = "Off: it shows nothing. Your settings are kept.",
+    ["Groupes de la guilde"] = "Guild groups",
+    ["Le guide des quêtes de donjon, de raid et de classe, avec la route et la flèche."] =
+        "The dungeon, raid and class quest guide, with the route and the arrow.",
+    ["Les Writs à faire, la liste d'achat et la remise automatique."] = "The Writs to do, the shopping list and automatic turn-in.",
+    ["Repère les objets de quête qui ne servent plus et libère de la place."] = "Finds quest items you no longer need and frees up space.",
+    ["Demande un objet à un artisan de la guilde, ou prends les commandes des autres."] =
+        "Ask a guild crafter for an item, or take other people's orders.",
+    ["Toute la guilde et le classement PvP."] = "The whole guild and the PvP ranking.",
+    ["Les événements de la guilde et les groupes du moment."] = "Guild events and the groups forming now.",
+    ["Une flèche verte sur les objets meilleurs que ceux que tu portes."] = "A green arrow on items better than the ones you wear.",
     -- General
-    ["Langue"] = "Language", ["Automatique"] = "Automatic", ["Français"] = "Français", ["English"] = "English",
-    ["Auto suit la langue du client.\nLes fenêtres déjà ouvertes changent après un /reload."] =
-        "Auto follows the client's language.\nWindows already open change after a /reload.",
+    ["Modules"] = "Modules",
+    ["Le GPS reste toujours allumé : les autres modules s'en servent. Un module rallumé revient tout de suite, sans /reload."] =
+        "The GPS always stays on: the other modules use it. A module turned back on comes back right away, no /reload needed.",
+    ["Clics"] = "Clicks",
+    ["Alt-clic sur un nom dans le chat"] = "Alt-click a name in chat",
+    ["Invite ce joueur dans ton groupe."] = "Invites that player to your group.",
+    ["Alt-clic sur un joueur ou un portrait"] = "Alt-click a player or a portrait",
+    ["Invite le joueur, dans le monde ou depuis son portrait."] = "Invites that player, in the world or from their portrait.",
+    ["Lien [Inviter] dans le chat"] = "[Invite] link in chat",
+    ["Ajouté aux messages qui demandent une invitation, comme « inv »."] = "Added to messages that ask for an invite, like \"inv\".",
+    ["Clic droit pour tirer"] = "Right-click to shoot",
+    ["Sur un ennemi, lance ton tir à distance : arc, fusil, arbalète, arme de jet ou baguette."] =
+        "On an enemy, starts your ranged attack: bow, gun, crossbow, thrown weapon or wand.",
+    ["Touche pour tirer"] = "Key to shoot",
+    ["Garde-la enfoncée, puis fais un clic droit sur l'ennemi. Avec « Aucune », le clic droit seul tire."] =
+        "Hold it down, then right-click the enemy. With \"None\", right-click alone shoots.",
+    ["Un autre addon le fait déjà : ce réglage reste sans effet."] = "Another addon already does this: this setting has no effect.",
+    ["Langue"] = "Language",
+    ["Langue de l'addon"] = "Addon language",
+    ["Automatique"] = "Automatic", ["Français"] = "Français", ["English"] = "English",
+    ["Automatique suit la langue du jeu. Les fenêtres déjà ouvertes changent après un /reload."] =
+        "Automatic follows the game's language. Windows already open change after a /reload.",
+    ["Police"] = "Font",
+    ["Police des textes"] = "Text font",
+    ["Police du jeu"] = "Game font",
+    ["Si des textes restent vides, reviens à celle du jeu."] = "If some texts stay blank, go back to the game's font.",
     ["Fenêtres"] = "Windows",
     ["Bouton de la minimap"] = "Minimap button",
-    ["Rouvrir le guide au chargement"] = "Reopen the guide on login",
-    ["même si tu l'avais fermé"] = "even if you closed it",
+    ["Ouvre l'Accueil de WL Helper d'un clic."] = "Opens the WL Helper Home in one click.",
+    ["Rouvrir le guide à la connexion"] = "Reopen the guide on login",
+    ["Même si tu l'avais fermé avant de te déconnecter."] = "Even if you closed it before logging out.",
     -- Dungeons
-    ["Guide"] = "Guide",
-    ["Flèche des donjons"] = "Dungeon arrow",
-    ["Guide automatique des points"] = "Automatic waypoint guide",
-    ["Quêtes répétables et de métiers que tu n'as pas"] = "Repeatable quests and quests of professions you don't have",
+    ["Guide de quêtes"] = "Quest guide",
+    ["Réglages du guide"] = "Guide settings",
+    ["Flèche du guide"] = "Guide arrow",
+    ["Le GPS te mène à la prochaine étape du guide."] = "The GPS leads you to the guide's next step.",
+    ["Alerte des monstres rares"] = "Rare monster alert",
+    ["Dans un donjon, un message et un son quand un monstre rare apparaît."] = "In a dungeon, a message and a sound when a rare monster shows up.",
+    ["Points GPS à chaque étape"] = "GPS points at each step",
+    ["Les points de l'étape en cours sont posés tout seuls quand une nouvelle étape commence."] =
+        "The current step's points are set on their own when a new step starts.",
+    ["Quêtes répétables ou d'un autre métier"] = "Repeatable or other-profession quests",
+    ["Masquées, elles sortent de la route et du compte de quêtes de chaque donjon."] =
+        "When hidden, they leave the route and each dungeon's quest count.",
     ["Masquer"] = "Hide", ["Afficher"] = "Show",
-    ["Masquées, elles ne sont ni dans la route ni dans le décompte des quêtes de chaque donjon."] = "Hidden, they are neither in the route nor counted in each dungeon's quests.",
-    ["Toutes"] = "All", ["Utiles"] = "Useful",
-    -- Comptoir
+    -- Writs
     ["Automatismes"] = "Automation",
-    ["Rendre les writs automatiquement"] = "Turn in writs automatically",
+    ["Rendre les Writs automatiquement"] = "Turn in Writs automatically",
+    ["Rendre les caisses automatiquement"] = "Turn in crates automatically",
+    ["En parlant à Dokimi ou à Marcy Baker."] = "When you talk to Dokimi or Marcy Baker.",
     ["Accepter la quête en ouvrant l'enveloppe"] = "Accept the quest when opening the envelope",
-    ["Rescanner en ouvrant l'HV"] = "Rescan when the AH opens",
-    ["fenêtre Writs ouverte, prix de plus d'une heure"] = "Writs window open, prices over an hour old",
+    ["Scanner l'HV à son ouverture"] = "Scan the AH when it opens",
+    ["Seulement si la fenêtre Writs est ouverte et que les prix ont plus d'une heure."] =
+        "Only when the Writs window is open and prices are over an hour old.",
     ["Infos"] = "Info",
     ["Rappel à la connexion"] = "Reminder on login",
-    ["« 3 prêts, 1 enveloppe à ouvrir »"] = "\"3 ready, 1 envelope to open\"",
-    ["Infobulle des enveloppes"] = "Envelope tooltip",
-    ["réputation, coût, à qui le rendre, déjà rendu"] = "reputation, cost, who to hand it to, already handed in",
+    ["Par exemple : « 3 Writs prêts à rendre, 1 enveloppe à ouvrir »."] = "For example: \"3 Writs ready to turn in, 1 envelope to open\".",
+    ["Détails dans l'infobulle des enveloppes"] = "Details in envelope tooltips",
+    ["Réputation, coût, à qui la rendre, et si tu l'as déjà rendue."] = "Reputation, cost, who to hand it to, and whether you already turned it in.",
     ["Plan"] = "Plan",
-    ["Objectif"] = "Goal", ["Rang suivant"] = "Next standing",
-    ["Masquer les zones trop hautes"] = "Hide zones too high",
+    ["Objectif de réputation"] = "Reputation goal",
+    ["Le plan achète les Writs qu'il faut pour l'atteindre."] = "The plan buys the Writs needed to reach it.",
+    ["Rang suivant"] = "Next standing",
+    ["Masquer les zones trop hautes"] = "Hide zones above your level",
+    ["Les zones au-dessus de ton niveau sortent du plan."] = "Zones above your level leave the plan.",
+    ["Zones du plan"] = "Zones in the plan",
+    ["niv. %d+"] = "lvl %d+",
+    ["Pour écarter un seul Writ : clic droit dessus dans l'onglet « Tous les writs » des Writs."] =
+        "To set aside a single Writ: right-click it in the Writs window's \"All writs\" tab.",
     -- GPS
     ["Itinéraire"] = "Route",
-    ["WL Helper"] = "WL Helper", ["Zygor"] = "Zygor", ["Zygor, absent"] = "Zygor, not installed",
-    ["Automatique prend Zygor s'il est installé, sinon notre GPS."] = "Automatic uses Zygor when it is installed, otherwise our GPS.",
+    ["Calcul de l'itinéraire"] = "Route planner",
+    ["WL Helper"] = "WL Helper", ["Zygor"] = "Zygor",
+    ["Pas installé"] = "Not installed",
+    ["Automatique prend Zygor quand il est installé, sinon le GPS de WL Helper."] =
+        "Automatic uses Zygor when it is installed, otherwise the WL Helper GPS.",
     ["Trajet"] = "Travel",
     ["Utiliser mes téléportations"] = "Use my teleports",
     ["Choisir le vol automatiquement"] = "Pick the flight automatically",
-    ["Points de vol"] = "Flight paths", [" connus"] = " known",
+    ["Chez le maître de vol, le bon trajet est choisi pour toi."] = "At the flight master, the right route is picked for you.",
+    ["Points de vol connus"] = "Known flight paths",
+    ["Ceux que ce personnage a déjà découverts."] = "The ones this character has already discovered.",
+    ["Distances en yards"] = "Distances in yards",
+    ["Sinon en mètres et en kilomètres."] = "Otherwise in meters and kilometers.",
     ["Flèche"] = "Arrow",
-    ["Taille"] = "Size", ["Opacité du fond"] = "Background opacity",
+    ["Taille de la flèche"] = "Arrow size",
+    ["Opacité du fond"] = "Background opacity",
+    ["%d %%"] = "%d%%",
     ["Masquer en combat"] = "Hide in combat",
-    ["Position"] = "Position", ["Déplacer la flèche"] = "Move the arrow",
+    ["Position de la flèche"] = "Arrow position",
+    ["Fais-la glisser où tu veux à l'écran."] = "Drag it anywhere on the screen.",
+    ["Déplacer la flèche"] = "Move the arrow",
     -- Bags
-    ["Nettoyage"] = "Cleanup",
-    ["Objets de quête inutiles"] = "Useless quest items", ["Voir"] = "Show",
-    ["Les objets qui lancent une quête ne sont jamais proposés."] = "Items that start a quest are never offered.",
-    -- About
-    ["Version"] = "Version", ["Auteur"] = "Author", ["Logo"] = "Logo",
-    ["WaR LegenD (War Legend Raid Tool)"] = "WaR LegenD (War Legend Raid Tool)",
-    ["Crédits"] = "Credits",
-    ["Sources et remerciements : voir CREDITS.txt dans le dossier de l'addon."] =
-        "Sources and thanks: see CREDITS.txt in the addon's folder.",
-    ["GitHub"] = "GitHub", ["Clique puis Ctrl+C pour copier"] = "Click, then Ctrl+C to copy",
-    ["Commandes du chat"] = "Chat commands",
-    ["Quêtes de donjon"] = "Dungeon quests",
-    ["Améliorations"] = "Upgrades",
-    ["Spé"] = "Spec",
-    ["Calcul"] = "Calculation",
-    ["Geared Forever si installé"] = "Geared Forever if installed",
-    ["Geared Forever classe plus finement (par tranche de niveaux et par spé) : quand il est installé, son verdict est lu directement"] = "Geared Forever ranks more finely (per level range and spec): when it is installed, its verdict is read directly",
-    ["Affichage"] = "Display",
-    ["Flèche à partir de"] = "Arrow from",
-    ["Le gain minimum pour montrer la flèche dans les sacs"] = "The smallest gain that shows the arrow in your bags",
-    ["Distances en yards (sinon mètres et km)"] = "Distances in yards (otherwise meters and km)",
-    ["Masquer le bloc Geared Forever des infobulles (même %)"] = "Hide the Geared Forever block in tooltips (same %)",
     ["Place dans les sacs"] = "Bag space",
-    ["Proposer de libérer une place quand les sacs sont pleins"] = "Offer to free a slot when the bags are full",
-    ["Vendre les objets gris chez les marchands"] = "Sell grey items at merchants",
-    ["EllesmereUI vend déjà tes gris : WL Helper le laisse faire."] = "EllesmereUI already sells your greys: WL Helper leaves it to it.",
-    ["Libérer une place jette l'objet le moins cher : gris, ou arme et armure blanches. Rien d'autre. /wlh free"] = "Free a slot throws away the cheapest item: grey, or a white weapon or armour. Nothing else. /wlh free",
+    ["Proposer de libérer une place"] = "Offer to free a slot",
+    ["Quand tes sacs sont pleins, WL Helper propose de jeter l'objet le moins cher : un gris, ou une arme ou une armure blanche."] =
+        "When your bags are full, WL Helper offers to throw away the cheapest item: a grey, or a white weapon or armor.",
+    ["Vendre les gris chez les marchands"] = "Sell greys at merchants",
+    ["Dès que tu ouvres la fenêtre d'un marchand."] = "As soon as you open a merchant's window.",
+    ["Un autre de tes addons les vend déjà : WL Helper le laisse faire."] = "Another of your addons already sells them: WL Helper lets it.",
+    ["Le nettoyeur ne propose jamais un objet qui lance une quête. Pour libérer une place à la main, tape /wlh free."] =
+        "The cleaner never offers an item that starts a quest. To free a slot by hand, type /wlh free.",
+    -- Upgrades
+    ["Calcul"] = "Calculation",
+    ["Méthode de calcul"] = "Method",
+    ["Poids WL Helper"] = "WL Helper weights",
+    ["Prend les classements de ton addon d'équipement s'il y en a un, sinon les poids de WL Helper."] =
+        "Uses your gear addon's rankings when you have one, otherwise WL Helper's weights.",
+    ["Spé"] = "Spec",
+    ["Spé évaluée"] = "Rated spec",
+    ["Auto"] = "Auto",
+    ["Auto : l'arbre de talents où tu as le plus de points."] = "Auto: the talent tree with the most points.",
+    ["Affichage"] = "Display",
+    ["Flèche à partir de"] = "Show the arrow from",
+    ["Le gain minimum pour mettre la flèche sur un objet."] = "The smallest gain that puts the arrow on an item.",
     ["Ligne dans les infobulles d'objet"] = "Line in item tooltips",
-    ["Poids utilisés (%s, niveaux %s)"] = "Weights used (%s, levels %s)",
+    ["Le gain ou la perte pour ta spé, et l'objet qu'il remplacerait."] = "The gain or loss for your spec, and the item it would replace.",
+    ["Masquer le bloc en double des infobulles"] = "Hide the duplicate tooltip block",
+    ["Quand ton addon d'équipement affiche déjà le même pourcentage."] = "When your gear addon already shows the same percentage.",
+    ["Poids utilisés : %s, niveaux %s"] = "Weights used: %s, levels %s",
     ["Dégâts des sorts"] = "Spell damage", ["Soins"] = "Healing", ["Intelligence"] = "Intellect", ["Esprit"] = "Spirit",
     ["Endurance"] = "Stamina", ["Force"] = "Strength", ["Agilité"] = "Agility", ["Puissance d'attaque"] = "Attack power",
     ["Puissance d'attaque à distance"] = "Ranged attack power", ["Critique (1 %)"] = "Crit (1%)",
@@ -130,23 +179,44 @@ ns.AddEnglish({
     ["Mana toutes les 5 s"] = "Mana per 5 s", ["Armure"] = "Armor", ["Défense"] = "Defense", ["Esquive (1 %)"] = "Dodge (1%)",
     ["Parade (1 %)"] = "Parry (1%)", ["Blocage (1 %)"] = "Block (1%)", ["Valeur de blocage"] = "Block value",
     ["Dégâts par seconde de l'arme"] = "Weapon damage per second",
-    ["Les poids sont ceux de WL Helper : par classe et par spé, ajustés à ta tranche de niveaux (1-20, 21-40, 41-59, 60). Les dégâts d'une école de magie comptent selon ta spé. Un objet que ta classe ne peut pas porter n'a pas de flèche."] =
-        "These are WL Helper's weights: per class and spec, adjusted to your level bracket (1-20, 21-40, 41-59, 60). One school's spell damage counts for your spec. An item your class can't wear gets no arrow.",
-    ["Police"] = "Font",
-    ["Du jeu"] = "The game's",
-    ["Celle d'EllesmereUI peut laisser des textes vides sur certaines installations"] = "EllesmereUI's may leave some texts blank on some installs",
-    ["Spé jugée"] = "Spec judged",
-    ["Auto : l'arbre de talents où tu as le plus de points"] = "Auto: the talent tree with the most points",
-    ["Auto"] = "Auto",
-    ["Alerte des monstres rares"] = "Rare monster alert",
-    ["Dans un donjon, un message et un son quand un monstre rare apparaît"] = "In a dungeon, a message and a sound when a rare monster shows up",
+    ["Ces poids sont ceux de WL Helper, par classe et par spé, ajustés à ta tranche de niveaux (1-20, 21-40, 41-59, 60). Les dégâts d'une école de magie comptent selon ta spé. Un objet que ta classe ne peut pas porter n'a pas de flèche."] =
+        "These are WL Helper's weights, per class and spec, adjusted to your level range (1-20, 21-40, 41-59, 60). One school's spell damage counts according to your spec. An item your class can't wear gets no arrow.",
+    -- About
+    ["Version %s"] = "Version %s",
+    ["Pour la guilde WaR LegenD."] = "For the WaR LegenD guild.",
+    ["Crédits"] = "Credits",
+    ["Auteur"] = "Author", ["Logo"] = "Logo",
+    ["WaR LegenD (War Legend Raid Tool)"] = "WaR LegenD (War Legend Raid Tool)",
+    ["Code source"] = "Source code",
+    ["Clique sur le lien, puis Ctrl+C pour le copier."] = "Click the link, then Ctrl+C to copy it.",
+    ["Clic : sélectionner le lien"] = "Click: select the link",
+    ["Sources et remerciements : le fichier CREDITS.txt dans le dossier de l'addon."] =
+        "Sources and thanks: the CREDITS.txt file in the addon's folder.",
+    ["Dis-nous ce qui manque ou ce qui coince. Chaque bouton t'affiche un lien à ouvrir dans ton navigateur."] =
+        "Tell us what's missing or broken. Each button gives you a link to open in your browser.",
+    ["Commandes du chat"] = "Chat commands",
     -- game settings and EllesmereUI
-    ["Guide des donjons, Craftsman's Writs et GPS intégré."] = "Dungeon guide, Craftsman's Writs and a built-in GPS.",
-    ["Ouvrir les options"] = "Open the options",
-    ["Réglages principaux. Le reste est dans la fenêtre d'options de WL Helper."] =
-        "Main settings. Everything else is in WL Helper's options window.",
-    ["Utiliser Zygor si présent"] = "Use Zygor when installed",
+    ["Le guide de quêtes, les Writs, le GPS et les outils de la guilde WaR LegenD."] =
+        "The quest guide, the Writs window, the GPS and the WaR LegenD guild tools.",
+    ["Ouvrir les réglages"] = "Open settings",
+    ["Les réglages les plus utilisés. Tous les autres sont dans la fenêtre Réglages de WL Helper."] =
+        "The most used settings. All the others are in WL Helper's Settings window.",
+    ["Utiliser Zygor quand il est installé"] = "Use Zygor when it is installed",
     ["Masquer la flèche en combat"] = "Hide the arrow in combat",
+    -- names read through WP.MODULES (Core.lua) and older keys other windows still use
+    ["Guide des quêtes de donjon, route, flèche"] = "Dungeon quest guide, route, arrow",
+    ["Donjons, raids et quêtes de classe : route, flèche"] = "Dungeons, raids and class quests: route, arrow",
+    ["Craftsman's Writs, liste d'achat, remise auto"] = "Craftsman's Writs, shopping list, auto turn-in",
+    ["Nettoyeur des objets de quête inutiles"] = "Cleaner for quest items you no longer need",
+    ["Faire fabriquer par la guilde, accepter des commandes"] = "Have the guild craft for you, take orders",
+    ["Writs et Faveur du marchand"] = "Writs & Merchant's Favor",
+    ["Writs et Faveur"] = "Writs & Favor",
+    ["éteint"] = "off",
+    ["Allumer"] = "Turn on",
+    ["Options"] = "Options",
+    ["Donjons · Raids · Classe"] = "Dungeons · Raids · Class",
+    ["Version"] = "Version", ["Voir"] = "Show",
+    ["Writs & Favor"] = "Writs & Favor",
 })
 
 -- ---------------------------------------------------------------- settings access
@@ -157,6 +227,8 @@ local function Comfort() local db = Writs(); db.comfort = db.comfort or {}; retu
 local function Guide() WLDTDB = WLDTDB or {}; return WLDTDB end
 
 local function ZygorPresent() return (ZGV and ZGV.Pointer) and true or false end
+local function secret(v) return root.IsSecret and root.IsSecret(v) end
+local function num(v) return type(v) == "number" and not secret(v) and v or nil end
 
 -- After a change: redraw what depends on it, each call only if that module provides it.
 local function RefreshWrits() if ns.WP and ns.WP.Refresh then ns.WP.Refresh() end end
@@ -185,61 +257,28 @@ end
 local function SetComfort(key) return function(v) Comfort()[key] = v; RefreshWrits() end end
 local function SetGps(key) return function(v) Gps()[key] = v; ApplyLook() end end
 
--- ---------------------------------------------------------------- page layout
-
-local WIN_W, WIN_H, NAV_W = 720, 600, 170
-local CONTENT_W = WIN_W - 2 - NAV_W - 1   -- window border, nav, nav divider
-local PAD_X, PAD_TOP, ROW_H, SECTION_GAP = 22, 18, 48, 20
-
--- A page is a frame filling the content area; rows are stacked from the top with p.y as cursor.
--- Every control added with Row() is re-synced (:Update or :Sync) when the page is shown.
--- A page scrolls when it is taller than the window (the zone list of the Trading Post page).
--- p is the scrolled content; showing or hiding it shows or hides its scroll frame.
-local function NewPage(parent)
-    local sf = CreateFrame("ScrollFrame", nil, parent)
-    sf:SetAllPoints()
-    sf:Hide()
-    local p = CreateFrame("Frame", nil, sf)
-    p:SetSize(WIN_W - NAV_W - 2, 10)
-    sf:SetScrollChild(p)
-    sf:EnableMouseWheel(true)
-    -- a thin thumb on the right says there is more below
-    local thumb = S.Solid(sf, "OVERLAY", C.muted, 0.8)
-    thumb:SetWidth(3)
-    local function Thumb()
-        local view, total = sf:GetHeight(), p:GetHeight()
-        if not view or view <= 0 or total <= view + 1 then thumb:Hide(); return end
-        local h = math.max(24, view * view / total)
-        local off = sf:GetVerticalScroll() / (total - view)
-        thumb:ClearAllPoints()
-        thumb:SetPoint("TOPRIGHT", sf, "TOPRIGHT", -3, -(view - h) * off)
-        thumb:SetHeight(h); thumb:Show()
-    end
-    sf:SetScript("OnMouseWheel", function(self, delta)
-        local max = math.max(0, p:GetHeight() - self:GetHeight())
-        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * 40)))
-        Thumb()
-    end)
-    sf:SetScript("OnShow", Thumb)
-    sf:SetScript("OnSizeChanged", Thumb)
-    p.sf = sf
-    function p:Show() sf:SetVerticalScroll(0); sf:Show() end
-    function p:Hide() sf:Hide() end
-    function p:SetShown(v) if v then self:Show() else sf:Hide() end end
-    function p:IsShown() return sf:IsShown() end
-    p.y, p.controls, p.first = -PAD_TOP, {}, true
-    p:SetScript("OnShow", function(self)
-        for _, c in ipairs(self.controls) do
-            if c.Sync then c:Sync() elseif c.Update then c:Update() end
-        end
-    end)
-    return p
+-- "1,5" in French, "1.5" in English
+local function Decimal(v)
+    local s = string.format("%.2f", v)
+    if not (ns.English and ns.English()) then s = s:gsub("%.", ",") end
+    return s
 end
 
+-- ---------------------------------------------------------------- layout constants
+
+local WIN_W, NAV_W = 640, 168
+local CONTENT_W = WIN_W - NAV_W - 1        -- the content column, right of the nav and its rule
+local INSET = 16                           -- one left edge, one right edge
+local CARD_W = CONTENT_W - 2 * INSET       -- a settings card
+local NAV_ITEM_H, NAV_GAP, NAV_TOP = 32, 2, 12 + 28 + 12
+local PAGE_COUNT = 7
+local NAV_H = NAV_TOP + PAGE_COUNT * NAV_ITEM_H + (PAGE_COUNT - 1) * NAV_GAP + 12
+local HEADER_H = 44
+
 -- ---------------------------------------------------------------- search index
--- Every row registers its page, section, label and hint while the pages are built. Text is matched
--- lower-cased and without accents, in both languages (the French key and its English text), plus a
--- few keywords, so "arrow", "fleche" and "flèche" all find the arrow settings.
+-- Every row registers its page, section, label and description while the pages are built. Text is
+-- matched lower-cased and without accents, in both languages (the French key and its English text),
+-- plus a few keywords, so "arrow", "fleche" and "flèche" all find the arrow settings.
 local INDEX = {}
 local BuildSearch   -- defined after ShowPage; builds the search box into the nav
 
@@ -267,143 +306,330 @@ end
 local KEYWORDS = {
     arrow = "fleche pointeur", fleche = "arrow pointeur", flight = "vol taxi", vol = "flight taxi",
     teleport = "teleportation portail mage", zygor = "guide pointeur", tooltip = "infobulle",
-    infobulle = "tooltip", writ = "enveloppe", minimap = "carte bouton", langue = "language english francais",
+    infobulle = "tooltip", writ = "enveloppe comptoir", minimap = "carte bouton", langue = "language english francais",
     language = "langue", sac = "bags clean nettoyeur", bags = "sacs nettoyeur", reglage = "settings options",
     commande = "orders artisan metier", orders = "commandes", guilde = "guild classement pvp",
-    groupe = "lfg events sorties donjon raid", lfg = "groupes events", spe = "spec talents poids amelioration",
+    groupe = "lfg events evenement donjon raid", lfg = "groupes events", spe = "spec talents poids amelioration",
     spec = "spe talents", stuff = "ameliorations upgrades equipement", son = "sound alerte", alerte = "rare sound son",
     caisse = "crates faveur favor", faveur = "favor caisses", hv = "hotel des ventes auction scan prix",
-    prix = "price scan hv", police = "font", font = "police",
+    prix = "price scan hv", police = "font", font = "police", comptoir = "writs trading post",
+    invite = "inviter inv clic", inviter = "invite inv", tir = "shoot tirer", shoot = "tirer tir",
 }
 
 local function Register(p, row, label, hint)
     local section = p.section or ""
     local text = table.concat({ label or "", OtherLanguage(label), hint or "", OtherLanguage(hint),
         section, OtherLanguage(section), p.pageLabel or "", OtherLanguage(p.pageLabel) }, " ")
-    INDEX[#INDEX + 1] = { page = p.key, pageLabel = p.pageLabel, pageIcon = p.pageIcon, section = section, label = label, hint = hint,
-        row = row, y = -select(5, row:GetPoint(1)), labelFold = Fold(label .. " " .. OtherLanguage(label)), all = Fold(text) }
+    INDEX[#INDEX + 1] = { page = p.key, pageLabel = p.pageLabel, pageIcon = p.pageIcon, section = section,
+        label = label, hint = hint, row = row,
+        labelFold = Fold((label or "") .. " " .. OtherLanguage(label)), all = Fold(text) }
 end
 
--- The last row of a section has no divider under it.
-local function CloseSection(p)
-    if p.lastRow then p.lastRow.divider:Hide(); p.lastRow = nil end
+-- ---------------------------------------------------------------- pages
+-- A page is the scrolled child of a scroll area filling the content column. Its items (section
+-- headers, settings cards, notes, module card, free blocks) are stacked by p:Layout(), which measures
+-- every text at its width and returns the page height; the window then fits it.
+
+local function NewPage(parent)
+    local sa = S.ScrollArea(parent)
+    sa:SetAllPoints()
+    sa:Hide()
+    local p = sa.child
+    p:SetWidth(CONTENT_W)
+    p.sa = sa
+    p.items, p.controls = {}, {}
+    function p:Show() sa:Show(); sa:ScrollTo(0, true) end
+    function p:Hide() sa:Hide() end
+    function p:SetShown(v) if v then self:Show() else sa:Hide() end end
+    function p:IsShown() return sa:IsShown() end
+    -- every control re-reads its value when the page shows
+    function p:Sync()
+        for _, c in ipairs(self.controls) do
+            if c.Sync then c:Sync() elseif c.Update then c:Update() end
+        end
+    end
+    function p:Layout()
+        local y = 0
+        for i, it in ipairs(self.items) do
+            local gap = it.gap
+            if gap == nil then gap = 12 end
+            if i == 1 then gap = (it.kind == "head") and 8 or 12 end
+            y = y + gap
+            it.frame:ClearAllPoints()
+            it.frame:SetPoint("TOPLEFT", self, "TOPLEFT", INSET, -y)
+            it.frame:SetWidth(CARD_W)
+            it.y = y
+            y = y + (it.Layout(CARD_W, y) or 0)
+        end
+        y = math.ceil(y + 16)
+        self.contentH = y
+        sa:SetContentHeight(y)
+        return y
+    end
+    return p
 end
 
+local function Add(p, frame, layout, kind, gap)
+    local it = { frame = frame, Layout = layout, kind = kind, gap = gap }
+    p.items[#p.items + 1] = it
+    return it
+end
+
+-- Section header: label 13 fg, 1 px divider under it. A settings card follows (opened by Row).
 local function Section(p, text)
-    CloseSection(p)
-    if not p.first then p.y = p.y - SECTION_GAP end
-    p.first = false
-    local fs = S.Section(p, text)
-    fs:SetPoint("TOPLEFT", PAD_X, p.y)
-    p.y = p.y - 18
+    p.card = nil
     p.section = text
+    local h = S.SectionHeader(p, text)
+    Add(p, h, function() return 32 end, "head", 16)
 end
 
--- One dim line (or a few, wrapped) under the cursor.
-local function Note(p, text, gapBefore)
-    if gapBefore then p.y = p.y - gapBefore end
-    local fs = S.Text(p, 13, C.dim)
-    fs:SetPoint("TOPLEFT", PAD_X, p.y)
-    fs:SetWidth(CONTENT_W - 2 * PAD_X)   -- a fixed width so the wrapped height is known right away
-    fs:SetJustifyH("LEFT")
-    fs:SetJustifyV("TOP")
+-- One explanatory paragraph under a card: 11 muted, wraps without a line limit.
+local function Note(p, text, size, color)
+    p.card = nil
+    local holder = CreateFrame("Frame", nil, p)
+    local fs = S.Text(holder, size or F.meta, color or T.muted)
+    fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
     fs:SetWordWrap(true)
+    fs:SetPoint("TOPLEFT", 0, 0)
     fs:SetText(text)
-    p.y = p.y - math.max(16, math.ceil(fs:GetStringHeight() or 16)) - 2
-    p.first = false
+    holder.text = fs
+    Add(p, holder, function(width)
+        local h = root.FitText(fs, 0, width, holder)
+        h = math.max(h, size and size + 2 or 13)
+        holder:SetHeight(h)
+        return h
+    end, "note", 8)
     return fs
 end
 
--- A 48 px row: label on the left, an optional dim hint just left of the control.
-local function Row(p, label, hint)
-    local row = CreateFrame("Frame", nil, p)
-    row:SetHeight(ROW_H)
-    row:SetPoint("TOPLEFT", PAD_X, p.y)
-    row:SetPoint("TOPRIGHT", -PAD_X, p.y)
-    row.label = S.Text(row, 14, C.text)
-    row.label:SetPoint("LEFT", 0, 0)
-    row.label:SetJustifyH("LEFT")
+-- The current settings card of the page (a new one after a section header or a note).
+local function Card(p)
+    if p.card then return p.card end
+    local card = CreateFrame("Frame", nil, p)
+    card.bg = S.Solid(card, "BACKGROUND", T.cardFill); card.bg:SetAllPoints()
+    S.Border(card, T.cardEdge)
+    card.rows = {}
+    p.card = card
+    Add(p, card, function(width, top)
+        local y = 0
+        for i, row in ipairs(card.rows) do
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", card, "TOPLEFT", 0, -y)
+            row:SetWidth(width)
+            local h = row:Layout(width)
+            row:SetHeight(h)
+            row.pageY = top + y
+            row.divider:SetShown(i < #card.rows)
+            y = y + h
+        end
+        card:SetHeight(math.max(1, y))
+        return y
+    end, "card", 0)
+    return card
+end
+
+-- A settings row (3.18): label 13 fg at the left, an optional description 11 muted on a second
+-- line, the control at the right. The row grows with its wrapped texts.
+local function Row(p, label, desc)
+    local card = Card(p)
+    local row = CreateFrame("Frame", nil, card)
+    row.label = S.Text(row, F.body, T.fg)
+    row.label:SetJustifyH("LEFT"); row.label:SetJustifyV("TOP")
     row.label:SetText(label)
-    row.divider = S.Solid(row, "BORDER", C.divider)
-    row.divider:SetPoint("BOTTOMLEFT"); row.divider:SetPoint("BOTTOMRIGHT"); row.divider:SetHeight(1)
-    if hint then
-        row.hint = S.Text(row, 13, C.dim)
-        row.hint:SetJustifyH("RIGHT")
-        row.hint:SetText(hint)
+    row.desc = S.Text(row, F.meta, T.muted)
+    row.desc:SetJustifyH("LEFT"); row.desc:SetJustifyV("TOP")
+    row.desc:SetWordWrap(true)
+    row.hl = S.Solid(row, "BACKGROUND", T.hoverFill); row.hl:SetAllPoints(); row.hl:SetAlpha(0)
+    row.divider = S.Rule(row)
+    row.divider:SetPoint("BOTTOMLEFT", INSET, 0); row.divider:SetPoint("BOTTOMRIGHT", -INSET, 0)
+    function row:SetDesc(t)
+        self.desc:SetText(t or "")
+        self.desc:SetShown(t ~= nil and t ~= "")
     end
-    p.y = p.y - ROW_H
-    p.lastRow = row
-    p.first = false
-    Register(p, row, label, hint)
+    row:SetDesc(desc)
+    function row:Layout(width)
+        local c = self.control
+        local cw = c and (num(c:GetWidth()) or 0) or 0
+        local textW = math.max(80, width - 2 * INSET - (cw > 0 and (cw + 12) or 0))
+        local lh = math.max(15, root.FitText(self.label, 2, textW, self))
+        local h
+        self.label:ClearAllPoints()
+        if self.desc:IsShown() then
+            local dh = math.max(13, root.FitText(self.desc, 0, textW, self))
+            self.label:SetPoint("TOPLEFT", INSET, -8)
+            self.desc:ClearAllPoints()
+            self.desc:SetPoint("TOPLEFT", self.label, "BOTTOMLEFT", 0, -3)
+            h = 8 + lh + 3 + dh + 8
+        else
+            h = math.max(36, lh + 16)
+            self.label:SetPoint("TOPLEFT", INSET, -math.floor((h - lh) / 2))
+        end
+        h = math.ceil(h)
+        if c then c:ClearAllPoints(); c:SetPoint("RIGHT", self, "RIGHT", -INSET, 0) end
+        return h
+    end
+    card.rows[#card.rows + 1] = row
+    Register(p, row, label, desc)
     return row
 end
 
--- Anchors a control at the row's right edge (xOff leaves room for e.g. a slider's value text).
-local function Place(p, row, control, xOff)
+-- Puts the control at the row's right edge; it is re-synced each time the page shows.
+local function Place(p, row, control)
+    row.control = control
     control:ClearAllPoints()
-    control:SetPoint("RIGHT", row, "RIGHT", -(xOff or 0), 0)
-    if row.hint then
-        row.hint:SetPoint("RIGHT", control, "LEFT", -10, 0)
-        -- the hint never runs over the label: it gets the room left between them, cut with "..."
-        -- when longer, and the whole text shows on the row's tooltip
-        local room = (CONTENT_W - 2 * PAD_X) - (control:GetWidth() or 0) - (xOff or 0) - (row.label:GetStringWidth() or 0) - 30
-        row.hint:SetWordWrap(false)
-        if room < 60 then row.hint:Hide() else row.hint:SetWidth(math.min(room, row.hint:GetStringWidth() + 2)) end
-        local full = row.hint:GetText()
-        row:EnableMouse(true)
-        row:SetScript("OnEnter", function(self) S.Tip(self, { row.label:GetText() or "", full }) end)
-        row:SetScript("OnLeave", S.HideTip)
-    else
-        -- no hint: the label stops before the control, cut with "..." when longer, whole on hover
-        row.label:SetPoint("RIGHT", control, "LEFT", -10, 0)
-        row:EnableMouse(true)
-        row:SetScript("OnEnter", function(self)
-            if row.label.IsTruncated and not row.label:IsTruncated() then return end
-            S.Tip(self, { row.label:GetText() or "" })
-        end)
-        row:SetScript("OnLeave", S.HideTip)
-    end
+    control:SetPoint("RIGHT", row, "RIGHT", -INSET, 0)
     p.controls[#p.controls + 1] = control
     return control
 end
 
-local function SwitchRow(p, label, get, set, hint)
-    local row = Row(p, label, hint)
-    return Place(p, row, S.Switch(row, get, set))
+-- A dropdown's list is a child of its trigger, so the page's scroll frame would clip it at the
+-- window's edge: once opened, it moves to UIParent (still anchored under the trigger, kept on
+-- screen) and closes when the page scrolls. The trigger's own OnHide still closes it.
+local function LiftList(d, sa)
+    d:HookScript("OnClick", function(self)
+        if not self.wlList then
+            for _, ch in ipairs({ self:GetChildren() }) do
+                if type(ch) == "table" and ch.Fill and ch.rows then self.wlList = ch end
+            end
+        end
+        local list = self.wlList
+        if not (list and list:IsShown()) then return end
+        if list:GetParent() ~= UIParent then list:SetParent(UIParent) end
+        list:SetFrameStrata("FULLSCREEN_DIALOG")
+        if list.SetClampedToScreen then list:SetClampedToScreen(true) end
+        if list.Raise then list:Raise() end
+    end)
+    if sa and not sa.wlListHook then
+        sa.wlListHook = {}
+        pcall(sa.HookScript, sa, "OnVerticalScroll", function()
+            for _, dd in ipairs(sa.wlListHook) do if dd.wlList then dd.wlList:Hide() end end
+        end)
+    end
+    if sa then sa.wlListHook[#sa.wlListHook + 1] = d end
 end
 
--- A slider shown in percent for a value stored as a fraction (1 = 100 %).
+-- A segmented control that turns into a dropdown when its labels would leave the row's texts less
+-- than 200 px. The dropdown is as wide as its longest choice.
+local CHOICE_MAX = CARD_W - 2 * INSET - 12 - 200
+local function Choice(p, row, options, get, set)
+    local seg = S.Segmented(row, options, get, set)
+    seg:SetMaxWidth(CHOICE_MAX)
+    local d = seg.dropdown
+    if d and d:IsShown() then
+        local longest = 0
+        for _, b in ipairs(seg.buttons or {}) do
+            local ok, sw = pcall(b.label.GetStringWidth, b.label)
+            longest = math.max(longest, (ok and num(sw)) or 0)
+        end
+        -- the button's own measure (label + 24, chevron and its gap + 12): the longest choice fits
+        d:SetWidth(math.max(120, math.min(CHOICE_MAX, math.ceil(longest) + 24 + 12)))
+        seg:SetWidth(num(d:GetWidth()) or CHOICE_MAX)
+        LiftList(d, p.sa)
+    end
+    return Place(p, row, seg)
+end
+
+-- A switch row: the whole row is the click target and shows what the click does.
+local function SwitchRow(p, label, get, set, desc)
+    local row = Row(p, label, desc)
+    local sw = S.Switch(row, get, set)
+    sw:AttachRow(row)
+    row:EnableMouse(true)
+    local function Over(f) local ok, v = pcall(f.IsMouseOver, f); return ok and v end
+    local function Tip() S.Tip(row, { row.label:GetText() or "", get() and L("Clic : désactiver") or L("Clic : activer") }) end
+    local function Enter()
+        root.Tween(row.hl, num(row.hl:GetAlpha()) or 0, 1, 0.10, function(v) row.hl:SetAlpha(v) end)
+        Tip()
+    end
+    local function Leave()
+        root.Tween(row.hl, num(row.hl:GetAlpha()) or 0, 0, 0.10, function(v) row.hl:SetAlpha(v) end)
+        S.HideTip()
+    end
+    -- the switch is a button over the row: moving onto it keeps the row lit and its tooltip
+    row:HookScript("OnEnter", Enter)
+    row:HookScript("OnLeave", function() if not Over(sw) then Leave() end end)
+    sw:HookScript("OnEnter", Enter)
+    sw:HookScript("OnLeave", function() if not Over(row) then Leave() end end)
+    -- after a click the tooltip tells the next click
+    sw:HookScript("OnClick", function()
+        local ok, owner = pcall(function() return GameTooltip:IsShown() and GameTooltip:GetOwner() end)
+        if ok and owner == row then Tip() end
+    end)
+    row.switch = sw
+    Place(p, row, sw)
+    return sw, row
+end
+
+-- A value shown at the right of a row (a count, a name): one line, full text in the row's tooltip.
+local function ValueText(row, maxW)
+    local fs = S.Text(row, F.label, T.fg)
+    fs:SetJustifyH("RIGHT")
+    S.ClampLabel(fs, nil, row)
+    row:EnableMouse(true)
+    function fs:Fit()
+        local ok, sw = pcall(self.GetStringWidth, self)
+        self:SetWidth(math.max(24, math.min(maxW or 220, math.ceil((ok and num(sw)) or 0) + 2)))
+    end
+    local set = fs.SetText
+    fs.SetText = function(self, t) set(self, t); self.wlFull = t; self:Fit() end
+    return fs
+end
+
+-- A slider shown in percent for a value stored as a fraction (1 = 100 %), its value at its right.
 local function PercentSlider(p, label, min, max, getFrac, setFrac)
     local row = Row(p, label)
-    local s = S.Slider(row, min, max, 5,
+    local holder = CreateFrame("Frame", nil, row)
+    holder:SetSize(160 + 12 + 48, 20)
+    local s = S.Slider(holder, min, max, 5,
         function() return math.floor((getFrac() or 1) * 100 + 0.5) end,
         function(v) setFrac(v / 100) end,
-        function(v) return v .. " %" end, 180)
+        function(v) return string.format(L("%d %%"), v) end, 160)
+    s:SetPoint("LEFT")
     s.value:SetJustifyH("RIGHT")
-    function s:Sync() self:SetValue(math.floor((getFrac() or 1) * 100 + 0.5)) end
-    return Place(p, row, s, 58)
+    function holder:Sync() s:SetValue(math.floor((getFrac() or 1) * 100 + 0.5)) end
+    holder.slider = s
+    return Place(p, row, holder)
 end
 
 -- ---------------------------------------------------------------- pages
 
 local PAGES = {
-    { key = "general",  label = "Général",         icon = "Interface\\Icons\\Trade_Engineering" },
-    { key = "dungeons", label = "Donjons",         icon = "Interface\\Icons\\INV_Misc_Map_01" },
-    { key = "comptoir", label = "Writs et Faveur", icon = "Interface\\Icons\\INV_Letter_15" },
-    { key = "gps",      label = "GPS",             icon = "Interface\\Icons\\Ability_Tracking" },
-    { key = "bags",     label = "Sacs",            icon = "Interface\\Icons\\INV_Misc_Bag_08" },
-    { key = "upgrades", label = "Améliorations",   icon = "Interface\\Icons\\INV_Chest_Cloth_17" },
-    { key = "about",    label = "À propos",        icon = "Interface\\Icons\\INV_Misc_QuestionMark" },
+    { key = "general",  label = "Général",       icon = "Interface\\Icons\\Trade_Engineering",     desc = "Modules, clics, langue et fenêtres." },
+    { key = "dungeons", label = "Donjons",       icon = "Interface\\Icons\\INV_Misc_Map_01",       desc = "La flèche, les alertes et les quêtes que montre le guide." },
+    { key = "comptoir", label = "Writs",      icon = "Interface\\Icons\\INV_Letter_15",         desc = "Remise des Writs, rappels, objectif et zones." },
+    { key = "gps",      label = "GPS",           icon = "Interface\\Icons\\Ability_Tracking",      desc = "Itinéraire, vols, téléportations et flèche." },
+    { key = "bags",     label = "Sacs",          icon = "Interface\\Icons\\INV_Misc_Bag_08",       desc = "Place dans les sacs et vente des objets gris." },
+    { key = "upgrades", label = "Améliorations", icon = "Interface\\Icons\\INV_Chest_Cloth_17",    desc = "Calcul, spé et affichage des améliorations." },
+    { key = "about",    label = "À propos",      icon = "Interface\\Icons\\INV_Misc_QuestionMark", desc = "Version, crédits, contact et commandes du chat." },
 }
 
--- A module's name in French: WP.MODULES (Core.lua) still says "LFG" and "Writs & Favor".
+-- What each module does, written for the Settings rows and the module card of its page.
+local MODULE_DESC = {
+    dungeons = "Le guide des quêtes de donjon, de raid et de classe, avec la route et la flèche.",
+    writs = "Les Writs à faire, la liste d'achat et la remise automatique.",
+    bags = "Repère les objets de quête qui ne servent plus et libère de la place.",
+    orders = "Demande un objet à un artisan de la guilde, ou prends les commandes des autres.",
+    guild = "Toute la guilde et le classement PvP.",
+    events = "Les événements de la guilde et les groupes du moment.",
+    upgrades = "Une flèche verte sur les objets meilleurs que ceux que tu portes.",
+}
+local MODULE_ICON = {
+    dungeons = "Interface\\Icons\\INV_Misc_Map_01", writs = "Interface\\Icons\\INV_Letter_15",
+    bags = "Interface\\Icons\\INV_Misc_Bag_08", upgrades = "Interface\\Icons\\INV_Chest_Cloth_17",
+}
+
+-- A module's name: "Groupes" has two English texts (Events.lua says "LFG"), and WP.MODULES says
+-- "Writs & Favor" for the trading post.
 local function ModLabel(m)
-    if m.key == "events" then return L("Groupes") elseif m.key == "writs" then return L("Writs et Faveur du marchand") end
+    if m.key == "events" then return L("Groupes de la guilde") elseif m.key == "writs" then return L("Writs") end
     return L(m.label)
+end
+local function ModDesc(m)
+    return MODULE_DESC[m.key] and L(MODULE_DESC[m.key]) or L(m.hint or "")
 end
 
 local Rebuild   -- defined with the window: rebuilds every page after a language change
-local ModuleBand   -- defined with the window: a module page's top band
+local Relayout  -- defined with the window: re-measures the page shown and fits the window
 
 local BUILD = {}
 
@@ -411,28 +637,32 @@ function BUILD.general(p)
     Section(p, L("Modules"))
     for _, m in ipairs(ns.WP.MODULES) do
         SwitchRow(p, ModLabel(m), function() return ns.WP.ModuleOn(m.key) end,
-            function(v) ns.WP.SetModule(m.key, v) end, L(m.hint))
+            function(v) ns.WP.SetModule(m.key, v) end, ModDesc(m))
     end
-    Note(p, L("Le GPS reste toujours actif : les autres modules s'en servent.\nRallumer un module est immédiat, sans /reload."), 6)
+    Note(p, L("Le GPS reste toujours allumé : les autres modules s'en servent. Un module rallumé revient tout de suite, sans /reload."))
 
     if ns.WP.ClicksDB then
-    Section(p, L("Clics"))
-    local function Clicks() return ns.WP.ClicksDB() end
-    local function setClick(k) return function(v) Clicks()[k] = v; if ns.WP.ApplyClicks then ns.WP.ApplyClicks() end end end
-    local inviteBy = ns.WP.ClickOwner and ns.WP.ClickOwner("invite")
-    local shootBy = ns.WP.ClickOwner and ns.WP.ClickOwner("shoot")
-    SwitchRow(p, L("Alt-clic pour inviter (chat)"), function() return Clicks().chat end, setClick("chat"), inviteBy and string.format(L("Déjà fait par %s"), inviteBy))
-    SwitchRow(p, L("Alt-clic pour inviter (monde, portraits)"), function() return Clicks().world end, setClick("world"))
-    SwitchRow(p, L("Lien [Inviter] sur les demandes"), function() return Clicks().link end, setClick("link"))
-    SwitchRow(p, L("Clic droit pour tirer"), function() return Clicks().shoot end, setClick("shoot"), shootBy and string.format(L("Déjà fait par %s"), shootBy))
-    local mrow = Row(p, L("Touche à tenir"))
-    Place(p, mrow, S.Segmented(mrow, ns.WP.ShootKeys(),
-        function() return Clicks().shootMod end, setClick("shootMod")))
+        Section(p, L("Clics"))
+        local function Clicks() return ns.WP.ClicksDB() end
+        local function setClick(k) return function(v) Clicks()[k] = v; if ns.WP.ApplyClicks then ns.WP.ApplyClicks() end end end
+        local taken = L("Un autre addon le fait déjà : ce réglage reste sans effet.")
+        local inviteBy = ns.WP.ClickOwner and ns.WP.ClickOwner("invite")
+        local shootBy = ns.WP.ClickOwner and ns.WP.ClickOwner("shoot")
+        SwitchRow(p, L("Alt-clic sur un nom dans le chat"), function() return Clicks().chat end, setClick("chat"),
+            inviteBy and taken or L("Invite ce joueur dans ton groupe."))
+        SwitchRow(p, L("Alt-clic sur un joueur ou un portrait"), function() return Clicks().world end, setClick("world"),
+            inviteBy and taken or L("Invite le joueur, dans le monde ou depuis son portrait."))
+        SwitchRow(p, L("Lien [Inviter] dans le chat"), function() return Clicks().link end, setClick("link"),
+            inviteBy and taken or L("Ajouté aux messages qui demandent une invitation, comme « inv »."))
+        SwitchRow(p, L("Clic droit pour tirer"), function() return Clicks().shoot end, setClick("shoot"),
+            shootBy and taken or L("Sur un ennemi, lance ton tir à distance : arc, fusil, arbalète, arme de jet ou baguette."))
+        local mrow = Row(p, L("Touche pour tirer"), L("Garde-la enfoncée, puis fais un clic droit sur l'ennemi. Avec « Aucune », le clic droit seul tire."))
+        Choice(p, mrow, ns.WP.ShootKeys(), function() return Clicks().shootMod end, setClick("shootMod"))
     end
 
     Section(p, L("Langue"))
-    local row = Row(p, L("Langue"))
-    Place(p, row, S.Segmented(row, {
+    local row = Row(p, L("Langue de l'addon"), L("Automatique suit la langue du jeu. Les fenêtres déjà ouvertes changent après un /reload."))
+    Choice(p, row, {
         { "auto", L("Automatique") }, { "fr", L("Français") }, { "en", L("English") },
     }, function() return Guide().lang or "auto" end, function(v)
         if v == "auto" then
@@ -447,73 +677,71 @@ function BUILD.general(p)
         RefreshWrits()
         -- Rebuild once the click has finished: this very control belongs to the old pages.
         C_Timer.After(0, function() if Rebuild then Rebuild() end end)
-    end))
-    CloseSection(p)
-    Note(p, L("Auto suit la langue du client.\nLes fenêtres déjà ouvertes changent après un /reload."), 8)
+    end)
 
     -- the font: the game's own (sure to show everywhere) or EllesmereUI's when it is installed
     if root.IsLoaded and root.IsLoaded("EllesmereUI") then
         Section(p, L("Police"))
-        local frow = Row(p, L("Police"), L("Celle d'EllesmereUI peut laisser des textes vides sur certaines installations"))
-        Place(p, frow, S.Segmented(frow, { { "game", L("Du jeu") }, { "eui", "EllesmereUI" } },
+        local frow = Row(p, L("Police des textes"), L("Si des textes restent vides, reviens à celle du jeu."))
+        Choice(p, frow, { { "game", L("Police du jeu") }, { "eui", "EllesmereUI" } },
             function() return WLWritsDB.font == "eui" and "eui" or "game" end,
-            function(v) WLWritsDB.font = v; if root.ApplyLooks then root.ApplyLooks() end end))
-        CloseSection(p)
+            function(v) WLWritsDB.font = v; if root.ApplyLooks then root.ApplyLooks() end end)
     end
 
     Section(p, L("Fenêtres"))
-    SwitchRow(p, L("Bouton de la minimap"), function() return not Guide().hideMinimap end, SetMinimap)
-    SwitchRow(p, L("Rouvrir le guide au chargement"), function() return Guide().reopenGuide == true end,
-        function(v) Guide().reopenGuide = v end, L("même si tu l'avais fermé"))
-    CloseSection(p)
+    SwitchRow(p, L("Bouton de la minimap"), function() return not Guide().hideMinimap end, SetMinimap,
+        L("Ouvre l'Accueil de WL Helper d'un clic."))
+    SwitchRow(p, L("Rouvrir le guide à la connexion"), function() return Guide().reopenGuide == true end,
+        function(v) Guide().reopenGuide = v end, L("Même si tu l'avais fermé avant de te déconnecter."))
 end
 
 function BUILD.dungeons(p)
-    Section(p, L("Guide"))
-    SwitchRow(p, L("Flèche des donjons"), function() return Guide().arrow ~= false end, SetGuideArrow)
+    Section(p, L("Réglages du guide"))
+    SwitchRow(p, L("Flèche du guide"), function() return Guide().arrow ~= false end, SetGuideArrow,
+        L("Le GPS te mène à la prochaine étape du guide."))
     SwitchRow(p, L("Alerte des monstres rares"), function() return Guide().rareAlert ~= false end, function(v) Guide().rareAlert = v end,
-        L("Dans un donjon, un message et un son quand un monstre rare apparaît"))
-    SwitchRow(p, L("Guide automatique des points"), function() return Guide().autoWay and true or false end,
-        function(v) Guide().autoWay = v; RefreshGuide() end)
+        L("Dans un donjon, un message et un son quand un monstre rare apparaît."))
+    SwitchRow(p, L("Points GPS à chaque étape"), function() return Guide().autoWay and true or false end,
+        function(v) Guide().autoWay = v; RefreshGuide() end,
+        L("Les points de l'étape en cours sont posés tout seuls quand une nouvelle étape commence."))
     -- "useful" hides the repeatable reputation quests and the quests of professions you don't have
-    local row = Row(p, L("Quêtes répétables et de métiers que tu n'as pas"))
-    Place(p, row, S.Segmented(row, { { true, L("Masquer") }, { false, L("Afficher") } },
+    local row = Row(p, L("Quêtes répétables ou d'un autre métier"), L("Masquées, elles sortent de la route et du compte de quêtes de chaque donjon."))
+    Choice(p, row, { { true, L("Masquer") }, { false, L("Afficher") } },
         function() return Guide().useful ~= false end,
         function(v)
             if (Guide().useful ~= false) == v then return end
             Guide().useful = v
             if root.Recalc and root.frame then root.Recalc() end
             if root.RenderPicker then root.RenderPicker() end
-        end))
-    CloseSection(p)
-    Note(p, L("Masquées, elles ne sont ni dans la route ni dans le décompte des quêtes de chaque donjon."), 4)
+        end)
 end
 
 function BUILD.comptoir(p)
     Section(p, L("Automatismes"))
-    SwitchRow(p, L("Rendre les writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"))
+    SwitchRow(p, L("Rendre les Writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"))
     SwitchRow(p, L("Rendre les caisses automatiquement"), function() return Comfort().autoCrates ~= false end, SetComfort("autoCrates"),
-        L("en parlant à Dokimi ou à Marcy Baker"))
+        L("En parlant à Dokimi ou à Marcy Baker."))
     SwitchRow(p, L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
-    SwitchRow(p, L("Rescanner en ouvrant l'HV"), function() return Writs().autoRescan end,
-        function(v) Writs().autoRescan = v; RefreshWrits() end, L("fenêtre Writs ouverte, prix de plus d'une heure"))
+    SwitchRow(p, L("Scanner l'HV à son ouverture"), function() return Writs().autoRescan end,
+        function(v) Writs().autoRescan = v; RefreshWrits() end,
+        L("Seulement si la fenêtre Writs est ouverte et que les prix ont plus d'une heure."))
 
     Section(p, L("Infos"))
     SwitchRow(p, L("Rappel à la connexion"), function() return Comfort().reminder end, SetComfort("reminder"),
-        L("« 3 prêts, 1 enveloppe à ouvrir »"))
-    SwitchRow(p, L("Infobulle des enveloppes"), function() return Comfort().tooltip end, SetComfort("tooltip"),
-        L("réputation, coût, à qui le rendre, déjà rendu"))
+        L("Par exemple : « 3 Writs prêts à rendre, 1 enveloppe à ouvrir »."))
+    SwitchRow(p, L("Détails dans l'infobulle des enveloppes"), function() return Comfort().tooltip end, SetComfort("tooltip"),
+        L("Réputation, coût, à qui la rendre, et si tu l'as déjà rendue."))
 
     Section(p, L("Plan"))
-    local row = Row(p, L("Objectif"))
-    Place(p, row, S.Segmented(row, {
+    local row = Row(p, L("Objectif de réputation"), L("Le plan achète les Writs qu'il faut pour l'atteindre."))
+    Choice(p, row, {
         { 0, L("Rang suivant") }, { 6, L("Honoré") }, { 7, L("Révéré") },
-    }, function() return Writs().goal or 0 end, function(v) Writs().goal = v; RefreshWrits() end))
+    }, function() return Writs().goal or 0 end, function(v) Writs().goal = v; RefreshWrits() end)
     SwitchRow(p, L("Masquer les zones trop hautes"), function() return Writs().hideHigh end,
-        function(v) Writs().hideHigh = v; RefreshWrits() end)
+        function(v) Writs().hideHigh = v; RefreshWrits() end, L("Les zones au-dessus de ton niveau sortent du plan."))
 
     -- zones: the plan only buys writs of the zones left on (a single writ: right-click in "All writs")
-    Section(p, L("Zones où je vais"))
+    Section(p, L("Zones du plan"))
     local maps, seen = {}, {}
     for _, w in ipairs(ns.WRITS or {}) do
         if w.map and not seen[w.map] then seen[w.map] = true; maps[#maps + 1] = w.map end
@@ -524,72 +752,78 @@ function BUILD.comptoir(p)
         if la ~= lb then return la < lb end
         return WP.ZoneName(a) < WP.ZoneName(b)
     end)
+    local muted = S.Hex(T.muted)
     for _, map in ipairs(maps) do
         local lo = WP.ZoneMin(map)
-        SwitchRow(p, WP.ZoneName(map), function() return not WP.IsSkipped("zones", map) end,
-            function(v) WP.SetSkipped("zones", map, not v) end, lo and string.format(L("niv. %d+"), lo) or nil)
+        local label = WP.ZoneName(map)
+        if lo then label = label .. "  " .. muted .. string.format(L("niv. %d+"), lo) .. "|r" end
+        SwitchRow(p, label, function() return not WP.IsSkipped("zones", map) end,
+            function(v) WP.SetSkipped("zones", map, not v) end)
     end
-    Note(p, L("Un writ précis : clic droit dessus dans « Tous les writs »."), 6)
-    CloseSection(p)
+    Note(p, L("Pour écarter un seul Writ : clic droit dessus dans l'onglet « Tous les writs » des Writs."))
 end
 
 function BUILD.gps(p)
     Section(p, L("Itinéraire"))
-    local seg = S.Segmented(p, {
+    local row = Row(p, L("Calcul de l'itinéraire"), L("Automatique prend Zygor quand il est installé, sinon le GPS de WL Helper."))
+    local seg = Choice(p, row, {
         { "auto", L("Automatique") },
         { "wl", L("WL Helper") },
-        { "zygor", ZygorPresent() and L("Zygor") or L("Zygor, absent"), not ZygorPresent() },
-    }, function() return Gps().provider or "auto" end, SetGps("provider"), 30)
-    seg:SetPoint("TOPLEFT", PAD_X, p.y - 4)
+        { "zygor", L("Zygor"), not ZygorPresent() },
+    }, function() return Gps().provider or "auto" end, SetGps("provider"))
+    for _, b in ipairs(seg.buttons or {}) do
+        if b.value == "zygor" then b.tip = { L("Zygor"), L("Pas installé") } end
+    end
     -- Zygor can finish loading after the window was built: re-check each time the page shows.
-    function seg:Sync() self:SetDisabled("zygor", not ZygorPresent()) end
-    p.controls[#p.controls + 1] = seg
-    p.y = p.y - 42
-    Note(p, L("Automatique prend Zygor s'il est installé, sinon notre GPS."))
+    function seg:Sync()
+        self:SetDisabled("zygor", not ZygorPresent())
+        for _, b in ipairs(self.buttons or {}) do
+            if b.value == "zygor" then b.tip = (not ZygorPresent()) and { L("Zygor"), L("Pas installé") } or nil end
+        end
+    end
 
     Section(p, L("Trajet"))
     SwitchRow(p, L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"))
-    SwitchRow(p, L("Choisir le vol automatiquement"), function() return Gps().autoFlight end, SetGps("autoFlight"))
-    local row = Row(p, L("Points de vol"))
-    local known = S.Text(row, 14, C.text)
-    known:SetJustifyH("RIGHT")
+    SwitchRow(p, L("Choisir le vol automatiquement"), function() return Gps().autoFlight end, SetGps("autoFlight"),
+        L("Chez le maître de vol, le bon trajet est choisi pour toi."))
+    row = Row(p, L("Points de vol connus"), L("Ceux que ce personnage a déjà découverts."))
+    local known = ValueText(row, 80)
     function known:Sync()
         local G = ns.WP and ns.WP.GPS
         local ok, n = pcall(function() return G and G.KnownFlights and G.KnownFlights() end)
-        self:SetText((ok and n or 0) .. L(" connus"))
+        self:SetText(tostring(ok and tonumber(n) or 0))
     end
+    known:Sync()
     Place(p, row, known)
-    SwitchRow(p, L("Distances en yards (sinon mètres et km)"), function() return Gps().yards end, SetGps("yards"))
+    SwitchRow(p, L("Distances en yards"), function() return Gps().yards end, SetGps("yards"), L("Sinon en mètres et en kilomètres."))
 
     Section(p, L("Flèche"))
-    PercentSlider(p, L("Taille"), 70, 150, function() return Gps().scale end, SetGps("scale"))
+    PercentSlider(p, L("Taille de la flèche"), 70, 150, function() return Gps().scale end, SetGps("scale"))
     PercentSlider(p, L("Opacité du fond"), 0, 100, function() return Gps().alpha end, SetGps("alpha"))
     SwitchRow(p, L("Masquer en combat"), function() return Gps().hideCombat end, SetGps("hideCombat"))
-    row = Row(p, L("Position"))
-    local move = S.Button(row, L("Déplacer la flèche"), 150, 30, "secondary", function()
+    row = Row(p, L("Position de la flèche"), L("Fais-la glisser où tu veux à l'écran."))
+    local move = S.Button(row, L("Déplacer la flèche"), 0, 28, "secondary", function()
         local G = ns.WP and ns.WP.GPS
         if G and G.UnlockArrow then G.UnlockArrow() end
     end)
+    move:SetIcon("arrow_up")
     function move:Sync()
         local G = ns.WP and ns.WP.GPS
         self:SetEnabled(G and G.UnlockArrow and true or false)
     end
     Place(p, row, move)
-    CloseSection(p)
 end
 
 function BUILD.bags(p)
-    -- the cleaner opens from the band at the top of the page
-    Section(p, L("Nettoyage"))
-    Note(p, L("Les objets qui lancent une quête ne sont jamais proposés."), 4)
     Section(p, L("Place dans les sacs"))
-    SwitchRow(p, L("Proposer de libérer une place quand les sacs sont pleins"),
-        function() return WLWritsDB.freeSlotPrompt ~= false end, function(v) WLWritsDB.freeSlotPrompt = v end)
-    SwitchRow(p, L("Vendre les objets gris chez les marchands"),
-        function() return WLWritsDB.sellGreys ~= false end, function(v) WLWritsDB.sellGreys = v end)
-    CloseSection(p)
-    Note(p, (ns.WP.Junk and ns.WP.Junk.OtherSeller() and (L("EllesmereUI vend déjà tes gris : WL Helper le laisse faire.") .. " ") or "")
-        .. L("Libérer une place jette l'objet le moins cher : gris, ou arme et armure blanches. Rien d'autre. /wlh free"), 4)
+    SwitchRow(p, L("Proposer de libérer une place"),
+        function() return WLWritsDB.freeSlotPrompt ~= false end, function(v) WLWritsDB.freeSlotPrompt = v end,
+        L("Quand tes sacs sont pleins, WL Helper propose de jeter l'objet le moins cher : un gris, ou une arme ou une armure blanche."))
+    local other = ns.WP.Junk and ns.WP.Junk.OtherSeller and ns.WP.Junk.OtherSeller()
+    SwitchRow(p, L("Vendre les gris chez les marchands"),
+        function() return WLWritsDB.sellGreys ~= false end, function(v) WLWritsDB.sellGreys = v end,
+        other and L("Un autre de tes addons les vend déjà : WL Helper le laisse faire.") or L("Dès que tu ouvres la fenêtre d'un marchand."))
+    Note(p, L("Le nettoyeur ne propose jamais un objet qui lance une quête. Pour libérer une place à la main, tape /wlh free."))
 end
 
 -- Upgrades: the spec judged, the weights it uses at your level, when an arrow shows, the tooltip line.
@@ -609,30 +843,26 @@ function BUILD.upgrades(p)
         return WLWritsDB.upgradeSpec, class
     end
     local function Refresh() if ns.WP.RefreshUpgrades then ns.WP.RefreshUpgrades() end end
+    local function ApplyTip() if ns.WP.ApplyGFTip then ns.WP.ApplyGFTip() end end
     Section(p, L("Calcul"))
-    local crow = Row(p, L("Calcul"))
-    Place(p, crow, S.Segmented(crow, { { "auto", L("Geared Forever si installé") }, { "wl", "WL Helper" } },
+    local crow = Row(p, L("Méthode de calcul"), L("Prend les classements de ton addon d'équipement s'il y en a un, sinon les poids de WL Helper."))
+    Choice(p, crow, { { "auto", L("Automatique") }, { "wl", L("Poids WL Helper") } },
         function() return WLWritsDB.upgradeSource == "wl" and "wl" or "auto" end,
-        function(v) WLWritsDB.upgradeSource = v; Refresh() end))
-    CloseSection(p)
-    Note(p, L("Geared Forever classe plus finement (par tranche de niveaux et par spé) : quand il est installé, son verdict est lu directement"), 4)
-    Section(p, L("Spé"))
-    local srow = Row(p, L("Spé jugée"))
-    Place(p, srow, S.Segmented(srow, Wt.SpecChoices(),
+        function(v) WLWritsDB.upgradeSource = v; Refresh() end)
+    local srow = Row(p, L("Spé évaluée"), L("Auto : l'arbre de talents où tu as le plus de points."))
+    Choice(p, srow, Wt.SpecChoices(),
         function() local db, c = SpecDB(); return db[c] or "auto" end,
-        function(v) local db, c = SpecDB(); db[c] = v; Refresh(); if Rebuild then C_Timer.After(0, Rebuild) end end))
-    CloseSection(p)
-    Note(p, L("Auto : l'arbre de talents où tu as le plus de points"), 4)
+        function(v) local db, c = SpecDB(); db[c] = v; Refresh(); if Rebuild then C_Timer.After(0, Rebuild) end end)
 
     Section(p, L("Affichage"))
-    local trow = Row(p, L("Flèche à partir de"))
-    Place(p, trow, S.Segmented(trow, { { 1, "1 %" }, { 3, "3 %" }, { 5, "5 %" }, { 10, "10 %" } },
-        function() return WLWritsDB.upgradeMin or 1 end, function(v) WLWritsDB.upgradeMin = v; Refresh() end))
+    local trow = Row(p, L("Flèche à partir de"), L("Le gain minimum pour mettre la flèche sur un objet."))
+    local function pct(n) return string.format(L("%d %%"), n) end
+    Choice(p, trow, { { 1, pct(1) }, { 3, pct(3) }, { 5, pct(5) }, { 10, pct(10) } },
+        function() return WLWritsDB.upgradeMin or 1 end, function(v) WLWritsDB.upgradeMin = v; Refresh() end)
     SwitchRow(p, L("Ligne dans les infobulles d'objet"), function() return WLWritsDB.upgradeTip ~= false end,
-        function(v) WLWritsDB.upgradeTip = v; if ns.WP.ApplyGFTip then ns.WP.ApplyGFTip() end end)
-    SwitchRow(p, L("Masquer le bloc Geared Forever des infobulles (même %)"), function() return WLWritsDB.hideGFTip ~= false end,
-        function(v) WLWritsDB.hideGFTip = v; if ns.WP.ApplyGFTip then ns.WP.ApplyGFTip() end end)
-    CloseSection(p)
+        function(v) WLWritsDB.upgradeTip = v; ApplyTip() end, L("Le gain ou la perte pour ta spé, et l'objet qu'il remplacerait."))
+    SwitchRow(p, L("Masquer le bloc en double des infobulles"), function() return WLWritsDB.hideGFTip ~= false end,
+        function(v) WLWritsDB.hideGFTip = v; ApplyTip() end, L("Quand ton addon d'équipement affiche déjà le même pourcentage."))
 
     local _, label = Wt.Bracket()
     -- built once: a level-up across a bracket or a respec on Auto rebuilds the pages when shown
@@ -641,20 +871,39 @@ function BUILD.upgrades(p)
         local _, l = Wt.Bracket()
         if Wt.SpecName() .. l ~= built and Rebuild then C_Timer.After(0, Rebuild) end
     end }
-    Section(p, string.format(L("Poids utilisés (%s, niveaux %s)"), Wt.SpecName(), label))
-    p.y = p.y - 4
+    Section(p, string.format(L("Poids utilisés : %s, niveaux %s"), Wt.SpecName(), label))
+    -- a zebra list: stat name at the left, weight in a number column at the right
+    local list = CreateFrame("Frame", nil, p)
+    local lines = {}
     for i, e in ipairs(Wt.Table()) do
-        local line = CreateFrame("Frame", nil, p)
-        line:SetHeight(22)
-        line:SetPoint("TOPLEFT", PAD_X, p.y); line:SetPoint("TOPRIGHT", -PAD_X, p.y)
-        if i % 2 == 0 then S.Solid(line, "BACKGROUND", C.card, 0.6):SetAllPoints() end
-        local name = S.Text(line, 13, C.text); name:SetPoint("LEFT", 8, 0); name:SetText(L(STAT_NAMES[e[1]] or e[1]))
-        local val = S.Text(line, 13, C.brandSoft, true); val:SetPoint("RIGHT", -8, 0); val:SetText(string.format("%.2f", e[2]))
-        p.y = p.y - 22
+        local line = CreateFrame("Frame", nil, list)
+        local z = (i % 2 == 0) and T.zebraB or T.zebraA
+        S.Solid(line, "BACKGROUND", z):SetAllPoints()
+        line.name = S.Text(line, F.label, T.text)
+        line.name:SetJustifyH("LEFT")
+        line.name:SetText(L(STAT_NAMES[e[1]] or e[1]))
+        line.value = S.Text(line, F.label, T.fg)
+        line.value:SetJustifyH("RIGHT")
+        S.ClampLabel(line.value, nil, line)
+        line.value:SetText(Decimal(e[2]))
+        lines[i] = line
     end
-    p.y = p.y - 6
-    CloseSection(p)
-    Note(p, L("Les poids sont ceux de WL Helper : par classe et par spé, ajustés à ta tranche de niveaux (1-20, 21-40, 41-59, 60). Les dégâts d'une école de magie comptent selon ta spé. Un objet que ta classe ne peut pas porter n'a pas de flèche."), 8)
+    Add(p, list, function(width)
+        local y = 0
+        for _, line in ipairs(lines) do
+            line:ClearAllPoints()
+            line:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
+            line:SetWidth(width)
+            line.value:ClearAllPoints(); line.value:SetPoint("TOPRIGHT", -12, -7); line.value:SetWidth(56)
+            line.name:ClearAllPoints(); line.name:SetPoint("TOPLEFT", 8, -7)
+            local h = math.max(28, 7 + math.max(15, root.FitText(line.name, 2, width - 8 - 12 - 56 - 8, line)) + 6)
+            line:SetHeight(h)
+            y = y + h
+        end
+        list:SetHeight(math.max(1, y))
+        return y
+    end, "list", 4)
+    Note(p, L("Ces poids sont ceux de WL Helper, par classe et par spé, ajustés à ta tranche de niveaux (1-20, 21-40, 41-59, 60). Les dégâts d'une école de magie comptent selon ta spé. Un objet que ta classe ne peut pas porter n'a pas de flèche."))
 end
 
 local function Version()
@@ -664,200 +913,285 @@ local function Version()
 end
 
 local GITHUB = "https://github.com/WarLegenDHelper/WLHelper"
-local TITLE = "WaR " .. S.Hex(C.danger) .. "LegenD|r Helper"
 
--- Selectable, read-only text: an EditBox that puts its text back if typed into.
+-- Selectable, read-only link: an input that puts its text back if typed into.
 local function CopyBox(parent, text, width)
-    local eb = CreateFrame("EditBox", nil, parent)
-    eb:SetSize(width, 26)
-    eb:SetAutoFocus(false)
-    local probe = S.Text(parent, 13, C.text)   -- borrows the theme's font
-    local font, size, flags = probe:GetFont()
-    probe:Hide()
-    if font then eb:SetFont(font, size or 13, flags or "") else eb:SetFontObject(ChatFontNormal) end
-    eb:SetTextColor(C.info[1], C.info[2], C.info[3])
-    eb:SetTextInsets(8, 8, 0, 0)
-    S.Solid(eb, "BACKGROUND", C.card):SetAllPoints()
-    S.Border(eb, C.border)
+    local eb = S.Input(parent, width, {})
+    eb:SetTextColor(T.accentSoft[1], T.accentSoft[2], T.accentSoft[3])
     eb:SetText(text)
     eb:SetCursorPosition(0)
-    eb:SetScript("OnTextChanged", function(self, user) if user then self:SetText(text); self:HighlightText() end end)
-    eb:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+    eb:SetScript("OnTextChanged", function(self, user)
+        if user then self:SetText(text); self:HighlightText() end
+        self.Paint()
+    end)
+    eb:HookScript("OnEditFocusGained", function(self) self:HighlightText() end)
     eb:SetScript("OnMouseUp", function(self) self:SetFocus(); self:HighlightText() end)
     eb:SetScript("OnEscapePressed", function(self) self:HighlightText(0, 0); self:ClearFocus() end)
     eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEnter", function(self) S.Tip(self, { L("Clique puis Ctrl+C pour copier") }) end)
+    eb:SetScript("OnEnter", function(self) S.Tip(self, { text, L("Clic : sélectionner le lien") }) end)
     eb:SetScript("OnLeave", S.HideTip)
     return eb
 end
 
 function BUILD.about(p)
-    local logo = p:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(56, 56)
-    logo:SetPoint("TOPLEFT", PAD_X, p.y)
+    -- the addon: logo, name, version, who it is for
+    local head = CreateFrame("Frame", nil, p)
+    local logo = head:CreateTexture(nil, "ARTWORK")
+    logo:SetSize(48, 48); logo:SetPoint("TOPLEFT", 0, 0)
     logo:SetTexture(S.LOGO)
-    local title = S.Text(p, 18, C.text, true)
-    title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 14, -6)
-    title:SetText(TITLE)
-    local ver = S.Text(p, 13, C.dim)
-    ver:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-    ver:SetText(L("Version") .. " " .. Version())
-    p.y = p.y - 56 - 4
-    p.first = false
+    local name = S.Text(head, F.title, T.fg, true)
+    name:SetJustifyH("LEFT"); name:SetWordWrap(false)
+    name:SetText("WL Helper")
+    local ver = S.Text(head, F.meta, T.muted)
+    ver:SetJustifyH("LEFT"); ver:SetWordWrap(false)
+    ver:SetText(string.format(L("Version %s"), Version()))
+    local guild = S.Text(head, F.body, T.text)
+    guild:SetJustifyH("LEFT"); guild:SetJustifyV("TOP")
+    guild:SetText(L("Pour la guilde WaR LegenD."))
+    Add(p, head, function(width)
+        name:ClearAllPoints(); name:SetPoint("TOPLEFT", logo, "TOPRIGHT", 12, -2); name:SetWidth(width - 60)
+        ver:ClearAllPoints(); ver:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -3); ver:SetWidth(width - 60)
+        guild:ClearAllPoints(); guild:SetPoint("TOPLEFT", ver, "BOTTOMLEFT", 0, -4)
+        local nh = math.max(18, num(name:GetStringHeight()) or 0)
+        local vh = math.max(13, num(ver:GetStringHeight()) or 0)
+        local gh = math.max(15, root.FitText(guild, 2, width - 60, head))
+        local h = math.ceil(math.max(48, 2 + nh + 3 + vh + 4 + gh))
+        head:SetHeight(h)
+        return h
+    end, "block", 12)
 
     local function info(label, value)
         local row = Row(p, label)
-        local v = S.Text(row, 14, C.text)
-        v:SetJustifyH("RIGHT")
+        local v = ValueText(row, CARD_W - 2 * INSET - 120)
         v:SetText(value)
         Place(p, row, v)
     end
-    Section(p, L("À propos"))
-    info(L("Auteur"), "Alandir (WarLegend)")
+    Section(p, L("Crédits"))
+    info(L("Auteur"), "Alandir (WaR LegenD)")
     info(L("Logo"), L("WaR LegenD (War Legend Raid Tool)"))
-    local row = Row(p, L("GitHub"))
-    Place(p, row, CopyBox(row, GITHUB, 300))
-    CloseSection(p)
-    Note(p, L("Sources et remerciements : voir CREDITS.txt dans le dossier de l'addon."), 6)
+    -- the link under its label, across the whole row: never cut
+    local row = Row(p, L("Code source"), L("Clique sur le lien, puis Ctrl+C pour le copier."))
+    local link = CopyBox(row, GITHUB, CARD_W - 2 * INSET)
+    function row:Layout(width)
+        local textW = width - 2 * INSET
+        self.label:ClearAllPoints(); self.label:SetPoint("TOPLEFT", INSET, -8)
+        local lh = math.max(15, root.FitText(self.label, 2, textW, self))
+        self.desc:ClearAllPoints(); self.desc:SetPoint("TOPLEFT", self.label, "BOTTOMLEFT", 0, -3)
+        local dh = math.max(13, root.FitText(self.desc, 0, textW, self))
+        link:ClearAllPoints(); link:SetPoint("TOPLEFT", self.desc, "BOTTOMLEFT", 0, -8)
+        link:SetWidth(textW)
+        local bh = num(link:GetHeight()) or 28
+        if bh <= 0 then bh = 28 end
+        return math.ceil(8 + lh + 3 + dh + 8 + bh + 12)
+    end
+    Note(p, L("Sources et remerciements : le fichier CREDITS.txt dans le dossier de l'addon."))
 
+    -- an idea, a bug: one sentence, two buttons under it
     Section(p, L("Une idée, un bug ?"))
-    local fb = Row(p, L("Écris-nous (lien à copier dans ton navigateur)"))
-    local bIdea = S.Button(fb, L("Proposer une idée"), 150, 30, "primary", function() if ns.WP.Feedback then ns.WP.Feedback("idea") end end)
-    local bBug = S.Button(fb, L("Signaler un bug"), 130, 30, "secondary", function() if ns.WP.Feedback then ns.WP.Feedback("bug") end end)
-    bBug:SetPoint("RIGHT", fb, "RIGHT", 0, 0)
-    Place(p, fb, bIdea)
-    bIdea:ClearAllPoints(); bIdea:SetPoint("RIGHT", bBug, "LEFT", -8, 0)
-    CloseSection(p)
+    local fb = CreateFrame("Frame", nil, p)
+    local say = S.Text(fb, F.body, T.text)
+    say:SetJustifyH("LEFT"); say:SetJustifyV("TOP")
+    say:SetText(L("Dis-nous ce qui manque ou ce qui coince. Chaque bouton t'affiche un lien à ouvrir dans ton navigateur."))
+    local bIdea = S.Button(fb, L("Proposer une idée"), 0, 28, "secondary", function() if ns.WP.Feedback then ns.WP.Feedback("idea") end end)
+    bIdea:SetIcon("star")
+    local bBug = S.Button(fb, L("Signaler un bug"), 0, 28, "secondary", function() if ns.WP.Feedback then ns.WP.Feedback("bug") end end)
+    bBug:SetIcon("warning")
+    Add(p, fb, function(width)
+        say:ClearAllPoints(); say:SetPoint("TOPLEFT", 0, 0)
+        local h = math.max(15, root.FitText(say, 0, width, fb))
+        bIdea:ClearAllPoints(); bIdea:SetPoint("TOPLEFT", 0, -(h + 12))
+        bBug:ClearAllPoints(); bBug:SetPoint("LEFT", bIdea, "RIGHT", 8, 0)
+        h = math.ceil(h + 12 + 28)
+        fb:SetHeight(h)
+        return h
+    end, "block", 8)
+    Register(p, fb, L("Une idée, un bug ?"), L("Proposer une idée") .. " " .. L("Signaler un bug"))
 
     Section(p, L("Commandes du chat"))
     -- the same list as /wlh help, in the guide's language
-    Note(p, root.L and root.L.HELP or "/wlh")
+    Note(p, root.L and root.L.HELP or "/wlh", F.label, T.text)
 end
 
 -- ---------------------------------------------------------------- the window
 
 local win, body, current
 
--- A module page's top band: what the module does and a button to open it, or, when it is switched
--- off, "this module is off" and a button to turn it back on (the window stays open).
+-- A module page's first card: the module's painted icon, its name, what it does and a button to
+-- open it; when it is switched off, a sentence that says so and the button that turns it back on.
 local OPEN = {
     dungeons = { "Ouvrir le guide", function()
         if root.GuideStatus and root.GuideStatus() then root.ShowGuide() elseif root.ShowPicker then root.ShowPicker() end
     end },
     comptoir = { "Ouvrir les Writs", function() ns.WP.Open("writs") end },
-    bags = { "Ouvrir le nettoyeur", function() if ns.WP.Cleaner then ns.WP.Cleaner.Toggle() end end },
+    bags = { "Nettoyer les sacs", function() if ns.WP.Cleaner then ns.WP.Cleaner.Toggle() end end },
 }
-ModuleBand = function(p, pageKey, mod)
-    local hint = ""
-    for _, m in ipairs(ns.WP.MODULES) do if m.key == mod then hint = m.hint end end
-    local bar = CreateFrame("Frame", nil, p)
-    bar:SetHeight(34)
-    bar:SetPoint("TOPLEFT", PAD_X, p.y); bar:SetPoint("TOPRIGHT", -PAD_X, p.y)
-    bar.bg = S.Solid(bar, "BACKGROUND", C.card); bar.bg:SetAllPoints()
-    S.Border(bar, C.divider)
-    bar.text = S.Text(bar, 13, C.dim)
-    bar.text:SetPoint("LEFT", 10, 0); bar.text:SetPoint("RIGHT", -170, 0)
-    bar.text:SetJustifyH("LEFT"); bar.text:SetWordWrap(false)
-    bar.on = S.Button(bar, L("Allumer"), 90, 24, "primary", function()
+local function ModuleCard(p, pageKey, mod)
+    local m = { key = mod, label = mod }
+    for _, x in ipairs(ns.WP.MODULES) do if x.key == mod then m = x end end
+    local c = CreateFrame("Frame", nil, p)
+    c.bg = S.Solid(c, "BACKGROUND", T.cardFill); c.bg:SetAllPoints()
+    S.Border(c, T.cardEdge)
+    c.iconFrame = CreateFrame("Frame", nil, c)
+    c.iconFrame:SetSize(32, 32); c.iconFrame:SetPoint("TOPLEFT", 12, -12)
+    c.icon = c.iconFrame:CreateTexture(nil, "ARTWORK"); c.icon:SetAllPoints()
+    S.Painted(c.icon, MODULE_ICON[mod] or "Interface\\Icons\\INV_Misc_QuestionMark", 32)
+    S.Border(c.iconFrame, T.cardEdge)
+    c.title = S.Text(c, F.heading, T.fg)
+    c.title:SetJustifyH("LEFT"); c.title:SetJustifyV("TOP")
+    c.title:SetText(ModLabel(m))
+    c.line = S.Text(c, F.meta, T.muted)
+    c.line:SetJustifyH("LEFT"); c.line:SetJustifyV("TOP")
+    c.line:SetWordWrap(true)
+    c.on = S.Button(c, L("Allumer le module"), 0, 28, "primary", function()
         ns.WP.SetModule(mod, true)   -- re-syncs this window too
         if ns.WP.RefreshHome then ns.WP.RefreshHome() end
     end)
-    bar.on:SetPoint("RIGHT", -5, 0)
     local open = OPEN[pageKey]
     if open then
-        bar.open = S.Button(bar, L(open[1]), 150, 24, "secondary", open[2])
-        bar.open:SetPoint("RIGHT", -5, 0)
+        c.open = S.Button(c, L(open[1]), 0, 28, "secondary", open[2])
     end
-    -- the hint is cut short: the whole of it on hover
-    bar:EnableMouse(true)
-    bar:SetScript("OnEnter", function(self)
-        if bar.text.IsTruncated and bar.text:IsTruncated() then S.Tip(self, { bar.text:GetText() or "" }) end
-    end)
-    bar:SetScript("OnLeave", S.HideTip)
     p.controls[#p.controls + 1] = { Sync = function()
         local on = ns.WP.ModuleOn(mod)
-        bar.on:SetShown(not on)
-        if bar.open then bar.open:SetShown(on) end
-        bar.text:SetText(on and L(hint) or L("Ce module est éteint."))
-        local c = on and C.dim or C.warn
-        bar.text:SetTextColor(c[1], c[2], c[3])
+        c.on:SetShown(not on)
+        if c.open then c.open:SetShown(on) end
+        c.line:SetText(on and ModDesc(m) or L("Éteint : il ne montre plus rien. Tes réglages sont gardés."))
+        local col = on and T.muted or T.warn
+        c.line:SetTextColor(col[1], col[2], col[3])
+        c.iconFrame:SetAlpha(on and 1 or 0.5)
     end }
-    -- found by the search as well (the bags page's only way in now)
-    Register(p, bar, L(hint))
-    p.y = p.y - 34 - 12
+    Add(p, c, function(width)
+        local btn = (c.on:IsShown() and c.on) or (c.open and c.open:IsShown() and c.open) or nil
+        local bw = btn and (num(btn:GetWidth()) or 0) + 12 or 0
+        local textW = math.max(80, width - 52 - 12 - bw)
+        c.title:ClearAllPoints(); c.title:SetPoint("TOPLEFT", 52, -12)
+        local th = math.max(17, root.FitText(c.title, 2, textW, c))
+        c.line:ClearAllPoints(); c.line:SetPoint("TOPLEFT", c.title, "BOTTOMLEFT", 0, -3)
+        local lh = math.max(13, root.FitText(c.line, 0, textW, c))
+        local inner = math.max(32, th + 3 + lh)
+        local h = math.ceil(12 + inner + 12)
+        c.on:ClearAllPoints(); c.on:SetPoint("RIGHT", c, "RIGHT", -12, 0)
+        if c.open then c.open:ClearAllPoints(); c.open:SetPoint("RIGHT", c, "RIGHT", -12, 0) end
+        c:SetHeight(h)
+        return h
+    end, "band", 12)
+    -- found by the search as well
+    Register(p, c, ModLabel(m), ModDesc(m))
+    c.pageY = 12
 end
 
 -- Builds the nav and every page into a fresh body frame (again after a language change).
 local function BuildBody()
     for i = #INDEX, 1, -1 do INDEX[i] = nil end
     body = CreateFrame("Frame", nil, win)
-    body:SetPoint("TOPLEFT", 1, -39)
-    body:SetPoint("BOTTOMRIGHT", -1, 1)
+    body:SetPoint("TOPLEFT", 0, -(HEADER_H + 1))
+    body:SetPoint("BOTTOMRIGHT", 0, 0)
 
     local nav = CreateFrame("Frame", nil, body)
     nav:SetPoint("TOPLEFT"); nav:SetPoint("BOTTOMLEFT"); nav:SetWidth(NAV_W)
-    local edge = S.Solid(body, "BORDER", C.divider)
+    local edge = S.Solid(body, "BORDER", T.divider)
     edge:SetPoint("TOPLEFT", NAV_W, 0); edge:SetPoint("BOTTOMLEFT", NAV_W, 0); edge:SetWidth(1)
+    root.PixelLine(body, edge, false)
 
     local content = CreateFrame("Frame", nil, body)
     content:SetPoint("TOPLEFT", NAV_W + 1, 0); content:SetPoint("BOTTOMRIGHT")
+    body.content = content
 
     body.pages, body.tabs = {}, {}
     for i, def in ipairs(PAGES) do
+        -- a nav item: painted icon 20 + label 12; selected: selection fill and bright label
         local b = CreateFrame("Button", nil, nav)
-        b:SetHeight(38)
-        b:SetPoint("TOPLEFT", 0, -54 - (i - 1) * 38)
-        b:SetPoint("TOPRIGHT", 0, -54 - (i - 1) * 38)
-        b.bg = S.Solid(b, "BACKGROUND", C.card)
-        b.bg:SetAllPoints()
-        b.hover = S.Solid(b, "BACKGROUND", C.hover)
-        b.hover:SetAllPoints()
-        b.hover:Hide()
-        b.bar = S.Solid(b, "ARTWORK", C.brand)
-        b.bar:SetPoint("TOPLEFT"); b.bar:SetPoint("BOTTOMLEFT"); b.bar:SetWidth(3); b.bar:SetAlpha(0)
-        b.icon = b:CreateTexture(nil, "ARTWORK")
-        b.icon:SetSize(18, 18); b.icon:SetPoint("LEFT", 12, 0)
-        b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); b.icon:SetTexture(def.icon)
-        b.label = S.Text(b, 15, C.dim)
-        b.label:SetPoint("LEFT", 38, 0)
+        local y = -(NAV_TOP + (i - 1) * (NAV_ITEM_H + NAV_GAP))
+        b:SetHeight(NAV_ITEM_H)
+        b:SetPoint("TOPLEFT", 8, y); b:SetPoint("TOPRIGHT", -8, y)
+        b.sel = S.Solid(b, "BACKGROUND", T.selFill); b.sel:SetAllPoints(); b.sel:Hide()
+        b.hl = S.Solid(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
+        b.press = S.Solid(b, "BORDER", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
+        b.iconFrame = CreateFrame("Frame", nil, b)
+        b.iconFrame:SetSize(20, 20); b.iconFrame:SetPoint("LEFT", 8, 0)
+        b.icon = b.iconFrame:CreateTexture(nil, "ARTWORK"); b.icon:SetAllPoints()
+        S.Painted(b.icon, def.icon, 20)
+        S.Border(b.iconFrame, T.cardEdge)
+        b.count = S.Counter(b)
+        b.count:SetPoint("RIGHT", -8, 0)
+        b.label = S.Text(b, F.label, T.muted)
+        b.label:SetPoint("LEFT", 36, 0); b.label:SetPoint("RIGHT", -8, 0)
+        b.label:SetJustifyH("LEFT")
         b.label:SetText(L(def.label))
+        S.ClampLabel(b.label, L(def.label), b)
         b.key = def.key
-        b:SetScript("OnEnter", function(self) if self.key ~= current then self.hover:Show() end end)
-        b:SetScript("OnLeave", function(self) self.hover:Hide() end)
+        b:SetScript("OnEnter", function(self)
+            root.Tween(self.hl, num(self.hl:GetAlpha()) or 0, 1, 0.10, function(v) self.hl:SetAlpha(v) end)
+            self.hover = true
+            body.PaintNav()
+            S.Tip(self, { L(def.label), L(def.desc), L("Clic : afficher ces réglages") })
+        end)
+        b:SetScript("OnLeave", function(self)
+            root.Tween(self.hl, num(self.hl:GetAlpha()) or 0, 0, 0.10, function(v) self.hl:SetAlpha(v) end)
+            self.hover = nil
+            body.PaintNav()
+            S.HideTip()
+        end)
+        b:SetScript("OnMouseDown", function(self) self.press:Show() end)
+        b:SetScript("OnMouseUp", function(self) self.press:Hide() end)
         b:SetScript("OnClick", function(self) ns.WP.ShowOptionsPage(self.key) end)
         body.tabs[i] = b
 
         local p = NewPage(content)
         p.key, p.pageLabel, p.pageIcon = def.key, L(def.label), def.icon
-        b.count = S.Text(b, 12, C.brandSoft or C.brand, true)
-        b.count:SetPoint("RIGHT", -12, 0)
-        b.label:SetPoint("RIGHT", -30, 0); b.label:SetJustifyH("LEFT"); b.label:SetWordWrap(false)
         local mod = ({ dungeons = "dungeons", comptoir = "writs", bags = "bags", upgrades = "upgrades" })[def.key]
-        if mod then ModuleBand(p, def.key, mod) end
+        if mod then ModuleCard(p, def.key, mod) end
         BUILD[def.key](p)
-        CloseSection(p)
-        p:SetHeight(-p.y + PAD_TOP)
         body.pages[def.key] = p
+    end
+
+    -- Selected page: selection fill and bright label; hover: soft fill and bright label.
+    function body.PaintNav()
+        for _, b in ipairs(body.tabs) do
+            local on = b.key == current
+            b.sel:SetShown(on)
+            local c = (on or b.hover) and T.fg or T.muted
+            b.label:SetTextColor(c[1], c[2], c[3])
+            b.iconFrame:SetAlpha((on or b.hover) and 1 or 0.8)
+        end
     end
     BuildSearch(nav, content)
 end
 
--- Selected page: card background, 3 px brand bar, bright semi-bold label.
-local function PaintNav()
-    for _, b in ipairs(body.tabs) do
-        local on = b.key == current
-        b.bg:SetShown(on)
-        b.bar:SetShown(on)
-        if on then b.hover:Hide() end
-        local c = on and C.text or C.dim
-        b.label:SetTextColor(c[1], c[2], c[3])
-        b.icon:SetDesaturated(not on); b.icon:SetAlpha(on and 1 or 0.7)
-        if b.label._bold ~= on and root.SetFont then b.label._bold = on; pcall(root.SetFont, b.label) end
+local function PaintNav() if body and body.PaintNav then body.PaintNav() end end
+
+-- Fits the window to the page (or the search results) and the nav, whichever is taller.
+local function FitNow()
+    if not (win and body) then return end
+    local h
+    local p = body.pages[current]
+    h = p and p.contentH or 0
+    -- while searching, never shorter than the page: the window does not jump at each key
+    if body.results and body.results:IsShown() then h = math.max(h, body.resultsH or 0) end
+    local bodyH = math.max(NAV_H, h)
+    win:FitHeight(bodyH - 24)   -- the window adds 12 above and 12 below the content
+end
+
+Relayout = function(later)
+    if not (win and body) then return end
+    local function go()
+        if body.results and body.results:IsShown() then
+            if body.LayoutResults then body.LayoutResults() end
+        else
+            local p = body.pages[current]
+            if p then p:Layout() end
+        end
+        FitNow()
+    end
+    go()
+    -- wrapped text measures right once its width is applied: once more on the next frame
+    if later ~= false and C_Timer and C_Timer.After then
+        C_Timer.After(0, function() if win and win:IsShown() then go() end end)
     end
 end
 
 local function BuildWindow()
-    win = S.Window("WLHelperOptions", WIN_W, WIN_H, TITLE, L("Réglages"), WLWritsDB, "optionsPos")
+    win = S.Window("WLHelperOptions", WIN_W, 400, L("Réglages"), "WL Helper " .. Version(), WLWritsDB, "optionsPos",
+        { header = HEADER_H, minH = HEADER_H + 1 + NAV_H })
     BuildBody()
 end
 
@@ -867,7 +1201,7 @@ Rebuild = function()
     body:Hide()
     body:SetParent(nil)   -- the old frames stay orphaned; a language change is rare
     BuildBody()
-    win.subtitle:SetText(L("Réglages"))
+    win.title:SetText(L("Réglages"))
     current = nil
     ns.WP.ShowOptionsPage(keep or "general")
 end
@@ -884,92 +1218,98 @@ ShowPage = function(key)
     end
     current = key
     for k, p in pairs(body.pages) do p:SetShown(k == key) end
-    -- OnShow re-syncs the controls even when the page was already visible.
     local p = body.pages[key]
-    local onShow = p:GetScript("OnShow")
-    if p:IsShown() and onShow then onShow(p) end
+    p:Sync()
     PaintNav()
+    Relayout()
 end
 
 -- ---------------------------------------------------------------- search
-local RESULT_H, HEAD_H = 44, 28
 
 BuildSearch = function(nav, content)
-    local box = CreateFrame("EditBox", nil, nav)
-    box:SetPoint("TOPLEFT", 10, -10); box:SetPoint("TOPRIGHT", -10, -10); box:SetHeight(32)
-    box:SetAutoFocus(false)
-    local probe = S.Text(nav, 14, C.text)
-    local font, size, flags = probe:GetFont()
-    probe:Hide()
-    if font then box:SetFont(font, size or 14, flags or "") else box:SetFontObject(ChatFontNormal) end
-    box:SetTextColor(C.text[1], C.text[2], C.text[3])
-    box:SetTextInsets(28, 22, 0, 0)
-    S.Solid(box, "BACKGROUND", C.card):SetAllPoints()
-    local border = S.Border(box, C.border)
-    local glass = box:CreateTexture(nil, "ARTWORK")
-    glass:SetSize(14, 14); glass:SetPoint("LEFT", 8, 0)
-    S.SetIcon(glass, { "common-search-magnifyingglass" }, "Interface\\Common\\UI-Searchbox-Icon")
-    local hint = S.Text(box, 13, C.muted)
-    hint:SetPoint("LEFT", 28, 0); hint:SetText(L("Chercher un réglage"))
-    local clear = S.CloseButton(box, 20, function() box:SetText(""); box:ClearFocus() end, nil, 8)
-    clear:SetPoint("RIGHT", -2, 0)
-    clear:Hide()
+    local box = S.Input(nav, NAV_W - 24, { search = true, placeholder = L("Ex. flèche") })
+    box:SetPoint("TOPLEFT", 12, -12)
     body.searchBox = box
     ns.WP.searchBox = box   -- for a key binding, and the offline tests
+    box.wlBody = body
 
     -- results, in place of the page
-    local sf = CreateFrame("ScrollFrame", nil, content)
-    sf:SetAllPoints(); sf:Hide()
-    body.results = sf
-    local list = CreateFrame("Frame", nil, sf)
-    list:SetSize(CONTENT_W, 10)
-    sf:SetScrollChild(list)
-    sf:EnableMouseWheel(true)
-    sf:SetScript("OnMouseWheel", function(self, delta)
-        local max = math.max(0, list:GetHeight() - self:GetHeight())
-        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * 40)))
-    end)
-    local summary = S.Text(list, 13, C.dim)
-    summary:SetPoint("TOPLEFT", PAD_X, -PAD_TOP); summary:SetPoint("RIGHT", -PAD_X, 0); summary:SetJustifyH("LEFT")
-    local empty = S.Button(list, L("Effacer la recherche"), 170, 30, "secondary", function() box:SetText("") end)
+    local sa = S.ScrollArea(content)
+    sa:SetAllPoints(); sa:Hide()
+    body.results = sa
+    local list = sa.child
+    list:SetWidth(CONTENT_W)
+    local summary = S.Text(list, F.body, T.fg)
+    summary:SetJustifyH("LEFT"); summary:SetJustifyV("TOP")
+    local how = S.Text(list, F.meta, T.muted)
+    how:SetJustifyH("LEFT"); how:SetJustifyV("TOP")
+    local empty = S.EmptyState(list, "search", "", L("Essaie un autre mot, en français ou en anglais."),
+        L("Effacer la recherche"), function() box:SetText(""); box:SetFocus() end, "secondary")
+    empty:Hide()
     local heads, rows, shown, sel = {}, {}, {}, 1
+    local hitsN = 0
 
     local function Head(i)
         local h = heads[i]
-        if not h then h = S.Text(list, 12, C.dim, true); heads[i] = h end
+        if not h then h = S.SectionHeader(list, ""); heads[i] = h end
         h:Show(); return h
     end
     local Pick
     local function ResultRow(i)
         local r = rows[i]
         if r then r:Show(); return r end
-        r = CreateFrame("Button", nil, list)
-        r:SetHeight(RESULT_H)
-        r.bg = S.Solid(r, "BACKGROUND", C.brandBg or C.card, 1); r.bg:SetAllPoints(); r.bg:Hide()
-        r.bar = S.Solid(r, "ARTWORK", C.brand); r.bar:SetPoint("TOPLEFT"); r.bar:SetPoint("BOTTOMLEFT"); r.bar:SetWidth(3); r.bar:SetAlpha(0); r.bar:Hide()
-        S.Solid(r, "HIGHLIGHT", { 1, 1, 1 }, 0.04):SetAllPoints()
-        r.label = S.Text(r, 15, C.text); r.label:SetPoint("TOPLEFT", 14, -6); r.label:SetPoint("RIGHT", -8, 0); r.label:SetJustifyH("LEFT")
-        r.trail = S.Text(r, 13, C.dim); r.trail:SetPoint("TOPLEFT", r.label, "BOTTOMLEFT", 0, -3); r.trail:SetPoint("RIGHT", -8, 0); r.trail:SetJustifyH("LEFT")
-        r:SetScript("OnClick", function(self) Pick(self.entry) end)
+        r = S.ListRow(list, { density = "dense", onClick = function(self) Pick(self.entry) end })
+        r.tip = function(self)
+            local e = self.entry
+            if not e then return nil end
+            local t = { e.label or "" }
+            if e.hint and e.hint ~= "" then t[#t + 1] = e.hint end
+            t[#t + 1] = L("Clic : afficher ce réglage")
+            return t
+        end
         rows[i] = r
         return r
     end
 
     local function Paint()
-        for i, r in ipairs(rows) do
-            local on = i == sel and r:IsShown()
-            r.bg:SetShown(on); r.bar:SetShown(on)
-        end
+        for i, r in ipairs(shown) do r:SetSelected(i == sel) end
     end
 
-    -- the found words in the brand colour, in the label as shown
+    -- The text folded like Fold(), one UTF-8 letter at a time, with the source bytes of each folded
+    -- byte; only the plain part before a colour code (a zone's grey level stays as it is).
+    local function FoldMap(text)
+        local stop = (text:find("|c", 1, true) or (#text + 1)) - 1
+        local out, map, i = {}, {}, 1
+        while i <= stop do
+            local b = text:byte(i)
+            local len = (b >= 240 and 4) or (b >= 224 and 3) or (b >= 192 and 2) or 1
+            local ch = text:sub(i, i + len - 1)
+            local f = (len > 1) and (FOLD[ch] or ch) or ch:lower()
+            for k = 1, #f do out[#out + 1] = f:sub(k, k); map[#out] = { i, i + len - 1 } end
+            i = i + len
+        end
+        return table.concat(out), map
+    end
+    -- the found words in the link colour, in the label as shown (accents included)
     local function Mark(text, words)
-        local out = text
+        local folded, map = FoldMap(text)
+        local spans = {}
         for _, w in ipairs(words) do
-            local i, j = Fold(out):find(w, 1, true)
-            if i and Fold(out) == out:lower() then
-                out = out:sub(1, i - 1) .. S.Hex(C.brandSoft or C.brand) .. out:sub(i, j) .. "|r" .. out:sub(j + 1)
-            end
+            local i, j = folded:find(w, 1, true)
+            if i and map[i] and map[j] then spans[#spans + 1] = { map[i][1], map[j][2] } end
+        end
+        if #spans == 0 then return text end
+        -- merge the overlaps, then insert from the right so the earlier offsets stay valid
+        table.sort(spans, function(x, y) return x[1] < y[1] end)
+        local merged = { spans[1] }
+        for k = 2, #spans do
+            local last, cur = merged[#merged], spans[k]
+            if cur[1] <= last[2] + 1 then last[2] = math.max(last[2], cur[2]) else merged[#merged + 1] = cur end
+        end
+        local out, hex = text, S.Hex(T.accentSoft)
+        for k = #merged, 1, -1 do
+            local a, z = merged[k][1], merged[k][2]
+            out = out:sub(1, a - 1) .. hex .. out:sub(a, z) .. "|r" .. out:sub(z + 1)
         end
         return out
     end
@@ -977,20 +1317,57 @@ BuildSearch = function(nav, content)
     local function NavCounts(counts, searching)
         for _, b in ipairs(body.tabs) do
             local n = counts and counts[b.key] or 0
-            b.count:SetText(searching and n > 0 and tostring(n) or "")
-            b:SetAlpha((searching and n == 0) and 0.35 or 1)
+            if searching and n > 0 then b.count:SetCount(n) else b.count:Hide() end
+            b.label:SetPoint("RIGHT", b, "RIGHT", (searching and n > 0) and -(8 + 18 + 4) or -8, 0)
+            b:SetAlpha((searching and n == 0) and T.disabledAlpha or 1)
         end
     end
 
+    -- places the summary, the headers and the rows; returns the list height
+    local layoutPlan = {}
+    function body.LayoutResults()
+        local width = CARD_W
+        local y = 12
+        if hitsN == 0 then
+            summary:Hide(); how:Hide()
+            empty:SetWrapWidth(width)
+            empty:ClearAllPoints(); empty:SetPoint("TOP", list, "TOP", 0, -24)
+            y = 24 + (empty.blockH or empty:Fit()) + 16
+        else
+            summary:Show(); how:Show()
+            summary:ClearAllPoints(); summary:SetPoint("TOPLEFT", INSET, -y)
+            y = y + math.max(15, root.FitText(summary, 2, width, list))
+            how:ClearAllPoints(); how:SetPoint("TOPLEFT", INSET, -(y + 3))
+            y = y + 3 + math.max(13, root.FitText(how, 2, width, list))
+            for _, it in ipairs(layoutPlan) do
+                if it.head then
+                    y = y + 8
+                    it.head:ClearAllPoints(); it.head:SetPoint("TOPLEFT", INSET, -y); it.head:SetWidth(width)
+                    y = y + 32 + 4
+                else
+                    local r = it.row
+                    r:ClearAllPoints(); r:SetPoint("TOPLEFT", INSET, -y); r:SetWidth(width)
+                    r.y = y
+                    y = y + r:Fit(width) + 2
+                end
+            end
+            y = y + 14
+        end
+        y = math.ceil(y)
+        body.resultsH = y
+        sa:SetContentHeight(y)
+        return y
+    end
+
     local function Update()
-        local q = Fold(box:GetText() or "")
-        hint:SetShown(q == ""); clear:SetShown(q ~= "")
-        border(q ~= "" and C.brand or C.border)
+        local raw = box:GetText() or ""
+        local q = Fold(raw)
         if #q < 2 then
-            local was = sf:IsShown()
-            sf:Hide(); NavCounts(nil, false)
+            local was = sa:IsShown()
+            sa:Hide(); NavCounts(nil, false)
             local page = body.pages[current]
             if was and page and not page:IsShown() then page:Show() end
+            if was then Relayout() end
             return
         end
         local words = {}
@@ -1019,17 +1396,22 @@ BuildSearch = function(nav, content)
             return (a.e.label or "") < (b.e.label or "")
         end)
         for _, p in pairs(body.pages) do p:Hide() end
-        sf:Show(); sf:SetVerticalScroll(0)
+        sa:Show(); sa:ScrollTo(0, true)
         NavCounts(counts, true)
         for _, h in ipairs(heads) do h:Hide() end
         for _, r in ipairs(rows) do r:Hide(); r.entry = nil end
         wipe(shown)
-        local y = -PAD_TOP
-        summary:SetText(#hits == 0 and string.format(L("Aucun réglage ne correspond à « %s »."), box:GetText())
-            or #hits == 1 and L("1 réglage · Entrée pour l'ouvrir")
-            or string.format(L("%d réglages · flèches haut / bas pour choisir, Entrée pour ouvrir"), #hits))
-        y = y - 26
-        empty:ClearAllPoints(); empty:SetPoint("TOPLEFT", PAD_X, y); empty:SetShown(#hits == 0)
+        wipe(layoutPlan)
+        hitsN = #hits
+        if hitsN == 0 then
+            empty:Set("search", string.format(L("Aucun réglage pour « %s »"), raw), L("Essaie un autre mot, en français ou en anglais."),
+                L("Effacer la recherche"), function() box:SetText(""); box:SetFocus() end, "secondary")
+            empty:Show()
+        else
+            empty:Hide()
+            summary:SetText(hitsN == 1 and L("1 réglage trouvé") or string.format(L("%d réglages trouvés"), hitsN))
+            how:SetText(hitsN == 1 and L("Entrée pour l'ouvrir.") or L("Flèches haut et bas pour choisir, Entrée pour ouvrir."))
+        end
         local page, hi, ri = nil, 0, 0
         for _, h in ipairs(hits) do
             local e = h.e
@@ -1037,56 +1419,47 @@ BuildSearch = function(nav, content)
                 page = e.page
                 hi = hi + 1
                 local head = Head(hi)
-                head:ClearAllPoints(); head:SetPoint("TOPLEFT", PAD_X, y - 8)
-                local icon = e.pageIcon and ("|T" .. e.pageIcon .. ":14:14:0:0:64:64:5:59:5:59|t ") or ""
-                head:SetText(icon .. (root.Upper and root.Upper(e.pageLabel or "") or (e.pageLabel or ""):upper()) .. " · " .. (counts[page] or 0))
-                y = y - HEAD_H
+                local icon = e.pageIcon and ("|T" .. e.pageIcon .. ":14:14:0:-1:64:64:5:59:5:59|t ") or ""
+                head:Set(icon .. (e.pageLabel or ""), counts[page] or 0)
+                layoutPlan[#layoutPlan + 1] = { head = head }
             end
             ri = ri + 1
             local r = ResultRow(ri)
             r.entry = e
-            r:ClearAllPoints(); r:SetPoint("TOPLEFT", PAD_X - 3, y); r:SetPoint("RIGHT", list, "RIGHT", -PAD_X, 0)
-            r.label:SetText(Mark(e.label or "", words))
-            local trail = (e.pageLabel or "") .. (e.section ~= "" and (" > " .. e.section) or "")
-            if e.hint and e.hint ~= "" then trail = trail .. " · " .. e.hint end
-            r.trail:SetText(trail)
+            -- the description when there is one (the page header already names the place), else the section
+            local detail = (e.hint and e.hint ~= "" and e.hint)
+                or (e.section ~= "" and e.section ~= e.pageLabel and e.section) or nil
+            r:Set({ name = Mark(e.label or "", words), detail = detail })
             shown[#shown + 1] = r
-            y = y - RESULT_H
+            layoutPlan[#layoutPlan + 1] = { row = r }
         end
-        list:SetHeight(-y + PAD_TOP)
         sel = 1
         Paint()
+        Relayout()
     end
 
     -- opens the page, scrolls the row into view and makes it flash
-    local flashGen = 0
     Pick = function(e)
         if not e then return end
-        sf:Hide()
+        sa:Hide()
         ShowPage(e.page)   -- clears the box quietly
         box:ClearFocus()
         local p = body.pages[e.page]
-        local view = p.sf:GetHeight() or 400
-        local max = math.max(0, p:GetHeight() - view)
-        p.sf:SetVerticalScroll(math.max(0, math.min(max, (e.y or 0) - view / 3)))
+        local view = num(p.sa:GetHeight()) or 400
+        p.sa:ScrollTo((e.row.pageY or 0) - view / 3, true)
         local row = e.row
-        if not row.flash then row.flash = S.Solid(row, "BACKGROUND", C.brand, 0); row.flash:SetAllPoints() end
-        flashGen = flashGen + 1
-        local gen, t = flashGen, 0
-        row.flash:SetAlpha(0.18)
-        row:SetScript("OnUpdate", function(self, dt)
-            t = t + dt
-            if gen ~= flashGen or t >= 1.5 then self.flash:SetAlpha(0); self:SetScript("OnUpdate", nil); return end
-            self.flash:SetAlpha(0.18 * (1 - t / 1.5))
-        end)
+        if not row.flash then row.flash = S.Solid(row, "BACKGROUND", T.selFill); row.flash:SetAllPoints() end
+        row.flash:SetAlpha(1)
+        root.Tween(row.flash, 1, 0, 1.5, function(v) row.flash:SetAlpha(v) end)
     end
 
-    box:SetScript("OnTextChanged", function() if not body.searchSilent then Update() end end)
+    box:SetScript("OnTextChanged", function(self)
+        self.Paint()
+        if not body.searchSilent then Update() end
+    end)
     body.ClearSearch = function()
-        hint:Show(); clear:Hide(); border(C.border); NavCounts(nil, false)
+        box.Paint(); NavCounts(nil, false)
     end
-    box:SetScript("OnEditFocusGained", function() border(C.brand) end)
-    box:SetScript("OnEditFocusLost", function() if (box:GetText() or "") == "" then border(C.border) end end)
     box:SetScript("OnEscapePressed", function(self)
         if (self:GetText() or "") ~= "" then self:SetText("") else self:ClearFocus() end
     end)
@@ -1100,15 +1473,16 @@ BuildSearch = function(nav, content)
         Paint()
         -- keep the selection in view
         local r = shown[sel]
-        local top = -select(5, r:GetPoint(1))
-        local view = sf:GetHeight() or 400
-        local cur = sf:GetVerticalScroll()
-        if top < cur then sf:SetVerticalScroll(math.max(0, top - HEAD_H))
-        elseif top + RESULT_H > cur + view then sf:SetVerticalScroll(top + RESULT_H - view) end
+        local top = r.y or 0
+        local view = num(sa:GetHeight()) or 400
+        local cur = sa:GetScroll() or 0
+        local rh = num(r:GetHeight()) or 36
+        if top < cur then sa:ScrollTo(math.max(0, top - 40), true)
+        elseif top + rh > cur + view then sa:ScrollTo(top + rh - view + 8, true) end
     end)
 
-    -- Ctrl+F while the window is open: into the box (other keys go on to the game)
-    -- Ctrl+F listens only out of combat, with every other key passed on to the game
+    -- Ctrl+F while the window is open: into the box. Listens only out of combat, with every other
+    -- key passed on to the game.
     local function ArmKeys()
         if InCombatLockdown() then win:EnableKeyboard(false); return end
         win:SetPropagateKeyboardInput(true)
@@ -1133,19 +1507,19 @@ ns.WP = ns.WP or {}
 -- After a module is switched elsewhere (the home card), the open page shows it.
 function ns.WP.SyncOptions()
     if win and win:IsShown() and body and body.pages[current] then
-        local onShow = body.pages[current]:GetScript("OnShow")
-        if onShow then onShow(body.pages[current]) end
+        body.pages[current]:Sync()
+        Relayout()
     end
 end
 
 function ns.WP.ShowOptionsPage(key)
     if not win then BuildWindow() end
-    ShowPage(key or current or "general")
     win:Show()
+    ShowPage(key or current or "general")
 end
 
--- Opens the options on a page ("general"|"dungeons"|"comptoir"|"gps"|"bags"|"about"); closes them
--- when they are already open on that page (or on any page when no page is given).
+-- Opens the options on a page ("general"|"dungeons"|"comptoir"|"gps"|"bags"|"upgrades"|"about");
+-- closes them when they are already open on that page (or on any page when no page is given).
 function ns.WP.OpenOptions(pageKey)
     if win and win:IsShown() and (pageKey == nil or pageKey == current) then
         win:Hide()
@@ -1172,22 +1546,29 @@ local function OpenFromOutside()
     ns.WP.ShowOptionsPage(current or "general")
 end
 
--- A small canvas: logo, title, one line and a button that opens our own window.
+-- A small canvas: logo, name, one sentence and the button that opens our own window.
 local function RegisterGameSettings()
     local panel = CreateFrame("Frame")
     panel.name = "WL Helper"
     local logo = panel:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(64, 64)
+    logo:SetSize(48, 48)
     logo:SetPoint("TOPLEFT", 16, -16)
     logo:SetTexture(S.LOGO)
-    local title = S.Text(panel, 20, C.text, true)
-    title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 14, -8)
-    title:SetText(TITLE)
-    local desc = S.Text(panel, 14, C.dim)
-    desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
-    desc:SetText(L("Guide des donjons, Craftsman's Writs et GPS intégré.") .. "   v" .. Version())
-    local open = S.Button(panel, L("Ouvrir les options"), 200, 32, "primary", OpenFromOutside)
-    open:SetPoint("TOPLEFT", logo, "BOTTOMLEFT", 0, -20)
+    local title = S.Text(panel, F.title, T.fg, true)
+    title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 12, -2)
+    title:SetWordWrap(false)
+    title:SetText("WL Helper")
+    local ver = S.Text(panel, F.meta, T.muted)
+    ver:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
+    ver:SetWordWrap(false)
+    ver:SetText(string.format(L("Version %s"), Version()))
+    local desc = S.Text(panel, F.body, T.text)
+    desc:SetPoint("TOPLEFT", logo, "BOTTOMLEFT", 0, -12)
+    desc:SetWidth(480); desc:SetJustifyH("LEFT")
+    desc:SetText(L("Le guide de quêtes, les Writs, le GPS et les outils de la guilde WaR LegenD."))
+    local open = S.Button(panel, L("Ouvrir les réglages"), 0, 32, "primary", OpenFromOutside)
+    open:SetIcon("gear")
+    open:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -12)
 
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
         local ok, category = pcall(Settings.RegisterCanvasLayoutCategory, panel, panel.name)
@@ -1212,8 +1593,8 @@ local function RegisterEllesmere()
             {
                 key = "Main",
                 title = "WL Helper",
-                description = L("Réglages principaux. Le reste est dans la fenêtre d'options de WL Helper."),
-                pages = { L("Options") },
+                description = L("Les réglages les plus utilisés. Tous les autres sont dans la fenêtre Réglages de WL Helper."),
+                pages = { L("Réglages") },
                 buildPage = function(pageName, parent, yOffset)
                     local W = EllesmereUI.Widgets
                     local y = yOffset
@@ -1223,14 +1604,14 @@ local function RegisterEllesmere()
                     end
                     _, h = W:SectionHeader(parent, L("Général"), y); y = y - h
                     toggle(L("Bouton de la minimap"), function() return not Guide().hideMinimap end, SetMinimap)
-                    toggle(L("Flèche des donjons"), function() return Guide().arrow ~= false end, SetGuideArrow)
+                    toggle(L("Flèche du guide"), function() return Guide().arrow ~= false end, SetGuideArrow)
 
-                    _, h = W:SectionHeader(parent, L("Writs et Faveur"), y); y = y - h
-                    toggle(L("Rendre les writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"))
+                    _, h = W:SectionHeader(parent, L("Writs"), y); y = y - h
+                    toggle(L("Rendre les Writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"))
                     toggle(L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
 
                     _, h = W:SectionHeader(parent, L("GPS"), y); y = y - h
-                    toggle(L("Utiliser Zygor si présent"), function() return Gps().provider ~= "wl" end,
+                    toggle(L("Utiliser Zygor quand il est installé"), function() return Gps().provider ~= "wl" end,
                         function(v) SetGps("provider")(v and "auto" or "wl") end)
                     toggle(L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"))
                     toggle(L("Masquer la flèche en combat"), function() return Gps().hideCombat end, SetGps("hideCombat"))
@@ -1239,10 +1620,11 @@ local function RegisterEllesmere()
                     y = y - 16
                     local prebuild = EllesmereUI.IsSearchPrebuild and EllesmereUI.IsSearchPrebuild()
                     if not prebuild then
-                        local b = S.Button(parent, L("Ouvrir les options"), 200, 30, "primary", OpenFromOutside)
+                        local b = S.Button(parent, L("Ouvrir les réglages"), 0, 32, "primary", OpenFromOutside)
+                        b:SetIcon("gear")
                         b:SetPoint("TOPLEFT", parent, "TOPLEFT", 20, y)
                     end
-                    y = y - 30 - 16
+                    y = y - 32 - 16
                     return math.abs(y)
                 end,
             },

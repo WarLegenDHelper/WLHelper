@@ -119,11 +119,45 @@ local function PerPct(pair, level)
     return v30 + (v60 - v30) * (math.min(level, 60) - 30) / 30
 end
 
+-- WL Helper change: scoring options (SetOptions in the API).
+--   neutral = true turns off every change dated 2026-11-15 (v2) below: proc and use
+--     effects, set bonuses, split hit caps, defense cap, proc enchants... Used by the tests
+--     to check the rest still gives Geared Forever's numbers.
+--   raid = true / false forces raid hit caps (17% spell, 8% melee) at 58+; nil = automatic:
+--     at level 60 once WoW Forever's raids are open (December 9, 2026).
+local opts = { neutral = false, raid = nil }
+local RAIDS_OPEN = 20261209
+local function Today()
+    local d = (type(date) == "function" and date) or (os and os.date)
+    if not d then return nil end
+    local ok, v = pcall(d, "%Y%m%d")
+    return ok and tonumber(v) or nil
+end
+local function RaidCaps(level)
+    if level < 58 then return false end
+    if opts.raid ~= nil then return opts.raid == true end
+    -- WL Helper change (v3): inside a raid instance the raid caps apply whatever the date.
+    if IsInInstance then
+        local ok, inside, kind = pcall(IsInInstance)
+        if ok and inside and kind == "raid" then return true end
+    end
+    local today = Today()
+    return level >= 60 and today ~= nil and today >= RAIDS_OPEN
+end
+
 -- Hit cap at a level: dungeon and quest mobs a couple of levels up while leveling,
 -- raid bosses (+3) at 58 and up.
+-- WL Helper change (v2): spells and melee have different caps below raid level. Against
+-- mobs up to 2 levels above you spells miss 6% at most (cap 5%), melee about 7% (cap 6%,
+-- as upstream). Raid caps (17% / 8%) apply only when RaidCaps() says so, not to every 58+
+-- player still doing dungeons.
 local function HitCap(level, spell)
-    if level >= 58 then return spell and 17 or 8 end
-    return 6
+    if opts.neutral then
+        if level >= 58 then return spell and 17 or 8 end
+        return 6
+    end
+    if RaidCaps(level) then return spell and 17 or 8 end
+    return spell and 5 or 6
 end
 
 -- What 1% hit is worth, as a share of 1% damage. Each 1% hit removes a miss, so it's
@@ -418,7 +452,10 @@ local function Physical(level, race, cls, o)
     w.spi = o.spi
     w.sp, w.sdmg = o.sp, o.sp
     if o.school then w[o.school] = o.sp end
-    return o.mh * 14, (o.oh or 0) * 14, (o.rg or 0.05) * 14, o.slow, W(w), o.prefer
+    -- WL Helper change (v2): role and the worth of 1% melee damage, for proc effects.
+    local wt = W(w)
+    wt.role, wt.mdmg = "phys", o.ranged and 0 or pct
+    return o.mh * 14, (o.oh or 0) * 14, (o.rg or 0.05) * 14, o.slow, wt, o.prefer
 end
 
 -- Damage casters: spell power counts in full, plus their school's spell damage.
@@ -445,7 +482,9 @@ local function Caster(level, race, cls, o)
     w.sta = o.sta or 0.15
     -- Spell penetration matters against raid bosses; leveling mobs barely resist.
     w.spen = o.spen or (level >= 58 and 0.3 or 0.05)
-    return 0, 0, o.wand or 1.2, false, W(w)
+    local wt = W(w)
+    wt.role, wt.mdmg = "caster", 0   -- WL Helper change (v2): for proc effects
+    return 0, 0, o.wand or 1.2, false, wt
 end
 
 -- Healers: healing power and spell power count in full.
@@ -468,7 +507,32 @@ local function Healer(level, race, cls, o)
     w.mp5 = o.mp5 or 0.9
     w.sta = 0.1
     w.armor = o.armor
-    return 0, 0, 1, false, W(w)
+    local wt = W(w)
+    wt.role, wt.mdmg = "healer", 0   -- WL Helper change (v2): for proc effects
+    return 0, 0, 1, false, wt
+end
+
+-- WL Helper change (v2): defense the character has, in skill points, and how many skill
+-- points one point of the item "defense" stat gives (nil when the client can't tell).
+local CR_DEFENSE = CR_DEFENSE_SKILL or 2
+local defOverride   -- tests and the API can set { skill =, ratio = }
+local function OwnedDefense()
+    if defOverride then return defOverride.skill, defOverride.ratio end
+    local skill, ratio, bonus
+    if GetCombatRating and GetCombatRatingBonus then
+        local ok1, rating = pcall(GetCombatRating, CR_DEFENSE)
+        local ok2, b = pcall(GetCombatRatingBonus, CR_DEFENSE)
+        rating, bonus = ok1 and Num(rating), ok2 and Num(b)
+        if rating and rating > 0 and bonus and bonus > 0 then ratio = bonus / rating end
+    end
+    if UnitDefense then
+        local ok, base, mod = pcall(UnitDefense, "player")
+        base, mod = ok and Num(base), ok and Num(mod)
+        -- The modifier holds talents and +Defense; on rating clients the rating bonus may be
+        -- apart from it, so take the larger of the two rather than adding them.
+        if base then skill = base + math.max(mod or 0, bonus or 0) end
+    end
+    return skill, ratio
 end
 
 -- Tanks score in Stamina: what each stat is worth in effective health.
@@ -496,7 +560,36 @@ local function Tank(level, race, cls, o)
     w.haste = pct * 0.5 / 10
     w.sp, w.sdmg, w.holy = o.sp, o.sp, o.sp
     w.int = o.int
-    return o.mh or 3, 0, 0.1, false, W(w)
+    if not opts.neutral then
+        -- WL Helper change (v2): bears can't parry or block, so defense only adds miss and dodge.
+        if o.bear then
+            w.parry = 0
+            w.def = avoid * 0.08 + 0.35
+        end
+        -- WL Helper change (v2): the crit-immunity cap. A raid boss (level + 3) crits a tank for
+        -- 5% + 0.04% per point of its weapon skill above the tank's defense, so 440 defense at 60
+        -- (5 x (level + 3) + 125) removes crits. Below it each point is worth twice its avoidance
+        -- value (a cap-priority heuristic, not a mean-damage derivation: being crit-immune
+        -- comes first); above it only
+        -- the avoidance part counts. The last 10 points fade. Needs the character's own defense
+        -- (UnitDefense), so only for your own class at 58+.
+        local have, ratio = nil, nil
+        if ctx and ctx.own and level >= 58 then have, ratio = OwnedDefense() end
+        if have then
+            local share = o.bear and 0.08 or 0.16
+            local cap = 5 * (level + 3) + 125
+            local left = cap - have
+            local crit = left > 0 and avoid * 0.16 * math.min(1, left / 10) or 0
+            w.def = avoid * share + crit
+            -- WL Helper change (v3): the weight is per defense skill point. Data.lua's def values
+            -- are skill points ("+N Defense"), so no ratio here; LiveItem turns a client's
+            -- defense rating into skill points instead.
+        end
+    end
+    local wt = W(w)
+    -- WL Helper change (v2): for proc effects (threat). WL Helper change (v3): half, like haste.
+    wt.role, wt.mdmg = "tank", pct * 0.5
+    return o.mh or 3, 0, 0.1, false, wt
 end
 
 -- Each spec returns: main-hand DPS weight, off-hand DPS weight, ranged DPS weight,
@@ -672,7 +765,8 @@ local SPECS = {
         end },
         -- Heart of the Wild +20% Stamina in bear; Thick Hide and bear form armor.
         { key = "bear", label = "Feral Tank", weights = function(level, race)
-            return Tank(level, race, "DRUID", { staPct = 0.2, armor = 0.12, str = 0.4, bv = 0, blockVal = 0, mh = 2.5 })   -- Nov 11: bear uses weapon DPS
+            -- WL Helper change (v2): bear = true (no parry or block).
+            return Tank(level, race, "DRUID", { staPct = 0.2, armor = 0.12, str = 0.4, bv = 0, blockVal = 0, mh = 2.5, bear = true })   -- Nov 11: bear uses weapon DPS
         end },
         -- Living Spirit +15% Spirit; Bloom heals for 100% of Spirit; Reflection 50% regen while casting.
         { key = "resto", label = "Restoration", weights = function(level, race)
@@ -917,13 +1011,81 @@ local function Better(aItem, aScore, bItem, bScore)
     return aItem.id < bItem.id
 end
 
+------------------------------------------------------------------------
+-- WL Helper change (v2): proc and use effects.
+--
+-- Data.lua only has flat stats, so "Chance on hit" and "Use:" items scored their stats
+-- alone (Hand of Justice 12 AP) or nothing (Earthstrike, 0). Each item below turns its
+-- effect into stats the spec already weighs:
+--   stat keys (ap, str, sp, mp5, crit...): the average stat the effect gives
+--     (Use: amount x duration / cooldown x 0.8 for timing; procs: amount x uptime)
+--   mdmg: % more melee damage (extra attacks, damage procs, armor reduction), valued at
+--     the spec's worth of 1% damage (0 for casters, healers and ranged hunters). An extra
+--     attack is a white swing, about 60% of melee damage: HoJ's 2% chance = 1.2.
+--   role: only for that kind of spec ("phys", "caster", "healer", "tank")
+-- Values are vanilla mechanics, kept on the low side; a Forever rework the table doesn't
+-- know about is not guessed. Items not in the table: Compare reads their "Use:" line from
+-- the tooltip (ItemEffects below) and flags procs it can't value.
+------------------------------------------------------------------------
+local PROCS = {
+    [11815] = { mdmg = 1.2, note = "extra attacks (2% chance on hit)" },          -- Hand of Justice
+    [21180] = { ap = 37, rap = 37, note = "Use: +280 attack power, 20 s / 2 min" }, -- Earthstrike
+    [11684] = { mdmg = 3.5, note = "2 extra attacks on hit" },                    -- Ironfoe
+    [871]   = { mdmg = 2.5, note = "extra attack on hit" },                       -- Flurry Axe
+    [17705] = { mdmg = 2.5, note = "extra attack on hit" },                       -- Thrash Blade
+    [12798] = { mdmg = 3, note = "armor reduction on hit" },                    -- Annihilator
+    [12790] = { str = 40, note = "Strength proc on hit" },                      -- Arcanite Champion
+    [870]   = { mdmg = 2, note = "fire damage on hit" },                        -- Fiery War Axe
+    [1728]  = { mdmg = 2, note = "fire damage on hit" },                        -- Teebu's Blazing Longsword
+    [14541] = { mdmg = 1, note = "shadow drain on hit" },                     -- Barovian Family Sword
+    [13361] = { mdmg = 1, note = "life drain on hit" },                       -- Skullforge Reaver
+    [19288] = { mp5 = 20, note = "regen proc on cast" },                        -- Darkmoon Card: Blue Dragon
+    [18646] = { crit = 28, role = "healer", note = "+2% Holy crit" },           -- The Eye of Divinity
+    [19958] = { haste = 27, role = "healer", note = "Use: faster heals, 15 s / 3 min" }, -- Hazza'rah's Charm of Healing
+    [22678] = { sp = 15, heal = 10, note = "Use: stacking spell power" },       -- Talisman of Ascendance
+    [18820] = { sp = 23, note = "Use: +175 spell power, 15 s / 90 s" },         -- Talisman of Ephemeral Power
+}
+
+local function ProcScore(p, w)
+    if p.role and w.role and p.role ~= w.role then return 0 end
+    local s = (p.mdmg or 0) * (w.mdmg or 0)
+    for k, v in pairs(p) do
+        local i = STAT[k]
+        if i and type(v) == "number" then s = s + v * w[i] end
+    end
+    return s
+end
+
 -- Score from stats alone. Weapon damage is added per section below.
+-- WL Helper change (v3): percent hit, crit and haste lines are kept apart by kind:
+-- st.spell (spell hit, spell crit, casting speed) counts for casters and healers only,
+-- st.melee (chance to hit, critical strike, attack speed) for the other specs only.
+local function SplitScore(st, w)
+    local b
+    if w.role == "caster" or w.role == "healer" then b = st.spell else b = st.melee end
+    local s = 0
+    if b then for k, v in pairs(b) do s = s + v * (w[k] or 0) end end
+    return s
+end
+local function MergeSplit(dst, src, f)
+    for _, kind in ipairs({ "spell", "melee" }) do
+        if src[kind] then
+            dst[kind] = dst[kind] or {}
+            for k, v in pairs(src[kind]) do dst[kind][k] = (dst[kind][k] or 0) + v * (f or 1) end
+        end
+    end
+end
+
 local function BaseScore(item, w)
     local base, st = 0, item.st
     for k = 1, NUM_STATS do
         local v = st[k]
         if v ~= 0 then base = base + v * w[k] end
     end
+    base = base + SplitScore(st, w)   -- WL Helper change (v3)
+    -- WL Helper change (v2): proc and use effects from the table above.
+    local p = not opts.neutral and PROCS[item.id]
+    if p then base = base + ProcScore(p, w) end
     return base
 end
 
@@ -1031,11 +1193,23 @@ local function TooltipLines(link)
     return lines
 end
 
+-- WL Helper change (v3): a "Use:" line ("Utiliser :", also with a no-break space) gives
+-- stats for a few seconds only. TooltipEffects and PROCS average it over its cooldown.
+-- The no-break space is replaced before lower(): lower() may change its bytes.
+local function NoNbsp(text)
+    return (text:gsub("\194\160", " "))
+end
+local function IsUseLine(text)
+    local t = NoNbsp(text):lower()
+    return t:find("^use%s*:") or t:find("^utiliser%s*:")
+end
+
 -- Returns spell power for both, extra healing, extra damage (the list's sp / heal / sdmg).
 local function SpellStatsFromLines(lines)
     local both, heal, dmg = 0, 0, 0
     for _, text in ipairs(lines) do
         local t = text:lower()
+        if opts.neutral or not IsUseLine(text) then   -- WL Helper change (v3)
         local n = t:match("damage and healing done by magical spells and effects by up to (%d+)")
             or t:match("^%+(%d+) spell power") or t:match("^%+(%d+) damage and healing")
         if n then both = both + tonumber(n) end
@@ -1044,6 +1218,7 @@ local function SpellStatsFromLines(lines)
         if n then heal = heal + tonumber(n) end
         n = t:match("and damage done by up to (%d+)") or t:match("^%+(%d+) damage spells")
         if n then dmg = dmg + tonumber(n) end
+        end
     end
     -- "healing up to 17 and damage up to 6": 6 counts for both, 11 is healing only.
     if heal > 0 and dmg > 0 then
@@ -1121,10 +1296,17 @@ local function LiveItem(id, link)
                 -- "of Fiery Wrath" and friends: one school only.
                 for _, text in ipairs(lines) do
                     local school, n = text:lower():match("damage done by (%a+) spells and effects by up to (%d+)")
+                    if school and not opts.neutral and IsUseLine(text) then school = nil end   -- WL Helper change (v3)
                     if school and STAT[school] and item.st[STAT[school]] == 0 then item.st[STAT[school]] = tonumber(n) end
                 end
             end)
         end
+    end
+    -- WL Helper change (v3): the client's defense rating turned into skill points, the unit
+    -- Data.lua and the defense weight use. Only when the client gives a ratio.
+    if not opts.neutral and item.st[STAT.def] > 0 and stats.ITEM_MOD_DEFENSE_SKILL_RATING_SHORT then
+        local _, ratio = OwnedDefense()
+        if ratio and ratio > 0 and math.abs(ratio - 1) > 0.01 then item.st[STAT.def] = item.st[STAT.def] * ratio end
     end
     if known then
         -- Keep what the list knows (level, speed, weapon type, hidden spell power) and use the
@@ -1195,11 +1377,49 @@ local ENCHANT_WORDS = {
     { "armor", "armor" }, { "armure", "armor" },
 }
 
+-- WL Helper change (v2): percent lines turned into rating (Forever: 14 crit, 10 hit,
+-- 10 haste, 12 dodge, 15 parry, 5 block = 1%). Checked in order.
+-- WL Helper change (v3): hit needs "chance to hit"; spell lines and melee lines are kept
+-- apart (st.spell / st.melee, see SplitScore).
+local PCT_WORDS = {
+    { "attack speed", "haste", 10 }, { "vitesse d'attaque", "haste", 10 },
+    { "casting speed", "haste", 10, "spell" }, { "vitesse d'incantation", "haste", 10, "spell" },
+    { "critical", "crit", 14 }, { "critique", "crit", 14 },
+    { "chance to hit", "hit", 10 }, { "chances de toucher", "hit", 10 }, { "chance de toucher", "hit", 10 },
+    { "% hit", "hit", 10 }, { "% toucher", "hit", 10 }, { "% au toucher", "hit", 10 },
+    { "dodge", "dodge", 12 }, { "esquive", "dodge", 12 },
+    { "parry", "parry", 15 }, { "parade", "parry", 15 },
+    { "block", "block", 5 }, { "blocage", "block", 5 },
+}
+
 -- One enchant line: adds to st (stat array) and returns extra weapon damage.
 local function ParseEnchantLine(text, st)
     local t = text:lower():gsub("^enchanted:%s*", ""):gsub("^enchanté%s*:%s*", "")
-    if t:find("%%") then return 0 end            -- "+1% dodge" and the like: not a flat stat
+    if t:find("%%") then
+        if opts.neutral then return 0 end         -- "+1% dodge" and the like: not a flat stat
+        -- WL Helper change (v2): "+2% hit", "Increases attack speed by 3%" -> rating.
+        local p = tonumber(t:match("(%d+)%s*%%") or "")
+        if not p then return 0 end
+        -- WL Helper change (v3): "2% chance on melee hit to ..." is a proc, not a stat.
+        if t:find("chance on", 1, true) or t:find("chances quand", 1, true) or t:find("chance quand", 1, true) then return 0 end
+        for _, row in ipairs(PCT_WORDS) do
+            if t:find(row[1], 1, true) then
+                local k = row[2]
+                if k == "hit" or k == "crit" or k == "haste" then
+                    local kind = row[4] or ((t:find("spell", 1, true) or t:find("sort", 1, true)) and "spell" or "melee")
+                    st[kind] = st[kind] or {}
+                    st[kind][STAT[k]] = (st[kind][STAT[k]] or 0) + p * row[3]
+                else
+                    st[STAT[k]] = st[STAT[k]] + p * row[3]
+                end
+                return 0
+            end
+        end
+        return 0
+    end
     local n = tonumber(t:match("%+%s*(%d+)") or "")
+    -- WL Helper change (v2): set bonuses and Use lines say "by N" ("de N") instead of "+N".
+    if not n and not opts.neutral then n = tonumber(t:match("by up to (%d+)") or t:match("by (%d+)") or t:match(" de (%d+)") or "") end
     if not n then return 0 end
     for _, row in ipairs(ENCHANT_WORDS) do
         if t:find(row[1], 1, true) then
@@ -1213,8 +1433,22 @@ local function ParseEnchantLine(text, st)
             return 0
         end
     end
+    -- WL Helper change (v2): scopes read "+7 Damage": weapon damage.
+    if not opts.neutral and (t:find("damage", 1, true) or t:find("dégâts", 1, true)) then return n end
     return 0
 end
+
+-- WL Helper change (v2): enchants whose line has no number to read (procs, or a bare
+-- name like "Crusader"), as average stats. Crusader: 100 Strength for 15 s at about
+-- 1 proc a minute (~22% uptime, a bit more with haste) -> 25 Strength.
+local ENCHANT_IDS = {
+    [1900] = { str = 25, note = "Crusader" },
+    [803]  = { ap = 25, note = "Fiery Weapon" },
+    [1898] = { ap = 15, note = "Lifestealing" },
+    [1894] = { ap = 10, note = "Icy Chill" },
+    [34]   = { haste = 30, note = "Iron Counterweight (+3% attack speed)" },
+    [2523] = { hit = 30, note = "Biznicks Accurascope (+3% hit)" },
+}
 
 local enchantCache = {}
 
@@ -1238,6 +1472,18 @@ local function EnchantStats(link)
     if not EnchantID(link) then return nil end
     local cached = enchantCache[link]
     if cached ~= nil then return cached or nil end
+    -- WL Helper change (v2): known proc enchants come from ENCHANT_IDS, no tooltip needed.
+    local known = not opts.neutral and ENCHANT_IDS[EnchantID(link)]
+    if known then
+        local st = {}
+        for k = 1, NUM_STATS do st[k] = 0 end
+        for k, v in pairs(known) do
+            if STAT[k] then st[STAT[k]] = v end
+        end
+        local result = { st = st, wdmg = 0, id = EnchantID(link), note = known.note }
+        enchantCache[link] = result
+        return result
+    end
     local ok1, withLines = pcall(TooltipLines, link)
     local ok2, bareLines = pcall(TooltipLines, StripEnchant(link))
     -- An enchanted tooltip has at least the name, the slot and the enchant line.
@@ -1256,9 +1502,11 @@ local function EnchantStats(link)
             else
                 local before = 0
                 for k = 1, NUM_STATS do before = before + st[k] end
+                local splitBefore = (st.spell and 1 or 0) + (st.melee and 1 or 0)   -- WL Helper change (v3)
                 wdmg = wdmg + ParseEnchantLine(text, st)
                 local after = 0
                 for k = 1, NUM_STATS do after = after + st[k] end
+                if (st.spell and 1 or 0) + (st.melee and 1 or 0) ~= splitBefore then after = after + 1 end
                 if after ~= before or wdmg > 0 then any = true end
             end
         end
@@ -1277,11 +1525,220 @@ local function WithEnchant(item, link)
     for k, v in pairs(item) do copy[k] = v end
     copy.st = {}
     for k = 1, NUM_STATS do copy.st[k] = (item.st[k] or 0) + ench.st[k] end
+    MergeSplit(copy.st, item.st) MergeSplit(copy.st, ench.st)   -- WL Helper change (v3)
     if ench.wdmg > 0 and (item.spd or 0) > 0 then
         copy.dps = (item.dps or 0) + ench.wdmg / item.spd
     end
     copy.enchant = ench
     return copy, ench
+end
+
+local function Zeros()
+    local st = {}
+    for k = 1, NUM_STATS do st[k] = 0 end
+    return st
+end
+
+local function Dot(st, w)
+    local s = 0
+    for k = 1, NUM_STATS do
+        if st[k] ~= 0 then s = s + st[k] * w[k] end
+    end
+    return s + SplitScore(st, w)   -- WL Helper change (v3)
+end
+
+------------------------------------------------------------------------
+-- WL Helper change (v2): "Use:" and proc lines read from the tooltip, for items the
+-- PROCS table doesn't know. "Use: Increases attack power by 200 for 20 sec. (2 Min
+-- Cooldown)" counts as 200 x 20 / 120 x 0.8 attack power. A proc line that can't be
+-- valued ("Chance on hit:") is reported in notes instead of silently scoring 0.
+------------------------------------------------------------------------
+local effectCache = {}
+-- WL Helper change (v3): a link whose tooltip isn't loaded yet is not scanned again for a
+-- second (every tooltip refresh calls Compare). Needs GetTime; without it, no wait.
+local notReady = {}
+local function RecentlyNotReady(link)
+    local t = notReady[link]
+    return t ~= nil and GetTime ~= nil and GetTime() - t < 1
+end
+local function MarkNotReady(link)
+    if GetTime then notReady[link] = GetTime() end
+end
+
+-- WL Helper change (v3): cooldown in seconds from "(1 Min, 30 Sec Cooldown)", "(2 Min
+-- Cooldown)", "(Recharge : 2 min)", "(Recharge : 1 min 30 s)", "(1 Hour Cooldown)".
+local function Cooldown(use)
+    local c = use:match("%(([^%)]*cooldown)%)") or use:match("%((recharge[^%)]*)%)")
+    if not c then return nil end
+    c = c .. " "
+    local h = tonumber(c:match("(%d+)%s*hour") or c:match("(%d+)%s*heure") or c:match("(%d+)%s*h[%s,]") or "") or 0
+    local m = tonumber(c:match("(%d+)%s*min") or "") or 0
+    local s = tonumber(c:match("(%d+)%s*sec") or c:match("(%d+)%s*s[%s,]") or "") or 0
+    local cd = h * 3600 + m * 60 + s
+    return cd > 0 and cd or nil
+end
+
+local function TooltipEffects(link)
+    local cached = effectCache[link]
+    if cached ~= nil then return cached end
+    if RecentlyNotReady(link) then return nil end
+    local ok, lines = pcall(TooltipLines, link)
+    if not ok or not TooltipReady(lines, 2) then MarkNotReady(link) return nil end
+    local st, notes, any = Zeros(), {}, false
+    for _, text in ipairs(lines) do
+        -- WL Helper change (v3): "Utiliser :" with a no-break space, and French cooldowns.
+        local t = NoNbsp(text):lower()
+        local use = t:match("^use%s*:%s*(.+)") or t:match("^utiliser%s*:%s*(.+)")
+        if use then
+            local dur = tonumber(use:match("for (%d+) sec") or use:match("pendant (%d+) s") or "")
+            local cd = Cooldown(use)
+            local tmp = Zeros()
+            if dur and cd and cd > 0 then ParseEnchantLine(use, tmp) end
+            local sum = 0
+            for k = 1, NUM_STATS do sum = sum + tmp[k] end
+            if tmp.spell or tmp.melee then sum = sum + 1 end
+            if sum > 0 then
+                local f = math.min(1, dur / cd) * 0.8
+                for k = 1, NUM_STATS do st[k] = st[k] + tmp[k] * f end
+                MergeSplit(st, tmp, f)
+                any = true
+                notes[#notes + 1] = "use effect averaged over its cooldown"
+            else
+                notes[#notes + 1] = "use effect not scored"
+            end
+        elseif t:find("^chance on hit") or t:find("^chances quand vous touchez") or t:find("^chance on hit:")
+            or (t:find("^equip:") and t:find("chance on")) or (t:find("^équipé") and t:find("chances")) then
+            notes[#notes + 1] = "proc not counted"
+        end
+    end
+    local result = { st = st, any = any, notes = notes }
+    effectCache[link] = result
+    return result
+end
+
+-- A copy of item ready for Compare/Score: its link, tooltip effects added. Returns
+-- item, notes. Same item back in neutral mode.
+local function Prepare(item, link)
+    if opts.neutral or not item then return item, {} end
+    local copy = {}
+    for k, v in pairs(item) do copy[k] = v end
+    copy.link = link
+    local notes = {}
+    local p = PROCS[item.id]
+    if p then
+        notes[#notes + 1] = "effect counted: " .. (p.note or "proc")
+    elseif link then
+        local fx = TooltipEffects(link)
+        if fx then
+            if fx.any then
+                copy.st = {}
+                for k = 1, NUM_STATS do copy.st[k] = (item.st[k] or 0) + fx.st[k] end
+                MergeSplit(copy.st, item.st) MergeSplit(copy.st, fx.st)   -- WL Helper change (v3)
+            end
+            for _, n in ipairs(fx.notes) do notes[#notes + 1] = n end
+        end
+    end
+    return copy, notes
+end
+
+-- Suffix ID of a random-suffix link (7th field), or nil.
+local function SuffixID(link)
+    if type(link) ~= "string" then return nil end
+    local s = tonumber(link:match("item:%-?%d+:%-?%d*:%-?%d*:%-?%d*:%-?%d*:%-?%d*:(%-?%d*)") or "")
+    if s and s ~= 0 then return s end
+    return nil
+end
+
+------------------------------------------------------------------------
+-- WL Helper change (v2): set bonuses in Compare. The set comes from GetItemInfo's
+-- setID (16th return) and its bonuses from the tooltip's "(N) Set:" lines, read with the
+-- enchant parser ("+50 Attack Power", "Increases your chance to hit by 2%" -> 20 hit).
+-- Compare adds the bonuses a new item would complete and takes off the ones it would
+-- break. Bonuses that aren't stats are named in notes, not scored.
+------------------------------------------------------------------------
+local setCache = {}
+local function SetInfo(link)
+    if type(link) ~= "string" or not GetInfo then return nil end
+    local cached = setCache[link]
+    if cached ~= nil then return cached or nil end
+    if RecentlyNotReady(link) then return nil end
+    -- WL Helper change (v3): "no set" is cached only once the item info is loaded (a name
+    -- came back); before that, nil and ask again later.
+    local ok, name, setID = pcall(function() local t = { GetInfo(link) } return t[1], t[16] end)
+    setID = ok and Num(setID)
+    if not setID or setID <= 0 then
+        if ok and name ~= nil then setCache[link] = false else MarkNotReady(link) end
+        return nil
+    end
+    local okL, lines = pcall(TooltipLines, link)
+    if not okL or not TooltipReady(lines, 2) then MarkNotReady(link) return nil end
+    local bonuses = {}
+    for _, text in ipairs(lines) do
+        local n, rest = text:match("^%((%d+)%)%s*[^:]+:%s*(.+)$")
+        if n then
+            local st = Zeros()
+            ParseEnchantLine(rest, st)
+            bonuses[#bonuses + 1] = { n = tonumber(n), st = st, text = rest }
+        end
+    end
+    local info = { id = setID, bonuses = bonuses }
+    setCache[link] = info
+    return info
+end
+
+local wornSets   -- WL Helper change (v3): { time, before, infos, bySlot } of the last read
+-- Score gained (new set bonuses) and lost (broken ones) when target replaces the items in
+-- invSlots. Returns gain, lost, notes.
+local function SetDelta(target, invSlots, w)
+    local notes = {}
+    if opts.neutral or not GetInventoryItemLink then return 0, 0, notes end
+    -- WL Helper change (v3): the worn sets are read once per frame (one Compare calls this
+    -- for each section), not 19 links per call. Without GetTime, every call.
+    local now = GetTime and GetTime()
+    local worn = now and wornSets and wornSets.time == now and wornSets
+    if not worn then
+        worn = { time = now, before = {}, infos = {}, bySlot = {} }
+        for s = 1, 19 do
+            local l = GetInventoryItemLink("player", s)
+            local info = l and SetInfo(l)
+            if info then
+                worn.before[info.id] = (worn.before[info.id] or 0) + 1
+                worn.infos[info.id], worn.bySlot[s] = info, info
+            end
+        end
+        wornSets = worn
+    end
+    local before, infos, bySlot = worn.before, {}, worn.bySlot
+    for id, info in pairs(worn.infos) do infos[id] = info end
+    local after = {}
+    for id, c in pairs(before) do after[id] = c end
+    for _, s in ipairs(invSlots) do
+        local info = bySlot[s]
+        if info then after[info.id] = after[info.id] - 1 end
+    end
+    local ti = target.link and SetInfo(target.link)
+    if ti then
+        after[ti.id] = (after[ti.id] or 0) + 1
+        infos[ti.id] = infos[ti.id] or ti
+    end
+    local gain, lost = 0, 0
+    for id, info in pairs(infos) do
+        local b, a = before[id] or 0, after[id] or 0
+        for _, bonus in ipairs(info.bonuses) do
+            local had, has = b >= bonus.n, a >= bonus.n
+            if had ~= has then
+                local v = Dot(bonus.st, w)
+                if has then
+                    gain = gain + v
+                    notes[#notes + 1] = string.format("set bonus (%d) %s: +%.1f", bonus.n, bonus.text, v)
+                else
+                    lost = lost + v
+                    notes[#notes + 1] = string.format("breaks set bonus (%d) %s: -%.1f", bonus.n, bonus.text, v)
+                end
+            end
+        end
+    end
+    return gain, lost, notes
 end
 
 -- Score of what's in a character slot. 0 = empty, nil = can't read it.
@@ -1293,6 +1750,7 @@ local function EquippedScore(invSlot, mh, oh, rg, slowBonus, w, prefer)
     local item = LiveItem(id, link)
     if not item then return nil end
     item = WithEnchant(item, link)
+    item = Prepare(item, link)   -- WL Helper change (v2): use effects of what you wear
     local sec
     if invSlot == 17 then
         sec = (item.slot == 17) and SEC_SHIELD or SEC_OFFHAND
@@ -1314,19 +1772,39 @@ local function Upgrade(target, sec, newScore, mh, oh, rg, slowBonus, w, prefer)
         return item and ((item.dps or 0) * 0.1 + (item.st[1] or 0) * 0.005) or 0
     end
     local old
+    local neutral = opts.neutral
+    r.notes = {}
+    -- WL Helper change (v2): a worn item with no score (a use or proc trinket nothing can
+    -- value) is not an empty slot. With two slots the weaker scored one is compared.
+    local unscoredSlot, unscoredLink
     for _, invSlot in ipairs(INV_SLOTS[sec]) do
         local score, item, link = EquippedScore(invSlot, mh, oh, rg, slowBonus, w, prefer)
         if not score then r.unknown = true return r end
-        if item and item.id == target.id then
+        -- WL Helper change (v2): same base item with another random suffix ("of the Bear" vs
+        -- "of the Monkey") is a different item.
+        if item and item.id == target.id and (neutral or not target.link or SuffixID(link) == SuffixID(target.link)) then
             r.equipped, r.invSlot, r.equippedLink, r.pct, r.pctExact, r.old = true, invSlot, link, 0, 0, score
             return r
         end
         if item and score <= 0 then score = Floor(item) end
+        if not neutral and item and score <= 0 then
+            unscoredSlot, unscoredLink = unscoredSlot or invSlot, unscoredLink or link
         -- Two ring and trinket slots: compare against the weaker one.
-        if not old or score < old then
+        elseif not old or score < old then
             old, r.invSlot, r.equippedLink = score, invSlot, link
+            r.enchantNote = not neutral and item and item.enchant and item.enchant.note or nil
         end
     end
+    if r.enchantNote then r.notes[#r.notes + 1] = "your enchant counted: " .. r.enchantNote end
+    if not old then
+        if unscoredSlot then
+            r.unscored, r.invSlot, r.equippedLink, r.old = true, unscoredSlot, unscoredLink, 0
+            r.notes[#r.notes + 1] = "the item you wear has an effect that isn't scored"
+            return r
+        end
+        old = 0
+    end
+    local replaced = { r.invSlot }
     if sec == SEC_TWOHAND then
         -- A two-hander replaces both hands.
         local off, offItem, offLink = EquippedScore(17, mh, oh, rg, slowBonus, w, prefer)
@@ -1334,11 +1812,19 @@ local function Upgrade(target, sec, newScore, mh, oh, rg, slowBonus, w, prefer)
         if offItem and off <= 0 then off = Floor(offItem) end
         old = old + off
         r.offLink = offLink
+        replaced[2] = 17
     elseif sec == SEC_OFFHAND or sec == SEC_SHIELD then
         -- Can't use an off hand with a two-hander equipped.
         local mainID = GetInventoryItemID("player", 16)
         local main = mainID and LiveItem(mainID, GetInventoryItemLink("player", 16))
         if main and main.slot == 13 then r.blocked = "twohand" return r end
+    end
+    -- WL Helper change (v2): set bonuses the swap completes or breaks.
+    if not neutral then
+        local gain, lost, notes = SetDelta(target, replaced, w)
+        newScore, old = newScore + gain, old + lost
+        r.new, r.setGain, r.setLost = newScore, gain, lost
+        for _, n in ipairs(notes) do r.notes[#r.notes + 1] = n end
     end
     r.old = old
     if old <= 0 then r.empty = true return r end
@@ -1372,6 +1858,21 @@ ns.engine = {
     Usable = Usable, CanUse = CanUse, LiveItem = LiveItem, Upgrade = Upgrade, EquippedScore = EquippedScore,
     EnchantStats = EnchantStats, WithEnchant = WithEnchant, ParseEnchantLine = ParseEnchantLine,
     ScanTalents = ScanTalents, ClearTalentCache = ClearTalentCache, OwnedHit = OwnedHit,
+    -- WL Helper change (v2)
+    PROCS = PROCS, ENCHANT_IDS = ENCHANT_IDS, Prepare = Prepare, SetInfo = SetInfo, SetDelta = SetDelta,
+    TooltipEffects = TooltipEffects, HitCap = HitCap, OwnedDefense = OwnedDefense,
+    SetDefenseOverride = function(t) defOverride = t end,
+    Options = function() return opts end,
+    SetOptions = function(t)
+        if type(t) ~= "table" then return end
+        if t.neutral ~= nil then opts.neutral = t.neutral == true end
+        if t.raidAuto then opts.raid = nil elseif t.raid ~= nil then opts.raid = t.raid == true end
+        for k in pairs(enchantCache) do enchantCache[k] = nil end
+        for k in pairs(effectCache) do effectCache[k] = nil end
+        for k in pairs(setCache) do setCache[k] = nil end
+        for k in pairs(notReady) do notReady[k] = nil end
+        wornSets = nil
+    end,
     ReadPlayer = ReadPlayer, Parse = ns.Parse, Rank = ns.Rank,
     PlayerClassToken = function() ReadPlayer() return playerClassToken end,
     PlayerRace = function() ReadPlayer() return playerRace end,
@@ -1383,6 +1884,11 @@ ns.engine = {
         if all then
             for k in pairs(enchantCache) do enchantCache[k] = nil end
             for k in pairs(liveCache) do liveCache[k] = nil end
+            -- WL Helper change (v2): tooltip effects and set bonuses are read again too.
+            for k in pairs(effectCache) do effectCache[k] = nil end
+            for k in pairs(setCache) do setCache[k] = nil end
+            for k in pairs(notReady) do notReady[k] = nil end   -- WL Helper change (v3)
+            wornSets = nil
         end
     end,
 }

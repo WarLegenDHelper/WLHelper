@@ -113,7 +113,7 @@ end
 -- Asks the ladders of these items (already fresh ones are skipped); cb when all are in.
 function WP.LadderFetch(ids, cb)
     if not Available() then return false end
-    if not WP.AuctionHouseOpen() then WP.Print(L("ouvre l'hôtel des ventes d'abord.")); return false end
+    if not WP.AuctionHouseOpen() then WP.Print(L("L'hôtel des ventes est fermé : parle à un commissaire-priseur, puis recommence."), true); return false end
     local seen = {}
     for _, id in ipairs(ids) do
         if id and not seen[id] and not WP.Ladder(id) then seen[id] = true; queue[#queue + 1] = id end

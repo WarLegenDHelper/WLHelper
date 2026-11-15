@@ -1,8 +1,8 @@
 -- Writs/Upgrades.lua: a green arrow on the bag items that are an upgrade for you, and a line in
--- every item tooltip ("WL Helper · Frost: +24%").
+-- every item tooltip ("WL Helper · Givre    +24 %", then "Remplace [icon] Old item").
 --
 -- The judge is WL Helper's own stat weights (Writs/Weights.lua): your class, your spec (the talent
--- tree with the most points, or the one picked in Settings > Bags) and what you wear.
+-- tree with the most points, or the one picked in Settings > Upgrades) and what you wear.
 -- Bags: the game's own and Baganator (corner widgets and its "upgrade" search).
 local ADDON, root = ...
 root.Writs = root.Writs or {}
@@ -10,25 +10,31 @@ local ns = root.Writs
 local WP = ns.WP
 local L = ns.L
 local W = WP.Weights
+local T = ns.S.C
 
 ns.AddEnglish({
     ["Améliorations"] = "Upgrades",
     ["Flèche verte sur les objets meilleurs que les tiens"] = "Green arrow on items better than yours",
     ["vide"] = "empty",
-    ["emplacement vide"] = "empty slot",
-    ["équipé"] = "equipped",
-    ["au niveau %d"] = "at level %d",
     ["%s%d %%"] = "%s%d%%",
-    ["à la place de"] = "instead of",
+    ["Déjà équipé"] = "Already equipped",
+    ["Emplacement vide"] = "Empty slot",
+    ["Équipable au niveau %d"] = "Equippable at level %d",
+    ["Remplace"] = "Replaces",
 })
 
-local ARROW = "Interface\\Buttons\\Arrow-Up-Up"
-local GREEN = { 0.25, 1, 0.3 }
--- the game's own green "upgrade" arrow of the bags when this client has it (already green: no tint)
-local ARROW_ATLAS = { "bags-greenarrow" }
+local GREEN = T.ok        -- a gain
+local RED = T.bad         -- a loss
+local GREY = T.muted      -- equipped, no change
+-- the game's own green "upgrade" arrow of the bags when this client has it (already green: no
+-- tint); otherwise the HD arrow tinted with the gain colour
 local function PaintArrow(tex)
-    if ns.S.SetIcon(tex, ARROW_ATLAS, ARROW) then tex:SetVertexColor(1, 1, 1)
-    else tex:SetVertexColor(GREEN[1], GREEN[2], GREEN[3]) end
+    -- SetAtlas returns nothing on this engine: S.SetIcon checks the result with GetAtlas
+    if ns.S.HasAtlas and ns.S.HasAtlas("bags-greenarrow") and ns.S.SetIcon(tex, { "bags-greenarrow" }, nil) then
+        tex:SetVertexColor(1, 1, 1)
+    else
+        root.SetHDIcon(tex, "arrow_up", GREEN)
+    end
 end
 
 local function Active() return WP.ModuleOn("upgrades") end
@@ -224,10 +230,13 @@ local function InsteadOf(tip, link)
         local cur = GetInventoryItemLink("player", s)
         local tex = GetInventoryItemTexture and GetInventoryItemTexture("player", s)
         if cur and tex then
-            tip:AddLine("   " .. L("à la place de") .. " |T" .. tex .. ":14:14:0:0:64:64:5:59:5:59|t " .. cur, 0.7, 0.7, 0.7)
+            tip:AddLine(L("Remplace") .. " |T" .. tex .. ":14:14:0:-1:64:64:5:59:5:59|t " .. cur, GREY[1], GREY[2], GREY[3])
         end
     end
 end
+
+-- the left half of the line: the addon's tag, then the spec judged
+local function Tag(spec) return ns.S.Hex(T.accent) .. "WL Helper|r · " .. (spec or "") end
 
 local function TooltipLine(tip, link)
     if not (Active() and link) or WLWritsDB.upgradeTip == false then return end
@@ -235,13 +244,13 @@ local function TooltipLine(tip, link)
         local v = GFVerdict(link)
         local text, col
         local pct = false
-        if v == "equipped" then text, col = L("équipé"), { 0.7, 0.7, 0.7 }
-        elseif type(v) == "number" and v >= 1000 then text, col = L("emplacement vide"), GREEN
+        if v == "equipped" then text, col = L("Déjà équipé"), GREY
+        elseif type(v) == "number" and v >= 1000 then text, col = L("Emplacement vide"), GREEN
         elseif type(v) == "number" then
             text, pct = Percent(v), true
-            col = v > 0 and GREEN or (v < 0 and { 1, 0.35, 0.3 } or { 0.8, 0.8, 0.8 })
+            col = v > 0 and GREEN or (v < 0 and RED or GREY)
         else return end
-        tip:AddDoubleLine("|cffce1918WL Helper|r · " .. W.SpecNameFor(GFSpec()), text, 1, 1, 1, col[1], col[2], col[3])
+        tip:AddDoubleLine(Tag(W.SpecNameFor(GFSpec())), text, T.fg[1], T.fg[2], T.fg[3], col[1], col[2], col[3])
         if pct then InsteadOf(tip, link) end
         return
     end
@@ -250,7 +259,7 @@ local function TooltipLine(tip, link)
     if not can then
         -- only your level stops you: say from which level
         if why == "level" and lvl then
-            tip:AddDoubleLine("|cffce1918WL Helper|r · " .. spec, string.format(L("au niveau %d"), lvl), 1, 1, 1, 1, 0.82, 0)
+            tip:AddDoubleLine(Tag(spec), string.format(L("Équipable au niveau %d"), lvl), T.fg[1], T.fg[2], T.fg[3], T.warn[1], T.warn[2], T.warn[3])
         end
         return
     end
@@ -261,15 +270,15 @@ local function TooltipLine(tip, link)
     for _, slots in pairs({ W.SLOTS[select(9, ((C_Item and C_Item.GetItemInfo) or GetItemInfo)(link)) or ""] or {} }) do
         for _, s in ipairs(slots) do if GetInventoryItemLink("player", s) == link then equipped = true end end
     end
-    if equipped then text, col = L("équipé"), { 0.7, 0.7, 0.7 }
-    elseif gain == "empty" then text, col = L("emplacement vide"), GREEN
+    if equipped then text, col = L("Déjà équipé"), GREY
+    elseif gain == "empty" then text, col = L("Emplacement vide"), GREEN
     elseif type(gain) == "number" then
         local n = math.floor(gain + 0.5)
         text, pct = Percent(n), true
-        col = n >= 1 and GREEN or (n <= -1 and { 1, 0.35, 0.3 } or { 0.8, 0.8, 0.8 })
+        col = n >= 1 and GREEN or (n <= -1 and RED or GREY)
     else return end
     -- no tip:Show() here: the game resizes the tooltip itself; calling it from an addon can taint it
-    tip:AddDoubleLine("|cffce1918WL Helper|r · " .. spec, text, 1, 1, 1, col[1], col[2], col[3])
+    tip:AddDoubleLine(Tag(spec), text, T.fg[1], T.fg[2], T.fg[3], col[1], col[2], col[3])
     if pct then InsteadOf(tip, link) end
 end
 if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then

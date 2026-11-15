@@ -16,18 +16,22 @@ local C = S.C
 
 ns.AddEnglish({
     ["Libérer une place"] = "Free a slot",
-    ["Sacs pleins"] = "Bags full",
-    ["Jeter %s (vaut %s)"] = "Throw away %s (worth %s)",
-    ["Vendre %s (%s)"] = "Sell %s (%s)",
-    ["Aucun objet gris ou blanc sans valeur à jeter."] = "No grey or plain white item to throw away.",
-    ["%s jeté (valait %s)."] = "%s thrown away (was worth %s).",
-    ["%s vendu (%s)."] = "%s sold (%s).",
-    ["%s est sur ton curseur : clique dans le monde, puis confirme."] = "%s is on your cursor: click in the world, then confirm.",
-    ["Objets gris vendus : %d pour %s."] = "Grey items sold: %d for %s.",
-    ["Clic : jeter l'objet le moins cher (gris, ou arme et armure blanches). Au marchand, il est vendu."] =
-        "Click: throw away the cheapest item (grey, or a white weapon or armour). At a merchant it is sold.",
-    ["Fermer"] = "Close",
-    ["impossible en combat."] = "not possible in combat.",
+    ["Tes sacs sont pleins"] = "Your bags are full",
+    ["Le moins cher à jeter : %s, qui vaut %s."] = "Cheapest to throw away: %s, worth %s.",
+    ["Rien à jeter : aucun objet gris, ni arme ou armure blanche, dans tes sacs."] =
+        "Nothing to throw away: no grey item, and no white weapon or armour, in your bags.",
+    ["%s jeté : il valait %s."] = "%s thrown away: it was worth %s.",
+    ["%s vendu pour %s."] = "%s sold for %s.",
+    ["%s est sur ton curseur : clique dans le décor, puis confirme pour le jeter."] = "%s is on your cursor: click in the world, then confirm to throw it away.",
+    ["1 objet gris vendu pour %s."] = "1 grey item sold for %s.",
+    ["%d objets gris vendus pour %s."] = "%d grey items sold for %s.",
+    ["Clic : jeter l'objet le moins cher de tes sacs (gris, ou arme ou armure blanche). Chez un marchand, il est vendu."] =
+        "Click: throw away the cheapest item in your bags (grey, or a white weapon or armour). At a merchant it is sold.",
+    ["Libère une place en jetant l'objet le moins cher. Rien d'autre n'est touché."] =
+        "Frees a slot by throwing away the cheapest item. Nothing else is touched.",
+    ["Masquer"] = "Hide",
+    ["Clic : masquer ce message"] = "Click: hide this message",
+    ["Impossible en combat : réessaie une fois le combat fini."] = "Not possible in combat: try again once the fight is over.",
 })
 
 local function Info(bag, slot)
@@ -76,13 +80,13 @@ local function MerchantOpen() return MerchantFrame and MerchantFrame:IsShown() e
 
 -- One click: the cheapest junk goes (sold at a merchant, deleted elsewhere).
 local function Free()
-    if InCombatLockdown() then WP.Print(L("impossible en combat.")); return end
+    if InCombatLockdown() then WP.Print(L("Impossible en combat : réessaie une fois le combat fini."), true); return end
     local e = Cheapest()
-    if not e then WP.Print(L("Aucun objet gris ou blanc sans valeur à jeter.")); return end
+    if not e then WP.Print(L("Rien à jeter : aucun objet gris, ni arme ou armure blanche, dans tes sacs."), true); return end
     local label = (e.link or e.name) .. (e.count > 1 and (" x" .. e.count) or "")
     if MerchantOpen() then
         C_Container.UseContainerItem(e.bag, e.slot)
-        WP.Print(string.format(L("%s vendu (%s)."), label, S.Money(e.value)))
+        WP.Print(string.format(L("%s vendu pour %s."), label, S.Money(e.value)))
         return
     end
     ClearCursor()
@@ -93,28 +97,53 @@ local function Free()
     C_Timer.After(0.2, function()
         local still = Info(e.bag, e.slot)
         if ok and not (still and still.itemID == e.id) then
-            WP.Print(string.format(L("%s jeté (valait %s)."), label, S.Money(e.value)))
+            WP.Print(string.format(L("%s jeté : il valait %s."), label, S.Money(e.value)))
         elseif GetCursorInfo() == "item" then
-            WP.Print(string.format(L("%s est sur ton curseur : clique dans le monde, puis confirme."), label))
+            WP.Print(string.format(L("%s est sur ton curseur : clique dans le décor, puis confirme pour le jeter."), label))
         end
     end)
 end
 
 -- ---------------------------------------------------------------- the banner when the bags are full
+-- A toast at the top of the screen (360 wide, panel fill, 1 px edge): the item's painted icon, the
+-- fact, the item it would throw away, and the one action. Its height is measured from the text.
+local BANNER_W = 360
 local banner
 local function Banner()
     if banner then return banner end
     local b = CreateFrame("Frame", "WLHelperFreeSlot", UIParent)
-    b:SetSize(330, 58); b:SetPoint("TOP", 0, -150); b:SetFrameStrata("DIALOG")
-    S.Solid(b, "BACKGROUND", C.bg):SetAllPoints()
-    S.Border(b, C.border)
-    b.icon = b:CreateTexture(nil, "ARTWORK"); b.icon:SetSize(34, 34); b.icon:SetPoint("LEFT", 12, 0); b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    b.title = S.Text(b, 13, C.warn, true); b.title:SetPoint("TOPLEFT", 56, -10); b.title:SetText(L("Sacs pleins"))
-    b.text = S.Text(b, 12, C.dim); b.text:SetPoint("TOPLEFT", 56, -30); b.text:SetWidth(150); b.text:SetWordWrap(false)
-    b.go = S.Button(b, L("Libérer une place"), 112, 30, "primary", function() Free(); b:Hide() end)
-    b.go:SetPoint("RIGHT", -30, 0)
-    b.close = S.CloseButton(b, 20, function() b:Hide() end, { L("Fermer") }, 8)
+    b.wlOwned = true
+    b:SetSize(BANNER_W, 96); b:SetPoint("TOP", 0, -120); b:SetFrameStrata("DIALOG")
+    S.Solid(b, "BACKGROUND", C.panel, 0.96):SetAllPoints()
+    S.Border(b, C.cardEdge)
+    local holder = CreateFrame("Frame", nil, b)
+    holder:SetSize(28, 28); holder:SetPoint("TOPLEFT", 12, -12)
+    b.icon = holder:CreateTexture(nil, "ARTWORK"); b.icon:SetAllPoints()
+    S.Border(holder, C.cardEdge)
+    b.title = S.Text(b, S.F.heading, C.fg)
+    b.title:SetPoint("TOPLEFT", 52, -12); b.title:SetJustifyH("LEFT")
+    b.title:SetText(L("Tes sacs sont pleins"))
+    b.text = S.Text(b, S.F.meta, C.muted)
+    b.text:SetJustifyH("LEFT"); b.text:SetJustifyV("TOP")
+    b.go = S.Button(b, L("Libérer une place"), 0, 28, "primary", function() Free(); b:Hide() end,
+        function() return { L("Libérer une place"), L("Libère une place en jetant l'objet le moins cher. Rien d'autre n'est touché."), L("Clic : jeter l'objet le moins cher de tes sacs (gris, ou arme ou armure blanche). Chez un marchand, il est vendu.") } end)
+    b.go:SetIcon("trash")
+    b.close = S.CloseButton(b, 28, function() b:Hide() end, { L("Masquer"), L("Clic : masquer ce message") })
     b.close:SetPoint("TOPRIGHT", -4, -4)
+    -- title and sentence wrap between the icon and the close button; the window grows with them
+    function b:Layout()
+        local textW = BANNER_W - 52 - 36
+        local y = 12 + S.FitText(self.title, 2, textW, self)
+        y = math.max(y, 12 + S.F.heading + 2)
+        y = y + 3
+        self.text:ClearAllPoints(); self.text:SetPoint("TOPLEFT", 52, -y)
+        local th = S.FitText(self.text, 2, textW, self)
+        y = y + math.max(th, S.F.meta + 2) + 12
+        self.go:ClearAllPoints(); self.go:SetPoint("TOPLEFT", 52, -y)
+        y = math.max(y + 28 + 12, 12 + 28 + 12)
+        self:SetHeight(math.ceil(y))
+    end
+    b:SetScript("OnShow", function(self) self:SetAlpha(0); root.Tween(self, 0, 1, 0.15, function(v) self:SetAlpha(v) end) end)
     b:Hide()
     banner = b
     return b
@@ -128,8 +157,11 @@ local function OfferFree()
     if not e then return end
     lastBanner = GetTime()
     local b = Banner()
-    b.icon:SetTexture(S.ItemIcon(e.id))
-    b.text:SetText(string.format(L("Jeter %s (vaut %s)"), e.name, S.Money(e.value)))
+    S.Painted(b.icon, S.ItemIcon(e.id))
+    local q = S.QualityColor(e.id)
+    local name = S.Hex(q) .. (e.name or "?") .. (e.count > 1 and (" x" .. e.count) or "") .. "|r"
+    b.text:SetText(string.format(L("Le moins cher à jeter : %s, qui vaut %s."), name, S.Money(e.value)))
+    b:Layout()
     b:Show()
     C_Timer.After(20, function() if b:IsShown() and GetTime() - lastBanner >= 19 then b:Hide() end end)
 end
@@ -158,7 +190,8 @@ local function SellGreys()
             end
         end
     end
-    if n > 0 then WP.Print(string.format(L("Objets gris vendus : %d pour %s."), n, S.Money(total))) end
+    if n == 1 then WP.Print(string.format(L("1 objet gris vendu pour %s."), S.Money(total)))
+    elseif n > 1 then WP.Print(string.format(L("%d objets gris vendus pour %s."), n, S.Money(total))) end
 end
 
 local ev = CreateFrame("Frame")
@@ -179,5 +212,5 @@ WP.Junk = {
     Free = Free,
     OtherSeller = OtherSeller,
     Offer = OfferFree,
-    Tip = function() return L("Clic : jeter l'objet le moins cher (gris, ou arme et armure blanches). Au marchand, il est vendu.") end,
+    Tip = function() return L("Clic : jeter l'objet le moins cher de tes sacs (gris, ou arme ou armure blanche). Chez un marchand, il est vendu.") end,
 }
