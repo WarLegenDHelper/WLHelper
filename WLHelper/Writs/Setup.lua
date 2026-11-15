@@ -1,7 +1,7 @@
 -- Writs/Setup.lua: the welcome screen, once, at the first login with WL Helper (and once more for
 -- those who had it before the clicks went off by default). It shows each module with a switch, the
 -- two click helpers (off until you turn them on) and the minimap button. Everything stays in
--- Settings afterwards; /wl bienvenue opens it again.
+-- Settings afterwards; /wl setup opens it again.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -12,7 +12,7 @@ local C = S.C
 
 ns.AddEnglish({
     ["Bienvenue"] = "Welcome",
-    ["Choisis ce que tu veux utiliser. Tout se change ensuite dans les Réglages (/wl reglages)."] = "Pick what you want to use. You can change all of it later in Settings (/wl options).",
+    ["Choisis ce que tu veux utiliser. Tout se change ensuite dans les Réglages (/wl options)."] = "Pick what you want to use. You can change all of it later in Settings (/wl options).",
     ["Modules"] = "Modules",
     ["Clics (désactivés par défaut)"] = "Clicks (off by default)",
     ["Alt-clic pour inviter"] = "Alt-click to invite",
@@ -61,7 +61,7 @@ local function Build()
     local intro = S.Text(win, 13, C.text)
     intro:SetPoint("TOPLEFT", PAD, y); intro:SetPoint("RIGHT", -PAD, 0)
     intro:SetJustifyH("LEFT"); intro:SetWordWrap(true)
-    intro:SetText(L("Choisis ce que tu veux utiliser. Tout se change ensuite dans les Réglages (/wl reglages)."))
+    intro:SetText(L("Choisis ce que tu veux utiliser. Tout se change ensuite dans les Réglages (/wl options)."))
     y = y - 44
 
     y = Section(win, y, L("Modules"))

@@ -1,7 +1,7 @@
 -- Writs/Feedback.lua: "Une idée, un bug ?" An addon cannot reach the internet, so this window builds
 -- the link of a GitHub issue form, already filled with the addon version, the client and the
 -- character, for the player to copy into a browser. Three forms: an idea, a bug, a wrong quest data.
--- Opened from the options (À propos), /wl idee, /comptoir idee.
+-- Opened from the options (About) and /wl idea.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs

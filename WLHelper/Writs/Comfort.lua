@@ -12,8 +12,8 @@ local L = ns.L
 local S = ns.S
 
 ns.AddEnglish({
-    ["Comptoir : %d writs prêts, %d enveloppes à ouvrir. /comptoir"] = "Trading Post: %d writs ready, %d envelopes to open. /comptoir",
-    ["Comptoir : %d writs prêts. /comptoir"] = "Trading Post: %d writs ready. /comptoir",
+    ["Comptoir : %d writs prêts, %d enveloppes à ouvrir. /wl trade"] = "Trading Post: %d writs ready, %d envelopes to open. /wl trade",
+    ["Comptoir : %d writs prêts. /wl trade"] = "Trading Post: %d writs ready. /wl trade",
     ["Comptoir : %s, %d rép"] = "Trading Post: %s, %d rep",
     ["Objet demandé : %s"] = "Requested item: %s",
     ["dans tes sacs"] = "in your bags",
@@ -126,8 +126,8 @@ f:SetScript("OnEvent", function(_, event, a1, a2)
                 for _, r in ipairs(WP.Rows()) do
                     if r.state == "ready" then ready = ready + 1 elseif r.state == "bag" then bag = bag + 1 end
                 end
-                if bag > 0 then WP.Print(string.format(L("Comptoir : %d writs prêts, %d enveloppes à ouvrir. /comptoir"), ready, bag))
-                elseif ready > 0 then WP.Print(string.format(L("Comptoir : %d writs prêts. /comptoir"), ready)) end
+                if bag > 0 then WP.Print(string.format(L("Comptoir : %d writs prêts, %d enveloppes à ouvrir. /wl trade"), ready, bag))
+                elseif ready > 0 then WP.Print(string.format(L("Comptoir : %d writs prêts. /wl trade"), ready)) end
             end)
         end
     end

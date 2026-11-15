@@ -4,30 +4,63 @@ local L, T = ns.L, ns.T_
 local Text, Tex, Button, Hex = ns.Text, ns.Tex, ns.Button, ns.Hex
 
 local p, qp
-local COLS, CW, CH, GAP = 4, 168, 112, 8
+-- two columns of wide cards, the dungeon's picture in full
+local COLS, CW, CH, GAP = 2, 384, 132, 10
 local PW = COLS * CW + (COLS - 1) * GAP + 28
 
--- Écrans de chargement du jeu pour les donjons Classic qui n'ont pas d'image dans les journaux
--- (mêmes fichiers que ForeverDungeonJournal utilise : ce sont les images du jeu lui-même)
+-- The game's own loading screens (files of the client, nothing shipped with the addon).
+-- Sure ones first (also used by Forever Dungeon Journal); the others are tried and dropped when the
+-- client has no such file. A dungeon with no picture gets a dark card and its icon.
 local LS = "Interface\\Glues\\LoadingScreens\\"
 local GAME_ART = {
   RagefireChasm = LS .. "LoadScreenRagefireChasm", WailingCaverns = LS .. "LoadScreenWailingCaverns",
   ShadowfangKeep = LS .. "LoadScreenShadowFangKeep", TheDeadmines = LS .. "LoadScreenDeadmines",
   BlackfathomDeeps = LS .. "LoadScreenBlackFathomDeeps", Gnomeregan = LS .. "LoadScreenGnomeregan",
-  TheStockade = 131870, RazorfenKraul = 131865,
+  TheStockade = 131870, RazorfenKraul = 131865, ExcavationSiteWetlands = 7963777, CityofDalaran = 7963775,
+  ScarletMonasteryGraveyard = LS .. "LoadScreenScarletMonastery2",
 }
+local MAYBE_ART = {
+  RazorfenDowns = "LoadScreenRazorfenDowns", Uldaman = "LoadScreenUldaman", ZulFarrak = "LoadScreenZulFarrak",
+  Maraudon = "LoadScreenMaraudon", SunkenTemple = "LoadScreenSunkenTemple", BlackrockDepths = "LoadScreenBlackrockDepths",
+  LowerBlackrockSpire = "LoadScreenBlackrockSpire", UpperBlackrockSpire = "LoadScreenBlackrockSpire",
+  DireMaulEast = "LoadScreenDireMaul", DireMaulWest = "LoadScreenDireMaul", DireMaulNorth = "LoadScreenDireMaul",
+  StratholmeLiving = "LoadScreenStratholme", StratholmeUndead = "LoadScreenStratholme", Scholomance = "LoadScreenScholomance",
+  ScarletMonasteryLibrary = "LoadScreenScarletMonastery", ScarletMonasteryArmory = "LoadScreenScarletMonastery",
+  ScarletMonasteryCathedral = "LoadScreenScarletMonastery",
+}
+local missing = {}   -- paths the client does not have, tried once per session
+local function TrySet(tex, path)
+  if missing[path] then return false end
+  local ok = tex:SetTexture(path)
+  local id = tex.GetTextureFileID and tex:GetTextureFileID()
+  if ok == false or (tex.GetTextureFileID and (not id or id == 0)) then missing[path] = true; return false end
+  return true
+end
 local function Art(tex, d, c)
   if c then c.bigIcon:Hide() end
+  tex:SetDesaturated(false)
   if d.art and ns.IsLoaded("ForeverDungeonJournal") then
-    tex:SetTexture("Interface\\AddOns\\ForeverDungeonJournal\\Media\\" .. d.art); tex:SetTexCoord(0, 1, 0.1, 0.9); return true
+    tex:SetTexture("Interface\\AddOns\\ForeverDungeonJournal\\Media\\" .. d.art); tex:SetTexCoord(0, 1, 0.12, 0.88); return true
   end
   local key = d.home or d.key
-  if GAME_ART[key] then tex:SetTexture(GAME_ART[key]); tex:SetTexCoord(0.02, 0.98, 0.3, 0.75); return true end
+  if GAME_ART[key] then tex:SetTexture(GAME_ART[key]); tex:SetTexCoord(0.02, 0.98, 0.26, 0.74); return true end
+  if MAYBE_ART[key] and TrySet(tex, LS .. MAYBE_ART[key]) then tex:SetTexCoord(0.02, 0.98, 0.26, 0.74); return true end
   if d.nart then tex:SetTexture(d.nart); tex:SetTexCoord(0, 1, 0.3, 0.7); return true end
-  -- pas d'image : fond sombre + icône du donjon au centre (au lieu d'une icône étirée)
+  -- no picture: a dark card with the dungeon's icon (not a stretched icon)
   tex:SetColorTexture(0.10, 0.11, 0.13, 1)
   if c then c.bigIcon:SetTexture(d.icon or "Interface\\Icons\\INV_Misc_Map_01"); c.bigIcon:Show() end
   return false
+end
+
+-- a shade from transparent to dark, top or bottom of the card
+local function Gradient(tex, fromTop, a)
+  if tex.SetGradient and CreateColor then
+    local dark, clear = CreateColor(0, 0, 0, a), CreateColor(0, 0, 0, 0)
+    if pcall(tex.SetGradient, tex, "VERTICAL", fromTop and clear or dark, fromTop and dark or clear) then return end
+  end
+  if tex.SetGradientAlpha then
+    if fromTop then tex:SetGradientAlpha("VERTICAL", 0, 0, 0, 0, 0, 0, 0, a) else tex:SetGradientAlpha("VERTICAL", 0, 0, 0, a, 0, 0, 0, 0) end
+  else tex:SetAlpha(a * 0.6) end
 end
 
 local function Counts(dkey)
@@ -90,9 +123,14 @@ local function MakeCard(parent)
   c:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   ns.Flat(c, { 0.08, 0.085, 0.095, 1 })
   c.art = c:CreateTexture(nil, "ARTWORK"); c.art:SetPoint("TOPLEFT", 1, -1); c.art:SetPoint("BOTTOMRIGHT", -1, 1)
+  -- the picture stays bright: a light veil (darker for "later"), dark bands behind the texts only
   c.shade = c:CreateTexture(nil, "ARTWORK", nil, 2); c.shade:SetPoint("TOPLEFT", 1, -1); c.shade:SetPoint("BOTTOMRIGHT", -1, 1)
-  c.shade:SetColorTexture(0, 0, 0, 0.55)
-  c.hl = Tex(c, "HIGHLIGHT", { 1, 1, 1, 0.08 }); c.hl:SetAllPoints()
+  c.shade:SetColorTexture(0, 0, 0, 0.15)
+  c.topBand = c:CreateTexture(nil, "ARTWORK", nil, 3); c.topBand:SetPoint("TOPLEFT", 1, -1); c.topBand:SetPoint("TOPRIGHT", -1, -1); c.topBand:SetHeight(52)
+  c.topBand:SetColorTexture(1, 1, 1, 1); Gradient(c.topBand, true, 0.8)
+  c.botBand = c:CreateTexture(nil, "ARTWORK", nil, 3); c.botBand:SetPoint("BOTTOMLEFT", 1, 1); c.botBand:SetPoint("BOTTOMRIGHT", -1, 1); c.botBand:SetHeight(40)
+  c.botBand:SetColorTexture(1, 1, 1, 1); Gradient(c.botBand, false, 0.85)
+  c.hl = Tex(c, "HIGHLIGHT", { 1, 1, 1, 0.07 }); c.hl:SetAllPoints()
   c.selBorder = {}
   for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
     local e = c:CreateTexture(nil, "OVERLAY")
@@ -101,17 +139,25 @@ local function MakeCard(parent)
     ns.Accent(e); c.selBorder[side] = e
   end
   -- ticked for the route: red border and a check box tick; every quest done: a green check
-  c.check = c:CreateTexture(nil, "OVERLAY"); c.check:SetSize(22, 22); c.check:SetPoint("TOPRIGHT", -4, -4)
-  c.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-  c.doneMark = c:CreateTexture(nil, "OVERLAY"); c.doneMark:SetSize(26, 26); c.doneMark:SetPoint("CENTER", c, "TOPRIGHT", -20, -22)
+  -- top: name on the left; quests on the right (faction emblem, "5/6 quests", green check once all done)
+  c.name = Text(c, 17, T.text, true); c.name:SetPoint("TOPLEFT", 12, -10); c.name:SetPoint("RIGHT", c, "RIGHT", -150, 0)
+  c.name:SetWordWrap(false); c.name:SetJustifyH("LEFT"); c.name:SetShadowOffset(1, -1); c.name:SetShadowColor(0, 0, 0, 1)
+  c.info = Text(c, 13, { 1, 0.82, 0.45 }, true); c.info:SetPoint("TOPRIGHT", -12, -12); c.info:SetJustifyH("RIGHT")
+  c.info:SetShadowOffset(1, -1); c.info:SetShadowColor(0, 0, 0, 1)
+  c.faction = c:CreateTexture(nil, "OVERLAY"); c.faction:SetSize(24, 24); c.faction:SetPoint("RIGHT", c.info, "LEFT", -2, -1)
+  c.faction:SetTexture("Interface\\TargetingFrame\\UI-PVP-Horde"); c.faction:SetTexCoord(0.06, 0.62, 0.02, 0.6)
+  c.doneMark = c:CreateTexture(nil, "OVERLAY"); c.doneMark:SetSize(24, 24); c.doneMark:SetPoint("RIGHT", c.faction, "LEFT", -2, 1)
   c.doneMark:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-Ready")
-  c.name = Text(c, 14, T.text, true); c.name:SetPoint("BOTTOMLEFT", 8, 30); c.name:SetWidth(CW - 16); c.name:SetWordWrap(true)
-  c.lvl = Text(c, 11, T.accent, true); c.lvl:SetPoint("TOPLEFT", 8, -8)
-  c.info = Text(c, 11, T.dim); c.info:SetPoint("BOTTOMLEFT", 8, 10); c.info:SetWidth(CW - 16); c.info:SetWordWrap(false)
+  c.cicon = c:CreateTexture(nil, "OVERLAY"); c.cicon:SetSize(22, 22); c.cicon:SetPoint("TOPLEFT", c.name, "BOTTOMLEFT", 0, -4)
+  -- bottom: levels on the left, "Picked" on the right when ticked for the route
+  c.lvl = Text(c, 12, T.text, true); c.lvl:SetPoint("BOTTOMLEFT", 12, 11)
+  c.lvl:SetShadowOffset(1, -1); c.lvl:SetShadowColor(0, 0, 0, 1)
+  c.check = c:CreateTexture(nil, "OVERLAY"); c.check:SetSize(22, 22); c.check:SetPoint("BOTTOMRIGHT", -8, 6)
+  c.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+  c.picked = Text(c, 12, T.text, true); c.picked:SetPoint("RIGHT", c.check, "LEFT", 0, 1)
   c.bar = Tex(c, "OVERLAY", T.accent); c.bar:SetPoint("BOTTOMLEFT", 1, 1); c.bar:SetHeight(3); ns.Accent(c.bar)
-  c.bigIcon = c:CreateTexture(nil, "ARTWORK", nil, 1); c.bigIcon:SetSize(40, 40); c.bigIcon:SetPoint("TOP", 0, -14); c.bigIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.bigIcon:Hide()
-  c.dicon = c:CreateTexture(nil, "OVERLAY"); c.dicon:SetSize(22, 22); c.dicon:SetPoint("TOPRIGHT", -30, -5); c.dicon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  c.cicon = c:CreateTexture(nil, "OVERLAY"); c.cicon:SetSize(24, 24); c.cicon:SetPoint("TOPRIGHT", -56, -4)
+  c.bigIcon = c:CreateTexture(nil, "ARTWORK", nil, 1); c.bigIcon:SetSize(48, 48); c.bigIcon:SetPoint("CENTER", 0, -4); c.bigIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.bigIcon:Hide()
+  c.dicon = c:CreateTexture(nil, "OVERLAY"); c.dicon:Hide()
   c:SetScript("OnClick", function(self, btn)
     if btn == "RightButton" then ns.OpenQuests(self.dkey) return end
     Selected()[self.dkey] = not Selected()[self.dkey] or nil
@@ -140,7 +186,7 @@ end
 
 local function Build()
   p = CreateFrame("Frame", "WLDTPicker", UIParent)
-  p:SetSize(PW, 560); p:SetPoint("CENTER"); p:SetFrameStrata("HIGH")
+  p:SetSize(PW, 640); p:SetPoint("CENTER"); p:SetFrameStrata("HIGH")
   p:SetMovable(true); p:EnableMouse(true); p:SetClampedToScreen(true); p:SetToplevel(true)
   ns.Flat(p, T.bg)
   local h = CreateFrame("Frame", nil, p)
@@ -243,20 +289,24 @@ Render = function()
     c.dicon:Hide()
     if d.cq then SetClassIcon(c.cicon, (d.cq:match("^[^,]+"))) else c.cicon:Hide() end
     c.name:SetText(ns.DName(k))
-    c.lvl:SetText((d.raid and (L.RAID .. "  ") or "") .. (d.lvl and d.lvl[1] and (d.lvl[1] .. "-" .. (d.lvl[2] or d.lvl[1])) or ""))
+    c.lvl:SetText((d.raid and (L.RAID .. "  ·  ") or "") .. (d.lvl and d.lvl[1] and (L.PICK_LV:format(d.lvl[1], d.lvl[2] or d.lvl[1])) or ""))
     local n, done = Counts(k)
     local finished = n > 0 and done >= n
-    c.info:SetText(finished and L.PICK_FINISHED:format(n)
-      or n > 0 and (L.PICK_QUESTS:format(n) .. "  ·  " .. L.PICK_DONE:format(done)) or L.PICK_NOQ)
+    c.info:SetText(n > 0 and L.PICK_QN:format(done, n) or L.PICK_NOQ)
+    local horde = UnitFactionGroup("player") ~= "Alliance"
+    c.faction:SetTexture(horde and "Interface\\TargetingFrame\\UI-PVP-Horde" or "Interface\\TargetingFrame\\UI-PVP-Alliance")
+    c.faction:SetShown(n > 0)
     c.bar:SetWidth(math.max(1, (CW - 2) * (n > 0 and done / n or 0)))
     if finished then c.bar:SetColorTexture(0.35, 0.86, 0.48, 1) else c.bar:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1) end
     c.doneMark:SetShown(finished)
-    c.lvl:SetTextColor(unpack(c.section == "later" and T.dim or T.accent))
+    c.lvl:SetTextColor(unpack(c.section == "later" and T.dim or T.text))
     local sel = Selected()[k] and true or false
     c.check:SetShown(sel)
-    if sel then c.check:ClearAllPoints(); c.check:SetPoint("TOPRIGHT", finished and -36 or -4, -4) end
+    c.picked:SetText(sel and L.PICK_PICKED or "")
     for _, e in pairs(c.selBorder) do e:SetShown(sel) end
-    c.shade:SetColorTexture(0, 0, 0, sel and 0.35 or (c.section == "todo" and 0.5 or 0.72))
+    -- later (too high) and done: greyed; to do: the picture as it is
+    c.art:SetDesaturated(c.section == "later" or c.section == "noq")
+    c.shade:SetColorTexture(0, 0, 0, (c.section == "todo" or sel) and 0.12 or 0.45)
     c:Show()
       end
       y = y + math.ceil(#keys / COLS) * (CH + GAP) + 8

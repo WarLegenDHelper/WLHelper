@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.17] — 2026-11-15
+
+### Modifié / Changed
+- **Commandes rangées** : une seule commande, `/wl`, et un seul mot anglais par action, le même en français : `dungeons`, `pick`, `trade`, `bags`, `orders`, `gps`, `options`, `setup`, `idea`, `help`. Les anciens mots (`/wl reglages`, `/wl sacs`...) marchent encore mais ne sont plus affichés. `/comptoir`, `/writs`, `/wlo`, `/dg`, `/dguide`, `/wldt` et `/zfg` sont retirés.
+  *One command, /wl, one English word per action in every language; the old extra slash commands are gone.*
+- **Sélecteur de donjons** refait : grandes cartes sur deux colonnes avec l'écran de chargement du donjon (les fichiers du jeu), le nom en haut, « 5/6 quêtes » et l'emblème de faction à droite, une coche verte quand tout est fait, les niveaux en bas. Les donjons trop hauts pour toi sont en gris.
+  *Dungeon picker redone: wide picture cards, quest count, levels; too-high dungeons in grey.*
+
 ## [1.0.0-beta.16] — 2026-11-15
 
 ### Ajouté / Added

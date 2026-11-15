@@ -1,4 +1,4 @@
--- Writs/Options.lua: WL Helper's options window (/wlo), one place for the dungeon guide, the
+-- Writs/Options.lua: WL Helper's options window (/wl options), one place for the dungeon guide, the
 -- Comptoir (Craftsman's Writs), the GPS and the bag cleaner. A 720x600 window: pages listed on the
 -- left, rows of "label left, control right" on the right, built lazily the first time it opens.
 -- Also registers WL Helper in the game's own settings (Esc > Options > AddOns) and, when present,
@@ -43,7 +43,6 @@ ns.AddEnglish({
     ["Zones où je vais"] = "Zones I go to",
     ["Un writ précis : clic droit dessus dans « Tous les writs »."] = "A single writ: right-click it in \"All writs\".",
     ["Formulaire GitHub prérempli"] = "Prefilled GitHub form",
-    ["/wl idee : proposer une idée ou signaler un bug"] = "/wl idea: suggest an idea or report a bug",
     -- General
     ["Langue"] = "Language", ["Automatique"] = "Automatic", ["Français"] = "Français", ["English"] = "English",
     ["Auto suit la langue du client.\nLes fenêtres déjà ouvertes changent après un /reload."] =
@@ -97,10 +96,6 @@ ns.AddEnglish({
     ["Commandes du chat"] = "Chat commands",
     ["Alerte des monstres rares"] = "Rare monster alert",
     ["Dans un donjon, un message et un son quand un monstre rare apparaît"] = "In a dungeon, a message and a sound when a rare monster shows up",
-    ["/wl : ouvre ou ferme le guide des donjons"] = "/wl: open or close the dungeon guide",
-    ["/comptoir ou /wl comptoir : fenêtre du Comptoir"] = "/comptoir or /wl trade: the Trading Post window",
-    ["/wl gps : lance ou arrête la tournée GPS"] = "/wl gps: start or stop the GPS tour",
-    ["/wlo : ces options"] = "/wlo: these options",
     -- game settings and EllesmereUI
     ["Guide des donjons, Craftsman's Writs et GPS intégré."] = "Dungeon guide, Craftsman's Writs and a built-in GPS.",
     ["Ouvrir les options"] = "Open the options",
@@ -582,7 +577,7 @@ function BUILD.about(p)
     CloseSection(p)
 
     Section(p, L("Commandes du chat"))
-    -- the same list as /wl aide, in the guide's language
+    -- the same list as /wl help, in the guide's language
     Note(p, root.L and root.L.HELP or "/wl")
 end
 
@@ -956,8 +951,6 @@ function ns.WP.OpenOptions(pageKey)
     ns.WP.ShowOptionsPage(pageKey)
 end
 
-SLASH_WLHELPEROPTIONS1 = "/wlo"
-SlashCmdList.WLHELPEROPTIONS = function() ns.WP.OpenOptions() end
 
 -- ---------------------------------------------------------------- the game's settings panel
 

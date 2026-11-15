@@ -154,11 +154,9 @@ end)
 -- =====================================================================
 --  Commandes : /wl (et /dg, /dguide, /wldt, /zfg pour l'habitude) ; /wl comptoir ... pour le Comptoir (writs)
 -- =====================================================================
+-- One command, /wl, and one English word per action (the same in French): dungeons, pick, trade,
+-- bags, orders, gps, options, setup, idea, help. Older words (French, clean, comptoir...) still work.
 SLASH_WLDUNGEONTOOL1 = "/wl"
-SLASH_WLDUNGEONTOOL5 = "/dg"
-SLASH_WLDUNGEONTOOL2 = "/dguide"
-SLASH_WLDUNGEONTOOL3 = "/wldt"
-SLASH_WLDUNGEONTOOL4 = "/zfg"
 SlashCmdList.WLDUNGEONTOOL = function(msg)
   if not ns.frame then return end
   -- « réglages », « idée » typed with accents: accents out before lower(), which may touch UTF-8 bytes
@@ -166,7 +164,6 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   msg = msg:lower():gsub("^%s+", ""):gsub("%s+$", "")
   local cmd, arg = msg:match("^(%S*)%s*(.*)$")
   local WP = ns.Writs and ns.Writs.WP
-  -- one root, French and English words; the old ones (clean, writs, comptoir, dj) still work
   if cmd == "" or cmd == "home" or cmd == "accueil" then if WP and WP.ToggleHome then WP.ToggleHome() else ns.ToggleMain() end
   elseif cmd == "donjons" or cmd == "dungeons" or cmd == "guide" then ns.ToggleMain()
   elseif cmd == "choisir" or cmd == "pick" or cmd == "dj" then ns.ShowPicker()

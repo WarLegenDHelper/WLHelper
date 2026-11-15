@@ -64,33 +64,35 @@ Alt-clic pour inviter (chat, monde, portraits) et Maj + clic droit pour tirer su
 
 ## Commandes
 
+Une seule commande, `/wl`, et les mêmes mots en français et en anglais.
+
 | Commande | Effet |
 |---|---|
 | `/wl` | Accueil |
-| `/wl donjons` | Le guide des donjons |
-| `/wl choisir` | Choisir les donjons |
-| `/wl comptoir` | Ouvre ou ferme le Comptoir (aussi `/comptoir`) |
+| `/wl dungeons` | Le guide des donjons |
+| `/wl pick` | Choisir les donjons |
+| `/wl trade` | Le Comptoir (`/wl trade gps`, `scan`, `reset`) |
+| `/wl bags` | Nettoyeur de sacs |
+| `/wl orders` | Commandes d'artisanat |
 | `/wl gps` | Arrête ou relance le guidage |
-| `/wl sacs` | Nettoyeur de sacs |
-| `/wl commandes` | Commandes d'artisanat |
-| `/wl bienvenue` | Écran de bienvenue : modules et clics |
-| `/wl reglages` | Réglages (aussi `/wlo`) |
-| `/wl idee` | Proposer une idée ou signaler un bug |
-| `/wl aide` | Toutes les commandes |
+| `/wl options` | Réglages |
+| `/wl setup` | Écran de bienvenue : modules et clics |
+| `/wl idea` | Proposer une idée ou signaler un bug |
+| `/wl help` | Toutes les commandes |
 
 Bouton de la minimap : clic pour l'accueil, clic droit pour un menu vers chaque module.
 
 ## Une idée, un bug ?
 
 Ouvre un [ticket](https://github.com/WarLegenDHelper/WLHelper/issues/new/choose) : idée, bug ou donnée de quête fausse.
-En jeu, `/wl idee` te donne le lien déjà rempli avec ta version.
+En jeu, `/wl idea` te donne le lien déjà rempli avec ta version.
 
 ## Bon à savoir
 
 - **Le dossier s'appelle `WLHelper`** depuis la 1.0.0-beta.4 (avant : `DungeonGuide`). Si tu avais installé une
   ancienne version à la main, supprime le dossier `DungeonGuide`. S'il traîne encore, l'addon le
   désactive tout seul et te le dit.
-- **Versions** : `1.0.0-beta.16` veut dire bêta de la 1.0. Le détail de chaque version est dans le
+- **Versions** : `1.0.0-beta.17` veut dire bêta de la 1.0. Le détail de chaque version est dans le
   [CHANGELOG](CHANGELOG.md).
 
 ## Crédits et licence

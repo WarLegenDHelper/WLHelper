@@ -828,21 +828,16 @@ f:SetScript("OnEvent", function(_, event, a1)
     end
 end)
 
--- Not /ledger: Merchant's Favor Ledger (CurseForge) already uses it.
--- /comptoir (also /writs, /wl comptoir). The language is WL Helper's (/wl lang).
-SLASH_WLWRITS1 = "/comptoir"
-SLASH_WLWRITS2 = "/writs"   -- old name, kept
+-- The Trading Post's words come through /wl trade (Main.lua): /wl trade gps, scan, stop, reset.
 
 local function Help()
     WP.Print(L("commandes :"))
     for _, line in ipairs({
-        L("  /comptoir : ouvre ou ferme la fenêtre"),
-        L("  /comptoir gps : lance ou arrête la tournée GPS (writs prêts à rendre)"),
-        L("  /comptoir stop : arrête le GPS"),
-        L("  /comptoir scan : scanne la liste d'achat à l'HV"),
-        L("  /comptoir reset : oublie les bourses mesurées et la faction"),
-        L("  /comptoir clean : objets de quête inutiles dans tes sacs"),
-        L("  /comptoir options : les options de WL Helper"),
+        L("  /wl trade : ouvre ou ferme le Comptoir"),
+        L("  /wl trade gps : lance ou arrête la tournée GPS (writs prêts à rendre)"),
+        L("  /wl trade stop : arrête le GPS"),
+        L("  /wl trade scan : scanne la liste d'achat à l'HV"),
+        L("  /wl trade reset : oublie les bourses mesurées et la faction"),
     }) do print(line) end
 end
 
@@ -903,7 +898,7 @@ function WP.SetModule(key, on)
     if WP.SyncOptions then WP.SyncOptions() end
 end
 
--- /comptoir: the Trading Post's own words need the module; options, clean, idea work anyway
+-- /wl trade: the Trading Post's own words need the module; options, clean, idea work anyway
 local WRIT_COMMANDS = { [""] = true, gps = true, stop = true, scan = true, reset = true }
 function WP.Command(msg)
     local cmd = (msg or ""):lower():match("^%s*(%S*)")
