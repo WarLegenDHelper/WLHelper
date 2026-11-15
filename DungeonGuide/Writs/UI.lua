@@ -154,7 +154,7 @@ local function MakeZoneCard(parent)
         r:SetSize(W - 2 * PAD - 2, 34)
         local line = S.Solid(r, "BORDER", C.divider)
         line:SetPoint("TOPLEFT"); line:SetPoint("TOPRIGHT"); line:SetHeight(1)
-        S.Solid(r, "HIGHLIGHT", C.hover):SetAllPoints()
+        S.Solid(r, "HIGHLIGHT", { 1, 1, 1 }, 0.05):SetAllPoints()   -- above the text: must stay see-through
         r.status = r:CreateTexture(nil, "ARTWORK")
         r.status:SetSize(14, 14); r.status:SetPoint("LEFT", 12, 0)
         r.icon = r:CreateTexture(nil, "ARTWORK")
@@ -339,7 +339,7 @@ local function RenderToday()
                 row.right:SetText(L("objet manquant")); SetColor(row.right, C.warn)
             end
             row.tip = { WP.ItemName(w.writ, w.writName), string.format(L("%d rép · %s %.0f, %.0f"), w.rep, z.name, w.x, w.y),
-                w.npcName and string.format(L("À rendre à %s"), w.npcName) or nil, { L("Clic : GPS jusqu'au PNJ"), 0.6, 0.6, 0.6 } }
+                w.npcName and string.format(L("À rendre à %s"), w.npcName) or L("lieu de remise sur la carte"), { L("Clic : GPS jusqu'au PNJ"), 0.6, 0.6, 0.6 } }
             ry = ry + 34
         end
         c.rows.HideFrom(#z.rows + 1)
@@ -390,7 +390,7 @@ local function BuildShop(p)
         r:RegisterForClicks("LeftButtonUp")
         S.Solid(r, "BACKGROUND", C.card):SetAllPoints()
         S.Border(r, C.border)
-        S.Solid(r, "HIGHLIGHT", C.hover):SetAllPoints()
+        S.Solid(r, "HIGHLIGHT", { 1, 1, 1 }, 0.05):SetAllPoints()   -- above the text: must stay see-through
         r.icon = r:CreateTexture(nil, "ARTWORK")
         r.icon:SetSize(18, 18); r.icon:SetPoint("LEFT", 12, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         r.name = S.Text(r, 14, C.text)
@@ -549,7 +549,7 @@ local function BuildAll(p)
     all.rows = Pool(function()
         local r = CreateFrame("Button", nil, sc.content)
         r:SetSize(W - 2 * PAD, 46)
-        S.Solid(r, "HIGHLIGHT", C.hover):SetAllPoints()
+        S.Solid(r, "HIGHLIGHT", { 1, 1, 1 }, 0.05):SetAllPoints()   -- above the text: must stay see-through
         r.icon = r:CreateTexture(nil, "ARTWORK")
         r.icon:SetSize(20, 20); r.icon:SetPoint("LEFT", 4, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         r.name = S.Text(r, 14, C.text)
@@ -561,20 +561,33 @@ local function BuildAll(p)
         r.cost = S.Text(r, 13, C.text)
         r.cost:SetPoint("RIGHT", -6, 0)
         r.cost:SetJustifyH("RIGHT")
-        r:SetScript("OnClick", function(self)
+        r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        r:SetScript("OnClick", function(self, button)
             local x = self.row
             if not x then return end
-            if IsShiftKeyDown() then WP.Search({ x }) else WP.TravelTo(x.w) end
+            if button == "RightButton" then
+                -- a writ set aside with its whole zone comes back from the zone list in the settings
+                if not (x.w.map and WP.IsSkipped("zones", x.w.map)) then
+                    WP.SetSkipped("writs", x.w.writ, not WP.IsSkipped("writs", x.w.writ))
+                    if self:IsMouseOver() and self:GetScript("OnEnter") then self:GetScript("OnEnter")(self) end
+                end
+            elseif IsShiftKeyDown() then WP.Search({ x }) else WP.TravelTo(x.w) end
         end)
         r:SetScript("OnEnter", function(self)
             local x = self.row
             if not x then return end
             local w = x.w
-            S.Tip(self, { WP.ItemName(w.writ, w.writName),
+            local lines = { WP.ItemName(w.writ, w.writName),
                 string.format(L("Enveloppe %s · objet %s · Coin Pouch -%s"), x.ownWrit and L("possédée") or S.Money(x.writPrice),
-                    (x.ownItem or x.state == "ready") and L("possédé") or S.Money(x.itemPrice and x.itemPrice * (w.count or 1)), S.Money((WP.PouchValue(w.tier)))),
-                w.npcName and string.format(L("À rendre à %s"), w.npcName) or nil,
-                { L("Clic : GPS · Maj-clic : chercher à l'HV"), 0.6, 0.6, 0.6 } })
+                    (x.ownItem or x.state == "ready") and L("possédé") or S.Money(x.itemPrice and x.itemPrice * (w.count or 1)), S.Money((WP.PouchValue(w.tier)))) }
+            if w.npcName then lines[#lines + 1] = string.format(L("À rendre à %s"), w.npcName) end
+            lines[#lines + 1] = { L("Clic : GPS · Maj-clic : chercher à l'HV"), 0.6, 0.6, 0.6 }
+            if w.map and WP.IsSkipped("zones", w.map) then
+                lines[#lines + 1] = { L("Zone mise de côté : Réglages › Comptoir"), C.warn[1], C.warn[2], C.warn[3] }
+            else
+                lines[#lines + 1] = { WP.IsSkipped("writs", w.writ) and L("Clic droit : le remettre dans le plan") or L("Clic droit : ne pas le faire"), 0.6, 0.6, 0.6 }
+            end
+            S.Tip(self, lines)
         end)
         r:SetScript("OnLeave", S.HideTip)
         return r
@@ -622,7 +635,7 @@ local function RenderAll()
         SetColor(b.name, S.QualityColor(w.item))
         local where = w.map and string.format("%s %.0f, %.0f", r.zone, w.x, w.y) or L("lieu inconnu")
         if r.tooHigh and r.zoneMin then where = where .. string.format(L(", niv. %d+"), r.zoneMin) end
-        b.sub:SetText(string.format("%s · %s, %d %s", where, WP.Tier(w.tier), w.rep, L("rép")))
+        b.sub:SetText((r.skipped and (S.Hex(C.warn) .. L("mis de côté") .. "|r · ") or "") .. string.format("%s · %s, %d %s", where, WP.Tier(w.tier), w.rep, L("rép")))
         if r.state == "done" then b.cost:SetText(L("rendu")); SetColor(b.cost, C.dim)
         elseif r.state == "ready" then b.cost:SetText(L("prêt")); SetColor(b.cost, C.ready)
         elseif r.net then
@@ -630,7 +643,7 @@ local function RenderAll()
             b.cost:SetText(per < 0 and ("+" .. S.Money(-per)) or S.Money(per))
             SetColor(b.cost, per < 0 and C.ready or C.text)
         else b.cost:SetText("?"); SetColor(b.cost, C.dim) end
-        b:SetAlpha(r.state == "done" and 0.5 or 1)
+        b:SetAlpha((r.state == "done" or r.skipped) and 0.5 or 1)
         y = y + 46
     end
     head(L("À faire, le moins cher d'abord"))
@@ -736,6 +749,11 @@ function WP.OnGPSChanged()
     if frame and frame:IsShown() and current == "today" then
         today.tour.label:SetText(WLWritsCharDB.gps and L("Arrêter la tournée GPS") or L("Lancer la tournée GPS"))
     end
+end
+
+function WP.Open()
+    if not frame then Build() end
+    frame:Show(); frame:Raise()
 end
 
 function WP.Toggle()

@@ -55,17 +55,17 @@ Ceux qui peuvent servir à une quête suivante sont signalés et ne sont pas coc
 
 | Commande | Effet |
 |---|---|
-| `/wl` | Ouvre ou ferme le guide des donjons |
-| `/wl pick` | Choisir les donjons |
-| `/comptoir` | Ouvre ou ferme le Comptoir |
-| `/comptoir gps` | Lance ou arrête la tournée GPS des writs prêts |
-| `/comptoir scan` | Scanne les prix de la liste d'achat (hôtel des ventes ouvert) |
-| `/wl clean` | Nettoyeur de sacs |
-| `/wl options` | Options (aussi `/wlo`) |
+| `/wl` | Accueil |
+| `/wl donjons` | Le guide des donjons |
+| `/wl choisir` | Choisir les donjons |
+| `/wl comptoir` | Ouvre ou ferme le Comptoir (aussi `/comptoir`) |
+| `/wl gps` | Arrête ou relance le guidage |
+| `/wl sacs` | Nettoyeur de sacs |
+| `/wl reglages` | Réglages (aussi `/wlo`) |
 | `/wl idee` | Proposer une idée ou signaler un bug |
-| `/wl help` | Toutes les commandes |
+| `/wl aide` | Toutes les commandes |
 
-Bouton de la minimap : clic pour le guide, clic droit pour choisir les donjons, Maj-clic pour le Comptoir.
+Bouton de la minimap : clic pour l'accueil, clic droit pour un menu vers chaque module.
 
 ## Une idée, un bug ?
 
@@ -76,7 +76,7 @@ En jeu, `/wl idee` te donne le lien déjà rempli avec ta version.
 
 - **Le dossier s'appelle `DungeonGuide`**, le nom d'origine de l'addon. Il reste ainsi pour que tes réglages
   et ta progression soient gardés à chaque mise à jour.
-- **Versions** : `1.0.0-beta.2` veut dire bêta de la 1.0. Le détail de chaque version est dans le
+- **Versions** : `1.0.0-beta.3` veut dire bêta de la 1.0. Le détail de chaque version est dans le
   [CHANGELOG](CHANGELOG.md).
 
 ## Crédits et licence

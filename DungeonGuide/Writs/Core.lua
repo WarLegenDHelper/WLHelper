@@ -321,6 +321,9 @@ function WP.Rows()
         r.zone = WP.ZoneName(w.map)
         r.zoneMin = WP.ZoneMin(w.map)
         r.tooHigh = r.zoneMin and level < r.zoneMin or false
+        -- set aside by the player: this writ, or every writ of its zone (never bought by the plan)
+        local skip = WLWritsCharDB.skip
+        r.skipped = skip and ((skip.writs and skip.writs[w.writ]) or (w.map and skip.zones and skip.zones[w.map])) and true or false
         local show = db.tiers[w.tier]
         if db.hideHigh and r.tooHigh and r.state == "buy" then show = false end
         if db.hideUnknown and not w.map then show = false end
@@ -332,6 +335,19 @@ end
 
 -- Picks the cheapest writs to buy so that pending writs plus the plan reach the goal.
 -- Writs already owned count first; each writ is once a day, so the plan never repeats one.
+-- Sets a writ (by envelope item ID) or a zone (by map ID) aside, or back in the plan.
+function WP.SetSkipped(kind, id, on)
+    local db = WLWritsCharDB
+    db.skip = db.skip or {}
+    db.skip[kind] = db.skip[kind] or {}
+    db.skip[kind][id] = on and true or nil
+    if WP.Refresh then WP.Refresh() end
+end
+function WP.IsSkipped(kind, id)
+    local s = WLWritsCharDB.skip
+    return s and s[kind] and s[kind][id] and true or false
+end
+
 function WP.Plan(rows)
     local need = WP.RepNeeded()
     local plan, pending, readyRep, zones = {}, 0, 0, {}
@@ -369,7 +385,7 @@ function WP.Plan(rows)
     local function build()
         byZone = {}
         for _, r in ipairs(rows) do
-            local pick = r.show and r.state == "buy" and r.per100 and r.w.map and not r.tooHigh
+            local pick = r.show and r.state == "buy" and r.per100 and r.w.map and not r.tooHigh and not r.skipped
                 and (not cap or r.per100 <= cap)
             if pick then
                 local z = byZone[r.w.map] or {}
@@ -699,7 +715,7 @@ end
 
 local REFRESH_EVENTS = { QUEST_LOG_UPDATE = true, BAG_UPDATE_DELAYED = true, UPDATE_FACTION = true }
 
-function WP.Print(msg) print("|cffffd200" .. WP.NAME .. "|r: " .. tostring(msg)) end
+function WP.Print(msg) if root.Print then root.Print(msg) else print("WL Helper " .. tostring(msg)) end end   -- one chat prefix for the whole addon
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")

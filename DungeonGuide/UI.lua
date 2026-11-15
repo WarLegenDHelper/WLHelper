@@ -22,7 +22,7 @@ local function DColor(dkey)
 end
 ns.DColor = DColor
 
-function ns.Print(msg) print("|cff0cd29dDG|r " .. tostring(msg)) end
+function ns.Print(msg) print("|cffce1918WL Helper|r " .. tostring(msg)) end
 
 -- =====================================================================
 --  État des étapes
@@ -130,11 +130,33 @@ local SCOL = { none = "|cffff9933", on = "|cff66b3ff", ready = "|cff59e67a", don
 
 local Render
 
+-- The step's points on the map and the arrow (the big button, the "..." menu, the key binding).
+-- Without TomTom, a second press goes to the step's next point.
+function ns.PlacePoints()
+  if not f then return end
+  local log, st = ns.LogEntries(), Steps()[f.view]; if not st then return end
+  local pts = StepPoints(log, st, false)
+  if #pts == 0 then pts = StepPoints(log, st, true) end
+  local key = f.view
+  if f.wpKey == key and not ns.HasTomTom() and #pts > 0 then f.wpIdx = (f.wpIdx % #pts) + 1 else f.wpIdx = 1 end
+  f.wpKey = key
+  ns.SetPoints(pts, false, f.wpIdx); Render()
+end
+-- "Go there": the arrow comes back on if it was turned off
+local function GoPoints()
+  if WLDTDB.arrow == false then WLDTDB.arrow = true end
+  ns.PlacePoints()
+end
+local function GoBack() if f and f.auto then ns.GoTo(f.auto) end end
+local function onoff(v) return " : " .. (v and L.ON or L.OFF) end
+
+
 function ns.GoTo(i)
   local n = #Steps()
   if n == 0 then return end
   f.view = math.max(1, math.min(n, i))
   f.scroll.offset = 0
+  if f.menu then f.menu:Hide() end
   Render()
 end
 
@@ -356,26 +378,36 @@ local function Build()
     if ns.UpdateActionBar then ns.UpdateActionBar() end
   end)
   h.mark = Tex(h, "ARTWORK", T.accent); h.mark:SetSize(3, 15); h.mark:SetPoint("LEFT", 10, 0); ns.Accent(h.mark); h.mark:Hide()
-  h.logo = h:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(22, 22); h.logo:SetPoint("LEFT", 4, -1)
+  -- back to WL Helper's home, logo, "Dungeons" and the route's dungeons
+  -- the logo is the way home (WL Helper's home page)
+  f.homeBtn = CreateFrame("Button", nil, h)
+  f.homeBtn:SetSize(24, 24); f.homeBtn:SetPoint("LEFT", 4, 0)
+  f.homeBtn:SetScript("OnClick", function()
+    local WP = ns.Writs and ns.Writs.WP
+    if WP and WP.OpenHome then WP.OpenHome() end
+  end)
+  f.homeBtn:SetScript("OnEnter", function(self) ns.ShowTip(self, { L.HOME }) end)
+  f.homeBtn:SetScript("OnLeave", ns.HideTip)
+  h.logo = f.homeBtn:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(20, 20); h.logo:SetPoint("CENTER")
   h.logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64")
-  h.title = Text(h, 13, T.text, true); h.title:SetPoint("LEFT", 28, 0); h.title:SetText(L.TITLE)
+  local hl = f.homeBtn:CreateTexture(nil, "HIGHLIGHT"); hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.08)
+  h.title = Text(h, 14, T.text, true); h.title:SetPoint("LEFT", f.homeBtn, "RIGHT", 6, 0); h.title:SetText(L.DUNGEONS)
+  h.sub = Text(h, 12, T.dim); h.sub:SetPoint("LEFT", h.title, "RIGHT", 8, 0); h.sub:SetWordWrap(false); h.sub:SetJustifyH("LEFT")
   f.header = h
   local close = Button(h, 22, 20, "x", function() f:Hide(); WLDTDB.hidden = true; ns.SetArrow(nil); if ns.UpdateActionBar then ns.UpdateActionBar() end end, function() return { L.TT_HCLOSE } end)
   close:SetPoint("RIGHT", -4, 0)
   f.miniBtn = Button(h, 22, 20, "-", function() f.mini = not f.mini; WLDTDB.mini = f.mini; Render() end, function() return { L.TT_HMIN } end)
   f.miniBtn:SetPoint("RIGHT", close, "LEFT", -4, 0)
-  f.langBtn = Button(h, 30, 20, "FR", function() ns.SetLang(ns.lang == "fr" and "en" or "fr"); ns.Print(L.LANG); Render() end, function() return { L.TT_HLANG } end)
-  f.langBtn:SetPoint("RIGHT", f.miniBtn, "LEFT", -4, 0)
-  f.listBtn = Button(h, 56, 20, L.LIST, function()
-    f.list:SetShown(not f.list:IsShown()); WLDTDB.list = f.list:IsShown(); Render()
-  end, function() return { L.TT_HLIST } end)
-  f.listBtn:SetPoint("RIGHT", f.langBtn, "LEFT", -4, 0)
-  f.pickBtn = Button(h, 76, 20, L.PICK, function() ns.TogglePicker() end, function() return { L.TT_HPICK } end)
-  f.pickBtn:SetPoint("RIGHT", f.listBtn, "LEFT", -4, 0)
-  ns.Primary(f.pickBtn)
-  f.writsBtn = Button(h, 56, 20, L.WRITS, function() if ns.Writs and ns.Writs.WP then ns.Writs.WP.Toggle() end end,
-    function() return { L.WRITS, L.TT_HWRITS } end)
-  f.writsBtn:SetPoint("RIGHT", f.pickBtn, "LEFT", -4, 0)
+  f.gearBtn = Button(h, 22, 20, "", function()
+    local WP = ns.Writs and ns.Writs.WP
+    if WP and WP.OpenOptions then WP.OpenOptions("dungeons") end
+  end, function() return { L.SETTINGS } end)
+  f.gearBtn:SetPoint("RIGHT", f.miniBtn, "LEFT", -4, 0)
+  local gear = f.gearBtn:CreateTexture(nil, "ARTWORK"); gear:SetSize(14, 14); gear:SetPoint("CENTER")
+  gear:SetTexture("Interface\\Buttons\\UI-OptionsButton"); gear:SetVertexColor(0.8, 0.82, 0.85)
+  f.pickBtn = Button(h, 64, 20, L.PICK, function() ns.TogglePicker() end, function() return { L.TT_HPICK } end)
+  f.pickBtn:SetPoint("RIGHT", f.gearBtn, "LEFT", -4, 0)
+  h.sub:SetPoint("RIGHT", f.pickBtn, "LEFT", -8, 0)
 
   f.progLabel = Text(f, 11, T.dim, true); f.progLabel:SetPoint("TOPLEFT", PAD, -40); f.progLabel:SetWordWrap(false); f.progLabel:SetWidth(W - 2 * PAD - 60)
   f.progPct = Text(f, 11, T.text, true); f.progPct:SetPoint("TOPRIGHT", -PAD, -40); f.progPct:SetJustifyH("RIGHT")
@@ -451,36 +483,52 @@ local function Build()
   local foot = CreateFrame("Frame", nil, f)
   foot:SetPoint("BOTTOMLEFT", PAD, PAD); foot:SetPoint("BOTTOMRIGHT", -PAD, PAD); foot:SetHeight(56)
   f.foot = foot
-  local BW = (W - PAD * 2 - 8) / 3
-  f.prev = Button(foot, BW, 24, L.PREV, function() ns.GoTo(f.view - 1) end); f.prev:SetPoint("TOPLEFT")
-  f.cur = Button(foot, BW, 24, L.CURRENT, function() ns.GoTo(f.auto or 1) end); f.cur:SetPoint("LEFT", f.prev, "RIGHT", 4, 0)
-  f.next = Button(foot, BW, 24, L.NEXT, function() ns.GoTo(f.view + 1) end); f.next:SetPoint("LEFT", f.cur, "RIGHT", 4, 0)
-  ns.Primary(f.next)
-  local SW = (W - PAD * 2 - 20) / 6
-  f.way = Button(foot, SW, 24, L.POINTS, function()
-    local log, st = ns.LogEntries(), Steps()[f.view]; if not st then return end
-    local pts = StepPoints(log, st, false)
-    if #pts == 0 then pts = StepPoints(log, st, true) end
-    local key = f.view
-    if f.wpKey == key and not ns.HasTomTom() and #pts > 0 then f.wpIdx = (f.wpIdx % #pts) + 1 else f.wpIdx = 1 end
-    f.wpKey = key
-    ns.SetPoints(pts, false, f.wpIdx); Render()
-  end, function() return { L.POINTS, L.TT_FPOINTS } end)
-  f.way:SetPoint("BOTTOMLEFT")
-  f.share = Button(foot, SW, 24, L.SHARE, ns.ShareQuests, function() return { L.SHARE, L.TT_FSHARE } end); f.share:SetPoint("LEFT", f.way, "RIGHT", 4, 0)
-  f.done = Button(foot, SW, 24, L.DONE, function()
+  -- one big button for what the step needs, then previous / next / more
+  f.go = Button(foot, W - PAD * 2, 26, L.GO, function(self) if self.action then self.action() end end)
+  f.go:SetPoint("TOPLEFT"); ns.Primary(f.go)
+  f.prev = Button(foot, 44, 24, "<", function() ns.GoTo(f.view - 1) end, function() return { L.B_PREV } end)
+  f.prev:SetPoint("BOTTOMLEFT")
+  f.moreBtn = Button(foot, 44, 24, "...", function() f.menu:SetShown(not f.menu:IsShown()) end, function() return { L.MORE } end)
+  f.moreBtn:SetPoint("BOTTOMRIGHT")
+  f.next = Button(foot, W - PAD * 2 - 96, 24, L.NEXT2, function() ns.GoTo(f.view + 1) end)
+  f.next:SetPoint("LEFT", f.prev, "RIGHT", 4, 0)
+
+  -- the "..." menu: everything that used to be a row of small buttons
+  local menu = CreateFrame("Frame", nil, f)
+  menu:SetSize(230, 10); menu:SetFrameStrata("DIALOG"); menu:SetPoint("BOTTOMRIGHT", f.moreBtn, "TOPRIGHT", 0, 4)
+  ns.Flat(menu, { 0.08, 0.09, 0.1, 0.98 }, { 1, 1, 1, 0.12 })
+  menu:EnableMouse(true); menu:Hide()
+  f.menu = menu
+  local items = {}
+  local function Item(onClick, tip)
+    local b = Button(menu, 222, 24, "", function(...) onClick(...); menu:Hide() end, tip)
+    b.label:ClearAllPoints(); b.label:SetPoint("LEFT", 8, 0); b.label:SetJustifyH("LEFT")
+    b:SetPoint("TOPLEFT", 4, -4 - #items * 26)
+    items[#items + 1] = b
+    menu:SetHeight(8 + #items * 26)
+    return b
+  end
+  f.share = Item(ns.ShareQuests, function() return { L.M_SHARE, L.TT_FSHARE } end)
+  f.recalc = Item(function() ns.Recalc() end, function() return { L.M_RECALC, L.RECALC_TT } end)
+  f.way = Item(function() ns.PlacePoints() end, function() return { L.M_POINTS, L.TT_FPOINTS } end)
+  f.done = Item(function()
     local st = Steps()[f.view]; if not st then return end
     SetManual(st, not Manual(st)); ns.Refresh()
-  end, function() return { L.DONE, L.TT_FDONE } end)
-  f.done:SetPoint("LEFT", f.share, "RIGHT", 4, 0)
-  f.autoBtn = Button(foot, SW, 24, "Auto", function() WLDTDB.autoWay = not WLDTDB.autoWay; f.sig = nil; ns.Refresh() end, function() return { "Auto", L.TT_FAUTO } end)
-  f.autoBtn:SetPoint("LEFT", f.done, "RIGHT", 4, 0)
-  f.arrowBtn = Button(foot, SW, 24, L.ARROW, function() ns.ToggleArrow(); Render() end, function() return { L.ARROW, L.TT_FARROW } end); f.arrowBtn:SetPoint("LEFT", f.autoBtn, "RIGHT", 4, 0)
-  f.recalc = Button(foot, SW, 24, L.RECALC, function() ns.Recalc() end, function() return { L.RECALC, L.RECALC_TT } end)
-  f.recalc:SetPoint("LEFT", f.arrowBtn, "RIGHT", 4, 0)
+  end, function() return { L.M_SKIP, L.TT_FDONE } end)
+  f.arrowBtn = Item(function() ns.ToggleArrow(); Render() end, function() return { L.M_ARROW, L.TT_FARROW } end)
+  f.autoBtn = Item(function() WLDTDB.autoWay = not WLDTDB.autoWay; f.sig = nil; ns.Refresh() end, function() return { L.M_AUTO, L.TT_FAUTO } end)
+  f.listBtn = Item(function() f.list:SetShown(not f.list:IsShown()); WLDTDB.list = f.list:IsShown(); Render() end, function() return { L.M_LIST, L.TT_HLIST } end)
+  f:HookScript("OnHide", function() menu:Hide() end)
+  -- closes once the mouse has been away from it (and its button) for a moment
+  menu:SetScript("OnUpdate", function(self, dt)
+    if self:IsMouseOver() or f.moreBtn:IsMouseOver() then self.away = 0; return end
+    self.away = (self.away or 0) + dt
+    if self.away > 1.5 then self:Hide() end
+  end)
+  menu:SetScript("OnShow", function(self) self.away = 0 end)
 
-  f.footBig = { f.prev, f.cur, f.next }
-  f.footSmall = { f.way, f.share, f.done, f.autoBtn, f.arrowBtn, f.recalc }
+  f.footBig = { f.go }
+  f.footSmall = {}
 
   -- poignée de redimensionnement (coin bas-droit)
   local grip = CreateFrame("Button", nil, f)
@@ -534,10 +582,8 @@ function ns.Relayout(nw, nh)
   card.zone:SetWidth(CW - 90); card.title:SetWidth(CW); card.travel:SetWidth(CW)
   card.ready:SetWidth(CW - 12); card.note:SetWidth(CW)
   for _, row in ipairs(card.rows) do row:SetWidth(CW + 8); row.sub:SetWidth(CW - 90) end
-  local BW = (W - PAD * 2 - 8) / 3
-  local SW = (W - PAD * 2 - 20) / 6
-  for _, b in ipairs(f.footBig or {}) do b:SetWidth(BW) end
-  for _, b in ipairs(f.footSmall or {}) do b:SetWidth(SW) end
+  f.go:SetWidth(W - PAD * 2)
+  f.next:SetWidth(W - PAD * 2 - 96)
 end
 
 -- =====================================================================
@@ -675,8 +721,8 @@ Render = function()
   f.pending = false
   local log = ns.LogEntries()
   local steps = Steps()
-  f.langBtn.label:SetText(ns.lang == "fr" and "FR" or "EN"); f.pickBtn.label:SetText(L.PICK); f.listBtn.label:SetText(L.LIST)
-  f.listBtn.label:SetTextColor(unpack(f.list:IsShown() and T.accent or T.text))
+  f.pickBtn.label:SetText(L.PICK); f.header.title:SetText(L.DUNGEONS)
+  f.header.sub:SetText(ns.route and ns.route.label or "")
   f.miniBtn.label:SetText(f.mini and "+" or "-")
   local card, holder = f.card, f.holder
 
@@ -684,12 +730,14 @@ Render = function()
     f.progLabel:SetText(L.NOROUTE); f.progPct:SetText("")
     f.bar:SetValue(0)
     card.zone:SetText(""); card.badge:SetText(""); card.where:Hide(); card.clsChip:Hide()
-    card.title:SetText(L.NOROUTE); card.travel:Hide(); card.ready:Hide(); card.readyBg:Hide()
+    card.title:SetText(L.NOROUTE_T2); card.travel:Hide(); card.ready:Hide(); card.readyBg:Hide()
     card.note:ClearAllPoints(); card.note:SetPoint("TOPLEFT", 14, -60); card.note:SetText(L.NOROUTE_TXT); card.note:Show()
     for _, row in ipairs(card.rows) do row.node = nil; row:Hide() end
     card:SetHeight(140); holder:SetHeight(140); holder.sbar:Hide()
     f.foot:Show(); f:SetHeight(70 + 140 + 12 + 56 + PAD)
-    for _, b in ipairs({ f.prev, f.cur, f.next, f.way, f.done }) do b:SetEnabled(false) end
+    for _, b in ipairs({ f.prev, f.next, f.moreBtn }) do b:SetEnabled(false) end
+    f.menu:Hide()
+    f.go.label:SetText(L.PICK_FIRST); f.go.action = ns.ShowPicker; f.go:SetEnabled(true)
     f.list:Hide()
     ns.UpdateActionBar()
     return
@@ -707,6 +755,7 @@ Render = function()
   f.progPct:SetText(("%d %%"):format(total > 0 and math.floor(n / total * 100 + 0.5) or 0))
 
   if f.mini then
+    f.menu:Hide()
     holder:Hide(); f.foot:Hide(); f.progLabel:Hide(); f.progPct:Hide(); f.list:Hide()
     local c = DColor(st.d or st.gate or st.ins)
     f.miniText:SetText(("%s%d.|r %s"):format(Hex(c), i, StepTitle(st))); f.miniText:Show()
@@ -954,16 +1003,27 @@ Render = function()
   else holder.sbar:Hide(); f.scroll.offset = 0 end
   f.scroll:SetVerticalScroll(math.min(f.scroll.offset or 0, math.max(0, over)))
 
-  f.prev:SetEnabled(i > 1); f.next:SetEnabled(i < #steps)
-  f.cur:SetEnabled(f.auto ~= nil and i ~= f.auto)
+  f.prev:SetEnabled(i > 1); f.next:SetEnabled(i < #steps); f.moreBtn:SetEnabled(true)
   local np = #StepPoints(log, st, true)
+  -- the big button: back to the current step when looking elsewhere, else "go there"
+  local cycling = not ns.HasTomTom() and np > 1 and f.wpKey == i
+  if f.auto and i ~= f.auto then
+    f.go.label:SetText(L.BACK_CUR); f.go.action = GoBack; f.go:SetEnabled(true)
+  elseif np > 0 then
+    f.go.label:SetText(cycling and (L.NEXTPOINT .. (" (%d/%d)"):format((f.wpIdx or 1) % np + 1, np)) or L.GO)
+    f.go.action = GoPoints; f.go:SetEnabled(true)
+  else
+    f.go.label:SetText(L.NOPOINT_S); f.go.action = nil; f.go:SetEnabled(false)
+  end
   f.way:SetEnabled(np > 0)
-  f.way.label:SetText((not ns.HasTomTom() and np > 1 and f.wpKey == i) and L.NEXTPOINT or L.POINTS)
-  f.share:SetEnabled(IsInGroup() and true or false)
+  f.way.label:SetText(cycling and L.NEXTPOINT or L.M_POINTS)
+  f.share.label:SetText(L.M_SHARE); f.share:SetEnabled(IsInGroup() and true or false)
+  f.recalc.label:SetText(L.M_RECALC)
   f.done:SetEnabled(true)
-  f.done.label:SetText(Manual(st) and L.UNDO or L.DONE)
-  f.autoBtn.label:SetText(WLDTDB.autoWay and L.AUTO_ON or L.AUTO_OFF)
-  f.arrowBtn.label:SetTextColor(unpack(WLDTDB.arrow ~= false and T.accent or T.dim))
+  f.done.label:SetText(Manual(st) and L.M_UNSKIP or L.M_SKIP)
+  f.arrowBtn.label:SetText(L.M_ARROW .. onoff(WLDTDB.arrow ~= false))
+  f.autoBtn.label:SetText(L.M_AUTO .. onoff(WLDTDB.autoWay))
+  f.listBtn.label:SetText(L.M_LIST .. onoff(f.list:IsShown()))
 
   f:SetHeight(70 + hh + 12 + 56 + PAD)
   WLDTDB.view = i
@@ -991,7 +1051,7 @@ function ns.Refresh(silent)
     if was and auto > was and not silent then
       PlaySound(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE or 878)
       local t = StepTitle(steps[auto])
-      if UIErrorsFrame then UIErrorsFrame:AddMessage("DG : " .. t, T.accent[1], T.accent[2], T.accent[3]) end
+      if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper : " .. t, T.accent[1], T.accent[2], T.accent[3]) end
       ns.Print(L.NEXT_STEP:format(t))
     end
   end
@@ -1041,7 +1101,7 @@ function ns.UpdateMacro()
     table.insert(m, tail)
     body = table.concat(m, "\n")
   else
-    body = "/run print('|cff0cd29dDG|r " .. L.MACRO_NONE:gsub("'", "\\'") .. "')"
+    body = "/run print('|cffce1918WL Helper|r " .. L.MACRO_NONE:gsub("'", "\\'") .. "')"
   end
   if body == macroBody and GetMacroIndexByName(MACRO) > 0 then return end
   macroBody = body
@@ -1211,6 +1271,21 @@ function ns.UpdateActionBar()
   else abar:Hide() end
 end
 function ns.ActionBarPending() return abPending end
+
+-- For WL Helper's home and the minimap: the route's dungeons, the current step and how many there are.
+function ns.GuideStatus()
+  local steps = Steps()
+  if #steps == 0 then return nil end
+  local log = ns.LogEntries()
+  local cur = FirstOpen(log)
+  local finished = cur == #steps and IsStepDone(log, cur)
+  return ns.route and ns.route.label or "", cur, #steps, finished
+end
+
+-- Opens the guide (never closes it).
+function ns.ShowGuide()
+  if f and not f:IsShown() then ns.ToggleMain() end
+end
 
 function ns.ToggleMain()
   if not f then return end

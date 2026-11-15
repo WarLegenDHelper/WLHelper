@@ -13,8 +13,10 @@ local C = S.C
 ns.AddEnglish({
     -- window and pages
     ["Options"] = "Options",
-    ["Général"] = "General", ["Donjons"] = "Dungeons", ["Comptoir"] = "Comptoir", ["GPS"] = "GPS",
+    ["Général"] = "General", ["Donjons"] = "Dungeons", ["Comptoir"] = "Trading Post", ["GPS"] = "GPS",
     ["Sacs"] = "Bags", ["À propos"] = "About",
+    ["Zones où je vais"] = "Zones I go to",
+    ["Un writ précis : clic droit dessus dans « Tous les writs »."] = "A single writ: right-click it in \"All writs\".",
     ["Formulaire GitHub prérempli"] = "Prefilled GitHub form",
     ["/wl idee : proposer une idée ou signaler un bug"] = "/wl idea: suggest an idea or report a bug",
     -- General
@@ -69,7 +71,7 @@ ns.AddEnglish({
     ["GitHub"] = "GitHub", ["Clique puis Ctrl+C pour copier"] = "Click, then Ctrl+C to copy",
     ["Commandes"] = "Commands",
     ["/wl : ouvre ou ferme le guide des donjons"] = "/wl: open or close the dungeon guide",
-    ["/comptoir ou /wl comptoir : fenêtre du Comptoir"] = "/comptoir or /wl comptoir: the Comptoir window",
+    ["/comptoir ou /wl comptoir : fenêtre du Comptoir"] = "/comptoir or /wl trade: the Trading Post window",
     ["/wl gps : lance ou arrête la tournée GPS"] = "/wl gps: start or stop the GPS tour",
     ["/wlo : ces options"] = "/wlo: these options",
     -- game settings and EllesmereUI
@@ -124,10 +126,40 @@ local PAD_X, PAD_TOP, ROW_H, SECTION_GAP = 22, 18, 48, 20
 
 -- A page is a frame filling the content area; rows are stacked from the top with p.y as cursor.
 -- Every control added with Row() is re-synced (:Update or :Sync) when the page is shown.
+-- A page scrolls when it is taller than the window (the zone list of the Trading Post page).
+-- p is the scrolled content; showing or hiding it shows or hides its scroll frame.
 local function NewPage(parent)
-    local p = CreateFrame("Frame", nil, parent)
-    p:SetAllPoints()
-    p:Hide()
+    local sf = CreateFrame("ScrollFrame", nil, parent)
+    sf:SetAllPoints()
+    sf:Hide()
+    local p = CreateFrame("Frame", nil, sf)
+    p:SetSize(WIN_W - NAV_W - 2, 10)
+    sf:SetScrollChild(p)
+    sf:EnableMouseWheel(true)
+    -- a thin thumb on the right says there is more below
+    local thumb = S.Solid(sf, "OVERLAY", C.muted, 0.8)
+    thumb:SetWidth(3)
+    local function Thumb()
+        local view, total = sf:GetHeight(), p:GetHeight()
+        if not view or view <= 0 or total <= view + 1 then thumb:Hide(); return end
+        local h = math.max(24, view * view / total)
+        local off = sf:GetVerticalScroll() / (total - view)
+        thumb:ClearAllPoints()
+        thumb:SetPoint("TOPRIGHT", sf, "TOPRIGHT", -3, -(view - h) * off)
+        thumb:SetHeight(h); thumb:Show()
+    end
+    sf:SetScript("OnMouseWheel", function(self, delta)
+        local max = math.max(0, p:GetHeight() - self:GetHeight())
+        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * 40)))
+        Thumb()
+    end)
+    sf:SetScript("OnShow", Thumb)
+    sf:SetScript("OnSizeChanged", Thumb)
+    p.sf = sf
+    function p:Show() sf:SetVerticalScroll(0); sf:Show() end
+    function p:Hide() sf:Hide() end
+    function p:SetShown(v) if v then self:Show() else sf:Hide() end end
+    function p:IsShown() return sf:IsShown() end
     p.y, p.controls, p.first = -PAD_TOP, {}, true
     p:SetScript("OnShow", function(self)
         for _, c in ipairs(self.controls) do
@@ -296,6 +328,25 @@ function BUILD.comptoir(p)
     }, function() return Writs().goal or 0 end, function(v) Writs().goal = v; RefreshWrits() end))
     SwitchRow(p, L("Masquer les zones trop hautes"), function() return Writs().hideHigh end,
         function(v) Writs().hideHigh = v; RefreshWrits() end)
+
+    -- zones: the plan only buys writs of the zones left on (a single writ: right-click in "All writs")
+    Section(p, L("Zones où je vais"))
+    local maps, seen = {}, {}
+    for _, w in ipairs(ns.WRITS or {}) do
+        if w.map and not seen[w.map] then seen[w.map] = true; maps[#maps + 1] = w.map end
+    end
+    local WP = ns.WP
+    table.sort(maps, function(a, b)
+        local la, lb = WP.ZoneMin(a) or 0, WP.ZoneMin(b) or 0
+        if la ~= lb then return la < lb end
+        return WP.ZoneName(a) < WP.ZoneName(b)
+    end)
+    for _, map in ipairs(maps) do
+        local lo = WP.ZoneMin(map)
+        SwitchRow(p, WP.ZoneName(map), function() return not WP.IsSkipped("zones", map) end,
+            function(v) WP.SetSkipped("zones", map, not v) end, lo and string.format(L("niv. %d+"), lo) or nil)
+    end
+    Note(p, L("Un writ précis : clic droit dessus dans « Tous les writs »."), 6)
     CloseSection(p)
 end
 
@@ -432,13 +483,8 @@ function BUILD.about(p)
     CloseSection(p)
 
     Section(p, L("Commandes"))
-    Note(p, table.concat({
-        L("/wl : ouvre ou ferme le guide des donjons"),
-        L("/comptoir ou /wl comptoir : fenêtre du Comptoir"),
-        L("/wl gps : lance ou arrête la tournée GPS"),
-        L("/wlo : ces options"),
-        L("/wl idee : proposer une idée ou signaler un bug"),
-    }, "\n"))
+    -- the same list as /wl aide, in the guide's language
+    Note(p, root.L and root.L.HELP or "/wl")
 end
 
 -- ---------------------------------------------------------------- the window
@@ -484,6 +530,7 @@ local function BuildBody()
         local p = NewPage(content)
         BUILD[def.key](p)
         CloseSection(p)
+        p:SetHeight(-p.y + PAD_TOP)
         body.pages[def.key] = p
     end
 end
@@ -502,7 +549,7 @@ local function PaintNav()
 end
 
 local function BuildWindow()
-    win = S.Window("WLHelperOptions", WIN_W, WIN_H, TITLE, L("Options"), WLWritsDB, "optionsPos")
+    win = S.Window("WLHelperOptions", WIN_W, WIN_H, TITLE, L("Réglages"), WLWritsDB, "optionsPos")
     BuildBody()
 end
 

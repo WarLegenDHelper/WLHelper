@@ -287,6 +287,7 @@ end
 
 local function Changed()
     if GPS.OnChanged then GPS.OnChanged() end
+    if WP.RefreshHome then WP.RefreshHome() end
 end
 
 function GPS.Replan()
@@ -401,6 +402,7 @@ function GPS.Stop(source)
 end
 
 function GPS.Active() return state.dest ~= nil end
+function GPS.DestName() return state.dest and state.dest.name end
 function GPS.Source() return state.source end
 
 -- What the arrow shows now. The first leg is dropped once you reach its end. The answer is one
@@ -552,6 +554,32 @@ function WP.ToggleGPS()
     db.gps = not db.gps
     if db.gps then WP.GoNext() else GPS.Stop("writs") end
     if WP.OnGPSChanged then WP.OnGPSChanged() end
+end
+
+-- Stops whatever the GPS is guiding to. A dungeon point: the guide's arrow is turned off (the
+-- guide's menu shows it, and the next step does not bring it back). A writ: the tour stops too.
+function WP.StopGPS()
+    if GPS.Source() == "dungeon" then
+        if root.ToggleArrow and WLDTDB and WLDTDB.arrow ~= false then root.ToggleArrow() else GPS.Stop() end
+    else
+        if WLWritsCharDB then WLWritsCharDB.gps = false end
+        GPS.Stop()
+        if WP.OnGPSChanged then WP.OnGPSChanged() end
+    end
+    if WP.RefreshHome then WP.RefreshHome() end
+    if root.Render then root.Render() end
+end
+
+-- /wl gps: stops the GPS when it guides; otherwise the dungeon arrow comes back if a route is
+-- running, else the Comptoir's tour starts.
+function WP.StopOrStartGPS()
+    if GPS.Active() then WP.StopGPS(); return end
+    if root.GuideStatus and root.GuideStatus() and WLDTDB and WLDTDB.arrow == false and root.ToggleArrow then
+        root.ToggleArrow()
+        if root.Render then root.Render() end
+    else
+        WP.ToggleGPS()
+    end
 end
 
 -- A click on a writ: the GPS to that writ alone.

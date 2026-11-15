@@ -138,7 +138,7 @@ end
 local function Build()
   p = CreateFrame("Frame", "WLDTPicker", UIParent)
   p:SetSize(PW, 560); p:SetPoint("CENTER"); p:SetFrameStrata("HIGH")
-  p:SetMovable(true); p:EnableMouse(true); p:SetClampedToScreen(true)
+  p:SetMovable(true); p:EnableMouse(true); p:SetClampedToScreen(true); p:SetToplevel(true)
   ns.Flat(p, T.bg)
   local h = CreateFrame("Frame", nil, p)
   h:SetPoint("TOPLEFT", 1, -1); h:SetPoint("TOPRIGHT", -1, -1); h:SetHeight(32)
@@ -148,7 +148,7 @@ local function Build()
   h:SetScript("OnDragStart", function() p:StartMoving() end)
   h:SetScript("OnDragStop", function() p:StopMovingOrSizing() end)
   h.logo = h:CreateTexture(nil, "ARTWORK"); h.logo:SetSize(26, 26); h.logo:SetPoint("LEFT", 6, -1)
-  h.logo:SetTexture("Interface\\TargetingFrame\\UI-PVP-Horde"); h.logo:SetTexCoord(0.08, 0.58, 0.03, 0.6)
+  h.logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64")
   h.title = Text(h, 14, T.text, true); h.title:SetPoint("LEFT", 34, 0); h.title:SetText(L.TITLE)
   p.tabs = {}
   local prevTab
@@ -242,7 +242,12 @@ ns.RenderPicker = function() if p and p:IsShown() then Render() end end
 
 function ns.TogglePicker()
   if not p then Build() end
-  if p:IsShown() then p:Hide() else Render(); p:Show() end
+  if p:IsShown() then p:Hide() else Render(); p:Show(); p:Raise() end
+end
+-- Opens the picker (buttons that say "pick dungeons" never close it).
+function ns.ShowPicker()
+  if not p then Build() end
+  Render(); p:Show(); p:Raise()
 end
 function ns.HidePicker() if p then p:Hide() end end
 

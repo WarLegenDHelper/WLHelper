@@ -537,4 +537,11 @@ WP.Cleaner = {
         if not win then Build() end
         if win:IsShown() then win:Hide() else win:Show() end
     end,
+    -- How many items the window offers (for the home page and the minimap tooltip).
+    Count = function()
+        if dirty then Scan() end
+        local n = 0
+        for _, e in ipairs(entries) do if not e.manual then n = n + 1 end end
+        return n
+    end,
 }

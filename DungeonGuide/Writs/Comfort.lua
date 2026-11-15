@@ -12,9 +12,9 @@ local L = ns.L
 local S = ns.S
 
 ns.AddEnglish({
-    ["Comptoir : %d writs prêts, %d enveloppes à ouvrir. /comptoir"] = "Comptoir: %d writs ready, %d envelopes to open. /comptoir",
-    ["Comptoir : %d writs prêts. /comptoir"] = "Comptoir: %d writs ready. /comptoir",
-    ["Comptoir : %s, %d rép"] = "Comptoir: %s, %d rep",
+    ["Comptoir : %d writs prêts, %d enveloppes à ouvrir. /comptoir"] = "Trading Post: %d writs ready, %d envelopes to open. /comptoir",
+    ["Comptoir : %d writs prêts. /comptoir"] = "Trading Post: %d writs ready. /comptoir",
+    ["Comptoir : %s, %d rép"] = "Trading Post: %s, %d rep",
     ["Objet demandé : %s"] = "Requested item: %s",
     ["dans tes sacs"] = "in your bags",
     ["À rendre à %s, %s %.0f, %.0f"] = "Turn in to %s, %s %.0f, %.0f",

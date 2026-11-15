@@ -6,6 +6,39 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.3] — 2026-11-15
+
+Une interface rangée : un accueil, un guide allégé, une minimap et des commandes claires.
+*A tidy interface: a home page, a lighter guide, a clear minimap button and commands.*
+
+### Ajouté / Added
+- **Accueil** (`/wl`, clic sur la minimap) : une carte par module avec où tu en es (donjon et étape, writs prêts, objets à jeter), le GPS en cours avec un bouton pour l'arrêter, « Une idée, un bug ? » et les réglages.
+  *Home page: one card per module with where you stand, the running GPS, feedback and settings.*
+- **Choisir ses writs** : clic droit sur un writ dans « Tous les writs » pour le mettre de côté ; Réglages › Comptoir › « Zones où je vais » pour écarter des zones entières. Le plan d'achat n'achète plus ce qui est écarté.
+  *Pick your writs: right-click a writ to set it aside, or turn whole zones off in the settings; the buying plan skips them.*
+- Minimap : clic droit, un menu vers chaque module ; l'infobulle dit où tu en es.
+  *Minimap right-click menu to each module; the tooltip shows where you stand.*
+
+### Modifié / Changed
+- **Guide des donjons** : en-tête avec le logo (retour à l'accueil), « Choisir » et les réglages ; en bas, un seul gros bouton selon l'étape (« Y aller », « Revenir à l'étape en cours », « Choisir des donjons »), puis précédente / suivante et un menu « ... » (partager, recalculer, points, étape faite, flèche, points auto, liste).
+  *Dungeon guide: logo back to home, Pick and settings in the header; one big contextual button, previous / next and a "..." menu below.*
+- **Commandes** sous `/wl`, en français et en anglais : `donjons`/`dungeons`, `choisir`/`pick`, `comptoir`/`trade`, `sacs`/`bags`, `gps`, `reglages`/`options`, `idee`/`idea`, `aide`/`help`. Les anciennes marchent encore.
+  *Commands under /wl in French and English; the old ones still work.*
+- Le Comptoir s'appelle **Trading Post** en anglais. Le bouton de minimap prend le logo War Legend. Les messages du chat commencent par « WL Helper ». « Réglages » partout.
+  *The Comptoir is the Trading Post in English; War Legend logo on the minimap button; one chat prefix; "Settings" everywhere.*
+
+### Corrigé / Fixed
+- Deux fenêtres ouvertes ne se mélangent plus (les interrupteurs des réglages passaient à travers le Comptoir).
+  *Two open windows no longer mix.*
+- Survoler une ligne du Comptoir ne cache plus son texte.
+  *Hovering a Comptoir row no longer hides its text.*
+- Infobulles des writs sans PNJ connu : les lignes « Clic : GPS » manquaient.
+  *Tooltips of writs without a known NPC lost their click hints.*
+- « Arrêter le GPS » arrête vraiment la flèche, qu'elle vienne du guide ou du Comptoir ; `/wl gps` l'arrête ou la relance.
+  *"Stop the GPS" really stops it, whoever started it.*
+- Les pages de réglages défilent quand elles sont longues.
+  *Long settings pages scroll.*
+
 ## [1.0.0-beta.2] — 2026-11-15
 
 Refonte complète de l'interface aux couleurs de War Legend, page d'options, GPS plus fin.
@@ -82,6 +115,7 @@ Première version de WL Helper (bêta). WL Dungeon Guide devient **WL Helper**.
 WL Dungeon Guide jusqu'à la 3.3 : guide des quêtes de donjon Horde pas à pas (versions partagées
 à la main, avant ce dépôt).
 
-[Unreleased]: https://github.com/NEM3S15/WLHelper/compare/v1.0.0-beta.2...HEAD
+[Unreleased]: https://github.com/NEM3S15/WLHelper/compare/v1.0.0-beta.3...HEAD
+[1.0.0-beta.3]: https://github.com/NEM3S15/WLHelper/compare/v1.0.0-beta.2...v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/NEM3S15/WLHelper/compare/v1.0.0-beta.1...v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/NEM3S15/WLHelper/releases/tag/v1.0.0-beta.1

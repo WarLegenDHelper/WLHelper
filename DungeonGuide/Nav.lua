@@ -97,7 +97,7 @@ local function BuildMinimap()
   b.bg = b:CreateTexture(nil, "BACKGROUND"); b.bg:SetSize(22, 22); b.bg:SetPoint("CENTER")
   b.bg:SetColorTexture(0.05, 0.06, 0.07, 0.95)
   b.icon = b:CreateTexture(nil, "ARTWORK"); b.icon:SetSize(20, 20); b.icon:SetPoint("CENTER")
-  b.icon:SetTexture("Interface\\Icons\\INV_Misc_Map_01"); b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  b.icon:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\Media\\Logo64")   -- the War Legend skull
   b.ring = b:CreateTexture(nil, "OVERLAY"); b.ring:SetSize(54, 54); b.ring:SetPoint("TOPLEFT")
   b.ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
   b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
@@ -117,12 +117,18 @@ local function BuildMinimap()
     end)
   end)
   b:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
-  b:SetScript("OnClick", function(_, btn)
-    if IsShiftKeyDown() and ns.Writs and ns.Writs.WP then ns.Writs.WP.Toggle()
-    elseif btn == "RightButton" then ns.TogglePicker() else ns.ToggleMain() end
+  -- click: WL Helper's home; right-click: a menu to each module; Shift-click: the Trading Post
+  b:SetScript("OnClick", function(self, btn)
+    local WP = ns.Writs and ns.Writs.WP
+    if not (WP and WP.ToggleHome) then ns.ToggleMain(); return end
+    if IsShiftKeyDown() then WP.Toggle()
+    elseif btn == "RightButton" then WP.MinimapMenu(self)
+    else WP.ToggleHome() end
   end)
   b:SetScript("OnEnter", function(self)
-    ns.ShowTip(self, { "WL Helper", { L.MM_TT1, 0.85, 0.85, 0.85 }, { L.MM_TT2, 0.85, 0.85, 0.85 }, { L.MM_TT4, 0.85, 0.85, 0.85 }, { L.MM_TT3, 0.6, 0.6, 0.6 } })
+    local WP = ns.Writs and ns.Writs.WP
+    if WP and WP.MinimapTooltip then WP.MinimapTooltip(self)
+    else ns.ShowTip(self, { "WL Helper", { L.MM_TT3, 0.6, 0.6, 0.6 } }) end
   end)
   b:SetScript("OnLeave", ns.HideTip)
   b:SetShown(not WLDTDB.hideMinimap)

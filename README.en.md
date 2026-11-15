@@ -34,7 +34,7 @@ Every Horde dungeon quest, step by step.
 - Quest sharing with your group, and the progress of group members who also run the addon.
 - Long chains too: keys and attunements, Dead Man's Plea, the Valthalak amulet, Quel'Serrar.
 
-### Comptoir
+### Trading Post
 Craftsman's Writs and the trade company reputation (Durotar Supply and Logistics, Azeroth Commerce Authority).
 - The cheapest writs for your next standing, with auction house prices (built-in scan, or Auctionator / TSM).
 - The shopping list, today's state (ready, envelope to open, item missing) and a GPS tour to the turn-in NPCs.
@@ -54,17 +54,17 @@ Items a later quest may need are flagged and left unchecked.
 
 | Command | What it does |
 |---|---|
-| `/wl` | Open or close the dungeon guide |
+| `/wl` | Home |
+| `/wl dungeons` | The dungeon guide |
 | `/wl pick` | Pick dungeons |
-| `/comptoir` | Open or close the Comptoir |
-| `/comptoir gps` | Start or stop the GPS tour of ready writs |
-| `/comptoir scan` | Scan the shopping list prices (auction house open) |
-| `/wl clean` | Bag cleaner |
-| `/wl options` | Options (also `/wlo`) |
+| `/wl trade` | Open or close the Trading Post |
+| `/wl gps` | Stop or restart guidance |
+| `/wl bags` | Bag cleaner |
+| `/wl options` | Settings (also `/wlo`) |
 | `/wl idea` | Suggest an idea or report a bug |
 | `/wl help` | Every command |
 
-Minimap button: click for the guide, right-click to pick dungeons, Shift-click for the Comptoir.
+Minimap button: click for home, right-click for a menu to each module.
 
 ## An idea, a bug?
 
@@ -75,7 +75,7 @@ In game, `/wl idea` gives you the link already filled with your version.
 
 - **The folder is named `DungeonGuide`**, the addon's original name. It stays that way so your settings and
   progress are kept on every update.
-- **Versions**: `1.0.0-beta.2` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
+- **Versions**: `1.0.0-beta.3` means a beta of 1.0. Every version is detailed in the [CHANGELOG](CHANGELOG.md).
 
 ## Credits and license
 

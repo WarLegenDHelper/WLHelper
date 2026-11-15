@@ -146,13 +146,17 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   if not ns.frame then return end
   msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
   local cmd, arg = msg:match("^(%S*)%s*(.*)$")
-  if cmd == "comptoir" or cmd == "c" or cmd == "writs" or cmd == "writ" then if ns.Writs and ns.Writs.WP then ns.Writs.WP.Command(arg) end
-  elseif cmd == "gps" then if ns.Writs and ns.Writs.WP then ns.Writs.WP.ToggleGPS() end
-  elseif cmd == "options" or cmd == "opt" then if ns.Writs and ns.Writs.WP and ns.Writs.WP.OpenOptions then ns.Writs.WP.OpenOptions() end
-  elseif cmd == "idee" or cmd == "idea" or cmd == "bug" then
-    if ns.Writs and ns.Writs.WP and ns.Writs.WP.Feedback then ns.Writs.WP.Feedback(cmd == "bug" and "bug" or "idea") end
-  elseif cmd == "clean" then if ns.Writs and ns.Writs.WP and ns.Writs.WP.Cleaner then ns.Writs.WP.Cleaner.Toggle() end
-  elseif cmd == "pick" or cmd == "dj" or cmd == "donjons" then ns.TogglePicker()
+  cmd = cmd:gsub("é", "e"):gsub("É", "e"):gsub("è", "e"):gsub("È", "e")   -- « réglages », « idée » typed with accents
+  local WP = ns.Writs and ns.Writs.WP
+  -- one root, French and English words; the old ones (clean, writs, comptoir, dj) still work
+  if cmd == "" or cmd == "home" or cmd == "accueil" then if WP and WP.ToggleHome then WP.ToggleHome() else ns.ToggleMain() end
+  elseif cmd == "donjons" or cmd == "dungeons" or cmd == "guide" then ns.ToggleMain()
+  elseif cmd == "choisir" or cmd == "pick" or cmd == "dj" then ns.ShowPicker()
+  elseif cmd == "trade" or cmd == "comptoir" or cmd == "c" or cmd == "writs" or cmd == "writ" then if WP then WP.Command(arg) end
+  elseif cmd == "sacs" or cmd == "bags" or cmd == "clean" then if WP and WP.Cleaner then WP.Cleaner.Toggle() end
+  elseif cmd == "gps" then if WP and WP.StopOrStartGPS then WP.StopOrStartGPS() end
+  elseif cmd == "reglages" or cmd == "options" or cmd == "settings" or cmd == "opt" then if WP and WP.ShowOptionsPage then WP.ShowOptionsPage() end
+  elseif cmd == "idee" or cmd == "idea" or cmd == "bug" then if WP and WP.Feedback then WP.Feedback(cmd == "bug" and "bug" or "idea") end
   elseif cmd == "share" then ns.ShareQuests()
   elseif cmd == "next" then ns.GoTo((ns.frame.view or 1) + 1)
   elseif cmd == "prev" then ns.GoTo((ns.frame.view or 1) - 1)
@@ -164,14 +168,16 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "all" or cmd == "tout" then WLDTDB.useful = (WLDTDB.useful == false); ns.Print(WLDTDB.useful and L.USEFUL_ON or L.USEFUL_OFF); ns.Recalc(); if ns.RenderPicker then ns.RenderPicker() end
   elseif cmd == "macro" then WLDTDB.macro = (WLDTDB.macro == false); ns.Print(WLDTDB.macro and L.MACRO_ON or L.MACRO_OFF); ns.UpdateMacro()
   elseif cmd == "reset" then WLDTDB.manual = {}; WLDTDB.order = nil; ns.Recalc(); ns.Print(L.RESET)
-  elseif cmd == "help" or cmd == "?" then ns.Print("WL Helper v" .. (ns.VERSION or "?")); ns.Print(L.HELP)
-  else ns.ToggleMain() end
+  elseif cmd == "help" or cmd == "aide" or cmd == "?" then
+    ns.Print("WL Helper v" .. (ns.VERSION or "?"))
+    for line in L.HELP:gmatch("[^\n]+") do print("   " .. line) end
+  else ns.Print(L.UNKNOWN_CMD:format(cmd)) end
 end
 
 -- =====================================================================
 --  Raccourcis clavier (Échap > Options > Raccourcis > AddOns > WLDT)
 -- =====================================================================
-BINDING_HEADER_WLDT = "|cff0cd29dWL|r Helper"
+BINDING_HEADER_WLDT = "|cffce1918WL|r Helper"
 BINDING_NAME_WLDT_TOGGLE = ns.L.B_TOGGLE
 BINDING_NAME_WLDT_PICK = ns.L.B_PICK
 BINDING_NAME_WLDT_NEXT = ns.L.B_NEXT
@@ -184,6 +190,6 @@ function WLDT_Binding(what)
   elseif what == "pick" then ns.TogglePicker()
   elseif what == "next" then ns.GoTo((ns.frame.view or 1) + 1)
   elseif what == "prev" then ns.GoTo((ns.frame.view or 1) - 1)
-  elseif what == "points" then if ns.frame.way and ns.frame.way:IsEnabled() then ns.frame.way:Click() end
+  elseif what == "points" then ns.PlacePoints()
   elseif what == "arrow" then ns.ToggleArrow(); ns.Render() end
 end

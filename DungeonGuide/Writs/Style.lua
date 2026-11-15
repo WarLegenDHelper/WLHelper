@@ -347,6 +347,10 @@ function S.Window(name, width, height, title, subtitle, db, posKey)
     close:SetScript("OnLeave", function() x:SetTextColor(C.dim[1], C.dim[2], C.dim[3]) end)
     close:SetScript("OnClick", function() f:Hide() end)
     f.header, f.close = h, close
+    -- Two windows open at once must not mix: the one clicked or opened last comes on top, whole.
+    f:SetToplevel(true)
+    local raiser = CreateFrame("Frame", nil, f)
+    raiser:SetScript("OnShow", function() f:Raise() end)
     f:Hide()
     return f
 end
