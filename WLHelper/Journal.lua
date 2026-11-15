@@ -77,6 +77,8 @@ local function RareOn() return WLDTDB and WLDTDB.rareAlert ~= false and (not ns.
 
 local function Check(unit)
   if not RareOn() or not UnitExists(unit) then return end
+  -- the bosses strip (Bosses.lua) has the banner with its target button: one alert, not two
+  if ns.RareAlert then pcall(ns.RareAlert, unit) return end
   local inInstance = IsInInstance and IsInInstance()
   if not inInstance then return end
   local class = UnitClassification(unit)

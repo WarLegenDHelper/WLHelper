@@ -1102,12 +1102,12 @@ local function RenderFocus(card, st, log, y, dkey)
   if body ~= "" then
     fo.body:SetText(body); fo.body:Show()
     fo.body:ClearAllPoints(); fo.body:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -(yy + 8))
-    yy = yy + 8 + ns.FitText(fo.body, 0, bodyW, fo)
+    yy = yy + 8 + ns.FitText(fo.body, f.compactIn and 4 or 0, bodyW, fo)
   else fo.body:Hide() end
   if desc then
     fo.gtext:SetText(Hex(T.text) .. L.GAME_TEXT .. "|r\n" .. desc); fo.gtext:Show()
     fo.gtext:ClearAllPoints(); fo.gtext:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -(yy + 8))
-    yy = yy + 8 + ns.FitText(fo.gtext, 8, bodyW, fo.cutSink)
+    yy = yy + 8 + ns.FitText(fo.gtext, f.compactIn and 3 or 8, bodyW, fo.cutSink)
   else fo.gtext:Hide() end
   local fh = math.max(44, math.ceil(yy + 12))
   fo:SetWidth(rowW); fo:SetHeight(fh)
@@ -1273,32 +1273,47 @@ local function Build()
   if f.instBtn.SetIcon then f.instBtn:SetIcon("plus") end
   f.instBtn:Hide()
 
-  -- inside one of the route's dungeons: a band above the card says so ("Inside the dungeon: ZF"),
-  -- with its icon, where you are in its steps, the quests finished here and the next boss.
+  -- inside one of the route's dungeons: one slim line above the card says so (its icon, the
+  -- dungeon, where you are in its steps and the quests finished here; the rest in the tooltip),
+  -- with share (in a group) and the bosses strip toggle at the right.
   -- A click shows the first open step inside. Leaving the instance hides it.
   local band = CreateFrame("Button", nil, f)
-  band:SetHeight(56)
+  band:SetHeight(36)
   band.bg = Tex(band, "BACKGROUND", T.cardFill); band.bg:SetAllPoints()
   band.tint = Tex(band, "BACKGROUND", { T.info[1], T.info[2], T.info[3], 0.10 }); band.tint:SetAllPoints()
   band.edge = ns.Outline(band, T.info, 0.4)
   band.hl = Tex(band, "HIGHLIGHT", T.hoverFill); band.hl:SetAllPoints()
-  band.icon = band:CreateTexture(nil, "ARTWORK"); band.icon:SetSize(32, 32); band.icon:SetPoint("TOPLEFT", 12, -12)
-  band.title = Text(band, ns.F.heading, T.fg); band.title:SetPoint("TOPLEFT", 56, -10)
-  band.sub = Text(band, ns.F.meta, T.text); band.sub:SetPoint("TOPLEFT", band.title, "BOTTOMLEFT", 0, -3); band.sub:SetSpacing(3)
-  band.chev = ns.Icon(band, "chevron_right", 16, "ARTWORK", T.muted); band.chev:SetPoint("RIGHT", -12, 0)
+  band.icon = band:CreateTexture(nil, "ARTWORK"); band.icon:SetSize(20, 20); band.icon:SetPoint("LEFT", 10, 0)
+  band.title = Text(band, ns.F.label, T.fg, true); band.title:SetPoint("LEFT", 38, 0)
+  ns.ClampLabel(band.title, nil, band)
+  band.sub = Text(band, ns.F.meta, T.muted); band.sub:SetPoint("LEFT", band.title, "RIGHT", 8, 0)
+  ns.ClampLabel(band.sub, nil, band)
+  band.chev = ns.Icon(band, "chevron_right", 16, "ARTWORK", T.muted); band.chev:SetPoint("RIGHT", -10, 0)
   band:SetScript("OnClick", function(self) if self.go then ns.GoTo(self.go) end end)
-  band:SetScript("OnEnter", function(self) self.chev:SetVertexColor(T.fg[1], T.fg[2], T.fg[3]); ns.ShowTip(self, { self.title:GetText() or "", L.INB_TT, L.INB_BACK }) end)
+  band:SetScript("OnEnter", function(self)
+    self.chev:SetVertexColor(T.fg[1], T.fg[2], T.fg[3])
+    ns.ShowTip(self, self.tipLines or { self.title:GetText() or "", L.INB_TT })
+  end)
   band:SetScript("OnLeave", function(self) self.chev:SetVertexColor(T.muted[1], T.muted[2], T.muted[3]); ns.HideTip() end)
-  -- under the band's lines: share the quests (in a group) and the bosses and rares panel
-  band.shareBtn = LabelBtn(band, L.SHARE_SHORT, 24, "secondary", DoShare, function() return { L.M_SHARE, L.TT_FSHARE } end)
-  if band.shareBtn.SetIcon then band.shareBtn:SetIcon("group") end
+  -- at the right of the line: share the quests (in a group) and the bosses strip (on / off)
+  -- (an icon, like the bosses toggle: the count is in its tooltip, so the band's texts keep their room;
+  -- inside, the footer has no share button: this is the view's one)
+  band.shareBtn = SW().IconButton(band, "group", 24, function()
+    local n = ShareN()
+    local t = { L.M_SHARE, L.TT_FSHARE }
+    if n > 0 then t[#t + 1] = { ShareLabel(n), T.accentSoft[1], T.accentSoft[2], T.accentSoft[3] }
+    else t[#t + 1] = { (IsInGroup and IsInGroup()) and L.NOSHARE or L.NOGROUP_TIP, T.muted[1], T.muted[2], T.muted[3] } end
+    return t
+  end, DoShare)
   band.shareBtn:Hide()
   if ns.ToggleBosses then
-    band.bossBtn = LabelBtn(band, L.BOSS_BAND_SHOW, 24, "secondary", function()
+    band.bossBtn = SW().IconButton(band, "skull", 24, function()
+      return { L.BOSS_TITLE, (ns.BossesShown and ns.BossesShown()) and L.BOSS_MENU_HIDE or L.BOSS_MENU_CLICK }
+    end, function()
       ns.ToggleBosses(ns.instIn or InsideKey())
-      if f.inBand.bossBtn then f.inBand.bossBtn:SetText((ns.BossesShown and ns.BossesShown()) and L.BOSS_BAND_HIDE or L.BOSS_BAND_SHOW) end
-    end, function() return { L.BOSS_TITLE, (ns.BossesShown and ns.BossesShown()) and L.BOSS_MENU_HIDE or L.BOSS_MENU_CLICK } end)
-    if band.bossBtn.SetIcon then band.bossBtn:SetIcon("skull") end
+      local b = f.inBand.bossBtn
+      if b and b.SetToggled then b:SetToggled(ns.BossesShown and ns.BossesShown()) end
+    end)
     band.bossBtn:Hide()
   end
   band:Hide()
@@ -1602,14 +1617,13 @@ function ns.StepView(st, log)
   return out
 end
 
--- The "inside the dungeon" band: icon, name, where you are in its steps, quests finished here,
--- the next boss. Returns its height (0 = hidden).
+-- The "inside the dungeon" line: icon, the dungeon, where you are in its steps and the quests
+-- finished here (the long sentences and the next boss in its tooltip). Returns its height (0 = hidden).
 function ns.RenderInsideBand(k, log)
   local band = f.inBand
   local d = ns.D[k] or {}
   band.icon:SetVertexColor(1, 1, 1)
   if d.icon then ns.SetPainted(band.icon, d.icon) else ns.SetHDIcon(band.icon, "portal", T.info) end
-  band.title:SetText(L.INB_T:format(ns.DName(k) or ""))
   local nIn, doneIn, firstOpen, firstIn, viewPos, openPos, nextBoss = 0, 0, nil, nil, nil, nil, nil
   local qseen, qT, qD = {}, 0, 0
   for i2, s2 in ipairs(Steps()) do
@@ -1631,38 +1645,49 @@ function ns.RenderInsideBand(k, log)
     end
   end
   if nIn == 0 then band:Hide() return 0 end
-  local lines = {}
+  local name = ns.DName(k) or ""
+  local tip = { L.INB_T:format(name) }
+  local short
   if doneIn == nIn then
-    table.insert(lines, Hex(T.ok) .. L.INB_DONE .. "|r")
+    short = Hex(T.ok) .. L.INB_DONE_S .. "|r"
+    tip[#tip + 1] = { L.INB_DONE, T.ok[1], T.ok[2], T.ok[3] }
   else
-    table.insert(lines, L.INB_STEP:format(viewPos or openPos or 1, nIn) .. "  " .. Hex(T.muted) .. "·|r  " .. L.INB_Q:format(qD, qT))
-    if nextBoss then table.insert(lines, L.INB_BOSS:format(nextBoss)) end
-    if not viewPos then table.insert(lines, Hex(T.accentSoft) .. L.INB_BACK .. "|r") end
+    short = L.INB_STEP_S:format(viewPos or openPos or 1, nIn) .. "  ·  " .. L.INB_Q_S:format(qD, qT)
+    tip[#tip + 1] = L.INB_STEP:format(viewPos or openPos or 1, nIn)
+    tip[#tip + 1] = L.INB_Q:format(qD, qT)
+    if nextBoss then tip[#tip + 1] = L.INB_BOSS:format(nextBoss) end
   end
-  band.sub:SetText(table.concat(lines, "\n"))
+  tip[#tip + 1] = L.INB_TT
+  -- the click brings you back only when you look at a step outside the dungeon
+  if not viewPos then tip[#tip + 1] = L.INB_BACK end
+  band.tipLines = tip
+  band.title:SetText(name)
+  band.sub:SetText(short)
+  -- away from the dungeon's steps: the chevron says a click brings you back
+  local cc = viewPos and T.muted or T.accentSoft
+  band.chev:SetVertexColor(cc[1], cc[2], cc[3])
   band.go = firstOpen or firstIn
   band:Show()
-  local tw = (W - 2 * PAD) - 56 - 36
-  local th = ns.FitText(band.title, 2, tw, band)
-  local sh = ns.FitText(band.sub, 0, tw, band)
-  local h = math.ceil(10 + th + 3 + sh)
-  -- a row of buttons under the lines: share (in a group), the bosses and rares panel
-  local x, any = 56, false
+  -- the right cluster: chevron, bosses toggle, share (in a group)
+  local x = -10 - 16 - 8
+  if band.bossBtn then
+    if band.bossBtn.SetToggled then band.bossBtn:SetToggled(ns.BossesShown and ns.BossesShown()) end
+    band.bossBtn:ClearAllPoints(); band.bossBtn:SetPoint("RIGHT", band, "RIGHT", x, 0); band.bossBtn:Show()
+    x = x - 24 - 6
+  end
   local inGroup = IsInGroup and IsInGroup()
   if inGroup then
-    SetShareButton(band.shareBtn, ShareN(), true)
-    band.shareBtn:ClearAllPoints(); band.shareBtn:SetPoint("TOPLEFT", band, "TOPLEFT", x, -(h + 8)); band.shareBtn:Show()
-    x = x + (num(band.shareBtn:GetWidth()) or 120) + 8; any = true
+    SetShareButton(band.shareBtn, ShareN(), false)
+    band.shareBtn:ClearAllPoints(); band.shareBtn:SetPoint("RIGHT", band, "RIGHT", x, 0); band.shareBtn:Show()
+    x = x - 24 - 6
   else band.shareBtn:Hide() end
-  if band.bossBtn then
-    band.bossBtn:SetText((ns.BossesShown and ns.BossesShown()) and L.BOSS_BAND_HIDE or L.BOSS_BAND_SHOW)
-    band.bossBtn:ClearAllPoints(); band.bossBtn:SetPoint("TOPLEFT", band, "TOPLEFT", x, -(h + 8)); band.bossBtn:Show()
-    any = true
-  end
-  if any then h = h + 8 + 24 end
-  h = math.max(56, h + 10)
-  band:SetHeight(h)
-  return h
+  -- the name first, the short progress after it; both cut (full text in the tooltip) when tight
+  local room = (W - 2 * PAD) - 38 + x
+  local sw = math.min(ns.TextWidth(band.sub), math.max(60, math.floor(room * 0.5)))
+  local tw = math.max(40, math.min(ns.TextWidth(band.title), room - 8 - sw))
+  band.title:SetWidth(tw); band.sub:SetWidth(math.max(20, sw))
+  band:SetHeight(36)
+  return 36
 end
 
 -- The footer's "Checklist" button: its icon says the state of the check-list it opens
@@ -1698,7 +1723,7 @@ local function LayoutFoot(full, centred)
   local CW = W - 2 * PAD
   f.go:ClearAllPoints()
   -- in a group, with a route: "Share 3 quests" on the big button's line, on its right
-  local share = full and not centred and IsInGroup and IsInGroup()
+  local share = full and not centred and not f.compactIn and IsInGroup and IsInGroup()
   if share then
     SetShareButton(f.shareFoot, ShareN(), true)
     f.shareFoot:ClearAllPoints(); f.shareFoot:SetPoint("TOPRIGHT", f.foot, "TOPRIGHT", 0, 0); f.shareFoot:Show()
@@ -1784,6 +1809,8 @@ Render = function()
   local inKey = (hasRoute and not f.mini) and InsideKey() or nil
   if inKey then offer = false end
   local bandH = inKey and ns.RenderInsideBand(inKey, log) or 0
+  -- inside: the card keeps a few lines per action (the full text is in each line's tooltip)
+  f.compactIn = inKey ~= nil
   local TOP = TopBase(hasRoute)
   if offer then
     local nLeft = ns.InstLeft(offerKey)
@@ -2101,7 +2128,7 @@ Render = function()
       row.sub:SetText(sub); row.sub:SetShown(sub ~= "")
       local subTop = 10 + nameH + 3
       row.sub:ClearAllPoints(); row.sub:SetPoint("TOPLEFT", row, "TOPLEFT", ROW_NAME_X, -subTop)
-      local subH = (sub ~= "") and (ns.FitText(row.sub, 0, subW, row)) or 0
+      local subH = (sub ~= "") and (ns.FitText(row.sub, f.compactIn and 3 or 0, subW, row)) or 0
       local rh = math.max(36, math.ceil(subTop + subH + 8))
       row:SetHeight(rh); row:ClearAllPoints(); row:SetPoint("TOPLEFT", card, "TOPLEFT", 4, -y)
       y = y + rh
@@ -2230,7 +2257,7 @@ Render = function()
       local subTop = 10 + nameH + 3
       if nd.loc then subTop = math.max(subTop, 5 + 24 + 4) end
       row.sub:ClearAllPoints(); row.sub:SetPoint("TOPLEFT", row, "TOPLEFT", ROW_NAME_X, -subTop)
-      local subH = (sub ~= "") and (ns.FitText(row.sub, 0, subW, row)) or 0
+      local subH = (sub ~= "") and (ns.FitText(row.sub, f.compactIn and 3 or 0, subW, row)) or 0
       local rh = math.max(36, math.ceil(subTop + subH + 8))
       row:SetHeight(rh)
       row:ClearAllPoints(); row:SetPoint("TOPLEFT", card, "TOPLEFT", 4, -y)
@@ -2245,7 +2272,7 @@ Render = function()
     card.after:ClearAllPoints(); card.after:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.after:SetText(after); card.after:Show()
     y = y + ns.FitText(card.after, 0, TW, card)
   else card.after:Hide() end
-  if shareAfter then
+  if shareAfter and not f.compactIn then
     y = y + 8
     card.shareBtn:SetText(L.SHARE_SHORT)
     card.shareBtn:ClearAllPoints(); card.shareBtn:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.shareBtn:Show()

@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.59] — 2026-11-15
+
+### Ajouté / Added
+- **Têtes des boss à côté du guide** (façon Dungeon Journal) : une petite colonne de portraits à droite, les boss dans l'ordre du donjon puis les rares (cadre argenté, grisés tant que tu ne les as pas vus) ; un clic sur une tête la cible et la marque (crâne pour un boss, étoile pour un rare) ; les boss tués sont grisés avec une coche. Déplaçable, repliable.
+  *Boss heads beside the guide: click a head to target and mark it.*
+- **Alerte des rares**, partout : son et bandeau « Rare : Nom (niv. N) » avec un bouton pour le cibler et le marquer (hors combat), au plus une fois toutes les 10 minutes par rare.
+  *Rare alert with a target-and-mark button.*
+
+### Modifié / Changed
+- **Guide compact dans les donjons** : le bandeau « Dans le donjon » tient sur une ligne et les descriptions sont raccourcies (le détail dans l'infobulle).
+- **Petit suivi replié** : il affiche l'action à faire maintenant au lieu du seul titre du chapitre, et son infobulle explique ce qu'il est.
+
 ## [1.0.0-beta.58] — 2026-11-15
 
 ### Modifié / Changed

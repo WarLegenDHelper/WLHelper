@@ -1,14 +1,20 @@
--- Bosses.lua: the bosses and rares of a dungeon, in a panel under the guide (or on its own).
+-- Bosses.lua: the bosses and rares of a dungeon as a strip of heads beside the guide (or on its own).
 -- Data read LIVE from LibForeverData (optional dependency, never copied): every NPC whose spawns
 -- sit on the dungeon's instance map (ns.D[k].inst = the client Map id LibForeverData stores for
 -- instance spawns), ranked boss (3) or rare (2 rare elite, 4 rare), plus the bosses of the walk
 -- order (ns.WALK / ns.BossOrder: most 5-player bosses are only "elite" in the data).
--- Each row: portrait, name, level, rare frame, killed check, quest link, a secure "Target and mark"
--- button (macro) and the marker it puts. Secure buttons are created, moved, shown and given their
--- macro out of combat only; changes in combat wait for PLAYER_REGEN_ENABLED.
+-- The strip: one square portrait per boss in dungeon order, then the rares under a "Rares" label.
+-- Killed: greyed, veiled, a check. A rare not seen yet: greyed and faded (seen = its nameplate,
+-- your target or your mouse met it once, kept in WLDTDB.raresSeen). The name, level, quests and
+-- the click line live in the tooltip. Each head IS a secure button (macro: target and mark),
+-- created, moved, shown and given its macro out of combat only; changes in combat wait for
+-- PLAYER_REGEN_ENABLED (only the colours change in combat).
+-- Rare alert (inside a dungeon, WLDTDB.rareAlert ~= false; the open world too when
+-- WLDTDB.rareAlertWorld is true): a rare shows up -> a sound and a small banner with a secure
+-- "Target and mark" button (made out of combat), at most once per 10 min per rare.
 -- API: ns.DungeonMobs(dkey[, sync]) -> { bosses = {...}, rares = {...}, loading, source }
 --      ns.ShowBosses(dkey), ns.HideBosses(), ns.ToggleBosses(dkey), ns.AttachBosses(parentFrame),
---      ns.RefreshBosses(), ns.BossesShown()
+--      ns.RefreshBosses(), ns.BossesShown(), ns.RareSeen(npcId), ns.RareAlert(unit)
 local ADDON, ns = ...
 local L = ns.L
 local T = ns.Tok
@@ -369,7 +375,19 @@ local function Names(o)
   return t
 end
 
--- Fills rec.quests ({ qid, item, kind }) and rec.killed for every row.
+-- Rares met once (nameplate, target, mouse): WLDTDB.raresSeen[npcId] = server time.
+local function Seen()
+  local db = DB()
+  db.raresSeen = db.raresSeen or {}
+  return db.raresSeen
+end
+local function IsSeen(rec)
+  local s = Seen()
+  for _, id in ipairs(rec.ids or {}) do if s[id] then return true end end
+  return false
+end
+
+-- Fills rec.quests ({ qid, item, kind }), rec.killed and rec.seen (rares) for every head.
 local function Dynamic(res)
   local pool, log = QuestPool(res.dkey)
   local k = Kills()
@@ -397,6 +415,7 @@ local function Dynamic(res)
         end
       end
     end
+    rec.seen = rec.rare and (rec.killed or IsSeen(rec)) or nil
   end
   for _, rec in ipairs(res.bosses) do each(rec) end
   for _, rec in ipairs(res.rares) do each(rec) end
@@ -420,13 +439,13 @@ function ns.DungeonMobs(dkey, sync)
   return res
 end
 
--- ---------------------------------------------------------------- panel
-local P               -- the panel
-local parentFrame     -- the guide window it hangs under
+-- ---------------------------------------------------------------- the strip of heads
+local P               -- the strip
+local parentFrame     -- the guide window it sits beside
 local pending = {}    -- what waits for the end of combat
-local dismissed = {}  -- instance IDs whose panel you closed during this visit
-local ROW_GAP, PAD, HEAD = 2, 16, 44
-local rowsN = 0
+local dismissed = {}  -- instance IDs whose strip you closed during this visit
+local SIZE, GAP, PAD, TOPBAR, LABEL = 40, 6, 8, 22, 18
+local MAXCOLS = 5
 
 local function Marker(rec)
   local db = DB()
@@ -434,11 +453,13 @@ local function Marker(rec)
   return db.bossMarks[rec.en] or (rec.rare and MARK_DEFAULT_RARE or MARK_DEFAULT_BOSS)
 end
 
-local function MacroFor(rec)
-  local m = Marker(rec)
-  return "/cleartarget\n/tar " .. (rec.name or rec.en) ..
+-- /targetexact: the exact name only, and the current target stays when nobody matches (a misclick
+-- in combat never leaves you without a target); a dead target with that name is dropped first.
+local function MacroText(name, m)
+  return "/cleartarget [dead]\n/targetexact " .. name ..
     "\n/run if UnitExists'target' and GetRaidTargetIndex'target'~=" .. m .. " then SetRaidTarget('target'," .. m .. ") end"
 end
+local function MacroFor(rec) return MacroText(rec.name or rec.en, Marker(rec)) end
 
 local function LevelText(rec)
   local a, b = rec.minL, rec.maxL
@@ -454,29 +475,13 @@ local function RankWord(rec)
   elseif rec.rank == 4 then return L.BOSS_R_RARE end
   return L.BOSS_R_ELITE
 end
-local function QuestLine(qn)
-  local qname = ns.QName(qn.qid)
-  if qn.kind == "item" then return L.BOSS_ITEM:format(ns.T(qn.item) or qn.item or qname) end
-  return L.BOSS_KILLQ:format(qname)
-end
-local function DetailText(rec)
-  local parts = {}
-  local lv = LevelText(rec)
-  if lv then parts[#parts + 1] = lv end
-  local q = rec.quests and rec.quests[1]
-  if q then
-    local s = QuestLine(q)
-    if #rec.quests > 1 then s = L.BOSS_MORE:format(s, #rec.quests - 1) end
-    parts[#parts + 1] = s
-  end
-  return table.concat(parts, " · ")
-end
 
-local function RowTip(row)
-  local rec = row.rec
+-- the head's tooltip: name; boss number or rank and level; quests; state; the click line
+local function HeadTip(head)
+  local rec = head.rec
   if not rec then return end
   local lines = { rec.name or rec.en }
-  local sub = RankWord(rec)
+  local sub = (not rec.rare and head.n) and L.BOSS_N:format(head.n) or RankWord(rec)
   local lv = LevelText(rec)
   if lv then sub = sub .. " · " .. lv end
   lines[#lines + 1] = sub
@@ -490,13 +495,17 @@ local function RowTip(row)
       lines[#lines + 1] = { L.BOSS_FOR:format(qname), T.gold[1], T.gold[2], T.gold[3] }
     end
   end
-  if rec.killed then lines[#lines + 1] = { L.BOSS_KILLED, T.ok[1], T.ok[2], T.ok[3] } end
-  ns.ShowTip(row, lines)
+  if rec.killed then lines[#lines + 1] = { L.BOSS_KILLED, T.ok[1], T.ok[2], T.ok[3] }
+  elseif rec.rare and not rec.seen then lines[#lines + 1] = L.BOSS_UNSEEN
+  elseif rec.rare then lines[#lines + 1] = { L.BOSS_SEEN, T.silver[1], T.silver[2], T.silver[3] } end
+  if head.stale then lines[#lines + 1] = { L.BOSS_WAIT, T.warn[1], T.warn[2], T.warn[3] } end
+  lines[#lines + 1] = L.BOSS_TT_CLICKM:format(MarkName(Marker(rec)))
+  ns.ShowTip(head, lines)
 end
 
 -- painted portrait: the creature's display (journal), its type icon, else the HD skull / star
-local function SetPortrait(row, rec)
-  local tex, hd = row.port, row.portHD
+local function SetPortrait(head, rec)
+  local tex, hd = head.port, head.portHD
   local shown = false
   if rec.model and SetPortraitTextureFromCreatureDisplayID then
     local ok = pcall(SetPortraitTextureFromCreatureDisplayID, tex, rec.model)
@@ -511,163 +520,90 @@ local function SetPortrait(row, rec)
   tex:SetShown(shown)
   hd:SetShown(not shown)
   if not shown then ns.SetHDIcon(hd, rec.rare and "star" or "skull", rec.rare and T.silver or T.muted) end
-  row.portEdge(rec.rare and T.silver or T.cardEdge, rec.rare and 0.9 or T.cardEdge[4])
 end
 
--- the secure button's look (a secondary button, 24 tall) and its tooltip
-local function MakeTargetButton(row, i)
-  local b = CreateFrame("Button", "WLBossTarget" .. i, row, "SecureActionButtonTemplate")
-  b:SetHeight(24)
-  b:RegisterForClicks("AnyUp", "AnyDown")
+-- One head: a secure button (the click targets and marks) holding a plain frame with the looks
+-- (its alpha may change in combat; the secure button's own state never does).
+local function MakeHead(i)
+  local b = CreateFrame("Button", "WLBossTarget" .. i, P, "SecureActionButtonTemplate")
+  b:SetSize(SIZE, SIZE)
+  b:RegisterForClicks("LeftButtonUp", "LeftButtonDown")
   b:SetAttribute("type", "macro")
-  ns.Flat(b, T.btnFill, T.btnEdge)
-  b.hl = ns.Tex(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
-  b.press = ns.Tex(b, "ARTWORK", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
-  b.icon = b:CreateTexture(nil, "OVERLAY"); b.icon:SetSize(14, 14); b.icon:SetPoint("LEFT", 8, 0)
-  ns.SetHDIcon(b.icon, "skull", T.muted)
-  b.label = ns.Text(b, ns.F.label, T.fg, false)
-  b.label:SetPoint("LEFT", b.icon, "RIGHT", 6, 0); b.label:SetJustifyV("MIDDLE"); b.label:SetWordWrap(false)
-  b.label:SetText(L.BOSS_TARGET)
-  b.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3], 0.85)
-  b.Fit = function(self)
-    local okW, sw = pcall(self.label.GetStringWidth, self.label)
-    sw = okW and num(sw) or 0
-    if sw <= 0 then sw = 96 end
-    self:SetWidth(math.ceil(8 + 14 + 6 + sw + 12))
-  end
-  b:Fit()
-  b:SetScript("OnEnter", function(self)
-    self.hl:SetAlpha(1); self._edgeSet(T.btnEdgeHover); self.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3], 1)
-    ns.SetHDIcon(self.icon, "skull", T.fg)
-    local rec = row.rec
-    if not rec then return end
-    local lines = { L.BOSS_TARGET, L.BOSS_TT_TARGET:format(rec.name or rec.en, MarkName(Marker(rec))) }
-    if row.stale then lines[#lines + 1] = { L.BOSS_WAIT, T.warn[1], T.warn[2], T.warn[3] } end
-    lines[#lines + 1] = L.BOSS_TT_CLICK
-    ns.ShowTip(self, lines)
-  end)
-  b:SetScript("OnLeave", function(self)
-    self.hl:SetAlpha(0); self._edgeSet(T.btnEdge); self.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3], 0.85)
-    ns.SetHDIcon(self.icon, "skull", T.muted)
-    ns.HideTip()
-  end)
-  b:HookScript("OnMouseDown", function(self) self.press:Show() end)
-  b:HookScript("OnMouseUp", function(self) self.press:Hide() end)
+  local face = CreateFrame("Frame", nil, b)
+  face:SetAllPoints()
+  b.face = face
+  local bg = ns.Tex(face, "BACKGROUND", T.cardFill); bg:SetAllPoints()
+  b.edge = ns.Outline(face, T.cardEdge)
+  b.port = face:CreateTexture(nil, "ARTWORK"); b.port:SetPoint("TOPLEFT", 1, -1); b.port:SetPoint("BOTTOMRIGHT", -1, 1)
+  b.portHD = ns.Icon(face, "skull", 20, "ARTWORK", T.muted); b.portHD:SetPoint("CENTER")
+  b.veil = ns.Tex(face, "OVERLAY", T.scrim); b.veil:SetPoint("TOPLEFT", 1, -1); b.veil:SetPoint("BOTTOMRIGHT", -1, 1); b.veil:Hide()
+  b.check = ns.Icon(face, "check", 18, "OVERLAY", T.ok); b.check:SetPoint("CENTER"); b.check:Hide()
+  b.hl = ns.Tex(face, "OVERLAY", T.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
+  -- the boss's number in the dungeon (bottom left, on a dark chip)
+  b.chip = ns.Tex(face, "OVERLAY", T.scrim); b.chip:SetPoint("BOTTOMLEFT", 1, 1); b.chip:SetSize(14, 13)
+  b.badge = ns.Text(face, ns.F.foot, T.fg, true)
+  b.badge:SetPoint("CENTER", b.chip, "CENTER", 0, 0)
+  b:SetScript("OnEnter", function(self) self.hl:SetAlpha(1); HeadTip(self) end)
+  b:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); ns.HideTip() end)
+  b:HookScript("OnMouseDown", function(self) self.port:SetPoint("TOPLEFT", 1, -2) end)
+  b:HookScript("OnMouseUp", function(self) self.port:SetPoint("TOPLEFT", 1, -1) end)
   return b
 end
 
-local function MakeRow(i)
-  local row = CreateFrame("Frame", nil, P.content)
-  row.bg = ns.Tex(row, "BACKGROUND", T.cardFill); row.bg:SetAllPoints()
-  row.hl = ns.Tex(row, "BACKGROUND", T.hoverFill); row.hl:SetAllPoints(); row.hl:SetAlpha(0)
-  row:EnableMouse(true)
-  row:SetScript("OnEnter", function(self) self.hl:SetAlpha(1); RowTip(self) end)
-  row:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); ns.HideTip() end)
-  -- portrait 28 px, 1 px edge (silver for a rare)
-  row.portBox = CreateFrame("Frame", nil, row)
-  row.portBox:SetSize(28, 28); row.portBox:SetPoint("TOPLEFT", 8, -6)
-  local pbg = ns.Tex(row.portBox, "BACKGROUND", T.cardFill); pbg:SetAllPoints()
-  row.portEdge = ns.Outline(row.portBox, T.cardEdge)
-  row.port = row.portBox:CreateTexture(nil, "ARTWORK"); row.port:SetPoint("TOPLEFT", 1, -1); row.port:SetPoint("BOTTOMRIGHT", -1, 1)
-  row.portHD = ns.Icon(row.portBox, "skull", 16, "ARTWORK", T.muted); row.portHD:SetPoint("CENTER")
-  -- right cluster: target button, marker, killed check
-  row.btn = MakeTargetButton(row, i)
-  row.btn:SetPoint("RIGHT", row, "RIGHT", -12, 0)
-  row.mark = CreateFrame("Button", nil, row)
-  row.mark:SetSize(24, 24); row.mark:SetPoint("RIGHT", row.btn, "LEFT", -4, 0)
-  row.mark.hl = ns.Tex(row.mark, "BACKGROUND", T.hoverFill); row.mark.hl:SetAllPoints(); row.mark.hl:SetAlpha(0)
-  row.mark.icon = row.mark:CreateTexture(nil, "ARTWORK"); row.mark.icon:SetSize(16, 16); row.mark.icon:SetPoint("CENTER")
-  row.mark:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  row.mark:SetScript("OnEnter", function(self)
-    self.hl:SetAlpha(1)
-    local rec = row.rec
-    if not rec then return end
-    local lines = { L.BOSS_MARK_TT:format(MarkName(Marker(rec))) }
-    if InCombat() then lines[#lines + 1] = { L.BOSS_COMBAT, T.warn[1], T.warn[2], T.warn[3] }
-    else lines[#lines + 1] = L.BOSS_MARK_CLICK; lines[#lines + 1] = L.BOSS_MARK_RCLICK end
-    ns.ShowTip(self, lines)
-  end)
-  row.mark:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); ns.HideTip() end)
-  row.mark:SetScript("OnClick", function(self, button)
-    local rec = row.rec
-    if not rec or InCombat() then return end
-    local db = DB()
-    db.bossMarks = db.bossMarks or {}
-    if button == "RightButton" then db.bossMarks[rec.en] = nil
-    else db.bossMarks[rec.en] = (Marker(rec) % 8) + 1 end
-    if PlaySound then PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856) end
-    ns.RefreshBosses()
-    local s = self:GetScript("OnEnter"); if s then s(self) end
-  end)
-  row.check = ns.Icon(row, "check", 16, "ARTWORK", T.ok)
-  row.check:SetPoint("RIGHT", row.mark, "LEFT", -8, 0)
-  row.check:SetAlpha(0)
-  -- name and detail
-  row.name = ns.Text(row, ns.F.label, T.fg, false)
-  row.name:SetPoint("TOPLEFT", 44, -6)
-  row.detail = ns.Text(row, ns.F.meta, T.muted, false)
-  row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
-  return row
-end
-
--- what may change in combat: colours and the check (regions only, nothing secure)
-local function PaintRow(row)
-  local rec = row.rec
+-- what may change in combat: colours, the veil, the check, the face's alpha (no secure state)
+local function PaintHead(b)
+  local rec = b.rec
   if not rec then return end
-  local c = rec.killed and T.muted or T.fg
-  row.name:SetTextColor(c[1], c[2], c[3])
-  row.check:SetAlpha(rec.killed and 1 or 0)
-  row.mark.icon:SetTexture(MarkTexture(Marker(rec)))
-  row.mark.icon:SetAlpha(row.mark:IsEnabled() == false and T.disabledAlpha or 1)
+  local dead = rec.killed == true
+  local unseen = (rec.rare and not rec.seen and not dead) and true or false
+  if b.port.SetDesaturated then b.port:SetDesaturated(dead or unseen) end
+  b.veil:SetShown(dead)
+  b.check:SetShown(dead)
+  local e = rec.rare and T.silver or T.cardEdge
+  b.edge(e, rec.rare and (unseen and 0.5 or 0.9) or T.cardEdge[4])
+  local a = unseen and 0.45 or 1
+  b.face:SetAlpha(a)
+  b.faceAlpha = a
+  local c = dead and T.muted or T.fg
+  b.badge:SetTextColor(c[1], c[2], c[3])
 end
 
-local function Measure(fs, w, lines)
-  return ns.FitText(fs, lines or 2, w, fs:GetParent())
+local function FillHead(b, rec, n)
+  b.rec, b.n, b.stale = rec, n, nil
+  b.badge:SetText(n and tostring(n) or "")
+  b.badge:SetShown(n ~= nil); b.chip:SetShown(n ~= nil)
+  b.chip:SetWidth((n and n >= 10) and 18 or 14)
+  SetPortrait(b, rec)
+  local m = MacroFor(rec)
+  if b.macro ~= m then b:SetAttribute("macrotext", m); b.macro = m end
+  b:SetAttribute("type", "macro")
+  PaintHead(b)
 end
 
-local function FillRow(row, rec, w)
-  row.rec = rec
-  row.stale = nil
-  row:SetWidth(w)
-  row.name:SetText(rec.name or rec.en)
-  -- the font may have changed (looks): the button follows its label (FillRow runs out of combat)
-  row.btn.label:SetText(L.BOSS_TARGET)
-  row.btn:Fit()
-  local det = DetailText(rec)
-  row.detail:SetText(det)
-  row.detail:SetShown(det ~= "")
-  local right = 12 + row.btn:GetWidth() + 4 + 24 + 8 + 16 + 8
-  local tw = math.max(60, w - 44 - right)
-  local h1 = Measure(row.name, tw, 2)
-  local h2 = det ~= "" and Measure(row.detail, tw, 2) or 0
-  local h = 6 + math.max(h1, 12) + (det ~= "" and (3 + math.max(h2, 11)) or 0) + 8
-  h = math.max(40, math.ceil(h))
-  row:SetHeight(h)
-  SetPortrait(row, rec)
-  row.btn:SetAttribute("macrotext", MacroFor(rec))
-  row.btn:SetAttribute("type", "macro")
-  PaintRow(row)
-  return h
+-- where the strip docks: the guide when it shows, else the tracker
+local function Host()
+  if parentFrame and parentFrame:IsShown() then return parentFrame end
+  local tr = WLHelperTracker and WLHelperTracker.Frame and WLHelperTracker.Frame()
+  if tr and tr:IsShown() then return tr end
+  return nil
 end
 
-local function Width()
-  local db = DB()
-  if P.attached and parentFrame then
-    local okW, pw = pcall(parentFrame.GetWidth, parentFrame)
-    local okS, ps = pcall(parentFrame.GetEffectiveScale, parentFrame)
-    local ms = P:GetEffectiveScale()
-    pw, ps, ms = okW and num(pw), okS and num(ps), num(ms)
-    if pw and ps and ms and ms > 0 and pw > 0 then return math.max(360, math.min(640, math.floor(pw * ps / ms + 0.5))) end
-  end
-  return db.bossW or 420
+-- a frame's box in the strip's units (nil when the client does not know yet)
+local function BoxOf(fr)
+  local okS, ps = pcall(fr.GetEffectiveScale, fr)
+  ps = okS and num(ps)
+  local ms = num(P:GetEffectiveScale())
+  local l, r, t, b = num(fr:GetLeft()), num(fr:GetRight()), num(fr:GetTop()), num(fr:GetBottom())
+  if not (ps and ms and ms > 0 and l and r and t and b) then return nil end
+  local k = ps / ms
+  return l * k, r * k, t * k, b * k
 end
 
 local function Build()
   if P then return P end
   if InCombat() then return nil end
-  local S = ns.S
   P = CreateFrame("Frame", "WLBossPanel", UIParent)
-  P:SetSize(420, 200)
+  P:SetSize(SIZE + 2 * PAD, 120)
   P:SetFrameStrata("MEDIUM")
   P:SetClampedToScreen(true)
   P:SetMovable(true)
@@ -676,43 +612,41 @@ local function Build()
   if ns.RegisterWindow then ns.RegisterWindow(P) end
   local bg = ns.Tex(P, "BACKGROUND", T.bg); bg:SetAllPoints()
   ns.Outline(P, T.cardEdge)
-  -- header 44: logo, title, subtitle (the dungeon), attach and close at the right
-  local h = CreateFrame("Frame", nil, P)
-  h:SetPoint("TOPLEFT"); h:SetPoint("TOPRIGHT"); h:SetHeight(HEAD)
-  h:EnableMouse(true)
-  h:RegisterForDrag("LeftButton")
-  h:SetScript("OnMouseDown", function() if not InCombat() then P:Raise() end end)
-  h:SetScript("OnDragStart", function() if not InCombat() then P.wlMoving = true; P:StartMoving() end end)
-  h:SetScript("OnDragStop", function()
+  -- drag anywhere off the heads: the strip leaves the guide and stays where you drop it
+  P:RegisterForDrag("LeftButton")
+  P:SetScript("OnDragStart", function() if not InCombat() then P.wlMoving = true; P:StartMoving() end end)
+  P:SetScript("OnDragStop", function()
     if not P.wlMoving then return end
     P.wlMoving = nil
     if not InCombat() then P:StopMovingOrSizing() end
     P.SavePos()
   end)
-  h:SetScript("OnEnter", function(self) ns.ShowTip(self, { L.BOSS_TITLE, L.BOSS_DRAG }) end)
-  h:SetScript("OnLeave", ns.HideTip)
-  local rule = ns.Tex(P, "BORDER", T.line)
-  rule:SetPoint("TOPLEFT", 0, -HEAD); rule:SetPoint("TOPRIGHT", 0, -HEAD)
-  ns.PixelLine(P, rule, true)
-  -- no logo here (it stays on the home page): a zero-width anchor keeps the title's place code
-  P.logo = h:CreateTexture(nil, "ARTWORK"); P.logo:SetSize(1, 28); P.logo:SetPoint("TOPLEFT", 6, -8)
-  P.logo:SetAlpha(0)
-  P.close = S.CloseButton(h, 28, function() ns.HideBosses(true) end)
-  P.close:SetPoint("TOPRIGHT", -8, -8)
-  P.attach = S.IconButton(h, "pin", 28, { L.BOSS_ATTACH, L.BOSS_ATTACH_CLICK }, function()
+  P:SetScript("OnEnter", function(self)
+    local lines = { L.BOSS_TITLE }
+    if P.dkey then lines[#lines + 1] = ns.DName(P.dkey) end
+    lines[#lines + 1] = P.attached and L.BOSS_DRAG or L.BOSS_DRAG2
+    ns.ShowTip(self, lines)
+  end)
+  P:SetScript("OnLeave", ns.HideTip)
+  -- top bar: close (and "attach" once moved away)
+  local S = ns.S
+  P.close = S.CloseButton(P, 20, function() ns.HideBosses(true) end, { L.BOSS_TITLE, L.BOSS_CLOSE_CLICK })
+  P.close:SetPoint("TOPRIGHT", -2, -2)
+  P.attach = S.IconButton(P, "pin", 20, { L.BOSS_ATTACH, L.BOSS_ATTACH_CLICK }, function()
     if InCombat() then return end
     DB().bossDetached = nil
-    P.attached = parentFrame ~= nil
     ns.RefreshBosses()
   end)
-  P.attach:SetPoint("RIGHT", P.close, "LEFT", -4, 0)
-  P.title = ns.Text(h, ns.F.title, T.fg, true)
-  P.title:SetPoint("TOPLEFT", 14, -6); P.title:SetPoint("RIGHT", P.attach, "LEFT", -8, 0)
-  ns.ClampLabel(P.title, nil, h)
-  P.sub = ns.Text(h, ns.F.meta, T.muted, false)
-  P.sub:SetPoint("TOPLEFT", P.title, "BOTTOMLEFT", 0, -2); P.sub:SetPoint("RIGHT", P.attach, "LEFT", -8, 0)
-  ns.ClampLabel(P.sub, nil, h)
-  P.title:SetText(L.BOSS_TITLE)
+  P.attach:SetPoint("RIGHT", P.close, "LEFT", -2, 0)
+  -- section labels (11, muted; the rares' in silver)
+  P.secBoss = ns.Text(P, ns.F.meta, T.muted, false)
+  P.secRare = ns.Text(P, ns.F.meta, T.silver, false)
+  ns.ClampLabel(P.secBoss, nil, P); ns.ClampLabel(P.secRare, nil, P)
+  -- nothing to show: one short sentence
+  P.empty = ns.Text(P, ns.F.meta, T.muted, false)
+  P.empty:SetJustifyH("LEFT")
+  P.empty:Hide()
+  P.heads = {}
   -- the position after a move (the drag's end, or the start of combat)
   function P.SavePos()
     local l, t = num(P:GetLeft()), num(P:GetTop())
@@ -725,69 +659,69 @@ local function Build()
       ns.RefreshBosses()
     end
   end
-  -- content: scrolls once the panel reaches its height cap (no scrolling in combat: the panel
-  -- holds secure buttons)
-  P.sa = S.ScrollArea(P)
-  P.sa:SetPoint("TOPLEFT", 0, -(HEAD + 1)); P.sa:SetPoint("TOPRIGHT", 0, -(HEAD + 1)); P.sa:SetHeight(10)
-  local wheel = P.sa:GetScript("OnMouseWheel")
-  P.sa:SetScript("OnMouseWheel", function(self, delta) if not InCombat() and wheel then wheel(self, delta) end end)
-  P.content = P.sa.child
-  P.secBoss = S.SectionHeader(P.content, L.BOSS_SEC)
-  P.secRare = S.SectionHeader(P.content, L.BOSS_RARES, nil, L.BOSS_HIDE, function()
-    if InCombat() then return end
-    local db = DB()
-    db.bossRaresOpen = not P.raresOpen
-    ns.RefreshBosses()
-  end)
-  P.empty = S.EmptyState(P.content, "skull", L.BOSS_EMPTY_T, nil)
-  P.empty:Hide()
-  P.rows = {}
-  -- attached: follow the guide when it moves or changes height (out of combat)
-  P:SetScript("OnUpdate", function()
-    if not (P.attached and parentFrame) or InCombat() then return end
-    local l, b = num(parentFrame:GetLeft()), num(parentFrame:GetBottom())
-    local w = num(parentFrame:GetWidth())
-    if l ~= P.lastL or b ~= P.lastB then ns.SnapBosses() end
-    if w and w ~= P.lastW then P.lastW = w; ns.RefreshBosses() end
+  -- docked: follow the guide (or the tracker) when it moves or changes height, out of combat
+  local acc = 0
+  P:SetScript("OnUpdate", function(_, el)
+    acc = acc + (num(el) or 0)
+    if acc < 0.2 or InCombat() or not P.attached then return end
+    acc = 0
+    local h = Host()
+    if not h then return end
+    local l, _, t, b = BoxOf(h)
+    if h ~= P.host or l ~= P.lastL or t ~= P.lastT or b ~= P.lastB then ns.RefreshBosses() end
   end)
   return P
 end
 
--- Puts the panel 4 px under the guide (absolute position: no anchor to the guide, so the guide
--- never becomes a protected frame and keeps resizing in combat).
+-- Puts the strip 4 px right of its host, tops aligned (left of it when the screen has no room).
+-- Absolute position: no anchor to the guide, so the guide never becomes a protected frame.
 function ns.SnapBosses()
   if not P then return end
   if InCombat() then pending.snap = true return end
-  if P.attached and parentFrame then
-    local l, b = num(parentFrame:GetLeft()), num(parentFrame:GetBottom())
-    local okS, ps = pcall(parentFrame.GetEffectiveScale, parentFrame)
-    ps = okS and num(ps)
-    local ms = num(P:GetEffectiveScale())
-    if l and b and ps and ms and ms > 0 then
+  local h = P.attached and Host()
+  if h then
+    local l, r, t, b = BoxOf(h)
+    if l then
+      local okW, sw = pcall(UIParent.GetWidth, UIParent)
+      sw = okW and num(sw) or 1920
+      local w = num(P:GetWidth()) or SIZE
+      local x = r + 4
+      if x + w > sw then x = l - 4 - w end
       P:ClearAllPoints()
-      P:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l * ps / ms, b * ps / ms - 4)
-      P.lastL, P.lastB = l, b
+      P:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, t)
+      P.host, P.lastL, P.lastT, P.lastB = h, l, t, b
       return
     end
   end
   local pos = DB().bossPos
   P:ClearAllPoints()
   if pos and pos[1] then P:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos[1], pos[2])
-  else P:SetPoint("CENTER", UIParent, "CENTER", 0, 0) end
+  else P:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -240, -220) end
 end
+
+-- the grid for `cols` columns: label, the bosses, label, the rares -> height
+local function GridHeight(nb, nr, cols)
+  local h = TOPBAR
+  local function block(n) return LABEL + math.ceil(n / cols) * (SIZE + GAP) - GAP end
+  if nb > 0 then h = h + block(nb) end
+  if nr > 0 then h = h + (nb > 0 and 10 or 0) + block(nr) end
+  return h + PAD
+end
+ns.BossGridHeight = GridHeight
 
 local function Render()
   if not P then return end
   if InCombat() then
     pending.render = true
-    -- what can change now: the killed checks
+    -- what can change now: killed and seen
     if P.dkey and P:IsShown() then
       local res = ns.DungeonMobs(P.dkey)
       local by = {}
       for _, r in ipairs(res.bosses) do by[r.en] = r end
       for _, r in ipairs(res.rares) do by[r.en] = r end
-      for _, row in ipairs(P.rows) do
-        if row.rec and by[row.rec.en] then row.rec.killed = by[row.rec.en].killed; row.stale = true; PaintRow(row) end
+      for _, b in ipairs(P.heads) do
+        local r = b.rec and by[b.rec.en]
+        if r then b.rec.killed, b.rec.seen = r.killed, r.seen; b.stale = true; PaintHead(b) end
       end
     end
     return
@@ -795,81 +729,72 @@ local function Render()
   pending.render = nil
   local dkey = P.dkey
   local db = DB()
-  P.attached = (parentFrame ~= nil and not db.bossDetached and parentFrame:IsShown()) and true or false
-  local W = Width()
-  P:SetWidth(W)
-  P.lastW = parentFrame and num(parentFrame:GetWidth()) or nil
-  P.attach:SetShown(parentFrame ~= nil and db.bossDetached == true)
-  P.sub:SetText(dkey and ns.DName(dkey) or "")
+  local host = Host()
+  P.attached = (host ~= nil and not db.bossDetached) and true or false
+  P.attach:SetShown(host ~= nil and db.bossDetached == true)
   local res = dkey and ns.DungeonMobs(dkey) or { bosses = {}, rares = {} }
   P.res = res
-  local cw = W - 2 * PAD
-  local y = 4
-  local used = 0
-  local function place(rec)
-    used = used + 1
-    local row = P.rows[used]
-    if not row then row = MakeRow(used); P.rows[used] = row; rowsN = used end
-    row:ClearAllPoints()
-    row:SetPoint("TOPLEFT", P.content, "TOPLEFT", PAD, -y)
-    local h = FillRow(row, rec, cw)
-    row:Show()
-    y = y + h + ROW_GAP
-  end
   local nb, nr = #res.bosses, #res.rares
-  if nb + nr == 0 then
-    P.secBoss:Hide(); P.secRare:Hide()
-    local title, text = L.BOSS_EMPTY_T, L.BOSS_EMPTY_NONE
-    if res.loading then title, text = L.BOSS_LOADING_T, L.BOSS_LOADING
-    elseif res.noLib then text = L.BOSS_EMPTY_NOLIB end
-    P.empty:SetWrapWidth(cw)
-    local eh = P.empty:Set(res.loading and "clock" or "skull", title, text, nil)
-    P.empty:ClearAllPoints(); P.empty:SetPoint("TOP", P.content, "TOP", 0, -24)
-    P.empty:Show()
-    y = 24 + (num(eh) or 80)
-  else
-    P.empty:Hide()
-    if nb > 0 then
-      P.secBoss:ClearAllPoints()
-      P.secBoss:SetPoint("TOPLEFT", P.content, "TOPLEFT", PAD, -y); P.secBoss:SetPoint("TOPRIGHT", P.content, "TOPRIGHT", -PAD, -y)
-      P.secBoss:Set(L.BOSS_SEC, tostring(nb)); P.secBoss:Show()
-      y = y + 32 + 4
-      for _, rec in ipairs(res.bosses) do place(rec) end
-    else P.secBoss:Hide() end
-    if nr > 0 then
-      if nb > 0 then y = y + 16 - ROW_GAP end
-      local open = db.bossRaresOpen
-      if open == nil then open = nr <= 4 end
-      P.raresOpen = open
-      P.secRare:ClearAllPoints()
-      P.secRare:SetPoint("TOPLEFT", P.content, "TOPLEFT", PAD, -y); P.secRare:SetPoint("TOPRIGHT", P.content, "TOPRIGHT", -PAD, -y)
-      P.secRare:Set(L.BOSS_RARES, tostring(nr)); P.secRare:Show()
-      if P.secRare.link then P.secRare.link:SetText(open and L.BOSS_HIDE or L.BOSS_SHOW) end
-      y = y + 32 + 4
-      if open then for _, rec in ipairs(res.rares) do place(rec) end end
-    else P.secRare:Hide() end
-    y = y - ROW_GAP
-  end
-  for i = used + 1, #P.rows do P.rows[i]:Hide(); P.rows[i].rec = nil end
-  local contentH = math.ceil(y)
-  -- the view: the content up to 80 % of the screen; attached, up to the room left under the guide
+  -- as tall as the host at most (the screen's 80 % on its own): more columns when it is not enough.
+  -- The host's height is the tallest seen for this dungeon, so the columns do not jump from one
+  -- step to the next as the guide grows and shrinks.
   local okH, screen = pcall(UIParent.GetHeight, UIParent)
   screen = okH and num(screen) or 768
-  local cap = math.floor(screen * 0.8) - HEAD - 1 - PAD
-  if P.attached and parentFrame then
-    local b = num(parentFrame:GetBottom())
-    local okS, ps = pcall(parentFrame.GetEffectiveScale, parentFrame)
-    ps = okS and num(ps)
-    local ms = num(P:GetEffectiveScale())
-    if b and ps and ms and ms > 0 then
-      local room = math.floor(b * ps / ms - 4 - 8) - HEAD - 1 - PAD
-      if room >= 120 then cap = math.min(cap, room) end
-    end
+  local cap = math.floor(screen * 0.8)
+  if P.capKey ~= dkey then P.capKey, P.capHost = dkey, nil end
+  if P.attached and host then
+    local _, _, t, b = BoxOf(host)
+    if t and b and t - b >= 200 then P.capHost = math.max(P.capHost or 0, math.floor(t - b)) end
+    if P.capHost then cap = math.min(cap, P.capHost) end
   end
-  local viewH = math.max(60, math.min(contentH, cap))
-  P.sa:SetHeight(viewH)
-  P.sa:SetContentHeight(contentH)
-  P:SetHeight(math.max(120, HEAD + 1 + viewH + PAD))
+  local cols = 1
+  while cols < MAXCOLS and GridHeight(nb, nr, cols) > cap do cols = cols + 1 end
+  P.cols = cols
+  local W = PAD + cols * SIZE + (cols - 1) * GAP + PAD
+  local used = 0
+  local y = TOPBAR
+  -- column by column (1 2 3 down the first column, then the next): the dungeon's order reads downward
+  local function place(list, numbered)
+    local rows = math.max(1, math.ceil(#list / cols))
+    for i, rec in ipairs(list) do
+      used = used + 1
+      local b = P.heads[used]
+      if not b then b = MakeHead(used); P.heads[used] = b end
+      local c, r = math.floor((i - 1) / rows), (i - 1) % rows
+      b:ClearAllPoints()
+      b:SetPoint("TOPLEFT", P, "TOPLEFT", PAD + c * (SIZE + GAP), -(y + r * (SIZE + GAP)))
+      FillHead(b, rec, numbered and i or nil)
+      b:Show()
+    end
+    y = y + math.ceil(#list / cols) * (SIZE + GAP) - GAP
+  end
+  local function label(fs, text)
+    fs:SetText(text)
+    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -(y + 2))
+    fs:SetWidth(W - 2 * PAD); fs:Show()
+    y = y + LABEL
+  end
+  if nb + nr == 0 then
+    P.secBoss:Hide(); P.secRare:Hide()
+    W = 180
+    local text = L.BOSS_EMPTY_NONE
+    if res.loading then text = L.BOSS_LOADING elseif res.noLib then text = L.BOSS_EMPTY_NOLIB end
+    P.empty:SetText(text)
+    P.empty:ClearAllPoints(); P.empty:SetPoint("TOPLEFT", P, "TOPLEFT", PAD + 2, -TOPBAR)
+    local eh = ns.FitText(P.empty, 4, W - 2 * PAD - 4, P)
+    P.empty:Show()
+    y = TOPBAR + math.ceil(num(eh) or 28)
+  else
+    P.empty:Hide()
+    if nb > 0 then label(P.secBoss, L.BOSS_SEC); place(res.bosses, true) else P.secBoss:Hide() end
+    if nr > 0 then
+      if nb > 0 then y = y + 10 end
+      label(P.secRare, L.BOSS_RARES); place(res.rares, false)
+    else P.secRare:Hide() end
+  end
+  for i = used + 1, #P.heads do P.heads[i]:Hide(); P.heads[i].rec = nil end
+  P:SetWidth(W)
+  P:SetHeight(math.ceil(y + PAD))
   ns.SnapBosses()
 end
 ns.RenderBosses = Render
@@ -880,13 +805,27 @@ function ns.RefreshBosses()
   if P:IsShown() then Render() end
 end
 
-function ns.BossesShown() return P ~= nil and P:IsShown() end
+-- Shown, or about to be: in combat a show or hide waits for the end of combat, and the toggles
+-- already show what was asked.
+function ns.BossesShown()
+  if pending.hide then return false end
+  if pending.show then return true end
+  return P ~= nil and P:IsShown()
+end
 
--- Opens the panel on a dungeon (from the guide, the overview or on entering it).
+-- Opens the strip on a dungeon (from the guide, the overview or on entering it).
 function ns.ShowBosses(dkey, auto)
   if not (dkey and ns.D and ns.D[dkey]) then return end
-  if InCombat() then pending.show = dkey; pending.showAuto = auto; pending.hide = nil return end
+  if InCombat() then
+    pending.hide = nil
+    if P then P:SetAlpha(1) end
+    -- already showing this dungeon: nothing waits
+    if P and P:IsShown() and P.dkey == dkey then pending.show, pending.showAuto = nil, nil return end
+    pending.show = dkey; pending.showAuto = auto
+    return
+  end
   if not Build() then return end
+  P:SetAlpha(1)
   P.dkey = dkey
   P.auto = auto and true or nil
   -- a list still being read shows itself once the data is in
@@ -902,28 +841,240 @@ function ns.HideBosses(byUser)
     local iid = CurrentInstance()
     if iid then dismissed[iid] = true end
   end
-  if InCombat() then pending.hide = true; pending.show = nil return end
+  if InCombat() then
+    pending.show, pending.showAuto = nil, nil
+    -- already hidden: nothing waits; shown: it fades now and hides after combat
+    if P:IsShown() then pending.hide = true; P:SetAlpha(0.35) end
+    return
+  end
+  pending.hide = nil
+  P:SetAlpha(1)
   P:Hide()
 end
 
 function ns.ToggleBosses(dkey)
-  if P and P:IsShown() and (not dkey or P.dkey == dkey) then ns.HideBosses(true) else ns.ShowBosses(dkey or (P and P.dkey)) end
+  local key = pending.show or (P and P.dkey)
+  if ns.BossesShown() and (not dkey or key == dkey) then ns.HideBosses(true) else ns.ShowBosses(dkey or key) end
 end
 
--- The guide window the panel hangs under (UI.lua calls it once the guide is built).
+-- The guide window the strip sits beside (UI.lua calls it once the guide is built). Hiding the
+-- guide moves the strip beside the tracker (or to its saved place).
 function ns.AttachBosses(parent)
   if not parent then return end
   parentFrame = parent
   if not parent.wlBossHooked and parent.HookScript then
     parent.wlBossHooked = true
-    pcall(parent.HookScript, parent, "OnHide", function()
-      if P and P:IsShown() and P.attached then P.hiddenWithGuide = true; ns.HideBosses() end
-    end)
-    pcall(parent.HookScript, parent, "OnShow", function()
-      if P and P.hiddenWithGuide and P.dkey then P.hiddenWithGuide = nil; ns.ShowBosses(P.dkey, P.auto) end
-    end)
+    local function again() if P and P:IsShown() then ns.RefreshBosses() end end
+    pcall(parent.HookScript, parent, "OnHide", again)
+    pcall(parent.HookScript, parent, "OnShow", again)
   end
   if P then ns.RefreshBosses() end
+end
+
+-- ---------------------------------------------------------------- rares: seen and the alert
+local function NpcIdOf(unit)
+  if not UnitGUID then return nil end
+  local okG, guid = pcall(UnitGUID, unit)
+  guid = okG and str(guid)
+  if not guid then return nil end
+  local kind, id = guid:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)")
+  if kind == "Creature" or kind == "Vehicle" then return tonumber(id) end
+  return nil
+end
+
+local function IsRareUnit(unit)
+  if not UnitClassification then return false end
+  local ok, c = pcall(UnitClassification, unit)
+  c = ok and str(c)
+  return c == "rare" or c == "rareelite"
+end
+
+-- the strip's rare with this NPC id (nil when the strip does not list it)
+local function StripRare(id)
+  if not (id and P and P.res) then return nil end
+  for _, r in ipairs(P.res.rares or {}) do
+    for _, x in ipairs(r.ids or {}) do if x == id then return r end end
+  end
+  return nil
+end
+
+-- Records a rare as seen; the strip's head lights up (colours only in combat).
+function ns.RareSeen(id)
+  id = num(id)
+  if not id then return end
+  local s = Seen()
+  local first = not s[id]
+  s[id] = (GetServerTime and GetServerTime()) or (time and time()) or 0
+  if first and StripRare(id) and P:IsShown() then Render() end
+end
+
+local function SeenCheck(unit)
+  local id = NpcIdOf(unit)
+  if not id then return end
+  if IsRareUnit(unit) or StripRare(id) then ns.RareSeen(id) end
+end
+
+-- the banner (plain frame, fixed place) and its secure button (on UIParent at a fixed place too:
+-- a secure child or anchor would make the banner protected). The button only ever shows inside
+-- the banner: in combat the banner stays up while the button does, and both go after combat.
+local A, AB
+local alerted = {}
+local ALERT_W, ALERT_H, ALERT_Y = 300, 62, -150
+local SUB_W, SUB_W_BTN = ALERT_W - 44, ALERT_W - 44 - 130
+
+local function BuildAlertButton()
+  if AB or InCombat() then return AB end
+  AB = CreateFrame("Button", "WLRareAlertTarget", UIParent, "SecureActionButtonTemplate")
+  AB:SetFrameStrata("HIGH")
+  AB:SetHeight(24)
+  AB:RegisterForClicks("LeftButtonUp", "LeftButtonDown")
+  AB:SetAttribute("type", "macro")
+  ns.Flat(AB, T.btnFill, T.btnEdge)
+  AB.hl = ns.Tex(AB, "BACKGROUND", T.hoverFill); AB.hl:SetAllPoints(); AB.hl:SetAlpha(0)
+  AB.icon = AB:CreateTexture(nil, "OVERLAY"); AB.icon:SetSize(14, 14); AB.icon:SetPoint("LEFT", 8, 0)
+  ns.SetHDIcon(AB.icon, "star", T.silver)
+  AB.label = ns.Text(AB, ns.F.label, T.fg, false)
+  AB.label:SetPoint("LEFT", AB.icon, "RIGHT", 6, 0); AB.label:SetWordWrap(false)
+  AB.label:SetText(L.BOSS_TARGET)
+  local okW, sw = pcall(AB.label.GetStringWidth, AB.label)
+  sw = okW and num(sw) or 96
+  AB:SetWidth(math.ceil(8 + 14 + 6 + sw + 12))
+  AB:SetPoint("BOTTOMRIGHT", UIParent, "TOP", ALERT_W / 2 - 8, ALERT_Y - ALERT_H + 8)
+  AB:SetScript("OnEnter", function(self)
+    self.hl:SetAlpha(1); if self._edgeSet then self._edgeSet(T.btnEdgeHover) end
+    ns.ShowTip(self, { self.who or L.BOSS_TARGET, L.BOSS_TT_TARGET:format(self.who or "?", MarkName(MARK_DEFAULT_RARE)), L.BOSS_TT_CLICK })
+  end)
+  AB:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); if self._edgeSet then self._edgeSet(T.btnEdge) end; ns.HideTip() end)
+  AB:Hide()
+  return AB
+end
+
+local function BuildAlert()
+  if A then return A end
+  A = CreateFrame("Frame", "WLRareAlert", UIParent)
+  A:SetSize(ALERT_W, ALERT_H)
+  A:SetPoint("TOP", UIParent, "TOP", 0, ALERT_Y)
+  A:SetFrameStrata("HIGH")
+  ns.Flat(A, T.panel, T.cardEdge)
+  A.icon = ns.Icon(A, "star", 16, "ARTWORK", T.silver); A.icon:SetPoint("TOPLEFT", 10, -10)
+  A.text = ns.Text(A, ns.F.label, T.fg, true)
+  A.text:SetPoint("TOPLEFT", A.icon, "TOPRIGHT", 8, 0); A.text:SetWidth(ALERT_W - 44)
+  ns.ClampLabel(A.text, nil, A)
+  A.sub = ns.Text(A, ns.F.meta, T.muted, false)
+  A.sub:SetPoint("BOTTOMLEFT", 34, 14); A.sub:SetWidth(SUB_W_BTN)
+  ns.ClampLabel(A.sub, nil, A)
+  BuildAlertButton()
+  -- a plain cover over the button's place (a child of the banner, never anchored to the button):
+  -- when the button still targets an earlier rare and combat forbids changing it, the cover hides
+  -- it and swallows its clicks
+  A.cover = CreateFrame("Frame", nil, A)
+  A.cover:SetSize(AB and num(AB:GetWidth()) or 130, 24)
+  A.cover:SetPoint("BOTTOMRIGHT", A, "BOTTOMRIGHT", -8, 8)
+  A.cover:SetFrameLevel(((AB and num(AB:GetFrameLevel())) or num(A:GetFrameLevel()) or 1) + 10)
+  A.cover:EnableMouse(true)
+  local cbg = ns.Tex(A.cover, "BACKGROUND", T.panel); cbg:SetAllPoints()
+  A.cover:Hide()
+  A:Hide()
+  return A
+end
+
+-- the sub-line: the full width when the button is not there
+local function AlertSub(text, withButton)
+  A.sub:SetWidth(withButton and SUB_W_BTN or SUB_W)
+  A.sub:SetText(text)
+end
+
+local function HideAlert(token)
+  if not A or A.token ~= token then return end
+  -- the button cannot hide in combat: the banner stays around it until combat ends
+  if AB and AB:IsShown() and InCombat() then pending.alertHide = true return end
+  A:Hide(); A.cover:Hide()
+  if AB then AB:Hide() end
+end
+
+-- after combat: the banner's time is up (both go), or the button gets the banner's rare back
+local function AlertAfterCombat()
+  if pending.alertHide then
+    pending.alertHide = nil
+    if A then A:Hide(); A.cover:Hide() end
+    if AB then AB:Hide() end
+    return
+  end
+  if A and A:IsShown() and ns.lastRareAlert and BuildAlertButton() and (A.cover:IsShown() or not AB:IsShown()) then
+    local name = ns.lastRareAlert.name
+    AB.who = name
+    local m = MacroText(name, MARK_DEFAULT_RARE)
+    if AB.macro ~= m then AB:SetAttribute("macrotext", m); AB.macro = m end
+    AB:Show(); A.cover:Hide()
+    AlertSub(L.RARE_ALERT_HERE, true)
+    ns.lastRareAlert.button = true
+  end
+end
+
+local function ShowAlert(name, level, id)
+  BuildAlert()
+  ns.lastRareAlert = { name = name, level = level, id = id }
+  A.text:SetText(level and L.RARE_ALERT_LVL:format(name, level) or L.RARE_ALERT:format(name))
+  local withButton = false
+  if not InCombat() then
+    local btn = BuildAlertButton()
+    if btn then
+      btn.who = name
+      local m = MacroText(name, MARK_DEFAULT_RARE)
+      if btn.macro ~= m then btn:SetAttribute("macrotext", m); btn.macro = m end
+      btn:Show()
+      withButton = true
+    end
+    A.cover:Hide()
+  elseif AB and AB:IsShown() then
+    if AB.who == name then withButton = true; A.cover:Hide()
+    else    -- it still targets the earlier rare: covered until combat ends
+      A.cover:SetWidth((num(AB:GetWidth()) or 130) + 2)
+      A.cover:Show()
+    end
+  end
+  AlertSub(withButton and L.RARE_ALERT_HERE or L.RARE_ALERT_COMBAT, withButton)
+  ns.lastRareAlert.button = withButton
+  pending.alertHide = nil
+  A:SetAlpha(0); A:Show()
+  if ns.Tween then ns.Tween(A, 0, 1, 0.15, function(v) A:SetAlpha(v) end) else A:SetAlpha(1) end
+  if PlaySound then pcall(PlaySound, (SOUNDKIT and SOUNDKIT.RAID_WARNING) or 8959, "Master") end
+  local token = {}
+  A.token = token
+  if C_Timer and C_Timer.After then C_Timer.After(10, function() HideAlert(token) end) end
+end
+ns.HideRareAlert = function() if A then HideAlert(A.token) end end
+
+-- a boolean the code may read (nil when the client hides it behind a secret value)
+local function bool(v) if type(v) == "boolean" and not secret(v) then return v end return nil end
+
+-- A rare's nameplate: seen for the strip, and the alert (once per 10 minutes per rare). The alert
+-- plays inside a dungeon (WLDTDB.rareAlert ~= false); in the open world only when
+-- WLDTDB.rareAlertWorld is true.
+function ns.RareAlert(unit)
+  if not (unit and IsRareUnit(unit)) then return false end
+  local okD, dead = pcall(UnitIsDead or function() return false end, unit)
+  if okD and bool(dead) == true then return false end
+  if UnitCanAttack then
+    local okA, can = pcall(UnitCanAttack, "player", unit)
+    if okA and bool(can) == false then return false end
+  end
+  local id = NpcIdOf(unit)
+  if id then ns.RareSeen(id) end
+  local db = DB()
+  if db.rareAlert == false then return false end
+  if not CurrentInstance() and db.rareAlertWorld ~= true then return false end
+  local okN, name = pcall(UnitName, unit)
+  name = okN and str(name)
+  if not name or name == "" then return false end
+  local key = id or name
+  local now = (GetTime and GetTime()) or 0
+  if alerted[key] and now >= alerted[key] and now - alerted[key] < 600 then return false end
+  alerted[key] = now
+  local okL, lv = pcall(UnitLevel or function() return nil end, unit)
+  lv = okL and num(lv)
+  ShowAlert(name, (lv and lv > 0) and lv or nil, id)
+  return true
 end
 
 -- ---------------------------------------------------------------- inside a dungeon
@@ -942,7 +1093,7 @@ local function OnEntering()
   NewVisitCheck()
   local dkey, iid = DungeonHere()
   if not iid then
-    -- out of the dungeon: the panel opened for it goes away
+    -- out of the dungeon: the strip opened for it goes away
     if P and P:IsShown() and P.auto then ns.HideBosses() end
     for k in pairs(dismissed) do dismissed[k] = nil end
     return
@@ -962,16 +1113,6 @@ local function MarkKilled(name, id)
   if name and name ~= "" then k.names[name] = true; hit = true end
   if id then k.ids[id] = true; hit = true end
   if hit then ns.RefreshBosses() end
-end
-
-local function NpcIdOf(unit)
-  if not UnitGUID then return nil end
-  local okG, guid = pcall(UnitGUID, unit)
-  guid = okG and str(guid)
-  if not guid then return nil end
-  local kind, id = guid:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)")
-  if kind == "Creature" or kind == "Vehicle" then return tonumber(id) end
-  return nil
 end
 
 local function TargetCheck()
@@ -999,12 +1140,12 @@ local function TargetCheck()
     end
   end
   local okD, dead = pcall(UnitIsDead or function() return false end, "target")
-  if okD and dead == true and not secret(dead) then MarkKilled(rec.en, id) end
+  if okD and bool(dead) == true then MarkKilled(rec.en, id) end
 end
 
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "ENCOUNTER_END", "BOSS_KILL",
-  "PLAYER_TARGET_CHANGED", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN" }) do
+  "PLAYER_TARGET_CHANGED", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "NAME_PLATE_UNIT_ADDED", "UPDATE_MOUSEOVER_UNIT" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
 -- the target's health only (a dead boss you look at counts as killed)
@@ -1017,18 +1158,27 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
     if C_Timer and C_Timer.After then C_Timer.After(2.5, OnEntering) else OnEntering() end
   elseif e == "PLAYER_REGEN_DISABLED" then
     if P and P.wlMoving then P.wlMoving = nil; P:StopMovingOrSizing(); P.SavePos() end
-    if P and P.sa then P.sa:SetScript("OnUpdate", nil); if P.sa.thumb then P.sa.thumb.drag = nil; P.sa.thumb:SetScript("OnUpdate", nil) end end
   elseif e == "PLAYER_REGEN_ENABLED" then
-    if pending.hide then pending.hide = nil; if P then P:Hide() end end
+    if pending.hide then pending.hide = nil; if P then P:SetAlpha(1); P:Hide() end end
     if pending.show then local k, a = pending.show, pending.showAuto; pending.show, pending.showAuto = nil, nil; ns.ShowBosses(k, a) end
     if pending.render or pending.snap then pending.render, pending.snap = nil, nil; if P and P:IsShown() then Render() end end
+    AlertAfterCombat()
   elseif e == "ENCOUNTER_END" then
     -- encounterID, encounterName, difficultyID, groupSize, success
     if num(a5) == 1 then MarkKilled(str(a2)) end
   elseif e == "BOSS_KILL" then
     MarkKilled(str(a2))
   elseif e == "PLAYER_TARGET_CHANGED" then
+    SeenCheck("target")
     TargetCheck()
+  elseif e == "UPDATE_MOUSEOVER_UNIT" then
+    SeenCheck("mouseover")
+  elseif e == "NAME_PLATE_UNIT_ADDED" then
+    local unit = str(a1)
+    if unit then
+      SeenCheck(unit)
+      ns.RareAlert(unit)
+    end
   elseif e == "UNIT_HEALTH" then
     if a1 == "target" then TargetCheck() end
   elseif (e == "QUEST_LOG_UPDATE" or e == "QUEST_TURNED_IN") and P and P:IsShown() and not questPending then

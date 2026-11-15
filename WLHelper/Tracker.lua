@@ -326,7 +326,8 @@ local function Build()
   Feedback(head, { head.title })
   head:SetScript("OnEnter", function(self)
     self.hl:Show()
-    ns.ShowTip(self, { (f.model and f.model.title) or L.TR_TITLE, L.TR_TIP_CLICK, L.TR_TIP_DRAG })
+    ns.ShowTip(self, { L.TR_WHAT or L.TR_TITLE, (f.model and f.model.title) or L.TR_TITLE, L.TR_TIP_CLICK, L.TR_TIP_DRAG,
+      WLDTDB.trackerCollapsed and L.TR_EXPAND or L.TR_COLLAPSE })
   end)
   head:SetScript("OnLeave", function(self) self.hl:Hide(); if ns.HideTip then ns.HideTip() end end)
   head:SetScript("OnClick", function() TR.OpenGuide(f.model and f.model.idx) end)
@@ -397,10 +398,17 @@ end
 -- Draws the model; the tracker's height follows its content.
 local function Draw(m)
   local head = f.head
-  head.title:SetText(m.title or L.TR_TITLE)
+  local collapsed = WLDTDB.trackerCollapsed
+  -- folded: the action to do now on the one line, so the folded tracker still says something
+  -- useful ("Rendre « Powering the Pylons » · 1/9"); open: the chapter title
+  local title = m.title or L.TR_TITLE
+  if collapsed and m.cur and m.cur.text then
+    local prog = (m.title or ""):match("(%d+/%d+)%s*$")
+    title = m.cur.text .. (prog and ("  |cff9a9ea6" .. prog .. "|r") or "")
+  end
+  head.title:SetText(title)
   local headH = math.max(HEAD_H, TextH(head.title, F.label) + 16)
   head:SetHeight(headH)
-  local collapsed = WLDTDB.trackerCollapsed
   ns.SetHDIcon(f.col.icon, collapsed and "chevron_down" or "chevron_up", T.muted)
   local y = headH
   local function hideBody()
