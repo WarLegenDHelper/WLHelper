@@ -1282,7 +1282,12 @@ function ns.GuideStatus()
   local log = ns.LogEntries()
   local cur = FirstOpen(log)
   local finished = cur == #steps and IsStepDone(log, cur)
-  return ns.route and ns.route.label or "", cur, #steps, finished, StepTitle(steps[cur])
+  -- full names ("Zul'Farrak", not "ZF"), the route's dungeons in order
+  local names = {}
+  for k in pairs(ns.route and ns.route.sel or {}) do names[#names + 1] = ns.DName(k) or k end
+  table.sort(names)
+  local label = #names > 0 and table.concat(names, ", ") or (ns.route and ns.route.label or "")
+  return label, cur, #steps, finished, StepTitle(steps[cur])
 end
 
 -- Opens the guide (never closes it).

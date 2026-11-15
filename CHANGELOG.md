@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.9] — 2026-11-15
+
+### Modifié / Changed
+- Accueil : les donjons portent leur nom complet (« Zul'Farrak », plus « ZF ») ; plus de barre rouge à côté d'une carte, le bouton suffit ; « Maintenant : » au lieu de « Ensuite : » pour l'étape en cours.
+  *Home: full dungeon names, no red edge, "Now:" for the current step.*
+
 ## [1.0.0-beta.8] — 2026-11-15
 
 ### Corrigé / Fixed
@@ -202,7 +208,8 @@ Première version de WL Helper (bêta). WL Dungeon Guide devient **WL Helper**.
 WL Dungeon Guide jusqu'à la 3.3 : guide des quêtes de donjon Horde pas à pas (versions partagées
 à la main, avant ce dépôt).
 
-[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.8...HEAD
+[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.9...HEAD
+[1.0.0-beta.9]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.8...v1.0.0-beta.9
 [1.0.0-beta.8]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.7...v1.0.0-beta.8
 [1.0.0-beta.7]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.6...v1.0.0-beta.7
 [1.0.0-beta.6]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.5...v1.0.0-beta.6

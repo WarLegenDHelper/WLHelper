@@ -35,6 +35,7 @@ ns.AddEnglish({
     ["%d prêts"] = "%d ready",
     ["%d à jeter"] = "%d to throw away",
     ["aucun"] = "none",
+    ["Maintenant : "] = "Now: ",
     ["terminé"] = "done",
     ["Route terminée"] = "Route finished",
     ["Aucun donjon choisi"] = "No dungeon picked",
@@ -139,9 +140,9 @@ local function Card(parent, y, icon, tint, onClick)
     return c
 end
 
+-- Every card looks the same; what needs you is said by its button, not by a coloured edge.
 local function SetActive(c, on)
-    local e = on and C.brand or C.border
-    c.edge:SetColorTexture(e[1], e[2], e[3], 1)
+    c.edge:SetColorTexture(C.border[1], C.border[2], C.border[3], 0)
 end
 
 local function Close() if win then win:Hide() end end
@@ -239,7 +240,7 @@ function WP.RefreshHome()
         -- where: the route and the step; then what to do next
         d.tag:SetText(string.format(L("étape %d sur %d"), cur, total))
         d.line1:SetText(label)
-        d.line2:SetText(nextStep and nextStep ~= "" and (L("Ensuite : ") .. nextStep) or "")
+        d.line2:SetText(nextStep and nextStep ~= "" and (L("Maintenant : ") .. nextStep) or "")
         d.bar:Show(); d.fill:SetWidth(math.max(0.01, (d.bar:GetWidth() > 0 and d.bar:GetWidth() or 200) * (cur - 1) / math.max(1, total)))
         d.action.label:SetText(L("Reprendre"))
         SetActive(d, true)
