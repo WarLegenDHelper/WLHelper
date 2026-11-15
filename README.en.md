@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/NEM3S15/WLHelper/releases/latest"><img alt="Latest version" src="https://img.shields.io/github/v/release/NEM3S15/WLHelper?label=version&color=CE1918"></a>
+  <a href="https://github.com/WarLegenDHelper/WLHelper/releases/latest"><img alt="Latest version" src="https://img.shields.io/github/v/release/WarLegenDHelper/WLHelper?label=version&color=CE1918"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-555"></a>
   <a href="README.md"><img alt="Français" src="https://img.shields.io/badge/lire%20en-fran%C3%A7ais-555"></a>
 </p>
@@ -19,10 +19,10 @@
 
 ## Install
 
-**With WowUp**: *Get Addons* → *Install from URL* → paste `https://github.com/NEM3S15/WLHelper` → *Import*.
+**With WowUp**: *Get Addons* → *Install from URL* → paste `https://github.com/WarLegenDHelper/WLHelper` → *Import*.
 Updates then arrive by themselves.
 
-**Manually**: download the zip of the [latest version](https://github.com/NEM3S15/WLHelper/releases/latest) and
+**Manually**: download the zip of the [latest version](https://github.com/WarLegenDHelper/WLHelper/releases/latest) and
 unzip it into `World of Warcraft\_forever_\Interface\AddOns`. The `WLHelper` folder must sit directly in `AddOns`.
 
 ## What it does
@@ -68,7 +68,7 @@ Minimap button: click for home, right-click for a menu to each module.
 
 ## An idea, a bug?
 
-Open an [issue](https://github.com/NEM3S15/WLHelper/issues/new/choose): idea, bug or wrong quest data.
+Open an [issue](https://github.com/WarLegenDHelper/WLHelper/issues/new/choose): idea, bug or wrong quest data.
 In game, `/wl idea` gives you the link already filled with your version.
 
 ## Good to know

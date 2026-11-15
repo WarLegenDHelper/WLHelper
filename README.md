@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/NEM3S15/WLHelper/releases/latest"><img alt="Dernière version" src="https://img.shields.io/github/v/release/NEM3S15/WLHelper?label=version&color=CE1918"></a>
+  <a href="https://github.com/WarLegenDHelper/WLHelper/releases/latest"><img alt="Dernière version" src="https://img.shields.io/github/v/release/WarLegenDHelper/WLHelper?label=version&color=CE1918"></a>
   <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-CC%20BY--NC--SA%204.0-555"></a>
   <a href="README.en.md"><img alt="English" src="https://img.shields.io/badge/read%20in-English-555"></a>
 </p>
@@ -19,10 +19,10 @@
 
 ## Installer
 
-**Avec WowUp** : *Get Addons* → *Install from URL* → colle `https://github.com/NEM3S15/WLHelper` → *Import*.
+**Avec WowUp** : *Get Addons* → *Install from URL* → colle `https://github.com/WarLegenDHelper/WLHelper` → *Import*.
 Les mises à jour arrivent ensuite d'elles-mêmes.
 
-**À la main** : télécharge le zip de la [dernière version](https://github.com/NEM3S15/WLHelper/releases/latest) et
+**À la main** : télécharge le zip de la [dernière version](https://github.com/WarLegenDHelper/WLHelper/releases/latest) et
 décompresse-le dans `World of Warcraft\_forever_\Interface\AddOns`. Le dossier `WLHelper` doit se trouver
 directement dans `AddOns`.
 
@@ -69,7 +69,7 @@ Bouton de la minimap : clic pour l'accueil, clic droit pour un menu vers chaque 
 
 ## Une idée, un bug ?
 
-Ouvre un [ticket](https://github.com/NEM3S15/WLHelper/issues/new/choose) : idée, bug ou donnée de quête fausse.
+Ouvre un [ticket](https://github.com/WarLegenDHelper/WLHelper/issues/new/choose) : idée, bug ou donnée de quête fausse.
 En jeu, `/wl idee` te donne le lien déjà rempli avec ta version.
 
 ## Bon à savoir
