@@ -13,9 +13,24 @@ ns.AddEnglish({
     ["Artisans"] = "Crafters",
     ["Mes commandes"] = "My orders",
     ["Reçues"] = "Received",
-    ["Chercher un objet à faire fabriquer"] = "Search an item to have crafted",
+    ["Chercher un objet, ou Maj-clic sur un objet pour le commander"] = "Search an item, or shift-click an item to order it",
     ["%d artisans connus · %d en ligne"] = "%d crafters known · %d online",
     ["Chuchoter"] = "Whisper",
+    ["Ouvertes"] = "Open",
+    ["Ce que je sais fabriquer"] = "What I can make",
+    ["Aucune commande ouverte pour ce que tu sais fabriquer. Décoche le filtre pour tout voir."] = "No open order for what you can make. Untick the filter to see them all.",
+    ["Aucune commande ouverte dans la guilde."] = "No open order in the guild.",
+    ["Masquer"] = "Hide",
+    ["Message"] = "Message",
+    ["Message · %s"] = "Message · %s",
+    ["Ton message (120 caractères)"] = "Your message (120 characters)",
+    ["Envoyer"] = "Send",
+    ["Merci ★"] = "Thanks ★",
+    ["Recommander"] = "Order again",
+    ["%d artisans connus pour cet objet"] = "%d crafters known for this item",
+    ["aucune recette partagée : la guilde verra la commande"] = "no recipe shared: the guild will see the order",
+    ["Recette inconnue : écris dans la note qui fournit quoi, l'artisan verra la commande."] = "Unknown recipe: write in the note who provides what, the crafter will see the order.",
+    ["composants %s%s · commission conseillée %s"] = "reagents %s%s · suggested fee %s",
     ["Recettes"] = "Recipes",
     ["Recettes de %s : %s %d"] = "%s's recipes: %s %d",
     ["Tous les artisans"] = "All crafters",
@@ -74,7 +89,7 @@ ns.AddEnglish({
 
 local W, H, PAD = 400, 600, 14
 local win, tabs, pages, current = nil, nil, {}, "find"
-local ui = { find = {}, mine = {}, recv = {}, new = {} }
+local ui = { find = {}, mine = {}, recv = {}, new = {}, board = {} }
 
 local function Money(c) return S.Money(c or 0) end
 local function Name(id) return O.Name(id) end
@@ -120,7 +135,7 @@ end
 -- ---------------------------------------------------------------- page 1: crafters (search)
 local function BuildFind(p)
     local f = ui.find
-    f.box = Box(p, W - 2 * PAD, 30, false, L("Chercher un objet à faire fabriquer"))
+    f.box = Box(p, W - 2 * PAD, 30, false, L("Chercher un objet, ou Maj-clic sur un objet pour le commander"))
     f.box:SetPoint("TOPLEFT", PAD, -12)
     f.box:HookScript("OnTextChanged", function() WP.RefreshOrders() end)
     f.info = S.Text(p, 12, C.dim); f.info:SetPoint("TOPLEFT", PAD, -48); f.info:SetPoint("RIGHT", -PAD, 0)
@@ -184,6 +199,14 @@ end
 local function ProfLabel(key, raw) local p = PROFS[key]; return p and ((root.lang == "en") and p[2] or p[1]) or raw or "?" end
 local function ProfIcon(key) local p = PROFS[key]; return p and p[3] or "Interface\\Icons\\INV_Misc_Note_01" end
 
+-- shift-click an item while the search box has the focus: its link goes in the box
+if hooksecurefunc and ChatEdit_InsertLink then
+    hooksecurefunc("ChatEdit_InsertLink", function(link)
+        local box = ui.find and ui.find.box
+        if box and box:HasFocus() and type(link) == "string" then box:SetText(link) end
+    end)
+end
+
 local function RenderFind()
     local f = ui.find
     local q = (f.box:GetText() or ""):lower()
@@ -244,6 +267,23 @@ local function RenderFind()
         return
     end
     f.back:Hide()
+    -- an item link (shift-click an item) or "item:12345": order it from the guild, recipe known or not
+    local linked = tonumber((f.box:GetText() or ""):match("item:(%d+)"))
+    if linked then
+        local row = f.list.Get(1)
+        row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, 0)
+        row.item, row.crafter, row.whisper, row.open = linked, nil, nil, nil
+        row.icon:Show(); row.icon:SetTexture(S.ItemIcon(linked))
+        row.name:SetText(Name(linked)); local qc = S.QualityColor(linked); row.name:SetTextColor(qc[1], qc[2], qc[3])
+        local who = O.Crafters(linked)
+        row.sub:SetText(#who > 0 and string.format(L("%d artisans connus pour cet objet"), #who) or L("aucune recette partagée : la guilde verra la commande"))
+        row.btn.label:SetText(L("Commander")); row.btn:Show()
+        row.bg:SetColorTexture(C.card[1], C.card[2], C.card[3], 1)
+        f.list.HideFrom(2)
+        f.empty:Hide()
+        f.list.content:SetHeight(50)
+        return
+    end
     -- nothing typed: the guild's crafters, grouped by profession (shared at login, recipes or not)
     if #q < 2 then
         local groups = {}
@@ -339,6 +379,10 @@ local function BuildNew(p)
     n.toOne = S.Button(p, "", half, 28, "secondary", function() if draft.crafter then draft.to = draft.crafter; WP.RefreshOrders() end end)
     n.toOne:SetPoint("LEFT", n.toGuild, "RIGHT", 8, 0)
     n.rlabel = S.Section(p, L("Composants")); n.rlabel:SetPoint("TOPLEFT", PAD, -100)
+    n.cost = S.Text(p, 12, C.dim); n.cost:SetPoint("TOPRIGHT", -PAD, -100); n.cost:SetJustifyH("RIGHT")
+    n.noRecipe = S.Text(p, 12, C.dim); n.noRecipe:SetPoint("TOPLEFT", PAD, -122); n.noRecipe:SetPoint("RIGHT", -PAD, 0)
+    n.noRecipe:SetJustifyH("LEFT"); n.noRecipe:SetWordWrap(true)
+    n.noRecipe:SetText(L("Recette inconnue : écris dans la note qui fournit quoi, l'artisan verra la commande."))
     n.rows = {}
     for i = 1, 8 do
         local r = CreateFrame("Button", nil, p)
@@ -394,6 +438,17 @@ local function RenderNew()
     local g, o = draft.to and dim or sel, draft.to and sel or dim
     n.toGuild.label:SetTextColor(g[1], g[2], g[3]); n.toOne.label:SetTextColor(o[1], o[2], o[3])
     local reagents = O.Reagents(draft.item)
+    n.noRecipe:SetShown(#reagents == 0)
+    -- what the reagents cost at the auction house, and a fee in proportion (10 %, at least 1 gold)
+    local total, priced = 0, true
+    for _, rg in ipairs(reagents) do
+        local pr = WP.Price and WP.Price(rg[1])
+        if pr then total = total + pr * rg[2] * (draft.qty or 1) else priced = false end
+    end
+    if #reagents > 0 and total > 0 then
+        local fee = math.max(10000, math.floor(total * 0.1 / 100) * 100)
+        n.cost:SetText(string.format(L("composants %s%s · commission conseillée %s"), priced and "" or "~", Money(total), Money(fee)))
+    else n.cost:SetText("") end
     for i, r in ipairs(n.rows) do
         local rg = reagents[i]
         r:SetShown(rg ~= nil)
@@ -416,11 +471,15 @@ local function RenderNew()
     if n.payUp.Update then n.payUp:Update() end
 end
 
-function WP.NewOrder(item, crafter)
+-- from: an earlier order to copy (quantity, fee, tip, note, who gives what)
+function WP.NewOrder(item, crafter, from)
     if WP.ModuleOff and WP.ModuleOff("orders") then return end
-    draft = { item = item, crafter = crafter, to = crafter, qty = 1, hours = 24, crafterGives = {}, fee = 0, tip = 0 }
+    draft = { item = item, crafter = crafter, to = crafter, qty = from and from.qty or 1, hours = 24, crafterGives = {}, fee = from and from.fee or 0, tip = from and from.tip or 0 }
+    if from and from.crafter then for _, r in ipairs(O.Decode(from.crafter)) do draft.crafterGives[r[1]] = true end end
     if not win then WP.ShowOrdersTab("find") end
-    ui.new.fee:SetText(""); ui.new.tip:SetText(""); ui.new.note:SetText("")
+    ui.new.fee:SetText(from and (from.fee or 0) > 0 and tostring(math.floor(from.fee / 10000)) or "")
+    ui.new.tip:SetText(from and (from.tip or 0) > 0 and tostring(math.floor(from.tip / 10000)) or "")
+    ui.new.note:SetText(from and from.note or "")
     WP.ShowOrdersTab("new")
 end
 
@@ -435,7 +494,9 @@ local function OrderCard(parent)
     c.detail = S.Text(c, 12, C.text); c.detail:SetPoint("TOPLEFT", 10, -46); c.detail:SetPoint("RIGHT", -10, 0); c.detail:SetJustifyH("LEFT"); c.detail:SetWordWrap(true)
     c.b1 = S.Button(c, "", 110, 26, "primary", function() if c.a1 then c.a1() end end)
     c.b2 = S.Button(c, "", 110, 26, "secondary", function() if c.a2 then c.a2() end end)
+    c.b3 = S.Button(c, L("Message"), 90, 26, "secondary", function() if c.o then WP.AskMessage(c.o) end end)
     c.b1:SetPoint("BOTTOMLEFT", 10, 8); c.b2:SetPoint("LEFT", c.b1, "RIGHT", 8, 0)
+    c.b3:SetPoint("BOTTOMRIGHT", -10, 8)
     return c
 end
 
@@ -446,12 +507,14 @@ Reagents = function(s, qty)
 end
 
 local function PaintOrder(c, o, side)
+    c.o = o
     c.title:SetText((o.qty or 1) .. "× " .. Name(o.item))
     c.fee:SetText(Money((o.fee or 0) + (o.tip or 0)))
     local col = STATUS_COL[o.status] or C.dim
     local st = S.Hex(col) .. L(STATUS[o.status] or o.status) .. "|r"
     local who
-    if side == "mine" then who = (o.to and string.format(L("pour %s"), o.to) or L("pour la guilde")) .. (o.by and (" · " .. string.format(L("par %s"), o.by)) or "")
+    local function Star(name) local n = name and O.Stars(name) or 0; return n > 0 and (" " .. S.Hex(C.warn) .. "★" .. n .. "|r") or "" end
+    if side == "mine" then who = (o.to and string.format(L("pour %s"), o.to) or L("pour la guilde")) .. (o.by and (" · " .. string.format(L("par %s"), o.by) .. Star(o.by)) or "")
     else who = o.from .. " · " .. (o.to and string.format(L("pour %s"), o.to) or L("pour la guilde")) end
     if o.status == "open" and o.expires then who = who .. " · " .. string.format(L("expire dans %d h"), math.max(0, math.floor((o.expires - time()) / 3600))) end
     c.who:SetText(st .. " · " .. who)
@@ -475,10 +538,23 @@ local function PaintOrder(c, o, side)
     end
     if o.reason then lines[#lines + 1] = S.Hex(C.danger) .. L(o.reason) .. "|r" end
     if o.note and o.note ~= "" then lines[#lines + 1] = "« " .. o.note .. " »" end
+    -- the steps so far, and the last messages between customer and crafter
+    if o.log and #o.log > 1 then
+        local t = {}
+        for _, e in ipairs(o.log) do t[#t + 1] = L(STATUS[e.s] or e.s) .. " " .. date("%H:%M", e.t) end
+        lines[#lines + 1] = S.Hex(C.muted) .. table.concat(t, "  ›  ") .. "|r"
+    end
+    for i = math.max(1, #(o.msgs or {}) - 2), #(o.msgs or {}) do
+        local m = o.msgs[i]
+        lines[#lines + 1] = S.Hex(C.info) .. m.from .. "|r : " .. m.text
+    end
     c.detail:SetText(table.concat(lines, "\n"))
     -- buttons by side and status
     c.a1, c.a2 = nil, nil
-    if side == "recv" and o.status == "open" then
+    if side == "board" then
+        c.b1.label:SetText(L("Accepter")); c.a1 = function() O.Accept(o); WP.ShowOrdersTab("recv") end
+        c.b2.label:SetText(L("Masquer")); c.a2 = function() O.Decline(o, "Autre") end
+    elseif side == "recv" and o.status == "open" then
         c.b1.label:SetText(L("Accepter")); c.a1 = function() O.Accept(o) end
         c.b2.label:SetText(L("Refuser")); c.a2 = function() WP.AskDecline(o) end
     elseif side == "recv" and o.status == "accepted" then
@@ -487,13 +563,25 @@ local function PaintOrder(c, o, side)
         c.b1.label:SetText(L("Livrée")); c.a1 = function() O.Delivered(o) end
     elseif side == "mine" and (o.status == "open" or o.status == "accepted") then
         c.b2.label:SetText(L("Annuler")); c.a2 = function() O.Cancel(o) end
-    elseif side == "mine" and (o.status == "crafted" or o.status == "delivered") then
+    elseif side == "mine" and o.status == "crafted" then
         c.b2.label:SetText(L("+ Pourboire")); c.a2 = function() O.AddTip(o, 10000); WP.RefreshOrders() end
+    elseif side == "mine" and o.status == "delivered" then
+        if not o.thanked and o.by then
+            c.b1.label:SetText(L("Merci ★")); c.a1 = function() O.Thank(o) end
+        else
+            c.b1.label:SetText(L("Recommander")); c.a1 = function() WP.NewOrder(o.item, o.by, o) end
+        end
+        c.b2.label:SetText(L("+ Pourboire")); c.a2 = function() O.AddTip(o, 10000); WP.RefreshOrders() end
+    elseif side == "mine" and (o.status == "cancelled" or o.status == "expired" or o.status == "declined") then
+        c.b1.label:SetText(L("Recommander")); c.a1 = function() WP.NewOrder(o.item, o.status == "declined" and nil or o.to, o) end
     end
+    -- messages: between the customer and the crafter, once someone took the order
+    c.b3:SetShown(o.by ~= nil and (o.status == "accepted" or o.status == "crafted" or o.status == "delivered")
+        and (UnitName("player") == o.from or UnitName("player") == o.by))
     c.b1:SetShown(c.a1 ~= nil); c.b2:SetShown(c.a2 ~= nil)
     if not c.a1 and c.a2 then c.b2:ClearAllPoints(); c.b2:SetPoint("BOTTOMLEFT", 10, 8)
     else c.b2:ClearAllPoints(); c.b2:SetPoint("LEFT", c.b1, "RIGHT", 8, 0) end
-    local h = 54 + math.max(14, (c.detail:GetStringHeight() or 14)) + ((c.a1 or c.a2) and 40 or 8)
+    local h = 54 + math.max(14, (c.detail:GetStringHeight() or 14)) + ((c.a1 or c.a2 or c.b3:IsShown()) and 40 or 8)
     c:SetHeight(h)
     return h
 end
@@ -513,6 +601,25 @@ local function RenderOrders(key, list)
     u.list.HideFrom(#list + 1)
     u.empty:SetShown(#list == 0)
     u.list.content:SetHeight(math.max(10, y))
+end
+
+-- a message on an order (a small box)
+local msgBox
+function WP.AskMessage(o)
+    if not msgBox then
+        msgBox = S.Window("WLHelperOrderMsg", 340, 130, L("Message"), nil, nil, nil)
+        msgBox.eb = Box(msgBox, 312, 28, false, L("Ton message (120 caractères)"))
+        msgBox.eb:SetPoint("TOPLEFT", 14, -52); msgBox.eb:SetMaxLetters(120)
+        local send = S.Button(msgBox, L("Envoyer"), 312, 30, "primary", function()
+            if msgBox.order then O.Say(msgBox.order, msgBox.eb:GetText()) end
+            msgBox.eb:SetText(""); msgBox:Hide()
+        end)
+        send:SetPoint("TOPLEFT", 14, -88)
+        msgBox.eb:SetScript("OnEnterPressed", function() send:Click() end)
+    end
+    msgBox.order = o
+    msgBox.title:SetText(string.format(L("Message · %s"), Name(o.item)))
+    msgBox:Show(); msgBox.eb:SetFocus()
 end
 
 -- decline with a reason (a small menu of reasons)
@@ -536,9 +643,10 @@ end
 -- ---------------------------------------------------------------- the window
 local function Build()
     win = S.Window("WLHelperOrders", W, H, L("Commandes"), nil, WLWritsDB, "ordersPos")
-    tabs = S.Tabs(win, { { "find", L("Artisans") }, { "mine", L("Mes commandes") }, { "recv", L("Reçues") } },
+    tabs = S.Tabs(win, { { "find", L("Artisans") }, { "board", L("Ouvertes") }, { "mine", L("Mes commandes") }, { "recv", L("Reçues") } },
         function() return current == "new" and "find" or current end, function(k) WP.ShowOrdersTab(k) end, function(k)
             if k == "find" then return nil end
+            if k == "board" then local n = #O.Board(WLWritsDB.ordersBoardMine ~= false); return n > 0 and n or nil end
             local mine, forMe = O.Lists()
             local n = 0
             if k == "recv" then for _, o in ipairs(forMe) do if o.status == "open" then n = n + 1 end end
@@ -546,13 +654,20 @@ local function Build()
             return n > 0 and n or nil
         end)
     tabs:SetPoint("TOPLEFT", 1, -39); tabs:SetPoint("TOPRIGHT", -1, -39)
-    for _, k in ipairs({ "find", "new", "mine", "recv" }) do
+    for _, k in ipairs({ "find", "new", "board", "mine", "recv" }) do
         local p = CreateFrame("Frame", nil, win)
         p:SetPoint("TOPLEFT", 0, -76); p:SetPoint("BOTTOMRIGHT")
         p:Hide()
         pages[k] = p
     end
     BuildFind(pages.find); BuildNew(pages.new); BuildOrders(pages.mine, "mine"); BuildOrders(pages.recv, "recv")
+    -- the board: the guild's open orders, all of them or only what you make
+    ui.board.list = List(pages.board, -50, 8, OrderCard)
+    ui.board.empty = S.Text(ui.board.list.content, 13, C.dim); ui.board.empty:SetPoint("TOPLEFT", 2, -8)
+    ui.board.empty:SetWidth(W - 2 * PAD - 4); ui.board.empty:SetWordWrap(true)
+    local only = S.Switch(pages.board, function() return WLWritsDB.ordersBoardMine ~= false end, function(v) WLWritsDB.ordersBoardMine = v; WP.RefreshOrders() end)
+    only:SetPoint("TOPRIGHT", -PAD, -12)
+    local ol = S.Text(pages.board, 13, C.text); ol:SetPoint("RIGHT", only, "LEFT", -8, 0); ol:SetText(L("Ce que je sais fabriquer"))
     win:SetScript("OnShow", function()
         -- warm the item cache so the search can match names the client has not seen yet
         if C_Item and C_Item.RequestLoadItemDataByID then
@@ -577,8 +692,15 @@ function WP.RefreshOrders()
     if current == "find" then RenderFind()
     elseif current == "new" then RenderNew()
     else
-        local mine, forMe = O.Lists()
-        if current == "mine" then RenderOrders("mine", mine) else RenderOrders("recv", forMe) end
+        if current == "board" then
+            local list = O.Board(WLWritsDB.ordersBoardMine ~= false)
+            RenderOrders("board", list)
+            ui.board.empty:SetText(WLWritsDB.ordersBoardMine ~= false and L("Aucune commande ouverte pour ce que tu sais fabriquer. Décoche le filtre pour tout voir.")
+                or L("Aucune commande ouverte dans la guilde."))
+        else
+            local mine, forMe = O.Lists()
+            if current == "mine" then RenderOrders("mine", mine) else RenderOrders("recv", forMe) end
+        end
     end
 end
 

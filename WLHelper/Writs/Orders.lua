@@ -36,6 +36,8 @@ ns.AddEnglish({
     ["Recharge en cours"] = "On cooldown",
     ["Autre"] = "Other",
     ["ouvre la boîte aux lettres, onglet Envoyer."] = "open the mailbox, Send tab.",
+    ["Message de %s sur la commande %s : %s"] = "Message from %s on the order %s: %s",
+    ["%s te remercie pour sa commande."] = "%s thanks you for their order.",
     ["Contre-remboursement impossible sans objet joint : demande %s à %s."] = "Cash on delivery needs an attached item: ask %s from %s.",
 })
 
@@ -363,6 +365,15 @@ local STATUS_RANK = { open = 1, accepted = 2, crafted = 3, delivered = 4, declin
 
 -- Merges what another copy says about an order; a status never goes back. The wire fields are
 -- copied into our copy, so what only we know (got, gotMoney, sentGive, snapshots) stays.
+local function LogStep(o, status, by)
+    o.log = o.log or {}
+    local last = o.log[#o.log]
+    if last and last.s == status then return end
+    o.log[#o.log + 1] = { s = status, by = by, t = time() }
+    while #o.log > 12 do table.remove(o.log, 1) end
+end
+O.LogStep = LogStep
+
 local function Merge(o)
     local d = DB()
     local cur = d.list[o.id]
@@ -373,6 +384,7 @@ local function Merge(o)
     -- two crafters took the same guild order: everyone keeps the same one (the first name)
     if r1 == r2 and cur.by and o.by and cur.by ~= o.by and cur.by < o.by then return cur, false end
     local changed = cur.status ~= o.status or cur.by ~= o.by
+    if cur.status ~= o.status then LogStep(cur, o.status, o.status == "open" and o.from or o.by or o.from) end
     local tip = math.max(cur.tip or 0, o.tip or 0)
     for _, k in ipairs(FIELDS) do cur[k] = o[k] end
     if tip > 0 then cur.tip = tip end
@@ -401,6 +413,7 @@ function O.Publish(order)
     order.status = "open"
     order.expires = time() + (order.hours or 24) * 3600
     order.hours = nil
+    LogStep(order, "open", order.from)
     Merge(order)
     Broadcast(order)
     if WP.RefreshOrders then WP.RefreshOrders() end
@@ -408,6 +421,7 @@ function O.Publish(order)
 end
 
 local function SetStatus(o, status, extra)
+    LogStep(o, status, (extra and extra.by) or (status == "cancelled" and o.from) or o.by or Me())
     o.status = status
     for k, v in pairs(extra or {}) do o[k] = v end
     Merge(o)
@@ -427,6 +441,60 @@ function O.Crafted(o) SetStatus(o, "crafted") end
 function O.Delivered(o) SetStatus(o, "delivered") end
 function O.Cancel(o) SetStatus(o, "cancelled") end
 function O.AddTip(o, copper) o.tip = (o.tip or 0) + copper; Merge(o); Broadcast(o) end
+
+-- A message on an order, between its customer and its crafter (anyone of the guild sees it go by,
+-- only the two of them keep it). At most 120 characters.
+local function CleanText(t)
+    t = tostring(t or ""):gsub("[|~\n]", " ")
+    if #t > 120 then
+        t = t:sub(1, 120)
+        while #t > 0 and t:byte(#t) >= 0x80 and t:byte(#t) < 0xC0 do t = t:sub(1, -2) end
+        if #t > 0 and t:byte(#t) >= 0xC0 then t = t:sub(1, -2) end
+    end
+    return t
+end
+local function AddMessage(o, from, text)
+    o.msgs = o.msgs or {}
+    o.msgs[#o.msgs + 1] = { from = from, text = text, t = time() }
+    while #o.msgs > 20 do table.remove(o.msgs, 1) end
+end
+function O.Say(o, text)
+    text = CleanText(text)
+    if text == "" then return end
+    AddMessage(o, Me(), text)
+    Guild("M|" .. o.id .. "|" .. text)
+    if WP.RefreshOrders then WP.RefreshOrders() end
+end
+
+-- After delivery the customer can thank the crafter: a star on their name for the whole guild.
+function O.Thank(o)
+    if o.from ~= Me() or not o.by or o.thanked then return end
+    o.thanked = true
+    local d = DB(); d.stars = d.stars or {}
+    d.stars[o.by] = d.stars[o.by] or {}
+    d.stars[o.by][o.id] = true
+    Guild("V|" .. o.id .. "|" .. o.by)
+    if WP.RefreshOrders then WP.RefreshOrders() end
+end
+function O.Stars(name)
+    local n = 0
+    for _ in pairs((DB().stars or {})[name] or {}) do n = n + 1 end
+    return n
+end
+
+-- The board: every open order of the guild you could take (to the whole guild or to you), not yours.
+-- canOnly: only what your shared recipes make.
+function O.Board(canOnly)
+    local d, me, now, out = DB(), Me(), time(), {}
+    for _, o in pairs(d.list) do
+        if o.status == "open" and (o.expires or 0) >= now and o.from ~= me and (not o.to or o.to == me)
+            and not (d.hidden and d.hidden[o.id]) and (not canOnly or O.CanCraft(me, o.item)) then
+            out[#out + 1] = o
+        end
+    end
+    table.sort(out, function(a, b) return (a.expires or 0) > (b.expires or 0) end)
+    return out
+end
 
 -- Orders as lists: mine (I asked), for me (I may craft), each sorted newest first.
 function O.Lists()
@@ -727,6 +795,27 @@ local function OnMessage(msg, channel, sender)
             if changed then O.Notify(merged) end
             if WP.RefreshOrders then WP.RefreshOrders() end
         end
+    elseif kind == "M" and channel == "GUILD" then
+        -- a message on an order: kept when it is between its customer and its crafter, and I am one of them
+        local id, text = rest:match("^([^|]+)|(.*)$")
+        local o = id and d.list[id]
+        if o and (sender == o.from or sender == o.by) and (Me() == o.from or Me() == o.by) then
+            AddMessage(o, sender, CleanText(text))
+            if WP.ModuleOn("orders") then
+                WP.Print(string.format(L("Message de %s sur la commande %s : %s"), sender, O.Name(o.item), CleanText(text)))
+            end
+            if WP.RefreshOrders then WP.RefreshOrders() end
+        end
+    elseif kind == "V" and channel == "GUILD" then
+        -- a thank-you: one star per delivered order, given by its customer only
+        local id, crafter = rest:match("^([^|]+)|([^|]+)$")
+        local o = id and d.list[id]
+        if crafter and (not o or (o.from == sender and o.by == crafter)) then
+            d.stars = d.stars or {}
+            d.stars[crafter] = d.stars[crafter] or {}
+            d.stars[crafter][id] = true
+            if crafter == Me() and WP.ModuleOn("orders") then WP.Print(string.format(L("%s te remercie pour sa commande."), sender)) end
+        end
     elseif kind == "Q" and channel == "GUILD" then
         -- someone asks who crafts what: my professions' hashes (they ask for the lists they lack)
         O.Announce(true)
@@ -769,7 +858,12 @@ function O.Notify(o)
     local me = Me()
     local name = O.Name(o.item)
     if o.status == "open" and o.from ~= me and (o.to == me or (not o.to and O.CanCraft(me, o.item))) then
-        WP.Print(string.format(L("Nouvelle commande de %s : %s ×%d (%s)."), o.from, name, o.qty or 1, S.Money((o.fee or 0) + (o.tip or 0))))
+        local msg = string.format(L("Nouvelle commande de %s : %s ×%d (%s)."), o.from, name, o.qty or 1, S.Money((o.fee or 0) + (o.tip or 0)))
+        WP.Print(msg)
+        if WLWritsDB.ordersAlert ~= false then
+            if RaidNotice_AddMessage and RaidWarningFrame then RaidNotice_AddMessage(RaidWarningFrame, msg, { r = 1, g = 0.82, b = 0.3 }) end
+            if PlaySound and SOUNDKIT and SOUNDKIT.READY_CHECK then pcall(PlaySound, SOUNDKIT.READY_CHECK, "Master") end
+        end
     elseif o.from == me and o.status == "accepted" then
         WP.Print(string.format(L("%s a accepté ta commande : %s ×%d."), o.by or "?", name, o.qty or 1))
     elseif o.from == me and o.status == "declined" then

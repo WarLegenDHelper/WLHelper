@@ -6,6 +6,20 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.31] — 2026-11-15
+
+### Ajouté / Added
+- **Commandes, le processus complet** :
+  - onglet **Ouvertes** : toutes les commandes ouvertes de la guilde, filtre « Ce que je sais fabriquer », Accepter ou Masquer ;
+  - **n'importe quel objet** : Maj-clic sur un objet (ou son lien) dans la recherche, puis Commander, même si personne n'a partagé la recette (la note dit qui fournit quoi) ;
+  - **historique** des étapes sur chaque commande (ouverte, acceptée, fabriquée, livrée, avec l'heure) ;
+  - **messages** entre le client et l'artisan (bouton Message, une ligne dans le chat à l'arrivée) ;
+  - **Merci ★** après la livraison : une étoile sur le nom de l'artisan, vue par toute la guilde ;
+  - **Recommander** en un clic une commande livrée, annulée, refusée ou expirée (quantité, commission, note reprises) ;
+  - **coût des composants** à l'HV et **commission conseillée** (10 %, au moins 1 po) en créant la commande ;
+  - **alerte** à l'écran et un son quand une commande arrive pour toi.
+  *Orders, the full process: guild board, any item by link, history, messages, thanks, order again, reagent cost and suggested fee, alerts.*
+
 ## [1.0.0-beta.30] — 2026-11-15
 
 ### Corrigé / Fixed
