@@ -1233,7 +1233,7 @@ local function MakeHead(i)
   b.checkBg = Disc(face, "OVERLAY", 0, 0, 0, 0.85, 2); b.checkBg:SetSize(16, 16); b.checkBg:SetPoint("BOTTOMRIGHT", 1, -1); b.checkBg:Hide()
   b.check = ns.Icon(face, "check", 12, "OVERLAY", T.ok); b.check:SetDrawLayer("OVERLAY", 3)
   b.check:SetPoint("CENTER", b.checkBg, "CENTER", 0, 0); b.check:Hide()
-  b:SetScript("OnEnter", function(self) self.hl:SetAlpha(1); HeadTip(self) end)
+  b:SetScript("OnEnter", function(self) self.hl:SetAlpha(0.18); HeadTip(self) end)
   b:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); self.press:Hide(); ns.HideTip() end)
   b:HookScript("OnMouseDown", function(self) self.press:Show() end)
   b:HookScript("OnMouseUp", function(self) self.press:Hide() end)
@@ -1257,7 +1257,7 @@ local function PaintHead(b)
   b.check:SetShown(dead); b.checkBg:SetShown(dead)
   if rec.rare and not unseen and not dead then b.ring:SetVertexColor(T.silver[1], T.silver[2], T.silver[3], 0.95)
   elseif rec.rare and unseen then b.ring:SetVertexColor(T.silver[1], T.silver[2], T.silver[3], 0.25)
-  else b.ring:SetVertexColor(T.muted[1], T.muted[2], T.muted[3], dead and 0.15 or 0.35) end
+  else b.ring:SetVertexColor(1, 1, 1, 0) end   -- bosses: no ring (it drew a grey crescent)
   local a = unseen and 0.7 or 1
   b.face:SetAlpha(a)
   b.faceAlpha = a
@@ -1420,7 +1420,7 @@ local function Build()
   P.close:SetPoint("TOPRIGHT", -4, -3)
   P.attach = S.IconButton(P, "pin", 24, { L.BOSS_ATTACH, L.BOSS_ATTACH_CLICK }, function()
     if InCombat() then return end
-    DB().bossDetached = nil
+    DB().bossDetached = false   -- pinned to the guide on purpose (nil means "free, the default")
     ns.RefreshBosses()
   end)
   P.reset = S.IconButton(P, "refresh", 24, function()
@@ -1489,6 +1489,8 @@ end
 -- Absolute position: no anchor to the guide, so the guide never becomes a protected frame.
 function ns.SnapBosses()
   if not P then return end
+  -- by default the panel lives on the right of the screen (like the Mythic+ timer), not on the guide
+  if DB().bossDetached == nil then DB().bossDetached = true end
   if InCombat() then pending.snap = true return end
   local h = P.attached and Host()
   if h then
@@ -1507,7 +1509,7 @@ function ns.SnapBosses()
   local pos = DB().bossPos
   P:ClearAllPoints()
   if pos and pos[1] then P:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos[1], pos[2])
-  else P:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -240, -220) end
+  else P:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -40, -260) end   -- under the minimap, right side
 end
 
 -- the panel's height for nb bosses and nr rares (`cols` per row, 5 by default)
@@ -1526,6 +1528,7 @@ local function RenderNow()
   local dkey = P.dkey
   local db = DB()
   local host = Host()
+  if db.bossDetached == nil then db.bossDetached = true end   -- free (top right) unless pinned to the guide
   P.attached = (host ~= nil and not db.bossDetached) and true or false
   local res = dkey and ns.DungeonMobs(dkey) or { bosses = {}, rares = {} }
   P.res = res

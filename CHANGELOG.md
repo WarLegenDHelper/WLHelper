@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.65] — 2026-11-15
+
+### Corrigé / Fixed
+- **Fenêtre des boss** : plus de croissant gris à droite des portraits (l'anneau n'est gardé que pour les rares, en argent) ; le survol éclaircit doucement au lieu de blanchir le portrait ; la fenêtre se place par défaut en haut à droite de l'écran (comme le minuteur Mythique+), l'épingle la colle au guide si tu préfères.
+  *Boss panel: no grey crescents, softer hover, top-right by default.*
+
 ## [1.0.0-beta.64] — 2026-11-15
 
 ### Modifié / Changed
