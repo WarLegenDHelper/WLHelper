@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.68] — 2026-11-15
+
+### Ajouté / Added
+- **Quoi de neuf** : après chaque mise à jour, une fenêtre liste une fois ce qui a changé depuis la version que tu avais (que l'addon ait été mis à jour par WowUp, CurseForge ou à la main). `/wlh nouveautes` la rouvre.
+  *What's new: after each update a window lists the changes since your last version, once; /wlh news reopens it.*
+
 ## [1.0.0-beta.67] — 2026-11-15
 
 ### Corrigé / Fixed
