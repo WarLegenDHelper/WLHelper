@@ -162,9 +162,20 @@ local function Build()
     end)
     y = y - CARD_H - 10
 
-    -- the GPS line
+    win.afterCards = y
+
+    -- an update seen on another player's copy (Version.lua)
+    local upd = CreateFrame("Frame", nil, win)
+    upd:SetHeight(34)
+    S.Solid(upd, "BACKGROUND", C.brandBg or C.card):SetAllPoints()
+    S.Border(upd, C.brand)
+    upd.text = S.Text(upd, 13, C.text)
+    upd.text:SetPoint("LEFT", 12, 0); upd.text:SetPoint("RIGHT", -12, 0); upd.text:SetJustifyH("LEFT"); upd.text:SetWordWrap(false)
+    win.upd = upd
+
+    -- the GPS line, only while it guides
     local gps = CreateFrame("Frame", nil, win)
-    gps:SetHeight(40); gps:SetPoint("TOPLEFT", PAD, y); gps:SetPoint("TOPRIGHT", -PAD, y)
+    gps:SetHeight(40)
     S.Border(gps, C.divider)
     gps.text = S.Text(gps, 14, C.dim)
     gps.text:SetPoint("LEFT", 12, 0); gps.text:SetPoint("RIGHT", -84, 0); gps.text:SetJustifyH("LEFT"); gps.text:SetWordWrap(false)
@@ -173,22 +184,34 @@ local function Build()
     end)
     gps.stop:SetPoint("RIGHT", -7, 0)
     win.gps = gps
-    y = y - 40 - 14
 
-    -- footer: an idea, the settings, the version
+    -- footer: an idea, the settings, the version (placed by Layout under what is shown)
     local half = (W - 2 * PAD - 8) / 2
-    local idea = S.Button(win, L("Une idée, un bug ?"), half, 34, "secondary", function()
+    win.idea = S.Button(win, L("Une idée, un bug ?"), half, 34, "secondary", function()
         Close(); if WP.Feedback then WP.Feedback("idea") end
     end)
-    idea:SetPoint("TOPLEFT", PAD, y)
-    local set = S.Button(win, L("Réglages"), half, 34, "secondary", function()
+    win.set = S.Button(win, L("Réglages"), half, 34, "secondary", function()
         Close(); if WP.ShowOptionsPage then WP.ShowOptionsPage() end
     end)
-    set:SetPoint("TOPRIGHT", -PAD, y)
-    y = y - 34 - 8
-    local ver = S.Text(win, 12, C.muted)
-    ver:SetPoint("TOP", 0, y); ver:SetText("v" .. Version() .. " · /wl")
-    win:SetHeight(-y + 12 + 14)
+    win.ver = S.Text(win, 12, C.muted)
+    win.ver:SetText("v" .. Version() .. " · /wl")
+
+    -- stacks the optional lines under the cards, then the footer, and sizes the window
+    function win.Layout(showUpdate, showGps)
+        local yy = win.afterCards
+        local function place(f, h, gap)
+            f:ClearAllPoints(); f:SetPoint("TOPLEFT", PAD, yy); f:SetPoint("TOPRIGHT", -PAD, yy); f:Show()
+            yy = yy - h - gap
+        end
+        if showUpdate then place(upd, 34, 10) else upd:Hide() end
+        if showGps then place(gps, 40, 14) else gps:Hide() end
+        win.idea:ClearAllPoints(); win.idea:SetPoint("TOPLEFT", PAD, yy)
+        win.set:ClearAllPoints(); win.set:SetPoint("TOPRIGHT", -PAD, yy)
+        yy = yy - 34 - 8
+        win.ver:ClearAllPoints(); win.ver:SetPoint("TOP", 0, yy)
+        win:SetHeight(-yy + 12 + 14)
+    end
+    win.Layout(false, false)
 
     cards.dungeons.key, cards.writs.key, cards.bags.key = "dungeons", "writs", "bags"
     win:SetScript("OnShow", function() WP.RefreshHome() end)
@@ -210,12 +233,13 @@ function WP.RefreshHome()
     -- dungeons
     local d = cards.dungeons
     d.title:SetText(L("Donjons"))
-    local label, cur, total, finished = DungeonState()
+    local label, cur, total, finished, nextStep = DungeonState()
     d.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
     if label and not finished then
-        d.tag:SetText(L("en cours"))
+        -- where: the route and the step; then what to do next
+        d.tag:SetText(string.format(L("étape %d sur %d"), cur, total))
         d.line1:SetText(label)
-        d.line2:SetText(string.format(L("étape %d sur %d"), cur, total))
+        d.line2:SetText(nextStep and nextStep ~= "" and (L("Ensuite : ") .. nextStep) or "")
         d.bar:Show(); d.fill:SetWidth(math.max(0.01, (d.bar:GetWidth() > 0 and d.bar:GetWidth() or 200) * (cur - 1) / math.max(1, total)))
         d.action.label:SetText(L("Reprendre"))
         SetActive(d, true)
@@ -240,7 +264,9 @@ function WP.RefreshHome()
     c.title:SetText(L("Comptoir")); c.tag:SetText(L("Craftsman's Writs")); c.bar:Hide(); c.action:Hide(); c.chev:Show(); c:Narrow(false)
     local need, goal, ready, bag = WritState()
     if need then
-        c.line1:SetText(need > 0 and string.format(L("%s dans %d rép"), WP.Reaction(goal), need) or string.format(L("%s atteint"), WP.Reaction(goal)))
+        local favor = WP.FavorNow and WP.FavorNow()
+        c.line1:SetText((need > 0 and string.format(L("%s dans %d rép"), WP.Reaction(goal), need) or string.format(L("%s atteint"), WP.Reaction(goal)))
+            .. (favor and ("  ·  " .. string.format(L("%d Favor"), favor)) or ""))
         local parts = {}
         if ready > 0 then parts[#parts + 1] = string.format(L("%d writs prêts à rendre"), ready) end
         if bag > 0 then parts[#parts + 1] = string.format(L("%d enveloppes à ouvrir"), bag) end
@@ -274,15 +300,15 @@ function WP.RefreshHome()
         end
     end
 
-    -- GPS
+    -- GPS (only while it guides) and an update seen on another player's copy
     local g = win.gps
-    if WP.GPS.Active() then
+    local guiding = WP.GPS.Active()
+    if guiding then
         g.text:SetText(S.Hex(C.text) .. L("GPS") .. "|r · " .. string.format(L("vers %s"), WP.GPS.DestName() or "?"))
-        g.stop:Show()
-    else
-        g.text:SetText(L("GPS") .. " · " .. L("aucun"))
-        g.stop:Hide()
     end
+    local newer = WP.UpdateAvailable and WP.UpdateAvailable()
+    if newer then win.upd.text:SetText(string.format(L("Mise à jour disponible : %s · WowUp › Update"), newer)) end
+    win.Layout(newer ~= nil, guiding)
 end
 
 function WP.OpenHome()
@@ -314,6 +340,11 @@ function WP.MinimapTooltip(owner)
     end
     tt:AddDoubleLine(L("Sacs"), WP.ModuleOn("bags") and string.format(L("%d à jeter"), BagCount()) or L("éteint"),
         C.dim[1], C.dim[2], C.dim[3], C.text[1], C.text[2], C.text[3])
+    local newer = WP.UpdateAvailable and WP.UpdateAvailable()
+    if newer then
+        tt:AddLine(" ")
+        tt:AddLine(string.format(L("Mise à jour disponible : %s · WowUp › Update"), newer), C.brandSoft[1], C.brandSoft[2], C.brandSoft[3])
+    end
     tt:AddLine(" ")
     tt:AddLine(L("Clic : accueil · Clic droit : menu"), C.warn[1], C.warn[2], C.warn[3])
     tt:AddLine(L("Glisser pour déplacer"), C.dim[1], C.dim[2], C.dim[3])

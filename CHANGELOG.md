@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.7] — 2026-11-15
+
+### Ajouté / Added
+- **Rappel de mise à jour** : chaque copie de l'addon annonce discrètement sa version à ta guilde et à ton groupe. Si quelqu'un a plus récent que toi, un message te le dit une fois, et l'accueil et l'infobulle de la minimap affichent « Mise à jour disponible : … · WowUp › Update ». Seul le numéro de version est envoyé. Ça marche à partir de cette version : il faut que d'autres joueurs l'aient aussi.
+  *Update reminder: copies tell each other their version on the guild and group channels; a newer one shows on the home page and the minimap tooltip.*
+
+### Modifié / Changed
+- Accueil : la carte Donjons dit l'étape et ce qu'il faut faire ensuite ; la carte Comptoir montre ta Merchant's Favor ; la ligne GPS n'apparaît que pendant un guidage.
+  *Home: the next step on the Dungeons card, your Favor on the Trading Post card, the GPS line only while guiding.*
+
 ## [1.0.0-beta.6] — 2026-11-15
 
 ### Ajouté / Added
@@ -169,7 +179,8 @@ Première version de WL Helper (bêta). WL Dungeon Guide devient **WL Helper**.
 WL Dungeon Guide jusqu'à la 3.3 : guide des quêtes de donjon Horde pas à pas (versions partagées
 à la main, avant ce dépôt).
 
-[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.6...HEAD
+[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.7...HEAD
+[1.0.0-beta.7]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.6...v1.0.0-beta.7
 [1.0.0-beta.6]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.5...v1.0.0-beta.6
 [1.0.0-beta.5]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.4...v1.0.0-beta.5
 [1.0.0-beta.4]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.3...v1.0.0-beta.4

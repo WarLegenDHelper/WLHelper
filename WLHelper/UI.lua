@@ -1282,7 +1282,7 @@ function ns.GuideStatus()
   local log = ns.LogEntries()
   local cur = FirstOpen(log)
   local finished = cur == #steps and IsStepDone(log, cur)
-  return ns.route and ns.route.label or "", cur, #steps, finished
+  return ns.route and ns.route.label or "", cur, #steps, finished, StepTitle(steps[cur])
 end
 
 -- Opens the guide (never closes it).
