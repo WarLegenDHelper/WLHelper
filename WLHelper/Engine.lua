@@ -820,7 +820,7 @@ function ns.TargetMacroText(st, log)
   if #names == 0 then
     return "/run print('|cffce1918WL|r " .. L.MACRO_NONE:gsub("'", "\\'") .. "')", names
   end
-  local tail = "/run if UnitExists'target'and GetRaidTargetIndex'target'~=8 then SetRaidTarget('target',8)end"
+  local tail = ns.MarkLine(8)
   local m = { "/cleartarget" }
   local len = #m[1] + #tail + 2
   for _, nm in ipairs(names) do
@@ -946,6 +946,16 @@ function ns.BossOrderReset() for k in pairs(bossCache) do bossCache[k] = nil end
 -- rare } }, idx = { [en] = i, ["#token"] = i }, src = "naowh" | "walk" } or false.
 -- NaowhForever's journal is read live when it is loaded (names, tips, models, encounter IDs);
 -- without it, our own walk order (ns.WALK).
+-- The macro line that puts a raid marker on the target. The game's own /tm (a secure command, made
+-- for macros) when the client has it: a /run script calling SetRaidTarget is blocked on this client
+-- (the target was taken, the mark never came). /tm sets the mark, it does not toggle it off.
+function ns.MarkLine(m)
+  local has = (SlashCmdList and SlashCmdList.TARGET_MARKER) or (SecureCmdList and SecureCmdList.TARGET_MARKER)
+    or (_G.SLASH_TARGET_MARKER1 ~= nil)
+  if has then return "/tm [@target,exists] " .. m end
+  return "/run if UnitExists'target'and GetRaidTargetIndex'target'~=" .. m .. " then SetRaidTarget('target'," .. m .. ")end"
+end
+
 function ns.BossOrder(dkey)
   local J = NaowhJournal()
   -- built before the journal was loaded: built again once it is

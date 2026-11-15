@@ -2698,7 +2698,7 @@ function ns.UpdateActionBar()
       else
         local m = { "/cleartarget" }
         for _, nm in ipairs(a.names) do table.insert(m, "/targetexact " .. nm) end
-        table.insert(m, "/run if UnitExists('target') and GetRaidTargetIndex('target') ~= 8 then SetRaidTarget('target', 8) end")
+        table.insert(m, ns.MarkLine(8))
         b:SetAttribute("type", "macro"); b:SetAttribute("macrotext", table.concat(m, "\n")); b:SetAttribute("item", nil)
         b.icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8"); b.icon:SetTexCoord(0, 1, 0, 1)
       end

@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.70] — 2026-11-15
+
+### Corrigé / Fixed
+- **Marque sur le boss** : un clic sur un portrait ciblait bien le boss mais ne posait pas la marque. La marque passe maintenant par la commande du jeu /tm, faite pour les macros (le script utilisé avant est bloqué sur ce client). Pareil pour le bouton de ciblage du guide et sa touche.
+  *Boss mark: clicking a portrait now also puts the marker on (game /tm command instead of a blocked script).*
+
 ## [1.0.0-beta.69] — 2026-11-15
 
 ### Ajouté / Added

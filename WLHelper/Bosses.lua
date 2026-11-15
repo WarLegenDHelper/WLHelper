@@ -1070,7 +1070,7 @@ end
 -- in combat never leaves you without a target); a dead target with that name is dropped first.
 local function MacroText(name, m)
   return "/cleartarget [dead]\n/targetexact " .. name ..
-    "\n/run if UnitExists'target' and GetRaidTargetIndex'target'~=" .. m .. " then SetRaidTarget('target'," .. m .. ") end"
+    "\n" .. ns.MarkLine(m)
 end
 local function MacroFor(rec) return MacroText(rec.name or rec.en, Marker(rec)) end
 
