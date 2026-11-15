@@ -413,6 +413,13 @@ function ns.MemberQuest(who, qid, dkey)
   return "unknown"
 end
 function ns.HasHelper(who) return ns.party[who] ~= nil end
+-- The summary knows this member's quests: WL Helper sent them, or the game answered a share
+-- ("sent" alone is no answer: a share with no reply yet does not make a column).
+function ns.MemberKnown(who)
+  if ns.party[who] ~= nil then return true end
+  for _, v in pairs(ns.partyPush[who] or {}) do if v ~= "sent" then return true end end
+  return false
+end
 
 -- =====================================================================
 --  One line for the guide: who has the quest

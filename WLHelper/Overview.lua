@@ -1,13 +1,15 @@
 -- Résumé d'un ou plusieurs donjons : le premier écran quand tu lances une route depuis le choix des
--- donjons (« Lancer la route »), et la vue d'ensemble d'un donjon (bouton de la carte, clic droit,
--- bouton du guide). En haut : l'image, le nom, les niveaux, l'entrée (GPS), la clé, et le total de
--- ce que tu as coché (quêtes, XP, argent, objets) qui suit tes coches. Puis une ligne par quête :
--- une case à cocher, son XP, son argent, ses récompenses, son état, ses pastilles (élite, chaîne,
--- autre donjon, niveau trop haut) ; une chaîne se déplie pour montrer chaque maillon, son XP, son
--- état et où il se fait. En groupe : une colonne par membre (synchronisée par WL Helper, ou remplie
--- par les réponses du jeu après un partage), un bouton « Partager » et un verdict sur une ligne.
--- En bas : « Lancer la route » (avec les quêtes cochées), ou « Retour à la route » quand la route de
--- ces donjons tourne déjà (les coches l'ont déjà mise à jour), et « Fermer ».
+-- donjons, et la vue d'ensemble d'un donjon (bouton de la carte, clic droit, bouton du guide).
+-- En haut : l'image du donjon (nom, niveaux, taille du groupe), l'entrée (GPS) et la clé sur deux
+-- lignes courtes, puis le total de ta sélection, qui suit tes coches. Puis « Quêtes à faire » : une
+-- ligne par quête (case à cocher, nom dans la couleur de difficulté, « Niv. 45 · 7 800 XP · 65 pa »,
+-- des pastilles seulement quand elles disent quelque chose, la chaîne qui se déplie). Les quêtes
+-- déjà rendues sont repliées en bas (« Déjà rendues (10) »). En groupe : une colonne d'icônes par
+-- membre dont l'état est connu (WL Helper, ou la réponse du jeu à un partage) ; les autres sur une
+-- seule ligne. En bas : « Lancer la route » (premier écran), « Mettre à jour la route » (la route
+-- tourne et tes coches ont changé) ou « Retour à la route » (rien n'a changé), et « Fermer » (« Retour
+-- au choix » quand le résumé vient du choix des donjons). Ouvert ailleurs pendant qu'une route tourne
+-- sur d'autres donjons : « Lancer la route ici », confirmé par un deuxième clic.
 -- Design system: docs/DESIGN.md (640 px window sized to its content, scroll past 80 % of the screen).
 local ADDON, ns = ...
 local L, T = ns.L, ns.T_
@@ -18,71 +20,97 @@ local L, T = ns.L, ns.T_
 local STR = {
   fr = {
     SUM_T = "Résumé", SUM_ROUTE_T = "Résumé de la route", SUM_DG1 = "%d donjon", SUM_DG = "%d donjons",
-    SUM_SEL = "Ta sélection : %s", SUM_SEL0 = "Rien de coché : coche au moins une quête à faire.",
-    SUM_Q1 = "%d quête", SUM_Q = "%d quêtes", SUM_XP = "%s XP", SUM_ITEMS1 = "%d objet", SUM_ITEMS = "%d objets",
-    SUM_CHAIN_LINE = "Chaîne de %d quêtes : %s XP au total", SUM_CHAIN_PILL = "Chaîne (%d quêtes)",
+    SUM_SEL = "Ta sélection : %s", SUM_SEL0 = "Aucune quête cochée pour l'instant.",
+    SUM_Q1 = "%d quête", SUM_Q = "%d quêtes", SUM_XP = "%s XP",
+    SUM_LV1 = "Niv. %d", SUM_LV = "Niv. %d-%d", SUM_SIZE = "Groupe de %d",
+    SUM_CHAIN_LINE = "Chaîne : %d quêtes · %s XP au total",
     SUM_ELITE = "Élite", SUM_ELITE_TT = "Un objectif vise un monstre élite : viens en groupe.",
     SUM_OTHER = "Autre donjon : %s", SUM_OTHER_TT = "Un maillon de la chaîne se fait dans %s.",
     SUM_HIGH = "Niveau trop haut", SUM_HIGH_TT = "La chaîne monte jusqu'au niveau %d, plus de 5 niveaux au-dessus de toi : décochée par défaut.",
-    SUM_ST_NONE = "À prendre", SUM_ST_ON = "Dans ton journal", SUM_ST_READY = "Prête à rendre", SUM_ST_DONE = "Rendue",
+    SUM_ST_ON = "Dans ton journal", SUM_ST_READY = "Prête à rendre", SUM_ST_DONE = "Rendue",
     SUM_TICK_OFF = "Clic : retirer cette quête de la route", SUM_TICK_ON = "Clic : remettre cette quête dans la route",
     SUM_TICK_OFF_CH = "Clic : retirer cette quête et ses %d prérequis de la route",
     SUM_TICK_ON_CH = "Clic : remettre cette quête et ses %d prérequis dans la route",
     SUM_EXPAND = "Clic : voir chaque quête de la chaîne", SUM_COLLAPSE = "Clic : replier la chaîne",
     SUM_FDJ = "Note de ForeverDungeonJournal", SUM_LFD = "Étapes (LibForeverData)",
-    SUM_GO = "Lancer la route", SUM_GO_TT = "Clic : construire la route avec les quêtes cochées",
-    SUM_GO_TT1 = "Clic : lancer la route sur ce donjon seul, avec les quêtes cochées (remplace tes donjons cochés)",
+    SUM_TODO = "Quêtes à faire",
+    SUM_DONE_H = "Déjà rendues (%d)", SUM_DONE_OPEN = "Clic : voir les quêtes déjà rendues", SUM_DONE_CLOSE = "Clic : replier les quêtes déjà rendues",
+    SUM_ALLDONE_T = "Toutes les quêtes sont rendues : %s", SUM_ALLDONE_TN = "Tu as déjà rendu toutes les quêtes de ces donjons",
+    SUM_ALLDONE_NOTE = "%s : toutes les quêtes sont déjà rendues.",
+    SUM_OTHER_DG = "Choisir un autre donjon",
+    SUM_BACK_PICK = "Retour au choix", SUM_BACK_PICK_TT = "Clic : revenir au choix des donjons sans lancer la route",
+    SUM_GO_HERE = "Lancer la route ici", SUM_GO_CONFIRM = "Remplacer la route ?",
+    SUM_GO_HERE_TT = "Clic : remplacer la route en cours par ce donjon seul, avec les quêtes cochées (les étapes cochées à la main sont perdues ; un 2e clic confirme)",
+    SUM_EXTRA1 = "Aussi dans le groupe : %s (son état est dans la bulle de chaque quête)",
+    SUM_EXTRA = "Aussi dans le groupe : %s (leur état est dans la bulle de chaque quête)",
+    SUM_COL_TT = "Une icône par quête : survole-la pour le détail",
+    SUM_GO = "Lancer la route", SUM_GO_TT = "Clic : fermer le résumé et ouvrir le guide sur la première étape, avec les quêtes cochées",
+    SUM_GO_TT1 = "Clic : lancer la route sur ce donjon seul, avec les quêtes cochées (remplace tes donjons choisis)",
     SUM_GO_WHY = "Coche au moins une quête à faire.", SUM_CLOSE = "Fermer", SUM_CLOSE_TT = "Clic : fermer le résumé sans lancer la route",
+    SUM_UPDATE = "Mettre à jour la route", SUM_UPDATE_TT = "Clic : revenir au guide, la route suit tes nouvelles coches",
+    SUM_BACK = "Retour à la route", SUM_BACK_TT = "Clic : revenir au guide là où tu en étais",
     SUM_SHARE = "Partager", SUM_SHARED = "Partagée", SUM_SHARE_TT = "Clic : partager « %s » avec le groupe",
     SUM_SHARE_ALL = "Tout partager", SUM_SHARE_ALL_TT = "Clic : partager avec le groupe les quêtes cochées de ton journal, une toutes les 1,5 s",
     SUM_SHARE_WHY = "Aucune quête cochée de ton journal ne se partage.", SUM_SHARING = "Partage en cours",
-    SUM_GROUP = "Groupe", SUM_NOQ = "Aucune quête pour toi dans ce donjon.",
-    SUM_G_ON = "L'a", SUM_G_READY = "Prête", SUM_G_DONE = "Faite", SUM_G_TAKE = "À prendre", SUM_G_PRE = "Prérequis",
-    SUM_G_LOW = "Niveau bas", SUM_G_NA = "Impossible", SUM_G_INVALID = "Pas éligible", SUM_G_DECLINED = "Refusée",
-    SUM_G_FULL = "Journal plein", SUM_G_BUSY = "Indisponible", SUM_G_FAR = "Trop loin", SUM_G_SENT = "Envoyée", SUM_G_UNKNOWN = "?",
-    SUM_G_PRE_TT = "Il lui manque : %s", SUM_G_UNKNOWN_TT = "%s n'a pas WL Helper : partage la quête, la réponse du jeu remplira cette case.",
+    SUM_NOQ = "Aucune quête pour toi dans ce donjon.",
+    SUM_NOHELPER1 = "Sans WL Helper : %s (son état apparaît quand tu partages)",
+    SUM_NOHELPER = "Sans WL Helper : %s (leur état apparaît quand tu partages)",
+    SUM_G_ON = "L'a dans son journal", SUM_G_READY = "Prête à rendre", SUM_G_DONE = "Déjà rendue", SUM_G_TAKE = "À prendre",
+    SUM_G_PRE = "Prérequis manquant", SUM_G_LOW = "Niveau trop bas", SUM_G_NA = "Pas pour ce personnage", SUM_G_INVALID = "Pas éligible",
+    SUM_G_DECLINED = "Refusée", SUM_G_FULL = "Journal plein", SUM_G_BUSY = "Indisponible", SUM_G_FAR = "Trop loin",
+    SUM_G_SENT = "Envoyée", SUM_G_UNKNOWN = "Pas encore de réponse", SUM_G_WAIT = "En attente",
+    SUM_G_PRE_TT = "Il lui manque : %s", SUM_G_UNKNOWN_TT = "Pas encore de réponse du jeu pour %s : partage la quête pour la voir.",
     SUM_G_SENT_TT = "Quête envoyée : en attente de la réponse de %s.", SUM_G_PUSH_TT = "D'après la réponse du jeu au partage.",
     SUM_G_NA_TT = "Cette quête n'est pas pour sa classe, sa faction ou sa race.",
-    SUM_V_ALL1 = "%d membre sur %d a toutes les quêtes", SUM_V_ALL = "%d membres sur %d ont toutes les quêtes",
-    SUM_V_TAKE = "%s doit en prendre %d", SUM_V_ME = "tu dois en prendre %d", SUM_V_PRE = "%s attend un prérequis (%s)",
-    SUM_V_NOHELPER = "%s n'a pas WL Helper", SUM_V_WAIT = "réponse de %s en attente", SUM_V_CANT = "%s ne peut pas en prendre %d",
-    SUM_G_WAIT = "En attente", SUM_G_WAIT_TT = "%s a WL Helper : sa réponse n'est pas encore arrivée.",
-    SUM_BACK = "Retour à la route", SUM_BACK_TT = "Clic : revenir au guide. Tes coches ont déjà mis la route à jour.",
+    SUM_G_WAIT_TT = "%s a WL Helper : sa réponse n'est pas encore arrivée.",
     SUM_OTHER_SHORT = "Autre donjon", SUM_RW_MORE = "Autres récompenses",
     SUM_PICK_GO_TT = "Clic : voir le résumé des quêtes (XP, récompenses, chaînes, groupe) avant de lancer la route",
   },
   en = {
     SUM_T = "Summary", SUM_ROUTE_T = "Route summary", SUM_DG1 = "%d dungeon", SUM_DG = "%d dungeons",
-    SUM_SEL = "Your selection: %s", SUM_SEL0 = "Nothing ticked: tick at least one quest to do.",
-    SUM_Q1 = "%d quest", SUM_Q = "%d quests", SUM_XP = "%s XP", SUM_ITEMS1 = "%d item", SUM_ITEMS = "%d items",
-    SUM_CHAIN_LINE = "Chain of %d quests: %s XP in all", SUM_CHAIN_PILL = "Chain (%d quests)",
+    SUM_SEL = "Your selection: %s", SUM_SEL0 = "No quest ticked yet.",
+    SUM_Q1 = "%d quest", SUM_Q = "%d quests", SUM_XP = "%s XP",
+    SUM_LV1 = "Lvl %d", SUM_LV = "Lvl %d-%d", SUM_SIZE = "Group of %d",
+    SUM_CHAIN_LINE = "Chain: %d quests · %s XP in all",
     SUM_ELITE = "Elite", SUM_ELITE_TT = "An objective targets an elite: bring a group.",
     SUM_OTHER = "Other dungeon: %s", SUM_OTHER_TT = "One link of the chain happens in %s.",
     SUM_HIGH = "Level too high", SUM_HIGH_TT = "The chain goes up to level %d, more than 5 levels above you: unticked by default.",
-    SUM_ST_NONE = "To take", SUM_ST_ON = "In your log", SUM_ST_READY = "Ready to turn in", SUM_ST_DONE = "Turned in",
+    SUM_ST_ON = "In your log", SUM_ST_READY = "Ready to turn in", SUM_ST_DONE = "Turned in",
     SUM_TICK_OFF = "Click: leave this quest out of the route", SUM_TICK_ON = "Click: put this quest back in the route",
     SUM_TICK_OFF_CH = "Click: leave this quest and its %d prerequisites out of the route",
     SUM_TICK_ON_CH = "Click: put this quest and its %d prerequisites back in the route",
     SUM_EXPAND = "Click: show each quest of the chain", SUM_COLLAPSE = "Click: fold the chain",
     SUM_FDJ = "Note from ForeverDungeonJournal", SUM_LFD = "Steps (LibForeverData)",
-    SUM_GO = "Start the route", SUM_GO_TT = "Click: build the route with the ticked quests",
+    SUM_TODO = "Quests to do",
+    SUM_DONE_H = "Already turned in (%d)", SUM_DONE_OPEN = "Click: show the quests already turned in", SUM_DONE_CLOSE = "Click: fold the quests already turned in",
+    SUM_ALLDONE_T = "Every quest turned in: %s", SUM_ALLDONE_TN = "You already turned in every quest of these dungeons",
+    SUM_ALLDONE_NOTE = "%s: every quest is already turned in.",
+    SUM_OTHER_DG = "Pick another dungeon",
+    SUM_BACK_PICK = "Back to the picker", SUM_BACK_PICK_TT = "Click: go back to the dungeon picker without starting the route",
+    SUM_GO_HERE = "Start the route here", SUM_GO_CONFIRM = "Replace the route?",
+    SUM_GO_HERE_TT = "Click: replace the running route with this dungeon only and the ticked quests (steps marked done by hand are lost; a 2nd click confirms)",
+    SUM_EXTRA1 = "Also in the group: %s (their state is in each quest's tooltip)",
+    SUM_EXTRA = "Also in the group: %s (their state is in each quest's tooltip)",
+    SUM_COL_TT = "One icon per quest: hover it for the detail",
+    SUM_GO = "Start the route", SUM_GO_TT = "Click: close the summary and open the guide on the first step, with the ticked quests",
     SUM_GO_TT1 = "Click: start the route with this dungeon only and the ticked quests (replaces your picked dungeons)",
     SUM_GO_WHY = "Tick at least one quest to do.", SUM_CLOSE = "Close", SUM_CLOSE_TT = "Click: close the summary without starting the route",
+    SUM_UPDATE = "Update the route", SUM_UPDATE_TT = "Click: go back to the guide, the route follows your new ticks",
+    SUM_BACK = "Back to the route", SUM_BACK_TT = "Click: go back to the guide where you left it",
     SUM_SHARE = "Share", SUM_SHARED = "Shared", SUM_SHARE_TT = "Click: share \"%s\" with the group",
     SUM_SHARE_ALL = "Share all", SUM_SHARE_ALL_TT = "Click: share the ticked quests of your log with the group, one every 1.5 s",
     SUM_SHARE_WHY = "No ticked quest in your log can be shared.", SUM_SHARING = "Sharing",
-    SUM_GROUP = "Group", SUM_NOQ = "No quest for you in this dungeon.",
-    SUM_G_ON = "Has it", SUM_G_READY = "Ready", SUM_G_DONE = "Done", SUM_G_TAKE = "To take", SUM_G_PRE = "Prerequisite",
-    SUM_G_LOW = "Level low", SUM_G_NA = "Can't take", SUM_G_INVALID = "Not eligible", SUM_G_DECLINED = "Declined",
-    SUM_G_FULL = "Log full", SUM_G_BUSY = "Busy", SUM_G_FAR = "Too far", SUM_G_SENT = "Sent", SUM_G_UNKNOWN = "?",
-    SUM_G_PRE_TT = "Missing link: %s", SUM_G_UNKNOWN_TT = "%s doesn't have WL Helper: share the quest and the game's answer fills this cell.",
+    SUM_NOQ = "No quest for you in this dungeon.",
+    SUM_NOHELPER1 = "Without WL Helper: %s (their state shows when you share)",
+    SUM_NOHELPER = "Without WL Helper: %s (their state shows when you share)",
+    SUM_G_ON = "Has it in their log", SUM_G_READY = "Ready to turn in", SUM_G_DONE = "Already turned in", SUM_G_TAKE = "To take",
+    SUM_G_PRE = "Missing prerequisite", SUM_G_LOW = "Level too low", SUM_G_NA = "Not for this character", SUM_G_INVALID = "Not eligible",
+    SUM_G_DECLINED = "Declined", SUM_G_FULL = "Log full", SUM_G_BUSY = "Busy", SUM_G_FAR = "Too far",
+    SUM_G_SENT = "Sent", SUM_G_UNKNOWN = "No answer yet", SUM_G_WAIT = "Waiting",
+    SUM_G_PRE_TT = "Missing link: %s", SUM_G_UNKNOWN_TT = "No answer from the game for %s yet: share the quest to see it.",
     SUM_G_SENT_TT = "Quest sent: waiting for %s's answer.", SUM_G_PUSH_TT = "From the game's answer to the share.",
     SUM_G_NA_TT = "This quest is not for their class, faction or race.",
-    SUM_V_ALL1 = "%d of %d members has every quest", SUM_V_ALL = "%d of %d members have every quest",
-    SUM_V_TAKE = "%s needs to take %d", SUM_V_ME = "you need to take %d", SUM_V_PRE = "%s is missing a prerequisite (%s)",
-    SUM_V_NOHELPER = "%s doesn't have WL Helper", SUM_V_WAIT = "waiting for %s's reply", SUM_V_CANT = "%s can't take %d",
-    SUM_G_WAIT = "Waiting", SUM_G_WAIT_TT = "%s has WL Helper: their reply has not arrived yet.",
-    SUM_BACK = "Back to the route", SUM_BACK_TT = "Click: go back to the guide. Your ticks have already updated the route.",
+    SUM_G_WAIT_TT = "%s has WL Helper: their reply has not arrived yet.",
     SUM_OTHER_SHORT = "Other dungeon", SUM_RW_MORE = "More rewards",
     SUM_PICK_GO_TT = "Click: see the quests' summary (XP, rewards, chains, group) before starting the route",
   },
@@ -98,14 +126,14 @@ do
 end
 
 -- =====================================================================
---  Sizes (design system: window 640, inset 16, rows 8 / 32, pills 18, group cells 68)
+--  Sizes (design system: window 640, inset 16, rows 8, pills 18, group cells 64)
 -- =====================================================================
 local W, PAD = 640, 16
 local CW = W - 2 * PAD          -- content width
 local HERO_H, HERO_H_MULTI = 96, 72
 local ROW_GAP = 4
 local TX = 32                   -- text column of a row (after the check box)
-local CELLW, MAXCOLS = 68, 4    -- group columns
+local CELLW, MAXCOLS = 64, 4    -- group columns (one icon each)
 local MAX_REWARDS = 8
 local HIGH_GAP = 5              -- a chain more than 5 levels above the player is unticked by default
 
@@ -479,6 +507,7 @@ local function ApplyDefault(qid, inf)
   return true
 end
 
+
 -- =====================================================================
 --  Window
 -- =====================================================================
@@ -492,6 +521,13 @@ local function RouteRuns(keys)
   for _, k in ipairs(keys) do if not WLDTDB.sel[k] then return false end; n = n + 1 end
   for k, v in pairs(WLDTDB.sel) do if v and ns.D[k] then n = n - 1 end end
   return n == 0
+end
+
+-- The guide's route runs on some picked dungeons (other than these, when RouteRuns is false).
+local function RouteElsewhere()
+  if not (ns.route and ns.frame and WLDTDB.sel) then return false end
+  for k, v in pairs(WLDTDB.sel) do if v and ns.D[k] then return true end end
+  return false
 end
 
 local function RouteHas(qid)
@@ -513,6 +549,8 @@ local function SetOff(qid, off)
   local pick = ns.OffPick()
   WLDTDB.off[qid] = off and true or nil
   pick[qid] = true
+  -- the running route follows at once; the main button then says "Update the route"
+  if f then f.changed = true end
   if PlaySound then PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856) end
   if ns.route and ns.frame and ns.Recalc and RouteHas(qid) then ns.Recalc() end
   if ns.RenderPicker then ns.RenderPicker() end
@@ -532,20 +570,17 @@ local function ShareTarget(qid, pre, log)
 end
 
 -- =====================================================================
---  Group: members, cells, verdict
+--  Group: one column per member whose state is known, the others on one line
 -- =====================================================================
+-- state -> word (tooltip), HD icon, colour token, a second check (ready to turn in)
 local CELL = {
-  on = { "SUM_G_ON", "clock", "info" }, ready = { "SUM_G_READY", "flag", "ok" }, done = { "SUM_G_DONE", "check", "muted" },
-  take = { "SUM_G_TAKE", "plus", "fg" }, pre = { "SUM_G_PRE", "warning", "warn" }, low = { "SUM_G_LOW", "warning", "warn" },
-  na = { "SUM_G_NA", "minus", "faint" }, invalid = { "SUM_G_INVALID", "warning", "warn" }, declined = { "SUM_G_DECLINED", "minus", "warn" },
+  on = { "SUM_G_ON", "check", "ok" }, ready = { "SUM_G_READY", "check", "gold", true }, done = { "SUM_G_DONE", "check", "faint" },
+  take = { "SUM_G_TAKE", "warning", "warn" }, pre = { "SUM_G_PRE", "close", "bad" }, low = { "SUM_G_LOW", "warning", "warn" },
+  na = { "SUM_G_NA", "minus", "faint" }, invalid = { "SUM_G_INVALID", "close", "bad" }, declined = { "SUM_G_DECLINED", "minus", "warn" },
   full = { "SUM_G_FULL", "warning", "warn" }, busy = { "SUM_G_BUSY", "clock", "muted" }, far = { "SUM_G_FAR", "clock", "muted" },
-  sent = { "SUM_G_SENT", "clock", "muted" }, unknown = { "SUM_G_UNKNOWN", "info", "muted" },
+  sent = { "SUM_G_SENT", "clock", "muted" }, unknown = { "SUM_G_UNKNOWN", "dot", "faint" },
   wait = { "SUM_G_WAIT", "clock", "muted" },
 }
--- states that leave nothing to do before the run
-local READY = { on = true, ready = true, done = true, na = true }
--- the game said the member cannot take it (class, level, chain): taking it again will not help
-local CANT = { invalid = true }
 
 local function Members()
   if not ns.GroupMembers then return {} end
@@ -558,44 +593,20 @@ local function ClassColor(cls)
   return c
 end
 
--- "3 membres sur 5 ont toutes les quêtes · tu dois en prendre 1 · Mylla doit en prendre 2 ·
--- Bob n'a pas WL Helper", over the ticked quests you still have to do.
-local function Verdict(sel, members)
-  if #members == 0 then return nil end
-  local okN, parts = 0, {}
-  local mine = 0
-  for _, it in ipairs(sel) do if it.st == "none" then mine = mine + 1 end end
-  if mine == 0 then okN = okN + 1 end
-  local tail = {}
-  if mine > 0 then tail[#tail + 1] = L.SUM_V_ME:format(mine) end
+-- Members whose quests are known (WL Helper, or the game's answers to a share) get a column (4 at
+-- most); the others are named once. Known members past the 4 columns (a raid) are named on their
+-- own line, their state in each quest's tooltip.
+local function SplitMembers(members)
+  local known, others, extra = {}, {}, {}
   for _, m in ipairs(members) do
-    local take, cant, prePid, known = 0, 0, nil, false
-    local helper = ns.HasHelper and ns.HasHelper(m.name)
-    for _, it in ipairs(sel) do
-      local s, pid = ns.MemberQuest(m.name, it.qid, it.dkey)
-      -- a share or a reply still on its way says nothing yet
-      local waiting = s == "unknown" or s == "sent"
-      if not waiting then known = true end
-      if s == "pre" then prePid = prePid or pid or it.qid
-      elseif CANT[s] then cant = cant + 1
-      elseif not READY[s] and not waiting then take = take + 1 end
-    end
-    if not known then tail[#tail + 1] = (helper and L.SUM_V_WAIT or L.SUM_V_NOHELPER):format(m.name)
-    elseif prePid then tail[#tail + 1] = L.SUM_V_PRE:format(m.name, ns.QName(prePid))
-    elseif take > 0 then tail[#tail + 1] = L.SUM_V_TAKE:format(m.name, take)
-    elseif cant > 0 then tail[#tail + 1] = L.SUM_V_CANT:format(m.name, cant)
-    else okN = okN + 1 end
+    local k
+    if ns.MemberKnown then k = ns.MemberKnown(m.name) else k = ns.HasHelper and ns.HasHelper(m.name) end
+    if not k then others[#others + 1] = m
+    elseif #known < MAXCOLS then known[#known + 1] = m
+    else extra[#extra + 1] = m end
   end
-  local total = #members + 1
-  parts[1] = ns.Plural(okN, "SUM_V_ALL1", "SUM_V_ALL", okN, total)
-  -- three lines at most: four members named, the others counted
-  for i, s in ipairs(tail) do
-    if i > 4 then parts[#parts + 1] = L.OV_MORE:format(#tail - 4); break end
-    parts[#parts + 1] = s
-  end
-  return table.concat(parts, " · ")
+  return known, others, extra
 end
-ns.SummaryVerdict = Verdict
 
 -- =====================================================================
 --  Widgets
@@ -627,14 +638,13 @@ local function MakeReward(parent)
   return b
 end
 
--- A group cell: the HD icon over one or two words, the member's name and the detail in the tooltip.
+-- A group cell: one HD icon (two checks when ready); the member, the state and the detail in the tooltip.
 local function MakeCell(parent)
   local c = CreateFrame("Frame", nil, parent)
-  c:SetSize(CELLW, 40)
+  c:SetSize(CELLW, 18)
   c:EnableMouse(true)
-  c.icon = ns.Icon(c, "dot", 14, "ARTWORK", T.muted); c.icon:SetPoint("TOP", 0, 0)
-  c.word = ns.Text(c, ns.F.meta, T.muted); c.word:SetPoint("TOP", 0, -17)
-  c.word:SetJustifyH("CENTER")
+  c.icon = ns.Icon(c, "dot", 16, "ARTWORK", T.muted); c.icon:SetPoint("CENTER", 0, 0)
+  c.icon2 = ns.Icon(c, "check", 16, "ARTWORK", T.gold); c.icon2:SetPoint("CENTER", 5, 0); c.icon2:Hide()
   c:SetScript("OnEnter", function(self) if self.tip then ns.ShowTip(self, self.tip) end end)
   c:SetScript("OnLeave", ns.HideTip)
   return c
@@ -646,22 +656,20 @@ local function FillCell(c, m, qid, dkey)
   local look = (wait and CELL.wait) or CELL[s] or CELL.unknown
   local col = T[look[3]] or T.muted
   ns.SetHDIcon(c.icon, look[2], col)
-  c.word:SetText(L[look[1]])
-  c.word:SetTextColor(col[1], col[2], col[3])
-  local h = LineH(c.word, ns.F.meta, CELLW - 4, c)
-  c:SetHeight(17 + h)
-  c.state = s
-  local tip = { m.name, L[look[1]] ~= "?" and L[look[1]] or nil }
-  if s == "pre" and pid then tip[#tip + 1] = L.SUM_G_PRE_TT:format(ns.QName(pid)) end
+  -- ready to turn in: two gold checks, 10 px apart (one green check is "in the log")
+  c.icon:ClearAllPoints(); c.icon:SetPoint("CENTER", look[4] and -5 or 0, 0)
+  if look[4] then ns.SetHDIcon(c.icon2, "check", col) end
+  c.icon2:SetShown(look[4] == true)
+  c.state, c.who = s, m.name
+  local cc = ClassColor(m.class)
+  local tip = { { m.name, cc[1], cc[2], cc[3] }, L[look[1]] }
   if wait then tip[2] = L.SUM_G_WAIT_TT:format(m.name)
   elseif s == "unknown" then tip[2] = L.SUM_G_UNKNOWN_TT:format(m.name) end
+  if s == "pre" and pid then tip[#tip + 1] = L.SUM_G_PRE_TT:format(ns.QName(pid)) end
   if s == "sent" then tip[#tip + 1] = L.SUM_G_SENT_TT:format(m.name) end
   if s == "na" then tip[#tip + 1] = L.SUM_G_NA_TT end
   if src == "push" and s ~= "sent" then tip[#tip + 1] = L.SUM_G_PUSH_TT end
-  local clean = {}
-  for i = 1, 4 do if tip[i] then clean[#clean + 1] = tip[i] end end
-  c.tip = clean
-  return 17 + h
+  c.tip = tip
 end
 
 -- One link of an unfolded chain: state icon, name, level, XP and state; where it happens.
@@ -725,12 +733,8 @@ local function OutsidePlaces(log, qid, q)
   return out
 end
 
-local LOOK = {
-  none  = { "SUM_ST_NONE", T.fg },
-  on    = { "SUM_ST_ON", T.info },
-  ready = { "SUM_ST_READY", T.ok },
-  done  = { "SUM_ST_DONE", T.muted, "check" },
-}
+-- the state words of the unfolded links
+local LINK_WORD = { none = "SUM_G_TAKE", on = "SUM_ST_ON", ready = "SUM_ST_READY", done = "SUM_ST_DONE" }
 
 local function RowTip(r)
   local qid = r.qid
@@ -759,11 +763,20 @@ local function RowTip(r)
   if r.low then table.insert(lines, { L.ST_LOW:format(r.low), T.warn[1], T.warn[2], T.warn[3] }) end
   if r.st ~= "done" then
     local n = r.pre and r.pre.total or 0
+    -- the members past the 4 columns: their state here
+    for _, m in ipairs(f and f.extraCols or {}) do
+      local s = ns.MemberQuest and ns.MemberQuest(m.name, qid, r.dkey) or "unknown"
+      local look = CELL[s] or CELL.unknown
+      local cc = ClassColor(m.class)
+      table.insert(lines, { m.name .. L.COLON .. L[look[1]], cc[1], cc[2], cc[3] })
+    end
     if IsOff(qid) then table.insert(lines, n > 0 and L.SUM_TICK_ON_CH:format(n) or L.SUM_TICK_ON)
     else table.insert(lines, n > 0 and L.SUM_TICK_OFF_CH:format(n) or L.SUM_TICK_OFF) end
   end
   ns.ShowTip(r, lines)
 end
+
+local ROW_TOP = 8   -- the name's top inset; the check box and the group icons sit on its first line
 
 local function MakeRow(parent)
   local S = SW()
@@ -775,15 +788,14 @@ local function MakeRow(parent)
   r.hl = ns.Tex(r, "BORDER", T.hoverFill); r.hl:SetAllPoints(); r.hl:Hide()
   r.press = ns.Tex(r, "ARTWORK", T.pressFill); r.press:SetAllPoints(); r.press:Hide()
   -- a drawn check box: panel fill, 1 px edge (accent when ticked), the HD check inside
-  r.boxF = CreateFrame("Frame", nil, r); r.boxF:SetSize(16, 16); r.boxF:SetPoint("TOPLEFT", 8, -8)
+  r.boxF = CreateFrame("Frame", nil, r); r.boxF:SetSize(16, 16); r.boxF:SetPoint("TOPLEFT", 8, -ROW_TOP)
   r.box = ns.Tex(r.boxF, "BACKGROUND", T.panel); r.box:SetAllPoints()
   r.boxEdge = ns.Outline(r.boxF, T.btnEdge)
   r.tick = ns.Icon(r.boxF, "check", 12, "ARTWORK", T.fg); r.tick:SetPoint("CENTER")
-  r.doneIcon = ns.Icon(r, "check", 16, "ARTWORK", T.ok); r.doneIcon:SetPoint("TOPLEFT", 8, -8); r.doneIcon:Hide()
+  r.doneIcon = ns.Icon(r, "check", 16, "ARTWORK", T.faint); r.doneIcon:SetPoint("TOPLEFT", 8, -ROW_TOP); r.doneIcon:Hide()
   r.name = ns.Text(r, ns.F.body, T.fg)
   r.detail = ns.Text(r, ns.F.meta, T.muted)
-  r.status = S.Pill(r)
-  -- the chain line: chevron + "Chain of 10 quests: 31,500 XP in all"; a click unfolds it
+  -- the chain line: chevron + "Chain: 10 quests · 31,500 XP in all"; a click unfolds it
   r.chain = CreateFrame("Button", nil, r)
   r.chain.hl = ns.Tex(r.chain, "BACKGROUND", T.hoverFill); r.chain.hl:SetAllPoints(); r.chain.hl:Hide()
   r.chain.chev = ns.Icon(r.chain, "chevron_right", 12, "ARTWORK", T.accentSoft); r.chain.chev:SetPoint("TOPLEFT", 0, -1)
@@ -822,8 +834,8 @@ local function MakeRow(parent)
     SetOff(self.qid, not IsOff(self.qid))
   end)
   local function nudge(self, dy)
-    self.name:SetPoint("TOPLEFT", TX, -6 - dy)
-    self.boxF:SetPoint("TOPLEFT", 8, -8 - dy)
+    self.name:SetPoint("TOPLEFT", TX, -ROW_TOP - dy)
+    self.boxF:SetPoint("TOPLEFT", 8, -ROW_TOP - dy)
   end
   r:SetScript("OnMouseDown", function(self) if self.st ~= "done" then self.press:Show(); nudge(self, 1) end end)
   r:SetScript("OnMouseUp", function(self) self.press:Hide(); nudge(self, 0) end)
@@ -859,89 +871,93 @@ local function PlacePills(r, list, x0, y, width)
   return y + rowH
 end
 
+-- Hides what a row turned in does not show.
+local function HideExtras(r)
+  r.chain:Hide(); r.share:Hide(); r.gps:Hide(); r.more:Hide()
+  for _, p in ipairs(r.pills) do p:Hide() end
+  for _, b in ipairs(r.rewards) do b:Hide() end
+  for _, l in ipairs(r.links) do l:Hide() end
+  for _, c in ipairs(r.cells) do c:Hide() end
+end
+
 -- Fills one quest row; returns its height.
 local function FillRow(r, qid, dkey, inf, ctx)
   local q = inf.q
   local log = ctx.log
   local st, pre = inf.st, inf.pre
+  local done = st == "done"
   local off = IsOff(qid)
   r.qid, r.dkey, r.st, r.pre, r.low = qid, dkey, st, pre, inf.low
-  r.point = (st ~= "done") and PointFor(log, qid, q, st, pre) or nil
+  r.point = (not done) and PointFor(log, qid, q, st, pre) or nil
 
-  -- check box (a quest turned in shows the check icon instead)
-  local done = st == "done"
+  -- check box (a quest turned in shows a grey check instead)
   r.boxF:SetShown(not done); r.doneIcon:SetShown(done)
   r.tick:SetShown(not off)
   r.boxEdge(off and T.btnEdge or T.accent)
 
-  -- right side: the status pill, then the group cells
-  local look = LOOK[st] or LOOK.none
-  r.status:Set(L[look[1]], look[2], look[3])
-  local pillW = num(r.status:GetWidth()) or 80
-  local ncol = #ctx.members
-  local cellsW = ncol > 0 and (ncol * CELLW + 8) or 0
-  local right = 12 + cellsW
-  r.status:ClearAllPoints(); r.status:SetPoint("TOPRIGHT", r, "TOPRIGHT", -right, -8)
-  local tw = CW - TX - right - pillW - 8
-
-  r.name:SetText(ns.QName(qid))
-  local nc = (off or done) and T.muted or T.fg
-  r.name:SetTextColor(nc[1], nc[2], nc[3])
-  r.name:ClearAllPoints(); r.name:SetPoint("TOPLEFT", TX, -6)
-  -- in a group the cells take the right side: the name keeps the room beside the status pill
-  -- (3 lines), everything else goes under the pill at the full width
-  local grouped = ncol > 0
-  local y = 6 + LineH(r.name, ns.F.body, tw, r, grouped and 3 or 2)
+  -- the group's columns take the right side of a quest still to do
+  local cols = done and {} or ctx.cols
+  local ncol = #cols
+  local right = 12 + (ncol > 0 and (ncol * CELLW + 8) or 0)
   local wide = CW - TX - right
+  r.wide = wide
 
-  -- this quest: level, XP, money, giver
+  -- the name in the game's quest colour against your level; muted when left out or turned in
+  r.name:SetText(ns.QName(qid))
+  local nc = (off or done) and T.muted or SW().LevelColor(q.l or q.r)
+  r.name:SetTextColor(nc[1], nc[2], nc[3])
+  r.name:ClearAllPoints(); r.name:SetPoint("TOPLEFT", TX, -ROW_TOP)
+  local y = ROW_TOP + LineH(r.name, ns.F.body, wide, r)
+
+  -- one muted line: level · XP · money
   local d = {}
-  if q.l then d[#d + 1] = L.PICK_LV1:format(q.l) end
+  if q.l then d[#d + 1] = L.SUM_LV1:format(q.l) end
   if inf.xp > 0 then d[#d + 1] = L.SUM_XP:format(Big(inf.xp)) end
   if inf.money > 0 then d[#d + 1] = Money(inf.money) end
-  if not done then local g = GiverText(q, st); if g then d[#d + 1] = g end end
   if #d > 0 then
-    if grouped then y = math.max(y, 8 + 18) end
     r.detail:SetText(table.concat(d, " · "))
     r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", TX, -(y + 3))
     r.detail:Show()
-    -- solo: beside the status pill, the same width as the name; in a group: under it
-    y = y + 3 + LineH(r.detail, ns.F.meta, grouped and wide or tw, r, grouped and 3 or 2)
+    y = y + 3 + LineH(r.detail, ns.F.meta, wide, r)
   else r.detail:Hide() end
-  -- nothing under the name in a group: the next lines still start under the pill
-  if grouped then y = math.max(y, 8 + 18) end
 
-  -- the chain line, unfoldable
-  local hasChain = pre.total > 0 and not done
+  if done then
+    HideExtras(r)
+    local h = math.ceil(math.max(y + 8, 36))
+    r:SetHeight(h)
+    return h
+  end
+
+  -- pills only when they say something: in your log / ready, elite, another dungeon, too high
+  local pills = {}
+  if st == "on" then pills[#pills + 1] = { L.SUM_ST_ON, T.info, nil, { L.SUM_ST_ON } }
+  elseif st == "ready" then pills[#pills + 1] = { L.SUM_ST_READY, T.ok, "check", { L.SUM_ST_READY } } end
+  if inf.elite then pills[#pills + 1] = { L.SUM_ELITE, T.warn, "skull", { L.SUM_ELITE, L.SUM_ELITE_TT } } end
+  if inf.other then
+    local dn = ns.DName(inf.other)
+    pills[#pills + 1] = { L.SUM_OTHER:format(dn), T.info, "portal", { L.SUM_OTHER:format(dn), L.SUM_OTHER_TT:format(dn) }, L.SUM_OTHER_SHORT }
+  end
+  if inf.high then
+    local lv = inf.low or inf.maxL
+    pills[#pills + 1] = { L.SUM_HIGH, T.warn, "warning", { L.SUM_HIGH, inf.low and L.ST_LOW:format(inf.low) or L.SUM_HIGH_TT:format(lv) } }
+  end
+  if #pills > 0 then y = PlacePills(r, pills, TX, y + 6, wide) else PlacePills(r, {}, TX, y, wide) end
+
+  -- the chain block, unfoldable: "Chain: 10 quests · 31,500 XP in all"
+  local hasChain = pre.total > 0
   if hasChain then
     r.chain.text:SetText(L.SUM_CHAIN_LINE:format(inf.chainN, Big(inf.chainXP)))
     ns.SetHDIcon(r.chain.chev, f.open[qid] and "chevron_down" or "chevron_right", T.accentSoft)
     local th = LineH(r.chain.text, ns.F.meta, wide - 16, r.chain)
     r.chain:SetSize(wide, th + 2)
-    r.chain:ClearAllPoints(); r.chain:SetPoint("TOPLEFT", TX, -(y + 3))
+    r.chain:ClearAllPoints(); r.chain:SetPoint("TOPLEFT", TX, -(y + 6))
     r.chain:Show()
-    y = y + 3 + th + 2
+    y = y + 6 + th + 2
   else r.chain:Hide() end
-
-  -- pills: elite, chain, another dungeon, level too high (p[5]: a shorter label when it does not fit)
-  local pills = {}
-  if not done then
-    if inf.elite then pills[#pills + 1] = { L.SUM_ELITE, T.warn, "skull", { L.SUM_ELITE, L.SUM_ELITE_TT } } end
-    if pre.total > 0 then pills[#pills + 1] = { L.SUM_CHAIN_PILL:format(inf.chainN), T.fg, nil, { L.OV_CHAIN_TT, L.SUM_CHAIN_LINE:format(inf.chainN, Big(inf.chainXP)) } } end
-    if inf.other then
-      local dn = ns.DName(inf.other)
-      pills[#pills + 1] = { L.SUM_OTHER:format(dn), T.info, "portal", { L.SUM_OTHER:format(dn), L.SUM_OTHER_TT:format(dn) }, L.SUM_OTHER_SHORT }
-    end
-    if inf.high then
-      local lv = inf.low or inf.maxL
-      pills[#pills + 1] = { L.SUM_HIGH, T.warn, "warning", { L.SUM_HIGH, inf.low and L.ST_LOW:format(inf.low) or L.SUM_HIGH_TT:format(lv) } }
-    end
-  end
-  if #pills > 0 then y = PlacePills(r, pills, TX, y + 6, wide) else PlacePills(r, {}, TX, y, wide) end
 
   -- the actions at the right (GPS, share), then as many reward icons (20 px) as the room left
   -- holds; the others behind a "+N" marker
-  r.shareId = (#ctx.members > 0 and not done) and ShareTarget(qid, pre, log) or nil
+  r.shareId = ctx.grouped and ShareTarget(qid, pre, log) or nil
   r.share:SetShown(r.shareId ~= nil)
   r.gps:SetShown(r.point ~= nil)
   local actY = y + 6
@@ -954,7 +970,7 @@ local function FillRow(r, qid, dkey, inf, ctx)
     if sw < 40 then sw = 80 end
     r.share:ClearAllPoints(); r.share:SetPoint("TOPRIGHT", r, "TOPLEFT", rightX, -actY); rightX = rightX - sw - 4
   end
-  local list = done and {} or Rewards(qid, q)
+  local list = Rewards(qid, q)
   local slots = math.max(1, math.min(MAX_REWARDS, math.floor((rightX - TX + 4) / 24)))
   local showN = #list
   if showN > slots then showN = slots - 1 end
@@ -1001,12 +1017,12 @@ local function FillRow(r, qid, dkey, inf, ctx)
         li = li + 1
         local b = r.links[li] or MakeLink(r); r.links[li] = b
         local ls = QState(log, id)
-        local word = L[(LOOK[ls] or LOOK.none)[1]]
+        local word = L[LINK_WORD[ls] or LINK_WORD.none]
         local icon, col = "dot", T.faint
-        if ls == "done" then icon, col = "check", T.ok elseif ls == "ready" then icon, col = "flag", T.ok elseif ls == "on" then icon, col = "clock", T.info end
+        if ls == "done" then icon, col = "check", T.faint elseif ls == "ready" then icon, col = "check", T.ok elseif ls == "on" then icon, col = "clock", T.info end
         ns.SetHDIcon(b.icon, icon, col)
         local parts = { ns.QName(id) .. (id == qid and (" (" .. L.OV_THIS .. ")") or "") }
-        if lq.l then parts[#parts + 1] = L.PICK_LV1:format(lq.l) end
+        if lq.l then parts[#parts + 1] = L.SUM_LV1:format(lq.l) end
         local xp = QuestXP(id)
         if xp > 0 then parts[#parts + 1] = L.SUM_XP:format(Big(xp)) end
         parts[#parts + 1] = word
@@ -1073,18 +1089,16 @@ local function FillRow(r, qid, dkey, inf, ctx)
   end
   for i = li + 1, #r.links do r.links[i]:Hide() end
 
-  -- group cells, one per member, at the right edge
-  local cellH = 0
-  for j, m in ipairs(ctx.members) do
+  -- one icon per known member, at the right edge, on the name's first line
+  for j, m in ipairs(cols) do
     local c = r.cells[j] or MakeCell(r); r.cells[j] = c
-    local h = FillCell(c, m, qid, dkey)
-    c:ClearAllPoints(); c:SetPoint("TOPLEFT", r, "TOPLEFT", CW - 12 - (ncol - j + 1) * CELLW, -8)
+    FillCell(c, m, qid, dkey)
+    c:ClearAllPoints(); c:SetPoint("TOPLEFT", r, "TOPLEFT", CW - 12 - (ncol - j + 1) * CELLW, -(ROW_TOP - 1))
     c:Show()
-    if h > cellH then cellH = h end
   end
   for j = ncol + 1, #r.cells do r.cells[j]:Hide() end
 
-  local h = math.ceil(math.max(y + 8, 8 + 18 + 8, 8 + cellH + 8))
+  local h = math.ceil(math.max(y + 8, 36))
   r:SetHeight(h)
   return h
 end
@@ -1101,34 +1115,75 @@ local function MakeHero(parent)
   hero.big = hero:CreateTexture(nil, "ARTWORK", nil, 1); hero.big:SetSize(40, 40); hero.big:SetPoint("CENTER", 0, 12); hero.big:Hide()
   hero.band = hero:CreateTexture(nil, "ARTWORK", nil, 3); hero.band:SetPoint("BOTTOMLEFT", 1, 1); hero.band:SetPoint("BOTTOMRIGHT", -1, 1)
   hero.band:SetColorTexture(unpack(T.scrim))
-  hero.loc = ns.Text(hero, ns.F.meta, T.text, false, "SHADOW"); hero.loc:SetPoint("BOTTOMLEFT", 12, 8)
-  hero.lvl = ns.Text(hero, ns.F.label, T.fg, false, "SHADOW"); hero.lvl:SetPoint("BOTTOMLEFT", hero.loc, "TOPLEFT", 0, 3)
+  hero.lvl = ns.Text(hero, ns.F.meta, T.text, false, "SHADOW"); hero.lvl:SetPoint("BOTTOMLEFT", 12, 8)
   hero.name = ns.Text(hero, ns.F.heading, T.fg, false, "SHADOW"); hero.name:SetPoint("BOTTOMLEFT", hero.lvl, "TOPLEFT", 0, 3)
   return hero
+end
+
+-- "Quests to do 7", and over the group's columns, the members' names.
+local function MakeHead(parent)
+  local h = CreateFrame("Frame", nil, parent)
+  h:SetSize(CW, 24)
+  h.label = ns.Text(h, ns.F.body, T.fg); h.label:SetPoint("BOTTOMLEFT", 0, 6)
+  h.count = ns.Text(h, ns.F.meta, T.muted); h.count:SetPoint("BOTTOMLEFT", h.label, "BOTTOMRIGHT", 6, 0)
+  h.rule = ns.Rule(h); h.rule:SetPoint("BOTTOMLEFT"); h.rule:SetPoint("BOTTOMRIGHT")
+  h.cols = CreateFrame("Frame", nil, h); h.cols:SetAllPoints()
+  h.cols.names, h.cols.hits = {}, {}
+  return h
+end
+
+-- "Already turned in (10)": folded by default, a click shows the quests turned in.
+local function MakeFold(parent)
+  local b = CreateFrame("Button", nil, parent)
+  b.wlOwned = true
+  b:SetSize(CW, 28)
+  b.hl = ns.Tex(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:Hide()
+  b.chev = ns.Icon(b, "chevron_right", 12, "ARTWORK", T.accentSoft); b.chev:SetPoint("LEFT", 8, 0)
+  b.text = ns.Text(b, ns.F.body, T.muted); b.text:SetPoint("LEFT", 26, 0); b.text:SetWidth(CW - 34)
+  b.rule = ns.Rule(b); b.rule:SetPoint("BOTTOMLEFT"); b.rule:SetPoint("BOTTOMRIGHT")
+  b:SetScript("OnEnter", function(self)
+    self.hl:Show(); self.chev:SetVertexColor(T.fg[1], T.fg[2], T.fg[3])
+    ns.ShowTip(self, { self.labelText or "", f.doneOpen[self.dkey] and L.SUM_DONE_CLOSE or L.SUM_DONE_OPEN })
+  end)
+  b:SetScript("OnLeave", function(self)
+    self.hl:Hide(); self.chev:SetVertexColor(T.accentSoft[1], T.accentSoft[2], T.accentSoft[3]); ns.HideTip()
+  end)
+  b:SetScript("OnMouseDown", function(self) self.text:SetPoint("LEFT", 26, -1) end)
+  b:SetScript("OnMouseUp", function(self) self.text:SetPoint("LEFT", 26, 0) end)
+  b:SetScript("OnClick", function(self)
+    f.doneOpen[self.dkey] = not f.doneOpen[self.dkey] or nil
+    if PlaySound then PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856) end
+    Render()
+  end)
+  return b
+end
+
+local function OpenPicker()
+  if f then f:Hide() end
+  if ns.ShowPicker then ns.ShowPicker() end
 end
 
 local function Build()
   local S = SW()
   f = S.Window("WLHelperOverview", W, 300, "", L.SUM_T, WLDTDB, "ovPos", { header = 44, minH = 120, strata = "HIGH" })
-  f.open = {}
-  -- pinned at the top: your selection's totals, the group's verdict, the members' names
-  f.top = CreateFrame("Frame", nil, f)
-  f.totals = ns.Text(f.top, ns.F.body, T.fg)
-  f.verdict = ns.Text(f.top, ns.F.body, T.text)
-  f.gHead = CreateFrame("Frame", nil, f.top)
-  f.gHead:SetSize(CW, 18)
-  f.gHead.label = ns.Text(f.gHead, ns.F.meta, T.muted); f.gHead.label:SetPoint("BOTTOMLEFT", 0, 2)
-  f.gHead.names = {}
-  f.gHead.rule = ns.Rule(f.gHead); f.gHead.rule:SetPoint("BOTTOMLEFT"); f.gHead.rule:SetPoint("BOTTOMRIGHT")
+  f.open, f.doneOpen = {}, {}
 
   f.sa = S.ScrollArea(f)
   f.child = f.sa.child
   f.child:SetWidth(CW)
-  f.heroes, f.info, f.gpsBtns, f.notes, f.rows = {}, {}, {}, {}, {}
-  f.empty = S.EmptyState(f.child, "portal", L.OV_EMPTY_T, L.OV_EMPTY)
+  local c = f.child
+  f.heroes, f.info, f.gpsBtns, f.notes, f.rows, f.heads, f.folds = {}, {}, {}, {}, {}, {}, {}
+  -- your selection's totals (they follow your ticks), and the members without WL Helper, once
+  f.totals = ns.Text(c, ns.F.body, T.fg)
+  f.noHelper = ns.Text(c, ns.F.meta, T.muted)
+  f.extra = ns.Text(c, ns.F.meta, T.muted)
+  f.empty = S.EmptyState(c, "portal", L.OV_EMPTY_T, L.OV_EMPTY)
   f.empty:Hide()
+  -- every quest turned in: the fact, and the way to another dungeon
+  f.allDone = S.EmptyState(c, "check", "", nil, L.SUM_OTHER_DG, OpenPicker, "primary")
+  f.allDone:Hide()
 
-  -- pinned at the bottom: share all (in a group), close, start the route (the one primary)
+  -- pinned at the bottom: share all (in a group), close, the route button (the one primary)
   f.bar = CreateFrame("Frame", nil, f)
   f.bar:SetHeight(32)
   f.goBtn = S.Button(f.bar, L.SUM_GO, 0, 32, "primary", function()
@@ -1136,7 +1191,7 @@ local function Build()
     if not keys or #keys == 0 then return end
     -- the route of these dungeons already runs: back to it (the ticks already replanned it);
     -- starting again would forget the steps marked done by hand
-    if RouteRuns(keys) then
+    if f.mode ~= "start" then
       f:Hide()
       if ns.ShowGuide then ns.ShowGuide() end
       return
@@ -1147,12 +1202,20 @@ local function Build()
     f:Hide()
     ns.StartGuide()
   end, function()
-    if RouteRuns(f.keys) then return { L.SUM_BACK, L.SUM_BACK_TT } end
+    if f.mode == "update" then return { L.SUM_UPDATE, L.SUM_UPDATE_TT } end
+    if f.mode == "back" then return { L.SUM_BACK, L.SUM_BACK_TT } end
+    if f.replaces then return { L.SUM_GO_HERE, L.SUM_GO_HERE_TT } end
     return { L.SUM_GO, f.one and L.SUM_GO_TT1 or L.SUM_GO_TT }
   end)
   f.goBtn:SetPoint("RIGHT", 0, 0)
   f.goBtn:SetDisabledReason(L.SUM_GO_WHY)
-  f.closeBtn = S.Button(f.bar, L.SUM_CLOSE, 0, 28, "secondary", function() f:Hide() end, { L.SUM_CLOSE, L.SUM_CLOSE_TT })
+  -- opened from the picker (which hides itself): the way back to it; else close
+  f.closeBtn = S.Button(f.bar, L.SUM_CLOSE, 0, 28, "secondary", function()
+    if f.backPick then OpenPicker() else f:Hide() end
+  end, function()
+    if f.backPick then return { L.SUM_BACK_PICK, L.SUM_BACK_PICK_TT } end
+    return { L.SUM_CLOSE, L.SUM_CLOSE_TT }
+  end)
   f.closeBtn:SetPoint("RIGHT", f.goBtn, "LEFT", -8, 0)
   f.shareAll = S.Button(f.bar, L.SUM_SHARE_ALL, 0, 28, "secondary", function(self)
     local list = f.shareList or {}
@@ -1207,16 +1270,17 @@ Render = function()
   local log = ns.LogEntries()
   local cls, lvl = Cls(), Level()
   local members = Members()
-  local shown = {}
-  for i = 1, math.min(MAXCOLS, #members) do shown[i] = members[i] end
-  local ctx = { log = log, cls = cls, lvl = lvl, members = shown }
+  local cols, others, extra = SplitMembers(members)
+  f.extraCols = extra
+  local ctx = { log = log, cls = cls, lvl = lvl, cols = cols, grouped = #members > 0 }
   local multi = #keys > 1
   if multi then
     f.title:SetText(L.SUM_ROUTE_T)
     f.subtitle:SetText(ns.Plural(#keys, "SUM_DG1", "SUM_DG", #keys))
   else
-    f.title:SetText(ns.DName(keys[1]))
-    f.subtitle:SetText(L.SUM_T)
+    -- the picture below names the dungeon
+    f.title:SetText(L.SUM_T)
+    f.subtitle:SetText("")
   end
   local c = f.child
 
@@ -1224,6 +1288,7 @@ Render = function()
   local per, sel, seen = {}, {}, {}
   local routeChanged = false
   local tq, txp, tmoney, titems = 0, 0, 0, 0
+  local nQuests, nTodo = 0, 0
   local shareList, shareSeen = {}, {}
   local function count(id)
     if seen[id] then return end
@@ -1235,11 +1300,16 @@ Render = function()
     if q then titems = titems + ItemCount(id, q) end
   end
   for _, dkey in ipairs(keys) do
-    local list = {}
+    local todo, done = {}, {}
     for _, qid in ipairs(ns.DungeonQuests(dkey, cls)) do
       local inf = Info(qid, dkey, ctx)
       if ApplyDefault(qid, inf) and WLDTDB.sel and WLDTDB.sel[dkey] then routeChanged = true end
-      list[#list + 1] = { qid = qid, inf = inf }
+      nQuests = nQuests + 1
+      if inf.st == "done" then done[#done + 1] = { qid = qid, inf = inf }
+      else
+        nTodo = nTodo + 1
+        todo[#todo + 1] = { qid = qid, inf = inf }
+      end
       if not IsOff(qid) and inf.st ~= "done" then
         sel[#sel + 1] = { qid = qid, dkey = dkey, st = inf.st }
         for k, pid in ipairs(inf.pre.chain) do if inf.pre.states[k] ~= "done" then count(pid) end end
@@ -1254,64 +1324,82 @@ Render = function()
         addShare(qid)
       end
     end
-    per[dkey] = list
+    -- to do by level, turned in by level
+    local function byLevel(a, b)
+      local la, lb = a.inf.q.l or 0, b.inf.q.l or 0
+      if la ~= lb then return la < lb end
+      return a.qid < b.qid
+    end
+    table.sort(todo, byLevel); table.sort(done, byLevel)
+    per[dkey] = { todo = todo, done = done }
   end
   f.shareList = shareList
+  f.totalsInfo = { quests = tq, xp = txp, money = tmoney, items = titems }
+  local allDone = nQuests > 0 and nTodo == 0
+  f.allDoneNow = allDone
   -- a default changed (a level up) for a dungeon of the running route: the route follows, once
   if routeChanged and ns.route and ns.frame and ns.frame:IsShown() and ns.Recalc and C_Timer and C_Timer.After then
     C_Timer.After(0, function() pcall(ns.Recalc) end)
   end
 
-  -- pinned top: totals, verdict, member names
-  local topY = 0
-  if tq > 0 then
-    local parts = { ns.Plural(tq, "SUM_Q1", "SUM_Q", tq) }
-    if txp > 0 then parts[#parts + 1] = L.SUM_XP:format(Big(txp)) end
-    if tmoney > 0 then parts[#parts + 1] = Money(tmoney) end
-    if titems > 0 then parts[#parts + 1] = ns.Plural(titems, "SUM_ITEMS1", "SUM_ITEMS", titems) end
-    f.totals:SetText(L.SUM_SEL:format(table.concat(parts, " · ")))
-    f.totals:SetTextColor(T.fg[1], T.fg[2], T.fg[3])
-  else
-    f.totals:SetText(L.SUM_SEL0)
-    f.totals:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
-  end
-  f.totalsInfo = { quests = tq, xp = txp, money = tmoney, items = titems }
-  f.totals:ClearAllPoints(); f.totals:SetPoint("TOPLEFT", f.top, "TOPLEFT", 0, 0)
-  topY = LineH(f.totals, ns.F.body, CW, f.top)
-  local verdict = Verdict(sel, members)
-  if verdict then
-    f.verdict:SetText(verdict)
-    f.verdict:ClearAllPoints(); f.verdict:SetPoint("TOPLEFT", f.top, "TOPLEFT", 0, -(topY + 4))
-    f.verdict:Show()
-    topY = topY + 4 + LineH(f.verdict, ns.F.body, CW, f.top, 3)
-  else f.verdict:SetText(""); f.verdict:Hide() end
-  f.verdictText = verdict
-  if #shown > 0 then
-    local gh = f.gHead
-    gh.label:SetText(L.SUM_GROUP)
-    for j, m in ipairs(shown) do
-      local fs = gh.names[j]
-      if not fs then fs = ns.Text(gh, ns.F.meta, T.fg); fs:SetJustifyH("CENTER"); gh.names[j] = fs end
-      fs:SetText(m.name)
-      local cc = ClassColor(m.class)
-      fs:SetTextColor(cc[1], cc[2], cc[3])
-      fs:SetWidth(CELLW - 4)
-      ns.ClampLabel(fs, m.name, gh)
-      fs:ClearAllPoints(); fs:SetPoint("BOTTOMLEFT", gh, "BOTTOMLEFT", CW - 12 - (#shown - j + 1) * CELLW + 2, 4)
-      fs:Show()
-    end
-    for j = #shown + 1, #gh.names do gh.names[j]:Hide() end
-    gh:ClearAllPoints(); gh:SetPoint("TOPLEFT", f.top, "TOPLEFT", 0, -(topY + 8))
-    gh:Show()
-    topY = topY + 8 + 18
-  else f.gHead:Hide() end
-  topY = math.ceil(topY)
+  local y = 0
+  local hi, ii, gi, ni, ri, hdi, fi = 0, 0, 0, 0, 0, 0, 0
+  local totalsShown, noHelperShown, allDoneShown, extraShown = false, false, false, false
+  local noHelperText, extraText
 
-  -- the dungeons, one after the other: picture, facts, quests
-  local y, hi, ii, gi, ni, ri = 0, 0, 0, 0, 0, 0
+  -- "Your selection: 7 quests · 38,900 XP · 3g 20s", then the members without WL Helper, once
+  local function TotalsBlock()
+    if tq > 0 then
+      local parts = { ns.Plural(tq, "SUM_Q1", "SUM_Q", tq) }
+      if txp > 0 then parts[#parts + 1] = L.SUM_XP:format(Big(txp)) end
+      if tmoney > 0 then parts[#parts + 1] = Money(tmoney) end
+      f.totals:SetText(L.SUM_SEL:format(table.concat(parts, " · ")))
+      f.totals:SetTextColor(T.fg[1], T.fg[2], T.fg[3])
+    else
+      f.totals:SetText(L.SUM_SEL0)
+      f.totals:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
+    end
+    f.totals:ClearAllPoints(); f.totals:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+    f.totals:Show(); totalsShown = true
+    y = y + LineH(f.totals, ns.F.body, CW, c)
+    if #others > 0 then
+      local names = {}
+      for _, m in ipairs(others) do names[#names + 1] = m.name end
+      noHelperText = ns.Plural(#others, "SUM_NOHELPER1", "SUM_NOHELPER", table.concat(names, ", "))
+      f.noHelper:SetText(noHelperText)
+      f.noHelper:ClearAllPoints(); f.noHelper:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 4))
+      f.noHelper:Show(); noHelperShown = true
+      y = y + 4 + LineH(f.noHelper, ns.F.meta, CW, c, 3)
+    end
+    if #extra > 0 then
+      local names = {}
+      for _, m in ipairs(extra) do names[#names + 1] = m.name end
+      extraText = ns.Plural(#extra, "SUM_EXTRA1", "SUM_EXTRA", table.concat(names, ", "))
+      f.extra:SetText(extraText)
+      f.extra:ClearAllPoints(); f.extra:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 4))
+      f.extra:Show(); extraShown = true
+      y = y + 4 + LineH(f.extra, ns.F.meta, CW, c, 3)
+    end
+    y = y + 8
+  end
+  local function AllDoneBlock(title)
+    f.allDone:ClearAllPoints(); f.allDone:SetPoint("TOP", c, "TOP", 0, -(y + 12))
+    f.allDone:SetWrapWidth(CW)
+    local eh = f.allDone:Set("check", title, nil, L.SUM_OTHER_DG, OpenPicker, "primary")
+    f.allDone:Show(); allDoneShown = true
+    y = y + 12 + (num(eh) or 80) + 12
+  end
+
+  -- the route of several dungeons: its totals (or "all turned in") first
+  if multi then
+    if allDone then AllDoneBlock(L.SUM_ALLDONE_TN) elseif nTodo > 0 then TotalsBlock() end
+  end
+
+  -- the dungeons, one after the other: picture, entrance and key, quests to do, quests turned in
   for di, dkey in ipairs(keys) do
     local d = ns.D[dkey]
-    if di > 1 then y = y + 16 end
+    local todo, done = per[dkey].todo, per[dkey].done
+    if di > 1 or (multi and y > 0) then y = y + 8 end
     hi = hi + 1
     local hero = f.heroes[hi] or MakeHero(c); f.heroes[hi] = hero
     if hi == 1 then f.hero = hero end
@@ -1322,72 +1410,70 @@ Render = function()
     local parts = {}
     if d.lvl and d.lvl[1] then
       local lo, hi2 = d.lvl[1], d.lvl[2] or d.lvl[1]
-      table.insert(parts, lo == hi2 and L.PICK_LV1:format(lo) or L.PICK_LV:format(lo, hi2))
+      table.insert(parts, lo == hi2 and L.SUM_LV1:format(lo) or L.SUM_LV:format(lo, hi2))
     end
-    table.insert(parts, L.OV_GROUP:format(d.size or 5))
+    table.insert(parts, L.SUM_SIZE:format(d.size or 5))
     hero.lvl:SetText(table.concat(parts, " · "))
-    local loc = (GetLocale and GetLocale() == "frFR" and d.locf) or ns.T(d.loc) or ""
-    if d.cq and d.home then loc = L.CQ_IN:format(ns.DName(d.home)) end
-    hero.loc:SetText(loc)
-    hero.name:SetText(multi and ns.DName(dkey) or "")
-    local locH = loc ~= "" and LineH(hero.loc, ns.F.meta, CW - 24, hero) or 0
-    local lvlH = LineH(hero.lvl, ns.F.label, CW - 24, hero, 1)
-    local nameH = multi and (3 + LineH(hero.name, ns.F.heading, CW - 24, hero, 1)) or 0
-    hero.band:SetHeight(math.min(hh - 2, 8 + locH + (locH > 0 and 3 or 0) + lvlH + nameH + 8))
+    hero.name:SetText(ns.DName(dkey))
+    local lvlH = LineH(hero.lvl, ns.F.meta, CW - 24, hero, 1)
+    local nameH = LineH(hero.name, ns.F.heading, CW - 24, hero, 1)
+    hero.band:SetHeight(math.min(hh - 2, 8 + nameH + 3 + lvlH + 8))
     hero:Show()
     y = y + hh + 12
 
-    -- facts: entrance (with its GPS), keys
-    local function place(it, w, extra)
-      it.icon:ClearAllPoints(); it.icon:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 1))
-      it.fs:ClearAllPoints(); it.fs:SetPoint("TOPLEFT", c, "TOPLEFT", 22, -y)
-      local h = LineH(it.fs, ns.F.body, w, c, 0)
-      y = y + math.max(h, extra or 0) + 6
-    end
-    local point = d.e and d.e.m and { d.e.m, d.e.x, d.e.y, ns.DName(dkey) } or nil
-    local entry = ns.T(d.ed) or loc
-    if entry and entry ~= "" then
-      ii = ii + 1
-      local it = InfoLine(ii, "portal", T.muted, L.OV_ENTRANCE:format(entry), T.text)
-      if point then
-        gi = gi + 1
-        local g = f.gpsBtns[gi]
-        if not g then
-          g = S.IconButton(c, "pin", 24, function(self) return { L.OV_GPS_T:format(L.OV_ENTRY_T), L.OV_GPS_CLICK } end,
-            function(self) GoPoint(self.point) end)
-          f.gpsBtns[gi] = g
-        end
-        g.point = point
-        g:ClearAllPoints(); g:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -(y - 5))
-        g:Show()
-        if gi == 1 then f.entryGps = g; f.entryPoint = point end
-      end
-      place(it, CW - 22 - (point and 32 or 0), point and 14 or 0)
-    end
-    local kl = ns.KeyLines and ns.KeyLines(dkey) or {}
-    if #kl == 0 then
-      ii = ii + 1
-      place(InfoLine(ii, "check", T.muted, L.OV_KEY_NONE, T.muted), CW - 22)
-    else
-      for _, k in ipairs(kl) do
-        ii = ii + 1
-        local icon, col = "check", T.ok
-        if not k[2] then if k[3] then icon, col = "warning", T.warn else icon, col = "info", T.muted end end
-        place(InfoLine(ii, icon, col, k[1], T.text), CW - 22)
-      end
-    end
-    y = y + 6
+    local dgDone = #todo == 0 and #done > 0
+    -- one dungeon, every quest turned in: say it at the top, offer another dungeon
+    if not multi and dgDone then AllDoneBlock(L.SUM_ALLDONE_T:format(ns.DName(dkey))) end
 
-    -- the quests: to do first (by level), turned in last
-    local list = per[dkey]
-    table.sort(list, function(a, b)
-      local da, db = a.inf.st == "done", b.inf.st == "done"
-      if da ~= db then return db end
-      local la, lb = a.inf.q.l or 0, b.inf.q.l or 0
-      if la ~= lb then return la < lb end
-      return a.qid < b.qid
-    end)
-    if #list == 0 then
+    -- entrance (with its GPS) and key: two short lines, only while something is left to do
+    if not dgDone then
+      local function place(it, w, extra)
+        it.icon:ClearAllPoints(); it.icon:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 1))
+        it.fs:ClearAllPoints(); it.fs:SetPoint("TOPLEFT", c, "TOPLEFT", 22, -y)
+        local h = LineH(it.fs, ns.F.body, w, c)
+        y = y + math.max(h, extra or 0) + 6
+      end
+      local point = d.e and d.e.m and { d.e.m, d.e.x, d.e.y, ns.DName(dkey) } or nil
+      local loc = (GetLocale and GetLocale() == "frFR" and d.locf) or ns.T(d.loc) or ""
+      if d.cq and d.home then loc = L.CQ_IN:format(ns.DName(d.home)) end
+      local entry = ns.T(d.ed) or loc
+      if entry and entry ~= "" then
+        ii = ii + 1
+        local it = InfoLine(ii, "portal", T.muted, L.OV_ENTRANCE:format(entry), T.text)
+        if point then
+          gi = gi + 1
+          local g = f.gpsBtns[gi]
+          if not g then
+            g = S.IconButton(c, "pin", 24, function(self) return { L.OV_GPS_T:format(L.OV_ENTRY_T), L.OV_GPS_CLICK } end,
+              function(self) GoPoint(self.point) end)
+            f.gpsBtns[gi] = g
+          end
+          g.point = point
+          g:ClearAllPoints(); g:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -(y - 5))
+          g:Show()
+          if gi == 1 then f.entryGps = g; f.entryPoint = point end
+        end
+        place(it, CW - 22 - (point and 32 or 0), point and 14 or 0)
+      end
+      local kl = ns.KeyLines and ns.KeyLines(dkey) or {}
+      if #kl == 0 then
+        ii = ii + 1
+        place(InfoLine(ii, "check", T.muted, L.OV_KEY_NONE, T.muted), CW - 22)
+      else
+        for _, k in ipairs(kl) do
+          ii = ii + 1
+          local icon, col = "check", T.ok
+          if not k[2] then if k[3] then icon, col = "warning", T.warn else icon, col = "info", T.muted end end
+          place(InfoLine(ii, icon, col, k[1], T.text), CW - 22)
+        end
+      end
+      y = y + 6
+    end
+
+    -- one dungeon: its totals under its facts
+    if not multi and #todo > 0 then TotalsBlock() end
+
+    if #todo == 0 and #done == 0 then
       if multi then
         ni = ni + 1
         local fs = f.notes[ni] or ns.Text(c, ns.F.body, T.muted); f.notes[ni] = fs
@@ -1405,15 +1491,88 @@ Render = function()
         y = y + 12 + (num(eh) or 80)
       end
     else
-      for _, e in ipairs(list) do
-        ri = ri + 1
-        local r = f.rows[ri] or MakeRow(c); f.rows[ri] = r
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
-        local h = FillRow(r, e.qid, dkey, e.inf, ctx)
-        r:Show(); r.shownNow = true
-        y = y + h + ROW_GAP
+      if multi and dgDone and not allDone then
+        ni = ni + 1
+        local fs = f.notes[ni] or ns.Text(c, ns.F.body, T.muted); f.notes[ni] = fs
+        fs:SetText(L.SUM_ALLDONE_NOTE:format(ns.DName(dkey)))
+        fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y); fs:Show()
+        y = y + LineH(fs, ns.F.body, CW, c) + 8
       end
-      y = y - ROW_GAP
+      -- quests to do: a header with the members' names over their columns, then the rows
+      if #todo > 0 then
+        hdi = hdi + 1
+        local hd = f.heads[hdi] or MakeHead(c); f.heads[hdi] = hd
+        if hdi == 1 then f.gHead = hd.cols end
+        hd.label:SetText(L.SUM_TODO)
+        hd.count:SetText(tostring(#todo))
+        local gh = hd.cols
+        for j, m in ipairs(cols) do
+          local fs = gh.names[j]
+          if not fs then fs = ns.Text(gh, ns.F.meta, T.fg); fs:SetJustifyH("CENTER"); gh.names[j] = fs end
+          fs:SetText(m.name)
+          local cc = ClassColor(m.class)
+          fs:SetTextColor(cc[1], cc[2], cc[3])
+          fs:SetWidth(CELLW - 4)
+          fs:SetWordWrap(false)
+          -- each name has its own hover area: the full class-coloured name, even when cut
+          local hit = gh.hits[j]
+          if not hit then
+            hit = CreateFrame("Frame", nil, gh)
+            hit:EnableMouse(true)
+            hit:SetScript("OnEnter", function(self) if self.tip then ns.ShowTip(self, self.tip) end end)
+            hit:SetScript("OnLeave", ns.HideTip)
+            gh.hits[j] = hit
+          end
+          hit.tip = { { m.name, cc[1], cc[2], cc[3] }, L.SUM_COL_TT }
+          ns.ClampLabel(fs, m.name, hit)
+          local x = CW - 12 - (#cols - j + 1) * CELLW
+          fs:ClearAllPoints(); fs:SetPoint("BOTTOMLEFT", gh, "BOTTOMLEFT", x + 2, 6)
+          fs:Show()
+          hit:SetSize(CELLW, 18)
+          hit:ClearAllPoints(); hit:SetPoint("BOTTOMLEFT", gh, "BOTTOMLEFT", x, 3)
+          hit:Show()
+        end
+        for j = #cols + 1, #gh.names do gh.names[j]:Hide() end
+        for j = #cols + 1, #gh.hits do gh.hits[j]:Hide() end
+        gh:SetShown(#cols > 0)
+        hd:ClearAllPoints(); hd:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+        hd:Show()
+        y = y + 24 + 8
+        for _, e in ipairs(todo) do
+          ri = ri + 1
+          local r = f.rows[ri] or MakeRow(c); f.rows[ri] = r
+          r:ClearAllPoints(); r:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+          local h = FillRow(r, e.qid, dkey, e.inf, ctx)
+          r:Show(); r.shownNow = true
+          y = y + h + ROW_GAP
+        end
+        y = y - ROW_GAP
+      end
+      -- quests turned in: folded at the bottom
+      if #done > 0 then
+        if #todo > 0 then y = y + 12 end
+        fi = fi + 1
+        local fb = f.folds[fi] or MakeFold(c); f.folds[fi] = fb
+        fb.dkey = dkey
+        fb.labelText = L.SUM_DONE_H:format(#done)
+        fb.text:SetText(fb.labelText)
+        ns.SetHDIcon(fb.chev, f.doneOpen[dkey] and "chevron_down" or "chevron_right", T.accentSoft)
+        fb:ClearAllPoints(); fb:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+        fb:Show()
+        y = y + 28
+        if f.doneOpen[dkey] then
+          y = y + 8
+          for _, e in ipairs(done) do
+            ri = ri + 1
+            local r = f.rows[ri] or MakeRow(c); f.rows[ri] = r
+            r:ClearAllPoints(); r:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+            local h = FillRow(r, e.qid, dkey, e.inf, ctx)
+            r:Show(); r.shownNow = true
+            y = y + h + ROW_GAP
+          end
+          y = y - ROW_GAP
+        end
+      end
     end
   end
   for j = hi + 1, #f.heroes do f.heroes[j]:Hide() end
@@ -1422,26 +1581,50 @@ Render = function()
   if gi == 0 then f.entryGps, f.entryPoint = nil, nil end
   for j = ni + 1, #f.notes do f.notes[j]:Hide() end
   for j = ri + 1, #f.rows do f.rows[j]:Hide(); f.rows[j].shownNow = nil end
-  if multi or ri > 0 then f.empty:Hide() end
+  for j = hdi + 1, #f.heads do f.heads[j]:Hide() end
+  for j = fi + 1, #f.folds do f.folds[j]:Hide() end
+  if hdi == 0 and f.heads[1] then f.gHead = f.heads[1].cols; f.gHead:Hide() end
+  if not totalsShown then f.totals:SetText(""); f.totals:Hide() end
+  if not noHelperShown then f.noHelper:SetText(""); f.noHelper:Hide() end
+  f.noHelperText = noHelperText
+  if not extraShown then f.extra:SetText(""); f.extra:Hide() end
+  f.extraText = extraText
+  if not allDoneShown then f.allDone:Hide() end
+  if multi or nQuests > 0 then f.empty:Hide() end
 
-  -- bottom bar
-  local back = RouteRuns(keys)
-  f.goBtn:SetText(back and L.SUM_BACK or L.SUM_GO)
-  if f.goBtn.SetIcon then f.goBtn:SetIcon(back and "chevron_left" or "pin") end
-  SetOn(f.goBtn, back or #sel > 0)
-  f.goBack = back
-  local grouped = #members > 0
-  f.shareAll:SetShown(grouped)
-  if grouped then
+  -- bottom bar: the route button says what it does; hidden when nothing is left to do
+  local mode
+  if f.first or not RouteRuns(keys) then mode = "start" elseif f.changed then mode = "update" else mode = "back" end
+  f.mode = mode
+  f.goBack = mode ~= "start"
+  -- opened outside the picker while the route runs on other dungeons: starting here replaces that
+  -- route (and its steps marked by hand), so the label says it and a second click confirms
+  f.replaces = mode == "start" and not f.fromPicker and RouteElsewhere() or nil
+  local label = mode == "update" and L.SUM_UPDATE or mode == "back" and L.SUM_BACK
+    or (f.replaces and L.SUM_GO_HERE) or L.SUM_GO
+  f.goBtn:SetConfirm(f.replaces and L.SUM_GO_CONFIRM or nil)
+  if not f.replaces and f.goBtn.armed then f.goBtn:Disarm() end
+  -- an armed button keeps its question until the second click (or 4 s)
+  if not f.goBtn.armed then f.goBtn:SetText(label) end
+  f.goLabel = label
+  -- opened from the picker (it hid itself): the secondary button goes back to it
+  f.backPick = f.fromPicker and nTodo > 0 or nil
+  f.closeBtn:SetText(f.backPick and L.SUM_BACK_PICK or L.SUM_CLOSE)
+  if f.closeBtn.SetIcon then f.closeBtn:SetIcon(f.backPick and "chevron_left" or nil) end
+  if f.goBtn.SetIcon then f.goBtn:SetIcon(mode == "update" and "refresh" or mode == "back" and "chevron_left" or "pin") end
+  SetOn(f.goBtn, mode ~= "start" or #sel > 0)
+  f.goBtn:SetShown(nTodo > 0)
+  f.closeBtn:ClearAllPoints()
+  if nTodo > 0 then f.closeBtn:SetPoint("RIGHT", f.goBtn, "LEFT", -8, 0) else f.closeBtn:SetPoint("RIGHT", f.bar, "RIGHT", 0, 0) end
+  f.shareAll:SetShown(ctx.grouped and nTodo > 0)
+  if f.shareAll:IsShown() then
     if not ns.pushBusy then f.shareAll:SetText(L.SUM_SHARE_ALL) end
     SetOn(f.shareAll, #shareList > 0 and not ns.pushBusy)
   end
 
-  -- the window fits its content up to 80 % of the screen; past that, the quests scroll
-  local contentH = math.ceil(y)
-  local top = f:ContentTop() + 12
-  f.top:ClearAllPoints(); f.top:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -top); f.top:SetSize(CW, math.max(1, topY))
-  local saTop = top + topY + 12
+  -- the window fits its content up to 80 % of the screen; past that, the content scrolls
+  local contentH = math.max(1, math.ceil(y))
+  local saTop = f:ContentTop() + 12
   local barH = 12 + 32
   local cap = math.floor((num(UIParent:GetHeight()) or 768) * 0.80) - saTop - barH - 12
   local viewH = math.max(60, math.min(contentH, cap))
@@ -1452,7 +1635,7 @@ Render = function()
   f.sa:SetContentHeight(contentH)
   f.bar:ClearAllPoints()
   f.bar:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -(saTop + viewH + 12)); f.bar:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -(saTop + viewH + 12))
-  f:FitHeight(topY + 12 + viewH + barH)
+  f:FitHeight(viewH + barH)
 end
 ns.RenderOverview = function() if f and f:IsShown() then Render() end end
 
@@ -1478,6 +1661,8 @@ ns.PickedKeys = PickedKeys
 
 -- Opens the summary of one or several dungeons (the picked ones without `keys`). `one`: opened on
 -- a single dungeon (its overview): starting the route replaces the picked dungeons with it.
+-- Opened from the picker (or with no route on these dungeons) it is the route's first screen: its
+-- main button starts the route.
 function ns.ShowSummary(keys, one)
   if GuideOff() then return end
   if ns.EnsureClassCards then ns.EnsureClassCards() end
@@ -1485,11 +1670,16 @@ function ns.ShowSummary(keys, one)
   local list = {}
   for _, k in ipairs(keys) do if ns.D[k] then list[#list + 1] = k end end
   if #list == 0 then return end
+  local picker = _G.WLDTPicker
+  local fromPicker = picker and picker.IsShown and picker:IsShown() and true or false
   if not f then Build() end
   local sig = table.concat(list, ",")
-  if f.sig ~= sig and f.sa then f.sa:ScrollTo(0, true); wipe(f.open) end
+  if f.sig ~= sig and f.sa then f.sa:ScrollTo(0, true); wipe(f.open); wipe(f.doneOpen) end
   f.sig, f.keys, f.one = sig, list, one and true or nil
   f.dkey = list[1]
+  f.first = fromPicker or not RouteRuns(list)
+  f.fromPicker = fromPicker or nil
+  f.changed = nil
   f:Show(); f:Raise()
   if ns.SyncAsk then ns.SyncAsk(list) end
   Render()
