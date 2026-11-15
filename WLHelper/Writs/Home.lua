@@ -10,6 +10,12 @@ local S = ns.S
 local C = S.C
 
 ns.AddEnglish({
+    ["Réputation"] = "Reputation",
+    ["%s dans %d points"] = "%s in %d points",
+    ["Caisses"] = "Crates",
+    ["%d Faveur en poche"] = "%d Favor in hand",
+    ["Pas encore de Faveur"] = "No Favor yet",
+    ["Caisses les moins chères, où les rendre"] = "Cheapest crates, where to hand them in",
     ["%s · niv. %d"] = "%s · lvl %d",
     ["en cours"] = "in progress",
     ["Reprendre"] = "Resume",
@@ -200,24 +206,27 @@ local function Build()
         if DungeonState() then root.ShowGuide() else root.ShowPicker() end
     end)
     y = y - CARD_H - 10
-    cards.writs = Card(win, y, "Interface\\Icons\\INV_Letter_15", C.warn, function() Close(); WP.Open() end, 1)
+    -- two by two: writs and favor, bags and orders, guild and LFG, upgrades
+    cards.writs = Card(win, y, "Interface\\Icons\\INV_Letter_15", C.warn, function() Close(); WP.Open("writs") end, 1)
+    cards.favor = Card(win, y, "Interface\\Icons\\INV_Crate_04", C.warn, function() Close(); WP.Open("favor") end, 2)
+    y = y - TILE_H - 10
     cards.bags = Card(win, y, "Interface\\Icons\\INV_Misc_Bag_08", C.info, function()
         Close(); if WP.Cleaner then WP.Cleaner.Toggle() end
-    end, 2)
-    y = y - TILE_H - 10
+    end, 1)
     cards.orders = Card(win, y, "Interface\\Icons\\INV_Misc_Note_01", C.ready, function()
         Close(); if WP.ToggleOrders then WP.ToggleOrders() end
-    end, 1)
-    cards.guild = Card(win, y, "Interface\\Icons\\INV_BannerPVP_01", C.brandSoft or C.info, function()
-        Close(); if WP.ToggleGuild then WP.ToggleGuild() end
     end, 2)
     y = y - TILE_H - 10
+    cards.guild = Card(win, y, "Interface\\Icons\\INV_BannerPVP_01", C.brandSoft or C.info, function()
+        Close(); if WP.ToggleGuild then WP.ToggleGuild() end
+    end, 1)
     cards.events = Card(win, y, "Interface\\Icons\\Ability_Warrior_BattleShout", C.warn, function()
         Close(); if WP.ToggleEvents then WP.ToggleEvents() end
-    end, 1)
+    end, 2)
+    y = y - TILE_H - 10
     cards.upgrades = Card(win, y, "Interface\\Icons\\INV_Chest_Cloth_17", C.ready, function()
         Close(); if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end
-    end, 2)
+    end, 1)
     y = y - TILE_H - 10
 
     win.afterCards = y
@@ -272,7 +281,7 @@ local function Build()
     win.Layout(false, false)
 
     cards.dungeons.key, cards.writs.key, cards.bags.key, cards.orders.key, cards.guild.key = "dungeons", "writs", "bags", "orders", "guild"
-    cards.events.key, cards.upgrades.key = "events", "upgrades"
+    cards.events.key, cards.upgrades.key, cards.favor.key = "events", "upgrades", "writs"
     win:SetScript("OnShow", function() WP.RefreshHome() end)
     local ev = CreateFrame("Frame", nil, win)
     pcall(ev.RegisterEvent, ev, "QUEST_LOG_UPDATE"); pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED"); pcall(ev.RegisterEvent, ev, "UPDATE_FACTION")
@@ -320,12 +329,10 @@ function WP.RefreshHome()
 
     -- Trading Post
     local c = cards.writs
-    c.title:SetText(L("Writs & Favor")); c.tag:SetText(L("Craftsman's Writs")); c.bar:Hide(); c.action:Hide(); c.chev:Show(); c:Narrow(false)
+    c.title:SetText(L("Writs")); c.tag:SetText(L("Réputation")); c.bar:Hide(); c.action:Hide(); c.chev:Show(); c:Narrow(false)
     local need, goal, ready, bag = WritState()
     if need then
-        local favor = WP.FavorNow and WP.FavorNow()
-        c.line1:SetText((need > 0 and string.format(L("%s dans %d rép"), WP.Reaction(goal), need) or string.format(L("%s atteint"), WP.Reaction(goal)))
-            .. (favor and ("  ·  " .. string.format(L("%d Favor"), favor)) or ""))
+        c.line1:SetText(need > 0 and string.format(L("%s dans %d points"), WP.Reaction(goal), need) or string.format(L("%s atteint"), WP.Reaction(goal)))
         local parts = {}
         if ready > 0 then parts[#parts + 1] = string.format(L("%d writs prêts à rendre"), ready) end
         if bag > 0 then parts[#parts + 1] = string.format(L("%d enveloppes à ouvrir"), bag) end
@@ -335,6 +342,14 @@ function WP.RefreshHome()
     else
         c.line1:SetText(L("Faction pas encore vue")); c.line2:SetText(""); SetActive(c, false)
     end
+
+    -- Merchant's Favor: what you have, and the crates that bring more
+    local fv = cards.favor
+    fv.title:SetText(L("Faveur du marchand")); fv.tag:SetText(L("Caisses")); fv.bar:Hide(); fv.action:Hide(); fv.chev:Show(); fv:Narrow(false)
+    local favor = WP.FavorNow and WP.FavorNow()
+    fv.line1:SetText(favor and string.format(L("%d Faveur en poche"), favor) or L("Pas encore de Faveur"))
+    fv.line2:SetText(L("Caisses les moins chères, où les rendre"))
+    fv.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
 
     -- bags
     local b = cards.bags
@@ -487,7 +502,8 @@ function WP.MinimapMenu(owner)
         tinsert(UISpecialFrames, "WLHelperMinimapMenu")
         local items = {
             { L("Quêtes de donjon"), function() if DungeonState() then root.ShowGuide() else root.ShowPicker() end end, "dungeons" },
-            { L("Writs & Favor"), function() WP.Open() end, "writs" },
+            { L("Writs"), function() WP.Open("writs") end, "writs" },
+            { L("Faveur du marchand"), function() WP.Open("favor") end, "writs" },
             { L("Sacs"), function() if WP.Cleaner then WP.Cleaner.Toggle() end end, "bags" },
             { L("Commandes"), function() if WP.ToggleOrders then WP.ToggleOrders() end end, "orders" },
             { L("Guilde"), function() if WP.ToggleGuild then WP.ToggleGuild() end end, "guild" },

@@ -16,6 +16,18 @@ ns.AddEnglish({
     ["Chercher un objet, ou Maj-clic sur un objet pour le commander"] = "Search an item, or shift-click an item to order it",
     ["%d artisans connus · %d en ligne"] = "%d crafters known · %d online",
     ["Chuchoter"] = "Whisper",
+    ["À envoyer à %s :"] = "To send to %s:",
+    ["Par la poste (bouton Préparer à la boîte aux lettres) ou en échange : l'addon le voit tout seul."] = "By mail (Prepare button at a mailbox) or by trade: the addon sees it on its own.",
+    ["envoyés"] = "sent",
+    ["Acheter le manquant"] = "Buy what's missing",
+    ["Ouvre l'hôtel des ventes, puis reclique."] = "Open the auction house, then click again.",
+    ["Préparer le courrier"] = "Prepare the mail",
+    ["Va à une boîte aux lettres, ou échange-les directement avec %s."] = "Go to a mailbox, or trade them directly with %s.",
+    ["%d artisans possibles · Commander : toute la guilde la voit"] = "%d possible crafters · Order: the whole guild sees it",
+    ["personne n'a encore déclaré ce métier : la guilde verra quand même la commande"] = "nobody declared this profession yet: the guild will still see the order",
+    ["recette connue"] = "recipe known",
+    ["métier compatible"] = "matching profession",
+    ["À lui"] = "To them",
     ["Ouvertes"] = "Open",
     ["Ce que je sais fabriquer"] = "What I can make",
     ["Aucune commande ouverte pour ce que tu sais fabriquer. Décoche le filtre pour tout voir."] = "No open order for what you can make. Untick the filter to see them all.",
@@ -275,13 +287,30 @@ local function RenderFind()
         row.item, row.crafter, row.whisper, row.open = linked, nil, nil, nil
         row.icon:Show(); row.icon:SetTexture(S.ItemIcon(linked))
         row.name:SetText(Name(linked)); local qc = S.QualityColor(linked); row.name:SetTextColor(qc[1], qc[2], qc[3])
-        local who = O.Crafters(linked)
-        row.sub:SetText(#who > 0 and string.format(L("%d artisans connus pour cet objet"), #who) or L("aucune recette partagée : la guilde verra la commande"))
+        local who = O.Possible(linked)
+        row.sub:SetText(#who > 0 and string.format(L("%d artisans possibles · Commander : toute la guilde la voit"), #who) or L("personne n'a encore déclaré ce métier : la guilde verra quand même la commande"))
         row.btn.label:SetText(L("Commander")); row.btn:Show()
-        row.bg:SetColorTexture(C.card[1], C.card[2], C.card[3], 1)
-        f.list.HideFrom(2)
+        row.bg:SetColorTexture(C.brandBg[1], C.brandBg[2], C.brandBg[3], 1)
+        -- each possible crafter: exact (shared recipe) or by profession, online first
+        local y = 46
+        for i, c in ipairs(who) do
+            local cr = f.list.Get(i + 1)
+            cr:ClearAllPoints(); cr:SetPoint("TOPLEFT", 0, -y)
+            cr.item, cr.crafter, cr.whisper, cr.open = linked, c.name, nil, nil
+            cr.icon:Hide()
+            local stars = O.Stars(c.name)
+            cr.name:SetText("   " .. c.name .. (stars > 0 and (" " .. S.Hex(C.warn) .. "★" .. stars .. "|r") or ""))
+            cr.name:SetTextColor(C.text[1], C.text[2], C.text[3])
+            cr.sub:SetText("   " .. c.prof .. " " .. (c.rank or 0) .. "  ·  " .. (c.online and (S.Hex(C.ready) .. L("en ligne") .. "|r") or L("hors ligne"))
+                .. "  ·  " .. (c.exact and L("recette connue") or L("métier compatible")))
+            cr.btn.label:SetText(L("À lui")); cr.btn:Show()
+            cr.bg:SetColorTexture(C.card[1], C.card[2], C.card[3], 1)
+            y = y + 46
+            if i >= 30 then break end
+        end
+        f.list.HideFrom(math.min(#who, 30) + 2)
         f.empty:Hide()
-        f.list.content:SetHeight(50)
+        f.list.content:SetHeight(y + 4)
         return
     end
     -- nothing typed: the guild's crafters, grouped by profession (shared at login, recipes or not)
@@ -519,9 +548,20 @@ local function PaintOrder(c, o, side)
     if o.status == "open" and o.expires then who = who .. " · " .. string.format(L("expire dans %d h"), math.max(0, math.floor((o.expires - time()) / 3600))) end
     c.who:SetText(st .. " · " .. who)
     local lines = {}
-    if o.give and o.give ~= "" then
+    local missing = {}
+    if side == "mine" and o.status == "accepted" and o.give and o.give ~= "" and not o.sentGive then
+        -- what to send to the crafter, with what you have (bags and bank) and what is missing
+        local t = {}
+        for _, g in ipairs(O.ToSend(o)) do
+            local ok = g.have >= g.need
+            if not ok then missing[#missing + 1] = g end
+            t[#t + 1] = S.Hex(ok and C.ready or C.danger) .. g.need .. "× " .. Name(g.id) .. " (" .. math.min(g.have, g.need) .. "/" .. g.need .. ")|r"
+        end
+        lines[#lines + 1] = S.Hex(C.text) .. string.format(L("À envoyer à %s :"), o.by or "?") .. "|r " .. table.concat(t, ", ")
+        lines[#lines + 1] = S.Hex(C.muted) .. L("Par la poste (bouton Préparer à la boîte aux lettres) ou en échange : l'addon le voit tout seul.") .. "|r"
+    elseif o.give and o.give ~= "" then
         local who = side == "mine" and L("je fournis") or string.format(L("%s fournit"), o.from)
-        lines[#lines + 1] = S.Hex(C.ready) .. who .. "|r " .. Reagents(o.give, o.qty)
+        lines[#lines + 1] = S.Hex(C.ready) .. who .. "|r " .. Reagents(o.give, o.qty) .. (o.sentGive and (" · " .. S.Hex(C.ready) .. L("envoyés") .. "|r") or "")
     end
     if o.crafter and o.crafter ~= "" then lines[#lines + 1] = S.Hex(C.warn) .. L("l'artisan fournit") .. "|r " .. Reagents(o.crafter, o.qty) end
     -- what reached the crafter (read in the crafter's mailbox)
@@ -561,6 +601,21 @@ local function PaintOrder(c, o, side)
         c.b1.label:SetText(L("Fabriquée")); c.a1 = function() O.Crafted(o) end
     elseif side == "recv" and o.status == "crafted" then
         c.b1.label:SetText(L("Livrée")); c.a1 = function() O.Delivered(o) end
+    elseif side == "mine" and o.status == "accepted" and #missing > 0 then
+        c.b1.label:SetText(L("Acheter le manquant")); c.a1 = function()
+            if not (WP.AuctionHouseOpen and WP.AuctionHouseOpen()) then WP.Print(L("Ouvre l'hôtel des ventes, puis reclique.")); return end
+            local g = missing[1]
+            if WP.Scan and WP.Scan.OpenToBuy then WP.Scan.OpenToBuy(g.id, g.need - g.have) end
+        end
+        c.b2.label:SetText(L("Annuler")); c.a2 = function() O.Cancel(o) end
+    elseif side == "mine" and o.status == "accepted" and o.give and o.give ~= "" and not o.sentGive then
+        c.b1.label:SetText(L("Préparer le courrier")); c.a1 = function()
+            if MailFrame and MailFrame:IsShown() then
+                if MailFrameTab2 and not (SendMailFrame and SendMailFrame:IsShown()) then MailFrameTab2:Click() end
+                O.FillMail(o, "give")
+            else WP.Print(string.format(L("Va à une boîte aux lettres, ou échange-les directement avec %s."), o.by or "?")) end
+        end
+        c.b2.label:SetText(L("Annuler")); c.a2 = function() O.Cancel(o) end
     elseif side == "mine" and (o.status == "open" or o.status == "accepted") then
         c.b2.label:SetText(L("Annuler")); c.a2 = function() O.Cancel(o) end
     elseif side == "mine" and o.status == "crafted" then

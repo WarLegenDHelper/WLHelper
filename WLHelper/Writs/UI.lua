@@ -391,8 +391,15 @@ local function BuildShop(p)
     buy.sub:SetPoint("TOPLEFT", PAD, -42)
     buy.sub:SetPoint("TOPRIGHT", -PAD, -42)
     buy.sub:SetWordWrap(true)
+    -- the price cap: writs costing more than this per 100 reputation points are left out of the plan
+    -- (net of the Coin Pouch they give back); the route then groups what is left by turn-in zone
+    local capLabel = S.Text(p, 12, C.dim); capLabel:SetPoint("TOPLEFT", PAD, -78); capLabel:SetText(L("Prix max pour 100 points"))
+    buy.cap = S.Segmented(p, { { 2000, "20 pa" }, { 4000, "40 pa" }, { 10000, "1 po" }, { 0, L("sans") } },
+        function() return WLWritsDB.maxPer100 or 4000 end,
+        function(v) WLWritsDB.maxPer100 = v; WP.Refresh() end, 24)
+    buy.cap:SetPoint("TOPRIGHT", -PAD, -72)
     local sc = Scroller(p)
-    sc:SetPoint("TOPLEFT", PAD, -70); sc:SetPoint("BOTTOMRIGHT", -PAD, 62)
+    sc:SetPoint("TOPLEFT", PAD, -104); sc:SetPoint("BOTTOMRIGHT", -PAD, 62)
     buy.scroll = sc
     buy.heads = Pool(function()
         local t = S.Text(sc.content, 13, C.dim)
@@ -460,8 +467,8 @@ local function RenderShop()
         buy.total:SetText(L("Rien à acheter"))
         buy.sub:SetText(#data > 0 and L("Tes writs suffisent pour l'objectif.") or "")
     else
-        buy.total:SetText(S.Money(shopTotal))
-        buy.sub:SetText(string.format(L("pour %d writs, +%d rép. Clique un objet pour l'acheter à l'HV."), #plan, rep))
+        buy.total:SetText(L("Coût") .. "  " .. S.Money(shopTotal))
+        buy.sub:SetText(string.format(L("Pour %d writs, qui rapportent %d points de réputation. Clique un objet pour l'acheter à l'HV."), #plan, rep))
     end
     -- groups: one per turn-in zone, in the order the list gives
     local groups, order = {}, {}
@@ -733,12 +740,12 @@ end
 
 local function Build()
     local db = WLWritsDB
-    frame = S.Window("WLHelperComptoir", W, H, L("Writs & Favor"), nil, db, "point")
+    frame = S.Window("WLHelperComptoir", W, H, L("Writs"), nil, db, "point")
     local opts = S.IconButton(frame.header, "Interface\\Buttons\\UI-OptionsButton", 28, { L("Options du Comptoir") }, function()
         if WP.OpenOptions then WP.OpenOptions("comptoir") end
     end)
     opts:SetPoint("RIGHT", frame.close, "LEFT", 0, 0)
-    tabs = S.Tabs(frame, { { "today", L("Aujourd'hui") }, { "shop", L("Achats") }, { "all", L("Tous") }, { "favor", L("Favor") } },
+    tabs = S.Tabs(frame, { { "today", L("Aujourd'hui") }, { "shop", L("Achats") }, { "all", L("Tous") } },
         function() return current end, WP.ShowTab, function(key)
             if key ~= "shop" then return nil end
             local n = 0
@@ -838,16 +845,27 @@ end
 function WP.HideWindow() if frame then frame:Hide() end end
 function WP.WindowShown() return frame and frame:IsShown() or false end
 
-function WP.Open()
+-- Two separate things share this window: the Craftsman's Writs (reputation with Durotar Supply and
+-- Logistics) and the Merchant's Favor (the currency of the Waylaid Crates). mode "favor" shows only the
+-- Favor page, with its own title; anything else shows the writs and their three tabs.
+function WP.Open(mode)
     if WP.ModuleOff("writs") then return end
     if not frame then Build() end
+    if mode == "favor" then
+        frame.title:SetText(L("Faveur du marchand"))
+        tabs:Hide()
+        WP.ShowTab("favor")
+    else
+        frame.title:SetText(L("Writs"))
+        tabs:Show()
+        if current == "favor" then WP.ShowTab("today") end
+    end
     frame:Show(); frame:Raise()
 end
 
 function WP.Toggle()
     if frame and frame:IsShown() then frame:Hide(); return end
-    if WP.ModuleOff("writs") then return end
-    if not frame then Build() end
-    frame:SetShown(not frame:IsShown())
+    WP.Open("writs")
 end
+function WP.OpenFavor() WP.Open("favor") end
 

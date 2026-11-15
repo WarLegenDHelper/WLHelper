@@ -37,6 +37,11 @@ ns.AddEnglish({
     ["Autre"] = "Other",
     ["ouvre la boîte aux lettres, onglet Envoyer."] = "open the mailbox, Send tab.",
     ["Message de %s sur la commande %s : %s"] = "Message from %s on the order %s: %s",
+    ["il t'en manque %d"] = "%d missing",
+    ["À lui envoyer (poste ou échange) : %s. /wlh orders"] = "Send them (mail or trade): %s. /wlh orders",
+    ["Commande fabriquée : %s ×%d pour %s. Envoie-la par la poste ou en échange."] = "Order made: %s ×%d for %s. Send it by mail or trade.",
+    ["Composants remis à %s pour %s."] = "Reagents handed to %s for %s.",
+    ["Commande livrée à %s : %s."] = "Order delivered to %s: %s.",
     ["%s te remercie pour sa commande."] = "%s thanks you for their order.",
     ["Contre-remboursement impossible sans objet joint : demande %s à %s."] = "Cash on delivery needs an attached item: ask %s from %s.",
 })
@@ -428,7 +433,12 @@ local function SetStatus(o, status, extra)
     Broadcast(o)
     if WP.RefreshOrders then WP.RefreshOrders() end
 end
-function O.Accept(o) if o.status == "open" then SetStatus(o, "accepted", { by = Me() }) end end
+function O.Accept(o)
+    if o.status ~= "open" then return end
+    local count = (C_Item and C_Item.GetItemCount) or GetItemCount
+    o.baseCount = (o.item and o.item > 0 and count) and (count(o.item) or 0) or nil
+    SetStatus(o, "accepted", { by = Me() })
+end
 function O.Decline(o, reason)
     if o.to then SetStatus(o, "declined", { by = Me(), reason = reason })
     else
@@ -493,6 +503,86 @@ function O.Board(canOnly)
         end
     end
     table.sort(out, function(a, b) return (a.expires or 0) > (b.expires or 0) end)
+    return out
+end
+
+-- ---------------------------------------------------------------- who could make it
+-- Without a shared recipe, the kind of item tells the profession: a potion is alchemy, cloth armour
+-- tailoring, leather armour leatherworking, plate blacksmithing, food cooking, a bandage first aid...
+-- Keys are English profession names, as the game gives them on an English client.
+local PROF_NAMES = {
+    Alchemy = { "Alchemy", "Alchimie" }, Blacksmithing = { "Blacksmithing", "Forge" }, Enchanting = { "Enchanting", "Enchantement" },
+    Engineering = { "Engineering", "Ingénierie" }, Leatherworking = { "Leatherworking", "Travail du cuir" }, Tailoring = { "Tailoring", "Couture" },
+    Cooking = { "Cooking", "Cuisine" }, ["First Aid"] = { "First Aid", "Secourisme" }, Mining = { "Mining", "Minage" },
+}
+local function SameProf(name, key)
+    for _, n in ipairs(PROF_NAMES[key] or {}) do if n:lower() == tostring(name):lower() then return true end end
+    return false
+end
+function O.LikelyProfs(item)
+    local GetInfo = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    if not (GetInfo and item and item > 0) then return {} end
+    local _, _, _, equipLoc, _, classID, subID = GetInfo(item)
+    if classID == 0 then        -- consumables
+        if subID == 1 or subID == 2 or subID == 3 then return { "Alchemy" } end
+        if subID == 5 then return { "Cooking" } end
+        if subID == 7 then return { "First Aid" } end
+        if subID == 6 then return { "Leatherworking", "Enchanting", "Alchemy" } end
+        return { "Alchemy", "Engineering", "Cooking" }
+    elseif classID == 2 then    -- weapons: guns and bows from engineering and leatherworking-free smiths
+        if subID == 3 or subID == 18 then return { "Engineering" } end
+        return { "Blacksmithing" }
+    elseif classID == 4 then    -- armour by its material
+        if subID == 1 then return equipLoc == "INVTYPE_CLOAK" and { "Tailoring", "Leatherworking" } or { "Tailoring" } end
+        if subID == 2 then return { "Leatherworking" } end
+        if subID == 3 then return { "Blacksmithing", "Leatherworking" } end
+        if subID == 4 or subID == 6 then return { "Blacksmithing" } end
+        return { "Engineering", "Blacksmithing", "Tailoring" }
+    elseif classID == 1 then return { "Tailoring", "Leatherworking" }      -- bags
+    elseif classID == 7 then    -- trade goods
+        if subID == 1 or subID == 2 or subID == 3 then return { "Engineering" } end
+        if subID == 5 then return { "Tailoring" } end
+        if subID == 6 then return { "Leatherworking" } end
+        if subID == 7 then return { "Mining", "Blacksmithing" } end
+        if subID == 8 then return { "Cooking" } end
+        if subID == 12 then return { "Enchanting" } end
+    end
+    return {}
+end
+-- Members whose declared profession may make this item: { { name, prof, rank, online, exact } }.
+-- Exact ones (a shared recipe) first, then the ones whose profession fits, best rank first.
+function O.Possible(item)
+    local out, seen = {}, {}
+    for _, c in ipairs(O.Crafters(item)) do c.exact = true; out[#out + 1] = c; seen[c.name] = true end
+    local online = O.OnlineGuild()
+    local profs = O.LikelyProfs(item)
+    for name, list in pairs(DB().crafters) do
+        if not seen[name] then
+            for prof, p in pairs(list) do
+                for _, key in ipairs(profs) do
+                    if SameProf(prof, key) and not seen[name] then
+                        seen[name] = true
+                        out[#out + 1] = { name = name, prof = prof, rank = p.rank or 0, online = online[name] or false }
+                    end
+                end
+            end
+        end
+    end
+    table.sort(out, function(a, b)
+        if (a.exact or false) ~= (b.exact or false) then return a.exact or false end
+        if a.online ~= b.online then return a.online end
+        return a.rank > b.rank
+    end)
+    return out
+end
+
+-- What the customer still has to send for an order: { { id, need, have } }, have = in bags and bank
+function O.ToSend(o)
+    local out = {}
+    for _, r in ipairs(O.Decode(o.give)) do
+        local need = r[2] * (o.qty or 1)
+        out[#out + 1] = { id = r[1], need = need, have = WP.OwnedCount and WP.OwnedCount(r[1]) or 0 }
+    end
     return out
 end
 
@@ -866,12 +956,78 @@ function O.Notify(o)
         end
     elseif o.from == me and o.status == "accepted" then
         WP.Print(string.format(L("%s a accepté ta commande : %s ×%d."), o.by or "?", name, o.qty or 1))
+        local t = {}
+        for _, g in ipairs(O.ToSend(o)) do t[#t + 1] = g.need .. "× " .. O.Name(g.id) .. (g.have < g.need and (" (" .. string.format(L("il t'en manque %d"), g.need - g.have) .. ")") or "") end
+        if #t > 0 then WP.Print(string.format(L("À lui envoyer (poste ou échange) : %s. /wlh orders"), table.concat(t, ", "))) end
     elseif o.from == me and o.status == "declined" then
         WP.Print(string.format(L("%s a refusé ta commande (%s)."), o.by or "?", L(o.reason or "?")))
     elseif o.from == me and o.status == "crafted" then
         WP.Print(string.format(L("%s a fabriqué ta commande : %s ×%d. Elle arrive par la poste."), o.by or "?", name, o.qty or 1))
     end
 end
+
+-- ---------------------------------------------------------------- automatic steps
+-- The crafter made the order: the item shows up in their bags (more than when they accepted it).
+local function CheckCrafted()
+    local me = Me()
+    local count = (C_Item and C_Item.GetItemCount) or GetItemCount
+    if not count then return end
+    for _, o in pairs(DB().list) do
+        if o.by == me and o.status == "accepted" and o.item and o.item > 0 and o.baseCount then
+            if (count(o.item) or 0) >= o.baseCount + (o.qty or 1) then
+                O.Crafted(o)
+                WP.Print(string.format(L("Commande fabriquée : %s ×%d pour %s. Envoie-la par la poste ou en échange."), O.Name(o.item), o.qty or 1, o.from))
+            end
+        end
+    end
+end
+
+-- A trade with the other side of an order: what you gave decides the step (the customer's reagents
+-- are sent; the crafter's item is delivered). Read when both sides accepted, applied when it completes.
+local trade = {}
+local function TradeItems(get)
+    local out = {}
+    for i = 1, 6 do
+        local link = get and get(i)
+        local id = link and tonumber(link:match("item:(%d+)"))
+        if id then out[id] = true end
+    end
+    return out
+end
+local function TradeDone()
+    local me, who, gave = Me(), trade.with, trade.gave or {}
+    if not who then return end
+    for _, o in pairs(DB().list) do
+        if o.from == me and o.by == who and o.status == "accepted" and not o.sentGive then
+            for _, g in ipairs(O.Decode(o.give)) do
+                if gave[g[1]] then o.sentGive = true; WP.Print(string.format(L("Composants remis à %s pour %s."), who, O.Name(o.item))); break end
+            end
+        elseif o.by == me and o.from == who and (o.status == "accepted" or o.status == "crafted") and gave[o.item] then
+            O.Delivered(o)
+            WP.Print(string.format(L("Commande livrée à %s : %s."), who, O.Name(o.item)))
+        end
+    end
+    if WP.RefreshOrders then WP.RefreshOrders() end
+end
+local tf = CreateFrame("Frame")
+for _, e in ipairs({ "TRADE_SHOW", "TRADE_ACCEPT_UPDATE", "TRADE_CLOSED", "UI_INFO_MESSAGE", "BAG_UPDATE_DELAYED" }) do pcall(tf.RegisterEvent, tf, e) end
+local craftQueued = false
+tf:SetScript("OnEvent", function(_, e, a1, a2)
+    if not (WLWritsDB and WP.ModuleOn("orders")) then return end
+    if e == "TRADE_SHOW" then
+        trade = { with = Short(UnitName("NPC") or "") }
+    elseif e == "TRADE_ACCEPT_UPDATE" then
+        trade.gave = TradeItems(GetTradePlayerItemLink)
+    elseif e == "UI_INFO_MESSAGE" then
+        local msg = type(a2) == "string" and a2 or a1
+        if ERR_TRADE_COMPLETE and msg == ERR_TRADE_COMPLETE then TradeDone(); trade = {} end
+    elseif e == "TRADE_CLOSED" then
+        C_Timer.After(1, function() trade = {} end)
+    elseif e == "BAG_UPDATE_DELAYED" and not craftQueued then
+        craftQueued = true
+        C_Timer.After(0.5, function() craftQueued = false; CheckCrafted() end)
+    end
+end)
 
 local f = CreateFrame("Frame")
 pcall(f.RegisterEvent, f, "PLAYER_LOGIN")

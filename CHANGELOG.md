@@ -6,6 +6,19 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.32] — 2026-11-15
+
+### Modifié / Changed
+- **Writs et Faveur du marchand séparés** : deux tuiles sur l'accueil et deux fenêtres. **Writs** (réputation avec Durotar Supply and Logistics : Aujourd'hui, Achats, Tous) et **Faveur du marchand** (les caisses). L'onglet Achats dit « Coût » puis « pour 29 writs, qui rapportent 3 025 points de réputation » au lieu de « +3025 rép ».
+  *Writs and Merchant's Favor split into two tiles and two windows; clearer cost and reputation wording.*
+- **Prix max pour 100 points de réputation** réglable dans Achats (20 pa, 40 pa, 1 po, sans) : le plan prend les writs les moins chers et le moins de zones possible sous ce plafond.
+  *A price cap per 100 reputation in the Shopping tab.*
+- **Commandes, le circuit de bout en bout** :
+  - en commandant un objet (Maj-clic), les **artisans possibles** : recette connue, ou métier compatible avec le type d'objet (potion → Alchimie, tissu → Couture, plaque → Forge...), en ligne d'abord, avec leurs étoiles ; « À lui » pour lui commander directement ;
+  - dès qu'un artisan prend la commande, le client reçoit dans le chat **ce qu'il doit envoyer** et ce qui lui manque ; sur la commande : « À envoyer à X » avec ce que tu as (sacs et banque), **Acheter le manquant** à l'HV, **Préparer le courrier** à la boîte aux lettres ;
+  - **automatique** : un échange avec l'autre côté marque les composants remis ou la commande livrée ; l'objet qui apparaît dans les sacs de l'artisan marque la commande fabriquée ; le courrier envoyé était déjà suivi.
+  *Orders end to end: possible crafters, what to send and buy, mail prep, automatic steps on trade and craft.*
+
 ## [1.0.0-beta.31] — 2026-11-15
 
 ### Ajouté / Added
