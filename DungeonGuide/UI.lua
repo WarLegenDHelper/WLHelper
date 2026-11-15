@@ -360,7 +360,7 @@ local function Build()
   h.logo:SetTexture("Interface\\TargetingFrame\\UI-PVP-Horde"); h.logo:SetTexCoord(0.08, 0.58, 0.03, 0.6)
   h.title = Text(h, 13, T.text, true); h.title:SetPoint("LEFT", 28, 0); h.title:SetText(L.TITLE)
   f.header = h
-  local close = Button(h, 22, 20, "x", function() f:Hide(); WLDTDB.hidden = true; if ns.UpdateActionBar then ns.UpdateActionBar() end end, function() return { L.TT_HCLOSE } end)
+  local close = Button(h, 22, 20, "x", function() f:Hide(); WLDTDB.hidden = true; ns.SetArrow(nil); if ns.UpdateActionBar then ns.UpdateActionBar() end end, function() return { L.TT_HCLOSE } end)
   close:SetPoint("RIGHT", -4, 0)
   f.miniBtn = Button(h, 22, 20, "-", function() f.mini = not f.mini; WLDTDB.mini = f.mini; Render() end, function() return { L.TT_HMIN } end)
   f.miniBtn:SetPoint("RIGHT", close, "LEFT", -4, 0)
@@ -1211,5 +1211,6 @@ function ns.ActionBarPending() return abPending end
 function ns.ToggleMain()
   if not f then return end
   f:SetShown(not f:IsShown()); WLDTDB.hidden = not f:IsShown()
+  if WLDTDB.hidden then ns.SetArrow(nil) end
   if ns.UpdateActionBar then ns.UpdateActionBar() end
 end

@@ -63,10 +63,12 @@ end
 -- =====================================================================
 local function GPS() return ns.Writs and ns.Writs.WP and ns.Writs.WP.GPS end
 
+-- Pas de flèche pour les donjons quand le guide est fermé ou la flèche coupée (bouton « Flèche »
+-- ou le x de la flèche) : ça tient après un /reload.
 function ns.SetArrow(p)
   local G = GPS()
   if not G then return end
-  if p and WLDTDB.arrow ~= false then
+  if p and WLDTDB.arrow ~= false and not WLDTDB.hidden then
     G.GoPoint(p[1], p[2], p[3], p[4], "dungeon")
   else
     G.Stop("dungeon")

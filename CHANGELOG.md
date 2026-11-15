@@ -6,6 +6,10 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+### Corrigé / Fixed
+- La flèche des donjons ne réapparaît plus à chaque /reload quand le guide est fermé ; fermer la flèche (x) tient après un reload, le bouton « Flèche » la remet.
+  *The dungeon arrow no longer comes back on every /reload while the guide is closed; closing it (x) sticks, the guide's Arrow button brings it back.*
+
 ## [1.0.0-beta.1] — 2026-11-15
 
 Première version de WL Helper (bêta). WL Dungeon Guide devient **WL Helper**.

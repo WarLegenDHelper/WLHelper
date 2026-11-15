@@ -87,7 +87,14 @@ local function Build()
     local x = S.Text(close, 13)
     x:SetPoint("CENTER"); x:SetText("x"); x:SetTextColor(1, 1, 1, 0.53)
     close:SetScript("OnClick", function()
-        if WLWritsCharDB.gps then WP.ToggleGPS() else GPS.Stop() end
+        if GPS.Source() == "dungeon" then
+            if WLDTDB then WLDTDB.arrow = false end   -- the guide's "Arrow" button turns it back on
+            GPS.Stop()
+        elseif WLWritsCharDB.gps then
+            WP.ToggleGPS()
+        else
+            GPS.Stop()
+        end
     end)
 
     arrow.fly = S.Button(arrow, "", 214, function() GPS.TakeFlight() end)
