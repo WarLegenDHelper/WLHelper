@@ -39,5 +39,13 @@ git push origin $tag
 $notesFile = Join-Path $env:TEMP "wlhelper-notes.md"
 Set-Content -Path $notesFile -Value $notes -Encoding UTF8
 # Betas are published as normal releases on purpose: WowUp only offers non-prerelease versions by default.
-gh release create $tag $zip --title "WL Helper $version" --notes-file $notesFile
+# release.json tells WowUp which client the zip is for (flavor "forever", the toc's interface);
+# without it WowUp warns "unable to verify ... compatible" on every install.
+$iface = (($toc | Where-Object { $_ -match '^## Interface:' } | Select-Object -First 1) -replace '^## Interface:\s*', '').Trim()
+$rel = @{ releases = @(@{ name = "WLHelper"; version = $version; filename = "WLHelper-$version.zip"; nolib = $false;
+    metadata = @(@{ flavor = "forever"; interface = [int]$iface }) }) } | ConvertTo-Json -Depth 6 -Compress
+$relFile = "dist
+elease.json"
+Set-Content -Path $relFile -Value $rel -Encoding ascii -NoNewline
+gh release create $tag $zip $relFile --title "WL Helper $version" --notes-file $notesFile
 Remove-Item $notesFile -Force -Confirm:$false
