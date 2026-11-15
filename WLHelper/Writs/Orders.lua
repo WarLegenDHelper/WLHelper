@@ -213,6 +213,68 @@ local function ReadProfession()
     d.mine[prof] = { rank = rank, max = max, recipes = recipes, hash = hash }
     if not old or old.hash ~= hash then O.Announce() end
 end
+-- Your recipes as Mastercraft already knows them (its saved scans of your profession windows), so
+-- the guild sees them without you reopening each window. Only fills what WL Helper has not read itself.
+local function ProfessionRanks()
+    local out = {}
+    if GetProfessions and GetProfessionInfo then
+        local list = { pcall(GetProfessions) }
+        for i = 2, #list do
+            local idx = list[i]
+            if idx then
+                local ok, name, _, rank, max = pcall(GetProfessionInfo, idx)
+                if ok and name then out[name] = { rank, max } end
+            end
+        end
+    end
+    return out
+end
+function O.ImportFromMastercraft()
+    local db = MastercraftDB and MastercraftDB.recipes
+    local mine = db and UnitGUID and db[UnitGUID("player")]
+    if type(mine) ~= "table" then return false end
+    local d, ranks, changed = DB(), ProfessionRanks(), false
+    for prof, p in pairs(mine) do
+        if type(p) == "table" and type(p.list) == "table" and not d.mine[prof] then
+            local recipes = {}
+            for _, r in ipairs(p.list) do
+                if type(r) == "table" and r.learned ~= false and (r.output or r.id) then
+                    local reagents = {}
+                    for _, g in ipairs(r.reagents or {}) do
+                        if g.itemID then reagents[#reagents + 1] = { g.itemID, g.qty or 1 } end
+                    end
+                    local key = (type(r.output) == "number" and r.output > 0) and r.output or (type(r.id) == "number" and -r.id)
+                    if key then recipes[key] = Encode(reagents) end
+                end
+            end
+            if next(recipes) then
+                local rk = ranks[prof] or {}
+                d.mine[prof] = { rank = rk[1] or 0, max = rk[2] or 0, recipes = recipes, hash = Hash(recipes), from = "Mastercraft" }
+                changed = true
+            end
+        end
+    end
+    if changed then O.Announce() end
+    return changed
+end
+
+-- Your professions and their level, straight from the game (no profession window needed): the guild
+-- sees who crafts what even before the recipe lists arrive.
+function O.ReadProfessionList()
+    local d, changed = DB(), false
+    for prof, rk in pairs(ProfessionRanks()) do
+        local p = d.mine[prof]
+        if not p then
+            d.mine[prof] = { rank = rk[1] or 0, max = rk[2] or 0, recipes = {}, hash = "0" }
+            changed = true
+        elseif p.rank ~= rk[1] then
+            p.rank, p.max = rk[1] or p.rank, rk[2] or p.max
+            changed = true
+        end
+    end
+    if changed then O.Announce() end
+end
+
 local readQueued = false
 local function QueueRead()
     if readQueued then return end
@@ -711,6 +773,8 @@ f:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
         pcall(Prune)
         C_Timer.After(20, function()
             O.Announce()
+            pcall(O.ImportFromMastercraft)
+            pcall(O.ReadProfessionList)
             Guild("S|")   -- ask the others to resend their running orders
             O.AskRecipes()
         end)

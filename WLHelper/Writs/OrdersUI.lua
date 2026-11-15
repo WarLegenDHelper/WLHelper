@@ -15,8 +15,11 @@ ns.AddEnglish({
     ["Reçues"] = "Received",
     ["Chercher un objet à faire fabriquer"] = "Search an item to have crafted",
     ["%d artisans connus · %d en ligne"] = "%d crafters known · %d online",
-    ["Tes métiers partagés : %s"] = "Your shared professions: %s",
-    ["Tes métiers : aucun lu. Ouvre une fois chacune de tes fenêtres de métier."] = "Your professions: none read yet. Open each of your profession windows once.",
+    ["Chuchoter"] = "Whisper",
+    ["Aucun artisan connu pour l'instant : les membres qui ont WL Helper partagent leurs métiers en se connectant. Tape un objet pour chercher qui le fabrique."] =
+        "No crafter known yet: members who have WL Helper share their professions when they log in. Type an item to find who makes it.",
+    ["tes métiers : %s"] = "yours: %s",
+    ["tes métiers : aucun"] = "yours: none yet",
     ["en ligne"] = "online",
     ["vu il y a %d j"] = "seen %d d ago",
     ["hors ligne"] = "offline",
@@ -111,15 +114,18 @@ local function BuildFind(p)
     f.box:SetPoint("TOPLEFT", PAD, -12)
     f.box:HookScript("OnTextChanged", function() WP.RefreshOrders() end)
     f.info = S.Text(p, 12, C.dim); f.info:SetPoint("TOPLEFT", PAD, -48); f.info:SetPoint("RIGHT", -PAD, 0)
-    f.info:SetJustifyH("LEFT"); f.info:SetWordWrap(true)
-    f.list = List(p, -86, 52, function(parent)
+    f.info:SetJustifyH("LEFT"); f.info:SetWordWrap(false)
+    f.list = List(p, -70, 52, function(parent)
         local r = CreateFrame("Frame", nil, parent)
         r:SetSize(W - 2 * PAD, 40)
         S.Solid(r, "BACKGROUND", C.card):SetAllPoints(); S.Border(r, C.border)
         r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:SetSize(22, 22); r.icon:SetPoint("LEFT", 9, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         r.name = S.Text(r, 14, C.text); r.name:SetPoint("TOPLEFT", 40, -5); r.name:SetPoint("RIGHT", -96, 0); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
         r.sub = S.Text(r, 12, C.dim); r.sub:SetPoint("BOTTOMLEFT", 40, 6); r.sub:SetPoint("RIGHT", -96, 0); r.sub:SetJustifyH("LEFT"); r.sub:SetWordWrap(false)
-        r.btn = S.Button(r, L("Commander"), 80, 26, "secondary", function() if r.item then WP.NewOrder(r.item, r.crafter) end end)
+        r.btn = S.Button(r, L("Commander"), 80, 26, "secondary", function()
+            if r.item then WP.NewOrder(r.item, r.crafter)
+            elseif r.whisper and ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. r.whisper .. " ") end
+        end)
         r.btn:SetPoint("RIGHT", -7, 0)
         return r
     end)
@@ -146,9 +152,8 @@ local function RenderFind()
         mineT[#mineT + 1] = prof .. " " .. (p.rank or 0) .. " (" .. n .. ")"
     end
     table.sort(mineT)
-    f.info:SetText(string.format(L("%d artisans connus · %d en ligne"), crafters, online) .. "\n"
-        .. (#mineT > 0 and string.format(L("Tes métiers partagés : %s"), table.concat(mineT, ", "))
-            or L("Tes métiers : aucun lu. Ouvre une fois chacune de tes fenêtres de métier.")))
+    f.info:SetText(string.format(L("%d artisans connus · %d en ligne"), crafters, online) .. "  ·  "
+        .. (#mineT > 0 and string.format(L("tes métiers : %s"), table.concat(mineT, ", ")) or L("tes métiers : aucun")))
     local catalog = O.Catalog()
     local rows = {}
     if #q >= 2 then
@@ -164,11 +169,41 @@ local function RenderFind()
         if a.c.online ~= b.c.online then return a.c.online end
         return a.c.rank > b.c.rank
     end)
+    -- nothing typed: the guild's crafters by profession (shared at login, recipes or not)
+    if #q < 2 then
+        local list = {}
+        for name, profs in pairs(O.DB().crafters) do
+            for prof, p in pairs(profs) do list[#list + 1] = { name = name, prof = prof, rank = p.rank or 0, online = on[name] or false, n = p.recipes and next(p.recipes) and 1 or 0 } end
+        end
+        table.sort(list, function(a, b)
+            if a.prof ~= b.prof then return a.prof < b.prof end
+            if a.online ~= b.online then return a.online end
+            return a.rank > b.rank
+        end)
+        local y = 0
+        for i, c in ipairs(list) do
+            local row = f.list.Get(i)
+            row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y)
+            row.item, row.crafter, row.whisper = nil, nil, c.name
+            row.icon:SetTexture("Interface\\Icons\\INV_Misc_Note_01")
+            row.name:SetText(c.name); row.name:SetTextColor(C.text[1], C.text[2], C.text[3])
+            row.sub:SetText(c.prof .. " " .. c.rank .. " · " .. (c.online and (S.Hex(C.ready) .. L("en ligne") .. "|r") or L("hors ligne")))
+            row.btn.label:SetText(L("Chuchoter")); row.btn:SetShown(c.online)
+            y = y + 46
+            if i >= 80 then break end
+        end
+        f.list.HideFrom(math.min(#list, 80) + 1)
+        f.empty:SetShown(#list == 0)
+        f.empty:SetText(L("Aucun artisan connu pour l'instant : les membres qui ont WL Helper partagent leurs métiers en se connectant. Tape un objet pour chercher qui le fabrique."))
+        f.list.content:SetHeight(math.max(10, y))
+        return
+    end
     local y = 0
     for i, r in ipairs(rows) do
         local row = f.list.Get(i)
         row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y)
-        row.item, row.crafter = r.item, not r.c.me and r.c.name or nil
+        row.item, row.crafter, row.whisper = r.item, not r.c.me and r.c.name or nil, nil
+        row.btn.label:SetText(L("Commander"))
         row.icon:SetTexture(S.ItemIcon(r.item))
         row.name:SetText(Name(r.item)); local qc = S.QualityColor(r.item); row.name:SetTextColor(qc[1], qc[2], qc[3])
         local where = r.c.online and S.Hex(C.ready) .. L("en ligne") .. "|r"

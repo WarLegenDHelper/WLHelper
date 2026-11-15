@@ -875,7 +875,7 @@ WP.MODULES = {
     { key = "bags", label = "Sacs", hint = "Nettoyeur des objets de quête inutiles" },
     { key = "orders", label = "Commandes", hint = "Faire fabriquer par la guilde, accepter des commandes" },
     { key = "guild", label = "Guilde", hint = "Voir toute la guilde et le classement PvP" },
-    { key = "events", label = "Événements", hint = "Donjons et raids de la guilde, groupes du moment" },
+    { key = "events", label = "LFG", hint = "Donjons et raids de la guilde, groupes du moment" },
     { key = "upgrades", label = "Améliorations", hint = "Flèche verte sur les objets meilleurs que les tiens" },
 }
 function WP.ModuleOn(key)

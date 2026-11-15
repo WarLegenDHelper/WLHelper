@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.28] — 2026-11-15
+
+### Modifié / Changed
+- **Commandes : chacun partage ses métiers dès la connexion**, avec leur niveau, sans ouvrir de fenêtre (comme WaR LegenD RaidTool). Les recettes viennent en plus : de la fenêtre de métier, ou de Mastercraft s'il les a déjà lues. Sans recherche, l'onglet Artisans liste les artisans de la guilde par métier (bouton Chuchoter).
+  *Orders: everyone shares their professions and levels at login; recipes also come from Mastercraft; crafters listed by profession.*
+- **LFG** (ancien « Événements ») : icônes de rôle du jeu (tank, soins, dégâts) ; dans Créer, choix d'un ou plusieurs donjons ou raids dans la liste du guide, ou une quête ou autre chose à écrire.
+  *LFG (formerly Events): the game's role icons; pick one or more dungeons or raids when creating.*
+- **Accueil en grille** : les Quêtes de donjon en haut, les autres modules en tuiles sur deux colonnes.
+- Réglages : les explications ne passent plus sous les boutons ; le tableau des poids est aligné en deux colonnes.
+
 ## [1.0.0-beta.27] — 2026-11-15
 
 ### Ajouté / Added

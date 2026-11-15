@@ -17,6 +17,7 @@ local C = S.C
 
 ns.AddEnglish({
     ["Événements"] = "Events",
+    ["Donjon"] = "Dungeon", ["Raid"] = "Raid", ["Quête"] = "Quest", ["Autre"] = "Other",
     ["Donjons et raids de la guilde, groupes du moment"] = "Guild dungeons and raids, groups right now",
     ["À venir"] = "Upcoming",
     ["Créer"] = "Create",
@@ -72,6 +73,16 @@ local function On() return WP.ModuleOn("events") end
 local function Clean(s, max) s = tostring(s or ""):gsub("[|~\n]", " "); if max and #s > max then s = s:sub(1, max) end; return s end
 local ROLES = { "tank", "heal", "dps" }
 local ROLE_LABEL = { tank = "Tank", heal = "Soins", dps = "DPS" }
+-- the game's role icons (64 x 64 sheet): shield, cross, sword
+local ROLE_ICON = "Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES"
+local ROLE_TC = { tank = { 0, 19, 22, 41 }, heal = { 20, 39, 1, 20 }, dps = { 20, 39, 22, 41 } }
+local function RoleIcon(role, size)
+    local t = ROLE_TC[role]
+    if not t then return "" end
+    size = size or 16
+    return string.format("|T%s:%d:%d:0:0:64:64:%d:%d:%d:%d|t", ROLE_ICON, size, size, t[1], t[2], t[3], t[4])
+end
+local function RoleText(role, size) return RoleIcon(role, size) .. " " .. L(ROLE_LABEL[role] or "?") end
 
 local function DB()
     WLWritsDB.events = WLWritsDB.events or {}
@@ -322,7 +333,7 @@ local function EventCard(parent)
     c.note = S.Text(c, 12, C.muted); c.note:SetPoint("TOPLEFT", c.who, "BOTTOMLEFT", 0, -4); c.note:SetPoint("RIGHT", -12, 0); c.note:SetJustifyH("LEFT"); c.note:SetWordWrap(true)
     c.btns = {}
     for i, role in ipairs(ROLES) do
-        local b = S.Button(c, L(ROLE_LABEL[role]), 84, 26, "secondary", function() if c.e then WP.SignUp(c.e, role) end end)
+        local b = S.Button(c, RoleText(role, 14), 92, 26, "secondary", function() if c.e then WP.SignUp(c.e, role) end end)
         b.role = role
         c.btns[i] = b
     end
@@ -345,7 +356,7 @@ local function PaintEvent(c, e)
         local want = e[role] or 0
         if want > 0 or n[role] > 0 then
             local col = (n[role] >= want and want > 0) and C.ready or C.text
-            parts[#parts + 1] = S.Hex(col) .. L(ROLE_LABEL[role]) .. " " .. n[role] .. "/" .. want .. "|r"
+            parts[#parts + 1] = RoleIcon(role, 16) .. " " .. S.Hex(col) .. n[role] .. "/" .. want .. "|r"
         end
     end
     c.roles:SetText(table.concat(parts, "   "))
@@ -353,7 +364,7 @@ local function PaintEvent(c, e)
     for name, s in pairs(e.signups or {}) do names[#names + 1] = { name, s } end
     table.sort(names, function(a, b) return a[1] < b[1] end)
     local t = {}
-    for _, p in ipairs(names) do t[#t + 1] = ClassHex(p[2].cls) .. p[1] .. "|r " .. S.Hex(C.muted) .. "(" .. L(ROLE_LABEL[p[2].role] or "?") .. ")|r" end
+    for _, p in ipairs(names) do t[#t + 1] = RoleIcon(p[2].role, 12) .. ClassHex(p[2].cls) .. p[1] .. "|r" end
     c.who:SetText(#t > 0 and table.concat(t, ", ") or "")
     c.note:SetText(e.note or "")
     -- buttons: sign up with a role / step out; the organizer invites or cancels
@@ -416,7 +427,7 @@ local function RenderNow()
         r.bg:SetAlpha(i % 2 == 0 and 0.6 or 1)
         r.who = l.name
         r.name:SetText(ClassHex(l.cls) .. l.name .. "|r " .. S.Hex(C.muted) .. (l.lvl or "") .. "|r")
-        r.role:SetText(L(ROLE_LABEL[l.role] or "?"))
+        r.role:SetText(RoleText(l.role, 14))
         r.what:SetText(l.what or "")
         r.ago:SetText(string.format(L("il y a %d min"), math.max(0, math.floor((time() - l.t) / 60))))
     end
@@ -436,28 +447,92 @@ local function DayChoices()
     return out
 end
 
+-- the dungeons and raids of the guide, for the "What" picker: { { key, name, lvlFrom, raid } }
+local function Instances(kind)
+    local out = {}
+    for _, k in ipairs(root.ORDER or {}) do
+        local d = root.D and root.D[k]
+        if d and not d.cq and ((kind == "raid") == (d.raid == true)) then
+            out[#out + 1] = { k, root.DName and root.DName(k) or d.n, d.lvl and d.lvl[1] or 0 }
+        end
+    end
+    table.sort(out, function(a, b) if a[3] ~= b[3] then return a[3] < b[3] end return a[2] < b[2] end)
+    return out
+end
+local picked = {}
+local function PickedTitle()
+    local t = {}
+    for _, e in ipairs(Instances(draft.kind == "raid" and "raid" or "dg")) do if picked[e[1]] then t[#t + 1] = e[2] end end
+    return table.concat(t, " + ")
+end
+
 local function BuildCreate(p)
-    local y = -14
+    local y = -12
     local function Label(text) local t = S.Text(p, 13, C.dim, true); t:SetPoint("TOPLEFT", PAD, y); t:SetText(text); y = y - 22; return t end
+    draft.kind = draft.kind or "dg"
+    -- the kind, then the instances of that kind as chips (several can be picked)
+    local chips = CreateFrame("ScrollFrame", nil, p)
+    local inner = CreateFrame("Frame", nil, chips)
+    local function Chips()
+        for _, c in ipairs(inner.items or {}) do c:Hide() end
+        inner.items = inner.items or {}
+        local list = (draft.kind == "dg" or draft.kind == "raid") and Instances(draft.kind) or {}
+        local cw, ch, cols = math.floor((W - 2 * PAD - 18) / 3), 26, 3
+        for i, e in ipairs(list) do
+            local c = inner.items[i]
+            if not c then
+                c = CreateFrame("Button", nil, inner)
+                c:SetSize(cw, ch)
+                c.bg = S.Solid(c, "BACKGROUND", C.card); c.bg:SetAllPoints()
+                c.edge = S.Border(c, C.border)
+                c.t = S.Text(c, 12, C.text); c.t:SetPoint("LEFT", 8, 0); c.t:SetPoint("RIGHT", -6, 0); c.t:SetJustifyH("LEFT"); c.t:SetWordWrap(false)
+                c:SetScript("OnClick", function(self)
+                    picked[self.key] = not picked[self.key] or nil
+                    ui.title:SetText(PickedTitle())
+                    Chips()
+                end)
+                inner.items[i] = c
+            end
+            c.key = e[1]
+            c:ClearAllPoints(); c:SetPoint("TOPLEFT", ((i - 1) % cols) * (cw + 6), -math.floor((i - 1) / cols) * (ch + 6))
+            c.t:SetText(e[2] .. "  " .. S.Hex(C.muted) .. e[3] .. "|r")
+            local on = picked[e[1]]
+            c.bg:SetColorTexture((on and C.brandBg or C.card)[1], (on and C.brandBg or C.card)[2], (on and C.brandBg or C.card)[3], 1)
+            c.edge(on and C.brand or C.border)
+            c:Show()
+        end
+        inner:SetSize(W - 2 * PAD, math.max(10, math.ceil(#list / cols) * (ch + 6)))
+        chips:SetShown(#list > 0)
+    end
+    local kind = S.Segmented(p, { { "dg", L("Donjon") }, { "raid", L("Raid") }, { "quest", L("Quête") }, { "other", L("Autre") } },
+        function() return draft.kind end, function(v) draft.kind = v; wipe(picked); ui.title:SetText(""); Chips() end, 28)
+    kind:SetPoint("TOPLEFT", PAD, y); y = y - 38
+    chips:SetPoint("TOPLEFT", PAD, y); chips:SetSize(W - 2 * PAD, 124); chips:SetScrollChild(inner)
+    chips:EnableMouseWheel(true)
+    chips:SetScript("OnMouseWheel", function(self, dlt)
+        local max = math.max(0, inner:GetHeight() - self:GetHeight())
+        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - dlt * 32)))
+    end)
+    y = y - 132
     Label(L("Quoi"))
     ui.title = Box(p, W - 2 * PAD, L("Zul'Farrak, Onyxia, farm de cuir..."))
-    ui.title:SetPoint("TOPLEFT", PAD, y); ui.title:SetMaxLetters(60); y = y - 44
+    ui.title:SetPoint("TOPLEFT", PAD, y); ui.title:SetMaxLetters(60); y = y - 40
+    Chips()
     Label(L("Jour"))
     ui.day = S.Segmented(p, DayChoices(), function() return draft.day end, function(v) draft.day = v end, 28)
-    ui.day:SetPoint("TOPLEFT", PAD, y); y = y - 44
-    Label(L("Heure"))
-    ui.hour = Box(p, 90, "20:30"); ui.hour:SetPoint("TOPLEFT", PAD, y); ui.hour:SetMaxLetters(5); y = y - 44
-    Label(L("Places"))
-    local x = PAD
+    ui.day:SetPoint("TOPLEFT", PAD, y); y = y - 40
+    Label(L("Heure") .. "                    " .. L("Places"))
+    ui.hour = Box(p, 90, "20:30"); ui.hour:SetPoint("TOPLEFT", PAD, y); ui.hour:SetMaxLetters(5)
+    local x = PAD + 150
     for _, role in ipairs(ROLES) do
-        local t = S.Text(p, 13, C.text); t:SetPoint("TOPLEFT", x, y - 6); t:SetText(L(ROLE_LABEL[role]))
-        local b = Box(p, 50, nil, true); b:SetPoint("TOPLEFT", x + t:GetStringWidth() + 8, y)
+        local t = S.Text(p, 13, C.text); t:SetPoint("TOPLEFT", x, y - 4); t:SetText(RoleIcon(role, 20))
+        local b = Box(p, 50, nil, true); b:SetPoint("TOPLEFT", x + 28, y)
         b:SetText(tostring(draft[role])); ui["n_" .. role] = b
-        x = x + t:GetStringWidth() + 80
+        x = x + 96
     end
-    y = y - 44
+    y = y - 40
     Label(L("Note"))
-    ui.note = Box(p, W - 2 * PAD, nil); ui.note:SetPoint("TOPLEFT", PAD, y); ui.note:SetMaxLetters(120); y = y - 52
+    ui.note = Box(p, W - 2 * PAD, nil); ui.note:SetPoint("TOPLEFT", PAD, y); ui.note:SetMaxLetters(120); y = y - 40
     ui.err = S.Text(p, 12, C.danger); ui.err:SetPoint("TOPLEFT", PAD, y + 6)
     local go = S.Button(p, L("Publier l'événement"), W - 2 * PAD, 36, "primary", function()
         local title = ui.title:GetText()
@@ -469,7 +544,7 @@ local function BuildCreate(p)
         if when < time() - 60 then ui.err:SetText(L("Cette heure est déjà passée.")); return end
         local function N(role) return tonumber(ui["n_" .. role]:GetText()) or 0 end
         WP.CreateEvent(title, when, N("tank"), N("heal"), N("dps"), ui.note:GetText())
-        ui.err:SetText(""); ui.title:SetText(""); ui.note:SetText("")
+        ui.err:SetText(""); ui.title:SetText(""); ui.note:SetText(""); wipe(picked); Chips()
         WP.ShowEventsTab("upcoming")
     end)
     go:SetPoint("BOTTOMLEFT", PAD, PAD)
@@ -483,7 +558,7 @@ local function BuildNow(p)
     end)
     ui.lookSwitch:SetPoint("TOPRIGHT", -PAD, -12)
     local rl = S.Text(p, 13, C.dim); rl:SetPoint("TOPLEFT", PAD, -52); rl:SetText(L("Mon rôle"))
-    local seg = S.Segmented(p, { { "tank", L("Tank") }, { "heal", L("Soins") }, { "dps", L("DPS") } },
+    local seg = S.Segmented(p, { { "tank", RoleText("tank", 14) }, { "heal", RoleText("heal", 14) }, { "dps", RoleText("dps", 14) } },
         function() return WLWritsCharDB.lfgRole or "dps" end, function(v)
             WLWritsCharDB.lfgRole = v
             if WP.IsLooking() then WP.SetLooking(v, ui.what:GetText()) end
@@ -501,7 +576,7 @@ local function BuildNow(p)
 end
 
 local function Build()
-    win = S.Window("WLHelperEvents", W, H, L("Événements"), GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "eventsPos")
+    win = S.Window("WLHelperEvents", W, H, "LFG", GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "eventsPos")
     tabs = S.Tabs(win, { { "upcoming", L("À venir") }, { "create", L("Créer") }, { "now", L("Groupe maintenant") } },
         function() return current end, function(k) WP.ShowEventsTab(k) end, function(k)
             if k == "upcoming" then local n = #WP.EventList(); return n > 0 and n or nil end

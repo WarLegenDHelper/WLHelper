@@ -319,7 +319,18 @@ end
 local function Place(p, row, control, xOff)
     control:ClearAllPoints()
     control:SetPoint("RIGHT", row, "RIGHT", -(xOff or 0), 0)
-    if row.hint then row.hint:SetPoint("RIGHT", control, "LEFT", -10, 0) end
+    if row.hint then
+        row.hint:SetPoint("RIGHT", control, "LEFT", -10, 0)
+        -- the hint never runs over the label: it gets the room left between them, cut with "..."
+        -- when longer, and the whole text shows on the row's tooltip
+        local room = (CONTENT_W - 2 * PAD_X) - (control:GetWidth() or 0) - (xOff or 0) - (row.label:GetStringWidth() or 0) - 30
+        row.hint:SetWordWrap(false)
+        if room < 60 then row.hint:Hide() else row.hint:SetWidth(math.min(room, row.hint:GetStringWidth() + 2)) end
+        local full = row.hint:GetText()
+        row:EnableMouse(true)
+        row:SetScript("OnEnter", function(self) S.Tip(self, { row.label:GetText() or "", full }) end)
+        row:SetScript("OnLeave", S.HideTip)
+    end
     p.controls[#p.controls + 1] = control
     return control
 end
@@ -560,20 +571,22 @@ function BUILD.upgrades(p)
     end
     local function Refresh() if ns.WP.RefreshUpgrades then ns.WP.RefreshUpgrades() end end
     Section(p, L("Calcul"))
-    local crow = Row(p, L("Calcul"), L("Geared Forever classe plus finement (par tranche de niveaux et par spé) : quand il est installé, son verdict est lu directement"))
+    local crow = Row(p, L("Calcul"))
     Place(p, crow, S.Segmented(crow, { { "auto", L("Geared Forever si installé") }, { "wl", "WL Helper" } },
         function() return WLWritsDB.upgradeSource == "wl" and "wl" or "auto" end,
         function(v) WLWritsDB.upgradeSource = v; Refresh() end))
     CloseSection(p)
+    Note(p, L("Geared Forever classe plus finement (par tranche de niveaux et par spé) : quand il est installé, son verdict est lu directement"), 4)
     Section(p, L("Spé"))
-    local srow = Row(p, L("Spé jugée"), L("Auto : l'arbre de talents où tu as le plus de points"))
+    local srow = Row(p, L("Spé jugée"))
     Place(p, srow, S.Segmented(srow, Wt.SpecChoices(),
         function() local db, c = SpecDB(); return db[c] or "auto" end,
         function(v) local db, c = SpecDB(); db[c] = v; Refresh(); if Rebuild then C_Timer.After(0, Rebuild) end end))
     CloseSection(p)
+    Note(p, L("Auto : l'arbre de talents où tu as le plus de points"), 4)
 
     Section(p, L("Affichage"))
-    local trow = Row(p, L("Flèche à partir de"), L("Le gain minimum pour montrer la flèche dans les sacs"))
+    local trow = Row(p, L("Flèche à partir de"))
     Place(p, trow, S.Segmented(trow, { { 1, "1 %" }, { 3, "3 %" }, { 5, "5 %" }, { 10, "10 %" } },
         function() return WLWritsDB.upgradeMin or 1 end, function(v) WLWritsDB.upgradeMin = v; Refresh() end))
     SwitchRow(p, L("Ligne dans les infobulles d'objet"), function() return WLWritsDB.upgradeTip ~= false end,
@@ -582,11 +595,17 @@ function BUILD.upgrades(p)
 
     local _, label = Wt.Bracket()
     Section(p, string.format(L("Poids utilisés (%s, niveaux %s)"), Wt.SpecName(), label))
-    local lines = {}
-    for _, e in ipairs(Wt.Table()) do
-        lines[#lines + 1] = string.format("%s  %s", L(STAT_NAMES[e[1]] or e[1]), string.format("%.2f", e[2]))
+    p.y = p.y - 4
+    for i, e in ipairs(Wt.Table()) do
+        local line = CreateFrame("Frame", nil, p)
+        line:SetHeight(22)
+        line:SetPoint("TOPLEFT", PAD_X, p.y); line:SetPoint("TOPRIGHT", -PAD_X, p.y)
+        if i % 2 == 0 then S.Solid(line, "BACKGROUND", C.card, 0.6):SetAllPoints() end
+        local name = S.Text(line, 13, C.text); name:SetPoint("LEFT", 8, 0); name:SetText(L(STAT_NAMES[e[1]] or e[1]))
+        local val = S.Text(line, 13, C.brandSoft, true); val:SetPoint("RIGHT", -8, 0); val:SetText(string.format("%.2f", e[2]))
+        p.y = p.y - 22
     end
-    Note(p, table.concat(lines, "\n"), 4)
+    p.y = p.y - 6
     CloseSection(p)
     Note(p, L("Les poids sont ceux de WL Helper : par classe et par spé, ajustés à ta tranche de niveaux (1-20, 21-40, 41-59, 60). Les dégâts d'une école de magie comptent selon ta spé. Un objet que ta classe ne peut pas porter n'a pas de flèche."), 8)
 end

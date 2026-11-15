@@ -51,7 +51,7 @@ ns.AddEnglish({
     ["Clic droit : le remettre dans le plan"] = "Right-click: back in the plan",
 })
 
-local W, PAD, CARD_H = 400, 14, 66
+local W, PAD, CARD_H, TILE_H = 440, 14, 72, 84
 
 local function Guide() return root end
 local function Version()
@@ -87,10 +87,17 @@ local win
 local cards = {}
 
 -- A module card: icon square, title, two lines, an optional bar, and a button or a chevron.
-local function Card(parent, y, icon, tint, onClick)
+local function Card(parent, y, icon, tint, onClick, col)
     local c = CreateFrame("Button", nil, parent)
-    c:SetHeight(CARD_H)
-    c:SetPoint("TOPLEFT", PAD, y); c:SetPoint("TOPRIGHT", -PAD, y)
+    c.tile = col ~= nil
+    if col then
+        local half = (W - 2 * PAD - 10) / 2
+        c:SetSize(half, TILE_H)
+        c:SetPoint("TOPLEFT", PAD + (col - 1) * (half + 10), y)
+    else
+        c:SetHeight(CARD_H)
+        c:SetPoint("TOPLEFT", PAD, y); c:SetPoint("TOPRIGHT", -PAD, y)
+    end
     S.Solid(c, "BACKGROUND", C.card):SetAllPoints()
     c.border = S.Border(c, C.border)
     c.edge = S.Solid(c, "ARTWORK", C.border)
@@ -105,14 +112,23 @@ local function Card(parent, y, icon, tint, onClick)
     c.icon:SetPoint("TOPLEFT", 3, -3); c.icon:SetPoint("BOTTOMRIGHT", -3, 3)
     c.icon:SetTexture(icon); c.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-    c.title = S.Text(c, 17, C.text, true)
+    if c.tile then box:SetSize(30, 30); box:ClearAllPoints(); box:SetPoint("TOPLEFT", 10, -10) end
+    c.title = S.Text(c, c.tile and 15 or 17, C.text, true)
     c.title:SetPoint("TOPLEFT", box, "TOPRIGHT", 12, 1)
-    c.tag = S.Text(c, 13, C.dim)
-    c.tag:SetPoint("BOTTOMLEFT", c.title, "BOTTOMRIGHT", 8, 1)
-    c.line1 = S.Text(c, 14, { 0.79, 0.8, 0.82 })
-    c.line1:SetPoint("TOPLEFT", c.title, "BOTTOMLEFT", 0, -5)
+    c.tag = S.Text(c, c.tile and 11 or 13, C.dim)
+    c.line1 = S.Text(c, c.tile and 12 or 14, { 0.79, 0.8, 0.82 })
+    if c.tile then
+        -- a tile: the title and its tag beside the icon, the two lines under it
+        c.title:ClearAllPoints(); c.title:SetPoint("TOPLEFT", box, "TOPRIGHT", 8, 0); c.title:SetPoint("RIGHT", c, "RIGHT", -26, 0)
+        c.title:SetJustifyH("LEFT"); c.title:SetWordWrap(false)
+        c.tag:SetPoint("TOPLEFT", c.title, "BOTTOMLEFT", 0, -2); c.tag:SetPoint("RIGHT", c, "RIGHT", -8, 0); c.tag:SetJustifyH("LEFT"); c.tag:SetWordWrap(false)
+        c.line1:SetPoint("TOPLEFT", box, "BOTTOMLEFT", 0, -8)
+    else
+        c.tag:SetPoint("BOTTOMLEFT", c.title, "BOTTOMRIGHT", 8, 1)
+        c.line1:SetPoint("TOPLEFT", c.title, "BOTTOMLEFT", 0, -5)
+    end
     c.line1:SetPoint("RIGHT", c, "RIGHT", -40, 0); c.line1:SetJustifyH("LEFT"); c.line1:SetWordWrap(false)
-    c.line2 = S.Text(c, 13, C.ready)
+    c.line2 = S.Text(c, c.tile and 11 or 13, C.ready)
     c.line2:SetPoint("TOPLEFT", c.line1, "BOTTOMLEFT", 0, -4)
     c.line2:SetPoint("RIGHT", c, "RIGHT", -40, 0); c.line2:SetJustifyH("LEFT"); c.line2:SetWordWrap(false)
     c.bar = CreateFrame("Frame", nil, c)
@@ -133,9 +149,19 @@ local function Card(parent, y, icon, tint, onClick)
     c.action:SetPoint("RIGHT", -12, 0)
     c.chev = S.Text(c, 18, C.muted, true)
     c.chev:SetPoint("RIGHT", -14, 0); c.chev:SetText(">")
+    if c.tile then
+        c.action:SetSize(70, 22); c.action:ClearAllPoints(); c.action:SetPoint("TOPRIGHT", -8, -10)
+        c.chev:ClearAllPoints(); c.chev:SetPoint("TOPRIGHT", -10, -14)
+    end
     c:SetScript("OnClick", Click)
     -- with a button on the right, the text stops before it
     function c:Narrow(on)
+        if self.tile then
+            -- a tile: the "on" button sits on the title line; the title stops before it
+            self.title:SetPoint("RIGHT", self, "RIGHT", on and -84 or -26, 0)
+            self.line1:SetPoint("RIGHT", self, "RIGHT", -8, 0); self.line2:SetPoint("RIGHT", self, "RIGHT", -8, 0)
+            return
+        end
         local r = on and -110 or -40
         self.line1:SetPoint("RIGHT", self, "RIGHT", r, 0)
         self.line2:SetPoint("RIGHT", self, "RIGHT", r, 0)
@@ -159,28 +185,25 @@ local function Build()
         if DungeonState() then root.ShowGuide() else root.ShowPicker() end
     end)
     y = y - CARD_H - 10
-    cards.writs = Card(win, y, "Interface\\Icons\\INV_Letter_15", C.warn, function() Close(); WP.Open() end)
-    y = y - CARD_H - 10
+    cards.writs = Card(win, y, "Interface\\Icons\\INV_Letter_15", C.warn, function() Close(); WP.Open() end, 1)
     cards.bags = Card(win, y, "Interface\\Icons\\INV_Misc_Bag_08", C.info, function()
         Close(); if WP.Cleaner then WP.Cleaner.Toggle() end
-    end)
-    y = y - CARD_H - 10
+    end, 2)
+    y = y - TILE_H - 10
     cards.orders = Card(win, y, "Interface\\Icons\\INV_Misc_Note_01", C.ready, function()
         Close(); if WP.ToggleOrders then WP.ToggleOrders() end
-    end)
-    y = y - CARD_H - 10
+    end, 1)
     cards.guild = Card(win, y, "Interface\\Icons\\INV_BannerPVP_01", C.brandSoft or C.info, function()
         Close(); if WP.ToggleGuild then WP.ToggleGuild() end
-    end)
-    y = y - CARD_H - 10
+    end, 2)
+    y = y - TILE_H - 10
     cards.events = Card(win, y, "Interface\\Icons\\Ability_Warrior_BattleShout", C.warn, function()
         Close(); if WP.ToggleEvents then WP.ToggleEvents() end
-    end)
-    y = y - CARD_H - 10
+    end, 1)
     cards.upgrades = Card(win, y, "Interface\\Icons\\INV_Chest_Cloth_17", C.ready, function()
         Close(); if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end
-    end)
-    y = y - CARD_H - 10
+    end, 2)
+    y = y - TILE_H - 10
 
     win.afterCards = y
 
@@ -335,7 +358,7 @@ function WP.RefreshHome()
 
     -- events: the next one, and who looks for a group now
     local ec = cards.events
-    ec.title:SetText(L("Événements")); ec.tag:SetText(""); ec.bar:Hide(); ec.action:Hide(); ec.chev:Show(); ec:Narrow(false)
+    ec.title:SetText("LFG"); ec.tag:SetText(""); ec.bar:Hide(); ec.action:Hide(); ec.chev:Show(); ec:Narrow(false)
     if WP.EventList then
         local list = WP.EventList()
         local nextE
@@ -452,7 +475,7 @@ function WP.MinimapMenu(owner)
             { L("Sacs"), function() if WP.Cleaner then WP.Cleaner.Toggle() end end, "bags" },
             { L("Commandes"), function() if WP.ToggleOrders then WP.ToggleOrders() end end, "orders" },
             { L("Guilde"), function() if WP.ToggleGuild then WP.ToggleGuild() end end, "guild" },
-            { L("Événements"), function() if WP.ToggleEvents then WP.ToggleEvents() end end, "events" },
+            { "LFG", function() if WP.ToggleEvents then WP.ToggleEvents() end end, "events" },
             { L("Améliorations"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end end, "upgrades" },
             false,
             { L("Arrêter le GPS"), function() WP.StopGPS() end, "gps" },
