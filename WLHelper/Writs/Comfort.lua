@@ -12,9 +12,9 @@ local L = ns.L
 local S = ns.S
 
 ns.AddEnglish({
-    ["Comptoir : %d writs prêts, %d enveloppes à ouvrir. /wlh trade"] = "Trading Post: %d writs ready, %d envelopes to open. /wlh trade",
-    ["Comptoir : %d writs prêts. /wlh trade"] = "Trading Post: %d writs ready. /wlh trade",
-    ["Comptoir : %s, %d rép"] = "Trading Post: %s, %d rep",
+    ["Writs : %d prêts à rendre, %d enveloppes à ouvrir. Tape /wlh trade."] = "Writs: %d ready to hand in, %d envelopes to open. Type /wlh trade.",
+    ["Writs : %d prêts à rendre. Tape /wlh trade."] = "Writs: %d ready to hand in. Type /wlh trade.",
+    ["WL Helper : writ %s, %d points de réputation"] = "WL Helper: %s writ, %d reputation",
     ["Objet demandé : %s"] = "Requested item: %s",
     ["dans tes sacs"] = "in your bags",
     ["À rendre à %s, %s %.0f, %.0f"] = "Turn in to %s, %s %.0f, %.0f",
@@ -130,8 +130,8 @@ f:SetScript("OnEvent", function(_, event, a1, a2)
                 for _, r in ipairs(WP.Rows()) do
                     if r.state == "ready" then ready = ready + 1 elseif r.state == "bag" then bag = bag + 1 end
                 end
-                if bag > 0 then WP.Print(string.format(L("Comptoir : %d writs prêts, %d enveloppes à ouvrir. /wlh trade"), ready, bag))
-                elseif ready > 0 then WP.Print(string.format(L("Comptoir : %d writs prêts. /wlh trade"), ready)) end
+                if bag > 0 then WP.Print(string.format(L("Writs : %d prêts à rendre, %d enveloppes à ouvrir. Tape /wlh trade."), ready, bag))
+                elseif ready > 0 then WP.Print(string.format(L("Writs : %d prêts à rendre. Tape /wlh trade."), ready)) end
             end)
         end
     end
@@ -147,7 +147,7 @@ local function AddLines(tooltip, itemID)
     local mySide = UnitFactionGroup("player") == "Alliance" and 1 or 2
     local C = S.C
     tooltip:AddLine(" ")
-    tooltip:AddLine(string.format(L("Comptoir : %s, %d rép"), WP.Tier(w.tier), w.rep), C.brandSoft[1], C.brandSoft[2], C.brandSoft[3])
+    tooltip:AddLine(string.format(L("WL Helper : writ %s, %d points de réputation"), WP.Tier(w.tier), w.rep), C.brandSoft[1], C.brandSoft[2], C.brandSoft[3])
     if w.side and w.side ~= mySide then
         tooltip:AddLine(L("Réservé à l'autre faction"), C.danger[1], C.danger[2], C.danger[3])
         return

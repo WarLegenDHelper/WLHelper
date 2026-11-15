@@ -112,7 +112,7 @@ function ns.Chip(parent)
   local c = CreateFrame("Frame", nil, parent)
   c:SetHeight(19)
   c.bg = Tex(c, "BACKGROUND", { 1, 1, 1, 0.1 }); c.bg:SetAllPoints()
-  c.edge = Tex(c, "ARTWORK", { 1, 1, 1, 1 }); c.edge:SetPoint("TOPLEFT"); c.edge:SetPoint("BOTTOMLEFT"); c.edge:SetWidth(2)
+  c.edge = Tex(c, "ARTWORK", { 1, 1, 1, 1 }); c.edge:SetPoint("TOPLEFT"); c.edge:SetPoint("BOTTOMLEFT"); c.edge:SetWidth(2); c.edge:SetAlpha(0)
   c.text = ns.Text(c, 10, T.text, true); c.text:SetPoint("LEFT", 7, 0); c.text:SetWordWrap(false); c.text:SetJustifyV("MIDDLE")
   return c
 end

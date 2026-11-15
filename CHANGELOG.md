@@ -6,6 +6,39 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.35] — 2026-11-15
+
+### Ajouté / Added
+- **Guide de démarrage** dans l'addon : une tuile sur l'accueil et `/wlh aide` présentent chaque module, avec un bouton pour l'ouvrir.
+  *Quick start guide inside the addon (home tile, /wlh help).*
+- **Sacs, « Libérer une place »** : quand les sacs sont pleins, un bandeau propose de jeter en un clic l'objet le moins cher (gris, ou arme et armure blanches ; rien d'autre). Chez un marchand il est vendu. Aussi `/wlh free`.
+  *Bags: "Free a slot" throws away the cheapest junk in one click when the bags are full.*
+- **Vente des objets gris** chez les marchands (réglable), sauf si EllesmereUI le fait déjà.
+  *Grey items sold at merchants, unless EllesmereUI already does it.*
+- **Accueil, « À faire maintenant »** : une ligne en haut avec la prochaine chose utile et son bouton.
+  *Home: a "to do now" line with the next useful thing.*
+- **Groupes** : récapitulatif à la connexion, rappel 1 h avant, bandeau d'invitation pour l'organisateur, acceptation automatique de l'invitation (réglable), annonce d'une annulation.
+  *LFG: login recap, 1 h reminder, organizer banner, auto-accept, cancellation notice.*
+
+### Modifié / Changed
+- **Writs, onglet Achats** : une seule ligne par writ (l'enveloppe et son objet, prix additionnés ; le détail dans l'infobulle), un filtre par zone, des zones repliables d'un clic (« Exclure » est un bouton à part), « absent de l'HV », la monnaie dans la langue du jeu (20s / 40s / 1g en anglais), « Tout acheter à la suite ».
+  *Writs Shopping tab: one line per writ, zone filter, foldable zones, money in the game's language, buy everything in a row.*
+- **« Quêtes de donjon » devient « Guide de quêtes »** (donjons, raids, quêtes de classe).
+  *"Dungeon quests" is now "Quest guide".*
+- **Guide** : quand la quête est dans ton journal, le GPS suit la zone bleue du jeu pour les objectifs (Forever a déplacé certains monstres, comme les invocateurs de l'Orbe infernal du mage). Bouton « GPS » clair sur chaque étape, plus de traits de couleur sur le côté, flèche GPS plus propre. Check-list « Prêt ? » qui guide vers les donneurs de quêtes manquants, fin de route, entrée d'instance.
+  *Guide: objectives follow the game's own quest area; clear GPS button; no side stripes; cleaner arrow; better ready check.*
+- **Commandes** : icône et couleur de l'objet, « ce qu'il faut faire maintenant » sur chaque carte, composants en banque, « Acheter le manquant (n) » achète tout à la suite, « J'ai reçu », pourboire, livraison vue toute seule par les sacs ou l'échange, classe des artisans.
+  *Orders: clearer cards, next step, bank reagents, buy all missing, receipt, automatic delivery.*
+- **Guilde** : les anciens doublons du classement PvP (« Nom Royaume ») sont fusionnés ; le texte du bas ne déborde plus.
+  *Guild: PvP ranking duplicates merged; bottom note fits.*
+- **Améliorations et Nettoyeur** : flèche posée sur l'icône, spé affichée, objets que tu ne peux pas encore porter signalés ; le nettoyeur nomme l'objet qu'il va prendre.
+
+### Corrigé / Fixed
+- **Erreur « secret number » dans Route.lua** (temps de recharge des téléportations) : plus d'erreur en boucle.
+  *Fixed the "secret number" error in Route.lua.*
+- **Bouton de téléportation et « Ouvrir l'enveloppe »** : ils réagissent quel que soit le réglage « lancer à l'appui ».
+  *Teleport and envelope buttons work with "cast on key down".*
+
 ## [1.0.0-beta.34] — 2026-11-15
 
 ### Ajouté / Added

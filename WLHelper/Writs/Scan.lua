@@ -14,6 +14,10 @@ local L = ns.L
 local S = {}
 WP.Scan = S
 
+ns.AddEnglish({
+    ["%s : plus en vente, je passe au suivant."] = "%s: no longer for sale, moving on.",
+})
+
 local BATCH = 20      -- item keys per request
 local TIMEOUT = 10    -- seconds to wait for an answer before moving on
 local api = C_AuctionHouse
@@ -180,22 +184,66 @@ end
 
 -- ---------------------------------------------------------------- buying in Blizzard's window
 
--- A queue of items to buy one after the other (a writ's envelope, then its item): the next buy
--- page opens by itself once a purchase goes through.
+-- A queue of items to buy one after the other (a writ's envelope, then its item, or the whole
+-- shopping list): the next buy page opens by itself once a purchase goes through. The player still
+-- clicks the game's own Buy button each time; nothing is bought by the addon.
 local queue = {}
+local queueTotal, queuePos, lastPop = 0, 0, 0
+
+local function QueueChanged()
+    if WP.OnScanProgress then WP.OnScanProgress() end
+end
+
+-- Opens the buy page of item, or skips it when the last scan (under 30 min) saw none for sale.
+local OpenNext
+OpenNext = function(item)
+    if not item then queueTotal, queuePos = 0, 0; QueueChanged(); return end
+    local _, q, age = S.Get(item.id)
+    if q == 0 and age and age < 1800 then
+        WP.Print(string.format(L("%s : plus en vente, je passe au suivant."), WP.ItemName(item.id) or "?"))
+        queuePos = queuePos + 1
+        local nxt = table.remove(queue, 1)
+        if not nxt then queueTotal, queuePos = 0, 0 end
+        QueueChanged()
+        if nxt then OpenNext(nxt) end
+        return
+    end
+    S.OpenToBuy(item.id, item.qty)
+end
+
 function S.BuyQueue(list)
     queue = {}
     for _, e in ipairs(list) do queue[#queue + 1] = e end
+    queueTotal, queuePos = #queue, 1
     local first = table.remove(queue, 1)
-    if first then S.OpenToBuy(first.id, first.qty) end
-    if queue[1] then WP.Print(string.format(L("Ensuite : %s (s'ouvre après l'achat)."), WP.ItemName(queue[1].id) or "?")) end
+    if not first then queueTotal, queuePos = 0, 0 end
+    QueueChanged()
+    if first then OpenNext(first) end
+end
+-- Items still waiting after the open buy page; the place in the queue ("2 of 9"), 0, 0 when idle.
+function S.QueueLeft() return #queue end
+function S.QueueState() return queuePos, queueTotal end
+function S.ClearQueue()
+    queue = {}
+    queueTotal, queuePos = 0, 0
+    QueueChanged()
 end
 local qf = CreateFrame("Frame")
 for _, e in ipairs({ "COMMODITY_PURCHASE_SUCCEEDED", "AUCTION_HOUSE_PURCHASE_COMPLETED", "AUCTION_HOUSE_CLOSED" }) do pcall(qf.RegisterEvent, qf, e) end
 qf:SetScript("OnEvent", function(_, e)
-    if e == "AUCTION_HOUSE_CLOSED" then queue = {}; return end
+    if e == "AUCTION_HOUSE_CLOSED" then S.ClearQueue(); return end
+    if queueTotal == 0 then return end
+    -- both purchase events can fire for one buy: count it once, or a long queue skips an item
+    if GetTime() - lastPop < 1 then return end
+    lastPop = GetTime()
     local nxt = table.remove(queue, 1)
-    if nxt then C_Timer.After(0.6, function() S.OpenToBuy(nxt.id, nxt.qty) end) end
+    if nxt then
+        queuePos = queuePos + 1
+        C_Timer.After(0.6, function() OpenNext(nxt) end)
+    else
+        queueTotal, queuePos = 0, 0
+    end
+    QueueChanged()
 end)
 
 -- Opens an item's buy page in the auction house and, for a stackable item, fills in the quantity.
@@ -252,6 +300,11 @@ f:SetScript("OnEvent", function(_, event)
     elseif event == "AUCTION_HOUSE_SHOW" then
         -- Last-minute prices, only when they are needed: the Trading Post window is open, and
         -- some item of the shopping list has no price or one older than an hour.
+        -- The Writs window already open with something to buy: straight to the Shopping tab.
+        if WP.WindowShown and WP.WindowShown() and WP.WritsMode and WP.WritsMode() and WP.ShoppingIDs
+            and #(WP.ShoppingIDs() or {}) > 0 and WP.ShowTab then
+            WP.ShowTab("shop")
+        end
         if WLWritsDB and WLWritsDB.autoRescan and WP.ShoppingIDs and WP.ModuleOn("writs") then
             -- After Blizzard's own favourites search has had its turn.
             C_Timer.After(4, function()

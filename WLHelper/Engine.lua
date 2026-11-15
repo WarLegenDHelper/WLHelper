@@ -459,7 +459,11 @@ function ns.MakeSteps(order)
           for _, n2 in ipairs(visit.acts) do if n2.kind == "a" and n2.q == n.q then hasOutsideA = false end end
           if hasOutsideA then
             seen[n.q] = true
-            table.insert(st.acts, { kind = "h", q = n.q, key = "h:" .. n.q .. ":" .. i, d = n.d, pre = n.pre, deps = {} })
+            local node = { kind = "h", q = n.q, key = "h:" .. n.q .. ":" .. i, d = n.d, pre = n.pre, deps = {} }
+            -- the quest giver's spot outside: the check-list row gets a map pin and the GPS goes there
+            local qq = ns.Q[n.q]; local sl = qq and qq.s
+            if sl and sl.m and not sl.i and not qq.si then node.loc = sl; node.npc = sl.n end
+            table.insert(st.acts, node)
           end
         end
       end

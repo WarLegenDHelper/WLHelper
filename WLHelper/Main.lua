@@ -103,6 +103,57 @@ local function GuideOn()
   return not (WP and WP.ModuleOn) or WP.ModuleOn("dungeons")
 end
 ns.GuideOn = GuideOn
+
+-- The guide's dungeons that live in the instance you stand in (several wings can share one
+-- instance ID: Scarlet Monastery, Dire Maul, Stratholme). Class-quest cards are left out.
+function ns.InstanceKeys()
+  local out = {}
+  if not GetInstanceInfo then return out, nil end
+  local _, kind, _, _, _, _, _, id = GetInstanceInfo()
+  if kind ~= "party" and kind ~= "raid" then return out, nil end
+  for _, k in ipairs(ns.ORDER) do local d = ns.D[k]; if d and d.inst == id and not d.cq then table.insert(out, k) end end
+  return out, id
+end
+-- How many of the dungeon's quests (for your class) are not turned in yet.
+function ns.InstLeft(k)
+  local _, cls = UnitClass("player")
+  local n = 0
+  for _, qid in ipairs(ns.DungeonQuests(k, cls)) do if not ns.IsDone(qid) then n = n + 1 end end
+  return n
+end
+
+-- Entering a dungeon: the guide opens on it (in the route), or offers it (not in the route).
+-- Runs once per entry; leaving the instance resets it.
+local OnInstanceEntry
+OnInstanceEntry = function()
+  local keys, iid = ns.InstanceKeys()
+  if #keys == 0 then ns.instOffer = nil; ns.instSeen = nil; return end
+  if ns.instSeen and ns.instSeen == iid then return end
+  -- after a /reload inside, the saved route is rebuilt a moment later: wait for it
+  if not ns.route and WLDTDB.sel and next(WLDTDB.sel) then C_Timer.After(1.5, OnInstanceEntry) return end
+  ns.instSeen = iid
+  local f = ns.frame
+  local sel = ns.route and ns.route.sel or {}
+  local inRoute
+  for _, k in ipairs(keys) do if sel[k] then inRoute = k break end end
+  if inRoute then
+    ns.instOffer = nil
+    if not f:IsShown() then f:Show(); WLDTDB.hidden = false end
+    ns.Refresh(true)
+    local log = ns.LogEntries()
+    for i, st in ipairs(ns.route.steps) do
+      if st.ins == inRoute and not st.gate and not ns.IsStepDone(log, i) then ns.GoTo(i) break end
+    end
+  else
+    local cands = {}
+    for _, k in ipairs(keys) do if ns.InstLeft(k) > 0 then table.insert(cands, k) end end
+    if #cands == 1 then
+      ns.instOffer = cands[1]
+      if not f:IsShown() then f:Show(); WLDTDB.hidden = false end
+      ns.Print(L.INST_CHAT:format(ns.DName(cands[1]), ns.InstLeft(cands[1])))
+    elseif #cands > 1 then ns.instOffer = nil; ns.Print(L.INST_PICK) end
+  end
+end
 ev:SetScript("OnEvent", function(_, e)
   -- module switched off in combat: the deferred action-bar update still has to hide the bar
   if e == "PLAYER_REGEN_ENABLED" and not GuideOn() then
@@ -144,6 +195,7 @@ ev:SetScript("OnEvent", function(_, e)
   elseif e == "PLAYER_ENTERING_WORLD" then
     if ns.frame then
       C_Timer.After(1, function()
+        if GuideOn() then OnInstanceEntry() end
         if ns.frame:IsShown() then ns.Refresh() end
       end)
     end
@@ -190,6 +242,7 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "choisir" or cmd == "pick" or cmd == "dj" then ns.ShowPicker()
   elseif cmd == "trade" or cmd == "comptoir" or cmd == "c" or cmd == "writs" or cmd == "writ" then if WP then WP.Command(arg) end
   elseif cmd == "sacs" or cmd == "bags" or cmd == "clean" then if WP and WP.Cleaner then WP.Cleaner.Toggle() end
+  elseif cmd == "free" or cmd == "place" then if WP and WP.Junk then WP.Junk.Free() end
   elseif cmd == "commandes" or cmd == "orders" or cmd == "cmd" then if WP and WP.ToggleOrders then WP.ToggleOrders() end
   elseif cmd == "events" or cmd == "evenements" or cmd == "lfg" or cmd == "calendar" or cmd == "agenda" then if WP and WP.ToggleEvents then WP.ToggleEvents() end
   elseif cmd == "guild" or cmd == "guilde" then if WP and WP.ToggleGuild then WP.ToggleGuild() end
@@ -211,6 +264,7 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "help" or cmd == "aide" or cmd == "?" then
     ns.Print("WL Helper v" .. (ns.VERSION or "?"))
     for line in L.HELP:gmatch("[^\n]+") do print("   " .. line) end
+    if ns.Writs and ns.Writs.WP and ns.Writs.WP.Help then ns.Writs.WP.Help.Toggle() end
   else ns.Print(L.UNKNOWN_CMD:format(cmd)) end
 end
 

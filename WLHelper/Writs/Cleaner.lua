@@ -15,22 +15,30 @@ ns.AddEnglish({
     ["Objet rare : à détruire toi-même"] = "Rare item: destroy it yourself",
     ["Quête inconnue dans ton journal : à détruire toi-même"] = "Unknown quest in your log: destroy it yourself",
     ["Pas lié à une quête rendue : à détruire toi-même si tu es sûr"] = "Not tied to a turned-in quest: destroy it yourself if you are sure",
-    ["Aucune quête de ton journal ne les demande.\nCoche, clique sur Détruire puis dans le monde : le jeu demande confirmation. En gris : vérifie avant."] = "No quest in your log asks for them.\nTick, click Destroy, then click in the world: the game asks to confirm. Greyed: check first.",
+    ["Objets de quête qu'aucune quête de ton journal ne demande.\nCochés : sans risque. Orange : lis la raison avant de cocher. Gris : objets rares ou sans quête connue, à jeter toi-même depuis tes sacs."] =
+        "Quest items no quest in your log asks for.\nTicked: safe. Orange: read the reason before ticking. Grey: rare items or no known quest, throw them away yourself from your bags.",
     ["Rien que l'addon puisse détruire"] = "Nothing the addon can destroy",
     ["Objets de quête inutiles"] = "Useless quest items",
     ["Quête rendue : %s"] = "Quest turned in: %s",
     ["Aucune quête ne le demande"] = "No quest asks for it",
     ["Peut servir à une quête suivante"] = "May be needed for a later quest",
-    ["Détruire les %d objets cochés"] = "Destroy the %d checked items",
-    ["Détruire l'objet coché"] = "Destroy the checked item",
-    ["Annuler"] = "Cancel",
+    ["Détruire : %s"] = "Destroy: %s",
+    ["Détruire : %s (1 sur %d)"] = "Destroy: %s (1 of %d)",
+    ["Fermer"] = "Close",
+    ["Sans risque (%d)"] = "Safe (%d)",
+    ["À vérifier (%d)"] = "Check first (%d)",
+    ["À jeter toi-même (%d)"] = "Throw away yourself (%d)",
+    ["Quête déjà rendue"] = "Quest already turned in",
+    ["%s est sur ton curseur. Clique dans le décor (hors des fenêtres), puis sur Oui."] = "%s is on your cursor. Click in the world (outside any window), then Yes.",
+    ["Nettoyer"] = "Clean up",
+    ["1 objet de quête ne sert plus et encombre tes sacs. %s"] = "1 quest item is no longer needed and clutters your bags. %s",
+    ["%d objets de quête ne servent plus et encombrent tes sacs. %s"] = "%d quest items are no longer needed and clutter your bags. %s",
     ["Rien à jeter : tes sacs sont propres."] = "Nothing to throw away: your bags are clean.",
     ["impossible en combat."] = "not possible in combat.",
     ["%d pile(s) détruite(s)."] = "%d stack(s) destroyed.",
     ["%s détruit."] = "%s destroyed.",
     ["%s est sur ton curseur : clique dans le monde (hors des fenêtres), puis confirme pour le détruire."] = "%s is on your cursor: click in the world (outside any window), then confirm to destroy it.",
     ["Coche ce que tu veux détruire"] = "Tick what you want to destroy",
-    ["Détruire le suivant (%d cochés)"] = "Destroy the next one (%d ticked)",
     ["À garder : invoque Gahz'rilla au gong de Zul'Farrak (quête « Gahz'rilla »)"] =
         "Keep it: summons Gahz'rilla at the gong in Zul'Farrak (quest \"Gahz'rilla\")",
     ["À garder : se change en Mallet of Zul'Farrak à l'autel de Hakkar"] =
@@ -268,19 +276,24 @@ end
 
 -- ---------------------------------------------------------------- scan
 
--- The client's (localised) quest title when it knows it, else LibForeverData's English one.
+-- The client's (localised) quest title when it knows it, else LibForeverData's English one; the
+-- second value is true for the client's own title.
 local function QuestTitle(q)
     local t = C_QuestLog and (C_QuestLog.GetTitleForQuestID or C_QuestLog.GetQuestInfo)
     t = t and safe(t, q.id)
-    if type(t) == "string" and t ~= "" then return t end
-    return q.name or ("#" .. q.id)
+    if type(t) == "string" and t ~= "" then return t, true end
+    return q.name or ("#" .. q.id), false
 end
+local function French() return root.lang == "fr" or (GetLocale() == "frFR" and root.lang ~= "en") end
 
 local entries = {}          -- { id, name, count, quality, slots, reason, amber, manual }
 local userChecked = {}      -- itemID -> true/false once the player clicked its box
 local dirty = true
 
 local function NumBags() return NUM_BAG_SLOTS or 4 end
+-- 1 safe (checked), 2 check first (amber), 3 throw away yourself (grey)
+local function rank(e) return e.manual and 3 or e.amber and 2 or 1 end
+local RANK_TITLE = { "Sans risque (%d)", "À vérifier (%d)", "À jeter toi-même (%d)" }
 
 local function Scan()
     if not (C_Container and C_Container.GetContainerItemInfo and C_Item and C_Item.GetItemInfoInstant) then
@@ -328,7 +341,13 @@ local function Scan()
                         elseif pending then
                             e.amber, e.reason = true, L("Peut servir à une quête suivante")
                         elseif done then
-                            e.reason = L("Quête rendue : %s"):format(QuestTitle(done))
+                            -- an English title in a French sentence reads badly: just say it was done
+                            local title, loc = QuestTitle(done)
+                            if loc or not French() then
+                                e.reason = L("Quête rendue : %s"):format(title)
+                            else
+                                e.reason = L("Quête déjà rendue")
+                            end
                         else
                             -- no data ties it to a quest you turned in: the game abandons a quest
                             -- whose item is destroyed, so this one is only listed, never destroyed here
@@ -352,7 +371,6 @@ local function Scan()
         end
     end
     -- Checked first, then amber, then manual; by name inside each group.
-    local function rank(e) return e.manual and 3 or e.amber and 2 or 1 end
     table.sort(list, function(a, b)
         if rank(a) ~= rank(b) then return rank(a) < rank(b) end
         return (a.name or "") < (b.name or "")
@@ -362,7 +380,7 @@ local function Scan()
 end
 
 local function IsChecked(e)
-    if e.manual then return userChecked[e.id] == true end   -- never ticked for you
+    if e.manual then return false end   -- grey: never ticked, never destroyed by the addon
     local u = userChecked[e.id]
     if u ~= nil then return u end
     return not e.amber
@@ -373,6 +391,7 @@ end
 -- Runs only from the button's OnClick: picks up one checked stack (re-read first so a moved or
 -- swapped slot is never hit); the game's own confirmation destroys it.
 local Refresh
+local win
 local function Destroy()
     if InCombatLockdown() then WP.Print(L("impossible en combat.")); return end
     -- Bags or quest log changed since the list was drawn: show the fresh list, destroy nothing.
@@ -399,18 +418,26 @@ local function Destroy()
             end
         end
     end
-    if name then WP.Print(string.format(L("%s est sur ton curseur : clique dans le monde (hors des fenêtres), puis confirme pour le détruire."), name)) end
+    if name then
+        WP.Print(string.format(L("%s est sur ton curseur : clique dans le monde (hors des fenêtres), puis confirme pour le détruire."), name))
+        if win and win.step then
+            win.step:SetText(string.format(L("%s est sur ton curseur. Clique dans le décor (hors des fenêtres), puis sur Oui."), name))
+            win.step:Show()
+        end
+    end
     dirty = true
     C_Timer.After(0.3, function() if Refresh then Refresh(true) end end)
 end
 
 -- ---------------------------------------------------------------- window
 
-local win, rows, offset = nil, {}, 0
+local rows, offset = {}, 0
+local heads = {}            -- group titles, a pool of font strings
+local HEAD_H = 24
 
 local function Paint(row, e)
     local on = IsChecked(e)
-    row.box:SetShown(true)
+    row.box:SetShown(not e.manual)
     row.fill:SetColorTexture(C.brand[1], C.brand[2], C.brand[3], on and 1 or 0)
     row.boxBorder(on and C.brand or { 0.353, 0.373, 0.400 })
     row.check:SetShown(on)
@@ -420,7 +447,7 @@ local function Paint(row, e)
     if e.quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[e.quality] then
         local c = ITEM_QUALITY_COLORS[e.quality]; q = { c.r, c.g, c.b }
     end
-    row.name:SetText((e.name or "?") .. (e.count > 1 and (" ×" .. e.count) or ""))
+    row.name:SetText((e.name or "?") .. (e.count > 1 and (" x" .. e.count) or ""))
     row.name:SetTextColor(q[1], q[2], q[3])
     local rc = (e.amber or e.keep) and C.warn or e.manual and C.muted or C.dim
     row.reason:SetText(e.reason or "")
@@ -474,7 +501,7 @@ local function MakeRow(parent)
     row:SetScript("OnLeave", function() hl:SetColorTexture(C.hover[1], C.hover[2], C.hover[3], 0); GameTooltip:Hide() end)
     row:SetScript("OnClick", function(self)
         local e = self.entry
-        if not e then return end
+        if not e or e.manual then return end
         userChecked[e.id] = not IsChecked(e)
         Paint(self, e)
         win.UpdateFooter()
@@ -484,30 +511,57 @@ end
 
 local function Layout()
     local viewH = win.list:GetHeight()
-    local maxOff = math.max(0, #entries * ROW_H - viewH)
+    local h = win.contentH or #entries * ROW_H
+    local maxOff = math.max(0, h - viewH)
     offset = math.max(0, math.min(offset, maxOff))
     win.content:ClearAllPoints()
     win.content:SetPoint("TOPLEFT", 0, offset)
     win.content:SetPoint("TOPRIGHT", 0, offset)
-    win.content:SetHeight(math.max(1, #entries * ROW_H))
+    win.content:SetHeight(math.max(1, h))
 end
 
 Refresh = function(rescan)
     if not win or not win:IsShown() then return end
     if rescan or dirty then Scan() end
+    -- the item left the cursor (destroyed, put back): the step is over
+    local kind = GetCursorInfo and GetCursorInfo()
+    if kind ~= "item" and win.step then win.step:Hide() end
+    local count = { 0, 0, 0 }
+    for _, e in ipairs(entries) do count[rank(e)] = count[rank(e)] + 1 end
+    local y, lastRank, k = 0, nil, 0
     for i, e in ipairs(entries) do
+        local r = rank(e)
+        if r ~= lastRank then
+            -- a title above each group: "Safe (3)", "Check first (1)"...
+            lastRank, k = r, k + 1
+            local h = heads[k]
+            if not h then
+                h = S.Text(win.content, 13, C.muted)
+                h:SetJustifyH("LEFT")
+                heads[k] = h
+            end
+            h:ClearAllPoints()
+            h:SetPoint("TOPLEFT", 0, -y - 6)
+            h:SetText(string.format(L(RANK_TITLE[r]), count[r]))
+            h:Show()
+            y = y + HEAD_H
+        end
         local row = rows[i]
         if not row then
             row = MakeRow(win.content)
-            row:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H)
-            row:SetPoint("TOPRIGHT", 0, -(i - 1) * ROW_H)
             rows[i] = row
         end
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 0, -y)
+        row:SetPoint("TOPRIGHT", 0, -y)
+        y = y + ROW_H
         row.entry = e
         Paint(row, e)
         row:Show()
     end
     for i = #entries + 1, #rows do rows[i]:Hide(); rows[i].entry = nil end
+    for i = k + 1, #heads do heads[i]:Hide() end
+    win.contentH = y
     win.empty:SetShown(#entries == 0)
     Layout()
     win.UpdateFooter()
@@ -527,23 +581,38 @@ local function Build()
     intro:SetJustifyH("LEFT"); intro:SetJustifyV("TOP")
     intro:SetPoint("TOPLEFT", PAD, -38 - PAD)
     intro:SetWidth(460 - 2 * PAD)
-    intro:SetText(L("Aucune quête de ton journal ne les demande.\nCoche, clique sur Détruire puis dans le monde : le jeu demande confirmation. En gris : vérifie avant."))
+    intro:SetText(L("Objets de quête qu'aucune quête de ton journal ne demande.\nCochés : sans risque. Orange : lis la raison avant de cocher. Gris : objets rares ou sans quête connue, à jeter toi-même depuis tes sacs."))
 
     local footer = CreateFrame("Frame", nil, win)
-    footer:SetPoint("BOTTOMLEFT", 1, 1); footer:SetPoint("BOTTOMRIGHT", -1, 1); footer:SetHeight(60)
+    footer:SetPoint("BOTTOMLEFT", 1, 1); footer:SetPoint("BOTTOMRIGHT", -1, 1); footer:SetHeight(84)
     local fline = S.Solid(footer, "BORDER", C.divider)
     fline:SetPoint("TOPLEFT"); fline:SetPoint("TOPRIGHT"); fline:SetHeight(1)
 
     local cancelW = 90
-    local cancel = S.Button(footer, L("Annuler"), cancelW, 36, "secondary", function() win:Hide() end)
+    local cancel = S.Button(footer, L("Fermer"), cancelW, 36, "secondary", function() win:Hide() end)
     cancel:SetPoint("TOPRIGHT", -(PAD - 1), -12)
     local destroy = S.Button(footer, "", 460 - 2 * PAD - 8 - cancelW, 36, "primary", Destroy)
     destroy:SetPoint("TOPLEFT", PAD - 1, -12)
+    -- a long item name is cut instead of overflowing the button
+    destroy.label:SetWordWrap(false)
+    destroy.label:SetWidth(460 - 2 * PAD - 8 - cancelW - 16)
+
+    -- the step in progress, under the buttons: what to do with the item on the cursor
+    win.step = S.Text(footer, 13, C.warn)
+    win.step:SetPoint("BOTTOMLEFT", PAD, 8)
+    win.step:SetWidth(460 - 2 * PAD)
+    win.step:SetJustifyH("LEFT")
+    win.step:SetWordWrap(true)
+    win.step:Hide()
 
     function win.UpdateFooter()
         local n = CheckedCount()
-        destroy.label:SetText(n == 0 and L("Coche ce que tu veux détruire") or n == 1 and L("Détruire l'objet coché")
-            or string.format(L("Détruire le suivant (%d cochés)"), n))
+        -- the first checked entry is the one Destroy picks up: name it
+        local first
+        for _, e in ipairs(entries) do if IsChecked(e) then first = e.name or "?"; break end end
+        if n == 0 then destroy.label:SetText(L("Coche ce que tu veux détruire"))
+        elseif n == 1 then destroy.label:SetText(string.format(L("Détruire : %s"), first))
+        else destroy.label:SetText(string.format(L("Détruire : %s (1 sur %d)"), first, n)) end
         destroy:SetEnabled(n > 0)
         -- only greyed items: nothing to tick, say it instead of "tick what you want"
         local any = false
@@ -572,24 +641,64 @@ local function Build()
     win.empty:SetText(L("Rien à jeter : tes sacs sont propres."))
     win.empty:Hide()
 
-    win:SetScript("OnShow", function() offset = 0; Refresh(true) end)
+    win:SetScript("OnShow", function() offset = 0; win.step:Hide(); Refresh(true) end)
 end
 
 -- ---------------------------------------------------------------- events
+
+-- A clickable reminder in the chat after a quest is turned in (once per new count) or when the bags
+-- are full (at most every 5 minutes); nothing is saved.
+local lastAnnounced, lastFull, loginAt = 0, 0, GetTime()
+local CLEAN_LINK = "addon:wlhelperclean"
+local function Announce(force)
+    if not WP.ModuleOn("bags") or InCombatLockdown() or (win and win:IsShown()) then return end
+    if GetTime() - loginAt < 10 then return end
+    local n = WP.Cleaner.Count()
+    if n == 0 then lastAnnounced = 0; return end
+    if not force and n == lastAnnounced then return end
+    lastAnnounced = n
+    local link = "|cff6fdc8c|H" .. CLEAN_LINK .. "|h[" .. L("Nettoyer") .. "]|h|r"
+    if n == 1 then
+        WP.Print(string.format(L("1 objet de quête ne sert plus et encombre tes sacs. %s"), link))
+    else
+        WP.Print(string.format(L("%d objets de quête ne servent plus et encombrent tes sacs. %s"), n, link))
+    end
+end
 
 local pending = false
 local ev = CreateFrame("Frame")
 pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED")
 pcall(ev.RegisterEvent, ev, "QUEST_LOG_UPDATE")
 pcall(ev.RegisterEvent, ev, "QUEST_TURNED_IN")
-ev:SetScript("OnEvent", function()
+pcall(ev.RegisterEvent, ev, "UI_ERROR_MESSAGE")
+ev:SetScript("OnEvent", function(self, e, a1, a2)
+    if e == "UI_ERROR_MESSAGE" then
+        -- "Inventory is full": not a bag change, only the reminder
+        if not ERR_INV_FULL or GetTime() - lastFull <= 300 then return end
+        local ok, full = pcall(function() return a2 == ERR_INV_FULL or a1 == ERR_INV_FULL end)
+        if ok and full then
+            lastFull = GetTime()
+            Announce(true)
+        end
+        return
+    end
     if not WP.ModuleOn("bags") then return end
     dirty = true
+    if e == "QUEST_TURNED_IN" then C_Timer.After(2, function() Announce(false) end) end
     if win and win:IsShown() and not pending then
         pending = true
         C_Timer.After(0.5, function() pending = false; Refresh(true) end)
     end
 end)
+
+-- the [Clean up] link of the reminder; runs after the game handled the click: nothing of
+-- Blizzard's is replaced
+if SetItemRef then
+    hooksecurefunc("SetItemRef", function(link)
+        if type(link) ~= "string" or (issecretvalue and issecretvalue(link)) then return end
+        if link == CLEAN_LINK and not (win and win:IsShown()) then WP.Cleaner.Toggle() end
+    end)
+end
 
 -- ---------------------------------------------------------------- API
 

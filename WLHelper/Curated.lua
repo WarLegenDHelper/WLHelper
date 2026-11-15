@@ -159,6 +159,9 @@ function ns.KeyLines(dkey)
     elseif k.boss then how = ns.L.KEY_BOSS:format(BossName(k.boss, k.bossn), k.src and ns.DName(k.src) or "") end
     local label = k.opt == "doors" and ns.L.KEY_DOORS or k.opt == "shortcut" and ns.L.KEY_SHORT or ns.L.KEY_REQ
     local txt = label .. " : " .. name .. "  " .. (have and ("|cff59e67a" .. ns.L.KEY_HAVE .. "|r") or ("|cffff9933" .. ns.L.KEY_MISSING .. "|r"))
+    -- the key's own icon from the game, to spot it in the bags
+    local ic = GetItemIcon and GetItemIcon(k.item)
+    if ic then txt = ("|T%s:14:14:0:0:64:64:5:59:5:59|t "):format(tostring(ic)) .. txt end
     if not have and how then txt = txt .. "\n   |cffb0b0b0" .. how .. "|r" end
     table.insert(out, { txt, have, k.opt == nil })
   end

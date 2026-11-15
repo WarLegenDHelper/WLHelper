@@ -28,7 +28,12 @@ ns.AddEnglish({
     ["Nouvelle commande de %s : %s ×%d (%s)."] = "New order from %s: %s ×%d (%s).",
     ["%s a accepté ta commande : %s ×%d."] = "%s accepted your order: %s ×%d.",
     ["%s a refusé ta commande (%s)."] = "%s declined your order (%s).",
-    ["%s a fabriqué ta commande : %s ×%d. Elle arrive par la poste."] = "%s crafted your order: %s ×%d. It comes by mail.",
+    ["%s a fabriqué ta commande : %s ×%d. Elle arrive par la poste (contre-remboursement s'il y a une commission) ou en échange."] =
+        "%s crafted your order: %s ×%d. It comes by mail (cash on delivery if there is a fee) or by trade.",
+    ["Commande reçue : %s ×%d de %s. Clique sur Merci dans Mes commandes pour lui donner une étoile."] =
+        "Order received: %s ×%d from %s. Click Thanks in My orders to give them a star.",
+    ["Commande livrée par %s. Clique sur Merci dans Mes commandes pour lui donner une étoile."] =
+        "Order delivered by %s. Click Thanks in My orders to give them a star.",
     ["Commande WL : %s ×%d"] = "WL order: %s ×%d",
     ["Commission trop basse"] = "Commission too low",
     ["Pas les composants"] = "Missing reagents",
@@ -393,6 +398,11 @@ local function Merge(o)
     local tip = math.max(cur.tip or 0, o.tip or 0)
     for _, k in ipairs(FIELDS) do cur[k] = o[k] end
     if tip > 0 then cur.tip = tip end
+    -- my order was just crafted: what my bags hold now, so the item arriving marks it delivered
+    if changed and cur.status == "crafted" and cur.from == Me() and (cur.item or 0) > 0 and not cur.custBase then
+        local count = (C_Item and C_Item.GetItemCount) or GetItemCount
+        cur.custBase = count and (count(cur.item) or 0) or nil
+    end
     return cur, changed
 end
 
@@ -576,12 +586,14 @@ function O.Possible(item)
     return out
 end
 
--- What the customer still has to send for an order: { { id, need, have } }, have = in bags and bank
+-- What the customer still has to send for an order: { { id, need, have, bank } }, have = in bags and
+-- bank, bank = the part of it in the bank
 function O.ToSend(o)
     local out = {}
     for _, r in ipairs(O.Decode(o.give)) do
         local need = r[2] * (o.qty or 1)
-        out[#out + 1] = { id = r[1], need = need, have = WP.OwnedCount and WP.OwnedCount(r[1]) or 0 }
+        out[#out + 1] = { id = r[1], need = need, have = WP.OwnedCount and WP.OwnedCount(r[1]) or 0,
+            bank = WP.InBank and WP.InBank(r[1]) or 0 }
     end
     return out
 end
@@ -651,16 +663,25 @@ function O.Catalog()
     return out
 end
 
-local onlineCache, onlineAt = {}, 0
+-- Who of the guild is online, and each member's class (file name, "WARRIOR"...), read together
+local onlineCache, classCache, onlineAt = {}, {}, 0
 function O.OnlineGuild()
     if GetTime() - onlineAt < 30 then return onlineCache end
-    onlineCache, onlineAt = {}, GetTime()
+    onlineCache, classCache, onlineAt = {}, {}, GetTime()
     if not (IsInGuild and IsInGuild() and GetNumGuildMembers and GetGuildRosterInfo) then return onlineCache end
     for i = 1, (GetNumGuildMembers() or 0) do
-        local name, _, _, _, _, _, _, _, online = GetGuildRosterInfo(i)
-        if name then onlineCache[Short(name)] = online and true or false end
+        local name, _, _, _, _, _, _, _, online, _, cls = GetGuildRosterInfo(i)
+        if name then
+            onlineCache[Short(name)] = online and true or false
+            if cls then classCache[Short(name)] = cls end
+        end
     end
     return onlineCache
+end
+function O.ClassOf(name)
+    if name == Me() then return select(2, UnitClass("player")) end
+    O.OnlineGuild()
+    return classCache[name]
 end
 
 -- ---------------------------------------------------------------- mail: what arrived, and filling a mail
@@ -962,13 +983,20 @@ function O.Notify(o)
     elseif o.from == me and o.status == "declined" then
         WP.Print(string.format(L("%s a refusé ta commande (%s)."), o.by or "?", L(o.reason or "?")))
     elseif o.from == me and o.status == "crafted" then
-        WP.Print(string.format(L("%s a fabriqué ta commande : %s ×%d. Elle arrive par la poste."), o.by or "?", name, o.qty or 1))
+        WP.Print(string.format(L("%s a fabriqué ta commande : %s ×%d. Elle arrive par la poste (contre-remboursement s'il y a une commission) ou en échange."), o.by or "?", name, o.qty or 1))
+    elseif o.from == me and o.status == "delivered" and not o.thanked then
+        WP.Print(string.format(L("Commande livrée par %s. Clique sur Merci dans Mes commandes pour lui donner une étoile."), o.by or "?"))
     end
 end
 
 -- ---------------------------------------------------------------- automatic steps
+local function PrintReceived(o)
+    WP.Print(string.format(L("Commande reçue : %s ×%d de %s. Clique sur Merci dans Mes commandes pour lui donner une étoile."),
+        O.Name(o.item), o.qty or 1, o.by or "?"))
+end
 -- The crafter made the order: the item shows up in their bags (more than when they accepted it).
-local function CheckCrafted()
+-- The customer got it: the item shows up in their bags (more than when it was crafted).
+local function CheckBags()
     local me = Me()
     local count = (C_Item and C_Item.GetItemCount) or GetItemCount
     if not count then return end
@@ -977,6 +1005,16 @@ local function CheckCrafted()
             if (count(o.item) or 0) >= o.baseCount + (o.qty or 1) then
                 O.Crafted(o)
                 WP.Print(string.format(L("Commande fabriquée : %s ×%d pour %s. Envoie-la par la poste ou en échange."), O.Name(o.item), o.qty or 1, o.from))
+            end
+        end
+    end
+    for _, o in pairs(DB().list) do
+        if o.from == me and o.status == "crafted" and (o.item or 0) > 0 then
+            if o.custBase == nil then
+                o.custBase = count(o.item) or 0   -- first look: note it and wait for the item
+            elseif (count(o.item) or 0) >= o.custBase + (o.qty or 1) then
+                O.Delivered(o)
+                PrintReceived(o)
             end
         end
     end
@@ -995,9 +1033,13 @@ local function TradeItems(get)
     return out
 end
 local function TradeDone()
-    local me, who, gave = Me(), trade.with, trade.gave or {}
+    local me, who, gave, got = Me(), trade.with, trade.gave or {}, trade.got or {}
     if not who then return end
     for _, o in pairs(DB().list) do
+        -- the customer got the crafted item in this trade (an accepted order can also have its
+        -- reagents handed over in the same trade, so this is checked on its own, after)
+        local received = o.from == me and o.by == who and (o.status == "accepted" or o.status == "crafted")
+            and (o.item or 0) > 0 and got[o.item]
         if o.from == me and o.by == who and o.status == "accepted" and not o.sentGive then
             for _, g in ipairs(O.Decode(o.give)) do
                 if gave[g[1]] then o.sentGive = true; WP.Print(string.format(L("Composants remis à %s pour %s."), who, O.Name(o.item))); break end
@@ -1006,6 +1048,7 @@ local function TradeDone()
             O.Delivered(o)
             WP.Print(string.format(L("Commande livrée à %s : %s."), who, O.Name(o.item)))
         end
+        if received then O.Delivered(o); PrintReceived(o) end
     end
     if WP.RefreshOrders then WP.RefreshOrders() end
 end
@@ -1018,6 +1061,7 @@ tf:SetScript("OnEvent", function(_, e, a1, a2)
         trade = { with = Short(UnitName("NPC") or "") }
     elseif e == "TRADE_ACCEPT_UPDATE" then
         trade.gave = TradeItems(GetTradePlayerItemLink)
+        trade.got = TradeItems(GetTradeTargetItemLink)
     elseif e == "UI_INFO_MESSAGE" then
         local msg = type(a2) == "string" and a2 or a1
         if ERR_TRADE_COMPLETE and msg == ERR_TRADE_COMPLETE then TradeDone(); trade = {} end
@@ -1025,7 +1069,12 @@ tf:SetScript("OnEvent", function(_, e, a1, a2)
         C_Timer.After(1, function() trade = {} end)
     elseif e == "BAG_UPDATE_DELAYED" and not craftQueued then
         craftQueued = true
-        C_Timer.After(0.5, function() craftQueued = false; CheckCrafted() end)
+        C_Timer.After(0.5, function()
+            craftQueued = false
+            CheckBags()
+            -- counts on the order cards follow purchases and bank withdrawals
+            if WP.RefreshOrders then WP.RefreshOrders() end
+        end)
     end
 end)
 

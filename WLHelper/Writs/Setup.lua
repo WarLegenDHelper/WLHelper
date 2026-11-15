@@ -78,11 +78,16 @@ local function Build()
     y = y - 44
 
     y = Section(win, y, L("Modules"))
+    -- a module's name in French: WP.MODULES (Core.lua) still says "LFG" and "Writs & Favor"
+    local function ModLabel(m)
+        if m.key == "events" then return L("Groupes") elseif m.key == "writs" then return L("Writs et Faveur du marchand") end
+        return L(m.label)
+    end
     for _, m in ipairs(WP.MODULES) do
         local key = m.key
         local _
         -- one line per module, its hint on hover: the window must fit a 768-unit screen
-        _, y = Line(win, y, L(m.label), L(m.hint), function() return WP.ModuleOn(key) end, function(v) WP.SetModule(key, v) end, nil, true)
+        _, y = Line(win, y, ModLabel(m), L(m.hint), function() return WP.ModuleOn(key) end, function(v) WP.SetModule(key, v) end, nil, true)
     end
 
     y = Section(win, y - 4, L("Clics (désactivés par défaut)"))

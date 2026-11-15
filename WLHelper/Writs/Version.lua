@@ -10,9 +10,9 @@ local WP = ns.WP
 local L = ns.L
 
 ns.AddEnglish({
-    ["Nouvelle version disponible : %s (tu as %s). Mets à jour dans WowUp."] =
-        "New version available: %s (you have %s). Update it in WowUp.",
-    ["Mise à jour disponible : %s · WowUp › Update"] = "Update available: %s · WowUp › Update",
+    ["Version %s disponible (tu as %s) : WowUp, Update sur WL Helper, puis /reload en jeu."] =
+        "Version %s available (you have %s): WowUp, Update on WL Helper, then /reload in game.",
+    ["Mise à jour %s disponible : ouvre WowUp, Update, puis /reload"] = "Update %s available: open WowUp, Update, then /reload",
 })
 
 local PREFIX = "WLHver"
@@ -72,7 +72,7 @@ local function Seen(version, channel)
         end
         if not told then
             told = true
-            WP.Print(string.format(L("Nouvelle version disponible : %s (tu as %s). Mets à jour dans WowUp."), version, mine))
+            WP.Print(string.format(L("Version %s disponible (tu as %s) : WowUp, Update sur WL Helper, puis /reload en jeu."), version, mine))
         end
         if WP.RefreshHome then WP.RefreshHome() end
     elseif WP.NewerVersion(mine, version) then

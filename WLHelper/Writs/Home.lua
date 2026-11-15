@@ -1,5 +1,6 @@
 -- Writs/Home.lua: WL Helper's home page and the minimap button's tooltip and menu.
--- One card per module with where you stand (dungeon route, writs, bag items), the GPS line, then
+-- A "to do now" strip (the next useful thing, the GPS while it guides), one card per module with
+-- where you stand (dungeon route, writs, bag items), then
 -- "An idea, a bug?" and the settings. Opened by /wlh and a click on the minimap button.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
@@ -28,10 +29,8 @@ ns.AddEnglish({
     ["Faction pas encore vue"] = "Faction not seen yet",
     ["Sacs"] = "Bags",
     ["Rien à jeter"] = "Nothing to throw away",
-    ["vers %s"] = "to %s",
     ["Arrêter"] = "Stop",
     ["Réglages"] = "Settings",
-    ["GPS"] = "GPS",
     ["Donjons"] = "Dungeons",
     ["Clic : accueil · Clic droit : menu"] = "Click: home · Right-click: menu",
     ["Glisser pour déplacer"] = "Drag to move",
@@ -57,7 +56,25 @@ ns.AddEnglish({
     ["Commander à la guilde"] = "Order from the guild",
     ["%d améliorations en sac"] = "%d upgrades in your bags",
     ["Tu es %de cette semaine"] = "You are #%d this week",
-    ["Réglages : spé et poids"] = "Settings: spec, weights",
+    -- the "to do now" strip
+    ["GPS en route vers %s"] = "GPS on its way to %s",
+    ["%d commandes attendent ta réponse"] = "%d orders are waiting for your answer",
+    ["%d enveloppes à ouvrir dans tes sacs"] = "%d envelopes to open in your bags",
+    ["%s commence %s"] = "%s starts %s",
+    ["Nettoyer"] = "Clean up",
+    ["Rien d'urgent. Choisis une tuile ci-dessous."] = "Nothing urgent. Pick a tile below.",
+    -- what a click on a tile does (its tooltip)
+    ["Clic : ouvrir le guide"] = "Click: open the guide",
+    ["Clic : tes writs du jour et la liste d'achat"] = "Click: today's writs and the shopping list",
+    ["Clic : les caisses et où les rendre"] = "Click: crates and where to hand them in",
+    ["Clic : voir les objets à jeter"] = "Click: see the items to throw away",
+    ["Clic : commander ou accepter une commande"] = "Click: place or accept an order",
+    ["Clic : membres, métiers et classement"] = "Click: members, professions and ranking",
+    ["Clic : sorties de la guilde et joueurs qui cherchent un groupe"] = "Click: guild runs and players looking for a group",
+    ["Clic : choisir ta spé et voir tes améliorations"] = "Click: pick your spec and see your upgrades",
+    ["Clic : choisir ta spé"] = "Click: pick your spec",
+    ["Groupes"] = "LFG",
+    ["%d à accepter"] = "%d to accept",
 })
 
 local W, PAD, CARD_H, TILE_H = 440, 14, 72, 84
@@ -110,7 +127,7 @@ local function Card(parent, y, icon, tint, onClick, col)
     S.Solid(c, "BACKGROUND", C.card):SetAllPoints()
     c.border = S.Border(c, C.border)
     c.edge = S.Solid(c, "ARTWORK", C.border)
-    c.edge:SetPoint("TOPLEFT"); c.edge:SetPoint("BOTTOMLEFT"); c.edge:SetWidth(3)
+    c.edge:SetPoint("TOPLEFT"); c.edge:SetPoint("BOTTOMLEFT"); c.edge:SetWidth(3); c.edge:SetAlpha(0)
     local hl = S.Solid(c, "HIGHLIGHT", { 1, 1, 1 }, 0.04); hl:SetAllPoints()
 
     local box = CreateFrame("Frame", nil, c)
@@ -169,11 +186,43 @@ local function Card(parent, y, icon, tint, onClick, col)
         c.chev:ClearAllPoints(); c.chev:SetPoint("TOPRIGHT", -10, -14)
     end
     c:SetScript("OnClick", Click)
-    -- a switched-off card: its line is cut short, the whole module hint shows on hover
+    -- a tile's count of what waits (replaces the chevron when there is something)
+    if c.tile then
+        c.badge = CreateFrame("Frame", nil, c)
+        c.badge:SetHeight(18); c.badge:SetWidth(18); c.badge:SetPoint("TOPRIGHT", -8, -10)
+        S.Solid(c.badge, "BACKGROUND", C.brand):SetAllPoints()
+        c.badge.text = S.Text(c.badge, 11, { 1, 1, 1 }, true)
+        c.badge.text:SetPoint("CENTER")
+        c.badge:Hide()
+    end
+    -- hover: the full text of the card (its lines may be cut short), then what a click does;
+    -- a switched-off card: the whole module hint
     c:SetScript("OnEnter", function(self)
-        if self.off and self.hintFull and self.hintFull ~= "" then S.Tip(self, { self.title:GetText() or "", self.hintFull }) end
+        if self.off then
+            if self.hintFull and self.hintFull ~= "" then S.Tip(self, { self.title:GetText() or "", self.hintFull }) end
+            return
+        end
+        local lines = { self.title:GetText() or "" }
+        for _, fs in ipairs({ self.tag, self.line1, self.line2 }) do
+            local t = fs:IsShown() and fs:GetText()
+            if t and t ~= "" then lines[#lines + 1] = t end
+        end
+        if self.clickHint then lines[#lines + 1] = self.clickHint end
+        S.Tip(self, lines)
     end)
     c:SetScript("OnLeave", S.HideTip)
+    -- the badge's count; call it after Narrow(), which resets the title's right edge
+    function c:SetCount(n)
+        if self.tile and n and n > 0 and not self.off then
+            local bd = self.badge
+            bd.text:SetText(n > 99 and "99+" or tostring(n))
+            bd:SetWidth(math.max(18, (bd.text:GetStringWidth() or 8) + 10))
+            bd:Show(); self.chev:Hide()
+            self.title:SetPoint("RIGHT", self, "RIGHT", -40, 0)
+        elseif self.badge then
+            self.badge:Hide()
+        end
+    end
     -- with a button on the right, the text stops before it
     function c:Narrow(on)
         if self.tile then
@@ -190,17 +239,46 @@ local function Card(parent, y, icon, tint, onClick, col)
     return c
 end
 
--- Every card looks the same; what needs you is said by its button, not by a coloured edge.
-local function SetActive(c, on)
-    c.edge:SetColorTexture(C.border[1], C.border[2], C.border[3], 0)
-end
-
 local function Close() if win then win:Hide() end end
+
+-- the upgrades tile's bag scan, redone only after the bags changed
+local upN, bagsDirty = 0, true
+
+-- orders placed for you that nobody has accepted yet
+local function OrdersOpen()
+    if not WP.Orders then return 0 end
+    local _, forMe = WP.Orders.Lists()
+    local open = 0
+    for _, o in ipairs(forMe or {}) do if o.status == "open" then open = open + 1 end end
+    return open
+end
 
 local function Build()
     win = S.Window("WLHelperHome", W, 10, "WaR |cffce1918LegenD|r Helper", nil, WLWritsDB, "homePos")
 
     local y = -38 - PAD
+    -- "to do now": one line with the next useful thing and its button (always shown, so the
+    -- window never changes height)
+    local todo = CreateFrame("Frame", nil, win)
+    todo:SetHeight(36)
+    todo:SetPoint("TOPLEFT", PAD, y); todo:SetPoint("TOPRIGHT", -PAD, y)
+    todo.bg = S.Solid(todo, "BACKGROUND", C.card); todo.bg:SetAllPoints()
+    todo.border = S.Border(todo, C.divider)
+    todo.icon = todo:CreateTexture(nil, "ARTWORK")
+    todo.icon:SetSize(20, 20); todo.icon:SetPoint("LEFT", 10, 0); todo.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    todo.text = S.Text(todo, 13, C.text)
+    todo.text:SetPoint("LEFT", todo.icon, "RIGHT", 8, 0); todo.text:SetPoint("RIGHT", -104, 0)
+    todo.text:SetJustifyH("LEFT"); todo.text:SetWordWrap(false)
+    todo.go = S.Button(todo, "", 92, 26, "primary", function() if todo.fn then todo.fn() end end)
+    todo.go:SetPoint("RIGHT", -6, 0)
+    todo:EnableMouse(true)
+    todo:SetScript("OnEnter", function(self)
+        if todo.text.IsTruncated and todo.text:IsTruncated() then S.Tip(self, { todo.text:GetText() or "" }) end
+    end)
+    todo:SetScript("OnLeave", S.HideTip)
+    win.todo = todo
+    y = y - 36 - 10
+
     cards.dungeons = Card(win, y, "Interface\\Icons\\INV_Misc_Map_01", C.brandHi or C.brand, function()
         Close()
         if DungeonState() then root.ShowGuide() else root.ShowPicker() end
@@ -227,6 +305,9 @@ local function Build()
     cards.upgrades = Card(win, y, "Interface\\Icons\\INV_Chest_Cloth_17", C.ready, function()
         Close(); if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end
     end, 1)
+    cards.help = Card(win, y, "Interface\\Icons\\INV_Misc_Book_09", C.info, function()
+        Close(); if WP.Help then WP.Help.Toggle() end
+    end, 2)
     y = y - TILE_H - 10
 
     win.afterCards = y
@@ -240,18 +321,6 @@ local function Build()
     upd.text:SetPoint("LEFT", 12, 0); upd.text:SetPoint("RIGHT", -12, 0); upd.text:SetJustifyH("LEFT"); upd.text:SetWordWrap(false)
     win.upd = upd
 
-    -- the GPS line, only while it guides
-    local gps = CreateFrame("Frame", nil, win)
-    gps:SetHeight(40)
-    S.Border(gps, C.divider)
-    gps.text = S.Text(gps, 14, C.dim)
-    gps.text:SetPoint("LEFT", 12, 0); gps.text:SetPoint("RIGHT", -84, 0); gps.text:SetJustifyH("LEFT"); gps.text:SetWordWrap(false)
-    gps.stop = S.Button(gps, L("Arrêter"), 70, 26, "secondary", function()
-        WP.StopGPS()
-    end)
-    gps.stop:SetPoint("RIGHT", -7, 0)
-    win.gps = gps
-
     -- footer: an idea, the settings, the version (placed by Layout under what is shown)
     local half = (W - 2 * PAD - 8) / 2
     win.idea = S.Button(win, L("Une idée, un bug ?"), half, 34, "secondary", function()
@@ -264,29 +333,29 @@ local function Build()
     win.ver:SetText("v" .. Version() .. " · /wlh")
 
     -- stacks the optional lines under the cards, then the footer, and sizes the window
-    function win.Layout(showUpdate, showGps)
+    function win.Layout(showUpdate)
         local yy = win.afterCards
         local function place(f, h, gap)
             f:ClearAllPoints(); f:SetPoint("TOPLEFT", PAD, yy); f:SetPoint("TOPRIGHT", -PAD, yy); f:Show()
             yy = yy - h - gap
         end
         if showUpdate then place(upd, 34, 10) else upd:Hide() end
-        if showGps then place(gps, 40, 14) else gps:Hide() end
         win.idea:ClearAllPoints(); win.idea:SetPoint("TOPLEFT", PAD, yy)
         win.set:ClearAllPoints(); win.set:SetPoint("TOPRIGHT", -PAD, yy)
         yy = yy - 34 - 8
         win.ver:ClearAllPoints(); win.ver:SetPoint("TOP", 0, yy)
         win:SetHeight(-yy + 12 + 14)
     end
-    win.Layout(false, false)
+    win.Layout(false)
 
     cards.dungeons.key, cards.writs.key, cards.bags.key, cards.orders.key, cards.guild.key = "dungeons", "writs", "bags", "orders", "guild"
     cards.events.key, cards.upgrades.key, cards.favor.key = "events", "upgrades", "writs"
-    win:SetScript("OnShow", function() WP.RefreshHome() end)
+    win:SetScript("OnShow", function() bagsDirty = true; WP.RefreshHome() end)
     local ev = CreateFrame("Frame", nil, win)
     pcall(ev.RegisterEvent, ev, "QUEST_LOG_UPDATE"); pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED"); pcall(ev.RegisterEvent, ev, "UPDATE_FACTION")
     local queued = false
-    ev:SetScript("OnEvent", function()
+    ev:SetScript("OnEvent", function(self, event)
+        if event == "BAG_UPDATE_DELAYED" then bagsDirty = true end
         if not win:IsShown() or queued then return end
         queued = true
         C_Timer.After(0.5, function() queued = false; WP.RefreshHome() end)
@@ -297,83 +366,93 @@ function WP.RefreshHome()
     if not (win and win:IsShown()) then return end
     local level = UnitLevel("player")
     win.subtitle:SetText(string.format(L("%s · niv. %d"), UnitName("player") or "", level or 0))
+    -- what the tiles find, reused by the "to do now" strip
+    local open, ready, bag, nextE, nextStep, dLabel, dFinished = 0, 0, 0, nil, nil, nil, nil
+    local function Hint(text) return S.Hex(C.warn) .. text .. "|r" end
 
     -- dungeons
     local d = cards.dungeons
-    d.title:SetText(L("Quêtes de donjon"))
-    local label, cur, total, finished, nextStep = DungeonState()
+    d.title:SetText(L("Guide de quêtes"))
+    local cur, total
+    dLabel, cur, total, dFinished, nextStep = DungeonState()
+    d.clickHint = Hint(L("Clic : ouvrir le guide"))
     d.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
-    if label and not finished then
+    if dLabel and not dFinished then
         -- where: the route and the step; then what to do next
         d.tag:SetText(string.format(L("étape %d sur %d"), cur, total))
-        d.line1:SetText(label)
+        d.line1:SetText(dLabel)
         d.line2:SetText(nextStep and nextStep ~= "" and (L("Maintenant : ") .. nextStep) or "")
         d.bar:Show(); d.fill:SetWidth(math.max(0.01, (d.bar:GetWidth() > 0 and d.bar:GetWidth() or 200) * (cur - 1) / math.max(1, total)))
         d.action.label:SetText(L("Reprendre"))
-        SetActive(d, true)
-    elseif label then
+    elseif dLabel then
         d.tag:SetText(L("terminé"))
-        d.line1:SetText(label); d.line2:SetText(L("Route terminée"))
+        d.line1:SetText(dLabel); d.line2:SetText(L("Route terminée"))
         d.bar:Hide()
         d.action.label:SetText(L("Choisir"))
-        SetActive(d, false)
     else
-        d.tag:SetText("")
+        d.tag:SetText(L("Donjons · Raids · Classe"))
         d.line1:SetText(L("Aucun donjon choisi"))
         d.line2:SetText(L("Route depuis ta position"))
         d.bar:Hide()
         d.action.label:SetText(L("Choisir"))
-        SetActive(d, false)
     end
     d.action:Show(); d.chev:Hide(); d:Narrow(true)
 
     -- Trading Post
     local c = cards.writs
     c.title:SetText(L("Writs")); c.tag:SetText(L("Réputation")); c.bar:Hide(); c.action:Hide(); c.chev:Show(); c:Narrow(false)
-    local need, goal, ready, bag = WritState()
+    c.clickHint = Hint(L("Clic : tes writs du jour et la liste d'achat"))
+    local need, goal, nReady, nBagW = WritState()
     if need then
+        ready, bag = nReady, nBagW
         c.line1:SetText(need > 0 and string.format(L("%s dans %d points"), WP.Reaction(goal), need) or string.format(L("%s atteint"), WP.Reaction(goal)))
         local parts = {}
         if ready > 0 then parts[#parts + 1] = string.format(L("%d writs prêts à rendre"), ready) end
         if bag > 0 then parts[#parts + 1] = string.format(L("%d enveloppes à ouvrir"), bag) end
         c.line2:SetText(#parts > 0 and table.concat(parts, " · ") or L("Rien à rendre pour l'instant"))
         c.line2:SetTextColor((#parts > 0 and C.ready or C.dim)[1], (#parts > 0 and C.ready or C.dim)[2], (#parts > 0 and C.ready or C.dim)[3])
-        SetActive(c, ready > 0)
     else
-        c.line1:SetText(L("Faction pas encore vue")); c.line2:SetText(""); SetActive(c, false)
+        c.line1:SetText(L("Faction pas encore vue")); c.line2:SetText("")
     end
+    c:SetCount(ready + bag)
 
     -- Merchant's Favor: what you have, and the crates that bring more
     local fv = cards.favor
     fv.title:SetText(L("Faveur du marchand")); fv.tag:SetText(L("Caisses")); fv.bar:Hide(); fv.action:Hide(); fv.chev:Show(); fv:Narrow(false)
+    fv.clickHint = Hint(L("Clic : les caisses et où les rendre"))
     local favor = WP.FavorNow and WP.FavorNow()
     fv.line1:SetText(favor and string.format(L("%d Faveur en poche"), favor) or L("Pas encore de Faveur"))
     fv.line2:SetText(L("Caisses les moins chères, où les rendre"))
     fv.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
+    fv:SetCount(0)
 
     -- bags
     local b = cards.bags
     b.title:SetText(L("Sacs")); b.tag:SetText(""); b.bar:Hide(); b.action:Hide(); b.chev:Show(); b.line2:SetText(""); b:Narrow(false)
-    local n = BagCount()
-    b.line1:SetText(n > 0 and string.format(L("%d objets de quête à jeter"), n) or L("Rien à jeter"))
-    SetActive(b, false)
+    b.clickHint = Hint(L("Clic : voir les objets à jeter"))
+    local nBag = WP.ModuleOn("bags") and BagCount() or 0
+    b.line1:SetText(nBag > 0 and string.format(L("%d objets de quête à jeter"), nBag) or L("Rien à jeter"))
+    b:SetCount(nBag)
 
     -- orders: what waits for you
     local oc = cards.orders
     oc.title:SetText(L("Commandes")); oc.tag:SetText(""); oc.bar:Hide(); oc.action:Hide(); oc.chev:Show(); oc:Narrow(false)
+    oc.clickHint = Hint(L("Clic : commander ou accepter une commande"))
     if WP.Orders then
-        local mine, forMe = WP.Orders.Lists()
-        local open, running = 0, 0
-        for _, o in ipairs(forMe) do if o.status == "open" then open = open + 1 end end
-        for _, o in ipairs(mine) do if o.status == "open" or o.status == "accepted" or o.status == "crafted" then running = running + 1 end end
+        local mine = WP.Orders.Lists()
+        local running = 0
+        open = OrdersOpen()
+        for _, o in ipairs(mine or {}) do if o.status == "open" or o.status == "accepted" or o.status == "crafted" then running = running + 1 end end
         oc.line1:SetText(open > 0 and string.format(L("%d commandes à accepter"), open) or L("Commander à la guilde"))
         oc.line2:SetText(running > 0 and string.format(L("%d de tes commandes en cours"), running) or "")
         oc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
     end
+    oc:SetCount(open)
 
     -- guild: who is on, and where you stand in this week's PvP ranking
     local gc = cards.guild
     gc.title:SetText(L("Guilde")); gc.tag:SetText(""); gc.bar:Hide(); gc.action:Hide(); gc.chev:Show(); gc:Narrow(false)
+    gc.clickHint = Hint(L("Clic : membres, métiers et classement"))
     if IsInGuild and IsInGuild() and WP.GuildRoster then
         local _, online = WP.GuildRoster(true)
         gc.tag:SetText(GetGuildInfo and GetGuildInfo("player") or "")
@@ -385,42 +464,57 @@ function WP.RefreshHome()
         gc.line1:SetText(L("Pas de guilde.")); gc.line2:SetText("")
     end
     gc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
+    gc:SetCount(0)
 
     -- events: the next one, and who looks for a group now
     local ec = cards.events
-    ec.title:SetText("LFG"); ec.tag:SetText(""); ec.bar:Hide(); ec.action:Hide(); ec.chev:Show(); ec:Narrow(false)
+    ec.title:SetText(L("Groupes")); ec.tag:SetText(""); ec.bar:Hide(); ec.action:Hide(); ec.chev:Show(); ec:Narrow(false)
+    ec.clickHint = Hint(L("Clic : sorties de la guilde et joueurs qui cherchent un groupe"))
+    local lfg = 0
     if WP.EventList then
         local list = WP.EventList()
-        local nextE
         for _, e in ipairs(list) do if e.status == "open" and e.when >= time() - 1800 then nextE = e; break end end
         ec.tag:SetText(#list > 0 and string.format(L("%d événements à venir"), #list) or "")
         ec.line1:SetText(nextE and string.format(L("Prochain : %s, %s"), nextE.title, WP.EventWhen(nextE.when)) or L("Rien de prévu"))
-        local n = #WP.LFGList()
-        ec.line2:SetText(n > 0 and string.format(L("%d cherchent un groupe"), n) or "")
+        lfg = WP.LFGList and #WP.LFGList() or 0
+        ec.line2:SetText(lfg > 0 and string.format(L("%d cherchent un groupe"), lfg) or "")
     end
     ec.line2:SetTextColor(C.ready[1], C.ready[2], C.ready[3])
+    ec:SetCount(lfg)
 
     -- upgrades: the spec judged, and how many bag items are better than what you wear
     local uc = cards.upgrades
     uc.title:SetText(L("Améliorations")); uc.tag:SetText(""); uc.bar:Hide(); uc.action:Hide(); uc.chev:Show(); uc:Narrow(false)
+    uc.clickHint = Hint(L("Clic : choisir ta spé et voir tes améliorations"))
     local Wt = WP.Weights
     if Wt then
         local _, bracket = Wt.Bracket()
         uc.tag:SetText(Wt.SpecName() .. " · " .. string.format(L("niv. %s"), bracket))
-        local n = 0
         local GetLink = C_Container and C_Container.GetContainerItemLink
-        if GetLink and WP.UpgradeCheck then
-            for bag = 0, NUM_BAG_SLOTS or 4 do
-                for slot = 1, (C_Container.GetContainerNumSlots(bag) or 0) do
-                    local link = GetLink(bag, slot)
-                    if link and WP.UpgradeCheck(link).up then n = n + 1 end
+        if bagsDirty and GetLink and WP.UpgradeCheck then
+            -- every bag slot is checked: only after the bags changed, not on every refresh
+            upN = 0
+            for bagID = 0, NUM_BAG_SLOTS or 4 do
+                for slot = 1, (C_Container.GetContainerNumSlots(bagID) or 0) do
+                    local link = GetLink(bagID, slot)
+                    if link and WP.UpgradeCheck(link).up then upN = upN + 1 end
                 end
             end
+            bagsDirty = false
         end
-        uc.line1:SetText(n > 0 and string.format(L("%d améliorations en sac"), n) or L("Rien de mieux dans tes sacs"))
-        uc.line2:SetText(L("Réglages : spé et poids"))
+        uc.line1:SetText(upN > 0 and string.format(L("%d améliorations en sac"), upN) or L("Rien de mieux dans tes sacs"))
+        uc.line2:SetText(L("Clic : choisir ta spé"))
         uc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
     end
+    uc:SetCount(upN)
+
+    -- the quick start guide
+    local hc = cards.help
+    hc.title:SetText(L("Guide de démarrage")); hc.tag:SetText(""); hc.bar:Hide(); hc.action:Hide(); hc.chev:Show(); hc:Narrow(false)
+    hc.line1:SetText(L("Que fait l'addon ?")); hc.line2:SetText(L("Clic : le guide de démarrage"))
+    hc.line2:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
+    hc.clickHint = Hint(L("Clic : le guide de démarrage"))
+    if hc.SetCount then hc:SetCount(0) end
 
     -- switched-off modules: dimmed, "off", one button to turn them back on
     local hints = {}
@@ -435,19 +529,56 @@ function WP.RefreshHome()
             card.tag:SetText(L("éteint")); card.line1:SetText(card.hintFull)
             card.line2:SetText(""); card.bar:Hide(); card.chev:Hide()
             card.action.label:SetText(L("Allumer")); card.action:Show(); card:Narrow(true)
-            SetActive(card, false)
+            card:SetCount(0)
         end
     end
 
-    -- GPS (only while it guides) and an update seen on another player's copy
-    local g = win.gps
-    local guiding = WP.GPS.Active()
-    if guiding then
-        g.text:SetText(S.Hex(C.text) .. L("GPS") .. "|r · " .. string.format(L("vers %s"), WP.GPS.DestName() or "?"))
+    -- "to do now": the first thing that waits, from the most urgent down
+    local t = win.todo
+    local function Todo(icon, text, label, fn)
+        t.icon:SetTexture(icon); t.icon:SetAlpha(1)
+        t.text:SetText(text); t.text:SetTextColor(C.text[1], C.text[2], C.text[3])
+        t.fn = fn
+        if label then t.go.label:SetText(label); t.go:Show() else t.go:Hide() end
+        local bgc = C.brandBg or C.card
+        t.bg:SetColorTexture(bgc[1], bgc[2], bgc[3], bgc[4] or 1)
     end
+    local On = WP.ModuleOn
+    if WP.GPS.Active() then
+        Todo("Interface\\Icons\\Ability_Tracking", string.format(L("GPS en route vers %s"), WP.GPS.DestName() or "?"), L("Arrêter"),
+            function() WP.StopGPS(); WP.RefreshHome() end)
+    elseif On("orders") and open > 0 then
+        Todo("Interface\\Icons\\INV_Misc_Note_01", string.format(L("%d commandes attendent ta réponse"), open), L("Voir"),
+            function() Close(); if WP.ToggleOrders then WP.ToggleOrders() end end)
+    elseif On("writs") and ready > 0 then
+        Todo("Interface\\Icons\\INV_Letter_15", string.format(L("%d writs prêts à rendre"), ready), L("Y aller"), function()
+            Close()
+            -- the tour already runs: on to the next stop; otherwise start it
+            if WLWritsCharDB and WLWritsCharDB.gps then WP.GoNext() else WP.ToggleGPS() end
+        end)
+    elseif On("writs") and bag > 0 then
+        Todo("Interface\\Icons\\INV_Letter_15", string.format(L("%d enveloppes à ouvrir dans tes sacs"), bag), L("Voir"),
+            function() Close(); WP.Open("writs") end)
+    elseif On("events") and nextE and nextE.when - time() < 3600 then
+        Todo("Interface\\Icons\\Ability_Warrior_BattleShout", string.format(L("%s commence %s"), nextE.title, WP.EventWhen(nextE.when)), L("Voir"),
+            function() Close(); if WP.ToggleEvents then WP.ToggleEvents() end end)
+    elseif On("dungeons") and dLabel and not dFinished then
+        Todo("Interface\\Icons\\INV_Misc_Map_01", nextStep and nextStep ~= "" and (L("Maintenant : ") .. nextStep) or dLabel, L("Reprendre"),
+            function() Close(); root.ShowGuide() end)
+    elseif On("bags") and nBag > 0 then
+        Todo("Interface\\Icons\\INV_Misc_Bag_08", string.format(L("%d objets de quête à jeter"), nBag), L("Nettoyer"),
+            function() Close(); if WP.Cleaner then WP.Cleaner.Toggle() end end)
+    else
+        Todo("Interface\\Icons\\INV_Misc_QuestionMark", L("Rien d'urgent. Choisis une tuile ci-dessous."))
+        t.icon:SetAlpha(0.5)
+        t.text:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
+        t.bg:SetColorTexture(C.card[1], C.card[2], C.card[3], C.card[4] or 1)
+    end
+
+    -- an update seen on another player's copy
     local newer = WP.UpdateAvailable and WP.UpdateAvailable()
-    if newer then win.upd.text:SetText(string.format(L("Mise à jour disponible : %s · WowUp › Update"), newer)) end
-    win.Layout(newer ~= nil, guiding)
+    if newer then win.upd.text:SetText(string.format(L("Mise à jour %s disponible : ouvre WowUp, Update, puis /reload"), newer)) end
+    win.Layout(newer ~= nil)
 end
 
 function WP.OpenHome()
@@ -468,21 +599,29 @@ function WP.MinimapTooltip(owner)
     tt:SetOwner(owner, "ANCHOR_LEFT")
     tt:AddLine("WaR |cffce1918LegenD|r Helper", 1, 1, 1)
     local label, cur, total, finished = DungeonState()
-    tt:AddDoubleLine(L("Quêtes de donjon"), not WP.ModuleOn("dungeons") and L("éteint") or label and (label .. ", " .. (finished and L("terminé") or string.format(L("%d / %d"), cur, total))) or L("aucun"),
+    tt:AddDoubleLine(L("Guide de quêtes"), not WP.ModuleOn("dungeons") and L("éteint") or label and (label .. ", " .. (finished and L("terminé") or string.format(L("%d / %d"), cur, total))) or L("aucun"),
         C.dim[1], C.dim[2], C.dim[3], C.text[1], C.text[2], C.text[3])
     local need, _, ready = WritState()
     if not WP.ModuleOn("writs") then
-        tt:AddDoubleLine(L("Writs & Favor"), L("éteint"), C.dim[1], C.dim[2], C.dim[3], C.dim[1], C.dim[2], C.dim[3])
+        tt:AddDoubleLine(L("Writs"), L("éteint"), C.dim[1], C.dim[2], C.dim[3], C.dim[1], C.dim[2], C.dim[3])
     elseif need then
         local col = ready > 0 and C.ready or C.text
-        tt:AddDoubleLine(L("Writs & Favor"), string.format(L("%d prêts"), ready), C.dim[1], C.dim[2], C.dim[3], col[1], col[2], col[3])
+        tt:AddDoubleLine(L("Writs"), string.format(L("%d prêts"), ready), C.dim[1], C.dim[2], C.dim[3], col[1], col[2], col[3])
     end
     tt:AddDoubleLine(L("Sacs"), WP.ModuleOn("bags") and string.format(L("%d à jeter"), BagCount()) or L("éteint"),
         C.dim[1], C.dim[2], C.dim[3], C.text[1], C.text[2], C.text[3])
+    local open = WP.ModuleOn("orders") and OrdersOpen() or 0
+    if open > 0 then
+        tt:AddDoubleLine(L("Commandes"), string.format(L("%d à accepter"), open), C.dim[1], C.dim[2], C.dim[3], C.ready[1], C.ready[2], C.ready[3])
+    end
+    local lfg = WP.ModuleOn("events") and WP.LFGList and #WP.LFGList() or 0
+    if lfg > 0 then
+        tt:AddDoubleLine(L("Groupes"), string.format(L("%d cherchent un groupe"), lfg), C.dim[1], C.dim[2], C.dim[3], C.text[1], C.text[2], C.text[3])
+    end
     local newer = WP.UpdateAvailable and WP.UpdateAvailable()
     if newer then
         tt:AddLine(" ")
-        tt:AddLine(string.format(L("Mise à jour disponible : %s · WowUp › Update"), newer), C.brandSoft[1], C.brandSoft[2], C.brandSoft[3])
+        tt:AddLine(string.format(L("Mise à jour %s disponible : ouvre WowUp, Update, puis /reload"), newer), C.brandSoft[1], C.brandSoft[2], C.brandSoft[3])
     end
     tt:AddLine(" ")
     tt:AddLine(L("Clic : accueil · Clic droit : menu"), C.warn[1], C.warn[2], C.warn[3])
@@ -501,17 +640,18 @@ function WP.MinimapMenu(owner)
         S.Border(menu, C.border)
         tinsert(UISpecialFrames, "WLHelperMinimapMenu")
         local items = {
-            { L("Quêtes de donjon"), function() if DungeonState() then root.ShowGuide() else root.ShowPicker() end end, "dungeons" },
+            { L("Guide de quêtes"), function() if DungeonState() then root.ShowGuide() else root.ShowPicker() end end, "dungeons" },
             { L("Writs"), function() WP.Open("writs") end, "writs" },
             { L("Faveur du marchand"), function() WP.Open("favor") end, "writs" },
             { L("Sacs"), function() if WP.Cleaner then WP.Cleaner.Toggle() end end, "bags" },
             { L("Commandes"), function() if WP.ToggleOrders then WP.ToggleOrders() end end, "orders" },
             { L("Guilde"), function() if WP.ToggleGuild then WP.ToggleGuild() end end, "guild" },
-            { "LFG", function() if WP.ToggleEvents then WP.ToggleEvents() end end, "events" },
+            { L("Groupes"), function() if WP.ToggleEvents then WP.ToggleEvents() end end, "events" },
             { L("Améliorations"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end end, "upgrades" },
             false,
             { L("Arrêter le GPS"), function() WP.StopGPS() end, "gps" },
             { L("Réglages"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage() end end },
+            { L("Une idée, un bug ?"), function() if WP.Feedback then WP.Feedback("idea") end end },
         }
         local y = -4
         menu.buttons = {}

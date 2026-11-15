@@ -64,17 +64,50 @@ local function FirstOpen(log)
   return #s
 end
 
+-- Where the game itself shows a quest's objective on a map (its blue area), when the quest is in
+-- the log: Forever moved some spawns, so the game's own marker wins over the database.
+local function GamePOI(qid, map)
+  local f = C_QuestLog and C_QuestLog.GetQuestsOnMap
+  if not (f and qid and map) then return nil end
+  local ok, list = pcall(f, map)
+  if not ok or type(list) ~= "table" then return nil end
+  for _, q in ipairs(list) do
+    if type(q) == "table" and q.questID == qid and not q.isQuestStart then
+      local okN, x, y = pcall(function()
+        if type(q.x) == "number" and type(q.y) == "number" and q.x > 0 and q.y > 0 then return q.x * 100, q.y * 100 end
+      end)
+      if okN and x then return math.floor(x * 10 + 0.5) / 10, math.floor(y * 10 + 0.5) / 10 end
+    end
+  end
+end
+ns.GamePOI = GamePOI
+
 local function StepPoints(log, st, all)
   local pts, seen = {}, {}
   if st.gate then
+    -- a missing check-list quest first: the GPS goes to its giver, then to the entrance
+    if not all then
+      for _, n in ipairs(st.acts) do
+        if n.kind == "h" and n.loc and n.loc.m and not ns.NodeOK(log, n) then
+          local k = ns.PKey(n.loc.m, n.loc.x, n.loc.y)
+          if not seen[k] then seen[k] = true; table.insert(pts, { n.loc.m, n.loc.x, n.loc.y, n.npc or ns.QName(n.q) }) end
+        end
+      end
+      if #pts > 0 then return pts end
+    end
     local d = ns.D[st.gate]
     if d and d.e and d.e.m then table.insert(pts, { d.e.m, d.e.x, d.e.y, ns.DName(st.gate) }) end
     return pts
   end
   for _, n in ipairs(st.acts) do
     if n.loc and n.loc.m and (all or not ns.NodeOK(log, n)) then
-      local k = ns.PKey(n.loc.m, n.loc.x, n.loc.y)
-      if not seen[k] then seen[k] = true; table.insert(pts, { n.loc.m, n.loc.x, n.loc.y, n.npc or ns.QName(n.q) }) end
+      local x, y = n.loc.x, n.loc.y
+      if n.kind == "o" then
+        local gx, gy = GamePOI(n.q, n.loc.m)
+        if gx then x, y = gx, gy end
+      end
+      local k = ns.PKey(n.loc.m, x, y)
+      if not seen[k] then seen[k] = true; table.insert(pts, { n.loc.m, x, y, n.npc or ns.QName(n.q) }) end
     end
   end
   if #pts == 0 and st.ins then
@@ -220,6 +253,20 @@ local function ObjectiveLines(n)
   return lines
 end
 
+-- icônes officielles du jeu pour chaque type de ligne
+local KICON = {
+  a = "Interface\\GossipFrame\\AvailableQuestIcon", t = "Interface\\GossipFrame\\ActiveQuestIcon",
+  c = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", o = "Interface\\Icons\\INV_Misc_Map_01",
+  h = "Interface\\RAIDFRAME\\ReadyCheck-Waiting",
+}
+local function KindIcon(nd)
+  if nd.kind == "i" then
+    local id = nd.items and nd.items[1]
+    return (id and GetItemIcon and GetItemIcon(id)) or "Interface\\Icons\\INV_Misc_Bag_10"
+  end
+  return KICON[nd.kind]
+end
+
 local function BuildList()
   local l = CreateFrame("Frame", nil, f)
   l:SetWidth(LISTW)
@@ -233,13 +280,15 @@ local function BuildList()
     row:SetHeight(LISTH)
     row:SetPoint("TOPLEFT", 1, -30 - (r - 1) * LISTH); row:SetPoint("TOPRIGHT", -1, -30 - (r - 1) * LISTH)
     row.sel = Tex(row, "BACKGROUND", { 1, 1, 1, 0.06 }); row.sel:SetAllPoints()
-    row.bar = Tex(row, "ARTWORK", T.accent); row.bar:SetPoint("TOPLEFT"); row.bar:SetPoint("BOTTOMLEFT"); row.bar:SetWidth(2); ns.Accent(row.bar)
+    row.bar = Tex(row, "ARTWORK", T.accent); row.bar:SetPoint("TOPLEFT"); row.bar:SetPoint("BOTTOMLEFT"); row.bar:SetWidth(2); ns.Accent(row.bar); row.bar:SetAlpha(0)
     row.hl = Tex(row, "HIGHLIGHT", { 1, 1, 1, 0.05 }); row.hl:SetAllPoints()
     row.pip = Tex(row, "ARTWORK", { 1, 1, 1 }); row.pip:SetSize(6, 6); row.pip:SetPoint("LEFT", 10, 0)
     row.check = row:CreateTexture(nil, "OVERLAY"); row.check:SetSize(13, 13); row.check:SetPoint("LEFT", 7, 0)
     row.check:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-Ready")
     row.num = Text(row, 11, T.dim); row.num:SetPoint("LEFT", 22, 0); row.num:SetWidth(24); row.num:SetJustifyH("RIGHT"); row.num:SetJustifyV("MIDDLE")
-    row.txt = Text(row, 12, T.text); row.txt:SetPoint("LEFT", 52, 0); row.txt:SetPoint("RIGHT", -6, 0)
+    -- the step's kind at a glance: check-list, boss, dungeon, quest giver, item...
+    row.kind = row:CreateTexture(nil, "ARTWORK"); row.kind:SetSize(14, 14); row.kind:SetPoint("LEFT", 50, 0)
+    row.txt = Text(row, 12, T.text); row.txt:SetPoint("LEFT", 68, 0); row.txt:SetPoint("RIGHT", -6, 0)
     row.txt:SetWordWrap(false); row.txt:SetJustifyV("MIDDLE")
     row:SetScript("OnClick", function(self) ns.GoTo(self.i) end)
     l.rows[r] = row
@@ -261,6 +310,9 @@ local function RenderList(log)
   l.visible = math.min(avail, LISTROWS)
   local max = math.max(0, #steps - l.visible)
   if l.offset > max then l.offset = max end
+  local doneCount = 0
+  for k = 1, #steps do if IsStepDone(log, k) then doneCount = doneCount + 1 end end
+  l.title:SetText(L.STEPS_N:format(doneCount, #steps))
   for r, row in ipairs(l.rows) do
     local i = l.offset + r
     local st = steps[i]
@@ -268,8 +320,19 @@ local function RenderList(log)
       row.i = i; row:Show()
       local done = IsStepDone(log, i)
       row.num:SetText(i)
-      local pre = st.gate and "|cffffcc40?|r " or (st.ins and "|cffff5555>|r " or "")
-      row.txt:SetText(pre .. StepTitle(st))
+      row.txt:SetText(StepTitle(st))
+      local tex, crop
+      if st.gate then tex = "Interface\\RAIDFRAME\\ReadyCheck-Waiting"
+      elseif st.split and st.bossIdx and st.bossIdx >= 1 and st.bossIdx <= 998 then tex = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
+      elseif st.ins then tex = (ns.D[st.ins] and ns.D[st.ins].icon) or "Interface\\Icons\\INV_Misc_Map_01"; crop = true
+      else
+        local has, itemNode = {}, nil
+        for _, nd in ipairs(st.acts) do has[nd.kind] = true; if nd.kind == "i" and not itemNode then itemNode = nd end end
+        if has.a then tex = KICON.a elseif itemNode then tex = KindIcon(itemNode); crop = true elseif has.o then tex = KICON.o; crop = true else tex = KICON.t end
+      end
+      row.kind:SetTexture(tex)
+      if crop then row.kind:SetTexCoord(0.08, 0.92, 0.08, 0.92) else row.kind:SetTexCoord(0, 1, 0, 1) end
+      row.kind:SetAlpha(done and 0.45 or 1)
       row.sel:SetShown(i == f.view); row.bar:SetShown(i == f.auto)
       row.check:SetShown(done); row.pip:SetShown(not done)
       local c = DColor(st.d or st.gate or st.ins)
@@ -281,26 +344,13 @@ local function RenderList(log)
   end
 end
 
--- icônes officielles du jeu pour chaque type de ligne
-local KICON = {
-  a = "Interface\\GossipFrame\\AvailableQuestIcon", t = "Interface\\GossipFrame\\ActiveQuestIcon",
-  c = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull", o = "Interface\\Icons\\INV_Misc_Map_01",
-  h = "Interface\\RAIDFRAME\\ReadyCheck-Waiting",
-}
-local function KindIcon(nd)
-  if nd.kind == "i" then
-    local id = nd.items and nd.items[1]
-    return (id and GetItemIcon and GetItemIcon(id)) or "Interface\\Icons\\INV_Misc_Bag_10"
-  end
-  return KICON[nd.kind]
-end
 
 local function MakeRow(parent, CW)
   local row = CreateFrame("Button", nil, parent)
   row:SetWidth(CW + 8)
   row.hl = Tex(row, "HIGHLIGHT", { 1, 1, 1, 0.05 }); row.hl:SetAllPoints()
   row.wpOn = Tex(row, "BACKGROUND", T.accent); row.wpOn:SetAllPoints(); ns.Accent(row.wpOn, 0.10)
-  row.wpBar = Tex(row, "ARTWORK", T.accent); row.wpBar:SetPoint("TOPLEFT"); row.wpBar:SetPoint("BOTTOMLEFT"); row.wpBar:SetWidth(2); ns.Accent(row.wpBar)
+  row.wpBar = Tex(row, "ARTWORK", T.accent); row.wpBar:SetPoint("TOPLEFT"); row.wpBar:SetPoint("BOTTOMLEFT"); row.wpBar:SetWidth(2); ns.Accent(row.wpBar); row.wpBar:SetAlpha(0)
   row.icon = row:CreateTexture(nil, "ARTWORK"); row.icon:SetSize(16, 16); row.icon:SetPoint("TOPLEFT", 2, -4)
   row.icon:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-Ready")
   row.pip = Tex(row, "ARTWORK", { 1, 1, 1 }); row.pip:SetSize(8, 8); row.pip:SetPoint("TOPLEFT", 6, -8)
@@ -314,9 +364,12 @@ local function MakeRow(parent, CW)
   -- pour que la fenêtre reste utilisable en combat
   -- GPS
   local gb = CreateFrame("Button", nil, row)
-  gb:SetSize(20, 20)
-  gb.icon = gb:CreateTexture(nil, "ARTWORK"); gb.icon:SetAllPoints()
-  gb.hl = Tex(gb, "HIGHLIGHT", { 1, 1, 1, 0.2 }); gb.hl:SetAllPoints()
+  gb:SetSize(54, 20)
+  gb.bg = Tex(gb, "BACKGROUND", { 1, 1, 1, 0.08 }); gb.bg:SetAllPoints()
+  ns.Flat(gb, { 0, 0, 0, 0 }, { 1, 1, 1, 0.18 })
+  gb.icon = gb:CreateTexture(nil, "ARTWORK"); gb.icon:SetSize(14, 14); gb.icon:SetPoint("LEFT", 5, 0)
+  gb.text = Text(gb, 11, T.text, true); gb.text:SetPoint("LEFT", gb.icon, "RIGHT", 3, 0); gb.text:SetText("GPS")
+  gb.hl = Tex(gb, "HIGHLIGHT", { 1, 1, 1, 0.15 }); gb.hl:SetAllPoints()
   gb.row = row
   gb:SetScript("OnClick", function(self) local n = self.row.node; if n and n.loc then ns.SetOne(n) end end)
   gb:SetScript("OnEnter", function(self)
@@ -444,12 +497,20 @@ local function Build()
   bar.bg = Tex(bar, "BACKGROUND", { 1, 1, 1, 0.08 }); bar.bg:SetAllPoints()
   bar:SetMinMaxValues(0, 1)
   f.bar = bar
+  -- inside a dungeon that is not in the route: one click adds it (Main.lua sets ns.instOffer)
+  f.instBtn = Button(f, W - 2 * PAD, 22, "", function()
+    local k = ns.instOffer; if not k then return end
+    ns.instOffer = nil; WLDTDB.sel[k] = true; ns.Assemble(true); f.auto, f.sig = nil, nil; ns.Refresh(true)
+    for i, st in ipairs(ns.route and ns.route.steps or {}) do if st.ins == k and not st.gate then ns.GoTo(i) break end end
+  end)
+  ns.Primary(f.instBtn); f.instBtn:SetPoint("TOPLEFT", PAD, -66); f.instBtn:Hide()
+  f.instBtn.label:ClearAllPoints(); f.instBtn.label:SetPoint("LEFT", 8, 0); f.instBtn.label:SetPoint("RIGHT", -8, 0); f.instBtn.label:SetWordWrap(false)
 
   -- carte avec défilement
   local holder = CreateFrame("Frame", nil, f)
   holder:SetPoint("TOPLEFT", PAD, -70); holder:SetPoint("TOPRIGHT", -PAD, -70)
   ns.Flat(holder, T.card, { 1, 1, 1, 0.06 })
-  holder.stripe = Tex(holder, "ARTWORK", T.accent); holder.stripe:SetPoint("TOPLEFT", 1, -1); holder.stripe:SetPoint("BOTTOMLEFT", 1, 1); holder.stripe:SetWidth(3)
+  holder.stripe = Tex(holder, "ARTWORK", T.accent); holder.stripe:SetPoint("TOPLEFT", 1, -1); holder.stripe:SetPoint("BOTTOMLEFT", 1, 1); holder.stripe:SetWidth(3); holder.stripe:SetAlpha(0)
   local sf = CreateFrame("ScrollFrame", nil, holder)
   sf:SetPoint("TOPLEFT", 4, -1); sf:SetPoint("BOTTOMRIGHT", -6, 1)
   local card = CreateFrame("Frame", nil, sf)
@@ -517,7 +578,7 @@ local function Build()
   f.prev:SetPoint("BOTTOMLEFT")
   f.moreBtn = Button(foot, 44, 24, "...", function() f.menu:SetShown(not f.menu:IsShown()) end, function() return { L.MORE } end)
   f.moreBtn:SetPoint("BOTTOMRIGHT")
-  f.next = Button(foot, W - PAD * 2 - 170, 24, L.NEXT2, function() ns.GoTo(f.view + 1) end)
+  f.next = Button(foot, W - PAD * 2 - 170, 24, L.NEXT2, function() ns.GoTo(f.view + 1) end, function() return { L.NEXT2, L.TT_NEXT } end)
   f.next:SetPoint("LEFT", f.prev, "RIGHT", 4, 0)
   -- "Ready?": straight to the check-list of the dungeon of the step on screen (quests, items, keys)
   f.readyBtn = Button(foot, 70, 24, L.B_READY, function() if ns.GoReady then ns.GoReady() end end, function() return { L.B_READY, L.TT_READY } end)
@@ -621,6 +682,7 @@ function ns.Relayout(nw, nh)
   for _, row in ipairs(card.rows) do row:SetWidth(CW + 8); row.sub:SetWidth(CW - 90) end
   f.go:SetWidth(W - PAD * 2)
   f.next:SetWidth(W - PAD * 2 - 170)
+  if f.instBtn then f.instBtn:SetWidth(W - 2 * PAD) end
 end
 
 -- =====================================================================
@@ -718,6 +780,12 @@ Render = function()
   f.header.sub:SetText(ns.route and ns.route.label or "")
   f.miniBtn.label:SetText(f.mini and "+" or "-")
   local card, holder = f.card, f.holder
+  -- inside a dungeon that is not in the route: a button above the card adds it
+  local offerKey = ns.instOffer
+  local offer = offerKey and ns.InstLeft and not f.mini and #steps > 0
+  local TOP = 70 + (offer and 28 or 0)
+  holder:ClearAllPoints(); holder:SetPoint("TOPLEFT", PAD, -TOP); holder:SetPoint("TOPRIGHT", -PAD, -TOP)
+  if offer then f.instBtn.label:SetText(L.INST_ADD:format(ns.DName(offerKey), ns.InstLeft(offerKey))); f.instBtn:Show() else f.instBtn:Hide() end
 
   if #steps == 0 then
     f.progLabel:SetText(L.NOROUTE); f.progPct:SetText("")
@@ -731,6 +799,16 @@ Render = function()
     for _, b in ipairs({ f.prev, f.next, f.moreBtn }) do b:SetEnabled(false) end
     f.menu:Hide()
     f.go.label:SetText(L.PICK_FIRST); f.go.action = ns.ShowPicker; f.go:SetEnabled(true)
+    if offerKey and ns.InstLeft then
+      -- no route yet, but you stand in a dungeon with quests: start its guide in one click
+      local name = ns.DName(offerKey)
+      card.title:SetText(L.INST_T:format(name)); card.note:SetText(L.INST_TXT:format(ns.InstLeft(offerKey)))
+      f.go.label:SetText(L.INST_GO:format(name))
+      f.go.action = function()
+        local kk = ns.instOffer; if not kk then return end
+        for k2 in pairs(WLDTDB.sel) do WLDTDB.sel[k2] = nil end; WLDTDB.sel[kk] = true; ns.instOffer = nil; ns.StartGuide()
+      end
+    end
     f.list:Hide()
     ns.UpdateActionBar()
     return
@@ -744,15 +822,19 @@ Render = function()
   for k = 1, #steps do if IsStepDone(log, k) then n = n + 1 end end
   f.bar:SetValue(total > 0 and n / total or 0)
   f.bar:SetStatusBarColor(T.accent[1], T.accent[2], T.accent[3])
-  -- the step first: with long full names, only the names get cut
-  f.progLabel:SetText(L.STEP:format(i, total) .. "   ·   " .. (ns.route.label or ""))
+  -- the route's names are already in the header: the step and what is left
+  f.progLabel:SetText(L.STEP_LEFT:format(i, total, total - n))
   f.progPct:SetText(("%d %%"):format(total > 0 and math.floor(n / total * 100 + 0.5) or 0))
+  -- every step done and the last one on screen: the "route finished" card ("<" still shows the steps)
+  local finished = total > 0 and n == total and i == f.auto
 
   if f.mini then
     f.menu:Hide()
     holder:Hide(); f.foot:Hide(); f.progLabel:Hide(); f.progPct:Hide(); f.list:Hide()
     local c = DColor(st.d or st.gate or st.ins)
-    f.miniText:SetText(("%s%d.|r %s"):format(Hex(c), i, StepTitle(st))); f.miniText:Show()
+    if finished then f.miniText:SetText("|cff59e67a" .. L.FIN_T .. "|r")
+    else f.miniText:SetText(("%s%d.|r %s"):format(Hex(c), i, StepTitle(st))) end
+    f.miniText:Show()
     f.bar:ClearAllPoints(); f.bar:SetPoint("BOTTOMLEFT", 1, 1); f.bar:SetPoint("BOTTOMRIGHT", -1, 1); f.bar:SetHeight(2)
     f:SetHeight(64)
     ns.UpdateActionBar()
@@ -761,6 +843,29 @@ Render = function()
   f.miniText:Hide(); holder:Show(); f.foot:Show(); f.progLabel:Show(); f.progPct:Show()
   f.bar:ClearAllPoints(); f.bar:SetPoint("TOPLEFT", PAD, -57); f.bar:SetPoint("TOPRIGHT", -PAD, -57); f.bar:SetHeight(4)
   f.list:SetShown(WLDTDB.list and true or false)
+
+  if finished then
+    f.progLabel:SetText(L.FIN_PROG); f.progPct:SetText("100 %")
+    f.bar:SetValue(1); f.bar:SetStatusBarColor(0.35, 0.86, 0.48)
+    holder.stripe:SetColorTexture(0.35, 0.86, 0.48, 1)
+    card.zone:SetText(ns.Upper(ns.route.label or "")); card.badge:SetText(Hex({ 0.35, 0.9, 0.48 }) .. L.B_DONE .. "|r")
+    card.where:Hide(); card.clsChip:Hide(); card.travel:Hide(); card.ready:Hide(); card.readyBg:Hide()
+    if card.shareBtn then card.shareBtn:Hide() end
+    card.model:Hide(); card.modelBg:Hide()
+    card.title:SetWidth(W - 2 * PAD - 40); card.title:SetText(L.FIN_T)
+    card.note:ClearAllPoints(); card.note:SetPoint("TOPLEFT", 14, -60); card.note:SetText(L.FIN_TXT:format(ns.route.label or "")); card.note:Show()
+    for _, row in ipairs(card.rows) do row.node = nil; row:Hide() end
+    card:SetHeight(140); holder:SetHeight(140); holder.sbar:Hide(); holder.over = 0
+    f.scroll.offset = 0; f.scroll:SetVerticalScroll(0)
+    f.menu:Hide()
+    f.prev:SetEnabled(#steps > 1); f.next:SetEnabled(false); f.readyBtn:SetEnabled(false); f.moreBtn:SetEnabled(true)
+    f.go.label:SetText(L.PICK_MORE); f.go.action = ns.ShowPicker; f.go:SetEnabled(true)
+    f:SetHeight(TOP + 140 + 12 + 56 + PAD)
+    WLDTDB.view = i
+    RenderList(log)
+    ns.UpdateActionBar()
+    return
+  end
 
   local dkey = st.d or st.gate or st.ins
   local dc = DColor(dkey)
@@ -810,12 +915,21 @@ Render = function()
 
   -- check-list « prêt ? »
   local checks = st.checks
+  -- every quest but no key: the banner says it, the gate note then skips its own key warning
+  local readyNoKey = false
   if checks and #checks > 0 then
     local miss = 0
     for _, nd in ipairs(checks) do if not ns.NodeOK(log, nd) then miss = miss + 1 end end
     local dn2 = ns.DName(st.gate or st.ins)
-    if miss == 0 then
+    local keyMissing = false
+    for _, k in ipairs(ns.KeyLines and ns.KeyLines(st.gate or st.ins) or {}) do if k[3] and not k[2] then keyMissing = true end end
+    if miss == 0 and not keyMissing then
       card.ready:SetText("|cff59e67a" .. L.READY:format(dn2) .. "|r"); card.readyBg:SetColorTexture(0.35, 0.9, 0.48, 0.12)
+    elseif miss == 0 then
+      readyNoKey = true
+      card.ready:SetText("|cffff9933" .. L.READY_NOKEY:format(dn2) .. "|r"); card.readyBg:SetColorTexture(1, 0.6, 0.2, 0.12)
+    elseif miss == 1 then
+      card.ready:SetText("|cffff9933" .. L.NOTREADY1:format(dn2) .. "|r"); card.readyBg:SetColorTexture(1, 0.6, 0.2, 0.12)
     else
       card.ready:SetText("|cffff9933" .. L.NOTREADY:format(miss, dn2) .. "|r"); card.readyBg:SetColorTexture(1, 0.6, 0.2, 0.12)
     end
@@ -847,7 +961,7 @@ Render = function()
     if #kl > 0 then
       local t, warn = {}, false
       for _, k in ipairs(kl) do table.insert(t, k[1]); if k[3] and not k[2] then warn = true end end
-      if warn then table.insert(t, "|cffff9933" .. L.KEY_WARN .. "|r") end
+      if warn and not readyNoKey then table.insert(t, "|cffff9933" .. L.KEY_WARN .. "|r") end
       note = table.concat(t, "\n") .. "\n" .. note
     end
   end
@@ -910,7 +1024,8 @@ Render = function()
       row.tag:SetText(L[KTAG[nd.kind]] or ""); row.tag:SetTextColor(kc[1], kc[2], kc[3])
       row.name:SetText(nd.label or ns.QName(nd.q))
       -- the NPC on the right, unless the step's title already names it (then the quest's state)
-      local npcShort = nd.npc and not nd.ins and nd.npc:gsub(",.*$", "")
+      -- a check-list row keeps its state ("not taken"): its sub-line already names the giver
+      local npcShort = nd.npc and not nd.ins and nd.kind ~= "h" and nd.npc:gsub(",.*$", "")
       local title = card.title:GetText() or ""
       if npcShort and title:find(npcShort, 1, true) then npcShort = nil end
       local right = npcShort or (SCOL[s] .. L[SLABEL[s]] .. "|r")
@@ -924,11 +1039,17 @@ Render = function()
         if not (row.gb.icon.SetAtlas and pcall(row.gb.icon.SetAtlas, row.gb.icon, "Waypoint-MapPin-ChatIcon") and row.gb.icon:GetAtlas()) then
           row.gb.icon:SetTexture("Interface\\Minimap\\MiniMap-QuestArrow")
         end
-        if isActive then row.gb.icon:SetVertexColor(1, 1, 1) else row.gb.icon:SetVertexColor(0.75, 0.77, 0.8) end
+        row.gb.icon:SetVertexColor(1, 1, 1)
+        -- followed: filled with the accent and "ON"; otherwise a plain button that says GPS
+        if isActive then
+          row.gb.bg:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 0.85); row.gb.text:SetText(L.GPS_ON or "GPS")
+        else
+          row.gb.bg:SetColorTexture(1, 1, 1, 0.08); row.gb.text:SetText("GPS")
+        end
       end
       local x = -4
       for _, b in ipairs({ row.gb }) do
-        if b:IsShown() then b:ClearAllPoints(); b:SetPoint("TOPRIGHT", x, -2); x = x - 24 end
+        if b:IsShown() then b:ClearAllPoints(); b:SetPoint("TOPRIGHT", x, -2); x = x - 58 end
       end
       row.npc:ClearAllPoints(); row.npc:SetPoint("TOPRIGHT", x - 2, -5)
       local npcW = math.min(row.npc:GetStringWidth() + 2, 150)
@@ -1015,7 +1136,7 @@ Render = function()
   else holder.over = 0; holder.sbar:Hide(); f.scroll.offset = 0 end
   f.scroll:SetVerticalScroll(math.min(f.scroll.offset or 0, math.max(0, over)))
 
-  f.prev:SetEnabled(i > 1); f.next:SetEnabled(i < #steps); f.moreBtn:SetEnabled(true)
+  f.prev:SetEnabled(i > 1); f.next:SetEnabled(i < #steps); f.moreBtn:SetEnabled(true); f.readyBtn:SetEnabled(true)
   -- count the points PlacePoints cycles through: the unfinished ones, else all of them
   local np = #StepPoints(log, st, false)
   if np == 0 then np = #StepPoints(log, st, true) end
@@ -1024,7 +1145,15 @@ Render = function()
   if f.auto and i ~= f.auto then
     f.go.label:SetText(L.BACK_CUR); f.go.action = GoBack; f.go:SetEnabled(true)
   elseif np > 0 then
-    f.go.label:SetText(cycling and (L.NEXTPOINT .. (" (%d/%d)"):format((f.wpIdx or 1) % np + 1, np)) or L.GO)
+    local label = L.GO
+    if cycling then label = L.NEXTPOINT .. (" (%d/%d)"):format((f.wpIdx or 1) % np + 1, np)
+    elseif st.gate and i == f.auto then
+      -- the check-list: first the missing quests' givers, then the entrance
+      local missLoc = 0
+      for _, nd in ipairs(st.checks or {}) do if nd.loc and not ns.NodeOK(log, nd) then missLoc = missLoc + 1 end end
+      label = missLoc > 0 and L.GO_MISSING or L.GO_ENTRANCE:format(ns.DName(st.gate))
+    end
+    f.go.label:SetText(label)
     f.go.action = GoPoints; f.go:SetEnabled(true)
   else
     f.go.label:SetText(L.NOPOINT_S); f.go.action = nil; f.go:SetEnabled(false)
@@ -1040,7 +1169,7 @@ Render = function()
   f.listBtn.label:SetText(L.M_LIST .. onoff(f.list:IsShown()))
   f.journal.label:SetText(L.M_JOURNAL); f.journal:SetEnabled(ns.JournalAvailable and ns.JournalAvailable() or false)
 
-  f:SetHeight(70 + hh + 12 + 56 + PAD)
+  f:SetHeight(TOP + hh + 12 + 56 + PAD)
   WLDTDB.view = i
   RenderList(log)
   if not f.pinned and not InCombatLockdown() then f.pinned = true; ns.PinTopLeft() end
@@ -1056,22 +1185,31 @@ function ns.Refresh(silent)
   if not f then return end
   if ns.GuideOn and not ns.GuideOn() then return end
   local steps = Steps()
-  if #steps == 0 then Render() return end
+  if #steps == 0 then f.wasFin = nil; Render() return end
   local log = ns.LogEntries()
   local auto = FirstOpen(log)
+  -- the whole route is done: points cleared, one sound and one message
+  local fin = (auto == #steps) and IsStepDone(log, auto)
   if auto ~= f.auto then
     local follow = (f.view == nil) or (f.view == f.auto)
     local was = f.auto
     f.auto = auto
     if follow then f.view = auto; f.scroll.offset = 0 end
-    if was and auto > was and not silent then
+    if was and auto > was and not silent and not fin then
       PlaySound(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE or 878)
       local t = StepTitle(steps[auto])
       if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper : " .. t, T.accent[1], T.accent[2], T.accent[3]) end
       ns.Print(L.NEXT_STEP:format(t))
     end
   end
-  if WLDTDB.autoWay then
+  if fin and not f.wasFin and not silent then
+    ns.ClearPoints(); f.sig = nil
+    PlaySound(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE or 878)
+    if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper : " .. L.FIN_T, 0.35, 0.9, 0.48) end
+    ns.Print(L.FIN_MSG:format(ns.route.label or ""))
+  end
+  f.wasFin = fin
+  if WLDTDB.autoWay and not fin then
     local pts = StepPoints(log, steps[auto], false)
     local sig = auto .. ":" .. #pts
     for _, p in ipairs(pts) do sig = sig .. p[2] .. p[3] end

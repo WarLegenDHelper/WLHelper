@@ -144,7 +144,7 @@ local function Draw(self, now, combat)
         SetText(self.sub, nxt and (L("puis ") .. LowerFirst(GPS.Describe(nxt))) or stepText)
         if mapOpen then
             button = "fly"
-            SetText(self.fly.label, combat and L("En combat") or string.format(L("Vol → %s"), leg.to.name))
+            SetText(self.fly.label, combat and L("En combat") or string.format(L("Vol pour %s"), leg.to.name))
         end
     elseif leg and leg.kind == "teleport" then
         SetIcon(self, SpellIcon(leg.to.spell), true)
@@ -230,7 +230,14 @@ local function Build()
     arrow.tex = arrow:CreateTexture(nil, "ARTWORK")
     arrow.tex:SetSize(60, 60)
     arrow.tex:SetPoint("TOPLEFT", 12, -12)
-    arrow.tex:SetTexture(ARROW_TEX)
+    -- the game's own smooth navigation arrow (the one of its tracked waypoints); the old minimap
+    -- arrow only when this client has no such drawing
+    local okA = arrow.tex.SetAtlas and pcall(arrow.tex.SetAtlas, arrow.tex, "Navigation-Tracked-Arrow", false)
+    if okA and arrow.tex:GetAtlas() then
+        arrow.tex:SetSize(48, 48); arrow.tex:ClearAllPoints(); arrow.tex:SetPoint("TOPLEFT", 18, -18)
+    else
+        arrow.tex:SetTexture(ARROW_TEX)
+    end
     arrow.icon = arrow:CreateTexture(nil, "ARTWORK")
     arrow.icon:SetSize(48, 48)
     arrow.icon:SetPoint("CENTER", arrow.tex, "CENTER")
@@ -271,7 +278,7 @@ local function Build()
     teleport:SetSize(246, 32)
     teleport:SetFrameStrata("MEDIUM")
     teleport:SetFrameLevel(arrow:GetFrameLevel() + 5)
-    teleport:RegisterForClicks("AnyUp")
+    teleport:RegisterForClicks("AnyUp", "AnyDown")   -- the game acts on the press or the release (its "cast on key down" setting): both registered
     S.Solid(teleport, "BACKGROUND", { 0.086, 0.196, 0.290 }):SetAllPoints()
     S.Border(teleport, { 0.169, 0.353, 0.502 })
     local tl = S.Text(teleport, 13, { 0.85, 0.93, 1 }, true)

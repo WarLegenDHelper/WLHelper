@@ -104,6 +104,16 @@ function W.SpecName(s)
     if not s then return "" end
     return French() and s[2] or s[3]
 end
+-- a spec name written by another addon ("frost", "Beast Mastery") in your language when it is one of
+-- your class's specs; any other text is given back as is
+function W.SpecNameFor(text)
+    if type(text) ~= "string" or text == "" then return W.SpecName() end
+    local norm = (text:lower():gsub("[%s%-_]", ""))
+    for _, s in ipairs(SPECS[Class()] or {}) do
+        if s[1] == norm or (s[3]:lower():gsub("[%s%-_]", "")) == norm then return W.SpecName(s) end
+    end
+    return text
+end
 -- { { "auto", label }, { key, label }... } for a segmented choice
 function W.SpecChoices()
     local out = { { "auto", L("Auto") } }
@@ -146,26 +156,32 @@ local function Info(link)
     return name, minLevel, equipLoc, classID, subID
 end
 
--- false + why when your class can't use it (or not yet)
+-- false when your class can't use it; false, "level", N when only your level stops you (N: the
+-- level it can be worn from); nil when the item is not loaded yet
 function W.CanWear(link)
     local name, minLevel, equipLoc, classID, subID = Info(link)
     if not name then return nil end
     if not SLOTS[equipLoc] then return false end
     local class, level = Class(), UnitLevel("player")
-    if minLevel and minLevel > level then return false end
+    local need = minLevel or 0
     if classID == 4 then
-        if subID == 0 then return true end   -- rings, necks, trinkets
-        local from = ARMOR_OK[class] and ARMOR_OK[class][subID]
-        if equipLoc == "INVTYPE_CLOAK" then return true end
-        return from ~= nil and level >= from
+        -- rings, necks, trinkets and cloaks: anyone
+        if not (subID == 0 or equipLoc == "INVTYPE_CLOAK") then
+            local from = ARMOR_OK[class] and ARMOR_OK[class][subID]
+            if from == nil then return false end
+            need = math.max(need, from)
+        end
     elseif classID == 2 then
         if not (WEAPON_OK[class] and WEAPON_OK[class][subID]) then return false end
-        if equipLoc == "INVTYPE_WEAPONOFFHAND" or (equipLoc == "INVTYPE_WEAPON" and false) then
-            return DUAL[class] ~= nil and level >= DUAL[class]
+        if equipLoc == "INVTYPE_WEAPONOFFHAND" then
+            if DUAL[class] == nil then return false end
+            need = math.max(need, DUAL[class])
         end
-        return true
+    else
+        return false
     end
-    return false
+    if need > (level or 0) then return false, "level", need end
+    return true
 end
 
 -- ---------------------------------------------------------------- scores

@@ -1,9 +1,9 @@
 ## Interface: 16001
 ## Title: WaR |cffce1918LegenD|r Helper
-## Notes: Dungeon quests step by step, Craftsman's Writs and a built-in GPS (flights, zeppelins, teleports). Dungeons: dungeon picker, custom multi-dungeon route from where you stand, ready check, waypoints, arrow, target/mark and quest item buttons, quest sharing. French / English. /wl
-## Notes-frFR: Quêtes de donjon pas à pas, Craftsman's Writs et GPS intégré (vols, zeppelins, téléportations). Donjons : sélecteur de donjons, route perso sur plusieurs donjons depuis ta position, check-list avant d'entrer, points, flèche, boutons cibler/marquer et objet de quête, partage. Français / anglais. /wl
+## Notes: Quest guide (dungeons, raids, class quests) step by step, Craftsman's Writs and a built-in GPS (flights, zeppelins, teleports). Dungeons: dungeon picker, custom multi-dungeon route from where you stand, ready check, waypoints, arrow, target/mark and quest item buttons, quest sharing. French / English. /wl
+## Notes-frFR: Guide de quêtes (donjons, raids, quêtes de classe) pas à pas, Craftsman's Writs et GPS intégré (vols, zeppelins, téléportations). Donjons : sélecteur de donjons, route perso sur plusieurs donjons depuis ta position, check-list avant d'entrer, points, flèche, boutons cibler/marquer et objet de quête, partage. Français / anglais. /wl
 ## Author: Alandir (WarLegend)
-## Version: 1.0.0-beta.34
+## Version: 1.0.0-beta.35
 ## X-Credits: LibForeverData (CC BY 4.0), RestedXP Guides (CC BY-NC-SA 4.0), ForeverDungeonJournal, Naowh Forever, Wowhead via Waylaid Crate Helper, TSM, wow.gg, Zygor (coordinates). See CREDITS.txt
 ## IconTexture: Interface\AddOns\WLHelper\Media\Logo64
 ## OptionalDeps: EllesmereUI, NaowhForever, NaowhForever_DungeonJournal, TomTom, WayDirect, ForeverDungeonJournal, Auctionator, TradeSkillMaster, Mastercraft, GearedForever, Baganator
@@ -35,6 +35,7 @@ Writs\Arrow.lua
 Writs\Comfort.lua
 Writs\Clicks.lua
 Writs\Cleaner.lua
+Writs\Junk.lua
 Writs\Weights.lua
 Writs\Upgrades.lua
 Writs\Orders.lua
@@ -43,6 +44,7 @@ Writs\Guild.lua
 Writs\Events.lua
 Writs\Feedback.lua
 Writs\Version.lua
+Writs\Help.lua
 Writs\Home.lua
 Writs\Options.lua
 Writs\Setup.lua

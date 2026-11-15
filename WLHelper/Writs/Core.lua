@@ -395,10 +395,9 @@ function WP.Plan(rows)
     local function build()
         byZone = {}
         for _, r in ipairs(rows) do
-            -- zones you left out (a click on the zone in the Shopping tab) are never planned
-            local skipZone = WLWritsCharDB.skipZones and WLWritsCharDB.skipZones[r.w.map]
+            -- r.skipped covers the writs and the zones you left out (Shopping tab, right-click, settings)
             local pick = r.show and r.state == "buy" and r.per100 and r.w.map and not r.tooHigh and not r.skipped
-                and not skipZone and (not cap or r.per100 <= cap)
+                and (not cap or r.per100 <= cap)
             if pick then
                 local z = byZone[r.w.map] or {}
                 byZone[r.w.map] = z
@@ -480,7 +479,10 @@ function WP.Plan(rows)
     for _, r in ipairs(plan) do r.inPlan = nil end
     plan = {}
     for _, r in ipairs(rows) do
-        if picked[r.w.writ] and r.state == "buy" then r.inPlan = true; plan[#plan + 1] = r end
+        -- a ticked writ whose zone you left out is not bought either
+        if picked[r.w.writ] and r.state == "buy" and not (r.w.map and WP.IsSkipped("zones", r.w.map)) then
+            r.inPlan = true; plan[#plan + 1] = r
+        end
     end
     return plan, need, pending, readyRep, zones
 end
@@ -778,6 +780,8 @@ ns.AddEnglish({
     ["le jeu a bloqué « %s »%s. Signale-le avec /wlh idea (bug) : la fonction est déjà dans le formulaire."] =
         "the game blocked \"%s\"%s. Report it with /wlh idea (bug): the function is already in the form.",
     [" en combat"] = " in combat",
+    ["  /wlh trade : ouvre ou ferme la fenêtre des Writs"] = "  /wlh trade: open or close the Writs window",
+    ["le module %s est éteint : Réglages, Général, Modules."] = "the %s module is off: Settings, General, Modules.",
 })
 local blocked = CreateFrame("Frame")
 pcall(blocked.RegisterEvent, blocked, "ADDON_ACTION_BLOCKED")
@@ -816,6 +820,13 @@ f:SetScript("OnEvent", function(_, event, a1)
         CopyDefaults(WLWritsDB, DEFAULTS)
         WLWritsCharDB = WLWritsCharDB or {}
         WLWritsCharDB.turnedIn = WLWritsCharDB.turnedIn or {}
+        -- beta.34 kept the Shopping tab's zones apart (skipZones): one list now, skip.zones
+        if WLWritsCharDB.skipZones then
+            WLWritsCharDB.skip = WLWritsCharDB.skip or {}
+            WLWritsCharDB.skip.zones = WLWritsCharDB.skip.zones or {}
+            for map in pairs(WLWritsCharDB.skipZones) do WLWritsCharDB.skip.zones[map] = true end
+            WLWritsCharDB.skipZones = nil
+        end
         WLWritsDB.turnedIn, WLWritsDB.factionID = nil, nil   -- were account-wide in 1.0
         WLWritsDB.spots = WLWritsDB.spots or {}
         for _, w in ipairs(ns.WRITS) do
@@ -863,7 +874,7 @@ end)
 local function Help()
     WP.Print(L("commandes :"))
     for _, line in ipairs({
-        L("  /wlh trade : ouvre ou ferme le Comptoir"),
+        L("  /wlh trade : ouvre ou ferme la fenêtre des Writs"),
         L("  /wlh trade gps : lance ou arrête la tournée GPS (writs prêts à rendre)"),
         L("  /wlh trade stop : arrête le GPS"),
         L("  /wlh trade scan : scanne la liste d'achat à l'HV"),
@@ -875,7 +886,7 @@ end
 -- A module switched off listens to nothing and opens no window; switching it back on is immediate.
 -- The GPS has no switch: the other modules use it.
 WP.MODULES = {
-    { key = "dungeons", label = "Quêtes de donjon", hint = "Guide des quêtes de donjon, route, flèche" },
+    { key = "dungeons", label = "Guide de quêtes", hint = "Donjons, raids et quêtes de classe : route, flèche" },
     { key = "writs", label = "Writs & Favor", hint = "Craftsman's Writs, liste d'achat, remise auto" },
     { key = "bags", label = "Sacs", hint = "Nettoyeur des objets de quête inutiles" },
     { key = "orders", label = "Commandes", hint = "Faire fabriquer par la guilde, accepter des commandes" },
@@ -894,7 +905,7 @@ end
 -- Says a module is off (and where to turn it on); true when it is off.
 function WP.ModuleOff(key)
     if WP.ModuleOn(key) then return false end
-    WP.Print(string.format(L("le module %s est éteint : Réglages › Général › Modules."), WP.ModuleLabel(key)))
+    WP.Print(string.format(L("le module %s est éteint : Réglages, Général, Modules."), WP.ModuleLabel(key)))
     return true
 end
 function WP.SetModule(key, on)

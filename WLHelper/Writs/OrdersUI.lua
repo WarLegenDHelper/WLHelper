@@ -17,9 +17,28 @@ ns.AddEnglish({
     ["%d artisans connus · %d en ligne"] = "%d crafters known · %d online",
     ["Chuchoter"] = "Whisper",
     ["À envoyer à %s :"] = "To send to %s:",
-    ["Par la poste (bouton Préparer à la boîte aux lettres) ou en échange : l'addon le voit tout seul."] = "By mail (Prepare button at a mailbox) or by trade: the addon sees it on its own.",
     ["envoyés"] = "sent",
-    ["Acheter le manquant"] = "Buy what's missing",
+    ["Acheter le manquant (%d)"] = "Buy what's missing (%d)",
+    [" dont %d en banque"] = " %d of them in the bank",
+    ["%s d'avance"] = "%s upfront",
+    ["Tu fournis :"] = "You provide:",
+    ["En attente d'un artisan."] = "Waiting for a crafter.",
+    ["À toi : il te manque des composants à envoyer à %s."] = "Your turn: you are missing reagents to send to %s.",
+    ["À toi : envoie les composants à %s (poste ou échange)."] = "Your turn: send the reagents to %s (mail or trade).",
+    ["À toi : sors les composants de la banque, puis va à une boîte aux lettres ou échange avec %s."] =
+        "Your turn: take the reagents out of the bank, then go to a mailbox or trade with %s.",
+    ["%s fabrique ta commande."] = "%s is crafting your order.",
+    ["Fabriquée : elle arrive par la poste ou en échange avec %s."] = "Crafted: it comes by mail or by trade with %s.",
+    ["À toi : accepte si tu peux la fabriquer."] = "Your turn: accept if you can craft it.",
+    ["À toi : fabrique l'objet, l'addon le voit tout seul."] = "Your turn: craft the item, the addon sees it on its own.",
+    ["À toi : livre à %s (boîte aux lettres ou échange)."] = "Your turn: deliver to %s (mailbox or trade).",
+    ["Terminée."] = "Done.",
+    ["J'ai reçu"] = "I got it",
+    ["Pourboire pour %s : %s au total, payé à la réception (contre-remboursement) ou en échange."] =
+        "Tip for %s: %s in total, paid on receipt (cash on delivery) or by trade.",
+    ["Pourboire pour %s : %s au total. Envoie-le par la poste ou en échange : l'addon ne déplace pas d'or tout seul."] =
+        "Tip for %s: %s in total. Send it by mail or trade: the addon never moves gold by itself.",
+    ["Ouvre une fois ta fenêtre de métier pour partager tes recettes."] = "Open your profession window once to share your recipes.",
     ["Ouvre l'hôtel des ventes, puis reclique."] = "Open the auction house, then click again.",
     ["Préparer le courrier"] = "Prepare the mail",
     ["Va à une boîte aux lettres, ou échange-les directement avec %s."] = "Go to a mailbox, or trade them directly with %s.",
@@ -37,7 +56,7 @@ ns.AddEnglish({
     ["Message · %s"] = "Message · %s",
     ["Ton message (120 caractères)"] = "Your message (120 characters)",
     ["Envoyer"] = "Send",
-    ["Merci ★"] = "Thanks ★",
+    ["Merci"] = "Thanks",
     ["Recommander"] = "Order again",
     ["%d artisans connus pour cet objet"] = "%d crafters known for this item",
     ["aucune recette partagée : la guilde verra la commande"] = "no recipe shared: the guild will see the order",
@@ -84,7 +103,7 @@ ns.AddEnglish({
     ["pour %s"] = "for %s", ["pour la guilde"] = "for the guild", ["par %s"] = "by %s",
     ["expire dans %d h"] = "expires in %d h",
     ["Accepter"] = "Accept", ["Refuser"] = "Decline", ["Annuler"] = "Cancel",
-    ["Fabriquée"] = "Crafted", ["Livrée"] = "Delivered", ["+ Pourboire"] = "+ Tip",
+    ["Fabriquée"] = "Crafted", ["Livrée"] = "Delivered", ["Pourboire +1 po"] = "Tip +1 g",
     ["Reçu : %s"] = "Received: %s",
     ["argent %s / %s"] = "money %s / %s",
     ["tout est arrivé"] = "everything arrived",
@@ -103,6 +122,8 @@ local W, H, PAD = 400, 600, 14
 local win, tabs, pages, current = nil, nil, {}, "find"
 local ui = { find = {}, mine = {}, recv = {}, new = {}, board = {} }
 
+-- the game font may lack a star glyph: the reputation star texture instead
+local STAR = "|TInterface\\COMMON\\ReputationStar:12:12:0:0:32:32:0:16:0:16|t"
 local function Money(c) return S.Money(c or 0) end
 local function Name(id) return O.Name(id) end
 local STATUS = { open = "ouverte", accepted = "acceptée", crafted = "fabriquée", delivered = "livrée",
@@ -160,6 +181,7 @@ local function BuildFind(p)
         r:SetSize(W - 2 * PAD, 40)
         r.bg = S.Solid(r, "BACKGROUND", C.card); r.bg:SetAllPoints(); S.Border(r, C.border)
         r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:SetSize(22, 22); r.icon:SetPoint("LEFT", 9, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        r.cls = r:CreateTexture(nil, "ARTWORK"); r.cls:SetSize(20, 20); r.cls:SetPoint("LEFT", 10, 0); r.cls:Hide()
         r.name = S.Text(r, 14, C.text); r.name:SetPoint("TOPLEFT", 40, -5); r.name:SetPoint("RIGHT", -96, 0); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
         r.sub = S.Text(r, 12, C.dim); r.sub:SetPoint("BOTTOMLEFT", 40, 6); r.sub:SetPoint("RIGHT", -96, 0); r.sub:SetJustifyH("LEFT"); r.sub:SetWordWrap(false)
         r.btn = S.Button(r, L("Commander"), 80, 26, "secondary", function()
@@ -219,6 +241,17 @@ if hooksecurefunc and ChatEdit_InsertLink then
     end)
 end
 
+-- a member's row: the class icon (same texture as the guild tab's class filter) and the class colour
+local function SetClass(row, name)
+    local cls = name and O.ClassOf(name)
+    local tc = cls and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[cls]
+    if tc then
+        row.cls:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles"); row.cls:SetTexCoord(tc[1], tc[2], tc[3], tc[4]); row.cls:Show()
+    else row.cls:Hide() end
+    local cc = cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls]
+    if cc then row.name:SetTextColor(cc.r, cc.g, cc.b) else row.name:SetTextColor(C.text[1], C.text[2], C.text[3]) end
+end
+
 local function RenderFind()
     local f = ui.find
     local q = (f.box:GetText() or ""):lower()
@@ -226,15 +259,22 @@ local function RenderFind()
     local on = O.OnlineGuild()
     for name in pairs(O.DB().crafters) do crafters = crafters + 1; if on[name] then online = online + 1 end end
     -- what this copy read of your own professions (so you can see that sharing works)
-    local mineT = {}
+    local mineT, noRecipe = {}, true
     for prof, p in pairs(O.DB().mine or {}) do
         local n = 0
         for _ in pairs(p.recipes or {}) do n = n + 1 end
-        mineT[#mineT + 1] = prof .. " " .. (p.rank or 0) .. " (" .. n .. ")"
+        if n > 0 then noRecipe = false end
+        mineT[#mineT + 1] = ProfLabel(ProfKey(prof), prof) .. " " .. (p.rank or 0) .. " · "
+            .. (n > 0 and string.format(L("%d recettes"), n) or L("recettes pas encore partagées"))
     end
     table.sort(mineT)
     f.info:SetText(string.format(L("%d artisans connus · %d en ligne"), crafters, online))
-    f.mine:SetText(#mineT > 0 and string.format(L("tes métiers : %s"), table.concat(mineT, ", ")) or L("tes métiers : aucun"))
+    local mineLine = #mineT > 0 and string.format(L("tes métiers : %s"), table.concat(mineT, "   ")) or L("tes métiers : aucun")
+    -- the profession list with none of your recipes shared yet: how to share them
+    if #mineT > 0 and noRecipe and #q < 2 and not f.view then
+        mineLine = mineLine .. "\n" .. L("Ouvre une fois ta fenêtre de métier pour partager tes recettes.")
+    end
+    f.mine:SetText(mineLine)
     local catalog = O.Catalog()
     local rows = {}
     if #q >= 2 then
@@ -264,7 +304,7 @@ local function RenderFind()
             local row = f.list.Get(i)
             row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y)
             row.item, row.crafter, row.whisper, row.open = id, not v.me and v.name or nil, nil, nil
-            row.icon:Show(); row.icon:SetTexture(S.ItemIcon(id))
+            row.cls:Hide(); row.icon:Show(); row.icon:SetTexture(S.ItemIcon(id))
             row.name:SetText(Name(id)); local qc = S.QualityColor(id); row.name:SetTextColor(qc[1], qc[2], qc[3])
             row.sub:SetText(Reagents(O.DB() and (p.recipes[id] or ""), 1))
             row.btn.label:SetText(L("Commander")); row.btn:SetShown(not v.me)
@@ -285,7 +325,7 @@ local function RenderFind()
         local row = f.list.Get(1)
         row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, 0)
         row.item, row.crafter, row.whisper, row.open = linked, nil, nil, nil
-        row.icon:Show(); row.icon:SetTexture(S.ItemIcon(linked))
+        row.cls:Hide(); row.icon:Show(); row.icon:SetTexture(S.ItemIcon(linked))
         row.name:SetText(Name(linked)); local qc = S.QualityColor(linked); row.name:SetTextColor(qc[1], qc[2], qc[3])
         local who = O.Possible(linked)
         row.sub:SetText(#who > 0 and string.format(L("%d artisans possibles · Commander : toute la guilde la voit"), #who) or L("personne n'a encore déclaré ce métier : la guilde verra quand même la commande"))
@@ -299,9 +339,11 @@ local function RenderFind()
             cr.item, cr.crafter, cr.whisper, cr.open = linked, c.name, nil, nil
             cr.icon:Hide()
             local stars = O.Stars(c.name)
-            cr.name:SetText("   " .. c.name .. (stars > 0 and (" " .. S.Hex(C.warn) .. "★" .. stars .. "|r") or ""))
-            cr.name:SetTextColor(C.text[1], C.text[2], C.text[3])
-            cr.sub:SetText("   " .. c.prof .. " " .. (c.rank or 0) .. "  ·  " .. (c.online and (S.Hex(C.ready) .. L("en ligne") .. "|r") or L("hors ligne"))
+            cr.name:SetText(c.name .. (stars > 0 and (" " .. STAR .. S.Hex(C.warn) .. stars .. "|r") or ""))
+            SetClass(cr, c.name)
+            local key = ProfKey(c.prof)
+            cr.sub:SetText("|T" .. ProfIcon(key) .. ":14|t " .. ProfLabel(key, c.prof) .. " " .. (c.rank or 0)
+                .. "  ·  " .. (c.online and (S.Hex(C.ready) .. L("en ligne") .. "|r") or L("hors ligne"))
                 .. "  ·  " .. (c.exact and L("recette connue") or L("métier compatible")))
             cr.btn.label:SetText(L("À lui")); cr.btn:Show()
             cr.bg:SetColorTexture(C.card[1], C.card[2], C.card[3], 1)
@@ -340,7 +382,7 @@ local function RenderFind()
             local h = f.list.Get(i)
             h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -y)
             h.item, h.crafter, h.whisper, h.open = nil, nil, nil, nil
-            h.icon:Show(); h.icon:SetTexture(ProfIcon(key))
+            h.cls:Hide(); h.icon:Show(); h.icon:SetTexture(ProfIcon(key))
             h.name:SetText(ProfLabel(key, members[1].prof)); h.name:SetTextColor(C.text[1], C.text[2], C.text[3])
             h.sub:SetText(string.format(L("%d artisans"), #members))
             h.btn:Hide()
@@ -354,9 +396,9 @@ local function RenderFind()
                 row.whisper = (not c.me and c.online) and c.name or nil
                 row.open = c.n > 0 and { name = c.name, prof = c.prof, me = c.me } or nil
                 row.icon:Hide()
-                row.name:SetText("   " .. c.name .. (c.me and (" " .. S.Hex(C.muted) .. L("(toi)") .. "|r") or ""))
-                row.name:SetTextColor(C.text[1], C.text[2], C.text[3])
-                row.sub:SetText("   " .. c.rank .. "  ·  " .. (c.online and (S.Hex(C.ready) .. L("en ligne") .. "|r") or L("hors ligne"))
+                row.name:SetText(c.name .. (c.me and (" " .. S.Hex(C.muted) .. L("(toi)") .. "|r") or ""))
+                SetClass(row, c.name)
+                row.sub:SetText(c.rank .. "  ·  " .. (c.online and (S.Hex(C.ready) .. L("en ligne") .. "|r") or L("hors ligne"))
                     .. "  ·  " .. (c.n > 0 and string.format(L("%d recettes"), c.n) or L("recettes pas encore partagées")))
                 row.btn.label:SetText(c.n > 0 and L("Recettes") or L("Chuchoter"))
                 row.btn:SetShown(c.n > 0 or row.whisper ~= nil)
@@ -377,11 +419,12 @@ local function RenderFind()
         row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y)
         row.item, row.crafter, row.whisper = r.item, not r.c.me and r.c.name or nil, nil
         row.btn.label:SetText(L("Commander"))
-        row.icon:SetTexture(S.ItemIcon(r.item))
+        row.cls:Hide(); row.icon:Show(); row.icon:SetTexture(S.ItemIcon(r.item))
+        row.bg:SetColorTexture(C.card[1], C.card[2], C.card[3], 1)
         row.name:SetText(Name(r.item)); local qc = S.QualityColor(r.item); row.name:SetTextColor(qc[1], qc[2], qc[3])
         local where = r.c.online and S.Hex(C.ready) .. L("en ligne") .. "|r"
             or (r.c.seen and string.format(L("vu il y a %d j"), math.floor((time() - r.c.seen) / 86400)) or L("hors ligne"))
-        row.sub:SetText(r.c.name .. " · " .. r.c.prof .. " " .. (r.c.rank or 0) .. " · " .. where)
+        row.sub:SetText(r.c.name .. " · " .. ProfLabel(ProfKey(r.c.prof), r.c.prof) .. " " .. (r.c.rank or 0) .. " · " .. where)
         row.btn:SetShown(not r.c.me)
         y = y + 46
         if i >= 60 then break end
@@ -517,10 +560,13 @@ local function OrderCard(parent)
     local c = CreateFrame("Frame", nil, parent)
     c:SetWidth(W - 2 * PAD)
     S.Solid(c, "BACKGROUND", C.card):SetAllPoints(); S.Border(c, C.border)
-    c.title = S.Text(c, 15, C.text, true); c.title:SetPoint("TOPLEFT", 10, -8); c.title:SetPoint("RIGHT", -100, 0); c.title:SetJustifyH("LEFT"); c.title:SetWordWrap(false)
+    c.icon = c:CreateTexture(nil, "ARTWORK"); c.icon:SetSize(28, 28); c.icon:SetPoint("TOPLEFT", 10, -8); c.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    c.title = S.Text(c, 15, C.text, true); c.title:SetPoint("TOPLEFT", 46, -8); c.title:SetPoint("RIGHT", -100, 0); c.title:SetJustifyH("LEFT"); c.title:SetWordWrap(false)
     c.fee = S.Text(c, 14, C.warn, true); c.fee:SetPoint("TOPRIGHT", -10, -8); c.fee:SetJustifyH("RIGHT")
-    c.who = S.Text(c, 12, C.dim); c.who:SetPoint("TOPLEFT", 10, -28); c.who:SetPoint("RIGHT", -10, 0); c.who:SetJustifyH("LEFT")
-    c.detail = S.Text(c, 12, C.text); c.detail:SetPoint("TOPLEFT", 10, -46); c.detail:SetPoint("RIGHT", -10, 0); c.detail:SetJustifyH("LEFT"); c.detail:SetWordWrap(true)
+    c.who = S.Text(c, 12, C.dim); c.who:SetPoint("TOPLEFT", 46, -28); c.who:SetPoint("RIGHT", -10, 0); c.who:SetJustifyH("LEFT")
+    -- what to do now, in one line (highlighted when it is your turn)
+    c.next = S.Text(c, 13, C.text, true); c.next:SetPoint("TOPLEFT", 10, -46); c.next:SetPoint("RIGHT", -10, 0); c.next:SetJustifyH("LEFT"); c.next:SetWordWrap(true)
+    c.detail = S.Text(c, 12, C.text); c.detail:SetPoint("TOPLEFT", c.next, "BOTTOMLEFT", 0, -4); c.detail:SetPoint("RIGHT", -10, 0); c.detail:SetJustifyH("LEFT"); c.detail:SetWordWrap(true)
     c.b1 = S.Button(c, "", 110, 26, "primary", function() if c.a1 then c.a1() end end)
     c.b2 = S.Button(c, "", 110, 26, "secondary", function() if c.a2 then c.a2() end end)
     c.b3 = S.Button(c, L("Message"), 90, 26, "secondary", function() if c.o then WP.AskMessage(c.o) end end)
@@ -535,35 +581,102 @@ Reagents = function(s, qty)
     return table.concat(t, ", ")
 end
 
+-- a tip of 1 gold more, and where it goes
+local function AddTip(o)
+    O.AddTip(o, 10000)
+    if o.status == "crafted" then
+        WP.Print(string.format(L("Pourboire pour %s : %s au total, payé à la réception (contre-remboursement) ou en échange."), o.by or "?", Money(o.tip)))
+    else
+        WP.Print(string.format(L("Pourboire pour %s : %s au total. Envoie-le par la poste ou en échange : l'addon ne déplace pas d'or tout seul."), o.by or "?", Money(o.tip)))
+    end
+    WP.RefreshOrders()
+end
+
 local function PaintOrder(c, o, side)
     c.o = o
+    -- the item's icon (an enchant: its spell's), title in the item's quality colour
+    local item = o.item or 0
+    local tex = item > 0 and S.ItemIcon(item)
+        or ((C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(-item)) or (GetSpellTexture and GetSpellTexture(-item)))
+        or "Interface\\Icons\\Trade_Engraving"
+    c.icon:SetTexture(tex)
+    if item > 0 then
+        local qc = S.QualityColor(item); c.title:SetTextColor(qc[1], qc[2], qc[3])
+    else c.title:SetTextColor(C.text[1], C.text[2], C.text[3]) end
     c.title:SetText((o.qty or 1) .. "× " .. Name(o.item))
     c.fee:SetText(Money((o.fee or 0) + (o.tip or 0)))
     local col = STATUS_COL[o.status] or C.dim
     local st = S.Hex(col) .. L(STATUS[o.status] or o.status) .. "|r"
     local who
-    local function Star(name) local n = name and O.Stars(name) or 0; return n > 0 and (" " .. S.Hex(C.warn) .. "★" .. n .. "|r") or "" end
+    local function Star(name) local n = name and O.Stars(name) or 0; return n > 0 and (" " .. STAR .. S.Hex(C.warn) .. n .. "|r") or "" end
     if side == "mine" then who = (o.to and string.format(L("pour %s"), o.to) or L("pour la guilde")) .. (o.by and (" · " .. string.format(L("par %s"), o.by) .. Star(o.by)) or "")
     else who = o.from .. " · " .. (o.to and string.format(L("pour %s"), o.to) or L("pour la guilde")) end
     if o.status == "open" and o.expires then who = who .. " · " .. string.format(L("expire dans %d h"), math.max(0, math.floor((o.expires - time()) / 3600))) end
     c.who:SetText(st .. " · " .. who)
     local lines = {}
-    local missing = {}
-    if side == "mine" and o.status == "accepted" and o.give and o.give ~= "" and not o.sentGive then
+    local missing, inBank = {}, false
+    -- something still to send to the crafter: reagents, or an upfront payment
+    local toSend = ((o.give and o.give ~= "") or (o.paid or 0) > 0) and not o.sentGive
+    if side == "mine" and o.status == "accepted" and toSend then
         -- what to send to the crafter, with what you have (bags and bank) and what is missing
         local t = {}
         for _, g in ipairs(O.ToSend(o)) do
             local ok = g.have >= g.need
+            local bank = g.bank or 0
             if not ok then missing[#missing + 1] = g end
+            -- enough in all, but not in the bags: take them out of the bank first
+            if ok and (g.have - bank) < g.need then inBank = true end
             t[#t + 1] = S.Hex(ok and C.ready or C.danger) .. g.need .. "× " .. Name(g.id) .. " (" .. math.min(g.have, g.need) .. "/" .. g.need .. ")|r"
+                .. (bank > 0 and (S.Hex(C.warn) .. string.format(L(" dont %d en banque"), math.min(bank, g.need)) .. "|r") or "")
         end
+        if (o.paid or 0) > 0 then t[#t + 1] = S.Hex(C.warn) .. string.format(L("%s d'avance"), Money(o.paid)) .. "|r" end
         lines[#lines + 1] = S.Hex(C.text) .. string.format(L("À envoyer à %s :"), o.by or "?") .. "|r " .. table.concat(t, ", ")
-        lines[#lines + 1] = S.Hex(C.muted) .. L("Par la poste (bouton Préparer à la boîte aux lettres) ou en échange : l'addon le voit tout seul.") .. "|r"
     elseif o.give and o.give ~= "" then
         local who = side == "mine" and L("je fournis") or string.format(L("%s fournit"), o.from)
         lines[#lines + 1] = S.Hex(C.ready) .. who .. "|r " .. Reagents(o.give, o.qty) .. (o.sentGive and (" · " .. S.Hex(C.ready) .. L("envoyés") .. "|r") or "")
     end
-    if o.crafter and o.crafter ~= "" then lines[#lines + 1] = S.Hex(C.warn) .. L("l'artisan fournit") .. "|r " .. Reagents(o.crafter, o.qty) end
+    if o.crafter and o.crafter ~= "" then
+        if side == "recv" and o.status == "accepted" then
+            -- the crafter's own share, with what they hold
+            local t = {}
+            for _, r in ipairs(O.Decode(o.crafter)) do
+                local need = r[2] * (o.qty or 1)
+                local have = WP.OwnedCount and WP.OwnedCount(r[1]) or 0
+                t[#t + 1] = S.Hex(have >= need and C.ready or C.danger) .. need .. "× " .. Name(r[1]) .. " (" .. math.min(have, need) .. "/" .. need .. ")|r"
+            end
+            lines[#lines + 1] = S.Hex(C.warn) .. L("Tu fournis :") .. "|r " .. table.concat(t, ", ")
+        else
+            lines[#lines + 1] = S.Hex(C.warn) .. L("l'artisan fournit") .. "|r " .. Reagents(o.crafter, o.qty)
+        end
+    end
+    -- the next step, said plainly: whose turn it is and what to do
+    local nxt, mineTurn = "", false
+    local stt = o.status
+    if side == "board" or (side == "recv" and stt == "open") then
+        nxt, mineTurn = L("À toi : accepte si tu peux la fabriquer."), true
+    elseif side == "mine" and stt == "open" then
+        nxt = L("En attente d'un artisan.")
+    elseif side == "mine" and stt == "accepted" then
+        if toSend then
+            mineTurn = true
+            if #missing > 0 then nxt = string.format(L("À toi : il te manque des composants à envoyer à %s."), o.by or "?")
+            elseif inBank then nxt = string.format(L("À toi : sors les composants de la banque, puis va à une boîte aux lettres ou échange avec %s."), o.by or "?")
+            else nxt = string.format(L("À toi : envoie les composants à %s (poste ou échange)."), o.by or "?") end
+        else
+            nxt = string.format(L("%s fabrique ta commande."), o.by or "?")
+        end
+    elseif side == "mine" and stt == "crafted" then
+        nxt = string.format(L("Fabriquée : elle arrive par la poste ou en échange avec %s."), o.by or "?")
+    elseif side == "recv" and stt == "accepted" then
+        nxt, mineTurn = L("À toi : fabrique l'objet, l'addon le voit tout seul."), true
+    elseif side == "recv" and stt == "crafted" then
+        nxt, mineTurn = string.format(L("À toi : livre à %s (boîte aux lettres ou échange)."), o.from or "?"), true
+    elseif stt == "delivered" then
+        nxt = L("Terminée.")
+    end
+    c.next:SetText(nxt)
+    local nc = mineTurn and C.warn or C.dim
+    c.next:SetTextColor(nc[1], nc[2], nc[3])
     -- what reached the crafter (read in the crafter's mailbox)
     if side == "recv" and o.status == "accepted" then
         local got, money = O.Received(o)
@@ -582,7 +695,7 @@ local function PaintOrder(c, o, side)
     if o.log and #o.log > 1 then
         local t = {}
         for _, e in ipairs(o.log) do t[#t + 1] = L(STATUS[e.s] or e.s) .. " " .. date("%H:%M", e.t) end
-        lines[#lines + 1] = S.Hex(C.muted) .. table.concat(t, "  ›  ") .. "|r"
+        lines[#lines + 1] = S.Hex(C.muted) .. table.concat(t, "  >  ") .. "|r"
     end
     for i = math.max(1, #(o.msgs or {}) - 2), #(o.msgs or {}) do
         local m = o.msgs[i]
@@ -591,9 +704,16 @@ local function PaintOrder(c, o, side)
     c.detail:SetText(table.concat(lines, "\n"))
     -- buttons by side and status
     c.a1, c.a2 = nil, nil
+    c.b1:SetWidth(110); c.b2:SetWidth(110)   -- cards are recycled: some branches widen them
     if side == "board" then
         c.b1.label:SetText(L("Accepter")); c.a1 = function() O.Accept(o); WP.ShowOrdersTab("recv") end
-        c.b2.label:SetText(L("Masquer")); c.a2 = function() O.Decline(o, "Autre") end
+        if o.to then
+            -- sent to me: a real refusal, with its reason
+            c.b2.label:SetText(L("Refuser")); c.a2 = function() WP.AskDecline(o) end
+        else
+            -- a guild order: only hidden here, the others still see it
+            c.b2.label:SetText(L("Masquer")); c.a2 = function() O.Decline(o, "Autre") end
+        end
     elseif side == "recv" and o.status == "open" then
         c.b1.label:SetText(L("Accepter")); c.a1 = function() O.Accept(o) end
         c.b2.label:SetText(L("Refuser")); c.a2 = function() WP.AskDecline(o) end
@@ -602,13 +722,17 @@ local function PaintOrder(c, o, side)
     elseif side == "recv" and o.status == "crafted" then
         c.b1.label:SetText(L("Livrée")); c.a1 = function() O.Delivered(o) end
     elseif side == "mine" and o.status == "accepted" and #missing > 0 then
-        c.b1.label:SetText(L("Acheter le manquant")); c.a1 = function()
+        c.b1:SetWidth(170)
+        c.b1.label:SetText(string.format(L("Acheter le manquant (%d)"), #missing)); c.a1 = function()
             if not (WP.AuctionHouseOpen and WP.AuctionHouseOpen()) then WP.Print(L("Ouvre l'hôtel des ventes, puis reclique.")); return end
-            local g = missing[1]
-            if WP.Scan and WP.Scan.OpenToBuy then WP.Scan.OpenToBuy(g.id, g.need - g.have) end
+            -- every missing reagent in one chain: the next buy page opens after each purchase
+            local q = {}
+            for _, g in ipairs(missing) do q[#q + 1] = { id = g.id, qty = g.need - g.have } end
+            if WP.Scan and WP.Scan.BuyQueue then WP.Scan.BuyQueue(q)
+            elseif WP.Scan and WP.Scan.OpenToBuy then WP.Scan.OpenToBuy(missing[1].id, missing[1].need - missing[1].have) end
         end
         c.b2.label:SetText(L("Annuler")); c.a2 = function() O.Cancel(o) end
-    elseif side == "mine" and o.status == "accepted" and o.give and o.give ~= "" and not o.sentGive then
+    elseif side == "mine" and o.status == "accepted" and toSend then
         c.b1.label:SetText(L("Préparer le courrier")); c.a1 = function()
             if MailFrame and MailFrame:IsShown() then
                 if MailFrameTab2 and not (SendMailFrame and SendMailFrame:IsShown()) then MailFrameTab2:Click() end
@@ -619,14 +743,16 @@ local function PaintOrder(c, o, side)
     elseif side == "mine" and (o.status == "open" or o.status == "accepted") then
         c.b2.label:SetText(L("Annuler")); c.a2 = function() O.Cancel(o) end
     elseif side == "mine" and o.status == "crafted" then
-        c.b2.label:SetText(L("+ Pourboire")); c.a2 = function() O.AddTip(o, 10000); WP.RefreshOrders() end
+        -- by hand when the addon could not see it arrive (an enchant, a mail still in the inbox)
+        c.b1.label:SetText(L("J'ai reçu")); c.a1 = function() O.Delivered(o) end
+        c.b2:SetWidth(130); c.b2.label:SetText(L("Pourboire +1 po")); c.a2 = function() AddTip(o) end
     elseif side == "mine" and o.status == "delivered" then
         if not o.thanked and o.by then
-            c.b1.label:SetText(L("Merci ★")); c.a1 = function() O.Thank(o) end
+            c.b1.label:SetText(L("Merci")); c.a1 = function() O.Thank(o) end
         else
             c.b1.label:SetText(L("Recommander")); c.a1 = function() WP.NewOrder(o.item, o.by, o) end
         end
-        c.b2.label:SetText(L("+ Pourboire")); c.a2 = function() O.AddTip(o, 10000); WP.RefreshOrders() end
+        c.b2:SetWidth(130); c.b2.label:SetText(L("Pourboire +1 po")); c.a2 = function() AddTip(o) end
     elseif side == "mine" and (o.status == "cancelled" or o.status == "expired" or o.status == "declined") then
         c.b1.label:SetText(L("Recommander")); c.a1 = function() WP.NewOrder(o.item, o.status == "declined" and nil or o.to, o) end
     end
@@ -636,7 +762,8 @@ local function PaintOrder(c, o, side)
     c.b1:SetShown(c.a1 ~= nil); c.b2:SetShown(c.a2 ~= nil)
     if not c.a1 and c.a2 then c.b2:ClearAllPoints(); c.b2:SetPoint("BOTTOMLEFT", 10, 8)
     else c.b2:ClearAllPoints(); c.b2:SetPoint("LEFT", c.b1, "RIGHT", 8, 0) end
-    local h = 54 + math.max(14, (c.detail:GetStringHeight() or 14)) + ((c.a1 or c.a2 or c.b3:IsShown()) and 40 or 8)
+    local h = 54 + (nxt ~= "" and (c.next:GetStringHeight() or 14) + 4 or 0)
+        + math.max(14, c.detail:GetStringHeight() or 14) + ((c.a1 or c.a2 or c.b3:IsShown()) and 40 or 8)
     c:SetHeight(h)
     return h
 end

@@ -16,7 +16,7 @@ ns.AddEnglish({
     ["Général"] = "General", ["Donjons"] = "Dungeons", ["Writs & Favor"] = "Writs & Favor", ["GPS"] = "GPS",
     ["Sacs"] = "Bags", ["À propos"] = "About",
     ["Rendre les caisses automatiquement"] = "Hand in crates automatically",
-    ["Dokimi / Marcy Baker"] = "Dokimi / Marcy Baker",
+    ["en parlant à Dokimi ou à Marcy Baker"] = "when talking to Dokimi or Marcy Baker",
     ["Clics"] = "Clicks",
     ["Alt-clic pour inviter (chat)"] = "Alt-click to invite (chat)",
     ["Alt-clic pour inviter (monde, portraits)"] = "Alt-click to invite (world, portraits)",
@@ -29,9 +29,17 @@ ns.AddEnglish({
     ["Aucun réglage ne correspond à « %s »."] = "No setting matches \"%s\".",
     ["%d réglages · flèches haut / bas pour choisir, Entrée pour ouvrir"] = "%d settings · up / down arrows to choose, Enter to open",
     ["1 réglage · Entrée pour l'ouvrir"] = "1 setting · Enter to open it",
-    ["Ce module est éteint : Général › Modules pour le rallumer."] = "This module is off: General › Modules to turn it back on.",
+    ["Ce module est éteint."] = "This module is off.",
+    ["Ouvrir le guide"] = "Open the guide",
+    ["Ouvrir les Writs"] = "Open Writs",
+    ["Ouvrir le nettoyeur"] = "Open the cleaner",
+    ["Writs et Faveur du marchand"] = "Writs & Merchant's Favor",
+    ["Writs et Faveur"] = "Writs & Favor",
     ["Modules"] = "Modules",
     ["Guide des quêtes de donjon, route, flèche"] = "Dungeon quest guide, route, arrow",
+    ["Donjons, raids et quêtes de classe : route, flèche"] = "Dungeons, raids and class quests: route, arrow",
+    ["Guide de quêtes"] = "Quest guide",
+    ["Donjons · Raids · Classe"] = "Dungeons · Raids · Class",
     ["Craftsman's Writs, liste d'achat, remise auto"] = "Craftsman's Writs, shopping list, auto turn-in",
     ["Nettoyeur des objets de quête inutiles"] = "Cleaner for quest items you no longer need",
     ["Faire fabriquer par la guilde, accepter des commandes"] = "Have the guild craft for you, take orders",
@@ -42,7 +50,7 @@ ns.AddEnglish({
     ["Allumer"] = "Turn on",
     ["Zones où je vais"] = "Zones I go to",
     ["Un writ précis : clic droit dessus dans « Tous les writs »."] = "A single writ: right-click it in \"All writs\".",
-    ["Formulaire GitHub prérempli"] = "Prefilled GitHub form",
+    ["Écris-nous (lien à copier dans ton navigateur)"] = "Write to us (a link to copy into your browser)",
     -- General
     ["Langue"] = "Language", ["Automatique"] = "Automatic", ["Français"] = "Français", ["English"] = "English",
     ["Auto suit la langue du client.\nLes fenêtres déjà ouvertes changent après un /reload."] =
@@ -64,12 +72,12 @@ ns.AddEnglish({
     ["Rendre les writs automatiquement"] = "Turn in writs automatically",
     ["Accepter la quête en ouvrant l'enveloppe"] = "Accept the quest when opening the envelope",
     ["Rescanner en ouvrant l'HV"] = "Rescan when the AH opens",
-    ["Comptoir ouvert, prix > 1 h"] = "Trading Post open, prices > 1 h",
+    ["fenêtre Writs ouverte, prix de plus d'une heure"] = "Writs window open, prices over an hour old",
     ["Infos"] = "Info",
     ["Rappel à la connexion"] = "Reminder on login",
     ["« 3 prêts, 1 enveloppe à ouvrir »"] = "\"3 ready, 1 envelope to open\"",
     ["Infobulle des enveloppes"] = "Envelope tooltip",
-    ["rép, coût, PNJ, déjà rendu"] = "rep, cost, NPC, already turned in",
+    ["réputation, coût, à qui le rendre, déjà rendu"] = "reputation, cost, who to hand it to, already handed in",
     ["Plan"] = "Plan",
     ["Objectif"] = "Goal", ["Rang suivant"] = "Next standing",
     ["Masquer les zones trop hautes"] = "Hide zones too high",
@@ -106,6 +114,11 @@ ns.AddEnglish({
     ["Affichage"] = "Display",
     ["Flèche à partir de"] = "Arrow from",
     ["Le gain minimum pour montrer la flèche dans les sacs"] = "The smallest gain that shows the arrow in your bags",
+    ["Place dans les sacs"] = "Bag space",
+    ["Proposer de libérer une place quand les sacs sont pleins"] = "Offer to free a slot when the bags are full",
+    ["Vendre les objets gris chez les marchands"] = "Sell grey items at merchants",
+    ["EllesmereUI vend déjà tes gris : WL Helper le laisse faire."] = "EllesmereUI already sells your greys: WL Helper leaves it to it.",
+    ["Libérer une place jette l'objet le moins cher : gris, ou arme et armure blanches. Rien d'autre. /wlh free"] = "Free a slot throws away the cheapest item: grey, or a white weapon or armour. Nothing else. /wlh free",
     ["Ligne dans les infobulles d'objet"] = "Line in item tooltips",
     ["Poids utilisés (%s, niveaux %s)"] = "Weights used (%s, levels %s)",
     ["Dégâts des sorts"] = "Spell damage", ["Soins"] = "Healing", ["Intelligence"] = "Intellect", ["Esprit"] = "Spirit",
@@ -254,13 +267,18 @@ local KEYWORDS = {
     teleport = "teleportation portail mage", zygor = "guide pointeur", tooltip = "infobulle",
     infobulle = "tooltip", writ = "enveloppe", minimap = "carte bouton", langue = "language english francais",
     language = "langue", sac = "bags clean nettoyeur", bags = "sacs nettoyeur", reglage = "settings options",
+    commande = "orders artisan metier", orders = "commandes", guilde = "guild classement pvp",
+    groupe = "lfg events sorties donjon raid", lfg = "groupes events", spe = "spec talents poids amelioration",
+    spec = "spe talents", stuff = "ameliorations upgrades equipement", son = "sound alerte", alerte = "rare sound son",
+    caisse = "crates faveur favor", faveur = "favor caisses", hv = "hotel des ventes auction scan prix",
+    prix = "price scan hv", police = "font", font = "police",
 }
 
 local function Register(p, row, label, hint)
     local section = p.section or ""
     local text = table.concat({ label or "", OtherLanguage(label), hint or "", OtherLanguage(hint),
         section, OtherLanguage(section), p.pageLabel or "", OtherLanguage(p.pageLabel) }, " ")
-    INDEX[#INDEX + 1] = { page = p.key, pageLabel = p.pageLabel, section = section, label = label, hint = hint,
+    INDEX[#INDEX + 1] = { page = p.key, pageLabel = p.pageLabel, pageIcon = p.pageIcon, section = section, label = label, hint = hint,
         row = row, y = -select(5, row:GetPoint(1)), labelFold = Fold(label .. " " .. OtherLanguage(label)), all = Fold(text) }
 end
 
@@ -367,23 +385,30 @@ end
 -- ---------------------------------------------------------------- pages
 
 local PAGES = {
-    { key = "general",  label = "Général" },
-    { key = "dungeons", label = "Donjons" },
-    { key = "comptoir", label = "Writs & Favor" },
-    { key = "gps",      label = "GPS" },
-    { key = "bags",     label = "Sacs" },
-    { key = "upgrades", label = "Améliorations" },
-    { key = "about",    label = "À propos" },
+    { key = "general",  label = "Général",         icon = "Interface\\Icons\\Trade_Engineering" },
+    { key = "dungeons", label = "Donjons",         icon = "Interface\\Icons\\INV_Misc_Map_01" },
+    { key = "comptoir", label = "Writs et Faveur", icon = "Interface\\Icons\\INV_Letter_15" },
+    { key = "gps",      label = "GPS",             icon = "Interface\\Icons\\Ability_Tracking" },
+    { key = "bags",     label = "Sacs",            icon = "Interface\\Icons\\INV_Misc_Bag_08" },
+    { key = "upgrades", label = "Améliorations",   icon = "Interface\\Icons\\INV_Chest_Cloth_17" },
+    { key = "about",    label = "À propos",        icon = "Interface\\Icons\\INV_Misc_QuestionMark" },
 }
 
+-- A module's name in French: WP.MODULES (Core.lua) still says "LFG" and "Writs & Favor".
+local function ModLabel(m)
+    if m.key == "events" then return L("Groupes") elseif m.key == "writs" then return L("Writs et Faveur du marchand") end
+    return L(m.label)
+end
+
 local Rebuild   -- defined with the window: rebuilds every page after a language change
+local ModuleBand   -- defined with the window: a module page's top band
 
 local BUILD = {}
 
 function BUILD.general(p)
     Section(p, L("Modules"))
     for _, m in ipairs(ns.WP.MODULES) do
-        SwitchRow(p, L(m.label), function() return ns.WP.ModuleOn(m.key) end,
+        SwitchRow(p, ModLabel(m), function() return ns.WP.ModuleOn(m.key) end,
             function(v) ns.WP.SetModule(m.key, v) end, L(m.hint))
     end
     Note(p, L("Le GPS reste toujours actif : les autres modules s'en servent.\nRallumer un module est immédiat, sans /reload."), 6)
@@ -466,16 +491,16 @@ function BUILD.comptoir(p)
     Section(p, L("Automatismes"))
     SwitchRow(p, L("Rendre les writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"))
     SwitchRow(p, L("Rendre les caisses automatiquement"), function() return Comfort().autoCrates ~= false end, SetComfort("autoCrates"),
-        L("Dokimi / Marcy Baker"))
+        L("en parlant à Dokimi ou à Marcy Baker"))
     SwitchRow(p, L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
     SwitchRow(p, L("Rescanner en ouvrant l'HV"), function() return Writs().autoRescan end,
-        function(v) Writs().autoRescan = v; RefreshWrits() end, L("Comptoir ouvert, prix > 1 h"))
+        function(v) Writs().autoRescan = v; RefreshWrits() end, L("fenêtre Writs ouverte, prix de plus d'une heure"))
 
     Section(p, L("Infos"))
     SwitchRow(p, L("Rappel à la connexion"), function() return Comfort().reminder end, SetComfort("reminder"),
         L("« 3 prêts, 1 enveloppe à ouvrir »"))
     SwitchRow(p, L("Infobulle des enveloppes"), function() return Comfort().tooltip end, SetComfort("tooltip"),
-        L("rép, coût, PNJ, déjà rendu"))
+        L("réputation, coût, à qui le rendre, déjà rendu"))
 
     Section(p, L("Plan"))
     local row = Row(p, L("Objectif"))
@@ -551,20 +576,17 @@ function BUILD.gps(p)
 end
 
 function BUILD.bags(p)
+    -- the cleaner opens from the band at the top of the page
     Section(p, L("Nettoyage"))
-    local row = Row(p, L("Objets de quête inutiles"))
-    local show = S.Button(row, L("Voir"), 90, 30, "secondary", function()
-        local Cl = ns.WP and ns.WP.Cleaner
-        if Cl and Cl.Toggle then Cl.Toggle() end
-    end)
-    function show:Sync()
-        local Cl = ns.WP and ns.WP.Cleaner
-        self:SetEnabled(Cl and Cl.Toggle and true or false)
-    end
-    Place(p, row, show)
+    Note(p, L("Les objets qui lancent une quête ne sont jamais proposés."), 4)
+    Section(p, L("Place dans les sacs"))
+    SwitchRow(p, L("Proposer de libérer une place quand les sacs sont pleins"),
+        function() return WLWritsDB.freeSlotPrompt ~= false end, function(v) WLWritsDB.freeSlotPrompt = v end)
+    SwitchRow(p, L("Vendre les objets gris chez les marchands"),
+        function() return WLWritsDB.sellGreys ~= false end, function(v) WLWritsDB.sellGreys = v end)
     CloseSection(p)
-    Note(p, L("Les objets qui lancent une quête ne sont jamais proposés."), 8)
-
+    Note(p, (ns.WP.Junk and ns.WP.Junk.OtherSeller() and (L("EllesmereUI vend déjà tes gris : WL Helper le laisse faire.") .. " ") or "")
+        .. L("Libérer une place jette l'objet le moins cher : gris, ou arme et armure blanches. Rien d'autre. /wlh free"), 4)
 end
 
 -- Upgrades: the spec judged, the weights it uses at your level, when an arrow shows, the tooltip line.
@@ -694,7 +716,7 @@ function BUILD.about(p)
     Note(p, L("Sources et remerciements : voir CREDITS.txt dans le dossier de l'addon."), 6)
 
     Section(p, L("Une idée, un bug ?"))
-    local fb = Row(p, L("Formulaire GitHub prérempli"))
+    local fb = Row(p, L("Écris-nous (lien à copier dans ton navigateur)"))
     local bIdea = S.Button(fb, L("Proposer une idée"), 150, 30, "primary", function() if ns.WP.Feedback then ns.WP.Feedback("idea") end end)
     local bBug = S.Button(fb, L("Signaler un bug"), 130, 30, "secondary", function() if ns.WP.Feedback then ns.WP.Feedback("bug") end end)
     bBug:SetPoint("RIGHT", fb, "RIGHT", 0, 0)
@@ -710,6 +732,55 @@ end
 -- ---------------------------------------------------------------- the window
 
 local win, body, current
+
+-- A module page's top band: what the module does and a button to open it, or, when it is switched
+-- off, "this module is off" and a button to turn it back on (the window stays open).
+local OPEN = {
+    dungeons = { "Ouvrir le guide", function()
+        if root.GuideStatus and root.GuideStatus() then root.ShowGuide() elseif root.ShowPicker then root.ShowPicker() end
+    end },
+    comptoir = { "Ouvrir les Writs", function() ns.WP.Open("writs") end },
+    bags = { "Ouvrir le nettoyeur", function() if ns.WP.Cleaner then ns.WP.Cleaner.Toggle() end end },
+}
+ModuleBand = function(p, pageKey, mod)
+    local hint = ""
+    for _, m in ipairs(ns.WP.MODULES) do if m.key == mod then hint = m.hint end end
+    local bar = CreateFrame("Frame", nil, p)
+    bar:SetHeight(34)
+    bar:SetPoint("TOPLEFT", PAD_X, p.y); bar:SetPoint("TOPRIGHT", -PAD_X, p.y)
+    bar.bg = S.Solid(bar, "BACKGROUND", C.card); bar.bg:SetAllPoints()
+    S.Border(bar, C.divider)
+    bar.text = S.Text(bar, 13, C.dim)
+    bar.text:SetPoint("LEFT", 10, 0); bar.text:SetPoint("RIGHT", -170, 0)
+    bar.text:SetJustifyH("LEFT"); bar.text:SetWordWrap(false)
+    bar.on = S.Button(bar, L("Allumer"), 90, 24, "primary", function()
+        ns.WP.SetModule(mod, true)   -- re-syncs this window too
+        if ns.WP.RefreshHome then ns.WP.RefreshHome() end
+    end)
+    bar.on:SetPoint("RIGHT", -5, 0)
+    local open = OPEN[pageKey]
+    if open then
+        bar.open = S.Button(bar, L(open[1]), 150, 24, "secondary", open[2])
+        bar.open:SetPoint("RIGHT", -5, 0)
+    end
+    -- the hint is cut short: the whole of it on hover
+    bar:EnableMouse(true)
+    bar:SetScript("OnEnter", function(self)
+        if bar.text.IsTruncated and bar.text:IsTruncated() then S.Tip(self, { bar.text:GetText() or "" }) end
+    end)
+    bar:SetScript("OnLeave", S.HideTip)
+    p.controls[#p.controls + 1] = { Sync = function()
+        local on = ns.WP.ModuleOn(mod)
+        bar.on:SetShown(not on)
+        if bar.open then bar.open:SetShown(on) end
+        bar.text:SetText(on and L(hint) or L("Ce module est éteint."))
+        local c = on and C.dim or C.warn
+        bar.text:SetTextColor(c[1], c[2], c[3])
+    end }
+    -- found by the search as well (the bags page's only way in now)
+    Register(p, bar, L(hint))
+    p.y = p.y - 34 - 12
+end
 
 -- Builds the nav and every page into a fresh body frame (again after a language change).
 local function BuildBody()
@@ -738,9 +809,12 @@ local function BuildBody()
         b.hover:SetAllPoints()
         b.hover:Hide()
         b.bar = S.Solid(b, "ARTWORK", C.brand)
-        b.bar:SetPoint("TOPLEFT"); b.bar:SetPoint("BOTTOMLEFT"); b.bar:SetWidth(3)
+        b.bar:SetPoint("TOPLEFT"); b.bar:SetPoint("BOTTOMLEFT"); b.bar:SetWidth(3); b.bar:SetAlpha(0)
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetSize(18, 18); b.icon:SetPoint("LEFT", 12, 0)
+        b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); b.icon:SetTexture(def.icon)
         b.label = S.Text(b, 15, C.dim)
-        b.label:SetPoint("LEFT", 16, 0)
+        b.label:SetPoint("LEFT", 38, 0)
         b.label:SetText(L(def.label))
         b.key = def.key
         b:SetScript("OnEnter", function(self) if self.key ~= current then self.hover:Show() end end)
@@ -749,15 +823,12 @@ local function BuildBody()
         body.tabs[i] = b
 
         local p = NewPage(content)
-        p.key, p.pageLabel = def.key, L(def.label)
+        p.key, p.pageLabel, p.pageIcon = def.key, L(def.label), def.icon
         b.count = S.Text(b, 12, C.brandSoft or C.brand, true)
         b.count:SetPoint("RIGHT", -12, 0)
-        local mod = def.key == "dungeons" and "dungeons" or def.key == "comptoir" and "writs" or def.key == "bags" and "bags"
-        if mod then
-            local off = Note(p, L("Ce module est éteint : Général › Modules pour le rallumer."))
-            off:SetTextColor(C.warn[1], C.warn[2], C.warn[3])
-            p.controls[#p.controls + 1] = { Sync = function() off:SetShown(not ns.WP.ModuleOn(mod)) end }
-        end
+        b.label:SetPoint("RIGHT", -30, 0); b.label:SetJustifyH("LEFT"); b.label:SetWordWrap(false)
+        local mod = ({ dungeons = "dungeons", comptoir = "writs", bags = "bags", upgrades = "upgrades" })[def.key]
+        if mod then ModuleBand(p, def.key, mod) end
         BUILD[def.key](p)
         CloseSection(p)
         p:SetHeight(-p.y + PAD_TOP)
@@ -775,6 +846,7 @@ local function PaintNav()
         if on then b.hover:Hide() end
         local c = on and C.text or C.dim
         b.label:SetTextColor(c[1], c[2], c[3])
+        b.icon:SetDesaturated(not on); b.icon:SetAlpha(on and 1 or 0.7)
         if b.label._bold ~= on and root.SetFont then b.label._bold = on; pcall(root.SetFont, b.label) end
     end
 end
@@ -870,7 +942,7 @@ BuildSearch = function(nav, content)
         r = CreateFrame("Button", nil, list)
         r:SetHeight(RESULT_H)
         r.bg = S.Solid(r, "BACKGROUND", C.brandBg or C.card, 1); r.bg:SetAllPoints(); r.bg:Hide()
-        r.bar = S.Solid(r, "ARTWORK", C.brand); r.bar:SetPoint("TOPLEFT"); r.bar:SetPoint("BOTTOMLEFT"); r.bar:SetWidth(3); r.bar:Hide()
+        r.bar = S.Solid(r, "ARTWORK", C.brand); r.bar:SetPoint("TOPLEFT"); r.bar:SetPoint("BOTTOMLEFT"); r.bar:SetWidth(3); r.bar:SetAlpha(0); r.bar:Hide()
         S.Solid(r, "HIGHLIGHT", { 1, 1, 1 }, 0.04):SetAllPoints()
         r.label = S.Text(r, 15, C.text); r.label:SetPoint("TOPLEFT", 14, -6); r.label:SetPoint("RIGHT", -8, 0); r.label:SetJustifyH("LEFT")
         r.trail = S.Text(r, 13, C.dim); r.trail:SetPoint("TOPLEFT", r.label, "BOTTOMLEFT", 0, -3); r.trail:SetPoint("RIGHT", -8, 0); r.trail:SetJustifyH("LEFT")
@@ -962,7 +1034,8 @@ BuildSearch = function(nav, content)
                 hi = hi + 1
                 local head = Head(hi)
                 head:ClearAllPoints(); head:SetPoint("TOPLEFT", PAD_X, y - 8)
-                head:SetText((root.Upper and root.Upper(e.pageLabel or "") or (e.pageLabel or ""):upper()) .. " · " .. (counts[page] or 0))
+                local icon = e.pageIcon and ("|T" .. e.pageIcon .. ":14:14:0:0:64:64:5:59:5:59|t ") or ""
+                head:SetText(icon .. (root.Upper and root.Upper(e.pageLabel or "") or (e.pageLabel or ""):upper()) .. " · " .. (counts[page] or 0))
                 y = y - HEAD_H
             end
             ri = ri + 1
@@ -970,7 +1043,7 @@ BuildSearch = function(nav, content)
             r.entry = e
             r:ClearAllPoints(); r:SetPoint("TOPLEFT", PAD_X - 3, y); r:SetPoint("RIGHT", list, "RIGHT", -PAD_X, 0)
             r.label:SetText(Mark(e.label or "", words))
-            local trail = (e.pageLabel or "") .. (e.section ~= "" and (" › " .. e.section) or "")
+            local trail = (e.pageLabel or "") .. (e.section ~= "" and (" > " .. e.section) or "")
             if e.hint and e.hint ~= "" then trail = trail .. " · " .. e.hint end
             r.trail:SetText(trail)
             shown[#shown + 1] = r
@@ -1148,7 +1221,7 @@ local function RegisterEllesmere()
                     toggle(L("Bouton de la minimap"), function() return not Guide().hideMinimap end, SetMinimap)
                     toggle(L("Flèche des donjons"), function() return Guide().arrow ~= false end, SetGuideArrow)
 
-                    _, h = W:SectionHeader(parent, L("Writs & Favor"), y); y = y - h
+                    _, h = W:SectionHeader(parent, L("Writs et Faveur"), y); y = y - h
                     toggle(L("Rendre les writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"))
                     toggle(L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
 

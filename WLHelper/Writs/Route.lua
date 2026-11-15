@@ -158,11 +158,25 @@ local function SpellReady(id)
     local start, duration
     if C_Spell and C_Spell.GetSpellCooldown then
         local ok, cd = pcall(C_Spell.GetSpellCooldown, id)
-        if ok and type(cd) == "table" then start, duration = cd.startTime, cd.duration end
+        if ok and type(cd) == "table" then
+            -- the client may hide the numbers ("secret" values): its plain isActive flag tells then
+            -- (the global cooldown is never long enough to matter for a teleport)
+            if issecretvalue and (issecretvalue(cd.startTime) or issecretvalue(cd.duration)) then
+                local okA, ready = pcall(function()
+                    if issecretvalue(cd.isActive) then return true end
+                    local gcd = cd.isOnGCD
+                    if gcd ~= nil and issecretvalue(gcd) then gcd = false end
+                    return not (cd.isActive and not gcd)
+                end)
+                return not okA or ready
+            end
+            start, duration = cd.startTime, cd.duration
+        end
     elseif GetSpellCooldown then
         start, duration = GetSpellCooldown(id)
     end
-    return not (start and duration and start > 0 and duration > 1.5)
+    local ok, onCD = pcall(function() return start and duration and start > 0 and duration > 1.5 end)
+    return not (ok and onCD)
 end
 
 local function BagCount(id)

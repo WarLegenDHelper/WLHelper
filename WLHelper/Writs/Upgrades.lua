@@ -17,7 +17,9 @@ ns.AddEnglish({
     ["vide"] = "empty",
     ["emplacement vide"] = "empty slot",
     ["équipé"] = "equipped",
-    ["moins bien"] = "worse",
+    ["au niveau %d"] = "at level %d",
+    ["%s%d %%"] = "%s%d%%",
+    ["à la place de"] = "instead of",
 })
 
 local ARROW = "Interface\\Buttons\\Arrow-Up-Up"
@@ -141,25 +143,57 @@ WP.UpgradeCheck = Check
 local function IsUpgrade(link) return Check(link).up end
 
 -- ---------------------------------------------------------------- tooltip line
+-- "+24 %" in French, "+24%" in English (a negative number carries its own sign)
+local function Percent(n)
+    return string.format(L("%s%d %%"), n > 0 and "+" or "", n)
+end
+-- "instead of [icon] Old Item" under the percent: the item(s) it would replace (both hands for a
+-- two-hander when an off hand is worn)
+local function InsteadOf(tip, link)
+    local equipLoc = select(9, ((C_Item and C_Item.GetItemInfo) or GetItemInfo)(link))
+    local slots = equipLoc and W.SLOTS[equipLoc]
+    if not slots then return end
+    local slot = (#slots == 1 and slots[1]) or select(2, W.Gain(link))
+    if not slot then return end
+    local list = { slot }
+    if equipLoc == "INVTYPE_2HWEAPON" and GetInventoryItemLink("player", 17) then list[#list + 1] = 17 end
+    for _, s in ipairs(list) do
+        local cur = GetInventoryItemLink("player", s)
+        local tex = GetInventoryItemTexture and GetInventoryItemTexture("player", s)
+        if cur and tex then
+            tip:AddLine("   " .. L("à la place de") .. " |T" .. tex .. ":14:14:0:0:64:64:5:59:5:59|t " .. cur, 0.7, 0.7, 0.7)
+        end
+    end
+end
+
 local function TooltipLine(tip, link)
     if not (Active() and link) or WLWritsDB.upgradeTip == false then return end
     if UseGF() then
         local v = GFVerdict(link)
         local text, col
+        local pct = false
         if v == "equipped" then text, col = L("équipé"), { 0.7, 0.7, 0.7 }
         elseif type(v) == "number" and v >= 1000 then text, col = L("emplacement vide"), GREEN
         elseif type(v) == "number" then
-            text = (v > 0 and "+" or "") .. v .. "%"
+            text, pct = Percent(v), true
             col = v > 0 and GREEN or (v < 0 and { 1, 0.35, 0.3 } or { 0.8, 0.8, 0.8 })
         else return end
-        tip:AddDoubleLine("|cffce1918WL Helper|r · " .. (GFSpec() or W.SpecName()), text, 1, 1, 1, col[1], col[2], col[3])
+        tip:AddDoubleLine("|cffce1918WL Helper|r · " .. W.SpecNameFor(GFSpec()), text, 1, 1, 1, col[1], col[2], col[3])
+        if pct then InsteadOf(tip, link) end
         return
     end
-    local can = W.CanWear(link)
-    if not can then return end
     local spec = W.SpecName()
+    local can, why, lvl = W.CanWear(link)
+    if not can then
+        -- only your level stops you: say from which level
+        if why == "level" and lvl then
+            tip:AddDoubleLine("|cffce1918WL Helper|r · " .. spec, string.format(L("au niveau %d"), lvl), 1, 1, 1, 1, 0.82, 0)
+        end
+        return
+    end
     local gain = W.Gain(link)
     local text, col
+    local pct = false
     local equipped = false
     for _, slots in pairs({ W.SLOTS[select(9, ((C_Item and C_Item.GetItemInfo) or GetItemInfo)(link)) or ""] or {} }) do
         for _, s in ipairs(slots) do if GetInventoryItemLink("player", s) == link then equipped = true end end
@@ -168,11 +202,12 @@ local function TooltipLine(tip, link)
     elseif gain == "empty" then text, col = L("emplacement vide"), GREEN
     elseif type(gain) == "number" then
         local n = math.floor(gain + 0.5)
-        text = (n >= 0 and "+" or "") .. n .. "%"
+        text, pct = Percent(n), true
         col = n >= 1 and GREEN or (n <= -1 and { 1, 0.35, 0.3 } or { 0.8, 0.8, 0.8 })
     else return end
     -- no tip:Show() here: the game resizes the tooltip itself; calling it from an addon can taint it
     tip:AddDoubleLine("|cffce1918WL Helper|r · " .. spec, text, 1, 1, 1, col[1], col[2], col[3])
+    if pct then InsteadOf(tip, link) end
 end
 if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
     TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tip)
@@ -193,7 +228,9 @@ end
 -- or combined) and the bag addons that use it (EllesmereUI Bags). Slot buttons are protected frames:
 -- nothing is written on them; the marks live in a table of our own, keyed by the button.
 local marks = setmetatable({}, { __mode = "k" })
-local function Mark(button, link)
+-- icon: the button's icon texture when the button is not a square bag slot (quest rewards): the
+-- marks then sit on the icon itself
+local function Mark(button, link, icon)
     local r = link and Check(link) or NO
     local m = marks[button]
     if not r.up then
@@ -206,9 +243,14 @@ local function Mark(button, link)
         m.arrow:SetTexture(ARROW)
         m.arrow:SetVertexColor(GREEN[1], GREEN[2], GREEN[3])
         m.arrow:SetSize(16, 16)
-        m.arrow:SetPoint("TOPLEFT", -1, 1)
         m.text = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-        m.text:SetPoint("TOPRIGHT", -1, -2)
+        if icon then
+            m.arrow:SetPoint("TOPLEFT", icon, "TOPLEFT", -1, 1)
+            m.text:SetPoint("TOPRIGHT", icon, "TOPRIGHT", -1, -2)
+        else
+            m.arrow:SetPoint("TOPLEFT", -1, 1)
+            m.text:SetPoint("TOPRIGHT", -1, -2)
+        end
         m.text:SetPoint("TOPLEFT", m.arrow, "TOPRIGHT", -2, -3)
         m.text:SetJustifyH("RIGHT")
         if m.text.SetWordWrap then m.text:SetWordWrap(false) end
@@ -272,6 +314,69 @@ local function PaintSoon()
     C_Timer.After(0.2, function() paintQueued = false; PaintBags() end)
 end
 
+-- ---------------------------------------------------------------- quest rewards and merchant
+-- The same arrow and percent on the rewards of a quest (quest giver and quest log) and on the
+-- merchant's items: the percent of each reward is enough to compare them.
+local function RewardIcon(btn)
+    return btn.Icon or btn.icon or _G[(btn:GetName() or "") .. "IconTexture"]
+end
+local REWARD_PREFIXES = { "QuestInfoRewardsFrameQuestInfoItem", "QuestInfoItem", "QuestLogItem", "QuestRewardItem" }
+local function PaintQuestRewards()
+    if not Active() then return end
+    local seen, list = {}, {}
+    local function add(btn, prefix)
+        if btn and not seen[btn] then seen[btn] = true; list[#list + 1] = { btn, prefix } end
+    end
+    if QuestInfoRewardsFrame and type(QuestInfoRewardsFrame.RewardButtons) == "table" then
+        for _, btn in ipairs(QuestInfoRewardsFrame.RewardButtons) do add(btn) end
+    end
+    for _, prefix in ipairs(REWARD_PREFIXES) do
+        for i = 1, 10 do add(_G[prefix .. i], prefix) end
+    end
+    for _, it in ipairs(list) do
+        local btn, prefix = it[1], it[2]
+        -- hidden buttons keep their (hidden) marks with them
+        if btn.IsVisible and btn:IsVisible() and (btn.objectType == nil or btn.objectType == "item") then
+            local kind = btn.type or "choice"
+            local ok, link = pcall(function()
+                local id = btn:GetID()
+                if prefix == "QuestLogItem" then return GetQuestLogItemLink and GetQuestLogItemLink(kind, id) end
+                return (QuestFrame and QuestFrame:IsShown() and GetQuestItemLink and GetQuestItemLink(kind, id))
+                    or (GetQuestLogItemLink and GetQuestLogItemLink(kind, id))
+            end)
+            Mark(btn, ok and link or nil, RewardIcon(btn))
+        end
+    end
+end
+local questQueued = false
+local function QuestSoon()
+    if questQueued then return end
+    questQueued = true
+    C_Timer.After(0.1, function() questQueued = false; PaintQuestRewards() end)
+end
+if QuestInfo_Display then hooksecurefunc("QuestInfo_Display", function() C_Timer.After(0, PaintQuestRewards) end) end
+if QuestLog_UpdateQuestDetails then hooksecurefunc("QuestLog_UpdateQuestDetails", function() C_Timer.After(0, PaintQuestRewards) end) end
+
+-- the merchant's Buy tab (its Buyback tab hides the marks)
+local function PaintMerchant()
+    for i = 1, (MERCHANT_ITEMS_PER_PAGE or 10) do
+        local btn = _G["MerchantItem" .. i .. "ItemButton"]
+        if btn then
+            if Active() and MerchantFrame and (MerchantFrame.selectedTab or 1) == 1 and btn:IsVisible() then
+                local link
+                if GetMerchantItemLink then
+                    local ok, l = pcall(GetMerchantItemLink, btn:GetID())
+                    link = ok and l or nil
+                end
+                Mark(btn, link)
+            else
+                Mark(btn, nil)
+            end
+        end
+    end
+end
+if MerchantFrame_Update then hooksecurefunc("MerchantFrame_Update", PaintMerchant) end
+
 -- ---------------------------------------------------------------- Baganator
 -- the IDs Geared Arrows used, so Baganator keeps the corners you had set
 local baganator = false
@@ -325,7 +430,8 @@ end
 
 local ev = CreateFrame("Frame")
 pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
-for _, e in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "CHARACTER_POINTS_CHANGED", "GET_ITEM_INFO_RECEIVED", "BAG_UPDATE_DELAYED" }) do
+for _, e in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "CHARACTER_POINTS_CHANGED", "GET_ITEM_INFO_RECEIVED", "BAG_UPDATE_DELAYED",
+        "QUEST_COMPLETE", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_LOG_UPDATE" }) do
     pcall(ev.RegisterEvent, ev, e)
 end
 ev:SetScript("OnEvent", function(_, e, ...)
@@ -347,9 +453,13 @@ ev:SetScript("OnEvent", function(_, e, ...)
         pending[id] = nil
         cache = {}
         PaintSoon()
+        if (QuestFrame and QuestFrame:IsShown()) or (QuestLogFrame and QuestLogFrame:IsShown()) then QuestSoon() end
+        if MerchantFrame and MerchantFrame:IsShown() then C_Timer.After(0.1, PaintMerchant) end
         return
     end
     if e == "BAG_UPDATE_DELAYED" then PaintSoon(); return end
+    -- a quest giver's page or the quest log: the rewards
+    if e == "QUEST_COMPLETE" or e == "QUEST_DETAIL" or e == "QUEST_PROGRESS" or e == "QUEST_LOG_UPDATE" then QuestSoon(); return end
     -- what you wear, your level or your talents changed: Geared Forever may answer differently now
     wipe(tries)
     Soon()

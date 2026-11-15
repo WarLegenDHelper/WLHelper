@@ -1,9 +1,11 @@
 -- Writs/Guild.lua: the Guild module (/wlh guild).
 --
 --  Members   The whole guild from the game's roster, with a search, a sort (level, name, zone, rank),
---            where the guild is right now (the busiest zones), and on each line: online dot, level,
---            class colour, zone (or when the member was last on), rank, the WL logo on those who
---            have the addon. Click: whisper. Right-click: invite. The tooltip adds the public note,
+--            class and role filters (one button clears them), where the guild is right now (the
+--            busiest zones, a click filters on one), and on each line: online dot, level, class
+--            icon and colour, the WL logo on those who have the addon, the role of their spec, zone
+--            (or when the member was last on), rank (an Invite button in its place on hover).
+--            Click: whisper. Right-click: invite. The tooltip adds class and spec, the public note,
 --            the professions the member shares (Orders) and the addon's version.
 --  PvP       A ranking of honorable kills, as the game counts them (battlegrounds included): this
 --            week, this season (one season = one calendar month) and all time. The game keeps the
@@ -39,8 +41,7 @@ ns.AddEnglish({
     ["Tu es %de du classement de la semaine"] = "You are #%d in this week's ranking",
     ["Victoire honorable en monde ouvert (%d cette semaine)"] = "Open-world honorable kill (%d this week)",
     ["Toi : %d cette semaine · %d cette saison · %d au total"] = "You: %d this week · %d this season · %d in total",
-    ["Victoires honorables comptées par le jeu, champs de bataille compris. Une saison dure un mois. Seuls les membres qui ont WL Helper apparaissent ; leurs chiffres arrivent quand ils se connectent."] =
-        "Honorable kills as the game counts them, battlegrounds included. A season lasts a month. Only members who have WL Helper appear; their numbers arrive when they log in.",
+    ["Victoires honorables du jeu, champs de bataille compris. Saison d'un mois. Seuls les membres avec WL Helper apparaissent."] = "Honorable kills from the game, battlegrounds included. A season lasts a month. Only members with WL Helper show up.",
     ["Personne n'a encore de victoire cette semaine."] = "Nobody has a kill this week yet.",
     ["Personne n'a encore de victoire cette saison."] = "Nobody has a kill this season yet.",
     ["Personne n'a encore de victoire."] = "Nobody has a kill yet.",
@@ -60,6 +61,17 @@ ns.AddEnglish({
     ["Note : %s"] = "Note: %s",
     ["Métiers : %s"] = "Professions: %s",
     ["Aucun membre ne correspond."] = "No member matches.",
+    ["Rôle connu pour %d membres sur %d : ceux qui ont WL Helper et ont choisi leur spé."] = "Role known for %d of %d members: those who have WL Helper and picked their spec.",
+    ["Aucun membre connu avec ce rôle. Enlève le filtre pour voir tout le monde."] = "No known member with this role. Remove the filter to see everyone.",
+    ["Enlever tous les filtres"] = "Remove all filters",
+    ["Où est la guilde :"] = "Where the guild is:",
+    ["Clic : ne montrer que les membres dans cette zone"] = "Click: show only the members in this zone",
+    ["Niv."] = "Lv",
+    ["Zone ou dernière connexion"] = "Zone or last seen",
+    ["Inviter"] = "Invite",
+    ["%s invité."] = "%s invited.",
+    ["Clic : chuchoter · bouton Inviter à droite"] = "Click: whisper · Invite button on the right",
+    ["il y a moins d'1 h"] = "less than 1 h ago",
 })
 
 local MONTHS = {
@@ -153,6 +165,15 @@ local function Board()
     if known and WLWritsDB.guild then
         if next(b) == nil then for name, e in pairs(WLWritsDB.guild) do b[name] = e end end
         WLWritsDB.guild = nil
+    end
+    -- old entries saved as "Name Realm" or "Name-Realm": folded into the short name, newest kept
+    local long = {}
+    for name in pairs(b) do if Short(name) ~= name then long[#long + 1] = name end end
+    for _, name in ipairs(long) do
+        local e, short = b[name], Short(name)
+        local cur = b[short]
+        if not cur or (e.t or 0) > (cur.t or 0) then b[short] = e end
+        b[name] = nil
     end
     return b
 end
@@ -294,11 +315,15 @@ local function HasRole(spec, role)
     local roles = ROLE_OF[spec] or "dps"
     return roles:find(role, 1, true) ~= nil
 end
+-- texture coordinates of the role icons on Interface\LFGFrame\UI-LFG-ICON-PORTRAITROLES
+local ROLE_TC = { tank = { 0, 19 / 64, 22 / 64, 41 / 64 }, heal = { 20 / 64, 39 / 64, 1 / 64, 20 / 64 }, dps = { 20 / 64, 39 / 64, 22 / 64, 41 / 64 } }
 local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
 
+-- returns the list, the number online, the zones of those online, and, among the members that pass
+-- the other filters (online, search, class), how many have a known role (spec shared) out of how many
 local function Roster(onlineOnly, filter, sort)
-    local out, online, zones = {}, 0, {}
-    if not (IsInGuild and IsInGuild() and GetNumGuildMembers) then return out, 0, zones end
+    local out, online, zones, known, total = {}, 0, {}, 0, 0
+    if not (IsInGuild and IsInGuild() and GetNumGuildMembers) then return out, 0, zones, 0, 0 end
     filter = filter and filter ~= "" and filter:lower() or nil
     for i = 1, (GetNumGuildMembers() or 0) do
         local name, rank, _, level, _, zone, note, _, isOnline, _, class = GetGuildRosterInfo(i)
@@ -313,6 +338,10 @@ local function Roster(onlineOnly, filter, sort)
             local b0 = Board()[short]
             local classOk = not WLWritsDB.guildClass or WLWritsDB.guildClass == class
             local roleOk = HasRole(b0 and b0.spec, WLWritsDB.guildRole)
+            if hit and classOk and (isOnline or not onlineOnly) then
+                total = total + 1
+                if b0 and b0.spec then known = known + 1 end
+            end
             if hit and classOk and roleOk and (isOnline or not onlineOnly) then
                 local y, m, d, h = 0, 0, 0, 0
                 if not isOnline and GetGuildRosterLastOnline then y, m, d, h = GetGuildRosterLastOnline(i) end
@@ -342,7 +371,7 @@ local function Roster(onlineOnly, filter, sort)
         if a.level ~= b.level then return a.level > b.level end
         return a.name < b.name
     end)
-    return out, online, zones
+    return out, online, zones, known, total
 end
 WP.GuildRoster = function(onlineOnly) local list, online = Roster(onlineOnly); return list, online end
 
@@ -372,6 +401,7 @@ local function ClassColor(class)
 end
 local function Ago(hours)
     if hours >= 24 then return string.format(L("il y a %d j"), math.floor(hours / 24)) end
+    if hours < 1 then return L("il y a moins d'1 h") end
     return string.format(L("il y a %d h"), math.max(1, hours))
 end
 local function Professions(name)
@@ -411,21 +441,43 @@ local function MemberRow(parent)
     r.cls = r:CreateTexture(nil, "OVERLAY"); r.cls:SetSize(16, 16); r.cls:SetPoint("LEFT", 52, 0)
     r.cls:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
     r.logo = r:CreateTexture(nil, "OVERLAY"); r.logo:SetSize(14, 14); r.logo:SetTexture(S.LOGO); r.logo:SetPoint("LEFT", 72, 0)
+    -- the role of the spec shared by WL Helper (the game's role icons), just before the zone column
+    r.role = r:CreateTexture(nil, "OVERLAY"); r.role:SetSize(14, 14); r.role:SetPoint("LEFT", 198, 0)
+    r.role:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES")
     r.where = S.Text(r, 12, C.dim); r.where:SetPoint("LEFT", 216, 0); r.where:SetWidth(190); r.where:SetJustifyH("LEFT")
     r.rank = S.Text(r, 12, C.muted); r.rank:SetPoint("RIGHT", -10, 0); r.rank:SetWidth(110); r.rank:SetJustifyH("RIGHT")
+    -- Invite shows in place of the rank while the mouse is on an online member
+    r.inv = S.Button(r, L("Inviter"), 64, 20, "secondary", function()
+        local mm = r.m
+        if mm and mm.online then InviteName(mm.name); WP.Print(string.format(L("%s invité."), mm.name)) end
+    end)
+    r.inv:SetPoint("RIGHT", -6, 0); r.inv:Hide()
+    r.inv:HookScript("OnLeave", function()
+        if not r:IsMouseOver() then r.inv:Hide(); r.rank:Show(); r.hl:SetColorTexture(1, 1, 1, 0) end
+    end)
     r:SetScript("OnEnter", function(self)
         r.hl:SetColorTexture(1, 1, 1, 0.05)
         local m = self.m
         if not m then return end
-        local lines = { m.name, (m.level or "?") .. " · " .. (m.online and (m.zone or "") or Ago(m.away)) .. " · " .. (m.rank or "") }
+        if m.online and m.name ~= Me() then r.inv:Show(); r.rank:Hide() end
+        local cls = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[m.class]) or m.class or ""
+        local sp = SpecName(m.class, m.spec)
+        local lines = { m.name, (m.level or "?") .. " · " .. cls .. (sp and (" " .. sp) or "") .. " · "
+            .. (m.online and (m.zone or "") or Ago(m.away)) .. " · " .. (m.rank or "") }
         if m.note and m.note ~= "" then lines[#lines + 1] = string.format(L("Note : %s"), m.note) end
         local profs = Professions(m.name)
         if profs ~= "" then lines[#lines + 1] = string.format(L("Métiers : %s"), profs) end
         if self.addon then lines[#lines + 1] = L("a WL Helper") .. (self.ver and (" · v" .. self.ver) or "") end
-        if m.online and m.name ~= Me() then lines[#lines + 1] = S.Hex(C.brandSoft) .. L("Clic : chuchoter · clic droit ou Alt-clic : inviter") .. "|r" end
+        if m.online and m.name ~= Me() then lines[#lines + 1] = S.Hex(C.brandSoft) .. L("Clic : chuchoter · bouton Inviter à droite") .. "|r" end
         S.Tip(self, lines)
     end)
-    r:SetScript("OnLeave", function() r.hl:SetColorTexture(1, 1, 1, 0); S.HideTip() end)
+    r:SetScript("OnLeave", function()
+        S.HideTip()
+        -- moving onto the Invite button keeps it (and the highlight)
+        if r:IsMouseOver() then return end
+        r.hl:SetColorTexture(1, 1, 1, 0)
+        r.inv:Hide(); r.rank:Show()
+    end)
     r:SetScript("OnClick", function(self, button)
         local m = self.m
         if not (m and m.online) or m.name == Me() then return end
@@ -454,16 +506,61 @@ local function RenderMembers()
         b.edge(on and C.brand or C.border)
         b.bg:SetColorTexture((on and C.brandBg or C.card)[1], (on and C.brandBg or C.card)[2], (on and C.brandBg or C.card)[3], 1)
     end
-    local list, online, zones = Roster(WLWritsDB.guildOnline ~= false, ui.search and ui.search:GetText(), WLWritsDB.guildSort)
+    local searchText = ui.search and ui.search:GetText() or ""
+    local list, online, zones, known, total = Roster(WLWritsDB.guildOnline ~= false, searchText, WLWritsDB.guildSort)
     local all = IsInGuild() and GetNumGuildMembers() or 0
     ui.count:SetText(IsInGuild() and string.format(L("%d en ligne sur %d"), online, all) or L("Pas de guilde."))
-    -- the busiest zones right now
+    ui.clear:SetShown(WLWritsDB.guildClass ~= nil or WLWritsDB.guildRole ~= nil or searchText ~= "")
+    ui.role:Update()
+    -- a role filter only knows the members who share their spec: say how many, in place of the zones
+    local roleOn = WLWritsDB.guildRole ~= nil
+    ui.roleInfo:SetShown(roleOn)
+    if roleOn then
+        ui.roleInfo:SetText(string.format(L("Rôle connu pour %d membres sur %d : ceux qui ont WL Helper et ont choisi leur spé."), known or 0, total or 0))
+    end
+    -- the busiest zones right now, as chips: a click shows only that zone (through the search)
     local z = {}
     for name, n in pairs(zones) do z[#z + 1] = { name, n } end
     table.sort(z, function(a, b) if a[2] ~= b[2] then return a[2] > b[2] end return a[1] < b[1] end)
-    local parts = {}
-    for i = 1, math.min(4, #z) do parts[#parts + 1] = z[i][1] .. " " .. S.Hex(C.text) .. z[i][2] .. "|r" end
-    ui.zones:SetText(#parts > 0 and string.format(L("Où est la guilde : %s"), table.concat(parts, "  ·  ")) or "")
+    local showZones = #z > 0 and not roleOn
+    ui.zonesLabel:SetShown(showZones)
+    local zx = PAD + (ui.zonesLabel:GetStringWidth() or 0) + 8
+    local stop = not showZones
+    for i = 1, 4 do
+        local c = ui.zoneChips[i]
+        if not stop and z[i] then
+            if not c then
+                c = CreateFrame("Button", nil, pages.members)
+                c:SetHeight(20)
+                c.bg = S.Solid(c, "BACKGROUND", C.card); c.bg:SetAllPoints()
+                c.edge = S.Border(c, C.border)
+                c.label = S.Text(c, 12, C.text); c.label:SetPoint("CENTER")
+                c:SetScript("OnClick", function(self)
+                    if ui.search:GetText() == self.zone then ui.search:SetText("") else ui.search:SetText(self.zone) end
+                end)
+                c:SetScript("OnEnter", function(self) S.Tip(self, { L("Clic : ne montrer que les membres dans cette zone") }) end)
+                c:SetScript("OnLeave", S.HideTip)
+                ui.zoneChips[i] = c
+            end
+            c.zone = z[i][1]
+            c.label:SetText(z[i][1] .. " " .. z[i][2])
+            local w = (c.label:GetStringWidth() or 0) + 16
+            if zx + w > W - PAD then
+                stop = true   -- no room left on the line: this chip and the next ones stay hidden
+                c:Hide()
+            else
+                c:SetWidth(w)
+                c:ClearAllPoints(); c:SetPoint("TOPLEFT", zx, -110)
+                local on = searchText == c.zone
+                c.edge(on and C.brand or C.border)
+                c.bg:SetColorTexture((on and C.brandBg or C.card)[1], (on and C.brandBg or C.card)[2], (on and C.brandBg or C.card)[3], 1)
+                c:Show()
+                zx = zx + w + 6
+            end
+        elseif c then
+            c:Hide()
+        end
+    end
     local board = Board()
     for i, m in ipairs(list) do
         local r = ui.members.Get(i)
@@ -478,9 +575,17 @@ local function RenderMembers()
         local tc = CLASS_ICON_TCOORDS and m.class and CLASS_ICON_TCOORDS[m.class]
         if tc then r.cls:SetTexCoord(tc[1], tc[2], tc[3], tc[4]); r.cls:Show() else r.cls:Hide() end
         r.name:ClearAllPoints(); r.name:SetPoint("LEFT", r.addon and 90 or 72, 0)
-        r.name:SetWidth(r.addon and 124 or 142)   -- ends before the zone column (216) either way
-        local sp = SpecName(m.class, m.spec)
-        r.name:SetText(m.name .. (sp and ("  " .. S.Hex(C.muted) .. sp .. "|r") or ""))
+        r.name:SetWidth(r.addon and 104 or 122)   -- ends before the role icon (198) either way
+        r.name:SetText(m.name)
+        -- the role icon of the shared spec (a feral druid shows as tank, its first role)
+        if m.spec then
+            local ro = (ROLE_OF[m.spec] or "dps"):match("^(%a+)")
+            local tc = ROLE_TC[ro] or ROLE_TC.dps
+            r.role:SetTexCoord(tc[1], tc[2], tc[3], tc[4]); r.role:Show()
+        else
+            r.role:Hide()
+        end
+        r.inv:Hide(); r.rank:Show()
         r.name:SetTextColor(col[1], col[2], col[3], m.online and 1 or 0.55)
         r.lvl:SetText(m.level)
         r.dot:SetColorTexture(m.online and C.ready[1] or 0.3, m.online and C.ready[2] or 0.32, m.online and C.ready[3] or 0.35, 1)
@@ -490,6 +595,7 @@ local function RenderMembers()
     ui.members.HideFrom(#list + 1)
     ui.members.content:SetHeight(math.max(10, #list * 30))
     ui.noMatch:SetShown(#list == 0 and IsInGuild())
+    ui.noMatch:SetText(roleOn and L("Aucun membre connu avec ce rôle. Enlève le filtre pour voir tout le monde.") or L("Aucun membre ne correspond."))
 end
 
 local function RenderPvP()
@@ -594,9 +700,32 @@ local function Build()
         function() return WLWritsDB.guildRole or "all" end,
         function(v) WLWritsDB.guildRole = v ~= "all" and v or nil; WP.RefreshGuild() end, 26)
     ui.role:SetPoint("TOPRIGHT", -PAD, -77)
-    ui.zones = S.Text(m, 12, C.dim); ui.zones:SetPoint("TOPLEFT", PAD, -112); ui.zones:SetPoint("RIGHT", -PAD, 0)
-    ui.zones:SetJustifyH("LEFT"); ui.zones:SetWordWrap(false)
-    ui.members = List(m, -132, PAD, MemberRow, 30)
+    -- the role segments are icons: their names on hover (S.Segmented's only child frames are its buttons)
+    local roleNames = { L("Tous"), L("Tank"), L("Soins"), L("DPS") }
+    for i, b in ipairs({ ui.role:GetChildren() }) do
+        b:SetScript("OnEnter", function(self) S.Tip(self, { roleNames[i] }) end)
+        b:SetScript("OnLeave", S.HideTip)
+    end
+    -- one click to see everyone again
+    ui.clear = S.Button(m, "x", 24, 24, "secondary", function()
+        WLWritsDB.guildClass = nil; WLWritsDB.guildRole = nil
+        ui.search:SetText("")
+        ui.role:Update()
+        WP.RefreshGuild()
+    end, { L("Enlever tous les filtres") })
+    ui.clear:SetPoint("TOPLEFT", PAD + 10 * 27 + 6, -78)
+    -- where the guild is: the busiest zones as chips (built in RenderMembers)
+    ui.zonesLabel = S.Text(m, 12, C.dim); ui.zonesLabel:SetPoint("TOPLEFT", PAD, -112); ui.zonesLabel:SetText(L("Où est la guilde :"))
+    ui.zoneChips = {}
+    ui.roleInfo = S.Text(m, 12, C.warn); ui.roleInfo:SetPoint("TOPLEFT", PAD, -112); ui.roleInfo:SetPoint("RIGHT", -PAD, 0)
+    ui.roleInfo:SetJustifyH("LEFT"); ui.roleInfo:SetWordWrap(false); ui.roleInfo:Hide()
+    -- column headers over the list
+    local function Head(text, x, right)
+        local h = S.Text(m, 11, C.muted); h:SetText(text)
+        if right then h:SetPoint("TOPRIGHT", x, -134) else h:SetPoint("TOPLEFT", x, -134) end
+    end
+    Head(L("Niv."), PAD + 22); Head(L("Nom"), PAD + 72); Head(L("Zone ou dernière connexion"), PAD + 216); Head(L("Rang"), -PAD - 10, true)
+    ui.members = List(m, -150, PAD, MemberRow, 30)
     ui.noMatch = S.Text(ui.members.content, 13, C.dim); ui.noMatch:SetPoint("TOPLEFT", 2, -8); ui.noMatch:SetText(L("Aucun membre ne correspond."))
     -- pvp
     local p = pages.pvp
@@ -605,12 +734,12 @@ local function Build()
     local seg = S.Segmented(p, { { "week", L("Cette semaine") }, { "season", L("Saison") }, { "all", L("Depuis toujours") } },
         function() return WLWritsDB.guildRankMode or "week" end, function(v) WLWritsDB.guildRankMode = v; WP.RefreshGuild() end, 26)
     seg:SetPoint("TOPRIGHT", -PAD, -38)
-    local note = S.Text(p, 12, C.muted); note:SetPoint("BOTTOMLEFT", PAD, 12); note:SetPoint("RIGHT", -PAD, 0)
+    local note = S.Text(p, 12, C.muted); note:SetPoint("BOTTOMLEFT", PAD, 18); note:SetPoint("RIGHT", -PAD, 0)
     note:SetJustifyH("LEFT"); note:SetWordWrap(true)
-    note:SetText(L("Victoires honorables comptées par le jeu, champs de bataille compris. Une saison dure un mois. Seuls les membres qui ont WL Helper apparaissent ; leurs chiffres arrivent quand ils se connectent."))
-    ui.past = S.Text(p, 12, C.warn); ui.past:SetPoint("BOTTOMLEFT", PAD, 52); ui.past:SetPoint("RIGHT", -PAD, 0)
+    note:SetText(L("Victoires honorables du jeu, champs de bataille compris. Saison d'un mois. Seuls les membres avec WL Helper apparaissent."))
+    ui.past = S.Text(p, 12, C.warn); ui.past:SetPoint("BOTTOMLEFT", PAD, 60); ui.past:SetPoint("RIGHT", -PAD, 0)
     ui.past:SetJustifyH("LEFT"); ui.past:SetWordWrap(false)
-    ui.rank = List(p, -74, 76, RankRow, 38)
+    ui.rank = List(p, -74, 84, RankRow, 38)
     ui.none = S.Text(ui.rank.content, 13, C.dim); ui.none:SetPoint("TOPLEFT", 2, -8)
     win:SetScript("OnShow", function()
         if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster) elseif GuildRoster then pcall(GuildRoster) end
