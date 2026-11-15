@@ -6,6 +6,29 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.8] — 2026-11-15
+
+### Corrigé / Fixed
+- **Nettoyeur de sacs : il pouvait faire perdre une quête.** Un objet d'une quête propre à Forever (absente de LibForeverData) était classé « aucune quête ne le demande », et le jeu abandonne une quête dont on détruit l'objet. Désormais le nettoyeur ne détruit que ce qu'il peut prouver inutile : un objet lié à des quêtes que tu as toutes rendues. Le reste est seulement listé, « à détruire à la main ». Il lit aussi le texte complet de chaque quête du journal pour y repérer les objets.
+  *Bag cleaner could make you lose a quest: it now only destroys items tied to quests you turned in; anything unproven is listed only.*
+- Nettoyeur : un objet détruit par clic (le jeu n'en accepte qu'un) ; le bouton dit combien il en reste.
+  *One item per click; the button says how many are left.*
+
+### Modifié / Changed
+- **Favor** : le plan montre les caisses puis, sur sa propre ligne, le lot à acheter (« 60× Silver Bar ») avec les autres lots possibles (« ou 120× Iron Bar ») ; un clic achète ce que la ligne montre. Noms raccourcis (« Journeyman Ingots »), lignes qui ne se chevauchent plus.
+  *Favor plan: crates and their bundle on separate clickable rows, with the other bundles; shorter names, no overlapping text.*
+- **Scan de l'HV** : une barre de progression sous les onglets du Comptoir et « Scan 12 / 48 », sur tous les onglets.
+  *AH scan progress bar under the Trading Post tabs.*
+- En-tête du Comptoir allégé (le titre seul).
+- **Prix réels à l'HV** : avec l'hôtel des ventes ouvert, le plan de Favor lit toutes les offres de chaque caisse et de chaque composant (offre par offre, du moins cher au plus cher) et calcule le vrai coût pour la quantité voulue ; il dit quand il n'y en a pas assez en vente. Sans l'HV, le prix est marqué « ~ estimé ».
+  *Real AH prices: with the auction house open, the Favor plan reads every listing and computes the true cost.*
+- **Lots mélangés** : un lot par caisse, mais les caisses peuvent prendre des lots différents ; le plan choisit caisse par caisse le moins cher (il passe aux Iron Bar quand les Silver Bar bon marché sont épuisés).
+  *Bundles mixed across crates, crate by crate, cheapest first.*
+- **La banque compte** : ce que tu as en banque n'est plus à racheter (liste d'achat, writs, Favor) ; la liste dit « 2 en banque ».
+  *Your bank counts: items in the bank are not bought again.*
+- Le guide ne s'ouvre plus jamais tout seul à la connexion ou au /reload : `/wl`, l'accueil ou la minimap l'ouvrent.
+  *The guide never opens by itself at login or /reload.*
+
 ## [1.0.0-beta.7] — 2026-11-15
 
 ### Ajouté / Added
@@ -179,7 +202,8 @@ Première version de WL Helper (bêta). WL Dungeon Guide devient **WL Helper**.
 WL Dungeon Guide jusqu'à la 3.3 : guide des quêtes de donjon Horde pas à pas (versions partagées
 à la main, avant ce dépôt).
 
-[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.7...HEAD
+[Unreleased]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.8...HEAD
+[1.0.0-beta.8]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.7...v1.0.0-beta.8
 [1.0.0-beta.7]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.6...v1.0.0-beta.7
 [1.0.0-beta.6]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.5...v1.0.0-beta.6
 [1.0.0-beta.5]: https://github.com/WarLegenDHelper/WLHelper/compare/v1.0.0-beta.4...v1.0.0-beta.5

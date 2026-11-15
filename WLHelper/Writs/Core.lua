@@ -77,6 +77,12 @@ local GetItemCountFn = (C_Item and C_Item.GetItemCount) or GetItemCount
 local function BagCount(id)
     return safe(GetItemCountFn, id) or 0
 end
+-- Bags and bank (the game knows the bank once you opened it, like Naowh's counts): what you own.
+local function OwnedCount(id)
+    return safe(GetItemCountFn, id, true) or BagCount(id)
+end
+function WP.OwnedCount(id) return OwnedCount(id) end
+function WP.InBank(id) return math.max(0, OwnedCount(id) - BagCount(id)) end
 
 local nameCache = {}
 function WP.ItemName(id, fallback)
@@ -294,7 +300,7 @@ function WP.Rows()
     end)
     for _, r in ipairs(byOrder) do
         local id, n = r.w.item, r.w.count or 1
-        if avail[id] == nil then avail[id] = BagCount(id) end
+        if avail[id] == nil then avail[id] = OwnedCount(id) end   -- the bank counts: no need to buy it again
         if r.state == "done" then
             r.ownItem = false
         elseif avail[id] >= n then
@@ -506,6 +512,8 @@ function WP.ShoppingList(rows)
     for _, r in ipairs(rows) do
         local w = r.w
         local onRoute = w.map and not r.tooHigh
+        -- an envelope waiting in the bank is not bought again
+        if r.inPlan and not r.ownWrit and WP.InBank(w.writ) > 0 then r.ownWrit = true end
         if r.inPlan then
             local group = (r.zone or "") .. WP.ItemName(w.item, w.itemName)
             if not r.ownWrit then add(w.writ, w.writName, r.writPrice, r.writSrc, r.writAge, "writ", group, 1, 1, r.zone, w.map) end
@@ -517,7 +525,8 @@ function WP.ShoppingList(rows)
     end
     local total = 0
     for _, e in ipairs(list) do
-        e.have = BagCount(e.id)
+        e.have = OwnedCount(e.id)
+        e.bank = WP.InBank(e.id)
         local _, listed, ago = WP.Scan.Get(e.id)
         e.listed = ago and ago < SCAN_FRESH and listed or nil
         e.done = e.have >= e.need

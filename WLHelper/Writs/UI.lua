@@ -476,7 +476,10 @@ local function RenderShop()
             SetColor(r.name, e.isWrit and C.text or S.QualityColor(e.id))
             local leftN = e.need - e.have
             if e.done then
-                r:SetAlpha(0.4); r.price:SetText(L("dans tes sacs")); SetColor(r.price, C.dim)
+                local inBank = math.min(e.bank or 0, e.need)
+                r:SetAlpha(inBank > 0 and 0.8 or 0.4)
+                if inBank > 0 then r.price:SetText(string.format(L("%d en banque"), inBank)); SetColor(r.price, C.info)
+                else r.price:SetText(L("dans tes sacs")); SetColor(r.price, C.dim) end
             else
                 r:SetAlpha(1)
                 if e.src == "Absent" then r.price:SetText(L("absent")); SetColor(r.price, C.danger)
@@ -725,6 +728,15 @@ local function Build()
             return n
         end)
     tabs:SetPoint("TOPLEFT", 1, -39); tabs:SetPoint("TOPRIGHT", -1, -39)
+    -- an auction house scan in progress, whatever the tab: a thin bar under the tabs and "12 / 48"
+    frame.scanBar = CreateFrame("Frame", nil, frame)
+    frame.scanBar:SetPoint("TOPLEFT", 1, -75); frame.scanBar:SetPoint("TOPRIGHT", -1, -75); frame.scanBar:SetHeight(2)
+    S.Solid(frame.scanBar, "BACKGROUND", C.divider):SetAllPoints()
+    frame.scanFill = S.Solid(frame.scanBar, "ARTWORK", C.ready)
+    frame.scanFill:SetPoint("TOPLEFT"); frame.scanFill:SetPoint("BOTTOMLEFT")
+    frame.scanText = S.Text(frame, 12, C.ready)
+    frame.scanText:SetPoint("RIGHT", frame, "TOPRIGHT", -12, -57)
+    frame.scanBar:Hide()
     for _, key in ipairs({ "today", "shop", "all", "favor" }) do
         local p = CreateFrame("Frame", nil, frame)
         p:SetPoint("TOPLEFT", 0, -76); p:SetPoint("BOTTOMRIGHT")
@@ -759,7 +771,7 @@ function WP.Refresh()
     if not frame or not frame:IsShown() then return end
     craftable = nil
     local name = WP.Reputation()
-    frame.subtitle:SetText(name or "")
+    frame.subtitle:SetText("")
     data = WP.Rows()
     for _, r in ipairs(data) do r.inPlan = nil end
     plan, need, pending, readyRep = WP.Plan(data)
@@ -770,6 +782,7 @@ function WP.Refresh()
     elseif current == "shop" then RenderShop()
     elseif current == "favor" then if WP.RenderFavor then WP.RenderFavor() end
     else RenderAll() end
+    WP.PaintScan()
     -- once the new layout has its sizes
     C_Timer.After(0, PlaceEnvelopes)
 end
@@ -781,7 +794,20 @@ function WP.RefreshSoon(delay)
     C_Timer.After(delay or 1, function() queued = false; if not InCombatLockdown() then WP.Refresh() end end)
 end
 
+function WP.PaintScan()
+    if not frame then return end
+    local done, tot = WP.Scan and WP.Scan.Progress()
+    if done and tot and tot > 0 then
+        frame.scanBar:Show()
+        frame.scanFill:SetWidth(math.max(1, (W - 2) * done / tot))
+        frame.scanText:SetText(string.format(L("Scan %d / %d"), done, tot))
+    else
+        frame.scanBar:Hide(); frame.scanText:SetText("")
+    end
+end
+
 function WP.OnScanProgress()
+    WP.PaintScan()
     if frame and frame:IsShown() then WP.RefreshSoon(0.3) end
 end
 

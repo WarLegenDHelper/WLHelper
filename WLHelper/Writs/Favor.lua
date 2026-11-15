@@ -21,9 +21,13 @@ ns.AddEnglish({
     ["Objectif"] = "Goal",
     ["Il te manque %s Favor."] = "You need %s more Favor.",
     ["Objectif atteint : tu as déjà assez de Favor."] = "Goal reached: you already have enough Favor.",
-    ["%d caisses · %s · %s par Favor"] = "%d crates · %s · %s per Favor",
+    ["%d caisses · %s · %s la Favor"] = "%d crates · %s · %s per Favor",
+    [" la Favor"] = " per Favor",
+    ["~%d Favor"] = "~%d Favor",
+    ["Scan %d / %d · clic pour arrêter"] = "Scan %d / %d · click to stop",
     ["Le plan, de la moins chère"] = "The plan, cheapest first",
     ["Toutes les caisses, par prix de la Favor"] = "Every crate, by price per Favor",
+    ["Caisses : ~ veut dire une Favor estimée, confirmée à ta première remise."] = "Crates: ~ means an estimated Favor, confirmed at your first hand-in.",
     ["Ce planificateur a besoin de Naowh Forever.\nC'est lui qui connaît les lots de chaque caisse : active-le."] =
         "This planner needs Naowh Forever.\nIt knows each crate's bundles: turn it on.",
     ["Scanner les prix (HV)"] = "Scan prices (AH)",
@@ -33,6 +37,17 @@ ns.AddEnglish({
     ["Favor inconnue : rends-en une pour l'apprendre"] = "Favor unknown: hand one in to learn it",
     ["prix inconnu : scanne l'HV"] = "price unknown: scan the AH",
     ["Clic : acheter la caisse · Maj-clic : le lot"] = "Click: buy the crate · Shift-click: the bundle",
+    ["Clic : acheter les caisses à l'HV"] = "Click: buy the crates at the AH",
+    ["%d Favor · à remplir avec %d× %s chacune"] = "%d Favor · fill each with %d× %s",
+    ["tu en as %d"] = "you have %d",
+    ["%d Favor · un lot par caisse : %s"] = "%d Favor · one bundle per crate: %s",
+    ["pour %d caisses"] = "for %d crates",
+    ["Prix réels de l'HV, offre par offre."] = "Real AH prices, listing by listing.",
+    ["Prix réels de l'HV, mais pas assez en vente pour tout."] = "Real AH prices, but not enough for sale for all of it.",
+    ["~ prix estimé : ouvre l'HV pour le prix réel, offre par offre."] = "~ estimated: open the AH for the real price, listing by listing.",
+    ["(dont %d en banque)"] = "(%d in the bank)",
+    ["ou "] = "or ",
+    [" ou "] = " or ",
     ["Clic : l'acheter à l'HV"] = "Click: buy it at the AH",
     ["à acheter : %d"] = "to buy: %d",
     ["dans tes sacs : %d"] = "in your bags: %d",
@@ -62,8 +77,10 @@ local function Bundles()
     return type(t) == "table" and t or nil
 end
 
+-- Bags and bank: what is in the bank does not need to be bought.
 local function Count(id)
-    return safe(C_Item and C_Item.GetItemCount, id) or safe(GetItemCount, id) or 0
+    if WP.OwnedCount then return WP.OwnedCount(id) end
+    return safe(C_Item and C_Item.GetItemCount, id, true) or safe(GetItemCount, id, true) or 0
 end
 
 local function ItemLevel(id)
@@ -137,12 +154,57 @@ function WP.FavorPlan(missing, rows)
             if WP.Scan and WP.Scan.Get then _, listed, ago = WP.Scan.Get(r.id) end
             if listed and ago and ago < 3600 then n = math.min(n, r.haveCrate + listed) end
             if n > 0 then
-            local crates = math.max(0, n - r.haveCrate)
-            local mats = math.max(0, r.bundle.qty * n - Count(r.bundle.item))
-            local cost = crates * (r.cratePrice or 0) + mats * r.bundle.unit
-            plan[#plan + 1] = { row = r, n = n, crates = crates, mats = mats, cost = cost }
-            total = total + cost
-            favor = favor + n * r.favor
+                local crates = math.max(0, n - r.haveCrate)
+                -- the real price when the listings were read (Ladder.lua), else the lowest price x n
+                local crateCost, crateAll = WP.CostFor and WP.CostFor(r.id, crates)
+                local exact = crateCost ~= nil
+                crateCost = crateCost or crates * (r.cratePrice or 0)
+                -- Each crate takes ONE bundle, but crates may use different ones: crate by crate, the
+                -- bundle whose next units cost least (what you own is free; the real listings when read).
+                local opts = {}
+                for _, b in ipairs(r.bundles or {}) do
+                    opts[#opts + 1] = { item = b[1], qty = b[2], owned = Count(b[1]), taken = 0, crates = 0 }
+                end
+                local function upto(o, units)   -- cost of having `units` of this material
+                    local buy = math.max(0, units - o.owned)
+                    local c, all = nil, true
+                    if WP.CostFor then c, all = WP.CostFor(o.item, buy) end
+                    if c then return c, true, all end
+                    local unit = WP.Price(o.item)
+                    if unit then return unit * buy, false, true end
+                end
+                local matCost, matExact, matAll, ok = 0, true, true, true
+                for _ = 1, n do
+                    local best, bestStep
+                    for _, o in ipairs(opts) do
+                        local before = upto(o, o.taken)
+                        local after = upto(o, o.taken + o.qty)
+                        if before and after and (not best or after - before < bestStep) then best, bestStep = o, after - before end
+                    end
+                    if not best then ok = false; break end
+                    best.taken, best.crates = best.taken + best.qty, best.crates + 1
+                end
+                local used = {}
+                if ok then
+                    for _, o in ipairs(opts) do
+                        if o.crates > 0 then
+                            local c, ex, all = upto(o, o.taken)
+                            o.cost, o.buy = c, math.max(0, o.taken - o.owned)
+                            matCost = matCost + c
+                            matExact = matExact and ex
+                            matAll = matAll and all
+                            used[#used + 1] = o
+                        end
+                    end
+                end
+                if ok and #used > 0 then
+                    local cost = crateCost + matCost
+                    plan[#plan + 1] = { row = r, n = n, crates = crates, used = used, opts = opts,
+                        crateCost = crateCost, matCost = matCost, cost = cost,
+                        exact = exact and matExact, short = crateAll == false or not matAll }
+                    total = total + cost
+                    favor = favor + n * r.favor
+                end
             end
         end
     end
@@ -213,7 +275,13 @@ ev:SetScript("OnEvent", function(_, e)
 end)
 
 -- ---------------------------------------------------------------- the tab
-local W, PAD, ROW = 400, 14, 40
+local W, PAD, ROW = 400, 14, 44
+
+-- "Waylaid Crate: Journeyman Ingots" -> "Journeyman Ingots" (the header already says crates)
+local function CrateName(id)
+    local n = WP.ItemName(id)
+    return (n:match("^[^:]+:%s*(.+)$")) or n
+end
 local ui = {}
 
 local function Pool(parent, make)
@@ -232,18 +300,20 @@ local function MakeRow(parent)
     S.Solid(r, "HIGHLIGHT", { 1, 1, 1 }, 0.05):SetAllPoints()
     r.icon = r:CreateTexture(nil, "ARTWORK")
     r.icon:SetSize(20, 20); r.icon:SetPoint("LEFT", 10, 0); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    r.name = S.Text(r, 14, C.text)
-    r.name:SetPoint("TOPLEFT", 40, -5); r.name:SetPoint("RIGHT", -96, 0); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
-    r.sub = S.Text(r, 12, C.dim)
-    r.sub:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -3); r.sub:SetPoint("RIGHT", -96, 0); r.sub:SetJustifyH("LEFT"); r.sub:SetWordWrap(false)
-    r.cost = S.Text(r, 13, C.text)
+    r.cost = S.Text(r, 14, C.text)
     r.cost:SetPoint("TOPRIGHT", -10, -6); r.cost:SetJustifyH("RIGHT")
     r.per = S.Text(r, 12, C.dim)
-    r.per:SetPoint("TOPRIGHT", r.cost, "BOTTOMRIGHT", 0, -3); r.per:SetJustifyH("RIGHT")
+    r.per:SetPoint("BOTTOMRIGHT", -10, 6); r.per:SetJustifyH("RIGHT")
+    r.name = S.Text(r, 14, C.text)
+    r.name:SetPoint("TOPLEFT", 40, -6); r.name:SetPoint("RIGHT", r.cost, "LEFT", -8, 0)
+    r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
+    r.sub = S.Text(r, 12, C.dim)
+    r.sub:SetPoint("BOTTOMLEFT", 40, 6); r.sub:SetPoint("RIGHT", r.per, "LEFT", -8, 0)
+    r.sub:SetJustifyH("LEFT"); r.sub:SetWordWrap(false)
     r:SetScript("OnClick", function(self)
         local e = self.entry
         if not e or not WP.Scan then return end
-        if IsShiftKeyDown() and e.row.bundle then WP.Scan.OpenToBuy(e.row.bundle.item, math.max(1, e.mats or e.row.bundle.qty))
+        if e.mat then WP.Scan.OpenToBuy(e.mat, math.max(1, e.buy or 1))
         else WP.Scan.OpenToBuy(e.row.id, math.max(1, e.crates or 1)) end
     end)
     r:SetScript("OnEnter", function(self)
@@ -258,7 +328,7 @@ local function MakeRow(parent)
             lines[#lines + 1] = { b[2] .. "× " .. WP.ItemName(b[1]) .. "  " .. (p and S.Money(p * b[2]) or "?"),
                 (row.bundle and row.bundle.item == b[1]) and 1 or 0.7, (row.bundle and row.bundle.item == b[1]) and 1 or 0.7, (row.bundle and row.bundle.item == b[1]) and 1 or 0.7 }
         end
-        lines[#lines + 1] = { L("Clic : acheter la caisse · Maj-clic : le lot"), 0.6, 0.6, 0.6 }
+        lines[#lines + 1] = { e.mat and L("Clic : l'acheter à l'HV") or L("Clic : acheter les caisses à l'HV"), 0.6, 0.6, 0.6 }
         S.Tip(self, lines)
     end)
     r:SetScript("OnLeave", S.HideTip)
@@ -294,7 +364,7 @@ function WP.BuildFavor(p)
     ui.summary:SetJustifyH("LEFT"); ui.summary:SetWordWrap(true)
 
     local sf = CreateFrame("ScrollFrame", nil, p)
-    sf:SetPoint("TOPLEFT", PAD, -86); sf:SetPoint("BOTTOMRIGHT", -PAD, 62)
+    sf:SetPoint("TOPLEFT", PAD, -108); sf:SetPoint("BOTTOMRIGHT", -PAD, 62)
     local content = CreateFrame("Frame", nil, sf); content:SetSize(W - 2 * PAD, 10); sf:SetScrollChild(content)
     sf:EnableMouseWheel(true)
     sf:SetScript("OnMouseWheel", function(self, d)
@@ -316,6 +386,13 @@ function WP.BuildFavor(p)
         return WP.AuctionHouseOpen() and { L("Scanner les prix (HV)") } or { L("Ouvre l'hôtel des ventes pour scanner") }
     end)
     ui.scan:SetPoint("LEFT", PAD, 0)
+    ui.bar = CreateFrame("Frame", nil, foot)
+    ui.bar:SetPoint("BOTTOMLEFT", ui.scan, "TOPLEFT", 0, 4); ui.bar:SetPoint("BOTTOMRIGHT", ui.scan, "TOPRIGHT", 0, 4)
+    ui.bar:SetHeight(3)
+    S.Solid(ui.bar, "BACKGROUND", C.divider):SetAllPoints()
+    ui.barFill = S.Solid(ui.bar, "ARTWORK", C.ready)
+    ui.barFill:SetPoint("TOPLEFT"); ui.barFill:SetPoint("BOTTOMLEFT")
+    ui.bar:Hide()
 end
 
 function WP.RenderFavor()
@@ -337,6 +414,18 @@ function WP.RenderFavor()
     ui.missing:Hide()
     local missing = math.max(0, goal - (now or 0))
     local plan, total, got = WP.FavorPlan(missing, rows)
+    local exact, short = #plan > 0, false
+    for _, e in ipairs(plan) do exact = exact and e.exact; short = short or e.short end
+    -- at the auction house, the plan's items get their real prices (once each per 10 min)
+    if #plan > 0 and not exact and WP.AuctionHouseOpen() and WP.LadderFetch and not WP.LadderBusy()
+        and not (WP.Scan and WP.Scan.Busy()) then
+        local ids = {}
+        for _, e in ipairs(plan) do
+            ids[#ids + 1] = e.row.id
+            for _, b in ipairs(e.row.bundles or {}) do ids[#ids + 1] = b[1] end
+        end
+        WP.LadderFetch(ids, function() if WP.RefreshSoon then WP.RefreshSoon(0.2) end end)
+    end
     if goal <= 0 then
         ui.summary:SetText("")
     elseif missing <= 0 then
@@ -344,8 +433,10 @@ function WP.RenderFavor()
     else
         local crates = 0
         for _, e in ipairs(plan) do crates = crates + e.n end
-        ui.summary:SetText(string.format(L("Il te manque %s Favor."), missing) .. "  " ..
-            string.format(L("%d caisses · %s · %s par Favor"), crates, S.Money(total), S.Money(got > 0 and math.floor(total / got) or 0)))
+        ui.summary:SetText(string.format(L("Il te manque %s Favor."), missing) .. "\n" ..
+            string.format(L("%d caisses · %s · %s la Favor"), crates, (exact and "" or "~") .. S.Money(total), S.Money(got > 0 and math.floor(total / got) or 0))
+            .. "\n" .. (exact and (short and L("Prix réels de l'HV, mais pas assez en vente pour tout.") or L("Prix réels de l'HV, offre par offre."))
+                or L("~ prix estimé : ouvre l'HV pour le prix réel, offre par offre.")))
     end
     local function head(text)
         hi = hi + 1
@@ -357,21 +448,36 @@ function WP.RenderFavor()
         ri = ri + 1
         local r = ui.rows.Get(ri)
         r.entry = e
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
         local rr = e.row
-        r.icon:SetTexture(S.ItemIcon(rr.id))
-        r.name:SetText((e.n and (e.n .. "× ") or "") .. WP.ItemName(rr.id))
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", e.mat and 22 or 0, -y); r:SetPoint("RIGHT", ui.content, "RIGHT", 0, 0)
+        r.icon:SetTexture(S.ItemIcon(e.mat or rr.id))
+        if e.mat then
+            r.name:SetText(string.format("%d× %s", e.total, WP.ItemName(e.mat)))
+            r.per:SetText("")
+        else
+            r.name:SetText((e.n and (e.n .. "× ") or "") .. CrateName(rr.id))
+            r.per:SetText(rr.per and (S.Money(math.floor(rr.per)) .. L(" la Favor")) or "")
+        end
         r.sub:SetText(sub)
         r.cost:SetText(cost and S.Money(cost) or "?")
-        r.per:SetText(rr.per and (S.Money(math.floor(rr.per)) .. " " .. L("par Favor")) or "")
-        y = y + ROW + 6
+        y = y + ROW + (e.mat and 10 or 4)
     end
     if #plan > 0 then
         head(L("Le plan, de la moins chère"))
         for _, e in ipairs(plan) do
-            local b = e.row.bundle
-            row(e, e.cost, string.format("%d× %s · %s", b.qty * e.n, WP.ItemName(b.item),
-                string.format(L("%d Favor"), e.n * e.row.favor)))
+            local r = e.row
+            local alts = {}
+            for _, o in ipairs(r.bundles or {}) do alts[#alts + 1] = string.format("%d× %s", o[2], WP.ItemName(o[1])) end
+            row(e, e.crateCost, string.format(L("%d Favor · un lot par caisse : %s"), e.n * r.favor, table.concat(alts, L(" ou "))))
+            for _, o in ipairs(e.used) do
+                local bank = WP.InBank and WP.InBank(o.item) or 0
+                local sub = string.format(L("pour %d caisses"), o.crates)
+                if o.owned > 0 then
+                    sub = sub .. " · " .. string.format(L("tu en as %d"), o.owned)
+                        .. (bank > 0 and (" " .. string.format(L("(dont %d en banque)"), bank)) or "")
+                end
+                row({ row = r, mat = o.item, total = o.taken, buy = o.buy }, o.cost, sub)
+            end
         end
     end
     head(L("Toutes les caisses, par prix de la Favor"))
@@ -381,11 +487,20 @@ function WP.RenderFavor()
         elseif not r.per then sub = L("prix inconnu : scanne l'HV")
         else
             sub = string.format("%d× %s · %s", r.bundle.qty, WP.ItemName(r.bundle.item),
-                r.sure and string.format(L("%d Favor"), r.favor) or string.format(L("~%d Favor (à confirmer)"), r.favor))
+                r.sure and string.format(L("%d Favor"), r.favor) or string.format(L("~%d Favor"), r.favor))
         end
         row({ row = r }, r.total, sub)
     end
     ui.content:SetHeight(math.max(10, y))
     local busy = WP.Scan and WP.Scan.Busy()
     ui.scan:SetEnabled(busy or WP.AuctionHouseOpen())
+    local done, tot = WP.Scan and WP.Scan.Progress()
+    if done and tot and tot > 0 then
+        ui.scan.label:SetText(string.format(L("Scan %d / %d · clic pour arrêter"), done, tot))
+        ui.bar:Show()
+        ui.barFill:SetWidth(math.max(1, (W - 2 * PAD) * done / tot))
+    else
+        ui.scan.label:SetText(WP.AuctionHouseOpen() and L("Scanner les prix (HV)") or L("Ouvre l'hôtel des ventes pour scanner"))
+        ui.bar:Hide()
+    end
 end

@@ -25,6 +25,13 @@ ns.AddEnglish({
     ["Rien à jeter : tes sacs sont propres."] = "Nothing to throw away: your bags are clean.",
     ["impossible en combat."] = "not possible in combat.",
     ["%d pile(s) détruite(s)."] = "%d stack(s) destroyed.",
+    ["%s détruit."] = "%s destroyed.",
+    ["Coche ce que tu veux détruire"] = "Tick what you want to destroy",
+    ["Détruire le suivant (%d cochés)"] = "Destroy the next one (%d ticked)",
+    ["Une quête de ton journal est inconnue des données : à détruire à la main"] =
+        "A quest in your log is unknown to the data: destroy it by hand",
+    ["Aucune quête rendue ne le relie : à détruire à la main si tu es sûr"] =
+        "No turned-in quest ties it: destroy it by hand if you are sure",
     ["À garder : invoque Gahz'rilla au gong de Zul'Farrak (quête « Gahz'rilla »)"] =
         "Keep it: summons Gahz'rilla at the gong in Zul'Farrak (quest \"Gahz'rilla\")",
     ["À garder : se change en Mallet of Zul'Farrak à l'autel de Hakkar"] =
@@ -181,9 +188,21 @@ end
 -- What the quests in your log need: item IDs (LibForeverData objectives and steps, the quest's own
 -- usable item) and lowercase texts (objective lines, step and note texts) an item's name is searched
 -- in. The third value is false when the objective texts could not be read at all.
+-- The quest's whole text (description + objectives), read by selecting it in the log; the previous
+-- selection is put back.
+local function QuestFullText(index)
+    if not (GetQuestLogQuestText and SelectQuestLogEntry) then return nil end
+    local old = GetQuestLogSelection and safe(GetQuestLogSelection)
+    safe(SelectQuestLogEntry, index)
+    local desc, obj = safe(GetQuestLogQuestText)
+    if old then safe(SelectQuestLogEntry, old) end
+    local t = (desc or "") .. " " .. (obj or "")
+    return t ~= " " and t or nil
+end
+
 local function LogNeeds()
     local ids, texts, active = {}, {}, {}
-    local readAny = false
+    local readAny, unknownQuest = false, false
     local n = C_QuestLog and C_QuestLog.GetNumQuestLogEntries and safe(C_QuestLog.GetNumQuestLogEntries)
         or safe(GetNumQuestLogEntries) or 0
     for i = 1, n do
@@ -200,6 +219,8 @@ local function LogNeeds()
             local link = GetQuestLogSpecialItemInfo and safe(GetQuestLogSpecialItemInfo, i)
             local sid = type(link) == "string" and tonumber(link:match("item:(%d+)"))
             if sid then ids[sid] = true end
+            local full = QuestFullText(i)
+            if full then texts[#texts + 1] = full:lower(); readAny = true end
             -- objective lines by log index, for clients without C_QuestLog.GetQuestObjectives
             if GetNumQuestLeaderBoards and GetQuestLogLeaderBoard then
                 for j = 1, (safe(GetNumQuestLeaderBoards, i) or 0) do
@@ -217,6 +238,7 @@ local function LogNeeds()
         end
         if lib then
             local q = safe(lib.Get, "quest", qid)
+            if not q then unknownQuest = true end   -- a Forever quest the data does not have
             for _, o in ipairs(q and q.objectives or {}) do
                 if o.kind == "item" and o.target then ids[o.target] = true end
             end
@@ -229,7 +251,7 @@ local function LogNeeds()
             end
         end
     end
-    return ids, texts, readAny or #active == 0
+    return ids, texts, readAny or #active == 0, unknownQuest
 end
 
 local function NamedIn(texts, name)
@@ -263,7 +285,7 @@ local function Scan()
         return entries
     end
     BuildIndex()
-    local needIds, texts, readLog = LogNeeds()
+    local needIds, texts, readLog, unknownQuest = LogNeeds()
     -- Without LibForeverData or readable objectives we cannot be sure: nothing is checked by default.
     local unsure = not Lib() or not readLog
     local byId, list = {}, {}
@@ -305,7 +327,12 @@ local function Scan()
                         elseif done then
                             e.reason = L("Quête rendue : %s"):format(QuestTitle(done))
                         else
-                            e.reason = L("Aucune quête ne le demande")
+                            -- no data ties it to a quest you turned in: the game abandons a quest
+                            -- whose item is destroyed, so this one is only listed, never destroyed here
+                            e.manual = true
+                            e.reason = unknownQuest
+                                and L("Une quête de ton journal est inconnue des données : à détruire à la main")
+                                or L("Aucune quête rendue ne le relie : à détruire à la main si tu es sûr")
                         end
                         if e then
                             if unsure and not e.manual then e.amber = true end
@@ -352,22 +379,23 @@ local function Destroy()
         return
     end
     ClearCursor()
-    local n = 0
+    -- the game allows one destruction per click: the first checked stack goes, the button then
+    -- shows what is left
+    local n, name = 0, nil
     for _, e in ipairs(entries) do
-        if IsChecked(e) then
+        if IsChecked(e) and n == 0 then
             for _, s in ipairs(e.slots) do
                 local info = safe(C_Container.GetContainerItemInfo, s[1], s[2])
-                if info and info.itemID == e.id and not info.isLocked and (info.quality or 0) < MANUAL_QUALITY then
+                if n == 0 and info and info.itemID == e.id and not info.isLocked and (info.quality or 0) < MANUAL_QUALITY then
                     C_Container.PickupContainerItem(s[1], s[2])
                     local kind, cid = GetCursorInfo()
-                    if kind == "item" and cid == e.id then DeleteCursorItem(); n = n + 1 end
+                    if kind == "item" and cid == e.id then DeleteCursorItem(); n = 1; name = e.name end
                     ClearCursor()
                 end
             end
-            userChecked[e.id] = nil
         end
     end
-    if n > 0 then WP.Print(L("%d pile(s) détruite(s)."):format(n)) end
+    if name then WP.Print(string.format(L("%s détruit."), name)) end
     dirty = true
     C_Timer.After(0.3, function() if Refresh then Refresh(true) end end)
 end
@@ -508,7 +536,8 @@ local function Build()
 
     function win.UpdateFooter()
         local n = CheckedCount()
-        destroy.label:SetText(n == 1 and L("Détruire l'objet coché") or L("Détruire les %d objets cochés"):format(n))
+        destroy.label:SetText(n == 0 and L("Coche ce que tu veux détruire") or n == 1 and L("Détruire l'objet coché")
+            or string.format(L("Détruire le suivant (%d cochés)"), n))
         destroy:SetEnabled(n > 0)
         destroy.Paint(false)
     end
