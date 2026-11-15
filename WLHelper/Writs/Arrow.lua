@@ -148,9 +148,24 @@ local function Layout(self)
     local topH
     if (self.big.cur or "") ~= "" then
         self.big:Show(); self.unit:Show(); self.state:Hide()
-        local okW, w = pcall(self.big.GetStringWidth, self.big)
+        -- measure the whole number (a width left from a shorter one used to cut it as "4...")
+        self.big:SetWidth(TEXT_W - 24)
+        local getW = self.big.GetUnboundedStringWidth or self.big.GetStringWidth
+        local okW, w = pcall(getW, self.big)
         w = (okW and type(w) == "number" and not (root.IsSecret and root.IsSecret(w))) and w or 0
-        self.big:SetWidth(math.min(TEXT_W - 24, math.ceil(w) + 2))
+        self.big:SetWidth(math.min(TEXT_W - 24, math.ceil(w) + 4))
+        -- the font may land a frame later: measure again then
+        if not self.bigRefit and C_Timer and C_Timer.After then
+            self.bigRefit = true
+            C_Timer.After(0, function()
+                self.bigRefit = nil
+                self.big:SetWidth(TEXT_W - 24)
+                local ok2, w2 = pcall(getW, self.big)
+                if ok2 and type(w2) == "number" and not (root.IsSecret and root.IsSecret(w2)) and w2 > 0 then
+                    self.big:SetWidth(math.min(TEXT_W - 24, math.ceil(w2) + 4))
+                end
+            end)
+        end
         local okB, bigH = pcall(self.big.GetStringHeight, self.big)
         topH = (okB and type(bigH) == "number" and not (root.IsSecret and root.IsSecret(bigH))) and bigH or 0
         if topH < S.F.hero then topH = S.F.hero + 2 end

@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.45] — 2026-11-15
+
+### Corrigé / Fixed
+- **Flèche GPS : distance coupée** (« 4... m ») : le nombre est mesuré en entier, puis remesuré une fois la police chargée.
+  *GPS arrow: the distance is no longer cut.*
+
 ## [1.0.0-beta.44] — 2026-11-15
 
 ### Modifié / Changed
