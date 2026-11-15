@@ -6,6 +6,13 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.53] — 2026-11-15
+
+### Ajouté / Added
+- **Quêtes récentes de Forever mieux guidées** : 55 quêtes des routes (chaînes de Shen'dralas et des pylônes, Krol'dok, Riverglades, prison d'Alcaz, Drowned City, Legashi, Blackmaw, Ruins of Lordaeron, Dalaran…) ont maintenant une marche à suivre en étapes, et leurs objectifs un point sur la carte quand on le connaît. Infos tirées de Wowhead Forever, réécrites, en français et en anglais.
+  *55 recent Forever quests get how-to notes and objective places.*
+- **`/wlh diag`** : enregistre ce que le client propose aux addons (talents, quêtes, carte, métiers…) pour nous aider à corriger les bugs sans te faire taper de commandes.
+
 ## [1.0.0-beta.52] — 2026-11-15
 
 ### Corrigé / Fixed

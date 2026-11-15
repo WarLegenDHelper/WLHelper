@@ -7,6 +7,8 @@ Guide de donjons - données et vérifications :
   Les parties adaptées de RestedXP restent sous CC BY-NC-SA 4.0 (usage non commercial, même licence).
 - ForeverDungeonJournal et Naowh Forever : listes de quêtes de donjon, noms français, clés ;
   les conseils de boss de Naowh sont lus en direct dans son addon, pas copiés.
+- Wowhead (base WoW Forever, pages et commentaires des quêtes) : conseils et lieux des objectifs
+  des quêtes récentes de Forever, réécrits avec nos mots (aucun texte copié, aucun nom de joueur).
 - FojjiCore : non utilisé comme source (sa licence l'interdit) ; seulement comparé pour repérer
   des quêtes manquantes, ensuite vérifiées dans LibForeverData.
 
