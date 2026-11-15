@@ -44,8 +44,7 @@ Set-Content -Path $notesFile -Value $notes -Encoding UTF8
 $iface = (($toc | Where-Object { $_ -match '^## Interface:' } | Select-Object -First 1) -replace '^## Interface:\s*', '').Trim()
 $rel = @{ releases = @(@{ name = "WLHelper"; version = $version; filename = "WLHelper-$version.zip"; nolib = $false;
     metadata = @(@{ flavor = "forever"; interface = [int]$iface }) }) } | ConvertTo-Json -Depth 6 -Compress
-$relFile = "dist
-elease.json"
+$relFile = Join-Path "dist" "release.json"
 Set-Content -Path $relFile -Value $rel -Encoding ascii -NoNewline
 gh release create $tag $zip $relFile --title "WL Helper $version" --notes-file $notesFile
 Remove-Item $notesFile -Force -Confirm:$false
