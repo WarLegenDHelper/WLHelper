@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.46] — 2026-11-15
+
+### Corrigé / Fixed
+- **La flèche ne suivait pas un objectif rempli** quand la fenêtre du guide était fermée : l'étape et la flèche se mettent maintenant à jour même avec seulement la flèche à l'écran.
+  *The arrow now moves on when an objective is done, even with the guide window closed.*
+
 ## [1.0.0-beta.45] — 2026-11-15
 
 ### Corrigé / Fixed

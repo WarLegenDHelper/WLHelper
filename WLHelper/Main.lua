@@ -246,7 +246,7 @@ ev:SetScript("OnEvent", function(_, e)
     if ns.frame then
       C_Timer.After(1, function()
         if GuideOn() then OnInstanceEntry() end
-        if ns.frame:IsShown() then ns.Refresh() end
+        if ns.frame:IsShown() or (GuideOn() and ns.route) then ns.Refresh() end
       end)
     end
   elseif ns.frame and not pending then
@@ -258,7 +258,7 @@ ev:SetScript("OnEvent", function(_, e)
         if questSig and sig ~= questSig then pcall(ns.Replan) end
         questSig = sig
       end
-      if ns.frame:IsShown() then ns.Refresh() end
+      if ns.frame:IsShown() or (GuideOn() and ns.route) then ns.Refresh() end
       ns.RenderPicker()
     end)
   end
