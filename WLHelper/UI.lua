@@ -1350,7 +1350,7 @@ local function DistText(m, x, y)
   if far then return L.ARROW_FAR end
   if type(yd) ~= "number" or (issecretvalue and issecretvalue(yd)) then return nil end
   -- the GPS's own format (meters or yards, as set on the GPS page); WP lives on the Writs side
-  local WP = (ns.Writs and ns.Writs.WP) or ns.WP
+  local WP = ns.Writs and ns.Writs.WP
   local GPS = WP and WP.GPS
   if GPS and GPS.Distance then
     local okG, t = pcall(GPS.Distance, yd)
@@ -1371,7 +1371,7 @@ ns.GuideDistText = DistText
 local function TravelText(st, m, x, y)
   if not (st and st.travel) then return nil end
   if st.travel == "TRAVEL_CONT" and type(m) == "number" and type(x) == "number" and type(y) == "number" then
-    local WP = (ns.Writs and ns.Writs.WP) or ns.WP
+    local WP = ns.Writs and ns.Writs.WP
     local GPS = WP and WP.GPS
     if GPS and GPS.TripSummary then
       local ok, t = pcall(GPS.TripSummary, m, x, y)
