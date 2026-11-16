@@ -6,6 +6,22 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.88] — 2026-11-16
+
+### Corrigé / Fixed
+- **Guide dans le donjon** : la route n'est plus recalculée depuis ta position à chaque quête prise ou rendue à l'intérieur (elle te renvoyait parfois à une étape du dehors) ; elle attend ta sortie.
+  *The route no longer rebuilds from your position while you are inside a dungeon.*
+- **Étapes de boss** : une quête ajoutée à une étape de boss déjà cochée (boss tué ou passé) n'est plus cachée, et le guide ne saute plus au rendu avant d'avoir fait l'objectif.
+  *A quest line added to an already ticked boss step is no longer hidden.*
+- **Rendus dans le donjon** : un rendu ne passe plus avant ses propres objectifs (Ombrecroc, Gouffre de Ragefeu, Temple englouti, Salle des Thanes...).
+  *Turn-ins inside a dungeon no longer come before their objectives.*
+- **Avant d'entrer** : le guide ne t'envoie plus dans le donjon tant qu'une étape faisable dehors reste ouverte (Scholomance, Brassenoire, Zul'Farrak, Kraal de Tranchebauge...), et un rendu prêt n'attend plus derrière une étape du donjon.
+  *No entering while doable outside steps are left.*
+- **Quêtes de race** : les quêtes réservées à une race ne sont plus proposées aux autres races.
+  *Race-restricted quests are no longer offered to other races.*
+- **Groupe et HV** : la classe des membres du groupe est bien lue (couleurs, Groupe), la progression du scan de l'hôtel des ventes s'affiche, et le texte de ta recherche de groupe est retenu.
+  *Party member classes, AH scan progress and the saved group-finder text work again.*
+
 ## [1.0.0-beta.87] — 2026-11-16
 
 ### Ajouté / Added

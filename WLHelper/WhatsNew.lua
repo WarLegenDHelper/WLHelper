@@ -2,6 +2,14 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.88", date = "2026-11-16", items = {
+    { s = "fix", fr = { "Guide dans le donjon", "La route n'est plus recalculée depuis ta position à chaque quête prise ou rendue à l'intérieur (elle te renvoyait parfois à une étape du dehors) ; elle attend ta sortie." }, en = { "The route no longer rebuilds from your position while you are inside a dungeon.", "" } },
+    { s = "fix", fr = { "Étapes de boss", "Une quête ajoutée à une étape de boss déjà cochée (boss tué ou passé) n'est plus cachée, et le guide ne saute plus au rendu avant d'avoir fait l'objectif." }, en = { "A quest line added to an already ticked boss step is no longer hidden.", "" } },
+    { s = "fix", fr = { "Rendus dans le donjon", "Un rendu ne passe plus avant ses propres objectifs (Ombrecroc, Gouffre de Ragefeu, Temple englouti, Salle des Thanes...)." }, en = { "Turn-ins inside a dungeon no longer come before their objectives.", "" } },
+    { s = "fix", fr = { "Avant d'entrer", "Le guide ne t'envoie plus dans le donjon tant qu'une étape faisable dehors reste ouverte (Scholomance, Brassenoire, Zul'Farrak, Kraal de Tranchebauge...), et un rendu prêt n'attend plus derrière une étape du donjon." }, en = { "No entering while doable outside steps are left.", "" } },
+    { s = "fix", fr = { "Quêtes de race", "Les quêtes réservées à une race ne sont plus proposées aux autres races." }, en = { "Race-restricted quests are no longer offered to other races.", "" } },
+    { s = "fix", fr = { "Groupe et HV", "La classe des membres du groupe est bien lue (couleurs, Groupe), la progression du scan de l'hôtel des ventes s'affiche, et le texte de ta recherche de groupe est retenu." }, en = { "Party member classes, AH scan progress and the saved group-finder text work again.", "" } },
+  } },
   { v = "1.0.0-beta.87", date = "2026-11-16", items = {
     { s = "add", fr = { "Fenêtres plus larges et redimensionnables", "Taille proportionnelle à ton écran, poignée en bas à droite, taille retenue ; réglages en 2 ou 3 colonnes, listes en grilles, profil d'artisan des Commandes en 2 colonnes." }, en = { "Wider, resizable windows sized to your screen; settings and lists in columns.", "" } },
     { s = "add", fr = { "Guide : onglets « Dehors · Dans le donjon · Après »", "Et mode consultation : reviens sur n'importe quelle étape, même faite, sans changer ton étape en cours ; « Voir où en est ... » pour un membre du groupe qui a WL Helper." }, en = { "Guide part tabs, browse any step, see where a group member is.", "" } },
@@ -122,8 +130,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Marques de raid", "Le jeu ne laisse pas un addon poser une marque ; les boutons ciblent seulement, plus d'erreur." }, en = { "Raid markers", "Targeting only, no more blocked-action error." } },
     { s = "fix", fr = { "Erreurs dans les donjons", "Valeurs cachées par le jeu (PNJ des caisses, alerte des rares)." }, en = { "Secret-value errors inside dungeons.", "" } },
     { s = "fix", fr = { "Icônes de récompense", "Manquantes et améliorations plus lisibles." }, en = { "Missing reward icons and clearer upgrades.", "" } },
-  } },
-  { v = "1.0.0-beta.73", date = "2026-11-16", items = {
-    { s = "fix", fr = { "Zygor", "La flèche de WL Helper ne prend plus la place de celle de ton guide Zygor. En « Automatique », c'est le GPS de WL Helper (avec son bouton pour l'arrêter) ; Zygor seulement si tu le choisis dans Réglages › GPS. Pour arrêter le GPS : /wlh gps." }, en = { "WL Helper no longer takes over your Zygor guide's arrow; Zygor only when you pick it.", "" } },
   } },
 }

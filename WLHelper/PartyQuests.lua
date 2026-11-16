@@ -132,7 +132,9 @@ local function RawMembers()
     local unit = (raid and "raid" or "party") .. k
     local nm = Short(UnitName and UnitName(unit))
     if nm and nm ~= me then
-      local _, cls = UnitClass and UnitClass(unit)
+      -- "a and f()" keeps only f's first value: the class token is the second
+      local cls
+      if UnitClass then cls = select(2, UnitClass(unit)) end
       out[#out + 1] = { name = nm, unit = unit, class = Str(cls) }
     end
   end

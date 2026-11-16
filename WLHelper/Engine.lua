@@ -217,7 +217,8 @@ local function FactionOK(fa)
 end
 local function RaceOK(race)
   if not race then return true end
-  local _, tok = UnitRace and UnitRace("player")
+  local tok
+  if UnitRace then tok = select(2, UnitRace("player")) end
   if not tok then return true end
   tok = tok:upper(); if tok == "SCOURGE" then tok = "UNDEAD" end
   for r in race:gmatch("[^,]+") do
@@ -558,6 +559,10 @@ local function MakeNodes(sel, cls)
         table.insert(outs, add({ kind = "o", q = qid, sub = i, oi = i, unknown = true, npc = r[1], obj = o, oneObj = o,
           noLoc = true, mapHint = q.s and not q.s.i and q.s.m or nil, d = home, pre = isPre, deps = { A } }))
       end
+    elseif real == 0 and not inside and A.ins and q.f and q.f.i and not q.noin then
+      -- given and turned in inside the dungeon (Belnistrasz's Oathstone): what it asks with no
+      -- known place is done there too, never in a step outside between two visits
+      inside = true; outer = false
     elseif real == 0 and not inside and (isPre or q.noin) and q.oe and not ns.TalkQuest(q) then
       -- nothing but the quest's text ("Acquire the Mana Sieve ... collect Ancient Mana Crystals"):
       -- one "do the objectives" step that ends when the game says the quest is complete
@@ -948,10 +953,46 @@ function ns.BuildRoute(sel, startPos)
     local d = n.dk or n.d
     return d and (insideLeft[d] or 0) > 0
   end
+  -- does something done inside dungeon d wait (through its dependencies) on n?
+  local function FeedsInside(n, d)
+    local seen, todo = { [n] = true }, { n }
+    while #todo > 0 do
+      local x = table.remove(todo)
+      for _, o in ipairs(dependents[x] or {}) do
+        if not seen[o] and not done[o] then
+          if InsideNode(o) and o.ins == d then return true end
+          seen[o] = true; todo[#todo + 1] = o
+        end
+      end
+    end
+    return false
+  end
+  -- the dungeon whose door a line holds while it is left outside (a take, an outside objective, a
+  -- prerequisite's turn-in, in the "before" phase, not held back by level), or false. A line on
+  -- another continent that nothing inside waits on (a class quest's material) can wait. Nothing
+  -- here changes while the route is built: worked out once per line.
+  local doorOf = {}
+  for _, n in ipairs(nodes) do
+    local q = ns.Q[n.q]
+    local d = false
+    if not done[n] and not n.ins and n.phase == "before" and n.kind ~= "h" and not (n.kind == "t" and not n.pre)
+      and not (n.kind == "a" and q and q.r and q.r > lvl) then
+      d = NodeDungeon(n) or false
+      if d then
+        local a, b = NodePos(n), NodePos({ ins = d })
+        if a and b and a[1] ~= b[1] and not FeedsInside(n, d) then d = false end
+      end
+    end
+    doorOf[n] = d
+  end
   local guard = 0
   while remaining > 0 and guard < 5000 do
     guard = guard + 1
     local best, bestCost
+    local ready = {}
+    -- a dungeon with a line of its own still to do outside (doorOf), doable now: its door waits,
+    -- however far that line is
+    local outLeft = {}
     for _, n in ipairs(nodes) do
       if not done[n] and not placed[n] then
         local ok = true
@@ -960,28 +1001,34 @@ function ns.BuildRoute(sel, startPos)
           for p in pairs(gate[n.ins]) do if not done[p] and not placed[p] then ok = false break end end
         end
         if ok then
-          local cost
-          if n.unknown then cost = 0
-          elseif n.ins and inDungeon == n.ins then cost = 0
-          else
-            local np = NodePos(n)
-            cost = (np and pos) and Dist(pos, np) or 50
-            if n.ins then
-              cost = cost + 400   -- on ne rentre dans un donjon qu'une fois tout pris autour
-              local d = ns.D[n.ins]
-              local lo = d and d.lvl and d.lvl[1]
-              if lo and lo > lvl then cost = cost + (lo - lvl) * 600 end
-            end
-          end
-          -- quête trop haute pour le niveau actuel : plus tard dans la route
-          local q = ns.Q[n.q]
-          if n.kind == "a" and q and q.r and q.r > lvl then cost = cost + (q.r - lvl) * 800 end
-          if SiblingsPending(n) then cost = cost + 5000 end
-          if n.kind == "o" and TakesPending(n) then cost = cost + 50000 end   -- the pick-ups first, wherever they are
-          if TurnInLater(n) then cost = cost + 4000 end
-          if not bestCost or cost < bestCost then best, bestCost = n, cost end
+          ready[#ready + 1] = n
+          if doorOf[n] then outLeft[doorOf[n]] = true end
         end
       end
+    end
+    for _, n in ipairs(ready) do
+      local cost
+      if n.unknown then cost = 0
+      elseif n.ins and inDungeon == n.ins then cost = 0
+      else
+        local np = NodePos(n)
+        cost = (np and pos) and Dist(pos, np) or 50
+        if n.ins then
+          cost = cost + 400   -- on ne rentre dans un donjon qu'une fois tout pris autour
+          -- outside work this dungeon still has (outLeft): its door waits, the zone around it too
+          if outLeft[n.ins] then cost = cost + 1000000 end
+          local d = ns.D[n.ins]
+          local lo = d and d.lvl and d.lvl[1]
+          if lo and lo > lvl then cost = cost + (lo - lvl) * 600 end
+        end
+      end
+      -- quête trop haute pour le niveau actuel : plus tard dans la route
+      local q = ns.Q[n.q]
+      if n.kind == "a" and q and q.r and q.r > lvl then cost = cost + (q.r - lvl) * 800 end
+      if SiblingsPending(n) then cost = cost + 5000 end
+      if n.kind == "o" and TakesPending(n) then cost = cost + 50000 end   -- the pick-ups first, wherever they are
+      if TurnInLater(n) then cost = cost + 4000 end
+      if not bestCost or cost < bestCost then best, bestCost = n, cost end
     end
     if not best then
       -- dépendance impossible (quête bloquée) : on ajoute ce qui reste tel quel
@@ -1619,6 +1666,25 @@ local function SplitOne(st, full, visit)
       elseif aGroup[n.q] == 0 then it.boss = 0
       else it.boss = 999 end
     end
+  end
+  -- a line never sits before a line it needs (a turn-in with no boss of its own went to the start,
+  -- ahead of its objectives at a boss): it moves to the group of the last of them
+  local groupOf = {}
+  for _, it in ipairs(items) do
+    local b = it.node.base or it.node
+    if not groupOf[b] or it.boss > groupOf[b] then groupOf[b] = it.boss end
+  end
+  for _ = 1, 4 do
+    local moved = false
+    for _, it in ipairs(items) do
+      local b = it.node.base or it.node
+      for _, d in ipairs(b.deps or {}) do
+        local g = groupOf[d]
+        if g and d ~= b and g > it.boss then it.boss = g; moved = true end
+      end
+      if it.boss > (groupOf[b] or -1) then groupOf[b] = it.boss end
+    end
+    if not moved then break end
   end
   table.sort(items, function(a, b) if a.boss ~= b.boss then return a.boss < b.boss end return a.ord < b.ord end)
   local groups, byBoss, cur = {}, {}, nil

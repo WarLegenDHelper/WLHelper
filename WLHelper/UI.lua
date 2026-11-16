@@ -100,6 +100,14 @@ local function StepAuto(log, st)
   return true
 end
 
+-- Does the step's mark still count? "kill" (the boss died with every line done) and "skip" (an
+-- optional boss left behind) stand for the lines the step held then: a replan that puts an open
+-- quest line under the same key opens it again. A tick by hand (true) stays.
+local function ManualHolds(log, st)
+  local m = Manual(st)
+  return m == true or (m and (#st.acts == 0 or StepAuto(log, st))) and true or false
+end
+
 local IsStepDoneRaw
 local function IsStepDone(log, i)
   -- kept for the length of one refresh pass (ns.PassGen): a refresh asks for every step many times
@@ -149,7 +157,7 @@ end
 function ns.SkipOptionalBosses(dkey)
   local log = ns.LogEntries()
   for _, st in ipairs(Steps()) do
-    if st.bossStep and st.ins == dkey and not Manual(st) and ns.BossStepOptional(st, log) then SetManual(st, true) end
+    if st.bossStep and st.ins == dkey and not Manual(st) and ns.BossStepOptional(st, log) then SetManual(st, "skip") end
   end
 end
 -- =====================================================================
@@ -304,7 +312,7 @@ end
 IsStepDoneRaw = function(log, i)
   local st = Steps()[i]
   if not st then return false end
-  if Manual(st) then return true end
+  if ManualHolds(log, st) then return true end
   if st.bossStep then return BossStepDone(log, i, st) end
   if st.gate then
     if InInstanceOf(st.gate) then SetManual(st, true) return true end
@@ -1039,7 +1047,8 @@ local function MakeRow(parent)
   gb = LabelBtn(row, "GPS", 24, "secondary", function(self) local n = self.row.node; if ns.NodeCanGo(n) then ns.SetOne(n) end end,
     function()
       local n = gb and gb.row and gb.row.node
-      local _, x, y = n and ns.NodePoint(n)
+      local x, y
+      if n then x, y = select(2, ns.NodePoint(n)) end
       if not x and n and n.loc then x, y = n.loc.x, n.loc.y end
       if not x then return nil end
       return { L.TT_GPS:format(n.npc or ns.QName(n.q), x, y), L.TT_GPS_CLICK }
@@ -2471,7 +2480,8 @@ local function Build()
   -- button, the tracker is in Settings and /wlh tracker; /wlh share, list, recalc, arrow, boss stay.
   f.done = Item(function()
     local st = Steps()[f.view]; if not st then return end
-    SetManual(st, not Manual(st)); ns.Refresh()
+    -- a "kill" / "skip" mark the step outgrew (a new open line): the click ticks it
+    SetManual(st, not ManualHolds(ns.LogEntries(), st)); ns.Refresh()
   end, function() return { L.M_SKIP, L.TT_FDONE } end)
   -- "Start the route over" (T-84, = /wlh reset) takes the place of "Rebuild the route from here":
   -- the route is planned again by itself when a quest changes, and /wlh recalc stays. A second
@@ -3608,7 +3618,7 @@ RenderNow = function()
     f.go.disabledReason = L.NOPOINT
   end
   f.done:SetEnabled(true)
-  f.done.label:SetText(Manual(st) and L.M_UNSKIP or L.M_SKIP)
+  f.done.label:SetText(ManualHolds(log, st) and L.M_UNSKIP or L.M_SKIP)
   if not f.restartItem.armToken then f.restartItem.label:SetText(L.M_RESTART) end
   local mi = 0
   for _, m in ipairs(ns.MemberSteps()) do

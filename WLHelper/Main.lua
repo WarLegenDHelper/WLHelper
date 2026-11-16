@@ -131,7 +131,9 @@ local function Replan()
   local db = WLDTDB
   if not db or db.autoReplan == false or not (db.sel and next(db.sel)) or not ns.route then return true end
   if InCombatLockdown and InCombatLockdown() then return false end
-  local _, kind = GetInstanceInfo and GetInstanceInfo()
+  -- "a and f()" keeps only f's first value: the instance type is the second
+  local kind
+  if GetInstanceInfo then kind = select(2, GetInstanceInfo()) end
   if kind == "party" or kind == "raid" then return false end   -- inside, the boss order is the route
   local f = ns.frame
   if not f then return true end

@@ -2208,7 +2208,8 @@ local function ToggleLooking(anchor)
     if lpop:IsShown() then lpop:Hide(); return end
     lpop.anchor = anchor
     lpop:ClearAllPoints(); lpop:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -4)
-    local _, what = WP.IsLooking and WP.IsLooking()
+    local what
+    if WP.IsLooking then what = select(2, WP.IsLooking()) end
     -- the old free text stays, prefilled with the dungeon names
     if not what or what == "" then what = NamesOf(F.SourceKeys()) end
     lpop.what:SetText(what or "")

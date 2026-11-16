@@ -52,7 +52,8 @@ function ns.GroupMembers()
     if type(nm) == "string" and not secret(nm) then
       nm = Short(nm)
       if nm ~= me then
-        local _, cls = UnitClass and UnitClass(unit)
+        local cls
+        if UnitClass then cls = select(2, UnitClass(unit)) end
         out[#out + 1] = { name = nm, unit = unit, class = (type(cls) == "string" and not secret(cls)) and cls or nil }
       end
     end

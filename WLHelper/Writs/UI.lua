@@ -1648,7 +1648,8 @@ local function Build()
 end
 
 local function Subtitle()
-    local done, tot = WP.Scan and WP.Scan.Progress()
+    local done, tot
+    if WP.Scan then done, tot = WP.Scan.Progress() end
     if done and tot and tot > 0 then return string.format(L("Scan de l'HV : %d sur %d"), done, tot) end
     if current == "favor" then return "" end
     local name = WP.Reputation()
@@ -1700,7 +1701,8 @@ function WP.FitComptoir(contentH) if frame then frame:FitHeight(contentH) end en
 
 function WP.PaintScan()
     if not frame then return end
-    local done, tot = WP.Scan and WP.Scan.Progress()
+    local done, tot
+    if WP.Scan then done, tot = WP.Scan.Progress() end
     if done and tot and tot > 0 then
         local top = frame:ContentTop() - 2
         frame.scanBar:ClearAllPoints()

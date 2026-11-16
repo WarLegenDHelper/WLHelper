@@ -171,7 +171,9 @@ function WP.FavorPlan(missing, rows)
             if n > 0 then
                 local crates = math.max(0, n - r.haveCrate)
                 -- the real price when the listings were read (Ladder.lua), else the lowest price x n
-                local crateCost, crateAll = WP.CostFor and WP.CostFor(r.id, crates)
+                -- (not "WP.CostFor and WP.CostFor()": that keeps only the first value)
+                local crateCost, crateAll
+                if WP.CostFor then crateCost, crateAll = WP.CostFor(r.id, crates) end
                 local capped = false
                 if crateCost == nil and crateAll == false and crates > 0 then
                     -- the listings were read a moment ago and nobody sells this crate now: only the
@@ -442,7 +444,8 @@ function WP.RenderFavor()
     ui.heads.HideFrom(1); ui.rows.HideFrom(1)
 
     local busy = WP.Scan and WP.Scan.Busy()
-    local done, tot = WP.Scan and WP.Scan.Progress()
+    local done, tot
+    if WP.Scan then done, tot = WP.Scan.Progress() end
     if done and tot and tot > 0 then
         ui.scan:SetText(string.format(L("Arrêter le scan (%d sur %d)"), done, tot)); ui.scan:SetIcon("close")
     elseif WP.LadderBusy and WP.LadderBusy() then
