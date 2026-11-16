@@ -107,6 +107,9 @@ pcall(ev.RegisterEvent, ev, "PLAYER_ENTERING_WORLD")
 ev:SetScript("OnEvent", function(_, e, unit)
   if e == "PLAYER_TARGET_CHANGED" then Check("target")
   elseif e == "UPDATE_MOUSEOVER_UNIT" then Check("mouseover")
-  elseif e == "NAME_PLATE_UNIT_ADDED" then if unit then Check(unit) end
+  elseif e == "NAME_PLATE_UNIT_ADDED" then
+    -- the bosses strip (Bosses.lua) already sends every nameplate to ns.RareAlert: once is enough
+    -- (a nameplate comes with every mob in view, so a second pass here was pure waste)
+    if unit and not (ns.BossEvents and ns.RareAlert) then Check(unit) end
   elseif e == "PLAYER_ENTERING_WORLD" then seen = {} end
 end)

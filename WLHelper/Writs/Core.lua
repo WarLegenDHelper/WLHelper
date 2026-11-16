@@ -1121,11 +1121,11 @@ ns.AddEnglish({
     ["Writs, liste d'achat et remise automatique"] = "Writs, shopping list and automatic turn-in",
     ["Commandes des Writs :"] = "Writs commands:",
     ["  /wlh trade : ouvre ou ferme les Writs"] = "  /wlh trade: open or close the trading post",
-    ["  /wlh trade gps : lance ou arrête la tournée GPS des writs prêts à rendre"] = "  /wlh trade gps: start or stop the GPS tour of the writs ready to turn in",
+    ["  /wlh trade gps : lance ou arrête la tournée GPS des Writs prêts à rendre"] = "  /wlh trade gps: start or stop the GPS tour of the Writs ready to turn in",
     ["  /wlh trade stop : arrête le GPS"] = "  /wlh trade stop: stop the GPS",
     ["  /wlh trade scan : scanne les prix de la liste d'achat à l'HV"] = "  /wlh trade scan: scan the shopping list's prices at the AH",
     ["  /wlh trade reset : oublie les bourses mesurées et la faction"] = "  /wlh trade reset: forget the measured Coin Pouches and the faction",
-    ["Le module %s est éteint. Rallume-le dans Réglages, Général, Modules."] = "The %s module is off. Turn it back on in Settings, General, Modules.",
+    ["Le module %s est éteint. Rallume-le dans Réglages > Général > Modules."] = "The %s module is off. Turn it back on in Settings > General > Modules.",
     ["Mesures des bourses et faction oubliées : elles seront relevées à nouveau."] = "Coin Pouch samples and faction forgotten: they will be measured again.",
     ["Cette liste a besoin d'un addon d'hôtel des ventes, et aucun n'est chargé."] = "This list needs an auction house addon, and none is loaded.",
     ["Cette recherche a besoin d'un addon d'hôtel des ventes, et aucun n'est chargé."] = "This search needs an auction house addon, and none is loaded.",
@@ -1246,7 +1246,7 @@ local function Help()
     WP.Print(L("Commandes des Writs :"))
     for _, line in ipairs({
         L("  /wlh trade : ouvre ou ferme les Writs"),
-        L("  /wlh trade gps : lance ou arrête la tournée GPS des writs prêts à rendre"),
+        L("  /wlh trade gps : lance ou arrête la tournée GPS des Writs prêts à rendre"),
         L("  /wlh trade stop : arrête le GPS"),
         L("  /wlh trade scan : scanne les prix de la liste d'achat à l'HV"),
         L("  /wlh trade reset : oublie les bourses mesurées et la faction"),
@@ -1278,7 +1278,7 @@ end
 -- Says a module is off (and where to turn it on); true when it is off.
 function WP.ModuleOff(key)
     if WP.ModuleOn(key) then return false end
-    WP.Print(string.format(L("Le module %s est éteint. Rallume-le dans Réglages, Général, Modules."), WP.ModuleLabel(key)), true)
+    WP.Print(string.format(L("Le module %s est éteint. Rallume-le dans Réglages > Général > Modules."), WP.ModuleLabel(key)), true)
     return true
 end
 function WP.SetModule(key, on)

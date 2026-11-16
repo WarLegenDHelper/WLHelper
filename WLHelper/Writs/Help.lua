@@ -79,8 +79,8 @@ ns.AddEnglish({
     ["Fais-la glisser avec le clic gauche : sa place est gardée. Sans route en cours, WL Helper, GPS, « Déplacer la flèche » l'affiche pour que tu la places."] =
         "Drag it with the left mouse button: its spot is saved. With no route running, WL Helper, GPS, \"Move the arrow\" shows it so you can place it.",
     ["Comment éteindre un module ?"] = "How do I turn a module off?",
-    ["Réglages, Général, Modules : un interrupteur par module. Un module éteint disparaît partout, sauf sa ligne grisée sur l'Accueil : un clic dessus le rallume."] =
-        "Settings, General, Modules: one switch per module. A module that is off disappears everywhere except its greyed-out line on Home: a click on it turns it back on.",
+    ["Réglages > Général > Modules : un interrupteur par module. Un module éteint disparaît partout, sauf sa ligne grisée sur l'Accueil : un clic dessus le rallume."] =
+        "Settings > General > Modules: one switch per module. A module that is off disappears everywhere except its greyed-out line on Home: a click on it turns it back on.",
     ["Mètres ou yards ?"] = "Meters or yards?",
     ["Les distances sont en mètres et en kilomètres. Pour les yards du jeu : WL Helper, GPS, « Distances en yards »."] =
         "Distances are in meters and kilometers. For the game's yards: WL Helper, GPS, \"Distances in yards\".",
@@ -392,7 +392,7 @@ local function Questions()
         { L("Comment déplacer la flèche ?"),
           L("Fais-la glisser avec le clic gauche : sa place est gardée. Sans route en cours, WL Helper, GPS, « Déplacer la flèche » l'affiche pour que tu la places.") },
         { L("Comment éteindre un module ?"),
-          L("Réglages, Général, Modules : un interrupteur par module. Un module éteint disparaît partout, sauf sa ligne grisée sur l'Accueil : un clic dessus le rallume.") },
+          L("Réglages > Général > Modules : un interrupteur par module. Un module éteint disparaît partout, sauf sa ligne grisée sur l'Accueil : un clic dessus le rallume.") },
         { L("Mètres ou yards ?"),
           L("Les distances sont en mètres et en kilomètres. Pour les yards du jeu : WL Helper, GPS, « Distances en yards ».") },
     }

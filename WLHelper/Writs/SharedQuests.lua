@@ -72,7 +72,7 @@ ns.AddEnglish({
     ["Seuls les membres qui ont WL Helper partagent leurs quêtes de donjon."] = "Only members who have WL Helper share their dungeon quests.",
     -- footer and settings
     ["Tu partages tes quêtes de donjon avec la guilde."] = "You share your dungeon quests with the guild.",
-    ["Tu ne partages pas tes quêtes de donjon (Réglages > Général > Guilde)."] = "You don't share your dungeon quests (Settings > General > Guild).",
+    ["Tu ne partages pas tes quêtes de donjon (Réglages > Guilde)."] = "You don't share your dungeon quests (Settings > Guild).",
     ["Partager mes quêtes de donjon"] = "Share my dungeon quests",
     ["Les membres de la guilde qui ont WL Helper voient quelles quêtes de donjon tu as, pour grouper. Rien d'autre n'est envoyé."] =
         "Guild members who have WL Helper see which dungeon quests you have, to group up. Nothing else is sent.",
@@ -642,7 +642,7 @@ end
 
 local refreshing = false
 local function Render()
-    win:SetFooter(DB().share and L("Tu partages tes quêtes de donjon avec la guilde.") or L("Tu ne partages pas tes quêtes de donjon (Réglages > Général > Guilde)."))
+    win:SetFooter(DB().share and L("Tu partages tes quêtes de donjon avec la guilde.") or L("Tu ne partages pas tes quêtes de donjon (Réglages > Guilde)."))
     local function Empty(icon, title, text)
         ui.sa:Hide()
         for _, b in ipairs(ui.blocks) do b:Hide() end

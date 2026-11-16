@@ -101,7 +101,7 @@ ns.AddEnglish({
     ["Ouvrir l'Accueil"] = "Open Home",
     ["Tout ce que tu as allumé, en un coup d'œil."] = "Everything you switched on, at a glance.",
     ["Clic : choisir les donjons, raids ou quêtes de classe de la route"] = "Click: pick the dungeons, raids or class quests of the route",
-    ["Clic : ouvrir Comment faire... ?"] = "Click: open How do I...?",
+    ["Clic : ouvrir « Comment faire... ? »"] = "Click: open How do I...?",
     ["Clic : ouvrir l'Accueil"] = "Click: open Home",
     ["Pour tout retrouver"] = "To find it all again",
     ["Quelques bulles sur les vraies fenêtres te montrent où est chaque chose, en deux minutes."] = "A few bubbles on the real windows show you where everything is, in two minutes.",
@@ -109,7 +109,7 @@ ns.AddEnglish({
     ["Les réglages sont dans la fenêtre WL Helper, à gauche sous chaque activité. /wlh setup rouvre cet écran."] =
         "Settings are in the WL Helper window, on the left under each activity. /wlh setup opens this screen again.",
     ["Le bouton WL de la minimap ouvre l'Accueil."] = "The WL button on the minimap opens Home.",
-    ["Le bouton de la minimap est caché : Réglages, Général pour le remettre."] = "The minimap button is hidden: Settings, General brings it back.",
+    ["Le bouton de la minimap est caché : remets-le dans Réglages > Général."] = "The minimap button is hidden: turn it back on in Settings > General.",
     ["Tape /wlh dans le chat pour ouvrir l'Accueil."] = "Type /wlh in chat to open Home.",
     ["Écran de bienvenue fermé : tes choix sont gardés. Tape /wlh setup pour le rouvrir."] =
         "Welcome closed: your choices are kept. Type /wlh setup to open it again.",
@@ -842,7 +842,7 @@ STEPS.ready = {
         end
         f.help:SetContent({ icon = Icon(ModIcon("help", "INV_Misc_Book_09")), title = L("Comment faire... ?"),
             line2 = L("Les gestes utiles pas à pas, avec le bon bouton qui s'allume."),
-            tip = { L("Comment faire... ?"), L("Clic : ouvrir Comment faire... ?") } })
+            tip = { L("Comment faire... ?"), L("Clic : ouvrir « Comment faire... ? »") } })
         f.help:Show()
         cards[#cards + 1] = f.help
         f.tour:SetShown(WP.Tour ~= nil)
@@ -864,7 +864,7 @@ STEPS.ready = {
         y = y + 24 + 8
         local words = {
             MinimapShown() and L("Le bouton WL de la minimap ouvre l'Accueil.")
-                or L("Le bouton de la minimap est caché : Réglages, Général pour le remettre."),
+                or L("Le bouton de la minimap est caché : remets-le dans Réglages > Général."),
             L("Tape /wlh dans le chat pour ouvrir l'Accueil."),
             L("Les réglages sont dans la fenêtre WL Helper, à gauche sous chaque activité. /wlh setup rouvre cet écran."),
             L("Tape /wlh bienvenue pour tout régler pas à pas, ou refaire la visite."),

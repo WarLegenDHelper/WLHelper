@@ -97,7 +97,7 @@ ns.AddEnglish({
     ["Clic droit : inviter dans ton groupe"] = "Right-click: invite to your group",
     ["il y a %d j"] = "%d days ago",
     ["il y a %d h"] = "%d h ago",
-    ["il y a moins d'1 h"] = "less than 1 h ago",
+    ["il y a moins d'une heure"] = "less than an hour ago",
     ["hier"] = "yesterday",
     -- members: empty states
     ["Aucun membre ne correspond"] = "No member matches",
@@ -1029,7 +1029,7 @@ end
 local function Ago(hours)
     if hours >= 48 then return string.format(L("il y a %d j"), math.floor(hours / 24)) end
     if hours >= 24 then return L("hier") end
-    if hours < 1 then return L("il y a moins d'1 h") end
+    if hours < 1 then return L("il y a moins d'une heure") end
     return string.format(L("il y a %d h"), math.max(1, hours))
 end
 local function Professions(name)

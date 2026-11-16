@@ -2614,22 +2614,32 @@ local function AliveCheck(unit, rec, id)
   return true
 end
 
+-- The bosses and rares of one list, merged once per list (UNIT_HEALTH asks on every hit on your
+-- target): kept while the list and its two counts stay the same. Callers only read it.
+local merged = { res = nil, nb = -1, nr = -1, out = nil }
+local NONE = {}
+local function Merged(res)
+  local nb, nr = #res.bosses, #res.rares
+  if merged.res ~= res or merged.nb ~= nb or merged.nr ~= nr then
+    local out = {}
+    for _, r in ipairs(res.bosses) do out[#out + 1] = r end
+    for _, r in ipairs(res.rares) do out[#out + 1] = r end
+    merged.res, merged.nb, merged.nr, merged.out = res, nb, nr, out
+  end
+  return merged.out
+end
+
 -- The bosses a unit may be: the panel's heads when it shows, else the dungeon's boss list (the
 -- list built for the panel, or the walk order) -> list of { en, name, ids }
 local function Candidates()
   if P and P:IsShown() and P.res then
-    local out = {}
-    for _, list in ipairs({ P.res.bosses, P.res.rares }) do for _, r in ipairs(list) do out[#out + 1] = r end end
-    return out, true
+    return Merged(P.res), true
   end
   local dkey = DungeonHere()
-  if not dkey then return {}, false end
+  if not dkey then return NONE, false end
   local res = mobsCache[dkey]
   if res then
-    local out = {}
-    for _, r in ipairs(res.bosses) do out[#out + 1] = r end
-    for _, r in ipairs(res.rares) do out[#out + 1] = r end
-    return out, false
+    return Merged(res), false
   end
   local out = {}
   local bo = ns.BossOrder and ns.BossOrder(dkey)

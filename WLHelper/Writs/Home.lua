@@ -22,11 +22,11 @@ ns.AddEnglish({
     -- the search field
     ["Où veux-tu aller ?"] = "Where do you want to go?",
     ["Voir tous les résultats"] = "See all results",
-    ["Ouvrir Aller à"] = "Open Go to",
+    ["Ouvrir « Aller à »"] = "Open Go to",
     -- the lines of Home
     ["Outils"] = "Tools",
     ["Un lieu, un PNJ, une ville : le GPS t'y mène"] = "A place, an NPC, a city: the GPS takes you there",
-    ["Clic : ouvrir Aller à"] = "Click: open Go to",
+    ["Clic : ouvrir « Aller à »"] = "Click: open Go to",
     ["Clic droit : réglages"] = "Right-click: settings",
     ["Aucune clé pour l'instant (%d en tout)"] = "No keys yet (%d in all)",
     ["Il te faut %s pour entrer dans %s."] = "You need %s to get into %s.",
@@ -126,7 +126,7 @@ ns.AddEnglish({
     ["Clic : choisir ta spé et voir tes améliorations"] = "Click: pick your spec and see your upgrades",
     ["Comment faire... ?"] = "How do I...?",
     ["Les gestes utiles, pas à pas"] = "Common tasks, step by step",
-    ["Clic : ouvrir Comment faire... ?"] = "Click: open How do I...?",
+    ["Clic : ouvrir « Comment faire... ? »"] = "Click: open How do I...?",
     ["Module éteint"] = "Module off",
     ["Clic : allumer le module"] = "Click: turn the module on",
     -- what each module does (home card tooltips, welcome window)
@@ -333,7 +333,7 @@ end
 local CLICK_HINT = {
     dungeons = "Clic : ouvrir le guide de quêtes", keys = "Clic : ouvrir le passeport des clés",
     shared = "Clic : voir les quêtes en commun", triage = "Clic : voir les quêtes à abandonner",
-    ["goto"] = "Clic : ouvrir Aller à", city = "Clic : ouvrir la tournée en ville",
+    ["goto"] = "Clic : ouvrir « Aller à »", city = "Clic : ouvrir la tournée en ville",
     writs = "Clic : ouvrir les Writs", favor = "Clic : voir les caisses", orders = "Clic : ouvrir les commandes",
     bags = "Clic : voir les objets à jeter", upgrades = "Clic : choisir ta spé et voir tes améliorations",
     guild = "Clic : ouvrir la guilde", events = "Clic : ouvrir Groupes",
@@ -406,7 +406,7 @@ local function RunSearch()
         row:SetShown(r and true or false)
     end
     local more = win.searchMore
-    if searchState == "none" then more:SetText(L("Ouvrir Aller à"))
+    if searchState == "none" then more:SetText(L("Ouvrir « Aller à »"))
     else more:SetText(L("Voir tous les résultats")) end
     more:SetShown(searchState == "none" or (searchState == "list" and #searchRes > SEARCH_ROWS))
     win.searchEmpty:SetShown(searchState == "none")
@@ -996,7 +996,7 @@ local function Refresh()
     end
 
     -- the tools: a dot when one has something to do now
-    Put("goto", "Set", L("Aller à"), L("Un lieu, un PNJ, une ville : le GPS t'y mène"), L("Clic : ouvrir Aller à"))
+    Put("goto", "Set", L("Aller à"), L("Un lieu, un PNJ, une ville : le GPS t'y mène"), L("Clic : ouvrir « Aller à »"))
     local cityDot = cityOpen > 0 and not tourOn
     Put("city", "Set", L("Tournée en ville"),
         cityOpen > 0 and N(cityOpen, "1 chose à faire dans cette ville", "%d choses à faire dans cette ville")
@@ -1217,7 +1217,7 @@ function WP.MinimapMenu(owner)
         end
         if #items > 0 then items[#items + 1] = false end
         items[#items + 1] = { { hd = root.ARROW }, L("Arrêter le GPS"), function() WP.StopGPS() end, nil, "gps", L("Aucun trajet GPS en cours."), L("Clic : arrêter le GPS") }
-        items[#items + 1] = { WP.MODULE_ICON.help, L("Comment faire... ?"), function() if WP.Help then WP.Help.Toggle() end end, nil, nil, nil, L("Clic : ouvrir Comment faire... ?") }
+        items[#items + 1] = { WP.MODULE_ICON.help, L("Comment faire... ?"), function() if WP.Help then WP.Help.Toggle() end end, nil, nil, nil, L("Clic : ouvrir « Comment faire... ? »") }
         items[#items + 1] = { { hd = "gear" }, L("Réglages"), function() if WP.OpenHub then WP.OpenHub("general") end end, nil, nil, nil, L("Clic : ouvrir les réglages") }
         items[#items + 1] = { { hd = "mail" }, L("Nous écrire"), function() if WP.Feedback then WP.Feedback("idea") end end, nil, nil, nil, L("Clic : ouvrir le formulaire pour nous écrire") }
         local y = -4

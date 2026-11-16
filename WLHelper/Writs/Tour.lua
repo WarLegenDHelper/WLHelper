@@ -25,12 +25,12 @@ ns.AddEnglish({
     -- the page (its nav item, Writs/Options.lua)
     ["Bienvenue"] = "Welcome",
     ["Tout régler pas à pas, et la visite guidée."] = "Set everything up step by step, and the guided tour.",
-    ["Clic : ouvrir Bienvenue"] = "Click: open Welcome",
+    ["Clic : ouvrir la page Bienvenue"] = "Click: open Welcome",
     ["Ta mise en route"] = "Getting set up",
     ["Dans l'ordre que tu veux. Une étape se coche toute seule quand c'est réglé, ou avec « C'est fait »."] = "In any order. A step ticks itself once it's set, or with \"Done\".",
     ["Tout est réglé. La visite reste là si tu veux revoir où est chaque chose."] = "All set. The tour is still here if you want to see where everything is again.",
-    ["Rouvrir le démarrage rapide"] = "Reopen the quick start",
-    ["Clic : rouvrir l'écran de démarrage (modules, spé, clics)"] = "Click: reopen the first screen (modules, spec, clicks)",
+    ["Rouvrir l'écran de bienvenue"] = "Reopen the welcome screen",
+    ["Clic : rouvrir l'écran de bienvenue (modules, spé, clics)"] = "Click: reopen the welcome screen (modules, spec, clicks)",
     ["C'est fait"] = "Done",
     ["Clic : cocher cette étape"] = "Click: tick this step",
     ["Décocher"] = "Untick",
@@ -65,7 +65,7 @@ ns.AddEnglish({
     ["Un clic ouvre l'Accueil, un clic droit le menu des modules. Fais-le glisser pour le déplacer autour de la minimap."] = "Click to open Home, right-click for the module menu. Drag it to move it around the minimap.",
     -- quests and dungeons
     ["Plusieurs donjons donnent une seule route, depuis là où tu es. Les raids et les quêtes de classe sont là aussi."] = "Several dungeons make one route, from where you stand. Raids and class quests are there too.",
-    ["Le résumé du donjon"] = "The dungeon overview",
+    ["La vue d'ensemble du donjon"] = "The dungeon overview",
     ["Les quêtes, l'entrée, les boss et ce qu'il faut avant d'entrer, sur une seule page."] = "The quests, the entrance, the bosses and what you need before going in, on one page.",
     ["Le bouton de l'étape"] = "The step's button",
     ["Il fait l'action de l'étape en cours : lancer le GPS, choisir un guide, entrer dans le donjon."] = "It does the current step's action: start the GPS, pick a guide, enter the dungeon.",
@@ -190,7 +190,7 @@ local STEPS = {
       can = function() return root.ShowGuide ~= nil and root.ShowOverview ~= nil end,
       open = function() CloseHub(); if not Shown(root.frame) then root.ShowGuide() end end,
       target = function() return root.frame and root.frame.ovBtn end,
-      title = "Le résumé du donjon", text = "Les quêtes, l'entrée, les boss et ce qu'il faut avant d'entrer, sur une seule page." },
+      title = "La vue d'ensemble du donjon", text = "Les quêtes, l'entrée, les boss et ce qu'il faut avant d'entrer, sur une seule page." },
     { id = "go", group = "quests", module = "dungeons", win = G("WLDTFrame"),
       can = function() return root.ShowGuide ~= nil end,
       open = function() CloseHub(); if not Shown(root.frame) then root.ShowGuide() end end,
@@ -247,7 +247,7 @@ local STEPS = {
       can = function() return WP.Shared ~= nil and WP.Shared.Show ~= nil end,
       open = function() CloseHub(); if not Shown(_G.WLHelperShared) then WP.Shared.Show() end end,
       target = G("WLHelperShared"),
-      title = "Les quêtes en commun", text = "Qui dans la guilde a les mêmes quêtes de donjon que toi, pour grouper. Le partage se règle dans Réglages, Guilde." },
+      title = "Les quêtes en commun", text = "Qui dans la guilde a les mêmes quêtes de donjon que toi, pour grouper. Le partage se règle dans Réglages > Guilde." },
     { id = "keys", group = "guild", module = "keys", win = G("WLHelperKeys"),
       can = function() return WP.ToggleKeys ~= nil end,
       open = function() CloseHub(); Ensure("WLHelperKeys", WP.ToggleKeys)() end,
@@ -610,10 +610,10 @@ local function BuildIntro()
     c.stack = root.TextStack(c)
     c.tour = S.Button(c, L("Faire la visite"), 0, 28, "primary", function() Tour.Start() end,
         { L("Faire la visite"), L("Clic : lancer la visite guidée") })
-    c.quick = S.Button(c, L("Rouvrir le démarrage rapide"), 0, 28, "ghost", function()
+    c.quick = S.Button(c, L("Rouvrir l'écran de bienvenue"), 0, 28, "ghost", function()
         if WP.CloseHub then WP.CloseHub() end
         if WP.ShowWelcome then WP.ShowWelcome(true) end
-    end, { L("Rouvrir le démarrage rapide"), L("Clic : rouvrir l'écran de démarrage (modules, spé, clics)") })
+    end, { L("Rouvrir l'écran de bienvenue"), L("Clic : rouvrir l'écran de bienvenue (modules, spé, clics)") })
     c.quick:SetShown(WP.ShowWelcome ~= nil)
     return c
 end

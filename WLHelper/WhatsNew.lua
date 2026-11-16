@@ -2,6 +2,11 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.86", date = "2026-11-16", items = {
+    { s = "fix", fr = { "Points de la route vérifiés", "Contre LibForeverData, NaowhForever et Questie pour les 439 quêtes du guide : 6 points d'objectif déplacés vers le camp principal (Fledgling Chillwind, Burning Blade Summoner, Young Wavethrasher, Crag Coyote, Pathstrider, Cliff Breaker), Bath'rah the Windwatcher suit son chemin, et Nazeer Bloodpike porte son vrai nom." }, en = { "Route points checked against 3 sources for all 439 guide quests: 6 objective points moved to the main camp, one more patrolling NPC, one name fixed.", "" } },
+    { s = "chg", fr = { "Textes relus dans toute l'interface", "« Writ » toujours avec une majuscule, chemins des réglages écrits d'une seule façon (« Réglages > Général > Modules »), noms de fenêtres entre « », et deux renvois corrigés." }, en = { "French text proofread across the UI.", "" } },
+    { s = "chg", fr = { "Moins de travail en jeu", "Moins de calculs à chaque barre de nom et sur ta cible, la flèche crée moins de déchets mémoire, et les anciens prix de l'HV ne restent plus dans la sauvegarde." }, en = { "Less work in game", "Nameplates, arrow, saved AH prices." } },
+  } },
   { v = "1.0.0-beta.85", date = "2026-11-16", items = {
     { s = "add", fr = { "GPS en vol", "La flèche affiche « En vol vers Kargath », l'étape suivante et le temps restant." }, en = { "In flight, the arrow shows the destination, next step and time left.", "" } },
     { s = "add", fr = { "Aller à", "Chaque lieu affiche le temps du trajet (vols et téléports compris), et l'infobulle donne le chemin (« Pierre de foyer → vol jusqu'à Kargath → 300 m à pied »)." }, en = { "Go to shows trip time and the itinerary.", "" } },
@@ -121,15 +126,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "Bouton « Choisir les donjons »", "Dans le guide." }, en = { "\"Pick dungeons\" button in the guide.", "" } },
     { s = "fix", fr = { "Images des raids", "Onyxia, Hyjal et Barrow Deeps ont une image tirée du jeu." }, en = { "Raid cards get a picture from the game.", "" } },
     { s = "fix", fr = { "Icône de récompense", "Quand le serveur ne connaît pas le numéro donné par la base de quêtes." }, en = { "Reward icon fallback through LibForeverData.", "" } },
-  } },
-  { v = "1.0.0-beta.71", date = "2026-11-15", items = {
-    { s = "add", fr = { "Prêt pour le donjon ?", "En haut du résumé, sous l'entrée : « Prêt : tu as les 7 quêtes à prendre dehors », ou « Il te manque 2 quêtes à prendre avant d'entrer » avec leurs noms (survol : qui la donne et où ; clic : le GPS y va), celles qui attendent une autre quête ou un niveau, et combien se prennent dans le donjon. Chaque carte dit aussi « À prendre » ou « Dans le donjon »." }, en = { "Ready to go in? The summary says whether every quest to pick up outside is in your log, and which are missing.", "" } },
-    { s = "add", fr = { "Artisans en haut des commandes", "Dans un métier, une ligne de pastilles sous son nom (« Fallanx · 38 », point vert en ligne) ; un clic ouvre ses recettes ; ceux qui n'ont rien partagé sont en gris avec l'explication au survol. La section du bas disparaît." }, en = { "Crafters shown as pills at the top of a profession's catalogue.", "" } },
-    { s = "add", fr = { "Clic droit sur un portrait de boss", "Le marque tué ou pas tué, pour les boss que l'addon n'a pas vus mourir." }, en = { "Right-click a boss portrait to mark it killed or not.", "" } },
-    { s = "fix", fr = { "Zul'Farrak", "Ukorz Sandscalp est le dernier boss, juste après Ruuzlu ; Velratha et Gahz'rilla passent avant." }, en = { "Zul'Farrak", "Ruuzlu and Chief Ukorz last." } },
-    { s = "fix", fr = { "Boss morts non cochés", "Une mort se voit aussi sur la barre de nom du boss et, en fin de combat, sur les cibles du groupe." }, en = { "Boss kills also seen on nameplates and the group's targets.", "" } },
-    { s = "fix", fr = { "Points d'interrogation à la place des récompenses", "Un objet connu seulement par son nom retrouve son numéro dans LibForeverData (vraie icône, qualité, comparaison)." }, en = { "Reward icons", "Names matched to item ids through LibForeverData." } },
-    { s = "fix", fr = { "Commander", "Quand un seul artisan sait fabriquer l'objet, l'infobulle le dit simplement, sans la ligne Maj-clic." }, en = { "Order tooltip", "No shift-click line when only one crafter can make it." } },
-    { s = "fix", fr = { "Étape « prêt ? » du guide", "Une quête qu'on rend dans le donjon compte aussi parmi celles à prendre avant d'entrer." }, en = { "The guide's ready step also counts quests turned in inside.", "" } },
   } },
 }

@@ -248,7 +248,7 @@ WP.WELCOME = {
               { { Word("Ma fiche"), Word("Ma fiche d'artisan"), Word("Partager mes recettes") } })
       end },
     { key = "shared", group = "guild", title = "Les quêtes en commun",
-      text = "Qui dans la guilde a les mêmes quêtes de donjon que toi, pour grouper. Le partage se règle dans Réglages, Guilde.",
+      text = "Qui dans la guilde a les mêmes quêtes de donjon que toi, pour grouper. Le partage se règle dans Réglages > Guilde.",
       button = "Voir les quêtes",
       shown = function() return On("guild") and WP.Shared ~= nil and WP.Shared.Show ~= nil end,
       open = function() CloseHub(); WP.Shared.Show() end },
@@ -281,7 +281,7 @@ ns.AddEnglish({
     ["Dis à la guilde si tu es disponible pour fabriquer, avec une note si tu veux (horaires, ce que tu fournis)."] = "Tell the guild whether you're available to craft, with a note if you like (hours, what you provide).",
     ["Voir ma fiche"] = "See my card",
     ["Les quêtes en commun"] = "Shared quests",
-    ["Qui dans la guilde a les mêmes quêtes de donjon que toi, pour grouper. Le partage se règle dans Réglages, Guilde."] = "Who in the guild has the same dungeon quests as you, to group up. Sharing is set in Settings, Guild.",
+    ["Qui dans la guilde a les mêmes quêtes de donjon que toi, pour grouper. Le partage se règle dans Réglages > Guilde."] = "Who in the guild has the same dungeon quests as you, to group up. Sharing is set in Settings > Guild.",
     ["Voir les quêtes"] = "See the quests",
     ["Le passeport des clés"] = "The key passport",
     ["Les clés de donjon que tu as, et qui dans la guilde a celles qui te manquent."] = "The dungeon keys you have, and who in the guild has the ones you're missing.",

@@ -39,7 +39,7 @@ local S = {
     TT_HOME = "Clic : revenir à l'accueil", TT_SETTINGS = "Clic : ouvrir les réglages du guide",
     TT_PICKBTN = "Clic : choisir les donjons, raids ou quêtes de classe de la route", TT_MORE = "Clic : marquer l'étape, recalculer la route, flèche GPS, boss du donjon",
     -- the Actions menu
-    M_SHARE = "Partager les quêtes au groupe", M_RECALC = "Recalculer la route d'ici", M_POINTS = "Poser les points sur la carte",
+    M_SHARE = "Partager les quêtes avec le groupe", M_RECALC = "Recalculer la route d'ici", M_POINTS = "Poser les points sur la carte",
     M_SKIP = "Marquer l'étape comme faite", M_UNSKIP = "Remettre l'étape à faire", M_ARROW = "Flèche GPS", M_BOSSES = "Boss du donjon", M_AUTO = "Points posés à chaque étape",
     M_LIST = "Liste des étapes", ON = "oui", OFF = "non",
     M_JOURNAL = "Journal du donjon (boss, butin)", TT_JOURNAL = "Ouvre les boss et le butin du donjon de l'étape dans le journal de donjon installé.",
@@ -187,9 +187,9 @@ local S = {
     TR_ON = "Suivi du guide affiché. Tape /wlh tracker pour le cacher.", TR_OFF = "Suivi du guide caché. Tape /wlh tracker pour le remettre.",
     TR_NOROUTE = "Aucune route en cours. Tape /wlh pick pour choisir un guide.",
     TR_MARKED = "Étape marquée comme faite : %s",
-    TR_GUIDE_OFF = "Le guide de quêtes est désactivé : le suivi revient quand tu le réactives dans Réglages > Général > Modules.",
+    TR_GUIDE_OFF = "Le guide de quêtes est éteint : le suivi revient quand tu le rallumes dans Réglages > Général > Modules.",
     -- key binding: target and mark
-    B_TARGET = "Cibler la cible de l'étape",
+    B_TARGET = "Cibler le PNJ ou le monstre de l'étape",
     TARGET_LATER = "Le raccourci de ciblage sera prêt à la fin du combat.",
     SHARE_N1 = "Partager %d quête", SHARE_N = "Partager %d quêtes",
     -- prerequisite chains and the ranked status words (picker, list and card)
@@ -431,7 +431,7 @@ local S = {
     TR_MARKED = "Step marked as done: %s",
     TR_GUIDE_OFF = "The quest guide is turned off: the tracker comes back when you turn it on in Settings > General > Modules.",
     -- key binding: target and mark
-    B_TARGET = "Target the step's target",
+    B_TARGET = "Target the step's NPC or mob",
     TARGET_LATER = "The targeting key will be ready after combat.",
     SHARE_N1 = "Share %d quest", SHARE_N = "Share %d quests",
     -- prerequisite chains and the ranked status words (picker, list and card)

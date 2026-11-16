@@ -35,7 +35,7 @@ ns.AddEnglish({
     ["Où tu en es, et tout ce que WL Helper peut ouvrir."] = "Where you stand, and everything WL Helper can open.",
     ["Chercher un réglage"] = "Search settings",
     ["Quoi de neuf"] = "What's new",
-    ["Clic : ouvrir Quoi de neuf"] = "Click: open What's new",
+    ["Clic : ouvrir « Quoi de neuf »"] = "Click: open What's new",
     ["Général"] = "General", ["Donjons"] = "Dungeons", ["Writs"] = "Writs", ["GPS"] = "GPS",
     ["Sacs"] = "Bags", ["Améliorations"] = "Upgrades", ["À propos"] = "About",
     ["Modules, clics, langue et fenêtres."] = "Modules, clicks, language and windows.",
@@ -1423,7 +1423,7 @@ local function BuildBody()
     body.foot = foot
     local WP = ns.WP
     local function Away(fn) return function() if win then win:Hide() end; fn() end end
-    foot.news = S.IconButton(foot, "star", 28, { L("Quoi de neuf"), L("Clic : ouvrir Quoi de neuf") },
+    foot.news = S.IconButton(foot, "star", 28, { L("Quoi de neuf"), L("Clic : ouvrir « Quoi de neuf »") },
         Away(function() if root.ShowWhatsNew then root.ShowWhatsNew(WLDTDB and WLDTDB.newsFrom) end end))
     foot.news:SetPoint("LEFT", 12, 0)
     foot.mail = S.IconButton(foot, "mail", 28,
@@ -1446,7 +1446,7 @@ local function BuildBody()
         local b = S.NavItem(parent, {
             key = def.key, label = L(def.label), icon = def.icon,
             tip = { L(def.label), L(def.desc), def.key == "home" and L("Clic : ouvrir l'Accueil")
-                or def.key == "welcome" and L("Clic : ouvrir Bienvenue") or L("Clic : afficher ces réglages") },
+                or def.key == "welcome" and L("Clic : ouvrir la page Bienvenue") or L("Clic : afficher ces réglages") },
             onClick = function(self) ns.WP.OpenHub(self.key) end,
             onHover = PaintNavLater,
         })
@@ -1605,7 +1605,7 @@ local function BuildWindow()
     if ns.WP.Help then
         -- the tip is read on hover: it follows a language change
         win.help = S.IconButton(win.header, "info", 28, function()
-            return { L("Comment faire... ?"), L("Les gestes utiles, pas à pas"), L("Clic : ouvrir Comment faire... ?") }
+            return { L("Comment faire... ?"), L("Les gestes utiles, pas à pas"), L("Clic : ouvrir « Comment faire... ? »") }
         end, function()
             win:Hide(); if ns.WP.Help then ns.WP.Help.Toggle() end
         end)

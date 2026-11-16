@@ -286,7 +286,7 @@ ns.AddEnglish({
     ["Commander à nouveau"] = "Order again",
     ["Clic : refaire la même commande"] = "Click: place the same order again",
     ["Clic : la proposer à toute la guilde"] = "Click: offer it to the whole guild",
-    ["Refusée par %s : Commander à nouveau la propose à toute la guilde."] = "Declined by %s: Order again offers it to the whole guild.",
+    ["Refusée par %s : « Commander à nouveau » la propose à toute la guilde."] = "Declined by %s: Order again offers it to the whole guild.",
     ["Écrire à %s"] = "Message %s",
     ["Pourboire pour %s : %s au total. Il est payé à la réception (contre-remboursement) ou en échange."] =
         "Tip for %s: %s in total. It is paid on receipt (cash on delivery) or by trade.",
@@ -2990,7 +2990,7 @@ function H.Search(f, q)
             r.btn:SetText(L("Commander")); r.btn:Show()
             r.btnTip = { L("Commander"), L("Toute la guilde verra ta commande."), L("Clic : commander à la guilde") }
             local qc = id > 0 and S.QualityColor(id) or C.fg
-            r.tip = { S.Hex(qc) .. it.name .. "|r", det, L("Clic : voir qui le fabrique"), id > 0 and L("Maj-clic : le lier dans la discussion") or nil }
+            r.tip = { S.Hex(qc) .. it.name .. "|r", det, L("Clic : voir qui le fabrique"), id > 0 and L("Maj-clic : le lier dans le chat") or nil }
             H.SetFlag(r, id)
             r.onRowClick = function()
                 Save()
@@ -3204,7 +3204,7 @@ ns.AddEnglish({
     ["%s · %s en ligne"] = "%s · %s online",
     ["%s · personne en ligne"] = "%s · nobody online",
     ["Clic : voir qui le fabrique"] = "Click: see who makes it",
-    ["Maj-clic : le lier dans la discussion"] = "Shift-click: link it in chat",
+    ["Maj-clic : le lier dans le chat"] = "Shift-click: link it in chat",
     ["Utilisé dans 1 recette"] = "Used in 1 recipe",
     ["Utilisé dans %d recettes"] = "Used in %d recipes",
     ["Clic : voir les objets faits avec"] = "Click: see the items made with it",
@@ -4118,7 +4118,7 @@ local function PaintOrder(c, o, side)
     elseif stt == "delivered" then
         nxt = L("Commande terminée.")
     elseif side == "mine" and stt == "declined" then
-        nxt = string.format(L("Refusée par %s : Commander à nouveau la propose à toute la guilde."), o.by or "?")
+        nxt = string.format(L("Refusée par %s : « Commander à nouveau » la propose à toute la guilde."), o.by or "?")
     end
     -- my crafter is in a dungeon (quiet mode): the order waits, and where it stands in their line
     local qx = side == "mine" and not mineTurn and (stt == "open" or stt == "accepted") and (o.by or o.to) or nil

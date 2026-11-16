@@ -43,11 +43,11 @@ ns.AddEnglish({
     ["Impossible de guider vers ce point : la carte de cette zone n'est pas lisible."] = "Can't guide you there: this zone's map can't be read.",
     ["Le GPS ne connaît pas encore tes points de vol : parle à un maître de vol pour qu'il les apprenne."] =
         "The GPS doesn't know your flight paths yet: talk to a flight master so it can learn them.",
-    ["Tournée GPS terminée : plus aucun writ prêt à rendre."] = "GPS tour finished: no writ left to turn in.",
+    ["Tournée GPS terminée : plus aucun Writ prêt à rendre."] = "GPS tour finished: no Writ left to turn in.",
     ["GPS : en route vers %s (%s %.0f, %.0f) pour rendre %s."] = "GPS: on the way to %s (%s %.0f, %.0f) to turn in %s.",
     ["le lieu de remise"] = "the turn-in spot",
-    ["C'est le dernier writ à rendre."] = "It's the last writ to turn in.",
-    ["%d writs à rendre en tout."] = "%d writs to turn in altogether.",
+    ["C'est le dernier Writ à rendre."] = "It's the last Writ to turn in.",
+    ["%d Writs à rendre en tout."] = "%d Writs to turn in altogether.",
     ["Ouvre son enveloppe avant d'arriver."] = "Open its envelope before you get there.",
     ["Pierre de foyer"] = "Hearthstone",
     ["Rappel astral"] = "Astral Recall",
@@ -192,9 +192,19 @@ end
 
 -- ---------------------------------------------------------------- positions
 
+-- One map vector reused for every question (the arrow asks 20 times a second, the router once per
+-- point): the game only reads it during the call, so no new table each time.
+local scratchVec
 local function World(map, x, y)   -- x, y from 0 to 1
     if not (C_Map and C_Map.GetWorldPosFromMapPos and CreateVector2D and map) then return end
-    local ok, cont, pos = pcall(C_Map.GetWorldPosFromMapPos, map, CreateVector2D(x, y))
+    local v = scratchVec
+    if v then
+        if v.SetXY then v:SetXY(x, y) else v.x, v.y = x, y end
+    else
+        v = CreateVector2D(x, y)
+        if type(v) == "table" then scratchVec = v end
+    end
+    local ok, cont, pos = pcall(C_Map.GetWorldPosFromMapPos, map, v)
     if ok and cont and pos and pos.GetXY then
         local wx, wy = pos:GetXY()
         return cont, wx, wy
@@ -1319,7 +1329,7 @@ function WP.GoNext()
     if not stop then
         WLWritsCharDB.gps = false
         GPS.Stop("writs")
-        WP.Print(L("Tournée GPS terminée : plus aucun writ prêt à rendre."))
+        WP.Print(L("Tournée GPS terminée : plus aucun Writ prêt à rendre."))
         if WP.OnGPSChanged then WP.OnGPSChanged() end
         return
     end
@@ -1327,7 +1337,7 @@ function WP.GoNext()
     GPS.Go(w)
     local msg = string.format(L("GPS : en route vers %s (%s %.0f, %.0f) pour rendre %s."), w.npcName or L("le lieu de remise"),
         WP.ZoneName(w.map), w.x, w.y, WP.ItemName(w.item, w.itemName))
-    msg = msg .. " " .. (count == 1 and L("C'est le dernier writ à rendre.") or string.format(L("%d writs à rendre en tout."), count))
+    msg = msg .. " " .. (count == 1 and L("C'est le dernier Writ à rendre.") or string.format(L("%d Writs à rendre en tout."), count))
     if stop.state == "bag" then msg = msg .. " " .. L("Ouvre son enveloppe avant d'arriver.") end
     WP.Print(msg)
 end

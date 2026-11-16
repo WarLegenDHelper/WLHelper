@@ -7,6 +7,8 @@ local _, ns = ...
 local PATHS = {
   -- Rexxar: his spawn at the north end of the Desolace road (Stonetalon border), then northern Feralas
   Rexxar = { m = 1444, sp = { { 54, 2, 1443 }, { 44.8, 7.4 }, { 46.4, 18.2 } } },
+  -- Bath'rah the Windwatcher: from his spot by the stream in eastern Alterac, north up the bank and back
+  ["Bath'rah the Windwatcher"] = { m = 1416, sp = { { 80.5, 66.9 }, { 79.2, 65.7 }, { 79.4, 63.7 }, { 80.4, 63 } } },
 }
 
 for _, q in pairs(ns.Q or {}) do

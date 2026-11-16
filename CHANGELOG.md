@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.86] — 2026-11-16
+
+### Corrigé / Fixed
+- **Points de la route vérifiés** contre LibForeverData, NaowhForever et Questie pour les 439 quêtes du guide : 6 points d'objectif déplacés vers le camp principal (Fledgling Chillwind, Burning Blade Summoner, Young Wavethrasher, Crag Coyote, Pathstrider, Cliff Breaker), Bath'rah the Windwatcher suit son chemin, et Nazeer Bloodpike porte son vrai nom.
+  *Route points checked against 3 sources for all 439 guide quests: 6 objective points moved to the main camp, one more patrolling NPC, one name fixed.*
+
+### Modifié / Changed
+- **Textes relus dans toute l'interface** : « Writ » toujours avec une majuscule, chemins des réglages écrits d'une seule façon (« Réglages > Général > Modules »), noms de fenêtres entre « », et deux renvois corrigés.
+  *French text proofread across the UI.*
+- **Moins de travail en jeu** : moins de calculs à chaque barre de nom et sur ta cible, la flèche crée moins de déchets mémoire, et les anciens prix de l'HV ne restent plus dans la sauvegarde.
+  *Less work in game: nameplates, arrow, saved AH prices.*
+
 ## [1.0.0-beta.85] — 2026-11-16
 
 ### Ajouté / Added

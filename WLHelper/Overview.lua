@@ -98,7 +98,7 @@ local STR = {
     SUM_IT1 = "%d objet", SUM_IT = "%d objets",
     SUM_IT_UP1 = "%s dont %d amélioration", SUM_IT_UP = "%s dont %d améliorations",
     SUM_UP_PCT = "+%d\194\160%%", SUM_UP_EMPTY = "vide", SUM_UP_EMPTY_TT = "Tu n'as rien à cet emplacement.",
-    SUM_BEST = "Ton meilleur choix", SUM_BEST_TT = "Le meilleur choix pour ta spécialisation parmi les récompenses au choix.",
+    SUM_BEST = "Ton meilleur choix", SUM_BEST_TT = "Le meilleur choix pour ta spé parmi les récompenses au choix.",
     SUM_RDY_OK1 = "Prêt : tu as la quête à prendre dehors", SUM_RDY_OK = "Prêt : tu as les %d quêtes à prendre dehors",
     SUM_RDY_IN1 = "%d autre se prend dans le donjon", SUM_RDY_IN = "%d autres se prennent dans le donjon",
     SUM_RDY_INALL1 = "Ta quête se prend dans le donjon", SUM_RDY_INALL = "Tes quêtes se prennent toutes dans le donjon",

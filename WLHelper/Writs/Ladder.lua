@@ -133,7 +133,20 @@ local f = CreateFrame("Frame")
 pcall(f.RegisterEvent, f, "COMMODITY_SEARCH_RESULTS_UPDATED")
 pcall(f.RegisterEvent, f, "ITEM_SEARCH_RESULTS_UPDATED")
 pcall(f.RegisterEvent, f, "AUCTION_HOUSE_CLOSED")
+pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
+-- At login: the ladders past FRESH are dropped from the saved file. WP.Ladder never reads them
+-- again (a new visit to the auction house asks afresh), so they only made the file grow.
+function WP.LadderPrune()
+    local b = WLWritsDB and WLWritsDB.ladder
+    if type(b) ~= "table" then return 0 end
+    local now, n = time(), 0
+    for id, e in pairs(b) do
+        if not (type(e) == "table" and type(e.t) == "number" and now - e.t < FRESH) then b[id] = nil; n = n + 1 end
+    end
+    return n
+end
 f:SetScript("OnEvent", function(_, e, a1)
+    if e == "PLAYER_LOGIN" then pcall(WP.LadderPrune); return end
     if e == "AUCTION_HOUSE_CLOSED" then queue = {}; current = nil; return end
     if not current then return end
     if e == "COMMODITY_SEARCH_RESULTS_UPDATED" and a1 == current.id then
