@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.78", date = "2026-11-16", items = {
+    { s = "fix", fr = { "Échap ne ferme plus le guide", "On le suit en jouant, il se ferme avec sa croix. Ça règle aussi pour de bon sa fermeture après un téléport." }, en = { "Escape no longer closes the guide; close it with its X.", "" } },
+  } },
   { v = "1.0.0-beta.77", date = "2026-11-16", items = {
     { s = "fix", fr = { "Centaur Pariah (Maraudon)", "Il fait des allers-retours sur le chemin au sud du Convent de Mannoroc. Le repère est maintenant au milieu de son trajet, et l'étape dit de suivre le chemin vers l'ouest s'il n'est pas là." }, en = { "Centaur Pariah patrols", "The marker is now mid-path, with a note to follow the path." } },
   } },
@@ -83,9 +86,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.64", date = "2026-11-15", items = {
     { s = "chg", fr = { "Fenêtre des boss façon Dungeon Journal", "En haut, la sortie en cours (Temps, XP, Or) avec « Nouveau run » ; puis les boss en **portraits ronds**, 5 par ligne, dans l'ordre du donjon (tués : grisés avec une coche) ; puis les **Rares** en silhouettes grises tant que tu ne les as pas vus, en couleur avec un anneau argenté ensuite. Chaque créature a un vrai visage (modèle du jeu, portrait vu en jeu, ou icône de sa famille). Un clic sur un portrait le cible et le marque. /wlh boss." }, en = { "Boss panel like Dungeon Journal", "Run stats, round portraits, rares greyed until seen." } },
     { s = "chg", fr = { "Bilan de sortie", "En quittant le donjon, une ligne dans le chat (« Zul'Farrak : 32 min · 38 200 XP · 12 po · 7/7 boss »)." }, en = { "", "" } },
-  } },
-  { v = "1.0.0-beta.63", date = "2026-11-15", items = {
-    { s = "chg", fr = { "Résumé du donjon plus lisible", "Bouton **« Lancer la route »** en bas à droite (ou « Mettre à jour la route » / « Retour à la route » quand une route tourne déjà) ; les quêtes déjà rendues sont repliées en bas ; quand tout est fait, « Tu as déjà rendu toutes les quêtes de … » avec « Choisir un autre donjon » ; une ligne par quête avec niveau, XP et argent ; le total de ta sélection en haut." }, en = { "Clearer dungeon summary with a Start the route button.", "" } },
-    { s = "chg", fr = { "Vue groupe", "Des colonnes seulement pour les membres dont on connaît l'état (WL Helper ou réponse au partage), une icône par case ; les autres en une ligne « Sans WL Helper : … »." }, en = { "", "" } },
   } },
 }

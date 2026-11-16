@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.78] — 2026-11-16
+
+### Corrigé / Fixed
+- **Échap ne ferme plus le guide** : on le suit en jouant, il se ferme avec sa croix. Ça règle aussi pour de bon sa fermeture après un téléport.
+  *Escape no longer closes the guide; close it with its X.*
+
 ## [1.0.0-beta.77] — 2026-11-16
 
 ### Corrigé / Fixed

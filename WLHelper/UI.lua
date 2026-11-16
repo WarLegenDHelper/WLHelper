@@ -2128,8 +2128,8 @@ local function Build()
   if ns.RegisterWindow then ns.RegisterWindow(f) end
   -- older saves kept a card height that capped the card for good: only the width is kept now
   if WLDTDB.size then WLDTDB.size[2] = nil; ns.Relayout(WLDTDB.size[1]) end
-  -- Escape closes the guide like every window (OnHide above remembers it)
-  tinsert(UISpecialFrames, "WLDTFrame")
+  -- Not in UISpecialFrames: the guide is followed while playing, Escape must not close it (the
+  -- player closes it with its X), and the game empties that list on loading screens too
   -- the bosses and rares panel hangs under the guide (by position only: the guide stays unprotected)
   if ns.AttachBosses then ns.AttachBosses(f) end
 end
