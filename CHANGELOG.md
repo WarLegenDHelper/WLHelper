@@ -6,6 +6,21 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.94] — 2026-11-17
+
+### Corrigé / Fixed
+- **Check-list du Temple englouti** : les objectifs de la chaîne du Sceptre des Sables changeants (Tête du seigneur des couvées Lanistaire, Fragments de carapace silithide, quêtes de raid de niveau 60) ne s'affichent plus ; une quête que tu ne peux pas encore prendre n'ajoute plus d'objectif « à finir dehors ».
+  *Sunken Temple checklist no longer lists the level 60 raid chain.*
+- **Données de quêtes vérifiées** :
+  - L'Ichor de non-mort se farme sur les Highborne du sud-ouest d'Azshara (plus Nathanos) ou s'achète à l'HV.
+  - Calice spectral et Nogg : rubis et barres sans point fixe (mines, fonte ou HV).
+  - Souvenir de la mémoire : le bon point à Stromgarde.
+  - Test de toxicité : zone des trois chemins des Diablosaures.
+  - Unending Torment : le sérum s'utilise à l'étage près d'Othmar.
+  - La corruption de Vylelangue ajoutée côté Alliance (Talendria).
+  - Powering the Pylons : note précisée (Tamis à mana en 45.9, 78.2).
+  *Quest data checked against two sources; Alliance Vyletongue Corruption added.*
+
 ## [1.0.0-beta.93] — 2026-11-17
 
 ### Ajouté / Added

@@ -2,6 +2,17 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.94", date = "2026-11-17", items = {
+    { s = "fix", fr = { "Check-list du Temple englouti", "Les objectifs de la chaîne du Sceptre des Sables changeants (Tête du seigneur des couvées Lanistaire, Fragments de carapace silithide, quêtes de raid de niveau 60) ne s'affichent plus ; une quête que tu ne peux pas encore prendre n'ajoute plus d'objectif « à finir dehors »." }, en = { "Sunken Temple checklist no longer lists the level 60 raid chain.", "" } },
+    { s = "fix", fr = { "Données de quêtes vérifiées", "" }, en = { "", "" } },
+    { s = "fix", fr = { "", "L'Ichor de non-mort se farme sur les Highborne du sud-ouest d'Azshara (plus Nathanos) ou s'achète à l'HV." }, en = { "", "" } },
+    { s = "fix", fr = { "", "Calice spectral et Nogg : rubis et barres sans point fixe (mines, fonte ou HV)." }, en = { "", "" } },
+    { s = "fix", fr = { "", "Souvenir de la mémoire : le bon point à Stromgarde." }, en = { "", "" } },
+    { s = "fix", fr = { "", "Test de toxicité : zone des trois chemins des Diablosaures." }, en = { "", "" } },
+    { s = "fix", fr = { "", "Unending Torment : le sérum s'utilise à l'étage près d'Othmar." }, en = { "", "" } },
+    { s = "fix", fr = { "", "La corruption de Vylelangue ajoutée côté Alliance (Talendria)." }, en = { "", "" } },
+    { s = "fix", fr = { "", "Powering the Pylons : note précisée (Tamis à mana en 45.9, 78.2)." }, en = { "Quest data checked against two sources; Alliance Vyletongue Corruption added.", "" } },
+  } },
   { v = "1.0.0-beta.93", date = "2026-11-17", items = {
     { s = "add", fr = { "Zones sur la carte", "Quand les objets ou monstres d'un objectif sont éparpillés (ex. Artefacts atal'ai dans l'eau autour de l'île du bassin des larmes), une zone est dessinée sur la carte du monde et la minimap, la flèche mène au plus proche, et l'étiquette dit « Dans la zone » ; 49 objectifs de 39 quêtes." }, en = { "Quest zones drawn for scattered targets; arrow to the nearest one.", "" } },
     { s = "add", fr = { "Horaires des zeppelins et bateaux", "« Zeppelin pour Grom'gol dans 1:20 » / « à quai, part dans 0:35 » ; horaires de NaowhForever s'il est installé, sinon relevés en jeu et partagés dans la guilde (et ceux de NauticusClassic / ForeverTransport) ; le GPS compte la vraie attente." }, en = { "Zeppelin and boat departure timers, used by the route planner.", "" } },
@@ -133,22 +144,5 @@ ns.WHATSNEW = {
     { s = "add", fr = { "Statut d'artisan dans la minimap", "« Artisan : Disponible » dans le menu, un clic passe à Occupé ou Absent." }, en = { "Crafter status in the minimap menu, click to change it.", "" } },
     { s = "add", fr = { "« Me prévenir quand quelqu'un sait le faire »", "Sur la page Demander : un message (et un son) quand un membre de la guilde apprend la recette." }, en = { "Get told when a guild member learns the recipe you asked for.", "" } },
     { s = "add", fr = { "Alertes des commandes", "Dans Réglages › Général › Commandes : favori qui se connecte, recette surveillée apprise, son." }, en = { "Orders alerts in Settings.", "" } },
-  } },
-  { v = "1.0.0-beta.79", date = "2026-11-16", items = {
-    { s = "add", fr = { "Trouver un groupe", "La fenêtre Groupes a un onglet de recherche de groupe pensé pour ton guide (donjons de ta route, de tes quêtes, de ton niveau), avec la guilde en premier : membres qui cherchent le même donjon, qui ont les mêmes quêtes, événement prévu. Filtres (rôle, classe, niveau, langue), notes des joueurs, messages groupés par personne, joueurs récents. /wlh lfg." }, en = { "Group finder in the Groups window, built around your guide and your guild: filters, player ratings, whispers by person, recent players.", "" } },
-    { s = "add", fr = { "Bienvenue et visite guidée", "Une page Bienvenue avec les réglages à faire pas à pas, et une visite qui montre chaque fonction à l'écran. /wlh bienvenue, /wlh visite." }, en = { "Welcome page with step-by-step setup and a replayable guided tour.", "" } },
-    { s = "add", fr = { "Quêtes du guide automatiques", "Accepter, rendre et partager les quêtes du guide tout seul (Réglages › Quêtes du guide)." }, en = { "Auto accept, turn in and share the guide's quests.", "" } },
-    { s = "add", fr = { "Les PNJ qui patrouillent", "Leur chemin est tracé sur la carte et la carte du guide dit « Il se déplace le long d'un chemin »." }, en = { "Patrolling NPCs", "Their path is drawn on the map." } },
-    { s = "add", fr = { "Budget des Writs", "Indique le maximum à dépenser, le plan choisit les Writs les plus rentables et les plus proches dans ce budget." }, en = { "Writs budget", "Set a max spend, the plan picks the best and nearest writs within it." } },
-    { s = "add", fr = { "Accueil des commandes", "Façon Mastercraft : fiche artisan, recherche, tuiles par métier, top de la semaine." }, en = { "Orders home", "Crafter card, search, profession tiles, weekly top." } },
-    { s = "add", fr = { "Marques BiS de Naowh", "Si NaowhForever est installé, ses listes BiS servent pour les marques ; ses poids de stats ne servent que pour une spé dont tu as changé les poids dans Naowh (mention « poids Naowh »). Sinon le % reste celui de notre outil (caps de toucher et défense, montée de niveau)." }, en = { "Naowh BiS lists used when installed; Naowh stat weights only for specs you customized there.", "" } },
-    { s = "chg", fr = { "Portraits", "Le bouton Cibler montre le visage du PNJ (ou une caisse pour un objet) au lieu d'une tête de mort." }, en = { "Target button shows the NPC portrait instead of a skull.", "" } },
-    { s = "chg", fr = { "Menu Actions", "Réduit à 4 entrées : étape faite, recalculer, flèche, boss du donjon." }, en = { "Actions menu down to 4 entries.", "" } },
-    { s = "chg", fr = { "Chaîne de quêtes en frise", "Dans la vue d'ensemble : numéros, trait, état, une ligne d'infos, détails au clic." }, en = { "Overview chain as a timeline.", "" } },
-    { s = "chg", fr = { "Choisir un guide", "En 3 ou 4 colonnes selon l'écran ; **modules du Hub** en deux colonnes ; **textes** mieux structurés (titres, puces) partout." }, en = { "Guide picker in 3-4 columns, hub modules in two columns, better text structure.", "" } },
-    { s = "chg", fr = { "Points du chemin", "Plus visibles et réglables (taille carte, minimap, couleur) ; **étiquette dans le monde** plus soignée (tige, anneau, grande distance)." }, en = { "Bigger, configurable path dots; polished world label.", "" } },
-    { s = "chg", fr = { "Équipement", "WL Helper Gear suit Geared Forever 1.1.1. Le réglage « baguette » est fusionné en un seul, et le choix « Méthode » des améliorations disparaît (automatique)." }, en = { "Gear synced to Geared Forever 1.1.1; wand settings merged; upgrade method is automatic.", "" } },
-    { s = "fix", fr = { "Budget des Writs", "Un Writ trop cher pour ce qui restait ne fait plus sauter les Writs moins chers de la même zone." }, en = { "Writs budget no longer skips cheaper writs behind a too-dear one.", "" } },
-    { s = "fix", fr = { "", "Les messages des commandes ne peuvent plus boucler quand beaucoup partent d'un coup." }, en = { "Orders messages can no longer loop when many are sent at once.", "" } },
   } },
 }

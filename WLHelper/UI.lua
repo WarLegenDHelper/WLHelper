@@ -1842,15 +1842,22 @@ local function OutsideLeft(log, gi)
   local out, req = {}, 0
   if not (dk and ns.StepDungeon and ns.StepPhase) then return out, 0 end
   local seen = {}
+  local okL, lvl = pcall(function() return tonumber(UnitLevel("player")) end)
+  lvl = okL and lvl or nil
   for i, st in ipairs(steps) do
     if not st.gate and not st.split and not st.ins and ns.StepDungeon(st) == dk and ns.StepPhase(st) == "before"
       and not IsStepDone(log, i) then
       for _, nd in ipairs(st.acts or {}) do
         local o = nd.kind == "o" and not nd.ins and (nd.oneObj or nd.obj) or nil
         local k = o and (tostring(nd.q) .. ":" .. tostring(nd.oi or nd.sub or o.n))
-        if o and not seen[k] and not ns.NodeOK(log, nd) then
+        -- a quest the player cannot take yet (above his level, not in the log) has nothing to
+        -- finish now: a level 60 chain ticked by hand lists no objective at level 55
+        local s = o and ns.State(log, nd.q)
+        local qd = o and ns.Q[nd.q]
+        local low = lvl and qd and qd.r and qd.r > lvl and s ~= "on" and s ~= "ready"
+        if o and not low and not seen[k] and not ns.NodeOK(log, nd) then
           seen[k] = true
-          local nm = ObjName(nd, o, log, ns.State(log, nd.q)) or ns.QName(nd.q)
+          local nm = ObjName(nd, o, log, s) or ns.QName(nd.q)
           local a, b = ns.ObjCount(log, nd.q, o)
           if not (a and b) then a, b = 0, (type(o.c) == "number" and o.c > 0) and o.c or 1 end
           local opt = BeforeReason(nd.q, dk) == false
