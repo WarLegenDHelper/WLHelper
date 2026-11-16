@@ -126,8 +126,8 @@ ns.AddEnglish({
     ["Calcul de l'itinéraire"] = "Route planner",
     ["WL Helper"] = "WL Helper", ["Zygor"] = "Zygor",
     ["Pas installé"] = "Not installed",
-    ["Automatique prend Zygor quand il est installé, sinon le GPS de WL Helper."] =
-        "Automatic uses Zygor when it is installed, otherwise the WL Helper GPS.",
+    ["Automatique garde le GPS de WL Helper et laisse ton guide Zygor tranquille. Choisis Zygor pour passer par son système de trajet."] =
+        "Automatic keeps the WL Helper GPS and leaves your Zygor guide alone. Pick Zygor to use its travel system.",
     ["Trajet"] = "Travel",
     ["Utiliser mes téléportations"] = "Use my teleports",
     ["Choisir le vol automatiquement"] = "Pick the flight automatically",
@@ -835,7 +835,7 @@ end
 
 function BUILD.gps(p)
     Section(p, L("Itinéraire"))
-    local row = Row(p, L("Calcul de l'itinéraire"), L("Automatique prend Zygor quand il est installé, sinon le GPS de WL Helper."))
+    local row = Row(p, L("Calcul de l'itinéraire"), L("Automatique garde le GPS de WL Helper et laisse ton guide Zygor tranquille. Choisis Zygor pour passer par son système de trajet."))
     local seg = Choice(p, row, {
         { "auto", L("Automatique") },
         { "wl", L("WL Helper") },
@@ -1724,8 +1724,8 @@ local function RegisterEllesmere()
                     toggle(L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
 
                     _, h = W:SectionHeader(parent, L("GPS"), y); y = y - h
-                    toggle(L("Utiliser Zygor quand il est installé"), function() return Gps().provider ~= "wl" end,
-                        function(v) SetGps("provider")(v and "auto" or "wl") end)
+                    toggle(L("Utiliser Zygor quand il est installé"), function() return Gps().provider == "zygor" end,
+                        function(v) SetGps("provider")(v and "zygor" or "auto") end)
                     toggle(L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"))
                     toggle(L("Masquer la flèche en combat"), function() return Gps().hideCombat end, SetGps("hideCombat"))
 

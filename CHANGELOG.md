@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.73] — 2026-11-16
+
+### Corrigé / Fixed
+- **Zygor** : la flèche de WL Helper ne prend plus la place de celle de ton guide Zygor. En « Automatique », c'est le GPS de WL Helper (avec son bouton pour l'arrêter) ; Zygor seulement si tu le choisis dans Réglages › GPS. Pour arrêter le GPS : `/wlh gps`.
+  *WL Helper no longer takes over your Zygor guide's arrow; Zygor only when you pick it.*
+
 ## [1.0.0-beta.72] — 2026-11-16
 
 ### Ajouté / Added

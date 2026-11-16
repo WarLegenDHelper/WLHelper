@@ -388,10 +388,9 @@ end
 function GPS.UseZygor()
     local Z = Zygor()
     if not Z then return false end
-    local p = Opt("provider", "auto")
-    if p == "zygor" then return true end
-    if p == "auto" then return Z.db and Z.db.profile and Z.db.profile.pathfinding and true or false end
-    return false
+    -- only when the player picked Zygor: on "auto" our point used to replace the waypoint of the
+    -- Zygor guide the player was following, and our stop button was hidden with our arrow
+    return Opt("provider", "auto") == "zygor"
 end
 
 -- Several events in a row (a loading screen fires a few) make one plan.
