@@ -7,6 +7,7 @@
 --   ville / city / tournee   Writs/CityTour.lua  the city tour card
 --   commun / quetes / quests Writs/SharedQuests  the dungeon quests shared with the guild
 --   tri / triage             Writs/LogTriage     the quests that can leave a full log
+--   groupes / groups         Writs/Events.lua    the Groupes window (Main.lua also takes lfg, evenements)
 --   altclick                 Writs/AltClick.lua  what Alt + click does for this character
 --   carte / map              Bosses.lua          the map of the dungeon you are in
 -- Each tool checks its own module switch: nothing is decided twice here.
@@ -54,6 +55,9 @@ Route({ "commun", "quetes", "quests", "partage" }, function()
 end)
 Route({ "tri", "triage" }, function()
     if WP.Triage then Run(WP.Triage.Toggle) end
+end)
+Route({ "groupes", "groupe", "groups" }, function()
+    Run(WP.ToggleEvents)
 end)
 Route({ "altclick" }, function()
     if WP.AltClick then Run(WP.AltClick.Status) end

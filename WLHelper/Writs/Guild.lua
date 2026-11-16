@@ -180,7 +180,11 @@ end
 local PREFIX = "WLHgld"
 local CI = C_ChatInfo
 local Register = (CI and CI.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-local SendRaw = (CI and CI.SendAddonMessage) or SendAddonMessage
+-- looked up at each send (not kept from load time): the same function, and tests can watch it
+local function SendRaw(...)
+    local f = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
+    if f then return f(...) end
+end
 if Register then pcall(Register, PREFIX) end
 
 local function Me() return (UnitName("player")) end
@@ -509,10 +513,38 @@ function WP.GuildPvPMessages()
     return { PlacesMsg("a", "", e.q.a.l), PlacesMsg("w", e.q.w.k, e.q.w.l), PlacesMsg("s", e.q.s.k, e.q.s.l), KdMsg(e.kd) }
 end
 
-local lastSent, shareQueued = 0, false
-local function Share(force)
-    if not (On() and IsInGuild and IsInGuild() and SendRaw) then return end
-    OwnEntry()   -- my line is always up to date, even between two messages
+-- Sends my line to the guild, at most every 30 s, and only when it changed (or 10 min went by):
+-- opening the Home page or the ranking no longer sends 4 to 6 messages each time.
+-- An "R" from a copy that just logged in is always answered (wantReply), it has nothing yet.
+-- onlyChange (the Home page, the ranking tab): nothing at all unless my line changed (a level, a spec).
+local lastSent, shareQueued, lastSig, wantReply = 0, false, nil, false
+-- set once the login send was tried: if it could not go out (guild not known yet), the next
+-- Home or ranking redraw sends my line instead of waiting for a kill
+local loginTried = false
+local function Messages(e)
+    -- "P" for the copies before 1.0.0-beta.25, "S" with the week and the season
+    local msgs = {
+        table.concat({ "P", e.kb, e.week, Mine().wk, e.hk, e.lvl, e.ver }, "|"),
+        table.concat({ "S", e.wk, e.w, e.sk, e.s, e.hk, e.kb, e.week, e.lvl, e.ver, e.spec }, "|"),
+    }
+    -- places and K/D/A: only once there is something to tell
+    for _, per in ipairs({ "a", "w", "s" }) do
+        local q = e.q[per]
+        if #q.l > 0 then msgs[#msgs + 1] = PlacesMsg(per, q.k, q.l) end
+    end
+    -- K always goes out (about 50 bytes): it also tells the others this copy knows places and K/D/A
+    msgs[#msgs + 1] = KdMsg(e.kd)
+    return msgs, table.concat(msgs, "\n")
+end
+local function Share(force, onlyChange)
+    if not (On() and IsInGuild and IsInGuild()) then return end
+    local e = OwnEntry()   -- my line is always up to date, even between two messages
+    if onlyChange then
+        -- before the login send (25 s) or with a send already queued: that one covers it
+        if (lastSig == nil and not loginTried) or shareQueued then return end
+        local _, sig = Messages(e)
+        if sig == lastSig then return end
+    end
     if not force and GetTime() - lastSent < 30 then
         if not shareQueued then
             shareQueued = true
@@ -520,18 +552,20 @@ local function Share(force)
         end
         return
     end
-    lastSent = GetTime()
-    local e = OwnEntry()
-    -- "P" for the copies before 1.0.0-beta.25, "S" with the week and the season
-    pcall(SendRaw, PREFIX, table.concat({ "P", e.kb, e.week, Mine().wk, e.hk, e.lvl, e.ver }, "|"), "GUILD")
-    pcall(SendRaw, PREFIX, table.concat({ "S", e.wk, e.w, e.sk, e.s, e.hk, e.kb, e.week, e.lvl, e.ver, e.spec }, "|"), "GUILD")
-    -- places and K/D/A: only once there is something to tell
-    for _, per in ipairs({ "a", "w", "s" }) do
-        local q = e.q[per]
-        if #q.l > 0 then pcall(SendRaw, PREFIX, PlacesMsg(per, q.k, q.l), "GUILD") end
-    end
-    -- K always goes out (about 50 bytes): it also tells the others this copy knows places and K/D/A
-    pcall(SendRaw, PREFIX, KdMsg(e.kd), "GUILD")
+    local msgs, sig = Messages(e)
+    if sig == lastSig and not wantReply and GetTime() - lastSent < 600 then return end
+    lastSent, lastSig, wantReply = GetTime(), sig, false
+    for _, m in ipairs(msgs) do pcall(SendRaw, PREFIX, m, "GUILD") end
+end
+WP._GuildShare = Share   -- tests
+
+-- an "R" is answered after a random 2 to 8 s: the copies of a full guild do not all answer at once
+local replyQueued = false
+local function Reply()
+    wantReply = true
+    if replyQueued then return end
+    replyQueued = true
+    C_Timer.After(2 + math.random() * 6, function() replyQueued = false; Share() end)
 end
 
 local askedAt = 0
@@ -550,7 +584,7 @@ local function Put(sender, e)
 end
 local function OnMessage(msg, sender)
     local kind = msg:match("^(%u)")
-    if kind == "R" then Share()
+    if kind == "R" then Reply()
     elseif kind == "S" then
         local wk, w, sk, s, hk, kb, owk, lvl, ver = msg:match("^S|([%d%-]+)|(%d+)|([%d%-]+)|(%d+)|(%d+)|(%d+)|(%d+)|(%d+)|([^|]*)")
         if wk then
@@ -728,7 +762,8 @@ end
 -- { { name, n, ow, lvl }, ... } best first. mode: "week", "season", "all" (true = week, false = all)
 function WP.GuildRanking(mode)
     if mode == true then mode = "week" elseif mode == false or mode == nil then mode = "all" end
-    Share()
+    -- my own line fresh; a message only if it changed (Home redraws this on every guild message)
+    Share(false, true)
     return Ranking(mode)
 end
 function WP.GuildMine() local hk, week, season = Numbers(); return week, season, hk end
@@ -1009,9 +1044,16 @@ local function Whisper(name)
     if ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. name .. " ")
     elseif ChatFrameUtil and ChatFrameUtil.OpenChat then ChatFrameUtil.OpenChat("/w " .. name .. " ") end
 end
+-- through the shared invite (SharedQuests): it says in the chat why the game would refuse (not the
+-- leader, party full, already grouped). Returns how many invites went out.
 local function InviteName(name)
+    if WP.Shared and WP.Shared.Invite then
+        local ok, n = pcall(WP.Shared.Invite, { name })
+        return ok and tonumber(n) or 0
+    end
     local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
-    if invite then pcall(invite, name) end
+    if invite and pcall(invite, name) then return 1 end
+    return 0
 end
 
 local function Num(v) return type(v) == "number" and not (root.IsSecret and root.IsSecret(v)) and v or nil end
@@ -1053,8 +1095,7 @@ local function MemberRow(parent)
     r.inv = S.Button(r, L("Inviter"), 0, 24, "secondary", function(self)
         local mm = r.m
         if mm and mm.online then
-            InviteName(mm.name)
-            self:Flash(L("Invité"))
+            if InviteName(mm.name) > 0 then self:Flash(L("Invité")) end
         end
     end)
     -- labelled: no plus beside "Inviter" (icon audit G3)
@@ -1099,7 +1140,9 @@ local function MemberRow(parent)
     r:SetScript("OnClick", function(self, button)
         local m = self.m
         if not (m and m.online) or m.name == Me() then return end
-        if button == "RightButton" or IsAltKeyDown() then InviteName(m.name); r.inv:Flash(L("Invité")) else Whisper(m.name) end
+        if button == "RightButton" or IsAltKeyDown() then
+            if InviteName(m.name) > 0 then r.inv:Flash(L("Invité")) end
+        else Whisper(m.name) end
     end)
     return r
 end
@@ -1414,7 +1457,7 @@ local function RenderPvP()
     ArchiveSeason()
     local p = pages.pvp
     local mode = WLWritsDB.guildRankMode or "week"
-    Share()
+    Share(false, true)
     local list = Ranking(mode)
     local w, s, hk = WP.GuildMine()
     -- a word pill: the calendar icon only repeated "Saison"
@@ -1700,7 +1743,7 @@ ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
                 if On() and IsInGuild and IsInGuild() and C_GuildInfo and type(C_GuildInfo.GuildRoster) == "function" then pcall(C_GuildInfo.GuildRoster) end
             end)
         end
-        C_Timer.After(25, function() Share(true) end)
+        C_Timer.After(25, function() loginTried = true; Share(true) end)
     elseif e == "PLAYER_PVP_KILLS_CHANGED" or e == "PLAYER_REGEN_ENABLED" or e == "ZONE_CHANGED_NEW_AREA" or e == "PLAYER_ENTERING_WORLD" then
         if On() then
             -- out of a battleground: its last numbers are counted; in one: ask for the scoreboard

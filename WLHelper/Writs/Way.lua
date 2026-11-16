@@ -272,6 +272,16 @@ local function ClearPin()
 end
 
 local function SetPin(map, x, y)
+    -- WL Helper's in-world marker (WorldPin.lua) places the map pin itself, on the leg you follow, and
+    -- tracks it for its label: a pin of ours, untracked, would hide that label for the whole trip
+    local WPn = WP.WorldPin
+    if WPn and type(WPn.Wanted) == "function" then
+        local ok, wanted = pcall(WPn.Wanted)
+        if ok and wanted then
+            if WPn.Sync then pcall(WPn.Sync) end
+            return
+        end
+    end
     if not (C_Map and type(C_Map.SetUserWaypoint) == "function" and UiMapPoint and type(UiMapPoint.CreateFromCoordinates) == "function") then return end
     if type(C_Map.CanSetUserWaypointOnMap) == "function" then
         local ok, can = pcall(C_Map.CanSetUserWaypointOnMap, map)

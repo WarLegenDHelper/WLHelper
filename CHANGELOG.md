@@ -6,6 +6,44 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.84] — 2026-11-16
+
+### Ajouté / Added
+- **Clic droit sur Commandes, Guilde ou Groupes** à l'Accueil : ouvre directement leurs réglages. Nouvelle commande `/wlh groupes`.
+  *Right-click Orders, Guild or Groups on Home to open their settings; new /wlh groupes.*
+- **/way** : le repère dans le monde (lieu, distance, temps) s'affiche aussi pour tes points /way.
+  *The world label also shows for /way points.*
+- **Commandes** : si le client annule une commande que tu as acceptée, ou si un autre artisan la prend en même temps, une ligne dans le chat te prévient.
+  *Orders: a chat line when an accepted order is cancelled or taken by someone else.*
+
+### Modifié / Changed
+- **GPS** : l'étape du guide n'écrase plus ton /way, « Aller à… » ou une clé ; elle attend et revient quand ta destination est atteinte ou arrêtée. « Aller à… » vise le vrai lieu, avec le même chemin à pied que le guide. Fermer la flèche arrête la tournée en ville.
+  *The guide no longer overrides your /way or Go to; Go to aims at the real place; closing the arrow stops the city tour.*
+- **GPS d'un objectif** : le bouton GPS mène à la zone de quête du jeu (celle de la carte), et un objectif placé seulement par le jeu a aussi son bouton.
+  *Objective GPS goes to the game's quest area.*
+- **Vue d'ensemble** : cocher ou décocher une quête met la route à jour sans message dans le chat et garde l'étape que tu regardes.
+  *Ticking quests in the Overview updates the route quietly.*
+- **Guide fermé** : plus redessiné en arrière-plan, plus de son « Étape suivante » quand rien n'est affiché ; la flèche suit toujours.
+  *A closed guide no longer redraws or plays sounds in the background.*
+- **Le module de groupes s'appelle « Groupes » partout.** « Inviter les inscrits » n'invite que les inscrits en ligne et dit pourquoi une invitation ne part pas ; idem pour « Inviter » dans la liste de la guilde.
+  *"Groups" everywhere; invites explain why they did not go out.*
+- **Classement PvP de la guilde** : l'addon n'envoie ses chiffres que quand ils changent.
+  *Guild PvP sync sends only on change.*
+
+### Corrigé / Fixed
+- **« Le jeu a bloqué SetRaidTarget() »** : WL Helper ne pose aucune marque ; ce message vient d'une macro d'un autre addon (RXPTargeting de RestedXP ajoute « /tm !7 »). Le message nomme maintenant la macro au lieu de demander de le signaler.
+  *The blocked raid-marker message now names the macro responsible (RestedXP's RXPTargeting).*
+- **Recharges** : les transmutations et l'Étoffe lunaire sont enregistrées à l'ouverture de la fenêtre de métier, même quand le jeu cache les temps.
+  *Transmute and Mooncloth cooldowns are recorded from the profession window.*
+- **Writs** : le calcul des trajets ne fige plus l'écran à l'HV ; une enveloppe sans son objet ouvre l'achat de l'objet ; les caisses sans prix connu ne comptent plus comme gratuites.
+  *Writs: no freeze at the AH, unpriced crates no longer free.*
+- **Prix de revient** : l'interrupteur se rallume bien ; la ligne d'infobulle n'entraîne plus d'alerte « bloqué » en combat.
+  *Cost price switch turns back on; no blocked alert in combat.*
+- **Récompense choisie toute seule** : réessaie quand les objets ne sont pas encore chargés, puis le dit clairement.
+  *Auto reward waits for item data, then says so.*
+- **Quoi de neuf** s'affiche aussi après un combat et repart de ta dernière version ; dans l'aide, /wlh commun ouvre bien les quêtes en commun.
+  *What's new after combat; help link fixed.*
+
 ## [1.0.0-beta.83] — 2026-11-16
 
 ### Modifié / Changed

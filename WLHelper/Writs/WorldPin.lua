@@ -36,6 +36,7 @@ ns.AddEnglish({
     ["Maître de vol de %s"] = "Flight master at %s",
     ["Zeppelin pour %s"] = "Zeppelin to %s",
     ["< 1 min"] = "< 1 min",
+    ["~%d min"] = "~%d min",
     -- the Settings row (Options.lua, GPS page)
     ["Repère dans le monde"] = "In-world marker",
     ["Toujours"] = "Always",

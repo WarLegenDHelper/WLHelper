@@ -266,8 +266,9 @@ local function AddLine(tooltip, id)
     local text = CP.TooltipText(id)
     if not text then return end
     local C = S.C
+    -- no tooltip:Show() from here: called from an addon it can taint GameTooltip (the "blocked"
+    -- popups); the game sizes the tooltip after its post-calls (as Upgrades.lua relies on)
     tooltip:AddLine(text, C.muted[1], C.muted[2], C.muted[3])
-    tooltip:Show()
 end
 CP.AddLine = AddLine
 

@@ -109,7 +109,6 @@ ns.AddEnglish({
     ["Pas encore classé en PvP cette semaine"] = "Not in this week's PvP ranking yet",
     ["Tu n'es pas dans une guilde"] = "You are not in a guild",
     ["Clic : ouvrir la guilde"] = "Click: open the guild",
-    ["LFG"] = "LFG",
     ["Aucun événement prévu"] = "No events planned",
     ["1 joueur cherche un groupe"] = "1 player looking for a group",
     ["%d joueurs cherchent un groupe"] = "%d players looking for a group",
@@ -118,7 +117,7 @@ ns.AddEnglish({
     ["1 autre événement à venir"] = "1 more upcoming event",
     ["%d autres événements à venir"] = "%d more upcoming events",
     ["Aucun autre événement prévu"] = "No other event planned",
-    ["Clic : ouvrir le LFG"] = "Click: open events",
+    ["Clic : ouvrir Groupes"] = "Click: open Groups",
     ["Améliorations"] = "Upgrades",
     ["1 amélioration dans tes sacs"] = "1 upgrade in your bags",
     ["%d améliorations dans tes sacs"] = "%d upgrades in your bags",
@@ -200,7 +199,7 @@ local MODULE_COPY = {
     bags     = { "Sacs", "Les objets de quête qui ne servent plus, et une place libre en un clic." },
     orders   = { "Commandes", "Faire fabriquer par la guilde, ou fabriquer pour elle." },
     guild    = { "Guilde", "Les membres, leurs métiers et le classement PvP." },
-    events   = { "LFG", "Les donjons et raids prévus par la guilde, et qui cherche un groupe." },
+    events   = { "Groupes", "Les donjons et raids prévus par la guilde, et qui cherche un groupe." },
     upgrades = { "Améliorations", "Une flèche verte sur les objets meilleurs que les tiens." },
 }
 -- WP.ModuleCopy(key) -> name, description (translated); unknown keys fall back to WP.MODULES.
@@ -337,7 +336,7 @@ local CLICK_HINT = {
     ["goto"] = "Clic : ouvrir Aller à", city = "Clic : ouvrir la tournée en ville",
     writs = "Clic : ouvrir les Writs", favor = "Clic : voir les caisses", orders = "Clic : ouvrir les commandes",
     bags = "Clic : voir les objets à jeter", upgrades = "Clic : choisir ta spé et voir tes améliorations",
-    guild = "Clic : ouvrir la guilde", events = "Clic : ouvrir le LFG",
+    guild = "Clic : ouvrir la guilde", events = "Clic : ouvrir Groupes",
 }
 function WP.HubClickHint(key) return CLICK_HINT[key] and L(CLICK_HINT[key]) or nil end
 
@@ -948,14 +947,14 @@ local function Refresh()
     local lfgLine = lfg > 0 and N(lfg, "1 joueur cherche un groupe", "%d joueurs cherchent un groupe") or nil
     if nowKey == "event" then
         local l1 = lfgLine or (nEvents > 1 and N(nEvents - 1, "1 autre événement à venir", "%d autres événements à venir")) or nil
-        Put("events", "Show2", { title = L("LFG"), line1 = l1 or L("Aucun autre événement prévu"),
-            lineColor = C.muted, hint = L("Clic : ouvrir le LFG") })
+        Put("events", "Show2", { title = L("Groupes"), line1 = l1 or L("Aucun autre événement prévu"),
+            lineColor = C.muted, hint = L("Clic : ouvrir Groupes") })
     else
-        Put("events", "Show2", { title = L("LFG"),
+        Put("events", "Show2", { title = L("Groupes"),
             line1 = nextE and (tostring(nextE.title) .. " · " .. WP.EventWhen(nextE.when)) or L("Aucun événement prévu"),
             lineColor = C.muted,
             line2 = lfgLine or (nEvents > 0 and N(nEvents, "1 événement à venir", "%d événements à venir") or nil),
-            hint = L("Clic : ouvrir le LFG") })
+            hint = L("Clic : ouvrir Groupes") })
     end
 
     -- upgrades: how many bag items are better than what you wear, for which spec
@@ -1095,7 +1094,7 @@ function WP.MinimapTooltip(owner)
     local word, _, _, st = CrafterStatus()
     if word then Row(L("Artisan"), word, C[STATUS_COLOR[st] or "fg"] or C.fg) end
     local lfg = WP.ModuleOn("events") and WP.LFGList and #WP.LFGList() or 0
-    if lfg > 0 then Row(L("LFG"), N(lfg, "1 cherche un groupe", "%d cherchent un groupe")) end
+    if lfg > 0 then Row(L("Groupes"), N(lfg, "1 cherche un groupe", "%d cherchent un groupe")) end
     local newer = WP.UpdateAvailable and WP.UpdateAvailable()
     if newer and WP.UpdateText then
         tt:AddLine(" ")

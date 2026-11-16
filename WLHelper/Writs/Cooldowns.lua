@@ -5,7 +5,8 @@
 -- (about 4 days) and the Salt Shaker, an item (Refined Deeprock Salt, about 3 days).
 -- Read with the game's own cooldown of each spell (or of the item) on login, when a profession
 -- window opens, when the spells or the bag cooldowns change, and every 60 s. No TRADE_SKILL_UPDATE
--- on Forever. Values hidden in a fight (secret) are skipped: what was stored stays.
+-- on Forever. Values hidden (secret): the plain isActive flag says ready, else what was stored stays.
+-- The profession window gives each learned recipe and its own cooldown (C_TradeSkillUI).
 --
 -- Stored account-wide: WLWritsDB.cooldowns["Realm-Name"][spell] = readyAt (server time(); 0 =
 -- known and ready, never seen on cooldown). The Salt Shaker's key is "i15846". WLWritsDB.cdTold
@@ -85,10 +86,26 @@ function CD.AlertOn() return not (type(WLWritsDB) == "table" and WLWritsDB.cdAle
 function CD.SetAlert(v) if type(WLWritsDB) == "table" then WLWritsDB.cdAlert = v and true or false end end
 
 -- ---------------------------------------------------------------- reading the game
+-- (start, duration) of a spell. The client may hide the numbers (secret values): then its plain
+-- isActive flag tells: not active (or only the global cooldown) = ready, (0, 0); active = false (the
+-- time left is unknown, false: what is stored stays). Like Route.lua's SpellCooldownReady.
 local function SpellCD(id)
     if C_Spell and C_Spell.GetSpellCooldown then
         local ok, info = pcall(C_Spell.GetSpellCooldown, id)
-        if ok and type(info) == "table" then return info.startTime, info.duration end
+        if ok and type(info) == "table" then
+            if Secret(info.startTime) or Secret(info.duration) then
+                local okA, ready = pcall(function()
+                    local a = info.isActive
+                    if a == nil or Secret(a) then return nil end
+                    local gcd = info.isOnGCD
+                    if gcd ~= nil and Secret(gcd) then gcd = false end
+                    return not (a and not gcd)
+                end)
+                if okA and ready == true then return 0, 0 end
+                return false            -- LeftOf: unknown
+            end
+            return info.startTime, info.duration
+        end
         if ok then return nil end
     end
     if GetSpellCooldown then
@@ -122,10 +139,40 @@ local function Knows(id)
     return false
 end
 
--- the recipes of the open profession window, by the spell id of their link (no TRADE_SKILL_UPDATE
--- on Forever: read on TRADE_SKILL_SHOW)
+-- the recipes of the open profession window (no TRADE_SKILL_UPDATE on Forever: read on
+-- TRADE_SKILL_SHOW). { [spell] = seconds left, or true when only known }.
+-- The modern API first (what this client uses, see Orders.lua; recipe id = spell id), with
+-- GetRecipeCooldown's plain seconds; then the old one, by the spell id of each recipe link.
+local function TradeModern(out)
+    local T = C_TradeSkillUI
+    if not (T and T.GetAllRecipeIDs and T.GetRecipeInfo) then return false end
+    if (T.IsTradeSkillLinked and T.IsTradeSkillLinked()) or (T.IsTradeSkillGuild and T.IsTradeSkillGuild()) then return true end
+    local ok, ids = pcall(T.GetAllRecipeIDs)
+    if not ok or type(ids) ~= "table" or #ids == 0 then return false end
+    for _, id in ipairs(ids) do
+        if GROUP_OF[id] then
+            local okI, info = pcall(T.GetRecipeInfo, id)
+            if okI and type(info) == "table" and info.learned == true then
+                -- only a real cooldown is taken from the window; nil or 0 (maybe a stub on this
+                -- client) leaves it to the spell's own cooldown, as before
+                local left = true
+                if T.GetRecipeCooldown then
+                    local okC, sec = pcall(T.GetRecipeCooldown, id)
+                    if okC and not Secret(sec) then
+                        sec = tonumber(sec)
+                        if sec and sec > MIN_CD then left = sec end
+                    end
+                end
+                out[id] = left
+            end
+        end
+    end
+    return true
+end
+
 local function TradeKnown()
     local out = {}
+    if TradeModern(out) then return out end
     if not (GetNumTradeSkills and GetTradeSkillRecipeLink) then return out end
     local ok, n = pcall(GetNumTradeSkills)
     if not ok or Secret(n) or type(n) ~= "number" then return out end
@@ -141,7 +188,7 @@ end
 
 -- seconds left from a (start, duration) pair; nil = hidden (secret), 0 = ready
 local function LeftOf(start, dur)
-    if Secret(start) or Secret(dur) then return nil end
+    if start == false or Secret(start) or Secret(dur) then return nil end
     start, dur = tonumber(start), tonumber(dur)
     if not (start and dur) or start <= 0 or dur <= MIN_CD then return 0 end
     local now = GetTime and GetTime() or 0
@@ -213,7 +260,9 @@ function CD.Prune()
     return changed
 end
 
--- Reads this character's cooldowns. tradeKnown: recipe ids from the open profession window.
+CD._TradeKnown = TradeKnown
+
+-- Reads this character's cooldowns. tradeKnown: from TradeKnown(), { [spell] = seconds left or true }.
 -- -> true when something changed
 function CD.Scan(tradeKnown)
     local db = DB()
@@ -241,8 +290,11 @@ function CD.Scan(tradeKnown)
             end
         else
             for _, id in ipairs(g.spells) do
-                local known = Knows(id) or (tradeKnown and tradeKnown[id]) or false
-                local left = (known or mine[id] ~= nil) and LeftOf(SpellCD(id)) or nil
+                local fromTrade = tradeKnown and tradeKnown[id]
+                local known = Knows(id) or (fromTrade ~= nil and fromTrade ~= false)
+                local left
+                if type(fromTrade) == "number" then left = fromTrade      -- the window's own cooldown
+                elseif known or mine[id] ~= nil then left = LeftOf(SpellCD(id)) end
                 -- not known but on cooldown: he has it (a recipe is not always in the spellbook).
                 -- Only for a group of one spell: the transmutes share their cooldown, so the
                 -- Arcanite one would put every elemental transmute on cooldown too.

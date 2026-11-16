@@ -441,6 +441,15 @@ local function MakeWritRow(parent)
             end
             return
         end
+        -- a writ to pick up whose item is missing: the item first, like "log" (the NPC can wait)
+        if self.r and self.r.state == "bag" and not self.r.ownItem and self.writ and self.writ.item then
+            if WP.AuctionHouseOpen() then
+                WP.Scan.OpenToBuy(self.writ.item, math.max(1, (self.writ.count or 1) - (self.r.haveItems or 0)))
+            else
+                WP.ShowTab("shop")
+            end
+            return
+        end
         if self.writ then WP.TravelTo(self.writ) end
     end)
     r:SetScript("OnEnter", function(self)
@@ -540,21 +549,45 @@ local function BuildToday(p)
     today.scan:SetPoint("BOTTOMRIGHT", -INSET + 2, 14)
 end
 
--- Minutes the GPS needs to reach each zone's first writ, for the cards: one search for all of them.
+-- Minutes the GPS needs to reach each zone's first writ, for the cards: one search for all of them,
+-- protected (an instance, a loading screen, no position: no times) and cached 20 s by the zones'
+-- first spots (the page redraws every few seconds at the AH and twice per refresh). In combat the
+-- last times stay.
+local ETA_FRESH = 20
+local eta = { at = -1000, sig = nil, out = {} }
+function WP._EtaResetCache() eta.at, eta.sig, eta.out = -1000, nil, {} end
 local function MinutesTo(order)
-    local out = {}
     local G = WP.GPS
-    if not (G and G.CostsTo and G.Point) then return out end
-    local dests, idx = {}, {}
+    if not (G and G.CostsTo and G.Point) then return {} end
+    local keys, firsts = {}, {}
     for i, z in ipairs(order) do
-        local w = z.rows[1].w
-        local p = G.Point(w.map, w.x, w.y, { kind = "dest" })
-        if p then dests[#dests + 1] = p; idx[#dests] = i end
+        local w = z.rows[1] and z.rows[1].w
+        firsts[i] = w
+        keys[i] = w and ((w.map or "?") .. ":" .. math.floor((tonumber(w.x) or 0) + 0.5) .. ":" .. math.floor((tonumber(w.y) or 0) + 0.5)) or "-"
     end
-    if #dests == 0 then return out end
-    for j, t in pairs(G.CostsTo(dests)) do out[idx[j]] = math.max(1, math.floor(t / 60 + 0.5)) end
+    local sig = table.concat(keys, ",")
+    local now = (GetTime and GetTime()) or 0
+    if eta.sig == sig and now - eta.at < ETA_FRESH then return eta.out end
+    if InCombatLockdown and InCombatLockdown() then return eta.sig == sig and eta.out or {} end
+    local out, dests, idx = {}, {}, {}
+    for i, w in ipairs(firsts) do
+        if w then
+            local okP, p = pcall(G.Point, w.map, w.x, w.y, { kind = "dest" })
+            if okP and p then dests[#dests + 1] = p; idx[#dests] = i end
+        end
+    end
+    if #dests > 0 then
+        local ok, costs = pcall(G.CostsTo, dests)
+        if ok and type(costs) == "table" then
+            for j, t in pairs(costs) do
+                if idx[j] and type(t) == "number" then out[idx[j]] = math.max(1, math.floor(t / 60 + 0.5)) end
+            end
+        end
+    end
+    eta.at, eta.sig, eta.out = now, sig, out
     return out
 end
+WP._MinutesTo, WP._MakeWritRow = MinutesTo, MakeWritRow   -- test access
 
 -- Writs left out of the plan only because they cost more than the price cap.
 local function CappedCount()
@@ -761,7 +794,7 @@ local function RenderToday()
             if r.state == "bag" and not r.ownItem then
                 row.tip[#row.tip + 1] = { L("Objet manquant : achète-le avant d'y aller."), C.warn[1], C.warn[2], C.warn[3] }
             end
-            if r.state == "log" then
+            if r.state == "log" or (r.state == "bag" and not r.ownItem and w.item) then
                 row.tip[#row.tip + 1] = WP.AuctionHouseOpen() and L("Clic : acheter l'objet") or L("Clic : voir l'onglet Achats")
             else
                 row.tip[#row.tip + 1] = string.format(L("Clic : guider vers %s"), w.npcName or z.name)

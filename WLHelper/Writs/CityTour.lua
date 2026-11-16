@@ -950,6 +950,9 @@ function CT.Refresh()
         if win and win:IsShown() then Render() end
         return
     end
+    -- the arrow closed (its X, /wlh gps) or taken by another place (/way, "Aller à"): the tour ends
+    -- there, and never starts the GPS again by itself on the next stop ticked
+    if visit.tour and current and not Ours() then visit.tour, current = nil, nil end
     -- nothing would show the stops: no card, no tour, and the card will not open by itself
     local shown = win and win:IsShown()
     if not shown and not (visit.tour and current) and (visit.dismissed or not CT.IsOn()) then return end

@@ -77,7 +77,7 @@ WP.HUB = {
       open = function() WP.Open("favor") end, settings = "comptoir" },
     { key = "orders", group = "items", label = "Commandes", icon = "orders", module = "orders",
       available = function() return Has("ToggleOrders") end,
-      open = function() if WP.ToggleOrders then WP.ToggleOrders() end end },
+      open = function() if WP.ToggleOrders then WP.ToggleOrders() end end, settings = "general", anchor = "Commandes" },
     { key = "bags", group = "items", label = "Sacs", icon = "bags", module = "bags",
       available = function() return Has("Cleaner") end,
       open = function() if WP.Cleaner then WP.Cleaner.Toggle() end end, settings = "bags" },
@@ -86,10 +86,10 @@ WP.HUB = {
       open = function() if WP.OpenHub then WP.OpenHub("upgrades") end end, settings = "upgrades", inHub = true },
     { key = "guild", group = "guild", label = "Guilde", icon = "guild", module = "guild",
       available = function() return Has("ToggleGuild") end,
-      open = function() if WP.ToggleGuild then WP.ToggleGuild() end end },
-    { key = "events", group = "guild", label = "LFG", icon = "events", module = "events",
+      open = function() if WP.ToggleGuild then WP.ToggleGuild() end end, settings = "general", anchor = "Guilde" },
+    { key = "events", group = "guild", label = "Groupes", icon = "events", module = "events",
       available = function() return Has("ToggleEvents") end,
-      open = function() if WP.ToggleEvents then WP.ToggleEvents() end end },
+      open = function() if WP.ToggleEvents then WP.ToggleEvents() end end, settings = "groups" },
 }
 
 -- WP.HubEntries(group) -> the entries of that activity whose files are loaded, in the list's order

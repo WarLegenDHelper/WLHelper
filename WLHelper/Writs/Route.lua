@@ -1002,8 +1002,9 @@ local function Tick()
 end
 
 local function Start(dest, source)
-    -- a Comptoir detour keeps the dungeon guide's point, given back when the detour ends
-    if source == "writs" and state.source == "dungeon" and state.dest then
+    -- a place the player chose (a Comptoir detour, /way, "Aller à", a key) keeps the dungeon guide's
+    -- point, given back when it ends
+    if source ~= "dungeon" and state.source == "dungeon" and state.dest then
         state.suspended = state.dest
     elseif source == "dungeon" then
         state.suspended = nil
@@ -1047,10 +1048,21 @@ function GPS.Go(w)
     if GPS.KnownFlights() == 0 then WP.Print(L("Le GPS ne connaît pas encore tes points de vol : parle à un maître de vol pour qu'il les apprenne.")) end
 end
 
+-- The guide's step while the player follows a place of their own choice: kept for later (GPS.Stop
+-- gives it back), never put over theirs. True when the point was kept aside.
+local function Waiting(map, x, y, label, source)
+    if source ~= "dungeon" or not state.dest or not state.source or state.source == "dungeon" then return false end
+    local p = Point(map, x, y, { kind = "dest", name = label, waited = true })
+    if p then state.suspended = p end
+    return true
+end
+GPS._Waiting = Waiting
+
 -- Guides you to any point (the dungeon guide's steps): map, x, y in percent, a label. The same point
--- again changes nothing, so the guide may call it as often as it likes; it never takes over a writ tour.
+-- again changes nothing, so the guide may call it as often as it likes; it never takes over a place
+-- the player chose (writ tour, /way, "Aller à", a key): it waits until that one ends.
 function GPS.GoPoint(map, x, y, label, source)
-    if state.source == "writs" and state.dest and source ~= "writs" then return end
+    if Waiting(map, x, y, label, source) then return end
     local d = state.dest
     if d and d.map == map and d.x == x and d.y == y and state.source == source then return end
     local dest = Point(map, x, y, { kind = "dest", name = label })
@@ -1060,8 +1072,12 @@ end
 
 -- Stops the GPS; with a source, only if the GPS is guiding for that source.
 function GPS.Stop(source)
-    if source and state.source ~= source then return end
-    local resume = state.source == "writs" and state.suspended
+    if source and state.source ~= source then
+        -- the guide closed while the player's place runs: its waiting step goes too
+        if source == "dungeon" then state.suspended = nil end
+        return
+    end
+    local resume = state.source ~= "dungeon" and state.suspended
     if state.zygor then
         local Z = Zygor()
         if Z and Z.Pointer.ClearWaypoints then pcall(Z.Pointer.ClearWaypoints, Z.Pointer, "manual") end
@@ -1081,7 +1097,11 @@ function GPS.Stop(source)
     if ticker then ticker:Cancel(); ticker = nil end
     if GPS.Hide then GPS.Hide() end
     -- back to the dungeon step the detour interrupted, if the guide still wants its arrow
-    if resume and WLDTDB and WLDTDB.arrow ~= false and not WLDTDB.hidden then Start(resume, "dungeon") end
+    if resume and WLDTDB and WLDTDB.arrow ~= false and not WLDTDB.hidden then
+        -- a step that waited is asked again as the guide asked it (an NPC's marker walks its path again)
+        if resume.waited then GPS.GoPoint(resume.map, resume.x, resume.y, resume.name, "dungeon")
+        else Start(resume, "dungeon") end
+    end
 end
 
 function GPS.Active() return state.dest ~= nil end
@@ -1487,8 +1507,8 @@ end
 
 local function PatrolTick()
     if not patrol then return end
-    -- a Comptoir detour: the spot comes back when it ends
-    if state.source == "writs" and state.suspended and state.suspended == patrol.dest then return end
+    -- a place the player chose: the spot comes back when it ends
+    if state.source ~= "dungeon" and state.suspended and state.suspended == patrol.dest then return end
     -- the GPS stopped or guides somewhere else
     if not state.dest or state.dest ~= patrol.dest then PatrolStop(); return end
     local here = HereWorld()
@@ -1502,7 +1522,12 @@ GPS.PatrolTick = PatrolTick
 function GPS.GoPoint(map, x, y, label, source)
     local spots = root.PatrolAt and root.PatrolAt(map, x, y)
     if not spots then return plainGoPoint(map, x, y, label, source) end
-    if state.source == "writs" and state.dest and source ~= "writs" then return end
+    -- the same marker again while its walk waits behind the player's place: the spot it waits on stays
+    -- (kept aside as a plain marker, PatrolTick would drop the walk)
+    if patrol and patrol.map == map and patrol.x == x and patrol.y == y and patrol.source == source
+        and state.source ~= "dungeon" and state.suspended and state.suspended == patrol.dest then return end
+    -- the player's own place goes first: the marker waits (a plain point, the walk starts again later)
+    if Waiting(map, x, y, label, source) then return end
     if patrol and patrol.map == map and patrol.x == x and patrol.y == y and patrol.source == source
         and state.dest and state.dest == patrol.dest then return end
     patrol = { map = map, x = x, y = y, source = source, label = label, spots = spots }

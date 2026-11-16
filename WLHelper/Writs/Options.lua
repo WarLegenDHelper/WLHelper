@@ -713,10 +713,10 @@ local MODULE_ICON = {
     bags = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", upgrades = MI.upgrades or { hd = "arrow_up", color = T.ok },
 }
 
--- A module's name, the one its window and its Home card show: "LFG" (WP.MODULES says "Groupes"),
+-- A module's name, the one its window and its Home card show: "Groupes" (as WP.MODULES),
 -- and "Writs" (WP.MODULES says "Writs & Favor" for the trading post).
 local function ModLabel(m)
-    if m.key == "events" then return L("LFG") elseif m.key == "writs" then return L("Writs") end
+    if m.key == "events" then return L("Groupes") elseif m.key == "writs" then return L("Writs") end
     return L(m.label)
 end
 local function ModDesc(m)
@@ -930,7 +930,8 @@ function BUILD.comptoir(p)
     Section(p, L("Prix de revient (HV)"))
     SwitchRow(p, L("Retenir mes prix d'achat"),
         function() local C = ns.WP.CostPrice; return not C or C.On() end,
-        function(v) WLWritsDB.costPrice = v and nil or false end,
+        -- on = nil (the default), off = false ("v and nil or false" was always false)
+        function(v) if v then WLWritsDB.costPrice = nil else WLWritsDB.costPrice = false end end,
         L("Retient ce que tu paies à l'HV (moyenne sur 60 jours), l'affiche dans l'infobulle et prévient si tu vends en dessous."))
 
     Section(p, L("Plan d'achat"))

@@ -2,6 +2,23 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.84", date = "2026-11-16", items = {
+    { s = "add", fr = { "Clic droit sur Commandes, Guilde ou Groupes", "À l'Accueil : ouvre directement leurs réglages. Nouvelle commande /wlh groupes." }, en = { "Right-click Orders, Guild or Groups on Home to open their settings; new /wlh groupes.", "" } },
+    { s = "add", fr = { "/way", "Le repère dans le monde (lieu, distance, temps) s'affiche aussi pour tes points /way." }, en = { "The world label also shows for /way points.", "" } },
+    { s = "add", fr = { "Commandes", "Si le client annule une commande que tu as acceptée, ou si un autre artisan la prend en même temps, une ligne dans le chat te prévient." }, en = { "Orders", "A chat line when an accepted order is cancelled or taken by someone else." } },
+    { s = "chg", fr = { "GPS", "L'étape du guide n'écrase plus ton /way, « Aller à… » ou une clé ; elle attend et revient quand ta destination est atteinte ou arrêtée. « Aller à… » vise le vrai lieu, avec le même chemin à pied que le guide. Fermer la flèche arrête la tournée en ville." }, en = { "The guide no longer overrides your /way or Go to; Go to aims at the real place; closing the arrow stops the city tour.", "" } },
+    { s = "chg", fr = { "GPS d'un objectif", "Le bouton GPS mène à la zone de quête du jeu (celle de la carte), et un objectif placé seulement par le jeu a aussi son bouton." }, en = { "Objective GPS goes to the game's quest area.", "" } },
+    { s = "chg", fr = { "Vue d'ensemble", "Cocher ou décocher une quête met la route à jour sans message dans le chat et garde l'étape que tu regardes." }, en = { "Ticking quests in the Overview updates the route quietly.", "" } },
+    { s = "chg", fr = { "Guide fermé", "Plus redessiné en arrière-plan, plus de son « Étape suivante » quand rien n'est affiché ; la flèche suit toujours." }, en = { "A closed guide no longer redraws or plays sounds in the background.", "" } },
+    { s = "chg", fr = { "Le module de groupes s'appelle « Groupes » partout.", "« Inviter les inscrits » n'invite que les inscrits en ligne et dit pourquoi une invitation ne part pas ; idem pour « Inviter » dans la liste de la guilde." }, en = { "\"Groups\" everywhere; invites explain why they did not go out.", "" } },
+    { s = "chg", fr = { "Classement PvP de la guilde", "L'addon n'envoie ses chiffres que quand ils changent." }, en = { "Guild PvP sync sends only on change.", "" } },
+    { s = "fix", fr = { "« Le jeu a bloqué SetRaidTarget() »", "WL Helper ne pose aucune marque ; ce message vient d'une macro d'un autre addon (RXPTargeting de RestedXP ajoute « /tm !7 »). Le message nomme maintenant la macro au lieu de demander de le signaler." }, en = { "The blocked raid-marker message now names the macro responsible (RestedXP's RXPTargeting).", "" } },
+    { s = "fix", fr = { "Recharges", "Les transmutations et l'Étoffe lunaire sont enregistrées à l'ouverture de la fenêtre de métier, même quand le jeu cache les temps." }, en = { "Transmute and Mooncloth cooldowns are recorded from the profession window.", "" } },
+    { s = "fix", fr = { "Writs", "Le calcul des trajets ne fige plus l'écran à l'HV ; une enveloppe sans son objet ouvre l'achat de l'objet ; les caisses sans prix connu ne comptent plus comme gratuites." }, en = { "Writs", "No freeze at the AH, unpriced crates no longer free." } },
+    { s = "fix", fr = { "Prix de revient", "L'interrupteur se rallume bien ; la ligne d'infobulle n'entraîne plus d'alerte « bloqué » en combat." }, en = { "Cost price switch turns back on; no blocked alert in combat.", "" } },
+    { s = "fix", fr = { "Récompense choisie toute seule", "Réessaie quand les objets ne sont pas encore chargés, puis le dit clairement." }, en = { "Auto reward waits for item data, then says so.", "" } },
+    { s = "fix", fr = { "Quoi de neuf", "S'affiche aussi après un combat et repart de ta dernière version ; dans l'aide, /wlh commun ouvre bien les quêtes en commun." }, en = { "What's new after combat; help link fixed.", "" } },
+  } },
   { v = "1.0.0-beta.83", date = "2026-11-16", items = {
     { s = "chg", fr = { "GPS à pied à jour avec Polestar 0.4.0", "Départs corrigés sous les rues des villes (quartier des Nains de Hurlevent), des milliers de nouveaux passages entre étages sur les deux continents, nouveaux villages relais, et danger des Montagnes d'Alterac recalé (niveau 30)." }, en = { "Walking GPS updated to Polestar Nav 0.4.0", "Better city starts, many more floor links, Alterac danger floor." } },
   } },
@@ -101,13 +118,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.70", date = "2026-11-15", items = {
     { s = "fix", fr = { "Marque sur le boss", "Un clic sur un portrait ciblait bien le boss mais ne posait pas la marque. La marque passe maintenant par la commande du jeu /tm, faite pour les macros (le script utilisé avant est bloqué sur ce client). Pareil pour le bouton de ciblage du guide et sa touche." }, en = { "Boss mark", "Clicking a portrait now also puts the marker on (game /tm command instead of a blocked script)." } },
-  } },
-  { v = "1.0.0-beta.69", date = "2026-11-15", items = {
-    { s = "add", fr = { "Recherche dans le choix des donjons", "Tape un nom de donjon (ou ZF, BRD, SM), une zone, une quête ou la personne qui la donne ; la recherche couvre tous les onglets et tous les niveaux, sans tenir compte des accents." }, en = { "Search box in the dungeon picker", "Dungeon, short name, zone, quest or quest giver, across every tab and level." } },
-    { s = "add", fr = { "Guide d'un donjon déjà fini", "Quand toutes ses quêtes sont rendues, le résumé propose « Me guider dans le donjon » : trajet jusqu'à l'entrée, puis boss par boss (tactiques, butin) jusqu'au dernier. Une route de quêtes s'arrête toujours une fois les quêtes finies." }, en = { "Guide me through the dungeon even when every quest is turned in: entrance, then boss by boss.", "" } },
-    { s = "add", fr = { "Objets en récompense dans le résumé", "Jusqu'à 4 icônes par quête, avec la flèche verte et le pourcentage d'amélioration calculés au niveau de la quête ; le meilleur choix est entouré en or ; le total dit « 3 objets dont 2 améliorations »." }, en = { "Reward items in the summary with upgrade arrows and the best choice ringed in gold.", "" } },
-    { s = "add", fr = { "Clic droit simple = baguette", "Pour les mages, prêtres et démonistes (ou toute classe avec une baguette), un clic droit seul sur un ennemi lance Tir. Proposé à l'accueil quand tu actives le tir, réglable dans Réglages › Général › Clics." }, en = { "Plain right-click = wand, offered to wand classes, in Settings too.", "" } },
-    { s = "fix", fr = { "Zul'Farrak", "Theka le Martyr passe avant Antu'sul dans la visite boss par boss." }, en = { "Zul'Farrak", "Theka the Martyr now comes before Antu'sul." } },
-    { s = "fix", fr = { "Fenêtre des boss", "Un boss mort ou hors de vue ne remplace plus son portrait par un rond blanc." }, en = { "Boss panel", "No more white disc portraits from dead or unseen bosses." } },
   } },
 }

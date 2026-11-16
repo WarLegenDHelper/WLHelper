@@ -41,6 +41,7 @@ ns.AddEnglish({
     ["Choisis ta récompense : la meilleure pour toi est %s (emplacement vide)."] = "Pick your reward: the best for you is %s (empty slot).",
     ["Choisis ta récompense : aucune n'est une amélioration pour toi."] = "Pick your reward: none of them is an upgrade for you.",
     ["Choisis ta récompense."] = "Pick your reward.",
+    ["Choisis ta récompense : objets pas encore chargés par le jeu."] = "Pick your reward: the game has not loaded the items yet.",
     ["Récompense choisie : %s (+%d %%)."] = "Reward picked: %s (+%d%%).",
     ["Récompense choisie : %s (emplacement vide)."] = "Reward picked: %s (empty slot).",
 })
@@ -212,30 +213,59 @@ function GQ.Judge(link)
     end
     return nil
 end
--- index, percent, name of the best upgrade among the choices; judged = false when one could not be read
+-- a reward item the game has not loaded yet (no link, or no item info): asked for, true
+local function NotLoaded(link)
+    if type(link) ~= "string" then return true end
+    local Info = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    if not Info then return false end
+    local ok, name = pcall(Info, link)
+    if ok and Str(name) then return false end
+    local id = tonumber(link:match("item:(%d+)"))
+    local Req = C_Item and C_Item.RequestLoadItemDataByID
+    if id and Req then pcall(Req, id) end
+    return true
+end
+-- index, percent, name of the best upgrade among the choices; judged = false when one could not be
+-- read; fifth value: one of them is not loaded by the game yet (worth asking again a moment later)
 function GQ.BestChoice()
     local n = Num(GetNumQuestChoices and GetNumQuestChoices()) or 0
-    local best, bestV, bestName, judged = nil, 0, nil, true
+    local best, bestV, bestName, judged, missing = nil, 0, nil, true, false
     for i = 1, n do
         local link = GetQuestItemLink and GetQuestItemLink("choice", i)
         local v = GQ.Judge(link)
-        if v == nil then judged = false
+        if v == nil then
+            judged = false
+            if NotLoaded(link) then missing = true end
         elseif v and v > bestV then
             local name = GetQuestItemInfo and GetQuestItemInfo("choice", i)
             best, bestV, bestName = i, v, Str(name) or (Str(link) and link:match("%[(.-)%]")) or link
         end
     end
-    if not judged then return nil, nil, nil, false end
-    return best, best and bestV or nil, bestName, true
+    if not judged then return nil, nil, nil, false, missing end
+    return best, best and bestV or nil, bestName, true, false
 end
 local function RewardLine(fmtPct, fmtEmpty, name, pct)
     if pct >= 1000 then return string.format(L(fmtEmpty), name) end
     return string.format(L(fmtPct), name, math.floor(pct + 0.5))
 end
-local function TakeReward(qid)
+-- Reward items never seen before are often not loaded yet when the window opens: asked again up to
+-- 3 times, 0.3 s apart, while the same window is open (same serial, same quest, Shift not held).
+local REWARD_TRIES, REWARD_GAP = 3, 0.3
+local function TakeReward(qid, tries)
+    tries = tries or 0
     local n = Num(GetNumQuestChoices and GetNumQuestChoices()) or 0
     if n <= 1 then GetQuestReward(n); return end
-    local best, pct, name, judged = GQ.BestChoice()
+    local best, pct, name, judged, missing = GQ.BestChoice()
+    -- only an item not loaded yet is worth the wait: a loaded one the gear check cannot judge
+    -- will not change, its line comes at once
+    if not judged and missing and tries < REWARD_TRIES and C_Timer and C_Timer.After then
+        local mine = serial
+        C_Timer.After(REWARD_GAP, function()
+            if serial ~= mine or IsShiftKeyDown() or not SameQuest(qid)() then return end
+            TakeReward(qid, tries + 1)
+        end)
+        return
+    end
     if best and On("questAutoReward") then
         GetQuestReward(best)
         WP.Print(RewardLine("Récompense choisie : %s (+%d %%).", "Récompense choisie : %s (emplacement vide).", name, pct))
@@ -244,6 +274,8 @@ local function TakeReward(qid)
             "Choisis ta récompense : la meilleure pour toi est %s (emplacement vide).", name, pct), true)
     elseif judged then
         WP.Print(L("Choisis ta récompense : aucune n'est une amélioration pour toi."), true)
+    elseif missing then
+        WP.Print(L("Choisis ta récompense : objets pas encore chargés par le jeu."), true)
     else
         WP.Print(L("Choisis ta récompense."), true)
     end

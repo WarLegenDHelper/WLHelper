@@ -30,6 +30,8 @@ O._K = K   -- for the offline tests
 
 ns.AddEnglish({
     ["Commandes"] = "Orders",
+    ["%s a annulé sa commande : %s ×%d."] = "%s cancelled their order: %s ×%d.",
+    ["%s a pris la commande %s avant toi : elle n'est plus pour toi."] = "%s took the order %s before you: it is no longer yours.",
     ["Nouvelle commande de %s : %s ×%d, %s. Tape /wlh orders, onglet Pour moi, pour l'accepter."] =
         "New order from %s: %s ×%d, %s. Type /wlh orders, For me tab, to accept it.",
     ["Nouvelle demande de %s : %s ×%d (%s), %s. Tape /wlh orders, onglet Pour moi, pour l'accepter."] =
@@ -2157,8 +2159,12 @@ local function OnMessage(msg, channel, sender)
     elseif kind == "O" and channel == "GUILD" then
         local o = Parse(rest)
         if o and Allowed(o, sender) then
+            -- an order I was making for someone else: told if it slips away (cancelled, taken by another)
+            local was = d.list[o.id]
+            local wasMine = was and was.by == Me() and was.from ~= Me() and (was.status == "accepted" or was.status == "crafted")
             local merged, changed = Merge(o)
             if changed then O.Notify(merged) end
+            if wasMine and changed and merged then O.NotifySlip(merged) end
             if WP.RefreshOrders then WP.RefreshOrders() end
         end
     elseif kind == "M" and channel == "GUILD" then
@@ -2271,6 +2277,19 @@ function O.Notify(o)
         Say(string.format(L("%s a fabriqué ta commande : %s ×%d. Elle t'arrive par la poste, contre-remboursement s'il y a une commission, ou en échange."), o.by or "?", name, o.qty or 1), o, "mine")
     elseif o.from == me and o.status == "delivered" and not o.thanked then
         Say(string.format(L("%s t'a livré %s. Tape /wlh orders, onglet Mes commandes, puis clique sur Remercier pour lui donner une étoile."), o.by or "?", name), o, "mine")
+    end
+end
+
+-- An order I had accepted (or crafted) for someone else is no longer mine: its customer cancelled it,
+-- or another crafter took it at the same time and the guild kept theirs. One line, to "Pour moi".
+function O.NotifySlip(o)
+    if WP.ModuleOn and not WP.ModuleOn("orders") then return end
+    local me = Me()
+    if o.from == me then return end
+    if o.status == "cancelled" then
+        Say(string.format(L("%s a annulé sa commande : %s ×%d."), o.from or "?", O.Name(o), o.qty or 1), o, "recv")
+    elseif o.by and o.by ~= me and (o.status == "accepted" or o.status == "crafted") then
+        Say(string.format(L("%s a pris la commande %s avant toi : elle n'est plus pour toi."), o.by, O.Name(o)), o, "recv")
     end
 end
 

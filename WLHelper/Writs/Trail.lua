@@ -18,7 +18,7 @@
 -- from the canvas's and UIParent's effective scales), and the dots sit about GAP diameters apart on
 -- screen too (on the world map in steps of sqrt(2), so a small zoom does not move them); never under
 -- MIN_SHARE of their size at 1080p and UI scale 1, however small the UI scale.
--- "Aller à" (GoTo.lua) still follows its own trail: its trail is drawn here, it is not asked twice.
+-- "Aller à" (GoTo.lua) is walked here like every other guide.
 --
 -- API: WP.Trail.For(target) -> trail | nil (target: { map, x, y } in percent or { cont, wx, wy });
 -- WP.Trail.Clear(); WP.Trail.Current() -> nil | { cont, pts = { { cont, wx, wy }, ... }, at, target,
@@ -205,7 +205,6 @@ end
 local cur          -- the trail being followed: { key, cont, target, pts, at, job, askedAt, ... }
 local token = 0
 local listeners = {}
-local external     -- GoTo's own trail, drawn here (it follows it itself)
 
 local function Cancel(t)
     if t and t.job then
@@ -361,7 +360,7 @@ end
 -- Forgets the trail (no redraw: Apply runs inside GPS.Now, which the drawing reads).
 local function Drop()
     if cur then Cancel(cur) end
-    cur, external = nil, nil
+    cur = nil
     token = token + 1
 end
 function Trail.Clear()
@@ -519,14 +518,6 @@ local function Follow(t, px, py)
 end
 Trail._Follow = Follow
 
--- GoTo ("Aller à") follows its own trail for now: true while it has a trip.
-local function GoToTrip(now)
-    if now.source ~= "goto" then return nil end
-    local G = WP.GoTo
-    local trip = G and G.Trip and G.Trip()
-    return trip
-end
-
 -- Called by GPS.Now (Route.lua) on each answer: on a walking leg with a trail, the arrow's target and
 -- distance become the next corner and the walk left. "You're here" stays GPS.Now's own (straight
 -- distance to the place).
@@ -539,7 +530,6 @@ local applying = false
 local lastError = -math.huge
 local function Apply(now)
     now.trail, now.straight = nil, now.dist
-    external = nil
     if now.arrived or not now.cont or not now.px then return end
     local leg, goal = now.leg, nil
     if not leg then goal = now.dest
@@ -550,13 +540,6 @@ local function Apply(now)
         return
     end
     if not goal or goal.cont ~= now.cont then if cur then Drop() end; return end
-    local trip = GoToTrip(now)
-    if trip then
-        if cur then Cancel(cur); cur = nil end
-        if trip.trail then external = trip end
-        StartMinimap()
-        return
-    end
     StartMinimap()
     local t = For(goal, now.cont, now.px, now.py)
     if not t then return end
@@ -584,7 +567,6 @@ pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
 
 -- The line to draw now: player first, then the corners left, then the place; the continent; the
 -- destination pin (the GPS's own destination, the end of the whole trip).
-local gotoDest = setmetatable({}, { __mode = "k" })   -- GoTo's destination -> its world point
 local function Line()
     -- a router answering at once, inside GPS.Now: drawn on the next refresh
     if applying or not (GPS.Active and GPS.Active()) then return nil end
@@ -593,19 +575,7 @@ local function Line()
     local cont, px, py = now.cont, now.px, now.py
     local line = { { wx = px, wy = py } }
     local dest = now.dest
-    if external and external.trail then
-        local tr = external.trail
-        for i = external.at or 1, #tr do
-            local p = tr[i]
-            if Num(p.wx) and Num(p.wy) then line[#line + 1] = { wx = p.wx, wy = p.wy } end
-        end
-        local d = external.dest
-        if d and d.map then
-            local wp = gotoDest[d]
-            if wp == nil then wp = GPS.Point(d.map, d.x, d.y) or false; gotoDest[d] = wp end
-            if wp then dest = wp end
-        end
-    elseif cur and cur.pts and now.trail == cur then
+    if cur and cur.pts and now.trail == cur then
         for i = cur.at or 1, #cur.pts do line[#line + 1] = cur.pts[i] end
         line[#line + 1] = cur.target
     end

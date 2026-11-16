@@ -1111,6 +1111,8 @@ ns.AddEnglish({
     ["Le jeu a bloqué « %s »%s. Tape /wlh idee pour le signaler : le nom de la fonction est déjà dans le formulaire."] =
         "The game blocked \"%s\"%s. Type /wlh idea to report it: the function's name is already in the form.",
     [" en combat"] = " in combat",
+    ["Le jeu bloque les marques de raid posées par une macro écrite par un addon. La macro %s contient /tm : c'est elle (RXPTargeting vient de RestedXP, qui la réécrit à chaque étape). Rien à signaler, le ciblage marche quand même."] =
+        "The game blocks raid markers set by a macro an addon wrote. The macro %s has /tm in it: that is the one (RXPTargeting comes from RestedXP, which rewrites it at each step). Nothing to report, targeting still works.",
     ["Writs"] = "Writs",
     ["Groupes"] = "Groups",
     ["Writs, liste d'achat et remise automatique"] = "Writs, shopping list and automatic turn-in",
@@ -1145,6 +1147,24 @@ blocked:SetScript("OnEvent", function(_, _, addon, func)
     local key = tostring(func)
     if blockedSaid[key] then return end
     blockedSaid[key] = true
+    -- a raid marker from a macro another addon wrote (RestedXP's "RXPTargeting" adds "/tm !7"): the
+    -- game may blame us, but the line is not ours; name the macro instead of asking for a report
+    if key:find("SetRaidTarget", 1, true) and GetMacroInfo then
+        local found = {}
+        for i = 1, 150 do
+            local ok, name, _, body = pcall(GetMacroInfo, i)
+            if ok and type(name) == "string" and type(body) == "string"
+                and not (issecretvalue and (issecretvalue(name) or issecretvalue(body)))
+                and (body:find("\n/tm ", 1, true) or body:find("^/tm ") or body:find("SetRaidTarget", 1, true)
+                     or body:find("/targetmarker", 1, true)) then
+                found[#found + 1] = "« " .. name .. " »"
+            end
+        end
+        if #found > 0 then
+            WP.Print(string.format(L("Le jeu bloque les marques de raid posées par une macro écrite par un addon. La macro %s contient /tm : c'est elle (RXPTargeting vient de RestedXP, qui la réécrit à chaque étape). Rien à signaler, le ciblage marche quand même."), table.concat(found, ", ")))
+            return
+        end
+    end
     WP.Print(string.format(L("Le jeu a bloqué « %s »%s. Tape /wlh idee pour le signaler : le nom de la fonction est déjà dans le formulaire."),
         tostring(func), combat and L(" en combat") or ""))
 end)

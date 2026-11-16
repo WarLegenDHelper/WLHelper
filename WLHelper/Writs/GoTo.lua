@@ -4,9 +4,9 @@
 -- LibForeverData knows. Up to 8 results, accent-insensitive, French and English names alike.
 -- A click starts WL Helper's own GPS (WP.GPS, source "goto"): the flights, boats and teleports it plans
 -- stay in charge of long trips. For a trip on foot, when the walking router (the separate GPL addon
--- WLHelper_Nav, load on demand) is installed, it is loaded out of combat and asked for a real path round
--- hills and through gates; the arrow then follows that trail one corner at a time (the GPS has no
--- "via" list, so this file moves its target to the next corner once you are within 20 yards).
+-- WLHelper_Nav, load on demand) is installed, Trail.lua asks it for a real path round hills and through
+-- gates, as for every other guide: the GPS keeps the place itself as its point, so the arrow, the walk
+-- left, the time and the in-world marker all measure to the place, not to the next corner.
 -- Without the router, the arrow points straight at the place.
 -- While the window is open, the list follows you: every half second, once you walked a few yards, each
 -- result is measured again and a service or an NPC moves to its nearest place (another bank, another
@@ -97,9 +97,6 @@ local INSET = 16
 local CW = W - 2 * INSET
 local MAX = 8                 -- results shown
 local RECENT_MAX = 3
-local ADVANCE = 20            -- yards: next corner of the trail (the GPS says "you're here" at 15)
-local THIN = 12               -- yards: corners closer than this to the previous one are dropped
-local OFF_TRAIL = 40          -- yards farther than your best: the path is asked again
 local NAV_ADDON = "WLHelper_Nav"
 
 local function IsSecret(v) return issecretvalue ~= nil and issecretvalue(v) end
@@ -780,7 +777,7 @@ GoTo.Repick = function(r) return Repick(r, Here(), Lib()) end
 
 -- ---------------------------------------------------------------- the walking router (WLHelper_Nav)
 
-local navTried = false
+-- Installed (loaded or loadable): the window's footer says so. Trail.lua loads it and walks the path.
 local function NavInstalled()
     if type(rawget(_G, "WLHelperNav")) == "table" then return true end
     local A = C_AddOns
@@ -791,21 +788,7 @@ local function NavInstalled()
 end
 GoTo.NavInstalled = NavInstalled
 
--- The router, loaded on first use. Never in combat: it builds a few MB of strings as it loads.
-local function Nav()
-    local N = rawget(_G, "WLHelperNav")
-    if type(N) == "table" and type(N.WalkTo) == "function" then return N end
-    if navTried or InCombat() or not NavInstalled() then return nil end
-    -- one try per session: a router that failed to load (disabled, missing part) is not asked again
-    navTried = true
-    local load = (C_AddOns and C_AddOns.LoadAddOn) or rawget(_G, "LoadAddOn")
-    if type(load) ~= "function" then return nil end
-    pcall(load, NAV_ADDON)
-    N = rawget(_G, "WLHelperNav")
-    if type(N) == "table" and type(N.WalkTo) == "function" then return N end
-end
-
-function GoTo._ResetNav() navTried = false end
+function GoTo._ResetNav() if WP.Trail and WP.Trail._ResetNav then WP.Trail._ResetNav() end end
 
 function GoTo.WalkOn() return not (WLWritsDB and WLWritsDB.gotoWalk == false) end
 function GoTo.SetWalk(on)
@@ -815,8 +798,9 @@ end
 
 -- ---------------------------------------------------------------- guiding
 
--- The trip in progress: dest (the result), trail (corners { map, x, y (percent), wx, wy }), at (the
--- corner the arrow points at), token (a new trip makes older router answers stale).
+-- The trip in progress: { dest = the result }. The GPS guides to the place itself: its walking path
+-- (Trail.lua, with WLHelper_Nav) gives the arrow its corners, the walk left and the time, as for every
+-- other guide. token: a new trip makes an older trip's delayed end stale.
 local trip
 local ticker
 local token = 0
@@ -826,83 +810,13 @@ local function Point(m, x, y, label)
 end
 
 local function EndTrip()
-    if trip and trip.job then
-        local N = rawget(_G, "WLHelperNav")
-        if N and N.Cancel then pcall(N.Cancel, trip.job) end
-    end
     trip = nil
     if ticker then ticker:Cancel(); ticker = nil end
-end
-
-local function RouterHere()
-    local N = rawget(_G, "WLHelperNav")
-    if N and N.PlayerPosition then
-        local c, x, y = Safe(N.PlayerPosition)
-        if c and Num(x) and Num(y) then return { cont = c, wx = x, wy = y } end
-    end
-    return Here()
-end
-
--- Walking only: the GPS's own plan for this trip has no flight, boat or teleport.
-local function OnFoot()
-    local now = GPS.Now and GPS.Now()
-    local legs = now and now.legs
-    if not legs then return true end
-    for _, leg in ipairs(legs) do if leg.kind ~= "ride" then return false end end
-    return true
 end
 
 local function Yards(ax, ay, bx, by)
     local dx, dy = ax - bx, ay - by
     return math.sqrt(dx * dx + dy * dy)
-end
-
--- The router's corners as the arrow's targets: the ones you already stand by and the ones a few
--- yards from the previous are dropped; the last (the place itself) always stays.
-local function UseTrail(points)
-    local here = RouterHere()
-    local out, last = {}, nil
-    for i, p in ipairs(points) do
-        local m, x, y = p[1], Num(p[2]), Num(p[3])
-        local wx, wy = Num(p.wx), Num(p.wy)
-        if m and x and y and wx and wy then
-            local isLast = i == #points
-            local nearYou = here and Yards(here.wx, here.wy, wx, wy) < ADVANCE
-            local nearLast = last and Yards(last.wx, last.wy, wx, wy) < THIN
-            if isLast or not (nearYou or nearLast) then
-                last = { map = m, x = x * 100, y = y * 100, wx = wx, wy = wy }
-                out[#out + 1] = last
-            end
-        end
-    end
-    return out
-end
-
-local function TryTrail()
-    if not trip or trip.trail or trip.job or not GoTo.WalkOn() then return end
-    if GPS.UseZygor and GPS.UseZygor() then return end   -- Zygor finds its own path
-    if InCombat() then trip.wantTrail = true; return end
-    trip.wantTrail = nil
-    if not OnFoot() then return end
-    local N = Nav()
-    if not N then return end
-    local my = token
-    trip.askedAt = GetTime and GetTime() or 0
-    local d = trip.dest
-    local ok, job = pcall(N.WalkTo, d.map, d.x / 100, d.y / 100, function(points)
-        if not trip or my ~= token then return end
-        trip.job = nil
-        if GPS.Source() ~= "goto" or type(points) ~= "table" then return end
-        local trail = UseTrail(points)
-        if #trail < 2 then return end   -- a straight line: the arrow does it already
-        trip.trail, trip.at, trip.best = trail, 1, nil
-        local p = trail[1]
-        Point(p.map, p.x, p.y, d.gps or d.label)
-    end, {})
-    if ok and type(job) == "table" then
-        job.urgent = true
-        if trip and my == token and trip.trail == nil then trip.job = job end
-    end
 end
 
 local function Arrived()
@@ -919,55 +833,14 @@ local function Arrived()
     end
 end
 
--- Four times a second while a trip runs: the next corner when you reach one, a new path when you
--- left it, the end when another guide took the arrow or it was closed.
+-- Four times a second while a trip runs: the arrival, or the end when another guide took the arrow
+-- or it was closed.
 local function Follow()
     if not trip then return end
     if GPS.Source() ~= "goto" or not GPS.Active() then EndTrip(); return end
     if GPS.UseZygor and GPS.UseZygor() then EndTrip(); return end   -- Zygor took the arrow over
     local now = GPS.Now and GPS.Now()
-    local trail = trip.trail
-    if not trail then
-        if now and now.arrived then Arrived(); return end
-        if trip.wantTrail and not InCombat() then TryTrail() end
-        return
-    end
-    local here = RouterHere()
-    if not here then return end
-    local at = trip.at
-    -- any of the next corners within reach (a shortcut skips the ones between)
-    local reached
-    for j = at, math.min(#trail, at + 6) do
-        local p = trail[j]
-        local d = DistTo(here, here.cont, p.wx, p.wy)
-        if d and d < ADVANCE and j < #trail then reached = j end
-    end
-    if reached then
-        trip.at, trip.best = reached + 1, nil
-        local dest = trip.dest
-        if trip.at >= #trail then
-            -- the last corner is the place itself: the GPS takes it from here, to the exact point
-            trip.trail, trip.at = nil, nil
-            Point(dest.map, dest.x, dest.y, dest.gps or dest.label)
-        else
-            local p = trail[trip.at]
-            Point(p.map, p.x, p.y, dest.gps or dest.label)
-        end
-        return
-    end
-    -- off the path: asked again (not in combat, at most every 10 s)
-    local p = trail[at]
-    local d = DistTo(here, here.cont, p.wx, p.wy)
-    if d then
-        trip.best = math.min(trip.best or d, d)
-        local t = GetTime and GetTime() or 0
-        if d > trip.best + OFF_TRAIL and not InCombat() and t - (trip.askedAt or 0) > 10 then
-            trip.trail, trip.at, trip.best = nil, nil, nil
-            local dest = trip.dest
-            Point(dest.map, dest.x, dest.y, dest.gps or dest.label)
-            TryTrail()
-        end
-    end
+    if now and now.arrived then Arrived() end
 end
 GoTo._Follow = Follow
 
@@ -985,8 +858,8 @@ local function Remember(r)
     db.gotoRecent = keep
 end
 
--- Guides you to a result of GoTo.Search (or a recent place): the GPS arrow now, and the walking
--- path as soon as the router answers.
+-- Guides you to a result of GoTo.Search (or a recent place): the GPS arrow to the place, its walking
+-- path (Trail.lua) as soon as the router answers.
 function GoTo.Go(r)
     if type(r) ~= "table" then return false end
     -- a recent service is found again from where you stand now
@@ -1014,11 +887,10 @@ function GoTo.Go(r)
     -- position to read then, so a trip of ours would tick for nothing)
     if GPS.UseZygor and GPS.UseZygor() then trip = nil; return true end
     if C_Timer and C_Timer.NewTicker then ticker = C_Timer.NewTicker(0.25, Follow) end
-    TryTrail()
     return true
 end
 
--- The trip now (for the tests and the Home page): nil, or { dest, trail, at }.
+-- The trip now (for the tests and the Home page): nil, or { dest }.
 function GoTo.Trip() return trip end
 
 -- ---------------------------------------------------------------- the window
@@ -1287,11 +1159,3 @@ function GoTo.OnIndexed()
     if win and win:IsShown() then Render() end
 end
 
--- ---------------------------------------------------------------- events
-
-local ev = CreateFrame("Frame")
-pcall(ev.RegisterEvent, ev, "PLAYER_REGEN_ENABLED")
-ev:SetScript("OnEvent", function(_, event)
-    -- the walking path waits for the end of a fight (the router never loads in combat)
-    if event == "PLAYER_REGEN_ENABLED" and trip and trip.wantTrail then TryTrail() end
-end)

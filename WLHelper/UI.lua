@@ -1015,17 +1015,19 @@ local function MakeRow(parent)
   -- the secure buttons (target / item) live in the action bar outside this window, so the window
   -- stays usable in combat. GPS: a secondary button with the pin.
   local gb
-  gb = LabelBtn(row, "GPS", 24, "secondary", function(self) local n = self.row.node; if n and n.loc then ns.SetOne(n) end end,
+  gb = LabelBtn(row, "GPS", 24, "secondary", function(self) local n = self.row.node; if ns.NodeCanGo(n) then ns.SetOne(n) end end,
     function()
       local n = gb and gb.row and gb.row.node
-      if not (n and n.loc) then return nil end
-      return { L.TT_GPS:format(n.npc or ns.QName(n.q), n.loc.x, n.loc.y), L.TT_GPS_CLICK }
+      local _, x, y = n and ns.NodePoint(n)
+      if not x and n and n.loc then x, y = n.loc.x, n.loc.y end
+      if not x then return nil end
+      return { L.TT_GPS:format(n.npc or ns.QName(n.q), x, y), L.TT_GPS_CLICK }
     end)
   if gb.SetIcon then gb:SetIcon("pin") end
   gb.row = row
   row.gb = gb
-  row:SetScript("OnClick", function(self) local n = self.node; if n and n.loc then ns.SetOne(n) end end)
-  row:SetScript("OnMouseDown", function(self) if self.node and self.node.loc then self.press:Show() end end)
+  row:SetScript("OnClick", function(self) local n = self.node; if ns.NodeCanGo(n) then ns.SetOne(n) end end)
+  row:SetScript("OnMouseDown", function(self) if ns.NodeCanGo(self.node) then self.press:Show() end end)
   row:SetScript("OnMouseUp", function(self) self.press:Hide() end)
   row:SetScript("OnEnter", function(self) ns.RowTip(self) end)
   row:SetScript("OnLeave", ns.HideTip)
@@ -1034,8 +1036,15 @@ local function MakeRow(parent)
   return row
 end
 
+-- The GPS of one line: the point the arrow follows (NodePoint: the game's quest area first for an
+-- objective, as the card, its distance and the tooltip say), else our database point.
 function ns.SetOne(n)
-  ns.SetPoints({ { n.loc.m, n.loc.x, n.loc.y, n.npc or ns.QName(n.q) } })
+  if not n then return end
+  local m, x, y
+  if ns.NodePoint then m, x, y = ns.NodePoint(n) end
+  if not (m and x and y) and n.loc and n.loc.m then m, x, y = n.loc.m, n.loc.x, n.loc.y end
+  if not (m and x and y) then return end
+  ns.SetPoints({ { m, x, y, n.npc or ns.QName(n.q) } })
   Render()
 end
 
@@ -1287,6 +1296,18 @@ local function NodePoint(nd)
       end
     end
   end
+end
+ns.NodePoint = NodePoint
+-- a click on the line (or its GPS button) leads somewhere: its own place, or the game's quest area
+function ns.NodeCanGo(nd)
+  if not nd then return false end
+  if nd.loc and nd.loc.m then return true end
+  return NodePoint(nd) ~= nil
+end
+-- the line is the one the arrow follows now (its point is set)
+local function NodeFollowed(nd)
+  local m, x, y = NodePoint(nd)
+  return (m and ns.active[ns.PKey(m, x, y)]) and true or false
 end
 
 -- How far a point is from you: "350 m", "1,2 km" (the GPS's own words), "Autre continent"; nil
@@ -1627,7 +1648,7 @@ local function FocusModel(card, nd, log, dkey, st)
   if desc then Det(L.GAME_TEXT, desc) end
 
   -- the GPS button's tooltip: where it leads, how the arrow finds it, the click
-  if nd.loc then
+  if nd.loc or x then
     local who = (kind == "a" or kind == "t" or kind == "h") and (npc or qn) or (objName or npc or qn)
     M.gpsTip[1] = L.TT_GPS:format(who, x or nd.loc.x, y or nd.loc.y)
     if src == "game" then M.gpsTip[#M.gpsTip + 1] = mt .. L.ARROW_GAME .. "|r" end
@@ -1730,7 +1751,7 @@ local function MakeFocus(card)
   -- its own blocks: their cut labels are kept apart, not put first in the tooltip
   fo.cutSink = {}
   local gb
-  gb = LabelBtn(fo, "GPS", 24, "secondary", function(self) local n = self.row.node; if n and n.loc then ns.SetOne(n) end end,
+  gb = LabelBtn(fo, "GPS", 24, "secondary", function(self) local n = self.row.node; if ns.NodeCanGo(n) then ns.SetOne(n) end end,
     function()
       local M = gb and gb.row and gb.row.model
       if not (M and M.gpsTip and M.gpsTip[1]) then return nil end
@@ -1747,8 +1768,8 @@ local function MakeFocus(card)
   end, function() return { WLDTDB.cardDetails and L.CARD_LESS_TT or L.CARD_MORE_TT } end)
   more:Hide()
   fo.more = more
-  fo:SetScript("OnClick", function(self) local n = self.node; if n and n.loc then ns.SetOne(n) end end)
-  fo:SetScript("OnMouseDown", function(self) if self.node and self.node.loc then self.press:Show() end end)
+  fo:SetScript("OnClick", function(self) local n = self.node; if ns.NodeCanGo(n) then ns.SetOne(n) end end)
+  fo:SetScript("OnMouseDown", function(self) if ns.NodeCanGo(self.node) then self.press:Show() end end)
   fo:SetScript("OnMouseUp", function(self) self.press:Hide() end)
   fo:SetScript("OnEnter", function(self) ns.RowTip(self) end)
   fo:SetScript("OnLeave", ns.HideTip)
@@ -1767,8 +1788,8 @@ local function MakeFocus(card)
     ln.icon = ln:CreateTexture(nil, "ARTWORK"); ln.icon:SetSize(14, 14); ln.icon:SetPoint("LEFT", 10, 0)
     ln.text = Text(ln, ns.F.label, T.text); ln.text:SetPoint("LEFT", 32, 0); ln.text:SetPoint("RIGHT", -8, 0); ln.text:SetJustifyV("MIDDLE")
     ns.ClampLabel(ln.text, nil, ln)
-    ln:SetScript("OnClick", function(self) local n = self.node; if n and n.loc then ns.SetOne(n) end end)
-    ln:SetScript("OnMouseDown", function(self) if self.node and self.node.loc then self.press:Show() end end)
+    ln:SetScript("OnClick", function(self) local n = self.node; if ns.NodeCanGo(n) then ns.SetOne(n) end end)
+    ln:SetScript("OnMouseDown", function(self) if ns.NodeCanGo(self.node) then self.press:Show() end end)
     ln:SetScript("OnMouseUp", function(self) self.press:Hide() end)
     ln:SetScript("OnEnter", function(self) ns.RowTip(self) end)
     ln:SetScript("OnLeave", ns.HideTip)
@@ -1798,7 +1819,8 @@ local function RenderFocus(card, st, log, y, dkey)
   local ok = M.ok
   fo.node, fo.model = nd, M
   -- hover feedback only when a click does something (a place to follow)
-  fo.hl:SetShown(nd.loc ~= nil)
+  local canGo = ns.NodeCanGo(nd)
+  fo.hl:SetShown(canGo)
   fo.icon:SetVertexColor(1, 1, 1)
   if ok then ns.SetHDIcon(fo.icon, "check", T.ok)
   elseif M.icon then ns.SetHDIcon(fo.icon, M.icon, T.muted)
@@ -1806,10 +1828,10 @@ local function RenderFocus(card, st, log, y, dkey)
   elseif not SetKindIcon(fo.icon, nd) then ns.SetHDIcon(fo.icon, "dot", T.muted, 0) end
   -- the GPS button at the top right, centred on the title's first line; followed: the block is
   -- selected and the button says so
-  local isActive = nd.loc and ns.active[ns.PKey(nd.loc.m, nd.loc.x, nd.loc.y)] and not ok
+  local isActive = canGo and NodeFollowed(nd) and not ok
   fo.wpOn:SetShown(isActive and true or false)
   local gpsW = 0
-  if nd.loc and not ok then
+  if canGo and not ok then
     fo.gb:SetText(isActive and L.GPS_ON or "GPS")
     fo.gb:ClearAllPoints(); fo.gb:SetPoint("TOPRIGHT", fo, "TOPRIGHT", -12, -6); fo.gb:Show()
     gpsW = (num(fo.gb:GetWidth()) or 60) + 8
@@ -1907,7 +1929,7 @@ local function RenderFocus(card, st, log, y, dkey)
     local a = others[j]
     if a then
       ln.node = a
-      ln.hl:SetShown(a.loc ~= nil)
+      ln.hl:SetShown(ns.NodeCanGo(a))
       ln.icon:SetVertexColor(1, 1, 1)
       if not SetKindIcon(ln.icon, a) then ns.SetHDIcon(ln.icon, "dot", T.muted, 0) end
       local t = LineText(a, log)
@@ -2988,11 +3010,12 @@ Render = function()
       if nd.kind == "h" then right = ok and (Hex(T.ok) .. L.CL_HAVE .. "|r") or (Hex(T.warn) .. L.CL_TAKE .. "|r") end
       row.npc:SetText(right)
       SetSecureRow(row, nd, ok)
-      row.gb:SetShown(nd.loc ~= nil)
-      local isActive = nd.loc and ns.active[ns.PKey(nd.loc.m, nd.loc.x, nd.loc.y)] and not ok
+      local canGo = ns.NodeCanGo(nd)
+      row.gb:SetShown(canGo)
+      local isActive = canGo and NodeFollowed(nd) and not ok
       row.wpOn:SetShown(isActive and true or false)
       local x = -12
-      if nd.loc then
+      if canGo then
         -- followed: the row is selected and the button says so
         row.gb:SetText(isActive and (L.GPS_ON or "GPS") or "GPS")
         row.gb:ClearAllPoints(); row.gb:SetPoint("TOPRIGHT", row, "TOPRIGHT", x, -5)
@@ -3192,10 +3215,21 @@ ns.Render = function() if f and f:IsShown() then Render() end end
 -- =====================================================================
 --  Suivi de l'étape en cours
 -- =====================================================================
+-- The guide is in front of you: its window, or the quest tracker that shows its step. A guide closed
+-- with its X (and no tracker) follows quietly: no sound, no centre-screen or chat line.
+local function GuideSeen()
+  if f and f:IsShown() then return true end
+  local TR = WLHelperTracker
+  local tf = TR and TR.Frame and TR.Frame()
+  return (tf and tf:IsShown()) and true or false
+end
+ns.GuideSeen = GuideSeen
+
 -- "Next step: ..." with the quest sound (Refresh on an advance, Replan when the current step changed)
 function ns.AnnounceStep(i)
   local st = Steps()[i]
   if not st then return end
+  if not GuideSeen() or ns.muteAnnounce then return end
   PlaySound(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE or 878)
   local t = StepTitle(st)
   if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper" .. L.COLON .. t, T.fg[1], T.fg[2], T.fg[3]) end
@@ -3206,7 +3240,10 @@ function ns.Refresh(silent)
   if not f then return end
   if ns.GuideOn and not ns.GuideOn() then return end
   local steps = Steps()
-  if #steps == 0 then f.wasFin = nil; Render() return end
+  -- the window is drawn only when shown (OnShow refreshes); the step, the arrow and the macro
+  -- still follow while it is closed (the target key and the tracker use them)
+  local shown = f:IsShown()
+  if #steps == 0 then f.wasFin = nil; if shown then Render() end return end
   local log = ns.LogEntries()
   local auto = FirstOpen(log)
   -- the whole route is done: points cleared, one sound and one message; the guide then shows the
@@ -3222,9 +3259,11 @@ function ns.Refresh(silent)
   end
   if fin and not f.wasFin and not silent then
     ns.ClearPoints(); f.sig = nil
-    PlaySound(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE or 878)
-    if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper" .. L.COLON .. L.FIN_T, T.ok[1], T.ok[2], T.ok[3]) end
-    ns.Print(L.FIN_MSG:format(ns.route.label or ""))
+    if GuideSeen() and not ns.muteAnnounce then
+      PlaySound(SOUNDKIT and SOUNDKIT.IG_QUEST_LIST_COMPLETE or 878)
+      if UIErrorsFrame then UIErrorsFrame:AddMessage("WL Helper" .. L.COLON .. L.FIN_T, T.ok[1], T.ok[2], T.ok[3]) end
+      ns.Print(L.FIN_MSG:format(ns.route.label or ""))
+    end
   end
   f.wasFin = fin
   if WLDTDB.autoWay and not fin then
@@ -3233,7 +3272,13 @@ function ns.Refresh(silent)
     for _, p in ipairs(pts) do sig = sig .. p[2] .. p[3] end
     if sig ~= f.sig then f.sig = sig; f.wpKey = nil; ns.SetPoints(pts, true) end
   end
-  Render()
+  if shown then Render()
+  else
+    -- closed: what Render keeps for later is kept all the same: the step a /reload brings back
+    -- (WLDTDB.view) and the action bar, hidden with the window (Escape, a loading screen)
+    if f.view then WLDTDB.view = math.max(1, math.min(fin and #steps + 1 or #steps, f.view)) end
+    ns.UpdateActionBar()
+  end
   ns.UpdateMacro()
 end
 

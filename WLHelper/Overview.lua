@@ -985,15 +985,42 @@ end
 -- Ticks or unticks a quest. Only the quest itself is written: the engine reads `off` for a
 -- dungeon's main quests and brings their prerequisites with them, so a chain row's links follow
 -- it. Writing the links would drop a link that is also another dungeon's main quest from that route.
+-- The running route follows a tick, an untick or a new default, quietly and once for a burst of
+-- clicks: a replan (the done steps stay on top, the step you look at stays), else the saved order
+-- rebuilt as a /reload does. No chat line (the main button already says "Update the route").
+local rebuildPending = false
+local function RebuildRoute()
+  rebuildPending = false
+  if not (ns.route and ns.frame) then return end
+  -- the replan's "Next step" / "route finished" announces are muted: the player is clicking here
+  ns.muteAnnounce = true
+  local ok, _, rebuilt = pcall(ns.Replan)
+  ns.muteAnnounce = nil
+  if ok and rebuilt then return end
+  if not ns.Assemble then return end
+  local okA = pcall(ns.Assemble, false)
+  if not okA then return end
+  local fr = ns.frame
+  fr.auto, fr.sig = nil, nil
+  if fr.view and ns.route and fr.view > #ns.route.steps then fr.view = nil end
+  if ns.Refresh then ns.Refresh(true) end
+end
+local function RebuildRouteSoon()
+  if rebuildPending then return end
+  rebuildPending = true
+  if C_Timer and C_Timer.After then C_Timer.After(0.3, RebuildRoute) else RebuildRoute() end
+end
+ns.SummaryRebuildRoute = RebuildRouteSoon
+
 local function SetOff(qid, off)
   if not qid then return end
   local pick = ns.OffPick()
   WLDTDB.off[qid] = off and true or nil
   pick[qid] = true
-  -- the running route follows at once; the main button then says "Update the route"
+  -- the running route follows; the main button then says "Update the route"
   if f then f.changed = true end
   if PlaySound then PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856) end
-  if ns.route and ns.frame and ns.Recalc and RouteHas(qid) then ns.Recalc() end
+  if ns.route and ns.frame and RouteHas(qid) then RebuildRouteSoon() end
   if ns.RenderPicker then ns.RenderPicker() end
   Render()
 end
@@ -2118,8 +2145,8 @@ Render = function()
     for _, k in ipairs(keys) do if ns.Runnable(k) then runnable = true end end
   end
   -- a default changed (a level up) for a dungeon of the running route: the route follows, once
-  if routeChanged and ns.route and ns.frame and ns.frame:IsShown() and ns.Recalc and C_Timer and C_Timer.After then
-    C_Timer.After(0, function() pcall(ns.Recalc) end)
+  if routeChanged and ns.route and ns.frame and ns.frame:IsShown() then
+    RebuildRouteSoon()
   end
 
   local y = 0

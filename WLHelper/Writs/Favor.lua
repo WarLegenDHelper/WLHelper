@@ -172,7 +172,13 @@ function WP.FavorPlan(missing, rows)
                 local crates = math.max(0, n - r.haveCrate)
                 -- the real price when the listings were read (Ladder.lua), else the lowest price x n
                 local crateCost, crateAll = WP.CostFor and WP.CostFor(r.id, crates)
-                local exact = crateCost ~= nil
+                local capped = false
+                if crateCost == nil and crates > 0 and not r.cratePrice then
+                    -- no price for this crate (no scan, no price addon): only the crates you hold
+                    -- are counted, the rest of the Favor comes from priced crates (never "free")
+                    n, crates, crateCost, capped = r.haveCrate, 0, 0, true
+                end
+                local exact = crateCost ~= nil and not capped
                 crateCost = crateCost or crates * (r.cratePrice or 0)
                 -- Each crate takes ONE bundle, but crates may use different ones: crate by crate, the
                 -- bundle whose next units cost least (what you own is free; the real listings when read).

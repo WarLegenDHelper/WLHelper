@@ -16,11 +16,16 @@ local function Cur()
   return meta and meta(ADDON, "Version") or ns.VERSION or "?"
 end
 
--- "1.0.0-beta.12" -> comparable numbers
+-- "1.0.0-beta.12" -> comparable numbers: alpha < beta < rc < the release itself
+-- (1.0.0-beta.83 < 1.0.0-rc.1 < 1.0.0 < 1.0.1-beta.1)
+local TAG_RANK = { alpha = 0, beta = 1, rc = 2 }
 local function Key(v)
-  local a, b, c, n = tostring(v or ""):match("^(%d+)%.(%d+)%.(%d+)%-?%a*%.?(%d*)")
-  return (tonumber(a) or 0) * 1e9 + (tonumber(b) or 0) * 1e6 + (tonumber(c) or 0) * 1e3 + (tonumber(n) or 0)
+  local a, b, c, tag, n = tostring(v or ""):match("^(%d+)%.(%d+)%.(%d+)%-?(%a*)%.?(%d*)")
+  if not a then return 0 end
+  local rank = (tag == "") and 3 or TAG_RANK[tag:lower()] or 0
+  return (((tonumber(a) * 1000 + tonumber(b)) * 1000 + tonumber(c)) * 4 + rank) * 1000 + (tonumber(n) or 0)
 end
+ns.WhatsNewKey = Key   -- for the offline tests
 
 local W, PAD = 480, 16
 local CW = W - 2 * PAD
@@ -233,15 +238,26 @@ end
 
 local ev = CreateFrame("Frame")
 pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
-ev:SetScript("OnEvent", function()
-  C_Timer.After(8, function()
-    if not WLDTDB then return end
-    local cur = Cur()
-    local seen = WLDTDB.seenVersion
-    WLDTDB.seenVersion = cur
-    -- first install: no list (the welcome screen speaks); an update: what changed since then
-    if seen and seen ~= cur and Key(cur) > Key(seen) and not InCombatLockdown() then ns.ShowWhatsNew(seen) end
-  end)
+-- first install: no list (the welcome screen speaks); an update: what changed since then, once.
+-- In combat the version stays unseen and the window waits for the end of the fight.
+local function CheckUpdate()
+  if not WLDTDB then return end
+  local cur = Cur()
+  local seen = WLDTDB.seenVersion
+  if not seen or seen == cur or Key(cur) <= Key(seen) then WLDTDB.seenVersion = cur; return end
+  WLDTDB.newsFrom = seen   -- the star button and /wlh nouveautes start from there too
+  if InCombatLockdown() then pcall(ev.RegisterEvent, ev, "PLAYER_REGEN_ENABLED"); return end
+  WLDTDB.seenVersion = cur
+  ns.ShowWhatsNew(seen)
+end
+ns.WhatsNewCheck = CheckUpdate   -- for the offline tests
+ev:SetScript("OnEvent", function(self, event)
+  if event == "PLAYER_REGEN_ENABLED" then
+    pcall(self.UnregisterEvent, self, "PLAYER_REGEN_ENABLED")
+    CheckUpdate()
+    return
+  end
+  if event == "PLAYER_LOGIN" then C_Timer.After(8, CheckUpdate) end
 end)
 
 local hook = CreateFrame("Frame")

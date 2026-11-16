@@ -48,6 +48,8 @@ ns.AddEnglish({
     ["Me désinscrire"] = "Cancel sign-up",
     ["Inviter les inscrits"] = "Invite sign-ups",
     ["Invitations envoyées"] = "Invites sent",
+    ["Hors ligne, pas invités : %s."] = "Offline, not invited: %s.",
+    ["Tous les inscrits sont déjà dans ton groupe."] = "Everyone signed up is already in your group.",
     ["Personne d'autre n'est inscrit pour l'instant."] = "Nobody else has signed up yet.",
     ["Annuler l'événement"] = "Cancel event",
     ["Confirmer l'annulation"] = "Confirm cancel",
@@ -384,9 +386,54 @@ local function InviteLater(names)
         end
     end)
 end
+-- name -> online, read once from the guild roster (a value the game hides is left out: unknown)
+local function OnlineMap()
+    local map = {}
+    if not (GetNumGuildMembers and GetGuildRosterInfo) then return map end
+    local secret = root.IsSecret
+    local n = GetNumGuildMembers()
+    if type(n) ~= "number" or (secret and secret(n)) then return map end
+    for i = 1, n do
+        local name, _, _, _, _, _, _, _, isOnline = GetGuildRosterInfo(i)
+        if type(name) == "string" and not (secret and (secret(name) or secret(isOnline))) then
+            map[Short(name)] = isOnline and true or false
+        end
+    end
+    return map
+end
+local function Grouped(name)
+    local function yes(v) return v and not (root.IsSecret and root.IsSecret(v)) end
+    return yes(UnitInParty and UnitInParty(name)) or yes(UnitInRaid and UnitInRaid(name))
+end
+-- Invites the sign-ups who are online (the offline ones are named in the chat). Returns how many
+-- invites go out and, when none, why ("none", "offline", "lead", "full"): the chat always says it.
 function WP.InviteSignups(e)
-    local names = {}
-    for name in pairs(e.signups or {}) do if name ~= Me() then names[#names + 1] = name end end
+    local names, off, all, grouped = {}, {}, 0, 0
+    local online = OnlineMap()
+    for name in pairs(e.signups or {}) do
+        if name ~= Me() then
+            if Grouped(name) then grouped = grouped + 1
+            else
+                all = all + 1
+                -- not in the roster (not read yet): the game decides
+                if online[name] == false then off[#off + 1] = name else names[#names + 1] = name end
+            end
+        end
+    end
+    if all == 0 then
+        Say(grouped > 0 and L("Tous les inscrits sont déjà dans ton groupe.") or L("Personne d'autre n'est inscrit pour l'instant."))
+        return 0, "none"
+    end
+    table.sort(names); table.sort(off)
+    if #off > 0 then Say(string.format(L("Hors ligne, pas invités : %s."), table.concat(off, ", "))) end
+    if #names == 0 then return 0, "offline" end
+    -- in a group without being its leader (or a raid assistant): the game would refuse every invite
+    local Sh = WP.Shared
+    if IsInGroup() and Sh and Sh.MayInvite and not Sh.MayInvite(IsInRaid()) then
+        Say(IsInRaid() and L("Seul le chef du raid ou un assistant peut inviter : demande au chef de te passer assistant.")
+            or string.format(L("Seul le chef du groupe peut inviter : demande-lui d'inviter %s ou de te passer chef."), table.concat(names, ", ")))
+        return 0, "lead"
+    end
     local now, later = names, {}
     if not IsInRaid() then
         local free = math.max(0, 4 - (GetNumSubgroupMembers and GetNumSubgroupMembers() or 0))
@@ -400,6 +447,8 @@ function WP.InviteSignups(e)
         Say(L("Les autres inscrits seront invités dès que le groupe passe en raid."))
         InviteLater(later)
     end
+    -- only the invites that go out now (a full party waits for the raid: the chat line says it)
+    return #now, (#now == 0 and "full" or nil)
 end
 
 -- The organizer's banner when the event is near: invite everyone in one click, or later.
@@ -825,8 +874,8 @@ local function EventCard(parent, width)
     c.out = S.Button(c, L("Me désinscrire"), 0, 24, "secondary", function() if c.e then WP.SignUp(c.e, nil) end end)
     c.invite = S.Button(c, L("Inviter les inscrits"), 0, 24, "secondary", function(self)
         if not c.e then return end
-        WP.InviteSignups(c.e)
-        self:Flash(L("Invitations envoyées"))
+        -- the flash (a check mark) only when invites went out; otherwise the chat line says why
+        if (WP.InviteSignups(c.e) or 0) > 0 then self:Flash(L("Invitations envoyées")) end
     end)
     -- labelled: no icon (icon audit G3); the trash stays on the cancel, a destructive action
     -- cancel in two clicks: the first asks (the label becomes the confirmation), the second cancels
