@@ -29,17 +29,17 @@ ns.AddEnglish({
     ["Trier le journal"] = "Clean up the log",
     ["%d quêtes sur %d"] = "%d of %d quests",
     -- the window
-    ["Ton journal est presque plein : %d quêtes sur %d. Voici celles que tu peux abandonner sans rien perdre d'important."] =
-        "Your quest log is nearly full: %d of %d quests. Here are the ones you can abandon without losing anything important.",
-    ["Ton journal est plein : %d quêtes sur %d. Voici celles que tu peux abandonner sans rien perdre d'important."] =
-        "Your quest log is full: %d of %d quests. Here are the ones you can abandon without losing anything important.",
-    ["%d quêtes sur %d dans ton journal. Voici celles que tu peux abandonner sans rien perdre d'important."] =
-        "%d of %d quests in your log. Here are the ones you can abandon without losing anything important.",
+    ["Ton journal est presque plein. Tu peux abandonner ces quêtes sans rien perdre d'important."] =
+        "Your quest log is nearly full. You can abandon these quests without losing anything important.",
+    ["Ton journal est plein. Tu peux abandonner ces quêtes sans rien perdre d'important."] =
+        "Your quest log is full. You can abandon these quests without losing anything important.",
+    ["Tu peux abandonner ces quêtes sans rien perdre d'important."] =
+        "You can abandon these quests without losing anything important.",
     ["Jamais proposées : les quêtes de tes donjons choisis, les clés et les accès de raid, les quêtes de classe, les Writs, celles prêtes à rendre et celles que tu gardes."] =
         "Never offered: the quests of your chosen dungeons, keys and raid attunements, class quests, Writs, quests ready to turn in and the ones you keep.",
-    ["Niveau %d"] = "Level %d",
+    ["Quête niv. %d"] = "Level %d quest",
     ["Abandonner"] = "Abandon",
-    ["Confirmer l'abandon"] = "Confirm",
+    ["Confirmer l'abandon"] = "Confirm abandon",
     ["Garder"] = "Keep",
     ["La quête quitte ton journal. Tu pourras la reprendre chez celui qui la donne."] =
         "The quest leaves your log. You can take it again from its quest giver.",
@@ -49,15 +49,14 @@ ns.AddEnglish({
     ["Clic : ouvrir la quête dans ton journal"] = "Click: open the quest in your log",
     ["1 quête gardée n'est plus proposée."] = "1 kept quest is no longer offered.",
     ["%d quêtes gardées ne sont plus proposées."] = "%d kept quests are no longer offered.",
-    ["Les reproposer"] = "Offer them again",
+    ["Les proposer à nouveau"] = "Offer them again",
     ["Clic : proposer à nouveau les quêtes que tu as gardées"] = "Click: offer the quests you kept again",
     -- the reasons
-    ["Quête grise : niveau %d, trop bas pour toi. Elle ne rapporte presque plus d'expérience."] =
-        "Grey quest: level %d, too low for you. It gives almost no experience now.",
-    ["Quête de groupe (%s) de niveau %d : trop dure seul à ton niveau."] =
-        "Group quest (%s) of level %d: too hard alone at your level.",
-    ["Quête de groupe de niveau %d : trop dure seul à ton niveau."] = "Group quest of level %d: too hard alone at your level.",
-    ["Quête du donjon %s : tu as dépassé son niveau et il n'est pas dans ta sélection."] = "A quest for %s: you have outgrown it and it is not in your selection.",
+    ["Grise : trop basse pour toi, elle donne très peu d'XP."] = "Grey: too low for you, it gives very little XP.",
+    ["Quête de groupe (%s) : trop dure seul à ton niveau."] = "Group quest (%s): too hard alone at your level.",
+    ["Quête de groupe : trop dure seul à ton niveau."] = "Group quest: too hard alone at your level.",
+    ["Quête de %s : tu as dépassé ce donjon et il n'est pas dans tes donjons choisis."] =
+        "A quest for %s: you have outgrown this dungeon and it is not one of your chosen dungeons.",
     -- the empty state
     ["Rien à abandonner"] = "Nothing to abandon",
     ["Toutes tes quêtes servent encore."] = "All your quests are still useful.",
@@ -360,18 +359,19 @@ local function Suggest()
             local ql = e.level or (q and num(q.l))
             local s
             if plvl and ql and IsGrey(ql, plvl) then
-                s = { kind = "grey", reason = string.format(L("Quête grise : niveau %d, trop bas pour toi. Elle ne rapporte presque plus d'expérience."), ql) }
+                -- the level is on the row's meta line ("Quête niv. 20 · Zone"): the reason says why only
+                s = { kind = "grey", reason = L("Grise : trop basse pour toi, elle donne très peu d'XP.") }
             elseif plvl and ql and e.group and not (q and q.d) and ql >= plvl + 3 then
                 s = { kind = "group", reason = e.tag
-                    and string.format(L("Quête de groupe (%s) de niveau %d : trop dure seul à ton niveau."), e.tag, ql)
-                    or string.format(L("Quête de groupe de niveau %d : trop dure seul à ton niveau."), ql) }
+                    and string.format(L("Quête de groupe (%s) : trop dure seul à ton niveau."), e.tag)
+                    or L("Quête de groupe : trop dure seul à ton niveau.") }
             elseif anySel and q then
                 local ds = DungeonOf(q)
                 local inSel = false
                 for _, k in ipairs(ds or {}) do if sel[k] then inSel = true end end
                 if ds and not inSel and Outgrown(ds, plvl) then
                     local dname = root.DName and root.DName(ds[1]) or ds[1]
-                    s = { kind = "dungeon", reason = string.format(L("Quête du donjon %s : tu as dépassé son niveau et il n'est pas dans ta sélection."), dname) }
+                    s = { kind = "dungeon", reason = string.format(L("Quête de %s : tu as dépassé ce donjon et il n'est pas dans tes donjons choisis."), dname) }
                 end
             end
             if s then
@@ -491,7 +491,7 @@ local function KeptCount()
     return n
 end
 
--- One row: the quest name in its difficulty colour, "Niveau 24 · Zone" (meta, muted), the reason
+-- One row: the quest name in its difficulty colour, "Quête niv. 24 · Zone" (meta, muted), the reason
 -- (meta, text colour), and on the right Garder then Abandonner (danger, two-step).
 local function MakeRow(parent)
     local row = CreateFrame("Button", nil, parent)
@@ -529,7 +529,14 @@ local function MakeRow(parent)
     row:SetScript("OnEnter", function(self)
         root.Tween(self, self.hov or 0, 1, 0.10, function(v) self.hov = v; self.hl:SetAlpha(v) end)
         local e = self.entry
-        if e then S.Tip(self, { e.title or "?", e.reason, L("Clic : ouvrir la quête dans ton journal") }) end
+        if e then
+            local meta = self.meta:IsShown() and self.meta:GetText() or nil
+            local t = { e.title or "?" }
+            if type(meta) == "string" and meta ~= "" then t[#t + 1] = meta end
+            t[#t + 1] = e.reason
+            t[#t + 1] = L("Clic : ouvrir la quête dans ton journal")
+            S.Tip(self, t)
+        end
     end)
     row:SetScript("OnLeave", function(self)
         root.Tween(self, self.hov or 0, 0, 0.10, function(v) self.hov = v; self.hl:SetAlpha(v) end)
@@ -548,7 +555,7 @@ local function Paint(row, e)
     local c = e.level and S.LevelColor(e.level) or C.fg
     row.name:SetTextColor(c[1], c[2], c[3])
     local parts = {}
-    if e.level then parts[#parts + 1] = string.format(L("Niveau %d"), e.level) end
+    if e.level then parts[#parts + 1] = string.format(L("Quête niv. %d"), e.level) end
     if e.zone and e.zone ~= "" then parts[#parts + 1] = e.zone end
     row.meta:SetText(table.concat(parts, " · "))
     row.meta:SetShown(#parts > 0)
@@ -583,10 +590,11 @@ Refresh = function()
     win.subtitle:SetText(string.format(L("%d quêtes sur %d"), currentCount, max))
     local free = max - currentCount
     local intro
-    if free <= 0 then intro = L("Ton journal est plein : %d quêtes sur %d. Voici celles que tu peux abandonner sans rien perdre d'important.")
-    elseif free <= NEAR then intro = L("Ton journal est presque plein : %d quêtes sur %d. Voici celles que tu peux abandonner sans rien perdre d'important.")
-    else intro = L("%d quêtes sur %d dans ton journal. Voici celles que tu peux abandonner sans rien perdre d'important.") end
-    win.intro:SetText(string.format(intro, currentCount, max))
+    -- the count is the subtitle ("18 quêtes sur 20"): the intro says what it means and what the list is
+    if free <= 0 then intro = L("Ton journal est plein. Tu peux abandonner ces quêtes sans rien perdre d'important.")
+    elseif free <= NEAR then intro = L("Ton journal est presque plein. Tu peux abandonner ces quêtes sans rien perdre d'important.")
+    else intro = L("Tu peux abandonner ces quêtes sans rien perdre d'important.") end
+    win.intro:SetText(intro)
 
     local child = win.list.child
     local y = 0
@@ -633,10 +641,10 @@ local function Build()
     win.note:SetText(L("Jamais proposées : les quêtes de tes donjons choisis, les clés et les accès de raid, les quêtes de classe, les Writs, celles prêtes à rendre et celles que tu gardes."))
     win.kept = S.Text(win, F.meta, C.muted)
     win.kept:SetJustifyH("LEFT"); win.kept:SetJustifyV("MIDDLE")
-    win.unkeep = S.Button(win, L("Les reproposer"), 0, 24, "ghost", function()
+    win.unkeep = S.Button(win, L("Les proposer à nouveau"), 0, 24, "ghost", function()
         if type(WLWritsCharDB) == "table" then WLWritsCharDB.triageKeep = {} end
         Refresh()
-    end, { L("Les reproposer"), L("Clic : proposer à nouveau les quêtes que tu as gardées") })
+    end, { L("Les proposer à nouveau"), L("Clic : proposer à nouveau les quêtes que tu as gardées") })
     win.empty = S.EmptyState(win, "check", L("Rien à abandonner"), L("Toutes tes quêtes servent encore."))
     win.empty:ClearAllPoints(); win.empty:SetPoint("TOP", win, "TOP", 0, -(top + 12))
     win.empty:Hide()

@@ -37,6 +37,8 @@ ns.AddEnglish({
     ["Clic : t'inscrire comme tank"] = "Click: sign up as tank",
     ["Clic : t'inscrire comme soigneur"] = "Click: sign up as healer",
     ["Clic : t'inscrire comme DPS"] = "Click: sign up as DPS",
+    ["T'inscrire comme"] = "Sign up as",
+    ["Ton rôle"] = "Your role",
     ["Me désinscrire"] = "Cancel sign-up",
     ["Inviter les inscrits"] = "Invite sign-ups",
     ["Invitations envoyées"] = "Invites sent",
@@ -87,7 +89,10 @@ ns.AddEnglish({
     ["Tu peux en cocher plusieurs : l'événement portera tous leurs noms."] = "You can tick several: the event will carry all their names.",
     ["Pour ton niveau"] = "For your level",
     ["Autres niveaux"] = "Other levels",
-    ["niveau %s"] = "level %s",
+    ["niv. %s à %s"] = "level %s-%s",
+    -- the same, at the start of a tooltip line
+    ["Niv. %s à %s"] = "Level %s-%s",
+    ["Niv. %s"] = "Level %s",
     ["Clic : cocher"] = "Click: tick",
     ["Clic : décocher"] = "Click: untick",
     ["Tout décocher"] = "Untick all",
@@ -112,7 +117,7 @@ ns.AddEnglish({
     ["n'importe quel groupe"] = "any group",
     ["à l'instant"] = "just now",
     ["il y a %d min"] = "%d min ago",
-    ["%s, niveau %s"] = "%s, level %s",
+    ["%s, niv. %s"] = "%s, level %s",
     ["Pour : %s"] = "For: %s",
     ["Pour n'importe quel groupe"] = "For any group",
     ["Chuchoter"] = "Whisper",
@@ -140,8 +145,8 @@ ns.AddEnglish({
     ["%s s'inscrit à %s (%s). 1 inscrit en tout."] = "%s signed up for %s (%s). 1 sign-up so far.",
     ["%s s'inscrit à %s (%s). %d inscrits en tout."] = "%s signed up for %s (%s). %d sign-ups so far.",
     ["%s se désinscrit de %s."] = "%s is no longer signed up for %s.",
-    ["%s cherche un groupe pour %s (%s, niveau %s). Tape /wlh lfg pour l'inviter."] = "%s is looking for a group for %s (%s, level %s). Type /wlh lfg to invite them.",
-    ["%s cherche un groupe (%s, niveau %s). Tape /wlh lfg pour l'inviter."] = "%s is looking for a group (%s, level %s). Type /wlh lfg to invite them.",
+    ["%s cherche un groupe pour %s (%s, niv. %s). Tape /wlh lfg pour l'inviter."] = "%s is looking for a group for %s (%s, level %s). Type /wlh lfg to invite them.",
+    ["%s cherche un groupe (%s, niv. %s). Tape /wlh lfg pour l'inviter."] = "%s is looking for a group (%s, level %s). Type /wlh lfg to invite them.",
     ["Ton groupe est complet : ta recherche de groupe s'arrête."] = "Your group is full: your group search has stopped.",
     ["Les autres inscrits seront invités dès que le groupe passe en raid."] = "The other sign-ups will be invited as soon as the group becomes a raid.",
     -- read by other windows (Home, the module list, the Writs window, the buttons)
@@ -150,7 +155,7 @@ ns.AddEnglish({
     ["Prochain : %s, %s"] = "Next: %s, %s",
     ["Rien de prévu"] = "Nothing planned",
     ["%d cherchent un groupe"] = "%d looking for a group",
-    ["niv. %s"] = "lv %s",
+    ["niv. %s"] = "level %s",
     ["%d objets meilleurs que les tiens dans tes sacs"] = "%d items in your bags better than yours",
     ["Rien de mieux dans tes sacs"] = "Nothing better in your bags",
     ["Spé, seuil et poids dans les réglages"] = "Spec, threshold and weights in the settings",
@@ -548,9 +553,9 @@ local function OnMessage(msg, sender)
             if not was and On() and GetTime() - askedAt > 20 then
                 local who, rl, lv = ClassHex(cls) .. sender .. "|r", L(ROLE_LABEL[role] or "DPS"), lvl ~= "" and lvl or "?"
                 if what ~= "" then
-                    Say(string.format(L("%s cherche un groupe pour %s (%s, niveau %s). Tape /wlh lfg pour l'inviter."), who, what, rl, lv))
+                    Say(string.format(L("%s cherche un groupe pour %s (%s, niv. %s). Tape /wlh lfg pour l'inviter."), who, what, rl, lv))
                 else
-                    Say(string.format(L("%s cherche un groupe (%s, niveau %s). Tape /wlh lfg pour l'inviter."), who, rl, lv))
+                    Say(string.format(L("%s cherche un groupe (%s, niv. %s). Tape /wlh lfg pour l'inviter."), who, rl, lv))
                 end
             end
         end
@@ -708,7 +713,8 @@ local function Instances(kind)
     table.sort(out, function(a, b) if a[3] ~= b[3] then return a[3] < b[3] end return a[2] < b[2] end)
     return out
 end
--- the painted icon of the event: the first dungeon or raid of its name, else the guild's banner
+-- the painted icon of the event: the first dungeon or raid of its name; nil for anything else
+-- (the card then shows the HD calendar: "an event", not a war-cry icon that meant nothing)
 local function EventIcon(title)
     local first = tostring(title or ""):match("^(.-)%s+%+%s+") or tostring(title or "")
     for _, kind in ipairs({ "dg", "raid" }) do
@@ -719,7 +725,7 @@ local function EventIcon(title)
             end
         end
     end
-    return "Interface\\Icons\\Ability_Warrior_BattleShout"
+    return nil
 end
 
 -- ---------------------------------------------------------------- the event card
@@ -732,7 +738,7 @@ local function EventCard(parent)
     c.iconFrame = CreateFrame("Frame", nil, c)
     c.iconFrame:SetSize(32, 32); c.iconFrame:SetPoint("TOPLEFT", 12, -12)
     c.icon = c.iconFrame:CreateTexture(nil, "ARTWORK"); c.icon:SetAllPoints()
-    S.Border(c.iconFrame, C.cardEdge)
+    c.iconEdge = S.Border(c.iconFrame, C.cardEdge)
     c.title = S.Text(c, F.heading, C.fg)
     c.pill = S.Pill(c)
     c.meta = S.Text(c, F.meta, C.muted)
@@ -742,7 +748,9 @@ local function EventCard(parent)
     c.keyWarn = S.Text(c, F.meta, C.warn)
     c.keyWarn:Hide()
     c.note = S.Text(c, F.label, C.text)
-    -- signing up is one segmented choice: no role yet, or the role you came with (a click changes it)
+    -- signing up is one segmented choice: no role yet, or the role you came with (a click changes it);
+    -- a label above says which ("T'inscrire comme", then "Ton rôle")
+    c.segLabel = S.Text(c, F.meta, C.muted); c.segLabel:SetWordWrap(false)
     local opts = {}
     for _, role in ipairs(ROLES) do opts[#opts + 1] = { role, RoleText(role, 14) } end
     c.seg = S.Segmented(c, opts, function() local m = c.e and WP.MySignup(c.e); return m and m.role end,
@@ -771,6 +779,11 @@ local function EventCard(parent)
         Place(self.meta, x, pad + th + 3)
         local mh = S.FitText(self.meta, 2, textW, self)
         local y = pad + math.max(32, th + 3 + mh) + 8
+        -- the organizer's note is a fact about the event: right under when and who, before the places
+        if self.note:IsShown() then
+            Place(self.note, pad, y)
+            y = y + S.FitText(self.note, 0, w - 2 * pad, self) + 8
+        end
         Place(self.roles, pad, y)
         y = y + S.FitText(self.roles, 2, w - 2 * pad, self)
         if self.who:IsShown() then
@@ -781,12 +794,9 @@ local function EventCard(parent)
             y = y + 4; Place(self.keyWarn, pad, y)
             y = y + S.FitText(self.keyWarn, 0, w - 2 * pad, self)
         end
-        if self.note:IsShown() then
-            y = y + 6; Place(self.note, pad, y)
-            y = y + S.FitText(self.note, 0, w - 2 * pad, self)
-        end
         if self.seg:IsShown() then
-            y = y + 12; Place(self.seg, pad, y)
+            y = y + 12; Place(self.segLabel, pad, y); y = y + LBL
+            Place(self.seg, pad, y)
             self.out:ClearAllPoints(); self.out:SetPoint("LEFT", self.seg, "RIGHT", 8, 0)
             y = y + 24
         end
@@ -809,14 +819,20 @@ local function PaintEvent(c, e)
     local cancelled = e.status ~= "open"
     local mine = WP.MySignup(e)
     local organizer = e.by == Me()
-    S.Painted(c.icon, EventIcon(e.title))
+    local path = EventIcon(e.title)
+    if path then
+        S.Painted(c.icon, path); c.icon:SetVertexColor(1, 1, 1); c.iconEdge(C.cardEdge)
+    else
+        S.HDIcon(c.icon, "calendar", C.muted); c.iconEdge(C.cardEdge, 0)
+    end
     if c.icon.SetDesaturated then pcall(c.icon.SetDesaturated, c.icon, cancelled) end
     c.title:SetText(e.title or "?")
     local tc = cancelled and C.muted or C.fg
     c.title:SetTextColor(tc[1], tc[2], tc[3])
     if cancelled then c.pill:Set(L("Annulé"), C.bad)
     elseif organizer then c.pill:Set(L("Organisateur"))
-    elseif mine then c.pill:Set(L("Inscrit"), C.ok, "check")
+    -- a word pill: the check only repeated "Inscrit"
+    elseif mine then c.pill:Set(L("Inscrit"), C.ok)
     else c.pill:Hide() end
     local count = CountSignups(e)
     -- the organizer reads "Organisateur" in the pill: the meta line does not say it again
@@ -862,6 +878,7 @@ local function PaintEvent(c, e)
     c.note:SetText(e.note or ""); c.note:SetShown((e.note or "") ~= "")
     -- sign up / change role / step out; the organizer invites or cancels
     c.seg:SetShown(not cancelled); c.seg:Update()
+    c.segLabel:SetText(mine and L("Ton rôle") or L("T'inscrire comme")); c.segLabel:SetShown(not cancelled)
     c.out:SetShown(not cancelled and mine ~= nil)
     local org = organizer and not cancelled
     c.invite:SetShown(org); c.cancel:SetShown(org)
@@ -921,7 +938,7 @@ local function LookRow(parent)
         local l = self.l
         local c = RAID_CLASS_COLORS and l.cls and RAID_CLASS_COLORS[l.cls]
         local lines = { c and { l.name, c.r, c.g, c.b } or l.name }
-        lines[#lines + 1] = string.format(L("%s, niveau %s"), L(ROLE_LABEL[l.role] or "DPS"), l.lvl or "?")
+        lines[#lines + 1] = string.format(L("%s, niv. %s"), L(ROLE_LABEL[l.role] or "DPS"), l.lvl or "?")
         lines[#lines + 1] = (l.what and l.what ~= "") and string.format(L("Pour : %s"), l.what) or L("Pour n'importe quel groupe")
         if l.name ~= Me() then
             lines[#lines + 1] = L("Clic : chuchoter")
@@ -1015,7 +1032,7 @@ local function RenderNow()
         if not S.ClassIcon(r.cls, l.cls) then r.cls:Hide() else r.cls:Show() end
         r.name:SetText(ClassHex(l.cls) .. l.name .. "|r" .. (l.name == Me() and (" " .. S.Hex(C.muted) .. L("(toi)") .. "|r") or ""))
         r.what:SetText((l.what and l.what ~= "") and string.format(L("Pour : %s"), l.what) or L("Pour n'importe quel groupe"))
-        r.detail:SetText(RoleText(l.role, 12) .. "  ·  " .. string.format(L("niveau %s"), l.lvl or "?") .. "  ·  " .. AgoText(l.t))
+        r.detail:SetText(RoleText(l.role, 12) .. "  ·  " .. string.format(L("niv. %s"), l.lvl or "?") .. "  ·  " .. AgoText(l.t))
         local other = l.name ~= Me()
         r.whisper:SetShown(other); r.inv:SetShown(other)
         local h = r:Fit()
@@ -1149,7 +1166,7 @@ local function PickCard(parent)
     c:SetScript("OnMouseDown", function(self) self.press:Show() end)
     c:SetScript("OnMouseUp", function(self) self.press:Hide() end)
     c:SetScript("OnEnter", function(self)
-        S.Tip(self, { self.fullName or "", self.lvText or nil,
+        S.Tip(self, { self.fullName or "", self.lvTip or nil,
             sel[self.key] and L("Clic : décocher") or L("Clic : cocher") })
     end)
     c:SetScript("OnLeave", S.HideTip)
@@ -1264,8 +1281,10 @@ function WP.OpenEventPicker()
             end
             c.fullName = e[2]
             FitCardName(c.name, e[2], PCW - 20)
-            c.lvText = string.format(L("niveau %s"), e[3] == e[4] and tostring(e[3]) or (e[3] .. "-" .. e[4]))
+            -- "niv. 35 à 45" / "level 35-45", the summary window's words
+            c.lvText = e[3] == e[4] and string.format(L("niv. %s"), e[3]) or string.format(L("niv. %s à %s"), e[3], e[4])
             c.lv:SetText(c.lvText)
+            c.lvTip = e[3] == e[4] and string.format(L("Niv. %s"), e[3]) or string.format(L("Niv. %s à %s"), e[3], e[4])
             PaintPickCard(c)
             c:Show()
         end

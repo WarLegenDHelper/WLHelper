@@ -6,6 +6,44 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.74] — 2026-11-16
+
+### Ajouté / Added
+- **Fenêtre WL Helper façon Naowh** (T-55) : une seule fenêtre avec, à gauche, une recherche et les activités (Quêtes & donjons, Objets & métiers, Guilde & groupes, Voyage) et leurs réglages ; à droite, l'accueil en deux colonnes. La minimap, /wlh et les boutons retour l'ouvrent sur la bonne page.
+  *WL Helper hub like Naowh: one window, sidebar grouped by activity with search, Home in two columns, settings next to each activity.*
+- **Chemin à pied comme Polestar** (T-43) : la flèche suit le vrai chemin, virage après virage, pour toutes les destinations ; la distance est celle qu'il reste à marcher ; des points sur la carte du monde et la minimap, une épingle sur l'endroit exact.
+  *Walking path like Polestar for every destination, drawn on the map and minimap.*
+- **La meilleure route** (T-44) : la pierre de foyer, le Rappel astral et Reflet-de-Lune comptent dans le calcul, avec les vrais temps à pied ; l'itinéraire complet s'affiche (« Pierre de foyer → vol jusqu'à Kargath → 300 m à pied »).
+  *Best route: hearthstone and class teleports, real walking times, full itinerary.*
+- **Repère dans le monde** (T-51) : une étiquette au-dessus de la destination (lieu, distance, temps restant), seulement si aucun autre addon ne le fait déjà. Réglages › GPS.
+  *In-world marker over the destination, only when no other addon already shows one.*
+
+### Modifié / Changed
+- **Flèche GPS façon Zygor** (T-52) : en haut l'action (l'icône du sort ou de l'objet à cliquer pour un téléport ou la pierre de foyer), puis quoi faire, où, et « 550 m · 1:10 ».
+  *GPS arrow organised like Zygor: clickable spell or item icon, what, where, distance and time.*
+- **Carte de l'étape du guide refaite** (T-37, T-42) : l'action en titre, le lieu avec la distance, une ligne pour la chaîne, les détails repliés ; plus aucune info répétée. Une étape « prendre la quête » ne montre plus le texte de la quête comme si c'était à faire.
+  *Guide step card rebuilt: action first, place and distance, folded details, nothing repeated.*
+- **Noms** (T-38, T-39) : « Overview » / « Vue d'ensemble » et « Pick a guide » / « Choisir un guide ».
+  *Names: Overview and Pick a guide.*
+- **Commandes avec beaucoup d'artisans** (T-53) : au-delà de 8, une liste « Artisans : 3 en ligne · 24 en tout » avec recherche ; deux noms au plus sur les lignes d'objets.
+  *Orders scale to many crafters: searchable list, two names per item row.*
+- **Quoi de neuf** plus lisible (T-34), **Aller à…** avec distances en direct (T-36), bouton retour sur toutes les fenêtres (T-35).
+  *Clearer What's new, live Go-to distances, back buttons everywhere.*
+- **Interface et textes** revus fenêtre par fenêtre (T-21) : vocabulaire, niveaux, nombres, icônes.
+  *Interface and texts reviewed window by window.*
+
+### Corrigé / Fixed
+- **Prérequis de quêtes** (T-45) : 169 liens entre maillons de chaîne ajoutés (LibForeverData, et Naowh pour les quêtes propres à Forever) ; Rot and Regret n'arrive plus avant Word of the Woods.
+  *Quest prerequisites: 169 missing chain links added.*
+- **Le guide se fermait** après un téléport ou un /reload (T-41).
+  *The guide no longer closes after a loading screen.*
+- **Marques de raid** (T-47) : le jeu ne laisse pas un addon poser une marque ; les boutons ciblent seulement, plus d'erreur.
+  *Raid markers: targeting only, no more blocked-action error.*
+- **Erreurs dans les donjons** (T-48) : valeurs cachées par le jeu (PNJ des caisses, alerte des rares).
+  *Secret-value errors inside dungeons.*
+- **Icônes de récompense** manquantes et améliorations plus lisibles (T-40).
+  *Missing reward icons and clearer upgrades.*
+
 ## [1.0.0-beta.73] — 2026-11-16
 
 ### Corrigé / Fixed

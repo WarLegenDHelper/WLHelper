@@ -197,6 +197,7 @@ All components live in one module (`ns.UI`, reused by Writs through `S`), each w
 - Width is fixed per window and chosen from: 360 (HUD-like), 420 (single list), 520 (two columns), 640 (wide tools). Width is never computed from text.
 - One recorded exception: the guide tracker (Tracker.lua) is 300, a compact overlay that stays on screen beside the game's own trackers.
 - Second recorded exception: the dungeon boss panel (Bosses.lua) is 248, five 40 px portraits with 6 px gaps and a 12 px pad, docked beside the guide like a dungeon journal.
+- 860: the Hub, the one WL Helper window (Home and Settings, 3.20). Width = min(860, floor(UIParent:GetWidth() x 0.90)), never under 640.
 - Movable by the header; position saved per window; clamped to screen.
 - Strata MEDIUM, raised on mouse down. Escape closes (UISpecialFrames).
 
@@ -222,6 +223,7 @@ height = clamp(height, minH, floor(UIParent:GetHeight() * 0.80))
 - The window keeps its TOP anchor when it changes height, so it grows downward and the header never jumps.
 - The footer sticks to the content (it is the last element), not to an arbitrary bottom.
 - Resizable windows (if any) save the size and use `SetResizeBounds(minW, minH, maxW, 0.8 * screenH)`.
+- Recorded exception: the Hub (3.20) has a fixed height, H = clamp(floor(UIParent:GetHeight() x 0.80), 520, 680), recomputed on `DISPLAY_SIZE_CHANGED` and `UI_SCALE_CHANGED`. Each page's content scrolls (3.15). It never calls `FitHeight`: a nav that changed height with every page would make the frame jump.
 
 ### 3.3 Tabs
 
@@ -369,6 +371,44 @@ Designed states for every list and card, before shipping: unknown/loading ("Fact
 - Step line 11 `muted` with shadow ("puis Tabetha" / "then Tabetha"). NPC and player names keep their capital letter.
 - Distance 13 `fg` with shadow, unit 11 muted ("120 m").
 
+### 3.20 Hub
+
+The one WL Helper window (`WLHelperHub`, Writs/Options.lua; `WLHelperHome` and `WLHelperOptions` are aliases of it). Home and the settings pages live in it; the module windows (Writs, Guild, LFG, ...) stay separate windows. It holds no secure frame: it opens, closes and changes in combat. Figures at scale 1 on a 1366 x 768 screen: 860 x 614.
+
+```
++------------------------------------------------------------------------------+
+| [logo] WL Helper 16                                              [?] [close] |  header 44
+|        Alandir, niv. 41                                                      |
++------------------+-----------------------------------------------------------+
+| [search 175x28]  | Page title 16                                             |  page header 60
+| Home             | One sentence 11 muted                                     |
+| Quests & dungeons|-----------------------------------------------------------|  1 px divider
+|   Quest guide    |  content, scrolls; inset 16, width 628                    |
+| Getting around   |  Home: two columns of 306, 16 apart (x = 16 and 338)      |
+|   GPS            |                                                           |
+| ...              |                                                           |
+| Settings         |                                                           |
+|   General        |                                                           |
+|   About          |                                                           |
+| [*][@]      1.0  |                                                           |
++------------------+-----------------------------------------------------------+
+   nav 199 + 1 px rule
+```
+
+- Header 44 (3.1) with the logo, no back chevron: title "WL Helper", subtitle "%s, niv. %d". Right cluster: close, then "?" (How do I...?). No gear, no primary button, no Reload UI.
+- Nav: 199 px, then a 1 px `divider` rule. Content: W - 200 (660 at 860), inset 16, usable 628.
+- Nav from the top: the settings search 175 x 28 at (12, -12); items 32 px, 2 px apart, 8 px from both edges; an activity title (`S.NavHeader`) 24 px, text 11 `muted` at x=16, its baseline 4 px above the first item, sentence case, never capitals (1.2). An activity without a page is not drawn. When the items do not fit, this part scrolls (3.15).
+- Nav bottom block, anchored to the bottom: the "Settings" title and its pages (General, About), then a 28 px row 12 px from the bottom: IconButton 28 "star" (What's new) at x=12, "mail" (Write to us) at x=44 (How do I...? is the header's "?", so the "info" glyph means About only), the version 10 `muted` right-aligned at x=-12 (the full "WL Helper x.y" in its tooltip).
+- Nav item (`S.NavItem`): icon 20 at x=8 (a painted icon in a 1 px `cardEdge`; an HD glyph is 16, no edge, tinted like the label), label 12 at x=36, `muted` at rest, `fg` on hover or selected. Selected: `selFill`, no side band. A counter at the right while searching.
+- Page header (fixed, does not scroll): title 16 `fg` at (16, -16); one sentence 11 `muted` 2 px under it, one line, cut with the full text in the tooltip; `divider` rule at y=-60. The page's scroll area starts at y=-61, its content 12 px below its top.
+- Home line (`S.HubRow`), 306 x 46, 6 px between two rows: the whole line is the click target (3.9), `cardFill` and a 1 px `cardEdge`, `hoverFill` on hover, `pressFill` on click. Icon 28 at x=8, centred, 1 px `cardEdge` (an HD glyph is 16 in the box). Name 13 `fg` at x=44, top 7. State line 11 (`muted` unless it says something to act on) 2 px under the name, one line, cut, full text in the tooltip. `chevron_right` 16 `muted` at x=-8; a 6 px `accent` dot at x=-30 when something waits. A switched-off module: alpha 0.5, an "Éteint" pill instead of the chevron, a click turns it back on. Right-click: the line's settings page, scrolled to its section, which flashes in `selFill` for 1.5 s.
+- Home: "Où veux-tu aller ?" (628 wide) at the top, the "Now" strip, the update banner, then one section title per activity (3.10, tight, 24) with its lines two a row, left then right, in the order of the registry (`WP.HUB`, Writs/Hub.lua). The order never changes with the state.
+- Settings pages: one column of 628 for now (V1); two columns of 306 per page come with the regrouping (V2).
+- A button in the Hub that opens another window closes the Hub. Keyboard (Ctrl+F) is off in combat.
+- A page is refreshed only while it is visible (`IsVisible`); a hidden page does no work and has no event registered (Home: one listener for the session, its events registered while Home shows).
+- Home is built with the Hub; a settings page is built the first time it shows, or all of them the first time the settings search is used (its index needs every row). A screen change rebuilds once, 0.25 s after the last event, and only when the Hub opens if it is hidden.
+- A Home line's right-click opens its settings even when it is switched off.
+
 ---
 
 ## 4. Text rules
@@ -454,7 +494,7 @@ One word per concept, everywhere: tab names, card titles, buttons, tooltips, cha
 |---|---|---|
 | WL Helper | WL Helper | the addon's name, never translated |
 | WaR LegenD | WaR LegenD | the guild, exact capitalisation |
-| Accueil | Home | the hub window and the home button |
+| Accueil | Home | the first page of the WL Helper window (the Hub), and the home button |
 | Guide de quêtes | Quest guide | the dungeon-quest guide (UI.lua); "le guide" in running text |
 | Donjon | Dungeon | |
 | Choisir les donjons | Pick dungeons | the Picker; the button says what it adds ("Ajouter 3 donjons") |
@@ -477,7 +517,8 @@ One word per concept, everywhere: tab names, card titles, buttons, tooltips, cha
 | Caisse | Crate | writ reward container |
 | HV (Hôtel des ventes) | AH (Auction House) | |
 | Sacs | Bags | the bag cleaner |
-| Réglages | Settings | the options page; command words "options", "settings" |
+| Réglages | Settings | the settings pages of the WL Helper window (the Hub); command words "options", "settings" |
+| Hub | Hub | (code and docs only, never in the UI) the WL Helper window that holds Home and Settings; the player sees "WL Helper" |
 | Guilde | Guild | |
 | PvP / Victoires honorables | PvP / Honorable kills | |
 | Idée / Bug | Idea / Bug | the feedback command |

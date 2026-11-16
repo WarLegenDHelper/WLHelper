@@ -16,7 +16,7 @@
 -- est connu, les autres nommés sous le titre « Quêtes à faire ». Avec plusieurs donjons, le total de
 -- toute la route vient à la fin. En bas : « Lancer la route » (premier écran), « Mettre à jour la
 -- route » (la route tourne et tes coches ont changé) ou « Retour à la route » (rien n'a changé), et
--- « Fermer » (« Retour au choix » quand le résumé vient du choix des donjons). Ouvert ailleurs pendant
+-- « Fermer » (« Retour au choix » quand le résumé vient du choix du guide). Ouvert ailleurs pendant
 -- qu'une route tourne sur d'autres donjons : « Lancer la route ici », confirmé par un deuxième clic.
 -- Design system: docs/DESIGN.md (640 px window sized to its content, scroll past 80 % of the screen).
 local ADDON, ns = ...
@@ -27,7 +27,7 @@ local L, T = ns.L, ns.T_
 -- =====================================================================
 local STR = {
   fr = {
-    SUM_T = "Résumé", SUM_ROUTE_T = "Résumé de la route", SUM_DG1 = "%d donjon", SUM_DG = "%d donjons",
+    SUM_T = "Vue d'ensemble", SUM_ROUTE_T = "Vue d'ensemble de la route", SUM_DG1 = "%d donjon", SUM_DG = "%d donjons",
     SUM_XP = "%s XP", SUM_XP_UNIT = "XP", SUM_SIZE = "Groupe de %d",
     SUM_CHAIN_LINE = "Chaîne de %d quêtes · %s XP en tout", SUM_CHAIN_HIGH = "monte au niv. %d",
     SUM_FACT_LV = "Quête niv. %d",
@@ -68,15 +68,15 @@ local STR = {
     SUM_RUN_TT = "Clic : ouvrir le guide, de l'entrée jusqu'au dernier boss, un boss après l'autre",
     SUM_RUN_SUB = "Le guide peut quand même te mener de l'entrée au dernier boss.",
     SUM_RUN_SUB_N = "Le guide peut quand même te mener dans chaque donjon, de boss en boss.",
-    SUM_BACK_PICK = "Retour au choix", SUM_BACK_PICK_TT = "Clic : revenir au choix des donjons sans lancer la route",
+    SUM_BACK_PICK = "Retour au choix", SUM_BACK_PICK_TT = "Clic : revenir au choix du guide sans lancer la route",
     SUM_GO_HERE = "Lancer la route ici", SUM_GO_CONFIRM = "Remplacer la route ?",
     SUM_GO_HERE_TT = "Clic : remplacer la route en cours par ce donjon seul, avec les quêtes cochées (les étapes cochées à la main sont perdues ; un 2e clic confirme)",
     SUM_EXTRA1 = "Aussi dans le groupe : %s. Son état est dans la bulle de chaque quête.",
     SUM_EXTRA = "Aussi dans le groupe : %s. Leur état est dans la bulle de chaque quête.",
     SUM_COL_TT = "Une icône par quête : survole-la pour le détail",
-    SUM_GO = "Lancer la route", SUM_GO_TT = "Clic : fermer le résumé et ouvrir le guide sur la première étape, avec les quêtes cochées",
+    SUM_GO = "Lancer la route", SUM_GO_TT = "Clic : fermer la vue d'ensemble et ouvrir le guide sur la première étape, avec les quêtes cochées",
     SUM_GO_TT1 = "Clic : lancer la route sur ce donjon seul, avec les quêtes cochées (remplace tes donjons choisis)",
-    SUM_GO_WHY = "Coche au moins une quête à faire.", SUM_CLOSE = "Fermer", SUM_CLOSE_TT = "Clic : fermer le résumé sans lancer la route",
+    SUM_GO_WHY = "Coche au moins une quête à faire.", SUM_CLOSE = "Fermer", SUM_CLOSE_TT = "Clic : fermer la vue d'ensemble sans lancer la route",
     SUM_UPDATE = "Mettre à jour la route", SUM_UPDATE_TT = "Clic : revenir au guide, la route suit tes nouvelles coches",
     SUM_BACK = "Retour à la route", SUM_BACK_TT = "Clic : revenir au guide là où tu en étais",
     SUM_SHARE = "Partager", SUM_SHARED = "Partagée", SUM_SHARE_TT = "Clic : partager « %s » avec le groupe",
@@ -94,7 +94,7 @@ local STR = {
     SUM_G_NA_TT = "Cette quête n'est pas pour sa classe, sa faction ou sa race.",
     SUM_G_WAIT_TT = "%s a WL Helper : sa réponse n'est pas encore arrivée.",
     SUM_OTHER_SHORT = "Autre donjon", SUM_RW_MORE = "Autres récompenses",
-    SUM_PICK_GO_TT = "Clic : voir le résumé des quêtes (XP, récompenses, chaînes, groupe) avant de lancer la route",
+    SUM_PICK_GO_TT = "Clic : voir la vue d'ensemble des quêtes (XP, récompenses, chaînes, groupe) avant de lancer la route",
     SUM_IT1 = "%d objet", SUM_IT = "%d objets",
     SUM_IT_UP1 = "%s dont %d amélioration", SUM_IT_UP = "%s dont %d améliorations",
     SUM_UP_PCT = "+%d\194\160%%", SUM_UP_EMPTY = "vide", SUM_UP_EMPTY_TT = "Tu n'as rien à cet emplacement.",
@@ -108,7 +108,7 @@ local STR = {
     SUM_ST_IN = "À prendre dedans", SUM_ST_IN_TT = "Elle se prend dans le donjon : rien à faire avant d'entrer.",
   },
   en = {
-    SUM_T = "Summary", SUM_ROUTE_T = "Route summary", SUM_DG1 = "%d dungeon", SUM_DG = "%d dungeons",
+    SUM_T = "Overview", SUM_ROUTE_T = "Route overview", SUM_DG1 = "%d dungeon", SUM_DG = "%d dungeons",
     SUM_XP = "%s XP", SUM_XP_UNIT = "XP", SUM_SIZE = "Group of %d",
     SUM_CHAIN_LINE = "Chain of %d quests · %s XP in all", SUM_CHAIN_HIGH = "goes up to level %d",
     SUM_FACT_LV = "Level %d quest",
@@ -149,15 +149,15 @@ local STR = {
     SUM_RUN_TT = "Click: open the guide, from the entrance to the last boss, one boss at a time",
     SUM_RUN_SUB = "The guide can still lead you from the entrance to the last boss.",
     SUM_RUN_SUB_N = "The guide can still lead you through each dungeon, boss by boss.",
-    SUM_BACK_PICK = "Back to the picker", SUM_BACK_PICK_TT = "Click: go back to the dungeon picker without starting the route",
+    SUM_BACK_PICK = "Back to the picker", SUM_BACK_PICK_TT = "Click: go back to the guide picker without starting the route",
     SUM_GO_HERE = "Start the route here", SUM_GO_CONFIRM = "Replace the route?",
     SUM_GO_HERE_TT = "Click: replace the running route with this dungeon only and the ticked quests (steps marked done by hand are lost; a 2nd click confirms)",
     SUM_EXTRA1 = "Also in the group: %s. Their state is in each quest's tooltip.",
     SUM_EXTRA = "Also in the group: %s. Their state is in each quest's tooltip.",
     SUM_COL_TT = "One icon per quest: hover it for the detail",
-    SUM_GO = "Start the route", SUM_GO_TT = "Click: close the summary and open the guide on the first step, with the ticked quests",
+    SUM_GO = "Start the route", SUM_GO_TT = "Click: close the overview and open the guide on the first step, with the ticked quests",
     SUM_GO_TT1 = "Click: start the route with this dungeon only and the ticked quests (replaces your picked dungeons)",
-    SUM_GO_WHY = "Tick at least one quest to do.", SUM_CLOSE = "Close", SUM_CLOSE_TT = "Click: close the summary without starting the route",
+    SUM_GO_WHY = "Tick at least one quest to do.", SUM_CLOSE = "Close", SUM_CLOSE_TT = "Click: close the overview without starting the route",
     SUM_UPDATE = "Update the route", SUM_UPDATE_TT = "Click: go back to the guide, the route follows your new ticks",
     SUM_BACK = "Back to the route", SUM_BACK_TT = "Click: go back to the guide where you left it",
     SUM_SHARE = "Share", SUM_SHARED = "Shared", SUM_SHARE_TT = "Click: share \"%s\" with the group",
@@ -175,7 +175,7 @@ local STR = {
     SUM_G_NA_TT = "This quest is not for their class, faction or race.",
     SUM_G_WAIT_TT = "%s has WL Helper: their reply has not arrived yet.",
     SUM_OTHER_SHORT = "Other dungeon", SUM_RW_MORE = "More rewards",
-    SUM_PICK_GO_TT = "Click: see the quests' summary (XP, rewards, chains, group) before starting the route",
+    SUM_PICK_GO_TT = "Click: see the quests' overview (XP, rewards, chains, group) before starting the route",
     SUM_IT1 = "%d item", SUM_IT = "%d items",
     SUM_IT_UP1 = "%s including %d upgrade", SUM_IT_UP = "%s including %d upgrades",
     SUM_UP_PCT = "+%d%%", SUM_UP_EMPTY = "empty", SUM_UP_EMPTY_TT = "You wear nothing in this slot.",
@@ -209,8 +209,8 @@ local ROW_GAP = 4
 local TX = 32                   -- text column of a row (after the check box)
 local CELLW, MAXCOLS = 64, 4    -- group columns (one icon each)
 local MAX_REWARDS = 4            -- reward icons per row (the last one is "+N" when there are more)
-local RW_SIZE, RW_STEP = 30, 40   -- a reward icon, and icon + gap (the "+12 %" under it fits the gap)
-local RW_LABEL = 14               -- the line under an icon: arrow and gain
+local RW_SIZE, RW_STEP = 32, 48   -- a reward icon, and icon + gap (the "+12 %" under it fits the gap)
+local RW_LABEL = 17               -- the line under an icon: arrow and gain
 local HIGH_GAP = 5              -- a chain more than 5 levels above the player is unticked by default
 local XPCOL = 88                -- the XP and money column at the right of a quest card
 local FX = 112                  -- the value column of the facts list (labels at 0, 100 wide)
@@ -376,8 +376,10 @@ local function Loose(s) return (s:lower():gsub("[%p%s]", "")) end
 local libItemIds
 local function LibItemId(n)
   if libItemIds == nil then
-    libItemIds = false
     local lib = Lib()
+    -- LibForeverData not loaded yet: ask again next time (never remember "no list" for good)
+    if not lib then return nil end
+    libItemIds = false
     if lib and type(lib.Ids) == "function" and type(lib.Name) == "function" then
       local ok, ids = pcall(lib.Ids, "item")
       if ok and type(ids) == "table" then
@@ -492,9 +494,31 @@ local function ItemInfo(rw)
   local c = key and infoCache[key]
   if c then return c[1], c[2], c[3] end
   local icon, link, quality
-  if rw.id then
-    local ok, ic = pcall(function() return (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(rw.id)) or (GetItemIcon and GetItemIcon(rw.id)) end)
-    if ok then icon = ic end
+  -- the icon without waiting for the server: GetItemInfoInstant reads the client's own files
+  local function IconOf(id)
+    if not id then return nil end
+    if C_Item and C_Item.GetItemInfoInstant then
+      local ok, _, _, _, _, ic = pcall(C_Item.GetItemInfoInstant, id)
+      if ok and ic and not secret(ic) then return ic end
+    end
+    if GetItemInfoInstant then
+      local ok, _, _, _, _, ic = pcall(GetItemInfoInstant, id)
+      if ok and ic and not secret(ic) then return ic end
+    end
+    local ok, ic = pcall(function() return (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(id)) or (GetItemIcon and GetItemIcon(id)) end)
+    return ok and ic or nil
+  end
+  icon = IconOf(rw.id)
+  -- an id this client does not know (QuestieDB's), or no id: LibForeverData's id for the name
+  if not icon and rw.name then
+    local alt = LibItemId(rw.name)
+    if alt and alt ~= rw.id then
+      icon = IconOf(alt)
+      if not icon and not requestedItems[alt] and C_Item and C_Item.RequestLoadItemDataByID then
+        requestedItems[alt] = true; pendingItems[alt] = true
+        pcall(C_Item.RequestLoadItemDataByID, alt)
+      end
+    end
   end
   if GetItemInfo and key then
     local ok, _, l, qu, _, _, _, _, _, _, tex = pcall(GetItemInfo, key)
@@ -1056,7 +1080,13 @@ local function MakeReward(parent)
   b.ring = CreateFrame("Frame", nil, b); b.ring:SetPoint("TOPLEFT", -2, 2); b.ring:SetPoint("BOTTOMRIGHT", 2, -2)
   ns.Outline(b.ring, T.gold); b.ring:Hide()
   -- an upgrade: the green gain under the icon ("+12 %")
-  b.pct = ns.Text(b, ns.F.foot, T.ok); b.pct:SetPoint("TOP", b, "BOTTOM", 0, -2); b.pct:Hide()
+  b.pct = ns.Text(b, ns.F.label, T.ok, true); b.pct:SetPoint("TOP", b, "BOTTOM", 0, -3); b.pct:Hide()
+  -- an upgrade also reads on the icon itself: a green arrow on a dark chip in its top-right corner
+  b.upChip = b:CreateTexture(nil, "OVERLAY", nil, 1); b.upChip:SetSize(14, 14); b.upChip:SetPoint("TOPRIGHT", 3, 3)
+  b.upChip:SetColorTexture(0.04, 0.05, 0.06, 0.92); b.upChip:Hide()
+  b.upArrow = ns.Icon(b, "arrow_up", 12, "OVERLAY", T.ok); b.upArrow:SetPoint("CENTER", b.upChip, "CENTER", 0, 0)
+  if b.upArrow.SetDrawLayer then b.upArrow:SetDrawLayer("OVERLAY", 2) end
+  b.upArrow:Hide()
   if b.pct.SetWordWrap then b.pct:SetWordWrap(false) end
   b:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1093,6 +1123,7 @@ local function FillReward(b, rw, best, lvl)
   if u.up then
     b.pct:SetText(u.short or u.text or ""); b.pct:Show()
   else b.pct:Hide() end
+  b.upChip:SetShown(u.up == true); b.upArrow:SetShown(u.up == true)
   return u.up == true
 end
 

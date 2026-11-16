@@ -75,6 +75,35 @@ function ns.Diag()
   if C_QuestLog then
     add("quests.numEntries", call(C_QuestLog.GetNumQuestLogEntries))
     add("quests.GetQuestObjectives", type(C_QuestLog.GetQuestObjectives))
+    add("quests.IsQuestFlaggedCompleted", type(C_QuestLog.IsQuestFlaggedCompleted))
+    -- 93404 Rot and Regret, 93594 Word of the Woods: done? (a test of the game's own answers)
+    add("quests.done.93594", call(C_QuestLog.IsQuestFlaggedCompleted, 93594))
+  end
+  -- the game's own list of quests you can pick up here (the "!" on the map): if this client has it,
+  -- the guide can ask the game instead of trusting the data
+  add("has C_QuestLine", C_QuestLine ~= nil)
+  if C_QuestLine and here then
+    for _, fn in ipairs({ "GetAvailableQuestLines", "GetQuestLineQuests", "RequestQuestLinesForMap", "GetQuestLineInfo" }) do
+      add("questline." .. fn, type(C_QuestLine[fn]))
+    end
+    if C_QuestLine.RequestQuestLinesForMap then pcall(C_QuestLine.RequestQuestLinesForMap, here) end
+    if C_QuestLine.GetAvailableQuestLines then
+      local ok, lines = pcall(C_QuestLine.GetAvailableQuestLines, here)
+      if ok and type(lines) == "table" then
+        local ids = {}
+        for i, l in ipairs(lines) do if i <= 12 and type(l) == "table" then ids[#ids + 1] = tostring(l.questID or l.questLineID or "?") .. ":" .. tostring(l.questName or l.questLineName or "") end end
+        add("questline.available", #lines .. " | " .. table.concat(ids, ", "))
+      else add("questline.available", ok and type(lines) or ("error " .. tostring(lines))) end
+    end
+  end
+  add("has C_TaskQuest", C_TaskQuest ~= nil)
+  if C_QuestLog and C_QuestLog.GetQuestsOnMap and here then
+    local ok, list = pcall(C_QuestLog.GetQuestsOnMap, here)
+    if ok and type(list) == "table" then
+      local ids = {}
+      for i, q in ipairs(list) do if i <= 12 and type(q) == "table" then ids[#ids + 1] = tostring(q.questID) end end
+      add("quests.onMap.ids", table.concat(ids, ","))
+    end
   end
   -- spells and cooldowns (the hearthstone spell 8690)
   if C_Spell and C_Spell.GetSpellCooldown then

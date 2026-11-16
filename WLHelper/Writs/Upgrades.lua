@@ -16,8 +16,8 @@ local T = ns.S.C
 
 ns.AddEnglish({
     ["(spé à choisir)"] = "(pick your spec)",
-    ["Améliorations : ta spé n'a pas pu être lue dans tes talents, %s est supposée. Choisis-la dans Réglages, Améliorations, Spé jugée."] =
-        "Upgrades: your spec could not be read from your talents, %s is assumed. Pick it in Settings, Upgrades, Judged spec.",
+    ["Améliorations : ta spé n'a pas pu être lue dans tes talents, %s est supposée. Choisis-la dans WL Helper, Améliorations, Spé jugée."] =
+        "Upgrades: your spec could not be read from your talents, %s is assumed. Pick it in WL Helper, Upgrades, Judged spec.",
     ["Améliorations"] = "Upgrades",
     ["Flèche verte sur les objets meilleurs que les tiens"] = "Green arrow on items better than yours",
     ["vide"] = "empty",
@@ -708,7 +708,7 @@ ev:SetScript("OnEvent", function(_, e, ...)
         -- once per login: the spec is only a guess, say how to set it
         C_Timer.After(15, function()
             if W.SpecGuessed and W.SpecGuessed() and WP.ModuleOn and WP.ModuleOn("upgrades") then
-                WP.Print(string.format(L("Améliorations : ta spé n'a pas pu être lue dans tes talents, %s est supposée. Choisis-la dans Réglages, Améliorations, Spé jugée."), W.SpecName()))
+                WP.Print(string.format(L("Améliorations : ta spé n'a pas pu être lue dans tes talents, %s est supposée. Choisis-la dans WL Helper, Améliorations, Spé jugée."), W.SpecName()))
             end
         end)
         specsMemo, judgedMemo = nil, nil

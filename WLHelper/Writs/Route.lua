@@ -1,8 +1,17 @@
 -- Writs/Route.lua: WL Helper's GPS, shared by the dungeon guide (source "dungeon") and the Comptoir
 -- (source "writs"). It finds the fastest way from where you stand: riding, the flight paths you know,
--- zeppelins, boats and a mage's city teleports, then guides you one leg at a time (Arrow.lua).
+-- zeppelins, boats, a mage's city teleports, the druid's Moonglade (and its flight home), the
+-- Hearthstone and a shaman's Astral Recall to your inn, then guides you one leg at a time (Arrow.lua).
 -- The plan is made again every few seconds, when a flight map opens, after a flight, a boat or a
 -- loading screen, and the first leg is dropped as soon as you reach its end.
+--
+-- Walking legs are priced on the straight line (x TERRAIN) first; then, out of combat and when the
+-- walking router WLHelper_Nav is there (Trail.lua's WalkCost), the walking legs of the 3 best plans
+-- are asked for their real length (3 questions at a time, 12 per destination, each pair once a
+-- session) and the plan is made again as answers come: it changes only when the new best is more
+-- than 10% faster than the plan you follow, so the arrow does not flip between two equal ways.
+-- GPS.Itinerary() / GPS.ItinerarySummary() say the whole way in one line ("Pierre de foyer → vol
+-- jusqu'à Kargath → 300 m à pied").
 --
 -- Positions are world coordinates (yards) from C_Map.GetWorldPosFromMapPos. The fixed points
 -- (docks, teleport landings, your flight masters) are converted once and kept.
@@ -40,6 +49,18 @@ ns.AddEnglish({
     ["C'est le dernier writ à rendre."] = "It's the last writ to turn in.",
     ["%d writs à rendre en tout."] = "%d writs to turn in altogether.",
     ["Ouvre son enveloppe avant d'arriver."] = "Open its envelope before you get there.",
+    ["Pierre de foyer"] = "Hearthstone",
+    ["Rappel astral"] = "Astral Recall",
+    ["Pierre de foyer : %s"] = "Hearthstone: %s",
+    ["Rappel astral : %s"] = "Astral Recall: %s",
+    ["Puis la pierre de foyer : %s"] = "Then the Hearthstone: %s",
+    ["Puis le rappel astral : %s"] = "Then Astral Recall: %s",
+    ["vol jusqu'à %s"] = "flight to %s",
+    ["bateau pour %s"] = "boat to %s",
+    ["zeppelin pour %s"] = "zeppelin to %s",
+    ["téléportation à %s"] = "teleport to %s",
+    ["%s à pied"] = "%s on foot",
+    ["%s en monture"] = "%s ride",
 })
 
 -- "Brackenwall Village, Dustwallow Marsh" -> "Brackenwall Village": the place without its zone, for
@@ -64,6 +85,13 @@ local LINKS = {
     { a = { 1434, 25.92, 73.15 }, b = { 1413, 63.66, 38.65 }, mode = "boat", nameA = "Booty Bay", nameB = "Ratchet" },
     { a = { 1453, 22.60, 56.13 }, b = { 1439, 30.76, 41.00 }, mode = "boat", side = "Alliance", nameA = "Stormwind", nameB = "Auberdine" },
     { a = { 1437, 5.08, 63.40 }, b = { 1445, 71.54, 56.34 }, mode = "boat", side = "Alliance", nameA = "Menethil Harbor", nameB = "Theramore" },
+    -- a druid's flight home from Moonglade (one way, gossip with the NPC): ends in world yards (continent,
+    -- north, west), from LibForeverData 2026.11.1's spawns of Bunthen Plainswind / Silva Fil'naveth
+    -- (Moonglade) and Tal (Thunder Bluff) / Vesprystus (Rut'theran Village)
+    { wa = { 1, 7785.5, -2403.5 }, wb = { 1, -1197.5, 23.5 }, mode = "flight", side = "Horde", class = "DRUID", oneWay = true,
+      nameA = "Moonglade", nameB = "Thunder Bluff" },
+    { wa = { 1, 7795.5, -2400.5 }, wb = { 1, 8640.5, 841.0 }, mode = "flight", side = "Alliance", class = "DRUID", oneWay = true,
+      nameA = "Moonglade", nameB = "Rut'theran Village" },
 }
 -- Teleports: spell, where it lands; a mage's need a Rune of Teleportation.
 local TELEPORTS = {
@@ -76,13 +104,84 @@ local TELEPORTS = {
     { spell = 18960, map = 1450, x = 56.26, y = 32.46, name = "Moonglade" },
 }
 local RUNE = 17031
+-- The Hearthstone (item, and the spell it casts) and a shaman's Astral Recall: both to your inn.
+local HEARTH_ITEM, HEARTH_SPELL, ASTRAL_RECALL = 6948, 8690, 556
+local HEARTH_COOLDOWN = 3600       -- seconds: the Hearthstone's cooldown, when the client hides it
+
+-- The inns: innkeeper's NPC id, continent, world yards (north, west), then the names GetBindLocation
+-- gives for that inn (its subzone; English, then French). Positions: LibForeverData 2026.11.1 (forever-db,
+-- client 1.60.1.70532), every NPC whose subName is "Innkeeper" with a spawn (offline extract:
+-- writ/inn_extract2.py + writ/inn_table.py). Names: only those known for sure; an inn without a name
+-- here (the Forever ones) is still found once you bind there or come back by Hearthstone (learned,
+-- WLWritsCharDB.hearthSpot). A bind location that matches nothing: no Hearthstone in the plans.
+local INNS = {
+    { 295, 0, -9462, 16, "Goldshire", "Comté-de-l'Or" },
+    { 1247, 0, -5602, -532, "Kharanos" },
+    { 1464, 0, -3828, -832, "Menethil Harbor", "Port de Menethil" },
+    { 2352, 0, -857, -571, "Southshore", "Austrivage" },
+    { 2388, 0, -6, -942, "Tarren Mill", "Moulin-de-Tarren" },
+    { 3934, 1, -407, -2646, "The Crossroads", "Crossroads", "La Croisée" },
+    { 5111, 0, -4840, -857, "Ironforge", "Forgefer" },
+    { 5688, 0, 2270, 244, "Brill" },
+    { 5814, 0, -12434, 212, "Grom'gol Base Camp", "Grom'gol", "Camp de base de Grom'gol", "Campement Grom'gol" },
+    { 6272, 1, -3616, -4471, "Theramore Isle", "Theramore", "Île de Theramore" },
+    { 6727, 0, -9224, -2157, "Lakeshire", "Comté-du-Lac" },
+    { 6734, 0, -5378, -2974, "Thelsamar" },
+    { 6735, 1, 10128, 2226, "Darnassus" },
+    { 6736, 1, 9802, 982, "Dolanaar" },
+    { 6737, 1, 6406, 516, "Auberdine" },
+    { 6738, 1, 2781, -433, "Astranaar" },
+    { 6739, 0, 511, 1636, "The Sepulcher", "Le Sépulcre" },
+    { 6740, 0, -8868, 674, "Stormwind City", "Stormwind", "Trade District", "Hurlevent", "Cité de Hurlevent", "Quartier commerçant" },
+    { 6741, 0, 1636, 224, "Undercity", "Fossoyeuse" },
+    { 6746, 1, -1300, 39, "Thunder Bluff", "Les Pitons-du-Tonnerre", "Pitons-du-Tonnerre" },
+    { 6747, 1, -2365, -348, "Bloodhoof Village", "Village de Sabot-de-Sang" },
+    { 6790, 0, -10516, -1161, "Darkshire", "Sombre-Comté" },
+    { 6791, 1, -1050, -3665, "Ratchet", "Cabestan" },
+    { 6807, 0, -14458, 496, "Booty Bay", "Baie-du-Butin" },
+    { 6928, 1, 340, -4686, "Razor Hill", "Tranchecolline" },
+    { 6929, 1, 1634, -4440, "Orgrimmar", "Valley of Strength", "Vallée de la Force" },
+    { 6930, 0, -10488, -3259, "Stonard", "Pierrêche" },
+    { 7714, 1, -2376, -1996, "Camp Taurajo" },
+    { 7731, 1, 894, 928, "Sun Rock Retreat", "Retraite de Roche-Soleil" },
+    { 7733, 1, -7159, -3842, "Gadgetzan" },
+    { 7736, 1, -4382, 3290, "Feathermoon Stronghold", "Bastion de Pennelune" },
+    { 7737, 1, -4460, 243, "Camp Mojache" },
+    { 7744, 0, 400, -2120, "Aerie Peak", "Nid-de-l'Aigle" },
+    { 8931, 0, -10653, 1166, "Sentinel Hill", "Colline des Sentinelles" },
+    { 9356, 0, -6650, -2150, "Kargath" },
+    { 9501, 0, -912, -3525, "Hammerfall", "Trépas-d'Orgrim" },
+    { 11103, 1, 256, 1254, "Nijel's Point", "Pointe de Nijel", "Point de Nijel" },
+    { 11106, 1, -1593, 3150, "Shadowprey Village" },
+    { 11116, 1, -5478, -2460, "Freewind Post", "Poste de Librevent" },
+    { 11118, 1, 6696, -4673, "Everlook", "Long-Guet" },
+    { 12196, 1, 2342, -2567, "Splintertree Post", "Poste de Bois-Brisé" },
+    { 14731, 0, -622, -4584, "Revantusk Village", "Village des Vengebroches" },
+    { 15174, 1, -6868, 730, "Cenarion Hold", "Fort cénarien" },
+    { 16256, 0, 2301, -5345, "Light's Hope Chapel", "Chapelle de l'Espoir de Lumière" },
+    { 16458, 1, 2730, 1498, "Stonetalon Peak", "Pic des Serres-Rocheuses" },
+    -- WoW Forever's own inns (no name in the data: learned in game)
+    { 28687, 0, 257, 270 }, { 32413, 0, 262, 443 }, { 240482, 1, 2728, -3916 }, { 243815, 1, 5112, -3383 },
+    { 244512, 1, 5082, -1374 }, { 252691, 1, -2889, 1123 }, { 254089, 2991, 3298, 1908 }, { 255894, 0, -8216, -5712 },
+    { 255940, 2991, 2233, 774 }, { 256675, 0, -7922, -4704 }, { 257595, 0, -9190, -5028 }, { 258380, 1, 5138, -1464 },
+}
+GPS._INNS = INNS
 
 local RUN, MOUNT = 7, 11.2         -- yards a second on foot and on a 60% mount
 local TERRAIN = 1.3                -- roads and hills: a ride is longer than the straight line
 local FLY, FLY_DETOUR, FLY_STOP = 30, 1.25, 20
 local LINK_TIME, TELEPORT_TIME = 150, 15
+local HEARTH_TIME = 25             -- 10 s cast, the loading screen, a few seconds to get going
 local NEAR = 15                    -- yards: a leg's end reached
 local REPLAN_EVERY = 8             -- seconds between two plans while guiding
+local BIND_SNAP = 60               -- yards: binding this near a known inn takes that inn's spot
+local CAST_NEAR = 100              -- yards: a teleport's or the Hearthstone's landing reached (the leg is done)
+-- the router's walking lengths (Trail.WalkCost): legs from 60 to 3000 yards, 3 asked at a time, 12 per
+-- destination; a new plan replaces the one you follow only when more than 10% faster
+local WALK_MIN, WALK_MAX, WALK_PENDING, WALK_PER_DEST = 60, 3000, 3, 12
+local WALK_CELL = 150              -- yards: where you stand, rounded, for the walks from you
+local SWITCH = 0.10
+local CANDIDATES, CANDIDATE_SPAN = 3, 2   -- plans whose walks are asked; slower than 2x the best: not asked
 
 local function Opt(key, default)
     local o = WLWritsDB and WLWritsDB.gpsOpts
@@ -130,22 +229,48 @@ local function Point(map, x, y, extra)   -- x, y in percent
 end
 GPS.Point = Point
 
+-- A point already in world yards (continent, north, west).
+local function WorldPoint(w, extra)
+    if not w then return nil end
+    local p = extra or {}
+    p.cont, p.wx, p.wy = w[1], w[2], w[3]
+    return p
+end
+
+local function IsSecret(v) return issecretvalue ~= nil and issecretvalue(v) end
+local function InCombat() return InCombatLockdown and InCombatLockdown() and true or false end
+local function Clock() return GetTime and GetTime() or 0 end
+
 -- ---------------------------------------------------------------- fixed points, kept
 
 local fixed   -- { taxi = {...}, docks = {...}, ports = {...} } for this faction, built once
 local knownCount   -- flight paths recorded, counted once
 
+local function PlayerClass()
+    if not UnitClass then return nil end
+    local ok, _, cls = pcall(UnitClass, "player")
+    if ok and type(cls) == "string" and not IsSecret(cls) then return cls end
+end
+
 local function BuildFixed()
     local side = UnitFactionGroup("player")
+    local cls = PlayerClass()
     fixed = { taxi = {}, docks = {}, ports = {} }
     for id, t in pairs(WLWritsCharDB.taxi or {}) do
         local p = Point(t.map, t.x, t.y, { kind = "taxi", name = t.name, nodeID = id })
         if p then fixed.taxi[#fixed.taxi + 1] = p end
     end
     for _, l in ipairs(LINKS) do
-        if not l.side or l.side == side then
-            local a = Point(l.a[1], l.a[2], l.a[3], { kind = "dock", name = l.nameA, link = l })
-            local b = Point(l.b[1], l.b[2], l.b[3], { kind = "dock", name = l.nameB, link = l })
+        if (not l.side or l.side == side) and (not l.class or l.class == cls) then
+            local a, b
+            if l.wa then
+                a = WorldPoint(l.wa, { kind = "dock", name = l.nameA, link = l })
+                b = WorldPoint(l.wb, { kind = "dock", name = l.nameB, link = l })
+            else
+                a = Point(l.a[1], l.a[2], l.a[3], { kind = "dock", name = l.nameA, link = l })
+                b = Point(l.b[1], l.b[2], l.b[3], { kind = "dock", name = l.nameB, link = l })
+            end
+            if a then a.start = true end   -- the end you board at (a one-way link goes from here only)
             if a and b then
                 a.other, b.other = b, a
                 fixed.docks[#fixed.docks + 1] = a
@@ -183,6 +308,9 @@ local function RecordTaxi()
     if added then fixed, knownCount = nil, nil end
 end
 
+-- tests: the fixed points built again (faction, class, flight paths changed)
+function GPS._ResetFixed() fixed, knownCount = nil, nil end
+
 function GPS.KnownFlights()
     if not knownCount then
         knownCount = 0
@@ -193,64 +321,239 @@ end
 
 -- ---------------------------------------------------------------- the route
 
-local function SpellReady(id)
-    local known = (IsPlayerSpell and IsPlayerSpell(id)) or (IsSpellKnown and IsSpellKnown(id))
-    if not known then return false end
+local state = {}   -- dest, source, legs, eta, plannedAt, planFor (the guidance, below)
+
+-- A cooldown's state from C_Spell.GetSpellCooldown (or the old GetSpellCooldown): true when ready,
+-- false when cooling down, nil when the client tells nothing readable.
+local function SpellCooldownReady(id)
     local start, duration
     if C_Spell and C_Spell.GetSpellCooldown then
         local ok, cd = pcall(C_Spell.GetSpellCooldown, id)
-        if ok and type(cd) == "table" then
-            -- the client may hide the numbers ("secret" values): its plain isActive flag tells then
-            -- (the global cooldown is never long enough to matter for a teleport)
-            if issecretvalue and (issecretvalue(cd.startTime) or issecretvalue(cd.duration)) then
-                local okA, ready = pcall(function()
-                    if issecretvalue(cd.isActive) then return true end
-                    local gcd = cd.isOnGCD
-                    if gcd ~= nil and issecretvalue(gcd) then gcd = false end
-                    return not (cd.isActive and not gcd)
-                end)
-                return not okA or ready
-            end
-            start, duration = cd.startTime, cd.duration
+        if not (ok and type(cd) == "table") then return nil end
+        -- the client may hide the numbers ("secret" values): its plain isActive flag tells then
+        -- (the global cooldown is never long enough to matter for a teleport)
+        if issecretvalue and (issecretvalue(cd.startTime) or issecretvalue(cd.duration)) then
+            local okA, ready = pcall(function()
+                if issecretvalue(cd.isActive) or cd.isActive == nil then return nil end
+                local gcd = cd.isOnGCD
+                if gcd ~= nil and issecretvalue(gcd) then gcd = false end
+                return not (cd.isActive and not gcd)
+            end)
+            if okA then return ready end
+            return nil
         end
+        start, duration = cd.startTime, cd.duration
     elseif GetSpellCooldown then
-        start, duration = GetSpellCooldown(id)
+        local ok, s, d = pcall(GetSpellCooldown, id)
+        if ok then start, duration = s, d end
     end
-    local ok, onCD = pcall(function() return start and duration and start > 0 and duration > 1.5 end)
-    return not (ok and onCD)
+    if start == nil or duration == nil then return nil end
+    local ok, onCD = pcall(function() return start > 0 and duration > 1.5 end)
+    if not ok then return nil end
+    return not onCD
 end
+
+local function SpellKnown(id)
+    local ok, known = pcall(function()
+        return (IsPlayerSpell and IsPlayerSpell(id)) or (IsSpellKnown and IsSpellKnown(id))
+    end)
+    return ok and known and not IsSecret(known) and true or false
+end
+
+local function SpellReady(id)
+    if not SpellKnown(id) then return false end
+    -- unreadable: as before, a known spell counts as ready
+    return SpellCooldownReady(id) ~= false
+end
+GPS._SpellReady = SpellReady
 
 local function BagCount(id)
     local f = (C_Item and C_Item.GetItemCount) or GetItemCount
+    if not f then return 0 end
     local ok, n = pcall(f, id)
-    return ok and n or 0
+    if not ok or type(n) ~= "number" or IsSecret(n) then return 0 end
+    return n
 end
+
+-- The Hearthstone in your bags and off cooldown. Its item cooldown first (numbers may be secret on this
+-- client: then unread), then the spell it casts (C_Spell's plain isActive), then the last time we saw you
+-- use it (an hour). Unknown everywhere: ready (the game says so on the click).
+local function HearthReady()
+    if BagCount(HEARTH_ITEM) <= 0 then return false end
+    local fn = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
+    if fn then
+        local ok, s, d = pcall(fn, HEARTH_ITEM)
+        if ok and type(s) == "number" and type(d) == "number" and not IsSecret(s) and not IsSecret(d) then
+            return not (s > 0 and d > 1.5)
+        end
+    end
+    -- a use we saw beats the spell's answer: its cooldown may not follow the item's on this client
+    local used = WLWritsCharDB and WLWritsCharDB.hearthUsed
+    local nowT = time and time() or 0
+    if type(used) == "number" and nowT - used < HEARTH_COOLDOWN then return false end
+    local r = SpellCooldownReady(HEARTH_SPELL)
+    if r ~= nil then return r end
+    return true
+end
+GPS._HearthReady = HearthReady
 
 local function RideSpeed()
     return (UnitLevel("player") or 1) >= 40 and MOUNT or RUN
 end
 
+-- ---------------------------------------------------------------- your inn
+
+-- "The Crossroads" and "Crossroads", "Fort Cénarien" and "Fort cénarien" are the same inn.
+local function Norm(s)
+    if type(s) ~= "string" then return nil end
+    s = s:lower():gsub("^%s+", ""):gsub("%s+$", "")
+    s = s:gsub("^the%s+", ""):gsub("^la%s+", ""):gsub("^le%s+", ""):gsub("^les%s+", ""):gsub("^l'", "")
+    return s
+end
+
+local innByName
+local function InnByName(name)
+    if not innByName then
+        innByName = {}
+        for _, t in ipairs(INNS) do
+            for i = 5, #t do
+                local k = Norm(t[i])
+                if k and not innByName[k] then innByName[k] = t end
+            end
+        end
+    end
+    local k = Norm(name)
+    return k and innByName[k]
+end
+
+local function BindName()
+    if not GetBindLocation then return nil end
+    local ok, name = pcall(GetBindLocation)
+    if not ok or type(name) ~= "string" or IsSecret(name) or name == "" then return nil end
+    return name
+end
+
+-- Where the Hearthstone takes you: the spot learned for this bind location (where you landed after a
+-- Hearthstone, or the innkeeper you bound at), else the inn of that name in INNS. Unknown: nil.
+local innPoint, innKey
+function GPS.InnPoint()
+    local name = BindName()
+    if not name then return nil end
+    local db = WLWritsCharDB
+    local spot = db and db.hearthSpot
+    local w
+    if type(spot) == "table" and spot.bind == name and spot.cont and spot.wx and spot.wy then
+        w = { spot.cont, spot.wx, spot.wy }
+    else
+        local bind = db and db.hearthBinder
+        if type(bind) == "table" and bind.bind == name and bind.cont and bind.wx and bind.wy then
+            w = { bind.cont, bind.wx, bind.wy }
+        else
+            local t = InnByName(name)
+            if t then w = { t[2], t[3], t[4] } end
+        end
+    end
+    if not w then return nil end
+    local key = name .. ":" .. w[1] .. ":" .. w[2] .. ":" .. w[3]
+    if innKey ~= key then
+        innKey = key
+        innPoint = WorldPoint(w, { kind = "inn", name = name })
+    end
+    return innPoint
+end
+
+-- The inn of INNS nearest to a world point, within `within` yards.
+local function NearestInn(cont, wx, wy, within)
+    local best, bestD
+    for _, t in ipairs(INNS) do
+        if t[2] == cont then
+            local dx, dy = t[3] - wx, t[4] - wy
+            local d = math.sqrt(dx * dx + dy * dy)
+            if d <= within and (not bestD or d < bestD) then best, bestD = t, d end
+        end
+    end
+    return best
+end
+GPS._NearestInn = NearestInn
+
+-- ---------------------------------------------------------------- walking lengths (WLHelper_Nav)
+
+-- walk[fromKey][toKey] = the walk's length over the straight line (>= 1), or false (the router could
+-- not walk it: the straight line x TERRAIN stays). Kept for the session.
+local walk = {}
+local walkAsked = {}         -- fromKey .. ">" .. toKey -> true once asked (each pair once)
+local walkPending, walkAsks, walkDirty, scheduling = 0, 0, false, false
+local walkSentAt = 0          -- when the newest ask went out: answers lost for a minute free the slots
+
+local function NodeKey(p)
+    if p.kind == "start" then
+        return "s" .. p.cont .. ":" .. math.floor(p.wx / WALK_CELL) .. ":" .. math.floor(p.wy / WALK_CELL)
+    end
+    if p._wk and p._wkx == p.wx and p._wky == p.wy then return p._wk end
+    p._wk = p.cont .. ":" .. math.floor(p.wx + 0.5) .. ":" .. math.floor(p.wy + 0.5)
+    p._wkx, p._wky = p.wx, p.wy
+    return p._wk
+end
+
+local function WalkFactor(a, b)
+    local row = walk[a._key or NodeKey(a)]
+    local f = row and row[b._key or NodeKey(b)]
+    return f or nil
+end
+
+-- Seconds to ride (or run) from a to b on one continent, and the straight yards.
+local function RideCost(a, b, speed)
+    local d = Dist(a, b)
+    local f = WalkFactor(a, b)
+    return d * (f or TERRAIN) / (speed or RideSpeed()), d
+end
+
+local function FlyCost(d) return d * FLY_DETOUR / FLY + FLY_STOP end
+
+-- What the Hearthstone (or Astral Recall) may do now: the inn and how ("item" / spell id), or nil.
+local function HearthWay(dead)
+    if dead then return nil end
+    local useStone = Opt("hearth", true) and HearthReady()
+    local useRecall = not useStone and Opt("teleports", true) and SpellReady(ASTRAL_RECALL)
+    if not (useStone or useRecall) then return nil end
+    local inn = GPS.InnPoint()
+    if not inn then return nil end
+    if useStone then return inn, "item" end
+    return inn, ASTRAL_RECALL
+end
+
 -- One Dijkstra over every pair of points (a few dozen), from where you stand. With `firstOnly` it
--- stops at the nearest of `dests`; otherwise it prices every destination.
-local function Search(dests, firstOnly)
+-- stops at the nearest of `dests`; otherwise it prices every destination. `exclude`: points left out
+-- (the next best plans).
+local function Search(dests, firstOnly, exclude)
     local cont, px, py = PlayerWorld()
     if not cont or not dests or #dests == 0 then return nil end
     if not fixed then BuildFixed() end
     -- a ghost runs to its corpse: no flight, no teleport
     local dead = UnitIsDeadOrGhost and UnitIsDeadOrGhost("player")
-    local nodes = { { cont = cont, wx = px, wy = py, kind = "start" } }
+    local start = { cont = cont, wx = px, wy = py, kind = "start" }
+    start._key = NodeKey(start)
+    local nodes = { start }
     local isDest = {}
-    for _, d in ipairs(dests) do nodes[#nodes + 1] = d; isDest[#nodes] = true end
-    if not dead then
-        for _, p in ipairs(fixed.taxi) do nodes[#nodes + 1] = p end
+    local function Add(p)
+        if exclude and exclude[p] then return end
+        p._key = NodeKey(p)
+        nodes[#nodes + 1] = p
     end
-    for _, p in ipairs(fixed.docks) do nodes[#nodes + 1] = p end
+    for _, d in ipairs(dests) do d._key = NodeKey(d); nodes[#nodes + 1] = d; isDest[#nodes] = true end
+    if not dead then
+        for _, p in ipairs(fixed.taxi) do Add(p) end
+    end
+    for _, p in ipairs(fixed.docks) do Add(p) end
     if Opt("teleports", true) and not dead then
         local hasRune = BagCount(RUNE) > 0
         for _, p in ipairs(fixed.ports) do
-            if (not p.rune or hasRune) and SpellReady(p.spell) then nodes[#nodes + 1] = p end
+            if (not p.rune or hasRune) and SpellReady(p.spell) then Add(p) end
         end
     end
+    local inn, via = HearthWay(dead)
+    if inn and exclude and exclude[inn] then inn = nil end
+    if inn then Add(inn) end
 
     local n, speed = #nodes, RideSpeed()
     local cost, prev, how, done = {}, {}, {}, {}
@@ -270,20 +573,25 @@ local function Search(dests, firstOnly)
                 local b = nodes[v]
                 local c, kind = math.huge, nil
                 if a.cont == b.cont then
-                    local d = Dist(a, b)
-                    c, kind = d * TERRAIN / speed, "ride"
+                    local d
+                    c, d = RideCost(a, b, speed)
+                    kind = "ride"
                     if a.kind == "taxi" and b.kind == "taxi" then
-                        local f = d * FLY_DETOUR / FLY + FLY_STOP
+                        local f = FlyCost(d)
                         if f < c then c, kind = f, "fly" end
                     end
                 end
-                if a.kind == "dock" and a.other == b and LINK_TIME < c then c, kind = LINK_TIME, "link" end
+                if a.kind == "dock" and a.other == b and (a.start or not a.link.oneWay) then
+                    local lt = a.link.mode == "flight" and FlyCost(Dist(a, b)) or LINK_TIME
+                    if lt < c then c, kind = lt, "link" end
+                end
                 if u == 1 and b.kind == "port" and TELEPORT_TIME < c then c, kind = TELEPORT_TIME, "teleport" end
+                if u == 1 and b == inn and HEARTH_TIME < c then c, kind = HEARTH_TIME, "hearth" end
                 if kind and base + c < cost[v] then cost[v], prev[v], how[v] = base + c, u, kind end
             end
         end
     end
-    return nodes, cost, prev, how, reached
+    return nodes, cost, prev, how, reached, via
 end
 
 -- Seconds to each of `dests` from where you stand (nil when unreachable), in one search.
@@ -300,13 +608,19 @@ function GPS.CostsTo(dests)
 end
 
 -- Fastest way from where you stand to the nearest of `dests` (Points). Returns the legs
--- { kind = "ride"|"fly"|"link"|"teleport", from, to }, the seconds it takes and the destination reached.
-function GPS.FindPath(dests)
-    local nodes, cost, prev, how, reached = Search(dests, true)
+-- { kind = "ride"|"fly"|"link"|"teleport"|"hearth", from, to, seconds }, the seconds it takes and the
+-- destination reached. A "hearth" leg says how: item = 6948 (the Hearthstone) or spell = 556 (Astral
+-- Recall). `exclude`: points the way may not use.
+function GPS.FindPath(dests, exclude)
+    local nodes, cost, prev, how, reached, via = Search(dests, true, exclude)
     if not reached then return nil end
     local legs, v = {}, reached
     while prev[v] do
-        table.insert(legs, 1, { kind = how[v], from = nodes[prev[v]], to = nodes[v] })
+        local leg = { kind = how[v], from = nodes[prev[v]], to = nodes[v], seconds = cost[v] - cost[prev[v]] }
+        if leg.kind == "hearth" then
+            if via == "item" then leg.item = HEARTH_ITEM else leg.spell = via end
+        end
+        table.insert(legs, 1, leg)
         v = prev[v]
     end
     -- A ride of a few yards (you already stand at the flight master or the dock) is no step.
@@ -317,12 +631,190 @@ function GPS.FindPath(dests)
     return out, cost[reached], nodes[reached]
 end
 
+-- What a plan costs now, from where you stand and with what is known now (the walks priced since,
+-- a teleport gone on cooldown): nil when it can no longer be followed.
+local function PlanCost(legs)
+    if not legs or #legs == 0 then return nil end
+    local cont, px, py = PlayerWorld()
+    if not cont then return nil end
+    local start = { cont = cont, wx = px, wy = py, kind = "start" }
+    start._key = NodeKey(start)
+    local dead = UnitIsDeadOrGhost and UnitIsDeadOrGhost("player")
+    local speed = RideSpeed()
+    local total, at = 0, start
+    for i, leg in ipairs(legs) do
+        local k = leg.kind
+        if k == "teleport" or k == "hearth" then
+            if i ~= 1 or dead then return nil end
+            -- you stand at its landing: cast already, this plan is over (the new one starts here)
+            if at.cont == leg.to.cont and Dist(at, leg.to) < CAST_NEAR then return nil end
+            if k == "teleport" then
+                if not (Opt("teleports", true) and SpellReady(leg.to.spell)) then return nil end
+                if leg.to.rune and BagCount(RUNE) <= 0 then return nil end
+                total = total + TELEPORT_TIME
+            else
+                local inn = HearthWay(dead)
+                if not inn or inn ~= leg.to then return nil end
+                total = total + HEARTH_TIME
+            end
+        else
+            local from = leg.from
+            if i == 1 then
+                if k == "ride" then
+                    from = at        -- the first ride starts where you stand now
+                else
+                    -- a flight or a boat first: you still have to reach its start
+                    if at.cont ~= leg.from.cont then return nil end
+                    if Dist(at, leg.from) >= NEAR then total = total + RideCost(at, leg.from, speed) end
+                end
+            end
+            if k == "ride" then
+                if from.cont ~= leg.to.cont then return nil end
+                total = total + RideCost(from, leg.to, speed)
+            elseif k == "fly" then
+                total = total + FlyCost(Dist(from, leg.to))
+            elseif k == "link" then
+                total = total + (from.link and from.link.mode == "flight" and FlyCost(Dist(from, leg.to)) or LINK_TIME)
+            end
+        end
+        at = leg.to
+    end
+    return total
+end
+GPS._PlanCost = PlanCost
+
+local function Signature(legs)
+    if not legs then return "" end
+    local t = {}
+    for i, leg in ipairs(legs) do t[i] = leg.kind .. "@" .. NodeKey(leg.to) end
+    return table.concat(t, "|")
+end
+
+-- The walking legs of the best plans, asked to the router (Trail.WalkCost) out of combat: 3 at a time,
+-- 12 per destination, each pair once a session. An answer prices the walk (its length over the straight
+-- line) and the plan is made again (GPS.Replan keeps the plan you follow unless the new one is 10% faster).
+local walkDest            -- the destination the asks count for
+local function WalkLegs(legs, out)
+    for _, leg in ipairs(legs or {}) do
+        if leg.kind == "ride" and leg.from and leg.to and leg.from.cont == leg.to.cont then
+            local d = Dist(leg.from, leg.to)
+            if d >= WALK_MIN and d <= WALK_MAX then out[#out + 1] = leg end
+        end
+    end
+end
+
+local ReplanSoon
+-- The walk the arrow follows is asked by Trail.lua already (its path): its length is kept here too, so
+-- the leg you walk is never asked twice.
+local trailHooked = false
+local function HookTrail()
+    if trailHooked or not (WP.Trail and WP.Trail.OnReady) then return end
+    trailHooked = true
+    WP.Trail.OnReady(function(t)
+        if type(t) ~= "table" or not t.target or not t.askX or type(t.yards) ~= "number" then return end
+        local tg = t.target
+        if not (tg.cont and tg.wx and tg.wy) then return end
+        local from = { cont = t.cont, wx = t.askX, wy = t.askY, kind = "start" }
+        local straight = Dist(from, tg)
+        if straight < WALK_MIN then return end
+        local fk, tk = NodeKey(from), tg._key or NodeKey(tg)
+        local r = walk[fk] or {}
+        walk[fk] = r
+        if r[tk] == nil then
+            r[tk] = math.max(1, math.min(6, t.yards / straight))
+            if ReplanSoon then ReplanSoon(0.1) end
+        end
+    end)
+end
+
+local function AskWalks(dest)
+    HookTrail()
+    if walkPending > 0 and Clock() - walkSentAt > 60 then walkPending = 0 end
+    if not dest or walkPending >= WALK_PENDING or InCombat() then return end
+    if walkDest ~= dest then walkDest, walkAsks = dest, 0 end
+    if walkAsks >= WALK_PER_DEST then return end
+    local T = WP.Trail
+    if not (T and T.WalkCost) then return end
+    if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then return end
+    -- the best plans: the best, then the best without its first stop, and so on
+    local plans, exclude, best = {}, {}, nil
+    for _ = 1, CANDIDATES do
+        local legs, c = GPS.FindPath({ dest }, exclude)
+        if not legs then break end
+        if not best then best = c elseif c > best * CANDIDATE_SPAN then break end
+        plans[#plans + 1] = legs
+        local first = legs[1] and legs[1].to
+        if not first or first == dest or first.kind == "dest" or exclude[first] then break end
+        exclude[first] = true
+    end
+    local wanted = {}
+    for _, legs in ipairs(plans) do WalkLegs(legs, wanted) end
+    -- the first walk of the plan you follow: the arrow's own path (Trail.lua) measures it
+    local following = state.legs and state.legs[1]
+    if following and following.kind == "ride" and following.from and following.from.kind == "start" then
+        for i = #wanted, 1, -1 do
+            local w = wanted[i]
+            if w.from.kind == "start" and (w.to == following.to) then table.remove(wanted, i) end
+        end
+    end
+    scheduling = true
+    for _, leg in ipairs(wanted) do
+        if walkPending >= WALK_PENDING or walkAsks >= WALK_PER_DEST then break end
+        local fromKey, toKey = leg.from._key or NodeKey(leg.from), leg.to._key or NodeKey(leg.to)
+        local pair = fromKey .. ">" .. toKey
+        local row = walk[fromKey]
+        if not walkAsked[pair] and not (row and row[toKey] ~= nil) then
+            walkAsked[pair] = true
+            walkAsks, walkPending = walkAsks + 1, walkPending + 1
+            walkSentAt = Clock()
+            local straight = Dist(leg.from, leg.to)
+            local from = { cont = leg.from.cont, wx = leg.from.wx, wy = leg.from.wy }
+            local to = { cont = leg.to.cont, wx = leg.to.wx, wy = leg.to.wy }
+            local answered = false
+            local function Done(yards, why)
+                if answered then return end
+                answered = true
+                walkPending = math.max(0, walkPending - 1)
+                local r = walk[fromKey] or {}
+                walk[fromKey] = r
+                if type(yards) == "number" and not IsSecret(yards) and yards > 0 and straight > 0 then
+                    r[toKey] = math.max(1, math.min(6, yards / straight))
+                elseif why == "combat" or why == "nonav" or why == "busy" then
+                    walkAsked[pair] = nil        -- not the walk's fault: asked again later
+                else
+                    r[toKey] = false
+                end
+                if scheduling then walkDirty = true else ReplanSoon(0.1) end
+            end
+            local ok, asked = pcall(T.WalkCost, from, to, Done)
+            if not ok or not asked then
+                -- the router is not there (or refused): nothing pending, nothing more asked this time
+                if not answered then
+                    answered = true
+                    walkPending = math.max(0, walkPending - 1)
+                    walkAsks = walkAsks - 1
+                    walkAsked[pair] = nil
+                end
+                break
+            end
+        end
+    end
+    scheduling = false
+    if walkDirty then walkDirty = false; ReplanSoon(0.1) end
+end
+function GPS._WalkReset() walk, walkAsked, walkPending, walkAsks, walkDest = {}, {}, 0, 0, nil end
+function GPS._WalkState() return walk, walkPending, walkAsks end
+
 -- ---------------------------------------------------------------- guidance
 
-local state = {}   -- dest, source, legs, eta, plannedAt
+-- (state: declared with the route, above)
 
 -- One leg in words ("Prends le vol pour Brackenwall Village"). full: keep the zone after a flight
 -- master's name (for the tooltip); the arrow's lines use the short place.
+local function LinkMode(leg)
+    local l = (leg.from and leg.from.link) or (leg.to and leg.to.link)
+    return l and l.mode
+end
 function GPS.Describe(leg, full)
     if not leg then return "" end
     local to = leg.to
@@ -330,15 +822,20 @@ function GPS.Describe(leg, full)
     if leg.kind == "ride" then
         if to.kind == "taxi" then return string.format(L("Va au maître de vol de %s"), P(to.name)) end
         if to.kind == "dock" then
+            if to.link.mode == "flight" then return string.format(L("Va au maître de vol de %s"), P(to.name)) end
             return string.format(to.link.mode == "boat" and L("Va au bateau pour %s") or L("Va au zeppelin pour %s"), P(to.other.name))
         end
         return string.format(L("Rejoins %s"), UpperFirst(to.name or "?"))
     elseif leg.kind == "fly" then
         return string.format(L("Prends le vol pour %s"), P(to.name))
     elseif leg.kind == "link" then
-        return string.format(leg.from.link.mode == "boat" and L("Prends le bateau pour %s") or L("Prends le zeppelin pour %s"), P(to.name))
+        local mode = LinkMode(leg)
+        if mode == "flight" then return string.format(L("Prends le vol pour %s"), P(to.name)) end
+        return string.format(mode == "boat" and L("Prends le bateau pour %s") or L("Prends le zeppelin pour %s"), P(to.name))
     elseif leg.kind == "teleport" then
         return string.format(L("Téléportation : %s"), P(to.name))
+    elseif leg.kind == "hearth" then
+        return string.format(leg.item and L("Pierre de foyer : %s") or L("Rappel astral : %s"), P(to.name))
     end
     return ""
 end
@@ -352,17 +849,100 @@ function GPS.DescribeNext(leg)
     if leg.kind == "ride" then
         if to.kind == "taxi" then return string.format(L("Puis le maître de vol de %s"), P(to.name)) end
         if to.kind == "dock" then
+            if to.link.mode == "flight" then return string.format(L("Puis le maître de vol de %s"), P(to.name)) end
             return string.format(to.link.mode == "boat" and L("Puis le bateau pour %s") or L("Puis le zeppelin pour %s"), P(to.other.name))
         end
         return string.format(L("Puis %s"), UpperFirst(to.name or "?"))
     elseif leg.kind == "fly" then
         return string.format(L("Puis le vol pour %s"), P(to.name))
     elseif leg.kind == "link" then
-        return string.format(leg.from.link.mode == "boat" and L("Puis le bateau pour %s") or L("Puis le zeppelin pour %s"), P(to.name))
+        local mode = LinkMode(leg)
+        if mode == "flight" then return string.format(L("Puis le vol pour %s"), P(to.name)) end
+        return string.format(mode == "boat" and L("Puis le bateau pour %s") or L("Puis le zeppelin pour %s"), P(to.name))
     elseif leg.kind == "teleport" then
         return string.format(L("Puis la téléportation : %s"), P(to.name))
+    elseif leg.kind == "hearth" then
+        return string.format(leg.item and L("Puis la pierre de foyer : %s") or L("Puis le rappel astral : %s"), P(to.name))
     end
     return ""
+end
+
+-- ---------------------------------------------------------------- the itinerary
+
+-- A distance as the arrow writes it ("300 m", "1,2 km", or yards when chosen): Arrow.lua's GPS.Distance.
+local function DistanceText(yards)
+    if GPS.Distance then
+        local ok, t = pcall(GPS.Distance, yards)
+        if ok and type(t) == "string" then return t end
+    end
+    local m = yards * 0.9144
+    if m >= 1000 then
+        local t = string.format("%.1f km", m / 1000)
+        if ns.English and not ns.English() then t = t:gsub("%.", ",") end
+        return t
+    end
+    if m >= 100 then m = math.floor(m / 10 + 0.5) * 10 end
+    return string.format("%d m", math.floor(m + 0.5))
+end
+
+-- The whole way, leg by leg: { { kind = "walk"|"ride"|"fly"|"boat"|"zeppelin"|"teleport"|"hearth", text,
+-- seconds, yards, leg }, ... }. `legs`: the plan to tell (default: the one followed now). The first walk
+-- is measured from where you stand; a walk the router measured counts its real length.
+function GPS.Itinerary(legs)
+    legs = legs or state.legs
+    local out = {}
+    if type(legs) ~= "table" then return out end
+    local cont, px, py = PlayerWorld()
+    local speed = RideSpeed()
+    for i, leg in ipairs(legs) do
+        local to = leg.to or {}
+        local P = GPS.ShortPlace(to.name)
+        local item
+        if leg.kind == "ride" then
+            local yards, factor
+            local from = leg.from
+            if from and from.wx and to.wx and from.cont == to.cont then factor = WalkFactor(from, to) end
+            if i == 1 and cont and to.cont == cont and to.wx then from = { cont = cont, wx = px, wy = py } end
+            if from and from.wx and to.wx and from.cont == to.cont then
+                yards = Dist(from, to) * (factor or 1)
+            end
+            local onFoot = speed <= RUN or (yards ~= nil and yards < 150)
+            local d = yards and DistanceText(yards) or "?"
+            item = { kind = onFoot and "walk" or "ride", yards = yards,
+                text = string.format(onFoot and L("%s à pied") or L("%s en monture"), d) }
+        elseif leg.kind == "fly" then
+            item = { kind = "fly", text = string.format(L("vol jusqu'à %s"), P) }
+        elseif leg.kind == "link" then
+            local mode = LinkMode(leg)
+            if mode == "flight" then
+                item = { kind = "fly", text = string.format(L("vol jusqu'à %s"), P) }
+            elseif mode == "boat" then
+                item = { kind = "boat", text = string.format(L("bateau pour %s"), P) }
+            else
+                item = { kind = "zeppelin", text = string.format(L("zeppelin pour %s"), P) }
+            end
+        elseif leg.kind == "teleport" then
+            item = { kind = "teleport", text = string.format(L("téléportation à %s"), P) }
+        elseif leg.kind == "hearth" then
+            item = { kind = "hearth", text = leg.item and L("Pierre de foyer") or L("Rappel astral") }
+        end
+        if item then
+            item.seconds = type(leg.seconds) == "number" and leg.seconds or nil
+            item.leg = leg
+            out[#out + 1] = item
+        end
+    end
+    return out
+end
+
+-- The whole way in one line: "Pierre de foyer → vol jusqu'à Kargath → 300 m à pied" (first word in
+-- capital). Empty when there is no plan.
+function GPS.ItinerarySummary(legs)
+    local parts = {}
+    for i, it in ipairs(GPS.Itinerary(legs)) do
+        parts[#parts + 1] = i == 1 and UpperFirst(it.text) or it.text
+    end
+    return table.concat(parts, " \226\134\146 ")
 end
 
 local function Changed()
@@ -370,14 +950,25 @@ local function Changed()
     if WP.RefreshHome then WP.RefreshHome() end
 end
 
+-- A new plan. The plan you follow stays unless the new one is more than 10% faster (both priced from
+-- where you stand now, with every walk the router measured): two ways of about the same time do not
+-- swap back and forth. A plan that can no longer be followed (a teleport gone on cooldown) is replaced.
 function GPS.Replan()
     if not state.dest or state.zygor then return end
     if UnitOnTaxi and UnitOnTaxi("player") then return end
-    state.legs, state.eta = GPS.FindPath({ state.dest })
+    local legs, eta = GPS.FindPath({ state.dest })
+    local old = state.legs
+    if legs and old and #old > 0 and state.planFor == state.dest and Signature(legs) ~= Signature(old) then
+        local oldCost = PlanCost(old)
+        if oldCost and eta >= oldCost * (1 - SWITCH) then legs, eta = old, oldCost end
+    end
+    state.legs, state.eta, state.planFor = legs, eta, state.dest
     -- "step 2 of 4" keeps counting across plans: legs already done plus the legs left
     if state.legs then state.legs.total = #state.legs + (state.doneLegs or 0) end
     state.plannedAt = GetTime()
     Changed()
+    -- then the real walks of the best ways, asked in the background (never in combat)
+    if state.legs then pcall(AskWalks, state.dest) end
 end
 
 -- Zygor's travel system, when the options ask for it (or "auto" and it is on).
@@ -395,7 +986,7 @@ end
 
 -- Several events in a row (a loading screen fires a few) make one plan.
 local replanQueued = false
-local function ReplanSoon(delay)
+function ReplanSoon(delay)
     if replanQueued or not state.dest then return end
     replanQueued = true
     C_Timer.After(delay or 0.5, function() replanQueued = false; GPS.Replan() end)
@@ -485,6 +1076,8 @@ function GPS.Stop(source)
     end
     state.pin = nil
     state.dest, state.source, state.legs, state.eta, state.zygor, state.suspended = nil, nil, nil, nil, nil, nil
+    -- the walking path and its dots go with it
+    if WP.Trail and WP.Trail.Clear then WP.Trail.Clear() end
     if ticker then ticker:Cancel(); ticker = nil end
     if GPS.Hide then GPS.Hide() end
     -- back to the dungeon step the detour interrupted, if the guide still wants its arrow
@@ -493,6 +1086,8 @@ end
 
 function GPS.Active() return state.dest ~= nil end
 function GPS.DestName() return state.dest and state.dest.name end
+-- The point guided to (map, x, y in percent, name), or nil: read it, do not change it.
+function GPS.Dest() return state.dest end
 function GPS.Source() return state.source end
 
 -- What the arrow shows now. The first leg is dropped once you reach its end. The answer is one
@@ -520,6 +1115,16 @@ function GPS.Now()
             Changed()
         end
     end
+    -- a teleport or the Hearthstone cast: you stand at its landing, the leg is done (no button again)
+    if leg and (leg.kind == "teleport" or leg.kind == "hearth") and #legs > 1 then
+        local d = DistFrom(cont, px, py, leg.to)
+        if d and d < CAST_NEAR then
+            table.remove(legs, 1)
+            state.doneLegs = (state.doneLegs or 0) + 1
+            leg = legs[1]
+            Changed()
+        end
+    end
     local target
     if not leg then target = state.dest
     elseif leg.kind == "ride" then target = leg.to
@@ -530,6 +1135,10 @@ function GPS.Now()
     now.dest, now.source = state.dest, state.source
     now.arrived = last and dist ~= nil and dist < NEAR
     now.map, now.cont, now.px, now.py = map, cont, px, py   -- for GPS.Bearing, no second lookup
+    -- a walking leg with a path from the walking router (Trail.lua): the arrow points at the path's
+    -- next corner and the distance is the walk left along it (now.straight keeps the straight line)
+    now.trail, now.straight = nil, dist
+    if WP.Trail and WP.Trail.Apply then WP.Trail.Apply(now) end
     return now
 end
 
@@ -579,9 +1188,20 @@ function GPS.FlightLeg()
     return leg and leg.kind == "fly" and leg or nil
 end
 
+-- The first leg when it is cast (a teleport, the Hearthstone, Astral Recall), else nil.
 function GPS.TeleportLeg()
     local leg = state.legs and state.legs[1]
-    return leg and leg.kind == "teleport" and leg or nil
+    return leg and (leg.kind == "teleport" or leg.kind == "hearth") and leg or nil
+end
+
+-- What a cast leg uses: "item", 6948 (the Hearthstone) or "spell", id (a teleport, Astral Recall).
+function GPS.CastOf(leg)
+    if not leg then return nil end
+    if leg.kind == "hearth" then
+        if leg.item then return "item", leg.item end
+        return "spell", leg.spell
+    end
+    if leg.kind == "teleport" and leg.to then return "spell", leg.to.spell end
 end
 
 -- Takes the planned flight while the flight map is open (the arrow's button, or by itself).
@@ -743,7 +1363,76 @@ pcall(f.RegisterEvent, f, "TAXIMAP_CLOSED")
 pcall(f.RegisterEvent, f, "ZONE_CHANGED_NEW_AREA")
 pcall(f.RegisterEvent, f, "PLAYER_CONTROL_GAINED")
 pcall(f.RegisterEvent, f, "LOADING_SCREEN_DISABLED")
-f:SetScript("OnEvent", function(_, event, a1)
+-- your inn: learned where you bind (CONFIRM_BINDER: the innkeeper's question, with the inn's name) and
+-- where a Hearthstone or Astral Recall lands you
+pcall(f.RegisterEvent, f, "CONFIRM_BINDER")
+pcall(f.RegisterUnitEvent or f.RegisterEvent, f, "UNIT_SPELLCAST_SUCCEEDED", "player")
+pcall(f.RegisterEvent, f, "PLAYER_REGEN_ENABLED")
+
+-- Where you stand, as a world point with no secret in it.
+local function Here()
+    local cont, wx, wy = PlayerWorld()
+    if not cont or IsSecret(cont) or IsSecret(wx) or IsSecret(wy) then return nil end
+    return cont, wx, wy
+end
+
+-- You talk to an innkeeper about binding: the inn nearest to you (or where you stand) for that name,
+-- used once GetBindLocation gives that name.
+function GPS._OnBinder(area)
+    if type(area) ~= "string" or IsSecret(area) or area == "" or not WLWritsCharDB then return end
+    local cont, wx, wy = Here()
+    if not cont then return end
+    local t = NearestInn(cont, wx, wy, BIND_SNAP)
+    if t then cont, wx, wy = t[2], t[3], t[4] end
+    WLWritsCharDB.hearthBinder = { bind = area, cont = cont, wx = wx, wy = wy }
+end
+
+-- After a Hearthstone or Astral Recall: where you landed is your inn for this bind location.
+local landing
+local castCont, castX, castY    -- where the Hearthstone or Astral Recall was cast
+function GPS._OnLanded()
+    if not landing or not WLWritsCharDB then return end
+    if Clock() - landing > 120 then landing = nil; return end
+    if UnitOnTaxi and UnitOnTaxi("player") then return end
+    local name = BindName()
+    local cont, wx, wy = Here()
+    if not (name and cont) then return end
+    -- still where you cast (the loading screen not over, the old map still reported): wait
+    if castCont and castCont == cont and math.sqrt((wx - castX) ^ 2 + (wy - castY) ^ 2) < CAST_NEAR then return end
+    landing = nil
+    WLWritsCharDB.hearthSpot = { bind = name, cont = cont, wx = wx, wy = wy }
+end
+
+local function OnCast(spell)
+    if type(spell) ~= "number" or IsSecret(spell) then return end
+    if spell ~= HEARTH_SPELL and spell ~= ASTRAL_RECALL then return end
+    if spell == HEARTH_SPELL and WLWritsCharDB then WLWritsCharDB.hearthUsed = time and time() or nil end
+    landing = Clock()
+    castCont, castX, castY = Here()
+    -- the cast ends with the teleport: you stand at the inn a moment later (or after the loading screen)
+    if C_Timer and C_Timer.After then
+        C_Timer.After(3, function() pcall(GPS._OnLanded) end)
+        C_Timer.After(10, function() pcall(GPS._OnLanded) end)   -- a long loading screen: once more
+    end
+    ReplanSoon(3.5)
+end
+GPS._OnCast = OnCast
+
+f:SetScript("OnEvent", function(_, event, a1, a2, a3)
+    if event == "CONFIRM_BINDER" then
+        pcall(GPS._OnBinder, a1)
+        return
+    elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+        if a1 == "player" then pcall(OnCast, a3) end
+        return
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        -- the walks that waited for the end of the fight
+        if state.dest and not state.zygor then pcall(AskWalks, state.dest) end
+        return
+    end
+    if event == "LOADING_SCREEN_DISABLED" and landing then
+        if C_Timer and C_Timer.After then C_Timer.After(1, function() pcall(GPS._OnLanded) end) end
+    end
     if event == "PLAYER_LOGIN" then
         -- A tour does not survive a reload: start it again from the button.
         if WLWritsCharDB then WLWritsCharDB.gps = false end

@@ -20,7 +20,7 @@ ns.AddEnglish({
     ["Salut !"] = "Hi!",
     ["WL Helper te guide dans tes quêtes de donjon et t'aide à monter ta Faveur du marchand, avec toute la guilde."] =
         "WL Helper guides you through your dungeon quests and helps you raise your Merchant's Favor, with the whole guild.",
-    ["Les quêtes de tes donjons, dans le bon ordre, avec une flèche."] = "Your dungeon quests in the right order, with an arrow.",
+    ["Les quêtes de tes donjons dans le bon ordre, avec une flèche GPS."] = "Your dungeon quests in the right order, with a GPS arrow.",
     ["Les Writs les moins chers et où les rendre."] = "The cheapest Writs and where to turn them in.",
     ["Les événements de la guilde et les commandes aux artisans."] = "Guild events and orders to crafters.",
     ["Une minute pour tout régler. Tout se change ensuite dans les Réglages."] =
@@ -40,7 +40,7 @@ ns.AddEnglish({
     ["Ce que tu éteins se cache. Tout se rallume dans les Réglages."] =
         "What you switch off is hidden. Everything can be switched back on in Settings.",
     ["Guide de quêtes"] = "Quest guide",
-    ["Donjons, raids et quêtes de classe, avec une flèche qui te guide."] = "Dungeons, raids and class quests, with an arrow that guides you.",
+    ["Donjons, raids et quêtes de classe, avec la flèche GPS qui te guide."] = "Dungeons, raids and class quests, with the GPS arrow to guide you.",
     ["Writs et Faveur"] = "Writs and Favor",
     ["Les Writs (contrats des marchands) les moins chers et les caisses de la Faveur du marchand."] =
         "The cheapest Writs (merchant contracts) and the Merchant's Favor crates.",
@@ -59,10 +59,10 @@ ns.AddEnglish({
     ["Le jeu ne nous laisse pas lire tes talents. Les flèches vertes des Améliorations dépendent de ta spé."] =
         "The game doesn't let us read your talents. The green Upgrades arrows depend on your spec.",
     ["Pas encore de talents ? Choisis ce que tu comptes jouer."] = "No talents yet? Pick what you plan to play.",
-    ["Clic : juger les objets pour cette spé"] = "Click: judge items for this spec",
+    ["Clic : choisir cette spé"] = "Click: pick this spec",
     ["Je ne sais pas encore"] = "I don't know yet",
-    ["WL Helper prendra la spé la plus courante de ta classe. Tu pourras la changer dans Réglages, Améliorations."] =
-        "WL Helper will use your class's most common spec. You can change it in Settings, Upgrades.",
+    ["WL Helper prendra la spé la plus courante de ta classe. Tu pourras la changer dans WL Helper, Améliorations."] =
+        "WL Helper will use your class's most common spec. You can change it in WL Helper, Upgrades.",
     ["Tank"] = "Tank",
     ["Soigneur"] = "Healer",
     ["DPS"] = "DPS",
@@ -93,22 +93,22 @@ ns.AddEnglish({
     -- ready
     ["C'est prêt !"] = "You're all set!",
     ["Par quoi veux-tu commencer ?"] = "Where do you want to start?",
-    ["Choisir les donjons"] = "Pick dungeons",
-    ["Le guide te donne leurs quêtes dans le bon ordre."] = "The guide gives you their quests in the right order.",
+    ["Choisir un guide"] = "Pick a guide",
+    ["Un donjon, un raid ou tes quêtes de classe, dans le bon ordre."] = "A dungeon, a raid or your class quests, in the right order.",
     ["Les moins chers à l'HV et la Faveur qu'ils rapportent."] = "The cheapest at the AH and the Favor they bring.",
     ["Comment faire... ?"] = "How do I...?",
     ["Les gestes utiles pas à pas, avec le bon bouton qui s'allume."] = "Handy how-tos step by step, with the right button lit up.",
     ["Ouvrir l'Accueil"] = "Open Home",
     ["Tout ce que tu as allumé, en un coup d'œil."] = "Everything you switched on, at a glance.",
-    ["Clic : ouvrir le choix des donjons"] = "Click: open dungeon picking",
+    ["Clic : choisir les donjons, raids ou quêtes de classe de la route"] = "Click: pick the dungeons, raids or class quests of the route",
     ["Clic : ouvrir Comment faire... ?"] = "Click: open How do I...?",
     ["Clic : ouvrir l'Accueil"] = "Click: open Home",
     ["Pour tout retrouver"] = "To find it all again",
+    ["Les réglages sont dans la fenêtre WL Helper, à gauche sous chaque activité. /wlh setup rouvre cet écran."] =
+        "Settings are in the WL Helper window, on the left under each activity. /wlh setup opens this screen again.",
     ["Le bouton WL de la minimap ouvre l'Accueil."] = "The WL button on the minimap opens Home.",
     ["Le bouton de la minimap est caché : Réglages, Général pour le remettre."] = "The minimap button is hidden: Settings, General brings it back.",
     ["Tape /wlh dans le chat pour ouvrir l'Accueil."] = "Type /wlh in chat to open Home.",
-    ["Tout se change dans les Réglages, et /wlh setup rouvre cet écran de bienvenue."] =
-        "Everything can be changed in Settings, and /wlh setup opens this welcome again.",
     ["Écran de bienvenue fermé : tes choix sont gardés. Tape /wlh setup pour le rouvrir."] =
         "Welcome closed: your choices are kept. Type /wlh setup to open it again.",
     ["L'écran de bienvenue s'ouvrira à la fin du combat."] = "The welcome will open once combat ends.",
@@ -420,7 +420,7 @@ local function SpecTile(parent, spec, iconPath, role, class)
     end
     t:SetScript("OnEnter", function(self)
         Hover(self, true)
-        S.Tip(self, { Name(), RoleWord(role), L("Clic : juger les objets pour cette spé") })
+        S.Tip(self, { Name(), RoleWord(role), L("Clic : choisir cette spé") })
     end)
     t:SetScript("OnLeave", function(self) Hover(self, false); S.HideTip() end)
     t:SetScript("OnClick", function(self)
@@ -483,7 +483,7 @@ STEPS.hello = {
         f.head:SetText(name and string.format(L("Salut %s !"), name) or L("Salut !"))
         f.value:SetText(L("WL Helper te guide dans tes quêtes de donjon et t'aide à monter ta Faveur du marchand, avec toute la guilde."))
         local words = {
-            L("Les quêtes de tes donjons, dans le bon ordre, avec une flèche."),
+            L("Les quêtes de tes donjons dans le bon ordre, avec une flèche GPS."),
             L("Les Writs les moins chers et où les rendre."),
             L("Les événements de la guilde et les commandes aux artisans."),
         }
@@ -518,13 +518,13 @@ STEPS.hello = {
 local function ModuleDefs()
     local function one(key) return function() return WP.ModuleOn(key) end, function(v) WP.SetModule(key, v) end end
     local defs = {
-        { keys = { "dungeons" }, icon = "INV_Misc_Map_01", title = function() return L("Guide de quêtes") end,
-          desc = function() return L("Donjons, raids et quêtes de classe, avec une flèche qui te guide.") end },
-        { keys = { "writs" }, icon = "INV_Letter_15", title = function() return L("Writs et Faveur") end,
+        { keys = { "dungeons" }, icon = ModIcon("dungeons", "INV_Misc_Map_01"), title = function() return L("Guide de quêtes") end,
+          desc = function() return L("Donjons, raids et quêtes de classe, avec la flèche GPS qui te guide.") end },
+        { keys = { "writs" }, icon = ModIcon("writs", "INV_Letter_15"), title = function() return L("Writs et Faveur") end,
           desc = function() return L("Les Writs (contrats des marchands) les moins chers et les caisses de la Faveur du marchand.") end },
-        { keys = { "bags" }, icon = "INV_Misc_Bag_08", title = function() return L("Sacs") end,
+        { keys = { "bags" }, icon = ModIcon("bags", "INV_Misc_Bag_08"), title = function() return L("Sacs") end,
           desc = function() return L("Une place libre en un clic, et les objets gris vendus chez le marchand.") end },
-        { keys = { "orders" }, icon = "Trade_BlackSmithing", title = function() return L("Commandes") end,
+        { keys = { "orders" }, icon = ModIcon("orders", "Trade_BlackSmithing"), title = function() return L("Commandes") end,
           desc = function() return L("Demande un objet aux artisans de la guilde, ou fabrique pour eux.") end },
         { keys = { "guild", "events" }, icon = ModIcon("events", "INV_Misc_GroupNeedMore"), title = function() return L("Guilde et événements") end,
           desc = function() return L("Les membres, le classement PvP, les événements prévus et qui cherche un groupe.") end },
@@ -591,7 +591,7 @@ STEPS.spec = {
             if class then SaveSpec(class, "auto") end
             if win and win.Relayout then win.Relayout() end
             Next()
-        end, { L("Je ne sais pas encore"), L("WL Helper prendra la spé la plus courante de ta classe. Tu pourras la changer dans Réglages, Améliorations.") })
+        end, { L("Je ne sais pas encore"), L("WL Helper prendra la spé la plus courante de ta classe. Tu pourras la changer dans WL Helper, Améliorations.") })
         texts[#texts + 1] = f.unsure.label
     end,
     Layout = function(f)
@@ -826,9 +826,9 @@ STEPS.ready = {
         local cards = {}
         if dungeons then
             f.first.isHome = false
-            f.first:SetContent({ icon = Icon("INV_Misc_Map_01"), title = L("Choisir les donjons"),
-                line2 = L("Le guide te donne leurs quêtes dans le bon ordre."),
-                tip = { L("Choisir les donjons"), L("Clic : ouvrir le choix des donjons") } })
+            f.first:SetContent({ icon = Icon(ModIcon("dungeons", "INV_Misc_Map_01")), title = L("Choisir un guide"),
+                line2 = L("Un donjon, un raid ou tes quêtes de classe, dans le bon ordre."),
+                tip = { L("Choisir un guide"), L("Clic : choisir les donjons, raids ou quêtes de classe de la route") } })
             cards[#cards + 1] = f.first
         elseif not writs then
             f.first.isHome = true
@@ -840,12 +840,12 @@ STEPS.ready = {
         f.first:SetShown(dungeons or not writs)
         f.writs:SetShown(writs and true or false)
         if writs then
-            f.writs:SetContent({ icon = Icon("INV_Letter_15"), title = L("Voir les Writs"),
+            f.writs:SetContent({ icon = Icon(ModIcon("writs", "INV_Letter_15")), title = L("Voir les Writs"),
                 line2 = L("Les moins chers à l'HV et la Faveur qu'ils rapportent."),
                 tip = { L("Voir les Writs"), L("Clic : ouvrir les Writs") } })
             cards[#cards + 1] = f.writs
         end
-        f.help:SetContent({ icon = Icon("INV_Misc_Book_09"), title = L("Comment faire... ?"),
+        f.help:SetContent({ icon = Icon(ModIcon("help", "INV_Misc_Book_09")), title = L("Comment faire... ?"),
             line2 = L("Les gestes utiles pas à pas, avec le bon bouton qui s'allume."),
             tip = { L("Comment faire... ?"), L("Clic : ouvrir Comment faire... ?") } })
         f.help:Show()
@@ -864,7 +864,7 @@ STEPS.ready = {
             MinimapShown() and L("Le bouton WL de la minimap ouvre l'Accueil.")
                 or L("Le bouton de la minimap est caché : Réglages, Général pour le remettre."),
             L("Tape /wlh dans le chat pour ouvrir l'Accueil."),
-            L("Tout se change dans les Réglages, et /wlh setup rouvre cet écran de bienvenue."),
+            L("Les réglages sont dans la fenêtre WL Helper, à gauche sous chaque activité. /wlh setup rouvre cet écran."),
         }
         for i, ln in ipairs(f.finds) do
             ln.text:SetText(words[i])
@@ -1013,7 +1013,7 @@ local function Ended()
 end
 
 local function Build()
-    win = S.Window("WLHelperWelcome", W, 400, L("Bienvenue dans WL Helper"), nil, nil, nil, { header = 44, strata = "DIALOG", minH = 300 })
+    win = S.Window("WLHelperWelcome", W, 400, L("Bienvenue dans WL Helper"), nil, nil, nil, { header = 44, strata = "DIALOG", minH = 300, logo = true })
     local sa = S.ScrollArea(win)
     sa:SetPoint("TOPLEFT", win, "TOPLEFT", 0, -(win.headerH + 1))
     sa:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", 0, BAR_H)

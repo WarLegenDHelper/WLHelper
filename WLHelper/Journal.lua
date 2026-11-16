@@ -81,11 +81,14 @@ local function Check(unit)
   if ns.RareAlert then pcall(ns.RareAlert, unit) return end
   local inInstance = IsInInstance and IsInInstance()
   if not inInstance then return end
+  -- inside instances these can come back secret: nothing to read then
+  local function secret(v) return issecretvalue and issecretvalue(v) end
   local class = UnitClassification(unit)
-  if class ~= "rare" and class ~= "rareelite" then return end
-  if UnitIsDead(unit) or UnitIsFriend("player", unit) then return end
+  if secret(class) or (class ~= "rare" and class ~= "rareelite") then return end
+  local dead, friend = UnitIsDead(unit), UnitIsFriend("player", unit)
+  if secret(dead) or secret(friend) or dead or friend then return end
   local guid = UnitGUID(unit)
-  if not guid or seen[guid] then return end
+  if not guid or secret(guid) or seen[guid] then return end
   seen[guid] = true
   local name = UnitName(unit) or "?"
   local msg = L.RARE_SEEN:format(name)

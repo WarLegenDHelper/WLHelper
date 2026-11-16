@@ -27,8 +27,9 @@ ns.AddEnglish({
     ["%d objets gris vendus pour %s."] = "%d grey items sold for %s.",
     ["Clic : jeter l'objet le moins cher de tes sacs (gris, ou arme ou armure blanche). Chez un marchand, il est vendu."] =
         "Click: throw away the cheapest item in your bags (grey, or a white weapon or armour). At a merchant it is sold.",
-    ["Libère une place en jetant l'objet le moins cher. Rien d'autre n'est touché."] =
-        "Frees a slot by throwing away the cheapest item. Nothing else is touched.",
+    ["Seuls les objets gris, et les armes ou armures blanches, sont concernés. Rien d'autre n'est touché."] =
+        "Only grey items, and white weapons or armour, count. Nothing else is touched.",
+    ["Clic : jeter cet objet. Chez un marchand, il est vendu."] = "Click: throw this item away. At a merchant it is sold.",
     ["Masquer"] = "Hide",
     ["Clic : masquer ce message"] = "Click: hide this message",
     ["Impossible en combat : réessaie une fois le combat fini."] = "Not possible in combat: try again once the fight is over.",
@@ -125,8 +126,9 @@ local function Banner()
     b.title:SetText(L("Tes sacs sont pleins"))
     b.text = S.Text(b, S.F.meta, C.muted)
     b.text:SetJustifyH("LEFT"); b.text:SetJustifyV("TOP")
-    b.go = S.Button(b, L("Libérer une place"), 0, 28, "primary", function() Free(); b:Hide() end,
-        function() return { L("Libérer une place"), L("Libère une place en jetant l'objet le moins cher. Rien d'autre n'est touché."), L("Clic : jeter l'objet le moins cher de tes sacs (gris, ou arme ou armure blanche). Chez un marchand, il est vendu.") } end)
+    -- throwing an item away is destructive: the danger button (trash icon), never the accent
+    b.go = S.Button(b, L("Libérer une place"), 0, 28, "danger", function() Free(); b:Hide() end,
+        function() return { L("Libérer une place"), L("Seuls les objets gris, et les armes ou armures blanches, sont concernés. Rien d'autre n'est touché."), L("Clic : jeter cet objet. Chez un marchand, il est vendu.") } end)
     b.go:SetIcon("trash")
     b.close = S.CloseButton(b, 28, function() b:Hide() end, { L("Masquer"), L("Clic : masquer ce message") })
     b.close:SetPoint("TOPRIGHT", -4, -4)

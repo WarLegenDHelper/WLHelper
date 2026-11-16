@@ -2,7 +2,9 @@
 -- orders, my orders, the orders for me) and the panel beside the mailbox that fills the mail for an
 -- order. Engine: Orders.lua. Drawn with the design system (Style.lua): one 640 px window that fits
 -- its content, HD icons for glyphs, painted game icons for things, text that wraps or shows its full
--- text in the tooltip.
+-- text in the tooltip. Words shared with the summary: levels in words ("Utilisable dès le niv. 30",
+-- never a bare "Niv. 30"), counts with their unit ("Mylla · 12 recettes"), and a card says each fact
+-- once (the pill gives the state, the sentence under it only what to do next).
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -75,7 +77,7 @@ ns.AddEnglish({
     ["Aucun artisan en ligne ne fabrique ce que tu cherches."] = "No online crafter makes what you are looking for.",
     ["Voir aussi hors ligne"] = "Include offline",
     ["Personne n'a partagé de recette qui correspond à ce nom."] = "Nobody shared a recipe that matches this name.",
-    ["Niveau %d requis"] = "Requires level %d",
+    ["Utilisable dès le niv. %d"] = "Usable from level %d",
     ["Composants inconnus"] = "Reagents unknown",
     ["Peuvent le fabriquer : %s"] = "Can craft it: %s",
     ["Clic : commander à %s"] = "Click: order from %s",
@@ -89,6 +91,12 @@ ns.AddEnglish({
     ["Réduire"] = "Show less",
     ["Clic : n'afficher que les premiers artisans"] = "Click: show only the first crafters",
     ["Clic : voir les recettes de %s"] = "Click: see %s's recipes",
+    ["Artisans : %s · %d en tout"] = "Crafters: %s · %d in all",
+    ["aucun en ligne"] = "none online",
+    ["Chercher un artisan"] = "Search for a crafter",
+    ["Clic : chercher un artisan et voir ses recettes"] = "Click: search for a crafter and see their recipes",
+    ["rien de partagé"] = "nothing shared",
+    ["Aucun artisan ne correspond à ce nom."] = "No crafter matches this name.",
     ["en ligne"] = "online",
     ["hors ligne"] = "offline",
     ["vu il y a %d jours"] = "seen %d days ago",
@@ -106,7 +114,6 @@ ns.AddEnglish({
     ["Maj-clic : commander à %s seulement"] = "Shift-click: order from %s only",
     ["Affine la recherche pour voir la suite (%d objets affichés sur %d)."] = "Narrow the search to see the rest (%d of %d items shown).",
     -- the catalogue's categories
-    ["Niv. %d"] = "Lvl %d",
     ["Armes"] = "Weapons",
     ["Armure"] = "Armor",
     ["Sacs"] = "Bags",
@@ -155,7 +162,7 @@ ns.AddEnglish({
         "Recipe unknown: use the note to tell the crafter who provides which reagents.",
     ["Commission (po)"] = "Fee (g)",
     ["Pourboire (po)"] = "Tip (g)",
-    ["Valable"] = "Valid for",
+    ["Ouverte pendant"] = "Open for",
     ["3 j"] = "3 d",
     ["Un mot pour l'artisan"] = "A note for the crafter",
     ["Ex. Pas pressé, merci !"] = "E.g. No rush, thanks!",
@@ -213,8 +220,9 @@ ns.AddEnglish({
     ["tout est arrivé"] = "everything arrived",
     ["or : %s sur %s"] = "gold: %s of %s",
     ["Raison : %s"] = "Reason: %s",
-    ["« %s »"] = "\"%s\"",
-    ["Suivi : %s"] = "History: %s",
+    ["Ton mot : « %s »"] = "Your note: \"%s\"",
+    ["Mot de %s : « %s »"] = "Note from %s: \"%s\"",
+    ["Historique : %s"] = "History: %s",
     ["%s : %s"] = "%s: %s",
     ["Accepte-la si tu peux la fabriquer."] = "Accept it if you can craft it.",
     ["En attente d'un artisan."] = "Waiting for a crafter.",
@@ -223,7 +231,8 @@ ns.AddEnglish({
         "Take the reagents out of the bank, then send them to %s by mail or trade.",
     ["Envoie les composants à %s par la poste ou en échange."] = "Send the reagents to %s by mail or trade.",
     ["%s fabrique ta commande."] = "%s is crafting your order.",
-    ["Fabriquée : %s te l'envoie par la poste ou en échange."] = "Crafted: %s sends it to you by mail or trade.",
+    ["%s te l'envoie par la poste ou en échange."] = "%s sends it to you by mail or trade.",
+    ["Tu l'as reçue. Remercie %s pour lui donner une étoile."] = "You got it. Thank %s to give them a star.",
     ["Fabrique l'objet : l'addon le voit tout seul dans tes sacs."] = "Craft the item: the addon sees it in your bags on its own.",
     ["Fabrique-la, puis marque-la comme fabriquée."] = "Craft it, then mark it as crafted.",
     ["Livre-la à %s par la poste ou en échange."] = "Deliver it to %s by mail or trade.",
@@ -280,7 +289,7 @@ ns.AddEnglish({
     ["Les commandes des membres de la guilde apparaîtront ici."] = "Guild members' orders will show up here.",
     ["Seulement ce que je sais fabriquer"] = "Only what I can craft",
     ["Tu n'as rien commandé"] = "You have not ordered anything",
-    ["Tes commandes et leur suivi apparaîtront ici."] = "Your orders and their progress will show up here.",
+    ["Tes commandes et leur historique apparaîtront ici."] = "Your orders and their history will show up here.",
     ["Aucune commande pour toi"] = "No orders for you",
     ["Les commandes qu'un membre t'adresse, ou que tu acceptes, apparaîtront ici."] =
         "Orders a member sends you, or that you accept, will show up here.",
@@ -586,14 +595,16 @@ local function CrafterName(c)
     if c.stars > 0 then n = n .. " " .. STAR .. S.Hex(C.gold) .. c.stars .. "|r" end
     return n
 end
--- "Mylla, Grok +2"
-local function WhoText(who, max)
+-- "Mylla, Grok +2" (total: how many in all, when who holds only the first ones)
+local function WhoText(who, max, total)
     local t = {}
-    for i = 1, math.min(#who, max) do t[i] = CrafterName(who[i]) end
+    for i = 1, max do if who[i] then t[#t + 1] = CrafterName(who[i]) end end
+    total = total or #who
     local s = table.concat(t, ", ")
-    if #who > max then s = s .. " " .. S.Hex(C.muted) .. "+" .. (#who - max) .. "|r" end
+    if total > #t then s = s .. " " .. S.Hex(C.muted) .. "+" .. (total - #t) .. "|r" end
     return s
 end
+local function ByOrd(a, b) return (a.ord or 0) < (b.ord or 0) end
 local function Where(online, seen)
     if online then return S.Hex(C.ok) .. L("en ligne") .. "|r" end
     if seen then
@@ -625,7 +636,7 @@ local function ItemTip(id, re, who, best)
     local qc = id > 0 and S.QualityColor(id) or C.fg
     local tip = { S.Hex(qc) .. Name(id) .. "|r" }
     local lvl = ReqLevel(id)
-    if lvl then tip[#tip + 1] = string.format(L("Niveau %d requis"), lvl) end
+    if lvl then tip[#tip + 1] = string.format(L("Utilisable dès le niv. %d"), lvl) end
     local rg = O.Decode(re or "")
     if #rg == 0 then tip[#tip + 1] = L("Composants inconnus") end
     for _, r in ipairs(rg) do tip[#tip + 1] = r[2] .. "× " .. Name(r[1]) end
@@ -1137,6 +1148,20 @@ local function CrafterFacts(key, c)
     return s
 end
 
+-- a crafter's tooltip (a pill, a row of the crafters list): who, how far, why nothing is shared yet
+local function CrafterTip(key, c)
+    local tip = { ClassHex(c) .. c.name .. "|r", CrafterFacts(key, c) }
+    local sl = (not c.me) and StarLine(c.name) or nil
+    if sl then tip[#tip + 1] = sl end
+    if c.n == 0 then
+        tip[#tip + 1] = c.me and L("Ouvre ta fenêtre de métier pour partager les tiennes.")
+            or string.format(L("Pas encore de recettes partagées par %s. Elles arrivent quand ce membre ouvre sa fenêtre de métier."), c.name)
+    else
+        tip[#tip + 1] = string.format(L("Clic : voir les recettes de %s"), c.name)
+    end
+    return tip
+end
+
 local function FillChip(f, ch, key, c)
     ch.quiet = c.n == 0
     -- "online only": an offline crafter stays reachable, only quieter
@@ -1149,24 +1174,233 @@ local function FillChip(f, ch, key, c)
         text = S.Hex(C.muted) .. name .. (c.me and (" " .. L("(toi)")) or "") .. "|r"
     else
         text = (ch.dim and S.Hex(C.muted) or ClassHex(c)) .. name .. "|r" .. (c.me and (" " .. S.Hex(C.muted) .. L("(toi)") .. "|r") or "")
-            .. " " .. S.Hex(C.muted) .. "· " .. c.n .. "|r"
+            .. " " .. S.Hex(C.muted) .. "· " .. P(c.n, L("1 recette"), L("%d recettes")) .. "|r"   -- a bare number read as anything
             .. (c.stars > 0 and (" " .. STAR .. S.Hex(C.gold) .. c.stars .. "|r") or "")
     end
     ch.crafter = c
-    local tip = { ClassHex(c) .. name .. "|r", CrafterFacts(key, c) }
-    local sl = (not c.me) and StarLine(c.name) or nil
-    if sl then tip[#tip + 1] = sl end
-    if ch.quiet then
-        tip[#tip + 1] = c.me and L("Ouvre ta fenêtre de métier pour partager les tiennes.")
-            or string.format(L("Pas encore de recettes partagées par %s. Elles arrivent quand ce membre ouvre sa fenêtre de métier."), name)
-        ch.onClick = nil
-    else
-        tip[#tip + 1] = string.format(L("Clic : voir les recettes de %s"), name)
-        ch.onClick = function() OpenCrafter(f, c) end
-    end
-    ch.tip = tip
+    ch.onClick = (not ch.quiet) and function() OpenCrafter(f, c) end or nil
+    ch.tip = CrafterTip(key, c)
     ch:Paint()
     return ch:Measure(text)
+end
+
+-- ---------------------------------------------------------------- many crafters: one control, a list
+-- Above STRIP_MAX crafters the pills would fill the window: one control instead ("Artisans : 3 en
+-- ligne · 24 en tout"), that opens a list under it: a search on top, ten rows at a time (the rows
+-- are reused while it scrolls), online first, then by recipes shared; who shared nothing at the
+-- bottom, grey, not clickable, the tooltip says why. Escape, a click outside or a pick closes it.
+local STRIP_MAX = 8
+local PICK_H, MENU_W, MENU_ROWS, MENU_ROW_H, MENU_TOP = 24, 340, 10, 24, 8 + 28 + 6
+local MENU_NAME, WIN_NAME = "WLHelperOrdersCrafters", "WLHelperOrders"
+
+-- online first (others before you), then recipes shared, stars, name; nothing shared: last
+local function ByMenu(a, b)
+    local qa, qb = a.n == 0, b.n == 0
+    if qa ~= qb then return qb end
+    if a.online ~= b.online then return a.online end
+    if (a.me or false) ~= (b.me or false) then return not a.me end
+    if a.n ~= b.n then return a.n > b.n end
+    if a.stars ~= b.stars then return a.stars > b.stars end
+    return a.name < b.name
+end
+
+-- One Escape hides every shown frame of UISpecialFrames: while the list is open the Orders window
+-- leaves that list, so Escape closes the list only (same as the LFG picker)
+local function Unlist(name)
+    if not UISpecialFrames then return end
+    for k = #UISpecialFrames, 1, -1 do if UISpecialFrames[k] == name then table.remove(UISpecialFrames, k) end end
+end
+local function List1(name)
+    if not UISpecialFrames then return end
+    for _, v in ipairs(UISpecialFrames) do if v == name then return end end
+    tinsert(UISpecialFrames, name)
+end
+
+local function CloseCrafterMenu(f)
+    local m = f.cmenu
+    if not m then return end
+    if m:IsShown() then m:Hide() end
+    if m.Done then m:Done() end
+end
+
+local function BuildCrafterMenu(f)
+    local m = CreateFrame("Frame", MENU_NAME, f.chead)
+    m.wlOwned = true
+    m:SetFrameStrata("DIALOG")
+    if m.SetToplevel then m:SetToplevel(true) end
+    if m.SetClampedToScreen then m:SetClampedToScreen(true) end
+    m:EnableMouse(true)
+    m:SetWidth(MENU_W)
+    S.Solid(m, "BACKGROUND", C.panel, 0.98):SetAllPoints()
+    S.Border(m, C.cardEdge)
+    m.shown, m.rows, m.off = {}, {}, 0
+    m.box = S.Input(m, MENU_W - 16, { search = true, placeholder = L("Chercher un artisan") })
+    m.box:SetPoint("TOPLEFT", 8, -8)
+    m.box:HookScript("OnTextChanged", function() m:Filter() end)
+    m.box:SetScript("OnEscapePressed", function() CloseCrafterMenu(f) end)
+    -- Enter: the first crafter that matches and shared something
+    m.box:SetScript("OnEnterPressed", function()
+        for _, c in ipairs(m.shown) do
+            if c.n > 0 then CloseCrafterMenu(f); OpenCrafter(f, c); return end
+        end
+    end)
+    m.empty = S.Text(m, F.meta, C.muted); m.empty:SetJustifyH("LEFT")
+    m.empty:SetPoint("TOPLEFT", 12, -(MENU_TOP + 4)); m.empty:SetWidth(MENU_W - 24)
+    m.empty:SetText(L("Aucun artisan ne correspond à ce nom.")); m.empty:Hide()
+    -- the scroll position: a thin bar on the right, only when the list is longer than ten rows
+    m.bar = S.Solid(m, "ARTWORK", { 1, 1, 1, 0.27 }); m.bar:SetWidth(3); m.bar:Hide()
+
+    local function Row(i)
+        local r = m.rows[i]
+        if r then return r end
+        r = CreateFrame("Button", nil, m)
+        r.wlOwned = true
+        r:SetHeight(MENU_ROW_H)
+        r:SetPoint("TOPLEFT", 1, -(MENU_TOP + (i - 1) * MENU_ROW_H)); r:SetPoint("TOPRIGHT", -8, -(MENU_TOP + (i - 1) * MENU_ROW_H))
+        r.hl = S.Solid(r, "BACKGROUND", C.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
+        r.dot = S.Icon(r, "dot", 8, "ARTWORK", C.ok); r.dot:SetPoint("LEFT", 8, 0)
+        r.right = S.Text(r, F.meta, C.muted); r.right:SetJustifyH("RIGHT"); r.right:SetWordWrap(false)
+        r.right:SetPoint("RIGHT", -6, 0)
+        r.name = S.Text(r, F.label, C.fg); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
+        r.name:SetPoint("LEFT", 22, 0); r.name:SetPoint("RIGHT", r.right, "LEFT", -8, 0)
+        S.ClampLabel(r.name, nil, r)
+        r:SetScript("OnEnter", function(self)
+            if self.c and self.c.n > 0 then self.hl:SetAlpha(1) end
+            if self.c then S.Tip(self, CrafterTip(f.prof, self.c)) end
+        end)
+        r:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); S.HideTip() end)
+        r:SetScript("OnClick", function(self)
+            local c = self.c
+            if not (c and c.n > 0) then return end   -- shared nothing: the tooltip says why
+            CloseCrafterMenu(f); OpenCrafter(f, c)
+        end)
+        m.rows[i] = r
+        return r
+    end
+
+    -- draws the ten rows at m.off (the only per-scroll work: ten rows, no new frame)
+    function m:Fill()
+        local total = #self.shown
+        self.off = math.max(0, math.min(self.off, total - MENU_ROWS))
+        local n = math.min(MENU_ROWS, total)
+        for i = 1, n do
+            local r, c = Row(i), self.shown[i + self.off]
+            r.c = c
+            local quiet = c.n == 0
+            local dim = (not quiet) and f.onlineOnly and not c.online and not c.me
+            r.dot:SetShown(c.online and not c.me and true or false)
+            r.dot:SetAlpha(quiet and 0.6 or 1)
+            local you = c.me and (" " .. S.Hex(C.muted) .. L("(toi)") .. "|r") or ""
+            r.name:SetText(((quiet or dim) and S.Hex(C.muted) or ClassHex(c)) .. c.name .. "|r" .. you)
+            if quiet then
+                r.right:SetText(L("rien de partagé"))
+            else
+                r.right:SetText(P(c.n, L("1 recette"), L("%d recettes")) .. (c.stars > 0 and (" " .. STAR .. S.Hex(C.gold) .. c.stars .. "|r") or ""))
+            end
+            r.hl:SetAlpha(0)
+            r:Show()
+            -- the wheel moved another crafter under the pointer: its highlight and tooltip
+            if self:IsShown() and r:IsMouseOver() then r:GetScript("OnEnter")(r) end
+        end
+        for i = n + 1, #self.rows do self.rows[i]:Hide(); self.rows[i].c = nil end
+        self.empty:SetShown(total == 0)
+        local listH = total == 0 and MENU_ROW_H or n * MENU_ROW_H
+        self:SetHeight(MENU_TOP + listH + 6)
+        if total > MENU_ROWS then
+            local trackH = MENU_ROWS * MENU_ROW_H
+            local th = math.max(16, math.floor(trackH * MENU_ROWS / total))
+            local y = math.floor((trackH - th) * self.off / (total - MENU_ROWS))
+            self.bar:ClearAllPoints(); self.bar:SetPoint("TOPRIGHT", -3, -(MENU_TOP + y)); self.bar:SetHeight(th)
+            self.bar:Show()
+        else
+            self.bar:Hide()
+        end
+    end
+    -- what the search keeps (one pass over the list, on each letter typed)
+    function m:Filter(keepOff)
+        local q = ((self.box:GetText() or ""):gsub("^%s+", ""):gsub("%s+$", "")):lower()
+        local out = {}
+        for _, c in ipairs(f.cmenuList or {}) do
+            if q == "" or c.name:lower():find(q, 1, true) then out[#out + 1] = c end
+        end
+        self.shown = out
+        if not keepOff then self.off = 0 end
+        self:Fill()
+    end
+    function m:Scroll(delta)
+        self.off = self.off - (delta or 0) * 3
+        self:Fill()
+    end
+    m:EnableMouseWheel(true)
+    m:SetScript("OnMouseWheel", function(self, delta) self:Scroll(delta) end)
+    -- a click anywhere else closes it (the control toggles it itself)
+    m:SetScript("OnEvent", function(self, ev)
+        if ev == "GLOBAL_MOUSE_DOWN" and self:IsShown() and not self:IsMouseOver() and not (f.cpick and f.cpick:IsMouseOver()) then
+            CloseCrafterMenu(f)
+        end
+    end)
+    -- closing: no event left, the keyboard back to the game, Escape back to the Orders window
+    function m:Done()
+        if self.done then return end
+        self.done = true
+        if self.UnregisterEvent then pcall(self.UnregisterEvent, self, "GLOBAL_MOUSE_DOWN") end
+        if self.box.ClearFocus then self.box:ClearFocus() end
+        Unlist(MENU_NAME)
+        -- one frame later: CloseSpecialWindows may still be walking the list
+        -- back even when the window itself is closing (its X, its key): the list is where it lives
+        -- while hidden too, or the next Escape would not close it
+        local function Relist() if not m:IsShown() then List1(WIN_NAME) end end
+        if C_Timer and C_Timer.After then C_Timer.After(0, Relist) else Relist() end
+    end
+    m:SetScript("OnHide", function(self) self:Done() end)
+    function m:Open()
+        self.done, self.key = nil, f.cmenuKey
+        self:ClearAllPoints(); self:SetPoint("TOPLEFT", f.cpick, "BOTTOMLEFT", 0, -2)
+        self.box:SetText("")
+        self:Filter()
+        self:Show()
+        if self.RegisterEvent then pcall(self.RegisterEvent, self, "GLOBAL_MOUSE_DOWN") end
+        Unlist(WIN_NAME); List1(MENU_NAME)
+        if self.box.SetFocus then self.box:SetFocus() end
+    end
+    m:Hide()
+    f.cmenu = m
+    return m
+end
+
+-- the control that stands for the pills: "Artisans : 3 en ligne · 24 en tout", and its list's
+-- content (sorted once per render)
+local function CrafterPicker(f, e, key)
+    local b = f.cpick
+    if not b then
+        b = S.Button(f.chead, "", 0, PICK_H, "secondary", function()
+            local m = f.cmenu or BuildCrafterMenu(f)
+            if m:IsShown() then CloseCrafterMenu(f) else m:Open() end
+        end, { L("Artisans"), L("Clic : chercher un artisan et voir ses recettes") })
+        b.arrow = b.content:CreateTexture(nil, "ARTWORK")
+        b.arrow:SetSize(12, 12); b.arrow:SetPoint("RIGHT", -8, 0)
+        root.SetHDIcon(b.arrow, "chevron_down", C.muted)
+        b.extraW = 12 + 4 - 4
+        b.label:SetJustifyH("LEFT")
+        function b:CustomLayout(dy)
+            self.label:ClearAllPoints()
+            self.label:SetPoint("LEFT", self.content, "LEFT", 8, dy)
+            self.label:SetPoint("RIGHT", self.arrow, "LEFT", -4, dy)
+        end
+        f.cpick = b
+    end
+    local on = e.nOnline > 0 and (S.Hex(C.ok) .. P(e.nOnline, L("1 en ligne"), L("%d en ligne")) .. "|r") or L("aucun en ligne")
+    b:SetText(string.format(L("Artisans : %s · %d en tout"), on, #e.crafters))
+    b:ClearAllPoints(); b:SetPoint("TOPLEFT", 0, -STRIP_Y)
+    b:Show()
+    local list = {}
+    for i, c in ipairs(e.crafters) do list[i] = c end
+    table.sort(list, ByMenu)
+    f.cmenuList, f.cmenuKey = list, key
+    local m = f.cmenu
+    if m and m:IsShown() then
+        if m.key ~= key then CloseCrafterMenu(f) else m:Filter(true) end   -- open across a refresh: kept, same scroll
+    end
 end
 
 -- places the pills, the search under them, and sets the header's height (f.cheadH)
@@ -1176,6 +1410,21 @@ local function CrafterTipName(c)
 end
 
 local function CrafterStrip(f, e, key)
+    -- a big guild: the control and its list instead of the pills
+    if e and #e.crafters > STRIP_MAX then
+        f.cwho:Hide()
+        for j = 1, #f.cchips do f.cchips[j]:Hide() end
+        if f.cchips.more then f.cchips.more:Hide() end
+        if f.cchips.fold then f.cchips.fold:Hide() end
+        CrafterPicker(f, e, key)
+        f.cchipsN, f.cchipLines = 0, 1
+        local boxY = STRIP_Y + PICK_H + 10
+        f.cbox:ClearAllPoints(); f.cbox:SetPoint("TOPLEFT", 0, -boxY)
+        f.cheadH = boxY + 28
+        f.chead:SetHeight(f.cheadH)
+        return
+    end
+    if f.cpick then f.cpick:Hide(); CloseCrafterMenu(f) end
     local list, quiet = {}, {}
     for _, c in ipairs(e and e.crafters or {}) do
         if c.n > 0 then list[#list + 1] = c else quiet[#quiet + 1] = c end
@@ -1281,6 +1530,9 @@ end
 local function RenderCatalog(f, g)
     local key = f.prof
     local e = g[key] or { crafters = {}, items = {}, nItems = 0, nOnline = 0, unshared = {} }
+    -- the crafters' order, once per render: each row then reads c.ord instead of sorting its list
+    table.sort(e.crafters, ByCrafter)
+    for k, c in ipairs(e.crafters) do c.ord = k end
     S.Painted(f.cicon.tex, ProfIcon(key))
     f.ctitle:SetText(ProfLabel(key))
     local counts = (#e.crafters == 0 and L("Aucun artisan") or P(#e.crafters, L("1 artisan"), L("%d artisans")))
@@ -1326,21 +1578,29 @@ local function RenderCatalog(f, g)
         i = i + 1
         local r = f.cat.Get(i)
         r.kind, r.item, r.prof, r.open = "item", it.id, key, nil
-        table.sort(it.who, ByCrafter)
-        local best
-        for _, c in ipairs(it.who) do if not c.me then best = c; break end end
+        -- the two first crafters in the guild's order (c.ord, sorted once per render), the best
+        -- other than you, and how many others: one pass, no sort per row
+        local a, b, best, others = nil, nil, nil, 0
+        for _, c in ipairs(it.who) do
+            if not a or c.ord < a.ord then a, b = c, a elseif not b or c.ord < b.ord then b = c end
+            if not c.me then
+                others = others + 1
+                if not best or c.ord < best.ord then best = c end
+            end
+        end
         r.crafter = best and best.name or nil
         SetItem(r, ItemTex(it.id), it.id)
         r.name:SetText(it.name)
-        local lvl = (it.lvl or 0) > 1 and (S.Hex(C.text) .. string.format(L("Niv. %d"), it.lvl) .. "|r") or ""
+        -- the level in words, like the summary ("se prend dès le niv. 30"): "Niv. 30" alone read as
+        -- the item's own level
+        local lvl = (it.lvl or 0) > 1 and (S.Hex(C.text) .. string.format(L("Utilisable dès le niv. %d"), it.lvl) .. "|r") or ""
         if mixed and it.kind then lvl = lvl .. (lvl ~= "" and " · " or "") .. it.kind end
-        if lvl ~= "" then lvl = lvl .. "  " end
+        if lvl ~= "" then lvl = lvl .. " · " end
         -- the crafters in words ("Crafters: ..."), not behind a person icon (icon audit, Orders)
-        r.detail:SetText(lvl .. L(#it.who == 1 and "Artisan :" or "Artisans :") .. " " .. WhoText(it.who, 3)); r.detail:Show()
+        -- two names at most ("Surfeuze, Jander +5"): every name is in the tooltip
+        r.detail:SetText(lvl .. L(#it.who == 1 and "Artisan :" or "Artisans :") .. " " .. WhoText({ a, b }, 2, #it.who)); r.detail:Show()
         r.btn:SetText(L("Commander")); r.btn:Show()
         -- one crafter only: shift-click would do the same as a click, so it is not offered
-        local others = 0
-        for _, c in ipairs(it.who) do if not c.me then others = others + 1 end end
         if r.crafter and others == 1 then
             r.btnTip = { L("Commander"), string.format(L("Clic : commander à %s, le seul artisan qui sait le fabriquer"), r.crafter) }
         else
@@ -1349,7 +1609,10 @@ local function RenderCatalog(f, g)
         end
         -- the reagents and every crafter go in the tooltip, built on hover only
         local id, re, who, crafter = it.id, it.re, it.who, r.crafter
-        r.tip = function() return ItemTip(id, re, who, crafter) end
+        r.tip = function()
+            table.sort(who, ByOrd)   -- on hover only, in the same order as the row
+            return ItemTip(id, re, who, crafter)
+        end
         r.tipFill = nil
         local rh = r:Fit(CW)
         r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
@@ -1663,7 +1926,7 @@ local function BuildNew(p)
     n.fee:HookScript("OnTextChanged", function(self, user) if user then draft.fee = (tonumber(self:GetText() or "") or 0) * 10000 end end)
     n.tip = NumberBox(c, 96, L("Pourboire (po)"), "0")
     n.tip:HookScript("OnTextChanged", function(self, user) if user then draft.tip = (tonumber(self:GetText() or "") or 0) * 10000 end end)
-    n.hoursLabel = S.Text(c, F.meta, C.muted); n.hoursLabel:SetText(L("Valable")); S.ClampLabel(n.hoursLabel, nil, c)
+    n.hoursLabel = S.Text(c, F.meta, C.muted); n.hoursLabel:SetText(L("Ouverte pendant")); S.ClampLabel(n.hoursLabel, nil, c)
     n.hours = S.Segmented(c, { { 12, "12 h" }, { 24, "24 h" }, { 72, L("3 j") } }, function() return draft and draft.hours or 24 end,
         function(v) draft.hours = v; WP.RefreshOrders() end, 28)
     n.note = S.Input(c, CW, { label = L("Un mot pour l'artisan"), placeholder = L("Ex. Pas pressé, merci !") })
@@ -1914,7 +2177,7 @@ local function BuildAsk(p)
     -- quantity, fee in gold, how long it stays open
     a.qty = NumberBox(c, 64, L("Quantité")); a.qty:SetText("1")
     a.fee = NumberBox(c, 96, L("Commission (po)"), "0")
-    a.hoursLabel = S.Text(c, F.meta, C.muted); a.hoursLabel:SetText(L("Valable")); S.ClampLabel(a.hoursLabel, nil, c)
+    a.hoursLabel = S.Text(c, F.meta, C.muted); a.hoursLabel:SetText(L("Ouverte pendant")); S.ClampLabel(a.hoursLabel, nil, c)
     a.hours = S.Segmented(c, { { 12, "12 h" }, { 24, "24 h" }, { 72, L("3 j") } }, function() return askState.hours or 24 end,
         function(v) askState.hours = v end, 28)
     a.note = S.Input(c, CW, { label = L("Un mot pour l'artisan"), placeholder = L("Ex. Pas pressé, merci !") })
@@ -2205,7 +2468,9 @@ local function PaintOrder(c, o, side)
     local who
     if side == "mine" then
         who = o.to and string.format(L("Pour %s"), o.to) or L("Pour la guilde")
-        if o.by then who = who .. " · " .. string.format(L("par %s"), o.by) .. Stars(o.by) end
+        -- "Pour Mylla · par Mylla" said the crafter twice: the stars go on the one name
+        if o.by and o.by == o.to then who = who .. Stars(o.by)
+        elseif o.by then who = who .. " · " .. string.format(L("par %s"), o.by) .. Stars(o.by) end
     else
         who = string.format(L("De %s"), o.from or "?") .. " · " .. ((o.to == me) and L("pour toi") or (o.to and string.format(L("pour %s"), o.to) or L("pour la guilde")))
     end
@@ -2273,12 +2538,14 @@ local function PaintOrder(c, o, side)
             nxt = string.format(L("%s fabrique ta commande."), o.by or "?")
         end
     elseif side == "mine" and stt == "crafted" then
-        nxt = string.format(L("Fabriquée : %s te l'envoie par la poste ou en échange."), o.by or "?")
+        nxt = string.format(L("%s te l'envoie par la poste ou en échange."), o.by or "?")   -- the pill already says Fabriquée
     elseif side == "recv" and stt == "accepted" then
         -- with no item ID the addon cannot see it in the bags: the button says it
         nxt, mineTurn = (item > 0) and L("Fabrique l'objet : l'addon le voit tout seul dans tes sacs.") or L("Fabrique-la, puis marque-la comme fabriquée."), true
     elseif side == "recv" and stt == "crafted" then
         nxt, mineTurn = string.format(L("Livre-la à %s par la poste ou en échange."), o.from or "?"), true
+    elseif side == "mine" and stt == "delivered" and not o.thanked and o.by then
+        nxt = string.format(L("Tu l'as reçue. Remercie %s pour lui donner une étoile."), o.by)
     elseif stt == "delivered" then
         nxt = L("Commande terminée.")
     elseif side == "mine" and stt == "declined" then
@@ -2300,7 +2567,11 @@ local function PaintOrder(c, o, side)
         if #parts > 0 then lines[#lines + 1] = string.format(L("Reçu : %s"), all and (S.Hex(C.ok) .. L("tout est arrivé") .. "|r") or table.concat(parts, ", ")) end
     end
     if o.reason then lines[#lines + 1] = string.format(L("Raison : %s"), S.Hex(C.bad) .. L(o.reason) .. "|r") end
-    if o.note and o.note ~= "" then lines[#lines + 1] = string.format(L("« %s »"), o.note) end
+    -- the note says whose it is (always the customer's)
+    if o.note and o.note ~= "" then
+        lines[#lines + 1] = (o.from == me or side == "mine") and string.format(L("Ton mot : « %s »"), o.note)
+            or string.format(L("Mot de %s : « %s »"), o.from or "?", o.note)
+    end
     -- the steps so far, and the last messages between customer and crafter
     if o.log and #o.log > 1 then
         local t = {}
@@ -2309,7 +2580,8 @@ local function PaintOrder(c, o, side)
             if i > 1 then w = w:lower() end
             t[#t + 1] = w .. " " .. Clock(e.t)
         end
-        lines[#lines + 1] = string.format(L("Suivi : %s"), table.concat(t, ", "))
+        -- "Historique", not "Suivi": "le suivi" is the guide tracker in the glossary
+        lines[#lines + 1] = string.format(L("Historique : %s"), table.concat(t, ", "))
     end
     for i = math.max(1, #(o.msgs or {}) - 2), #(o.msgs or {}) do
         local m = o.msgs[i]
@@ -2420,7 +2692,7 @@ local EMPTY = {
             L("Faire une demande"), function() WP.ShowOrdersTab("ask") end, "primary"
     end,
     mine = function()
-        return "bag", L("Tu n'as rien commandé"), L("Tes commandes et leur suivi apparaîtront ici."),
+        return "hammer", L("Tu n'as rien commandé"), L("Tes commandes et leur historique apparaîtront ici."),
             L("Faire une demande"), function() WP.ShowOrdersTab("ask") end, "primary"
     end,
     recv = function()

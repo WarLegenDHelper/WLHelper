@@ -1039,6 +1039,232 @@ function S.Card(parent, opts)
     return c
 end
 
+-- ---------------------------------------------------------------- the WL Helper window (Hub)
+
+-- Draws a page or module icon: a painted path (white, cropped) or { hd = glyph, color } (an HD
+-- glyph in its own colour, else `rest`). -> true for a glyph
+function S.PaintIcon(tex, icon, rest)
+    if type(icon) == "table" then
+        root.SetHDIcon(tex, icon.hd, icon.color or rest or T.muted)
+        return true
+    end
+    S.Painted(tex, icon); tex:SetVertexColor(1, 1, 1)
+    return false
+end
+
+-- S.NavItem(parent, def): one entry of a side nav (32 px; the caller places it 8 px from both
+-- edges). Icon box 20 at x=8: a painted icon fills it inside a 1 px edge, an HD glyph is 16 px,
+-- no edge, tinted like the label. Label 12 at x=36, one line (full text in the tooltip), a counter
+-- at the right (search hits). Selected: selFill and the fg label, no side band; hover: hoverFill
+-- and fg. def: key, label (shown text), icon, tip (lines or function), onClick(self),
+-- onHover(self) (the caller repaints its nav). b:Paint(selected).
+function S.NavItem(parent, def)
+    local b = CreateFrame("Button", nil, parent)
+    b.wlOwned = true
+    b:SetHeight(32)
+    b.sel = S.Solid(b, "BACKGROUND", T.selFill); b.sel:SetAllPoints(); b.sel:Hide()
+    b.hl = S.Solid(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
+    b.press = S.Solid(b, "BORDER", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
+    b.iconFrame = CreateFrame("Frame", nil, b)
+    b.iconFrame:SetSize(20, 20); b.iconFrame:SetPoint("LEFT", 8, 0)
+    b.icon = b.iconFrame:CreateTexture(nil, "ARTWORK")
+    b.hdIcon = S.PaintIcon(b.icon, def.icon or { hd = "dot" })
+    b.hdColor = b.hdIcon and type(def.icon) == "table" and def.icon.color or nil
+    if b.hdIcon then
+        b.icon:SetSize(16, 16); b.icon:SetPoint("CENTER")
+    else
+        b.icon:SetAllPoints()
+        S.Border(b.iconFrame, T.cardEdge)
+    end
+    b.count = S.Counter(b)
+    b.count:SetPoint("RIGHT", -8, 0)
+    b.label = S.Text(b, root.F.label, T.muted)
+    b.label:SetPoint("LEFT", 36, 0); b.label:SetPoint("RIGHT", -8, 0)
+    b.label:SetJustifyH("LEFT")
+    b.label:SetText(def.label or "")
+    S.ClampLabel(b.label, def.label, b)
+    b.key = def.key
+    function b:Paint(selected)
+        self.selected = selected and true or nil
+        self.sel:SetShown(self.selected == true)
+        local c = (self.selected or self.hover) and T.fg or T.muted
+        self.label:SetTextColor(c[1], c[2], c[3])
+        if self.hdIcon and not self.hdColor then self.icon:SetVertexColor(c[1], c[2], c[3]) end
+        self.iconFrame:SetAlpha((self.selected or self.hover) and 1 or 0.8)
+    end
+    b:SetScript("OnEnter", function(self)
+        root.Tween(self.hl, num(self.hl:GetAlpha()) or 0, 1, 0.10, function(v) self.hl:SetAlpha(v) end)
+        self.hover = true
+        if def.onHover then def.onHover(self) else self:Paint(self.selected) end
+        local t = type(def.tip) == "function" and def.tip(self) or def.tip
+        if t then S.Tip(self, t) end
+    end)
+    b:SetScript("OnLeave", function(self)
+        root.Tween(self.hl, num(self.hl:GetAlpha()) or 0, 0, 0.10, function(v) self.hl:SetAlpha(v) end)
+        self.hover = nil
+        if def.onHover then def.onHover(self) else self:Paint(self.selected) end
+        S.HideTip()
+    end)
+    b:SetScript("OnMouseDown", function(self) self.press:Show() end)
+    b:SetScript("OnMouseUp", function(self) self.press:Hide() end)
+    b:SetScript("OnClick", function(self) if def.onClick then def.onClick(self) end end)
+    b:Paint(false)
+    return b
+end
+
+-- S.NavHeader(parent, text): an activity's title in the nav, 24 px: 11 muted at x=16, its baseline
+-- 4 px above the first item under it. Sentence case, never capitals (DESIGN 1.2).
+function S.NavHeader(parent, text)
+    local h = CreateFrame("Frame", nil, parent)
+    h:SetHeight(24)
+    h.label = S.Text(h, root.F.meta, T.muted)
+    h.label:SetPoint("BOTTOMLEFT", 16, 4); h.label:SetPoint("RIGHT", -8, 0)
+    h.label:SetJustifyH("LEFT")
+    h.label:SetText(text or "")
+    S.ClampLabel(h.label, nil, h)
+    return h
+end
+
+-- S.HubRow(parent, onClick): one window on the Hub's Home (DESIGN 3.20), 46 px, the width set by
+-- the caller (a column, 306 at 860). The whole line is the click target (3.9): cardFill, a 1 px
+-- edge, hoverFill under the mouse, pressFill on click. Icon box 28 at x=8 (painted, 1 px cardEdge;
+-- an HD glyph is 16 in it), the name 13 fg at x=44 (top 7), one state line 11 under it (cut, the
+-- full text in the tooltip), chevron_right 16 muted at the right, a 6 px accent dot left of it when
+-- something waits. A switched-off module: alpha 0.5, an "Éteint" pill instead of the chevron, and a
+-- click turns it back on (r.onTurnOn).
+-- r:Show2{ title, line1, line2, lineColor, pill, pillColor, hint, dot } (the old Home card's call),
+-- r:Set(name, state, hint, dot, reason) (the old tool tile's call), r:ShowOff(title),
+-- r:SetIcon(icon), r:SetOnRightClick(fn, hint). r.desc: what the window does (tooltip).
+function S.HubRow(parent, onClick)
+    local r = CreateFrame("Button", nil, parent)
+    r.wlOwned = true
+    r:SetHeight(46)
+    r.bg = S.Solid(r, "BACKGROUND", T.cardFill); r.bg:SetAllPoints()
+    S.Border(r, T.cardEdge)
+    r.hl = S.Solid(r, "BORDER", T.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
+    r.press = S.Solid(r, "BORDER", T.pressFill); r.press:SetAllPoints(); r.press:Hide()
+    r.iconFrame = CreateFrame("Frame", nil, r)
+    r.iconFrame:SetSize(28, 28); r.iconFrame:SetPoint("LEFT", 8, 0)
+    S.Border(r.iconFrame, T.cardEdge)
+    r.icon = r.iconFrame:CreateTexture(nil, "ARTWORK")
+    r.name = S.Text(r, root.F.body, T.fg)
+    r.name:SetJustifyH("LEFT")
+    r.name:SetPoint("TOPLEFT", 44, -7); r.name:SetPoint("RIGHT", -40, 0)
+    S.ClampLabel(r.name, nil, r)
+    r.stateText = S.Text(r, root.F.meta, T.muted)
+    r.stateText:SetJustifyH("LEFT")
+    r.stateText:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2); r.stateText:SetPoint("RIGHT", -40, 0)
+    S.ClampLabel(r.stateText, nil, r)
+    r.title, r.line1 = r.name, r.stateText   -- the old card's names, for its callers
+    r.chev = root.Icon(r, "chevron_right", 16, "ARTWORK", T.muted)
+    r.chev:SetPoint("RIGHT", -8, 0)
+    r.dot = r:CreateTexture(nil, "OVERLAY")
+    r.dot:SetSize(6, 6); r.dot:SetPoint("RIGHT", -30, 0)
+    root.SetHDIcon(r.dot, "dot", T.accent)
+    r.dot:Hide()
+    r.offPill = S.Pill(r)
+    r.offPill:SetPoint("RIGHT", -8, 0)
+    r.offPill:Hide()
+    function r:SetIcon(icon)
+        self.iconSrc = icon
+        self.icon:ClearAllPoints()
+        if S.PaintIcon(self.icon, icon or { hd = "dot" }, T.fg) then
+            self.icon:SetSize(16, 16); self.icon:SetPoint("CENTER")
+        else
+            self.icon:SetAllPoints()
+        end
+    end
+    local function TextRight()
+        local right = 8 + 16 + 16          -- the chevron and the dot's place
+        if r.offPill:IsShown() then right = 8 + (num(r.offPill:GetWidth()) or 40) + 8 end
+        r.name:SetPoint("RIGHT", -right, 0); r.stateText:SetPoint("RIGHT", -right, 0)
+    end
+    local function Look(off)
+        r.off = off and true or false
+        r:SetAlpha(off and 0.5 or 1)
+        r.chev:SetShown(not off)
+        if off then r.offPill:Set(L("Éteint"), T.muted); r.offPill:Show(); r.dot:Hide() else r.offPill:Hide() end
+        TextRight()
+    end
+    -- the old card's call: the pill goes before line 1 ("Étape 3 sur 6 · Deadmines"); line 2 and
+    -- the hint go to the tooltip
+    function r:Show2(o)
+        o = o or {}
+        self.name:SetText(o.title or "")
+        local state = o.line1 or ""
+        if o.pill and o.pill ~= "" then state = (state ~= "") and (o.pill .. " · " .. state) or o.pill end
+        self.state, self.line2, self.clickHint, self.reason = state, o.line2, o.hint, nil
+        self.stateText:SetText(state)
+        local lc = o.lineColor or T.muted
+        self.stateText:SetTextColor(lc[1], lc[2], lc[3])
+        self.dot:SetShown(o.dot and true or false)
+        Look(false)
+    end
+    -- the old tile's call
+    function r:Set(name, state, hint, dot, reason)
+        self.name:SetText(name or "")
+        self.state, self.line2, self.clickHint, self.reason = state, nil, hint, reason
+        self.stateText:SetText(state or "")
+        self.stateText:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
+        self.dot:SetShown(dot and true or false)
+        Look(false)
+    end
+    function r:ShowOff(title, state, hint)
+        self.name:SetText(title or self.name:GetText() or "")
+        self.state, self.line2, self.clickHint, self.reason = state or L("Module éteint"), nil, hint or L("Clic : allumer le module"), nil
+        self.stateText:SetText(self.state)
+        self.stateText:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
+        Look(true)
+    end
+    function r:SetOnRightClick(fn, hint)
+        self.onRightClick, self.rightHint = fn, fn and hint or nil
+        self:RegisterForClicks(fn and "AnyUp" or "LeftButtonUp")
+    end
+    -- name, state, line 2, what it does, why the dot, the clicks
+    function r:TipLines()
+        local t = { self.name:GetText() or "" }
+        local function add(x) if type(x) == "string" and x ~= "" then t[#t + 1] = x end end
+        add(self.state); add(self.line2); add(self.desc)
+        if self.dot:IsShown() then add(self.reason) end
+        add(self.clickHint)
+        add(self.rightHint)
+        return t
+    end
+    r.tip = function() return r:TipLines() end
+    r:SetScript("OnEnter", function(self)
+        root.Tween(self, self.hov or 0, 1, 0.10, function(v) self.hov = v; self.hl:SetAlpha(v) end)
+        self.chev:SetVertexColor(T.fg[1], T.fg[2], T.fg[3])
+        S.Tip(self, self:TipLines())
+    end)
+    r:SetScript("OnLeave", function(self)
+        root.Tween(self, self.hov or 0, 0, 0.10, function(v) self.hov = v; self.hl:SetAlpha(v) end)
+        self.chev:SetVertexColor(T.muted[1], T.muted[2], T.muted[3])
+        S.HideTip()
+    end)
+    r:SetScript("OnMouseDown", function(self)
+        self.press:Show()
+        self.iconFrame:SetPoint("LEFT", 8, -1)
+    end)
+    r:SetScript("OnMouseUp", function(self)
+        self.press:Hide()
+        self.iconFrame:SetPoint("LEFT", 8, 0)
+    end)
+    r:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then
+            -- its settings, even switched off (the module's switch is there too)
+            if self.onRightClick then self.onRightClick(self) end
+            return
+        end
+        if self.off then
+            if self.onTurnOn then self.onTurnOn(self) end
+            return
+        end
+        if onClick then onClick(self) end
+    end)
+    Look(false)
+    return r
+end
+
 -- ---------------------------------------------------------------- list row
 
 -- S.ListRow(parent, opts): opts.density "dense" (min 36, name 12) or "reading" (min 44, name 13),
@@ -1531,7 +1757,7 @@ function S.HomeButton(parent, onClick)
 end
 
 -- Windows that are the home page or small popups: no home button.
-local NO_BACK = { WLHelperHome = true, WLHelperDecline = true, WLHelperWelcome = true, WLHelperOrderMsg = true }
+local NO_BACK = { WLHelperHub = true, WLHelperHome = true, WLHelperDecline = true, WLHelperWelcome = true, WLHelperOrderMsg = true }
 
 -- Converts the window's anchor to TOPLEFT so a new height grows downward (the header stays put).
 local function KeepTop(f)
@@ -1606,11 +1832,11 @@ function S.Window(name, width, height, title, subtitle, db, posKey, opts)
         if WP and WP.OpenHome then WP.OpenHome() end
     end
     local midY = -math.floor((HH - 28) / 2)
-    -- the left of the header: on the Home window the guild logo (the app's mark), on every other
-    -- window one HD "<" back to Home; the Welcome window (the first contact) keeps the logo too;
-    -- small popups have neither. The title follows it.
+    -- the left of the header: on the WL Helper window (the Hub) the guild logo (the app's mark), on
+    -- every other window one HD "<" back to the Hub's Home; the Welcome window (the first contact)
+    -- keeps the logo too (both pass opts.logo); small popups have neither. The title follows it.
     local titleX = 16
-    if name == "WLHelperHome" or name == "WLHelperWelcome" or opts.logo then
+    if opts.logo then
         local logo = h:CreateTexture(nil, "ARTWORK")
         logo:SetSize(28, 28); logo:SetTexture(S.LOGO)
         logo:SetPoint("TOPLEFT", 8, midY)

@@ -8,6 +8,10 @@
 -- hills and through gates; the arrow then follows that trail one corner at a time (the GPS has no
 -- "via" list, so this file moves its target to the next corner once you are within 20 yards).
 -- Without the router, the arrow points straight at the place.
+-- While the window is open, the list follows you: every half second, once you walked a few yards, each
+-- result is measured again and a service or an NPC moves to its nearest place (another bank, another
+-- flight master) among the places read when the list was made (no new search); the rows are sorted
+-- again only when their order changed.
 --
 -- Services are found in LibForeverData (an optional dependency) by the NPC's title ("Banker",
 -- "Gryphon Master"...): its 13,000 NPCs are read once, a few milliseconds a frame, the first time the
@@ -36,22 +40,22 @@ ns.AddEnglish({
     ["Ex. banque, HV, Mortemines, Forgefer"] = "E.g. bank, AH, Deadmines, Ironforge",
     ["Aucun lieu trouvé"] = "No place found",
     ["Essaie un autre mot : une zone, un donjon, un PNJ ou « banque »."] = "Try another word: a zone, a dungeon, an NPC or \"bank\".",
-    ["Sans LibForeverData, seuls les donjons, les zones, les PNJ du guide et tes maîtres de vol sont connus."] =
-        "Without LibForeverData, only dungeons, zones, the guide's NPCs and your flight masters are known.",
+    ["La liste complète des PNJ n'est pas chargée : seuls les donjons, les zones, les PNJ du guide et tes maîtres de vol sont connus."] =
+        "The full NPC list isn't loaded: only dungeons, zones, the guide's NPCs and your flight masters are known.",
     ["Tape au moins 2 lettres."] = "Type at least 2 letters.",
     ["Derniers lieux"] = "Recent places",
-    ["Services"] = "Services",
-    ["Clic : y aller avec la flèche"] = "Click: go there with the arrow",
+    ["Services les plus proches"] = "Nearest services",
+    ["Clic : y aller avec le GPS"] = "Click: go there with the GPS",
     ["Entrée : aller au premier résultat"] = "Enter: go to the first result",
     ["Chemins à pied par WL Helper Nav."] = "Walking paths by WL Helper Nav.",
     ["Sans WL Helper Nav, la flèche va tout droit."] = "Without WL Helper Nav, the arrow points straight there.",
-    ["Lecture des PNJ : %d %%"] = "Reading NPCs: %d%%",
+    ["Chargement des PNJ : %d %%"] = "Loading NPCs: %d%%",
     -- the kinds of places, in the detail line
     ["Le plus proche : %s"] = "Nearest: %s",
     ["Maître de métier le plus proche : %s"] = "Nearest trainer: %s",
     ["Entrée de donjon · %s"] = "Dungeon entrance · %s",
     ["Entrée de donjon"] = "Dungeon entrance",
-    ["Zone · le centre de la carte"] = "Zone · the middle of the map",
+    ["Zone · centre de la carte"] = "Zone · middle of the map",
     ["Pour prendre la quête : %s"] = "To pick up the quest: %s",
     ["Pour rendre la quête : %s"] = "To turn in the quest: %s",
     ["PNJ du guide · %s"] = "Guide NPC · %s",
@@ -487,7 +491,7 @@ local function BuildStatic()
         local label = ZoneLabel(id)
         if label then
             local z = ZONES[id] or {}
-            local entry = { kind = "zone", label = label, map = id, x = 50, y = 50, detail = L("Zone · le centre de la carte"), gps = label }
+            local entry = { kind = "zone", label = label, map = id, x = 50, y = 50, detail = L("Zone · centre de la carte"), gps = label }
             AddKeys(entry, z[1], z[2], label)
             static[#static + 1] = entry
         end
@@ -552,21 +556,51 @@ local function MapPoint(lib, here, cont, wx, wy)
     return Safe(lib.ToUiMap, cont, wx, wy)
 end
 
-local function NearestSpawn(lib, kind, id, here)
+-- Every spawn of an NPC or object as a world point { cont, wx, wy, who }, added to `into`. A result
+-- keeps these points: the window picks the nearest again as you walk, without asking the library.
+local function SpawnPoints(lib, kind, id, who, into)
+    into = into or {}
     local ok, list = pcall(lib.Spawns, kind, id)
-    if not ok or type(list) ~= "table" then return nil end
-    local best, bestD, first
-    for _, s in ipairs(list) do
-        local d = DistTo(here, s.map, s.x, s.y)
-        if d and (not bestD or d < bestD) then
-            local m, x, y = MapPoint(lib, here, s.map, s.x, s.y)
-            if m then best, bestD = { map = m, x = x, y = y, dist = d }, d end
-        elseif not first and not best then
-            local m, x, y = Safe(lib.ToUiMap, s.map, s.x, s.y)
-            if m then first = { map = m, x = x, y = y } end
+    if ok and type(list) == "table" then
+        for _, s in ipairs(list) do
+            if s.map and s.x and s.y then into[#into + 1] = { cont = s.map, wx = s.x, wy = s.y, who = who } end
         end
     end
-    return best or first
+    return into
+end
+
+-- The point of `pts` nearest to you that lies on a map: point, distance, map, x, y (percent). Nil when
+-- none is on your continent. A point that no map holds is set aside (p.off) and never measured again;
+-- a point that brings its own map point (a flight master the GPS learnt) is taken as it is.
+local function Nearest(pts, here, lib)
+    if not (here and pts) then return nil end
+    while true do
+        local best, bestD
+        for _, p in ipairs(pts) do
+            if not p.off then
+                local d = DistTo(here, p.cont, p.wx, p.wy)
+                if d and (not bestD or d < bestD) then best, bestD = p, d end
+            end
+        end
+        if not best then return nil end
+        if best.map then return best, bestD, best.map, best.x, best.y end
+        local m, x, y
+        if lib then m, x, y = MapPoint(lib, here, best.cont, best.wx, best.wy) end
+        if m then return best, bestD, m, x, y end
+        best.off = true
+    end
+end
+
+-- The spawn of an NPC or object nearest to you: { map, x, y (percent), dist, pt }, and all its points.
+-- On another continent (or with no position) its first spawn that lies on a map, without a distance.
+local function NearestSpawn(lib, kind, id, here)
+    local pts = SpawnPoints(lib, kind, id)
+    local p, d, m, x, y = Nearest(pts, here, lib)
+    if p then return { map = m, x = x, y = y, dist = d, pt = p }, pts end
+    for _, q in ipairs(pts) do
+        m, x, y = Safe(lib.ToUiMap, q.cont, q.wx, q.wy)
+        if m then return { map = m, x = x, y = y }, pts end
+    end
 end
 
 local function ServiceDetail(svc, who, map)
@@ -577,18 +611,13 @@ local function ServiceDetail(svc, who, map)
     return string.format(L("Le plus proche : %s"), where)
 end
 
--- The nearest place giving a service, on your continent and open to your side. Nil when unknown.
-local function ResolveService(svc, here)
-    if not here then return nil end
+-- Every place giving a service and open to your side, on any continent, as world points: the spawns
+-- of its NPCs (or mailboxes) in LibForeverData, then the flight masters the GPS learnt
+-- (WLWritsCharDB.taxi), known even without LibForeverData.
+local function ServicePoints(svc)
     local lib = Lib()
     local side = Faction()
-    local best
-    local function consider(map, x, y, d, who)
-        if d and (not best or d < best.dist) then
-            best = { kind = "service", svc = svc.key, label = L(svc.label), map = map, x = x, y = y, dist = d, gps = who or L(svc.label),
-                detail = ServiceDetail(svc, who, map) }
-        end
-    end
+    local pts = {}
     local cands = svc.cands
     if svc.class then
         local en = CLASS_EN[ClassToken() or ""]
@@ -596,28 +625,48 @@ local function ResolveService(svc, here)
     end
     if lib then
         for _, c in ipairs(cands) do
-            if Friendly(c.ft, side, c.sub) then
-                local p = NearestSpawn(lib, c.kind, c.id, here)
-                if p and p.dist then consider(p.map, p.x, p.y, p.dist, c.kind ~= "object" and c.name or nil) end
-            end
+            if Friendly(c.ft, side, c.sub) then SpawnPoints(lib, c.kind, c.id, c.kind ~= "object" and c.name or nil, pts) end
         end
     end
-    -- the flight masters the GPS learnt (WLWritsCharDB.taxi): known even without LibForeverData
     if svc.taxi and WLWritsCharDB and type(WLWritsCharDB.taxi) == "table" then
         for _, t in pairs(WLWritsCharDB.taxi) do
             if type(t) == "table" and t.map and t.x and t.y then
                 t.wp = t.wp or GPS.Point(t.map, t.x, t.y)
                 local p = t.wp
-                local d = p and DistTo(here, p.cont, p.wx, p.wy)
-                if d and (not best or d < best.dist) then
-                    local who = GPS.ShortPlace(t.name or "?")
-                    best = { kind = "service", svc = svc.key, label = L(svc.label), map = t.map, x = t.x, y = t.y, dist = d,
-                        gps = who, detail = string.format(L("Le plus proche : %s"), t.name or "?") }
-                end
+                if p then pts[#pts + 1] = { cont = p.cont, wx = p.wx, wy = p.wy, map = t.map, x = t.x, y = t.y, taxi = t.name or "?" } end
             end
         end
     end
-    return best
+    return pts
+end
+
+-- A service result at one of its places: where, how far, what the arrow and the detail line say.
+local function ServicePlace(r, svc, p, d, m, x, y)
+    r.map, r.x, r.y, r.dist, r.pt = m, x, y, d, p
+    if p.taxi then
+        r.gps, r.detail = GPS.ShortPlace(p.taxi), string.format(L("Le plus proche : %s"), p.taxi)
+    else
+        r.gps, r.detail = p.who or L(svc.label), ServiceDetail(svc, p.who, m)
+    end
+end
+
+-- The nearest place giving a service, on your continent and open to your side. Nil when unknown.
+-- The result keeps all the places (r.pts) for the window to pick the nearest again as you walk.
+local function ResolveService(svc, here)
+    if not here then return nil end
+    local pts = ServicePoints(svc)
+    local p, d, m, x, y = Nearest(pts, here, Lib())
+    if not p then return nil end
+    local r = { kind = "service", svc = svc.key, label = L(svc.label), pts = pts }
+    ServicePlace(r, svc, p, d, m, x, y)
+    return r
+end
+
+-- An NPC's detail line: its title and the zone of the spawn shown.
+local function NpcDetail(sub, map)
+    local zone = ZoneLabel(map)
+    local what = sub and (zone and string.format(L("%s, %s"), sub, zone) or sub) or (zone or "?")
+    return string.format(L("PNJ · %s"), what)
 end
 GoTo.ResolveService = function(key) local s = SERVICE[key]; return s and ResolveService(s, Here()) end
 
@@ -626,6 +675,7 @@ GoTo.ResolveService = function(key) local s = SERVICE[key]; return s and Resolve
 local function Copy(e, here)
     local r = { kind = e.kind, label = e.label, detail = e.detail, map = e.map, x = e.x, y = e.y, gps = e.gps, icon = e.icon }
     local p = WorldOf(e)
+    r.wp = p
     r.dist = p and DistTo(here, p.cont, p.wx, p.wy) or nil
     return r
 end
@@ -692,14 +742,12 @@ function GoTo.Search(text)
             local i = c.i
             if not names[norm[i]] then
                 tried = tried + 1
-                local p = NearestSpawn(lib, "npc", idx.id[i], here)
+                local p, pts = NearestSpawn(lib, "npc", idx.id[i], here)
                 if p then
                     names[norm[i]] = true
-                    local zone = ZoneLabel(p.map)
                     local sub = idx.sub[i]
-                    local what = sub and (zone and string.format(L("%s, %s"), sub, zone) or sub) or (zone or "?")
                     add({ kind = "npc", label = idx.name[i], map = p.map, x = p.x, y = p.y, dist = p.dist, gps = idx.name[i],
-                        detail = string.format(L("PNJ · %s"), what) }, c.s + BONUS.npc)
+                        detail = NpcDetail(sub, p.map), sub = sub, pts = pts, pt = p.pt }, c.s + BONUS.npc)
                 end
             end
         end
@@ -708,6 +756,27 @@ function GoTo.Search(text)
     for i = #out, MAX + 1, -1 do out[i] = nil end
     return out
 end
+
+-- A result measured again from `here`: its distance and, for a service or an NPC, the nearest of the
+-- places it kept (r.pts). True when it moved to another place (its detail line may name another town).
+local function Repick(r, here, lib)
+    if r.pts then
+        local p, d, m, x, y = Nearest(r.pts, here, lib)
+        if not p then r.dist = nil; return false end
+        if p == r.pt then r.dist = d; return false end
+        if r.kind == "service" and SERVICE[r.svc] then
+            ServicePlace(r, SERVICE[r.svc], p, d, m, x, y)
+        else
+            r.map, r.x, r.y, r.dist, r.pt = m, x, y, d, p
+            if r.kind == "npc" then r.detail = NpcDetail(r.sub, m) end
+        end
+        return true
+    elseif r.wp then
+        r.dist = DistTo(here, r.wp.cont, r.wp.wx, r.wp.wy)
+    end
+    return false
+end
+GoTo.Repick = function(r) return Repick(r, Here(), Lib()) end
 
 -- ---------------------------------------------------------------- the walking router (WLHelper_Nav)
 
@@ -956,6 +1025,9 @@ function GoTo.Trip() return trip end
 
 local win, rows, heads = nil, {}, {}
 local pending
+local MOVE = 3             -- yards walked before the list is measured again
+local TRACK = 0.5          -- seconds between two looks at where you are
+local tracker, trackAt     -- the ticker while the window is shown; where the list was last measured
 
 local function Recents()
     local out = {}
@@ -969,6 +1041,7 @@ local function Recents()
             if not r and Num(o.m) and Num(o.x) and Num(o.y) then
                 r = { kind = o.k, label = o.l, detail = o.d, map = o.m, x = o.x, y = o.y, gps = o.g, svc = o.s }
                 local p = GPS.Point(o.m, o.x, o.y)
+                r.wp = p
                 r.dist = p and DistTo(here, p.cont, p.wx, p.wy) or nil
             end
             if r and type(r.label) == "string" then out[#out + 1] = r end
@@ -982,7 +1055,7 @@ local function RowTip(row)
     if not r then return nil end
     local t = { r.label }
     if r.detail and r.detail ~= "" then t[#t + 1] = r.detail end
-    t[#t + 1] = L("Clic : y aller avec la flèche")
+    t[#t + 1] = L("Clic : y aller avec le GPS")
     return t
 end
 
@@ -1056,7 +1129,7 @@ end
 local function Footer()
     local note = GoTo.WalkOn() and (NavInstalled() and L("Chemins à pied par WL Helper Nav.") or L("Sans WL Helper Nav, la flèche va tout droit.")) or ""
     local pct = GoTo.IndexProgress()
-    win:SetFooter(note, pct and string.format(L("Lecture des PNJ : %d %%"), pct) or "")
+    win:SetFooter(note, pct and string.format(L("Chargement des PNJ : %d %%"), pct) or "")
 end
 
 local function Render()
@@ -1074,25 +1147,84 @@ local function Render()
             local r = ResolveService(SERVICE[key], here)
             if r then svc[#svc + 1] = r end
         end
-        groups[#groups + 1] = { title = (#rec > 0) and L("Services") or nil, items = svc }
+        -- always titled: a lost player sees what the list is before reading it
+        groups[#groups + 1] = { title = L("Services les plus proches"), items = svc }
     elseif #Norm(text) < 2 then
         win.box:SetError(L("Tape au moins 2 lettres."))
     else
         local res = GoTo.Search(text)
-        groups[1] = { items = res }
+        groups[1] = { items = res, sorted = true }
         if #res == 0 then
             emptyShown = true
             win.empty:Set("search", L("Aucun lieu trouvé"), Lib() and L("Essaie un autre mot : une zone, un donjon, un PNJ ou « banque ».")
-                or L("Sans LibForeverData, seuls les donjons, les zones, les PNJ du guide et tes maîtres de vol sont connus."))
+                or L("La liste complète des PNJ n'est pas chargée : seuls les donjons, les zones, les PNJ du guide et tes maîtres de vol sont connus."))
         end
     end
     win.empty:SetShown(emptyShown)
+    win.groups, win.emptyShown = groups, emptyShown
+    trackAt = Here()
     local listH = Fill(emptyShown and {} or groups)
     win.list:SetShown(listH > 0)
     Footer()
     Layout(listH, emptyShown)
 end
 GoTo.Refresh = function() if win and win:IsShown() then Render() end end
+
+-- The same results placed again (another order, another detail line): no search.
+local function Redraw()
+    local listH = Fill(win.emptyShown and {} or win.groups or {})
+    win.list:SetShown(listH > 0)
+    Layout(listH, win.emptyShown)
+end
+
+local function StopTrack()
+    if tracker then tracker:Cancel(); tracker = nil end
+end
+
+-- Twice a second while the window is shown: once you walked MOVE yards, every result is measured
+-- again (a service or an NPC may move to a nearer place); the search results are sorted again only
+-- when their order changed. When only the distances changed, the rows keep their place.
+local function Track()
+    if not (win and win:IsShown()) then StopTrack(); return end
+    local here = Here()
+    if not here then return end
+    local a = trackAt
+    if a and a.cont == here.cont and Yards(a.wx, a.wy, here.wx, here.wy) < MOVE then return end
+    trackAt = here
+    local lib = Lib()
+    local redo = false
+    for _, g in ipairs(win.groups or {}) do
+        local items = g.items
+        for _, r in ipairs(items) do
+            if Repick(r, here, lib) then redo = true end
+        end
+        if g.sorted then
+            local unsorted = false
+            for i = 2, #items do
+                if Better(items[i], items[i - 1]) then unsorted = true; break end
+            end
+            if unsorted then table.sort(items, Better); redo = true end
+        end
+    end
+    if not redo then
+        for _, row in ipairs(rows) do
+            local r = row.result
+            if r and row:IsShown() then
+                local v = r.dist and GPS.Distance(r.dist) or nil
+                -- a distance that appears or goes away changes the row's layout
+                if (v ~= nil) ~= (row.value:IsShown() and true or false) then redo = true; break end
+                if v then row.value:SetText(v) end
+            end
+        end
+    end
+    if redo then Redraw() end
+end
+GoTo._Track = Track
+
+local function StartTrack()
+    if tracker or not (C_Timer and C_Timer.NewTicker) then return end
+    tracker = C_Timer.NewTicker(TRACK, Track)
+end
 
 -- The list follows the typing, a short moment after the last key.
 local function Soon()
@@ -1123,7 +1255,9 @@ local function Build()
     win.list = S.ScrollArea(win)
     win.empty = S.EmptyState(win, "search", L("Aucun lieu trouvé"), nil)
     win.empty:Hide()
-    win:SetScript("OnShow", function() win.list:ScrollTo(0, true); Render() end)
+    win:SetScript("OnShow", function() win.list:ScrollTo(0, true); Render(); StartTrack() end)
+    -- the list stops following you when the window closes
+    if win.HookScript then win:HookScript("OnHide", StopTrack) else win:SetScript("OnHide", StopTrack) end
 end
 
 -- Opens the window, the box focused; `text` (optional) is searched at once.

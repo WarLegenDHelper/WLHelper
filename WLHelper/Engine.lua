@@ -964,14 +964,12 @@ function ns.BossOrderReset() for k in pairs(bossCache) do bossCache[k] = nil end
 -- rare } }, idx = { [en] = i, ["#token"] = i }, src = "naowh" | "walk" } or false.
 -- NaowhForever's journal is read live when it is loaded (names, tips, models, encounter IDs);
 -- without it, our own walk order (ns.WALK).
--- The macro line that puts a raid marker on the target. The game's own /tm (a secure command, made
--- for macros) when the client has it: a /run script calling SetRaidTarget is blocked on this client
--- (the target was taken, the mark never came). /tm sets the mark, it does not toggle it off.
+-- The macro line that would put a raid marker on the target: none. On this client SetRaidTarget is
+-- protected, and a macro written by an addon carries its taint, so both a /run script and the game's
+-- own /tm in it end in ADDON_ACTION_FORBIDDEN (seen in game). Our macros only target; the player
+-- marks with the game's own key bindings (Interface > Key Bindings > Target markers).
 function ns.MarkLine(m)
-  local has = (SlashCmdList and SlashCmdList.TARGET_MARKER) or (SecureCmdList and SecureCmdList.TARGET_MARKER)
-    or (_G.SLASH_TARGET_MARKER1 ~= nil)
-  if has then return "/tm [@target,exists] " .. m end
-  return "/run if UnitExists'target'and GetRaidTargetIndex'target'~=" .. m .. " then SetRaidTarget('target'," .. m .. ")end"
+  return ""
 end
 
 function ns.BossOrder(dkey)

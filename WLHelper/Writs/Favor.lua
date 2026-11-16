@@ -18,7 +18,7 @@ local F = S.F
 
 ns.AddEnglish({
     ["Faveur du marchand"] = "Merchant's Favor",
-    ["Tu as %d Faveur"] = "You have %d Favor",
+    ["Tu as %s Faveur"] = "You have %s Favor",
     ["%d Faveur, 1 caisse"] = "%d Favor, 1 crate",
     ["%d Faveur, %d caisses"] = "%d Favor, %d crates",
     ["Une Faveur te coûte %s, au prix réel des offres de l'HV."] = "One Favor costs you %s, at the real AH listing prices.",
@@ -39,13 +39,13 @@ ns.AddEnglish({
     ["Écris ton objectif de Faveur : le plan des caisses les moins chères apparaîtra."] =
         "Type your Favor goal: the plan of the cheapest crates will show up.",
     ["Objectif atteint : tu as déjà assez de Faveur."] = "Goal reached: you already have enough Favor.",
-    ["Il te manque %d Faveur : 1 caisse, %s."] = "You need %d more Favor: 1 crate, %s.",
-    ["Il te manque %d Faveur : %d caisses, %s."] = "You need %d more Favor: %d crates, %s.",
+    ["Il te manque %s Faveur : 1 caisse, %s."] = "You need %s more Favor: 1 crate, %s.",
+    ["Il te manque %s Faveur : %d caisses, %s."] = "You need %s more Favor: %d crates, %s.",
     ["%s la Faveur"] = "%s per Favor",
     ["Prix scannés à l'instant"] = "Prices scanned just now",
     ["Prix scannés il y a %d min"] = "Prices scanned %d min ago",
     ["Prix scannés il y a %d h"] = "Prices scanned %d h ago",
-    ["Le plan, la moins chère d'abord"] = "The plan, cheapest first",
+    ["À acheter, la moins chère d'abord"] = "To buy, cheapest first",
     ["Toutes les caisses, par prix de la Faveur"] = "Every crate, by price per Favor",
     ["Lots des caisses inconnus"] = "Crate bundles unknown",
     ["Scanner l'HV"] = "Scan the AH",
@@ -300,6 +300,8 @@ local function Height(fs, minH)
     local ok, h = pcall(fs.GetStringHeight, fs)
     return math.max(ok and num(h) or 0, minH or 0)
 end
+-- 12 500 / 12,500 by the addon's language, the same helper as the summary (Overview.lua)
+local function Big(n) return root.BigNumber and root.BigNumber(n) or tostring(n) end
 
 -- "Waylaid Crate: Journeyman Ingots" -> "Journeyman Ingots" (the section header already says crates)
 local function CrateName(id)
@@ -384,7 +386,6 @@ function WP.BuildFavor(p)
         if ui.scan:IsEnabled() == false then return nil end
         return { L("Scanner l'HV"), L("Clic : scanner les prix des caisses et des lots") }
     end)
-    ui.scan:SetIcon("refresh")
     ui.scan:SetDisabledReason(L("L'hôtel des ventes est fermé."))
     ui.scan:SetPoint("BOTTOMLEFT", INSET, 12)
     -- the Inventory Intake NPC who takes the filled crates (Supply Shipments)
@@ -399,7 +400,6 @@ function WP.BuildFavor(p)
         and L("Dokimi : les Tarides, porte ouest de la Croisée (50, 29). Elle prend les caisses remplies.")
         or L("Marcy Baker : les Carmines, Trois-Chemins (10, 71). Elle prend les caisses remplies."),
         string.format(L("Clic : guider vers %s"), npc) } end)
-    ui.go:SetIcon("flag")
     ui.go:SetPoint("BOTTOMRIGHT", -INSET, 12)
 end
 
@@ -407,7 +407,7 @@ function WP.RenderFavor()
     if not ui.page then return end
     local p = ui.page
     local now = WP.FavorNow()
-    ui.now:SetText(string.format(L("Tu as %d Faveur"), now or 0))
+    ui.now:SetText(string.format(L("Tu as %s Faveur"), Big(now or 0)))
     ui.now:SetWidth(math.max(60, LIST_W - 84 - 8 - 60 - 12))
     local goal = WLWritsCharDB.favorGoal or 0
     if not ui.box:HasFocus() then ui.box:SetText(goal > 0 and tostring(goal) or "") end
@@ -424,7 +424,7 @@ function WP.RenderFavor()
         local left = WP.LadderLeft()
         ui.scan:SetText(left == 1 and L("Lecture des offres (1 restante)") or string.format(L("Lecture des offres (%d restantes)"), left)); ui.scan:SetIcon("clock")
     else
-        ui.scan:SetText(L("Scanner l'HV")); ui.scan:SetIcon("refresh")
+        ui.scan:SetText(L("Scanner l'HV")); ui.scan:SetIcon(nil)
     end
     ui.scan:SetDisabledReason(L("L'hôtel des ventes est fermé."))
     ui.scan:SetEnabled((busy or WP.AuctionHouseOpen()) and true or false)
@@ -480,8 +480,8 @@ function WP.RenderFavor()
         local crates = 0
         for _, e in ipairs(plan) do crates = crates + e.n end
         local cost = (exact and "" or "~") .. S.Money(total)
-        sentence = (crates == 1 and string.format(L("Il te manque %d Faveur : 1 caisse, %s."), missing, cost)
-            or string.format(L("Il te manque %d Faveur : %d caisses, %s."), missing, crates, cost))
+        sentence = (crates == 1 and string.format(L("Il te manque %s Faveur : 1 caisse, %s."), Big(missing), cost)
+            or string.format(L("Il te manque %s Faveur : %d caisses, %s."), Big(missing), crates, cost))
         local per = S.Money(got > 0 and math.floor(total / got) or 0)
         if not exact then
             detail = string.format(L("Une Faveur te coûte environ %s : ouvre l'HV pour lire les offres une par une."), per)
@@ -543,7 +543,7 @@ function WP.RenderFavor()
         ly = ly + r:Fit(LIST_W - x) + 2
     end
     if #plan > 0 then
-        head(L("Le plan, la moins chère d'abord"), #plan)
+        head(L("À acheter, la moins chère d'abord"), #plan)
         for _, e in ipairs(plan) do
             local r = e.row
             -- every bundle the crate accepts is in the row's tooltip; the rows under it show the ones used

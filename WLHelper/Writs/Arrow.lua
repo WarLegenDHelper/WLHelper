@@ -1,14 +1,21 @@
--- Writs/Arrow.lua: the GPS HUD, readable while running: the HD arrow (or the painted icon of a flight,
--- a boat or zeppelin, a teleport; the HD check once you are there), one large line (the distance or
--- the state), the step and the next step under it. Step lines wrap to two lines and the HUD grows
--- with them: nothing is cut. A long flight master's name drops its zone ("Brackenwall Village");
--- the whole route, with the full names, is in the HUD's tooltip.
--- A button appears when it saves a click: take the planned flight while the flight map is open, or
--- cast the teleport.
+-- Writs/Arrow.lua: the GPS HUD, readable while running. One column, centred:
+--   the action, big: on a cast leg (a teleport, the Hearthstone, Astral Recall, Moonglade) the spell or
+--   item icon IS the button (click it to cast); at the flight master the flight icon; at a dock the
+--   boat icon; else the HD arrow (the HD check once you are there);
+--   line 1, what to do ("Lance Téléportation : Fossoyeuse", "Va voir Woodwyrd");
+--   line 2, where, in gold ("Fossoyeuse");
+--   line 3, how far and how long ("550 m · 1:10": the walk left along the path when there is one,
+--   the time from your speed's moving average, hidden while you stand still);
+--   line 4, muted, the whole way when it has several legs ("Pierre de foyer → vol jusqu'à Kargath →
+--   300 m à pied").
+-- Lines wrap and the HUD grows with them: nothing is cut. The whole route, with the full names, is
+-- in the HUD's tooltip. While the flight map is open a button takes the planned flight.
 --
--- The teleport button is secure, so it is parented AND anchored to UIParent (placed at the HUD's
--- button row out of combat): the HUD itself stays an ordinary frame that may move, resize, show and
--- hide in combat. The text is redrawn 4 times a second, only when it changes; the arrow turns 20 times.
+-- The cast button is secure, so it is parented AND anchored to UIParent (placed over the HUD's icon
+-- spot out of combat): the HUD itself stays an ordinary frame that may move, resize, show and hide in
+-- combat. Its attributes never change in combat: a cast leg that comes in combat shows its icon
+-- (not clickable) and the button is set after the fight. The text is redrawn 4 times a second, only
+-- when it changes; the arrow turns 20 times.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -21,18 +28,19 @@ local GPS = WP.GPS
 ns.AddEnglish({
     ["Tu y es"] = "You're here",
     ["Parle à %s"] = "Talk to %s",
+    ["Va voir %s"] = "Go to %s",
     ["Dans le donjon"] = "Inside the dungeon",
-    ["Au maître de vol"] = "At the flight master",
-    ["Prends le vol pour %s"] = "Take the flight to %s",
-    ["Prendre le vol pour %s"] = "Take the flight to %s",
-    ["Le chemin le plus rapide : la téléportation."] = "The fastest way: teleport.",
+    ["Parle au maître de vol"] = "Talk to the flight master",
+    ["Vol pour %s"] = "Flight to %s",
+    ["Prendre ce vol"] = "Take this flight",
+    ["Lance %s"] = "Cast %s",
+    ["Utilise %s"] = "Use %s",
+    ["Utilise ta pierre de foyer"] = "Use your Hearthstone",
     ["Attends le bateau"] = "Wait for the boat",
     ["Attends le zeppelin"] = "Wait for the zeppelin",
     ["Autre continent"] = "Other continent",
     ["Pas d'itinéraire connu : la flèche va tout droit."] = "No known route: the arrow points straight there.",
     ["Parle à un maître de vol : le GPS apprendra tes trajets."] = "Talk to a flight master: the GPS will learn your routes.",
-    ["Étape %d sur %d"] = "Step %d of %d",
-    ["~%d min"] = "~%d min",
     ["Place la flèche"] = "Place the arrow",
     ["Glisse-la où tu veux."] = "Drag it where you want it.",
     ["Clique sur la croix pour la fixer ici."] = "Click the cross to lock it here.",
@@ -48,19 +56,30 @@ ns.AddEnglish({
     ["GPS"] = "GPS",
     ["Glisser : déplacer la flèche"] = "Drag: move the arrow",
     ["Clic : prendre ce vol"] = "Click: take this flight",
-    ["Clic : lancer le sort"] = "Click: cast the spell",
+    ["Clic : lancer %s"] = "Click: cast %s",
+    ["Clic : utiliser %s"] = "Click: use %s",
     ["La téléportation attend la fin du combat."] = "The teleport waits for the end of the fight.",
 })
 
 local arrow, teleport, demo
 local ICON_LINK = "Interface\\Icons\\INV_Misc_Map_01"
 local ICON_DUNGEON = "Interface\\Icons\\INV_Misc_Key_03"
+local HEARTHSTONE = 6948
 local TURN_EVERY, TEXT_EVERY = 0.05, 0.25
--- HUD-like width (design system: 360). The arrow 48 px at 12, 12; text from x = 72 to the close
--- button (28 px hit area at -4): 252 px wide.
-local HUD_W, ARROW_SIZE, TEXT_X = 360, 48, 72
-local TEXT_W = HUD_W - TEXT_X - 36
+-- HUD-like width (design system: 360). The action icon 48 px, centred at the top; the lines under it,
+-- centred, 16 from each edge; the close button (28 px hit area at -4, -4) beside the icon.
+local HUD_W, ICON, PAD = 360, 48, 12
+local ARROW_SIZE = ICON
+local LINE_W = HUD_W - 32
+local ICON_X = (HUD_W - ICON) / 2
 local BTN_H = 32
+local MOVING = 0.5          -- yards a second: slower than this, you stand (no time shown)
+local AVG_OVER = 4          -- seconds: the speed's moving average
+
+local function IsSecret(v) return root.IsSecret and root.IsSecret(v) end
+local function Num(v) if type(v) == "number" and not IsSecret(v) then return v end end
+local function Str(v) if type(v) == "string" and not IsSecret(v) and v ~= "" then return v end end
+local function Clock() return GetTime and GetTime() or 0 end
 
 local function FlyIcon()
     return UnitFactionGroup("player") == "Alliance" and "Interface\\Icons\\Ability_Mount_Gryphon_01"
@@ -89,17 +108,75 @@ local function Distance(yards)
 end
 GPS.Distance = Distance
 
-local function Minutes(seconds)
-    if not seconds then return "" end
-    return string.format(L("~%d min"), math.max(1, math.floor(seconds / 60 + 0.5)))
+-- "1:10", "12:05", "1:02:30"
+local function Duration(seconds)
+    local s = math.floor(seconds + 0.5)
+    if s >= 3600 then return string.format("%d:%02d:%02d", math.floor(s / 3600), math.floor(s / 60) % 60, s % 60) end
+    return string.format("%d:%02d", math.floor(s / 60), s % 60)
 end
 
 local function SpellIcon(id)
     if C_Spell and C_Spell.GetSpellTexture then
         local ok, t = pcall(C_Spell.GetSpellTexture, id)
-        if ok and t then return t end
+        if ok and t and not IsSecret(t) then return t end
     end
-    return GetSpellTexture and GetSpellTexture(id) or ICON_LINK
+    if GetSpellTexture then
+        local ok, t = pcall(GetSpellTexture, id)
+        if ok and t and not IsSecret(t) then return t end
+    end
+    return ICON_LINK
+end
+
+local function ItemIcon(id)
+    local f = (C_Item and C_Item.GetItemIconByID) or GetItemIcon
+    if f then
+        local ok, t = pcall(f, id)
+        if ok and t and not IsSecret(t) then return t end
+    end
+    return "Interface\\Icons\\INV_Misc_Rune_01"
+end
+
+-- The spell's name in the client's language ("Téléportation : Fossoyeuse"), nil when unknown.
+local function SpellName(id)
+    if not id then return nil end
+    if C_Spell and C_Spell.GetSpellName then
+        local ok, n = pcall(C_Spell.GetSpellName, id)
+        if ok and Str(n) then return n end
+    end
+    if C_Spell and C_Spell.GetSpellInfo then
+        local ok, info = pcall(C_Spell.GetSpellInfo, id)
+        if ok and type(info) == "table" and Str(info.name) then return info.name end
+    end
+    if GetSpellInfo then
+        local ok, n = pcall(GetSpellInfo, id)
+        if ok and Str(n) then return n end
+    end
+end
+
+-- A place's short name ("Brackenwall Village"), "" when there is none.
+local function Place(name)
+    if type(name) ~= "string" or name == "" then return "" end
+    return GPS.ShortPlace(name) or ""
+end
+
+local function CastIcon(kind, id)
+    if kind == "item" then return ItemIcon(id) end
+    return SpellIcon(id)
+end
+
+-- The cast's name: the spell's or the item's ("Pierre de foyer" when the game has not loaded it yet).
+local function CastName(kind, id, leg)
+    if kind == "item" then return WP.ItemName(id, L("Pierre de foyer")) end
+    return SpellName(id) or (leg and GPS.Describe(leg)) or L("Lancer la téléportation")
+end
+
+-- Line 1 of a cast leg: "Lance Téléportation : Fossoyeuse", "Utilise ta pierre de foyer".
+local function CastWhat(kind, id, leg)
+    if kind == "item" then
+        if id == HEARTHSTONE then return L("Utilise ta pierre de foyer") end
+        return string.format(L("Utilise %s"), CastName(kind, id, leg))
+    end
+    return string.format(L("Lance %s"), CastName(kind, id, leg))
 end
 
 -- Sets a font string only when the value changes (no work, no garbage when it doesn't); true when it did.
@@ -108,123 +185,193 @@ local function SetText(fs, t)
     if fs.cur ~= t then fs.cur = t; fs:SetText(t); return true end
     return false
 end
--- The top line: a distance is the HUD's one hero number (20 fg) with its unit small and muted
--- beside it ("350" + "m"); a state ("Tu y es", "Attends le zeppelin", a city) is a 14 fg sentence.
-local function SetTop(self, text, isDistance)
-    text = text or ""
-    local num, unit
-    if isDistance then num, unit = text:match("^(%S+)%s+(%S+)$") end
-    if not num then num, unit = isDistance and text or "", "" end
-    local a = SetText(self.big, num)
-    local b = SetText(self.unit, unit)
-    local c = SetText(self.state, isDistance and "" or text)
-    return a or b or c
-end
--- The painted icon of a thing (flight, boat, spell, dungeon key) in place of the arrow.
-local function SetPaintedIcon(self, path)
-    self.tex:Hide(); self.icon:Show()
-    if self.icon.cur ~= path then
-        self.icon.cur = path
-        S.Painted(self.icon, path, ARROW_SIZE)
+
+-- The big visual: "arrow" (the HD arrow turns), "painted" (a game icon), "here" (the HD check),
+-- "cast" (the secure button draws the icon itself). True when it changed.
+local function SetVisual(self, mode, path)
+    local key = mode .. ":" .. tostring(path)
+    if self.visual == key then return false end
+    self.visual = key
+    self.tex:SetShown(mode == "arrow")
+    self.icon:SetShown(mode == "painted" or mode == "here")
+    if mode == "painted" then
+        S.Painted(self.icon, path, ICON)
         self.icon:SetVertexColor(1, 1, 1, 1)
-    end
-end
--- "You are there": the HD check in the ok colour (it pulses slowly, see OnUpdate).
-local function SetHereIcon(self)
-    self.tex:Hide(); self.icon:Show()
-    if self.icon.cur ~= "here" then
-        self.icon.cur = "here"
+        self.icon:SetDesaturated(false)
+    elseif mode == "here" then
         S.HDIcon(self.icon, "check", C.ok)
         self.icon:SetSize(40, 40)
     end
+    return true
+end
+
+-- ---------------------------------------------------------------- speed
+
+-- Your speed, sampled each redraw: the game's own (GetUnitSpeed) when readable, else from how far you
+-- moved. speedNow: this sample; speedAvg: its moving average over about AVG_OVER seconds of moving.
+local speedNow, speedAvg
+local lastC, lastX, lastY, lastT
+local function SampleSpeed(now)
+    local t = Clock()
+    local v
+    if GetUnitSpeed then
+        local ok, s = pcall(GetUnitSpeed, "player")
+        if ok then v = Num(s) end
+    end
+    local dt = lastT and (t - lastT) or 0
+    if not v and lastT and dt > 0 and now.cont and now.cont == lastC and Num(now.px) and Num(now.py) then
+        local dx, dy = now.px - lastX, now.py - lastY
+        v = math.sqrt(dx * dx + dy * dy) / dt
+    end
+    if Num(now.px) and Num(now.py) then lastC, lastX, lastY = now.cont, now.px, now.py else lastC = nil end
+    lastT = t
+    speedNow = v
+    if v and v > MOVING then
+        if speedAvg and dt > 0 then
+            speedAvg = speedAvg + (v - speedAvg) * math.min(1, dt / AVG_OVER)
+        else
+            speedAvg = v
+        end
+    end
+end
+
+-- "550 m · 1:10": the distance in the warm accent, the time in fg (only while you move).
+local function DistLine(yards)
+    local d = S.Hex(C.accentSoft) .. Distance(yards) .. "|r"
+    if speedNow and speedNow > MOVING and speedAvg and speedAvg > MOVING then
+        local secs = yards / speedAvg
+        if secs < 5 * 3600 then
+            return d .. S.Hex(C.muted) .. "  \194\183  |r" .. Duration(secs)
+        end
+    end
+    return d
 end
 
 -- ---------------------------------------------------------------- layout
 
--- The HUD grows with its text: big line, step (2 lines max), next step (2 lines max), then the
--- button row when there is one. Called only when a text or the button changed.
+-- The column: the icon, then the lines that have text, then the flight button when there is one.
+-- Called only when a line comes, goes or changes length (not for the distance ticking down).
 local function Layout(self)
-    local y = 12
-    local topH
-    if (self.big.cur or "") ~= "" then
-        self.big:Show(); self.unit:Show(); self.state:Hide()
-        -- measure the whole number (a width left from a shorter one used to cut it as "4...")
-        -- the font may land a frame later: TextWidth measures again then
-        local big = self.big
-        -- one late re-measure at a time (the distance changes several times a second), and it
-        -- measures the text shown THEN, not the one captured now
-        local w = root.TextWidth(big)
-        if not self.bigRefit and C_Timer and C_Timer.After then
-            self.bigRefit = true
-            local hud = self
-            C_Timer.After(0, function()
-                hud.bigRefit = nil
-                if not big:IsShown() then return end
-                local w2 = root.TextWidth(big)
-                if w2 and w2 > 0 then big:SetWidth(math.min(TEXT_W - 24, w2 + 4)) end
-            end)
-        end
-        big:SetWidth(math.min(TEXT_W - 24, (w > 0 and w or (TEXT_W - 28)) + 4))
-        local okB, bigH = pcall(self.big.GetStringHeight, self.big)
-        topH = (okB and type(bigH) == "number" and not (root.IsSecret and root.IsSecret(bigH))) and bigH or 0
-        if topH < S.F.hero then topH = S.F.hero + 2 end
-    else
-        self.big:Hide(); self.unit:Hide(); self.state:Show()
-        topH = S.FitText(self.state, 2, TEXT_W, self)
-        if topH < S.F.heading then topH = S.F.heading + 2 end
-    end
-    y = y + topH
-    local function line(fs, size, gap)
+    local top = PAD + ICON + 8
+    local y = top
+    local function line(fs, maxLines, gap)
         if (fs.cur or "") == "" then fs:Hide() return end
         fs:Show()
-        y = y + gap
-        fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", TEXT_X, -y)
-        local h = S.FitText(fs, 2, TEXT_W, self)
-        if h < size then h = size + 2 end
+        if y > top then y = y + gap end
+        fs:ClearAllPoints(); fs:SetPoint("TOP", self, "TOP", 0, -y)
+        local h = S.FitText(fs, maxLines, LINE_W, self)
+        if h < fs.size then h = fs.size + 2 end
         y = y + h
     end
-    line(self.step, S.F.label, 4)
-    line(self.sub, S.F.meta, 3)
-    y = math.max(y, 12 + ARROW_SIZE) + 12
+    line(self.what, 2, 0)
+    line(self.where, 2, 2)
+    line(self.dist, 1, 4)
+    line(self.route, 3, 6)
+    local okH, h = pcall(self.route.GetStringHeight, self.route)
+    self.routeH = okH and Num(h) or 0
+    y = y + PAD
     self.btnY = y
-    if self.button then y = y + BTN_H + 12 end
+    if self.button then y = y + BTN_H + PAD end
     y = math.ceil(y)
     if self.h ~= y then self.h = y; self:SetHeight(y) end
-    self.fly:ClearAllPoints(); self.fly:SetPoint("TOPLEFT", 12, -self.btnY)
+    self.fly:ClearAllPoints(); self.fly:SetPoint("TOPLEFT", PAD, -self.btnY)
 end
 
--- ---------------------------------------------------------------- the teleport button
+-- ---------------------------------------------------------------- the cast button
 
--- Put on the HUD's button row, in UIParent coordinates (both frames share the scale). Out of combat only.
+-- Put over the HUD's icon spot, in UIParent coordinates (both frames share the scale). Out of combat only.
 local function PlaceTeleport()
     if not (teleport and arrow) or InCombatLockdown() then return end
     local left, top = arrow:GetLeft(), arrow:GetTop()
     if not (left and top) then return end
     teleport:SetScale(arrow:GetScale())
     teleport:ClearAllPoints()
-    teleport:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left + 12, top - (arrow.btnY or (12 + ARROW_SIZE + 12)))
+    teleport:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left + ICON_X, top - PAD)
 end
 
--- Shows the button for this spell, or hides it. Out of combat only; called again after combat.
-local shownSpell = false
-local function SetTeleport(spell)
-    if not teleport or InCombatLockdown() then return end
-    if spell == shownSpell then return end
-    shownSpell = spell
-    if spell then
+-- The cast's cooldown on the button, when the game gives readable numbers (they may be secret).
+local shownSpell, shownKind, shownId = false, nil, nil
+local function RefreshCooldown()
+    local cd = teleport and teleport.cd
+    if not cd then return end
+    local s, d
+    if shownKind == "item" then
+        local f = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
+        if f then
+            local ok, a, b = pcall(f, shownId)
+            if ok then s, d = Num(a), Num(b) end
+        end
+    elseif shownKind == "spell" then
+        if C_Spell and C_Spell.GetSpellCooldown then
+            local ok, info = pcall(C_Spell.GetSpellCooldown, shownId)
+            if ok and type(info) == "table" then
+                local ok2, a, b = pcall(function() return info.startTime, info.duration end)
+                if ok2 then s, d = Num(a), Num(b) end
+            end
+        elseif GetSpellCooldown then
+            local ok, a, b = pcall(GetSpellCooldown, shownId)
+            if ok then s, d = Num(a), Num(b) end
+        end
+    end
+    if s and d and d > 1.5 then
+        pcall(cd.SetCooldown, cd, s, d)
+    else
+        if not (cd.Clear and pcall(cd.Clear, cd)) then pcall(cd.SetCooldown, cd, 0, 0) end
+    end
+end
+
+-- Shows the button for this spell (kind "spell") or item (kind "item": the Hearthstone), or hides it
+-- (no kind). Out of combat only: in combat the change waits (PLAYER_REGEN_ENABLED sets it).
+local function SetTeleport(kind, id)
+    if not teleport then return end
+    if InCombatLockdown() then
+        teleport.pending = true
+        return
+    end
+    teleport.pending = nil
+    if not id then kind = nil end
+    local key = kind and (kind .. ":" .. tostring(id)) or nil
+    if key == shownSpell then return end
+    shownSpell, shownKind, shownId = key, kind, id
+    -- another cast (or none): the bar and the "in progress" of the last one go
+    if teleport.ResetCast then teleport.ResetCast() end
+    if kind == "item" then
+        teleport:SetAttribute("type", "item")
+        teleport:SetAttribute("spell", nil)
+        teleport:SetAttribute("item", "item:" .. id)
+    elseif kind then
         teleport:SetAttribute("type", "spell")
-        teleport:SetAttribute("spell", spell)
+        teleport:SetAttribute("item", nil)
+        teleport:SetAttribute("spell", id)
+    end
+    if kind then
+        teleport.tex:SetTexture(CastIcon(kind, id))
         PlaceTeleport()
         teleport:Show()
+        RefreshCooldown()
     else
         teleport:Hide()
+        if teleport.ResetLook then teleport.ResetLook() end   -- hidden under the mouse: no hover left on
     end
+end
+
+-- The cast the current leg wants: "spell"/"item", id (GPS.CastOf), or nil.
+local function CastOf(leg)
+    if GPS.CastOf then return GPS.CastOf(leg) end
+    if leg and leg.kind == "teleport" then return "spell", leg.to.spell end
 end
 
 local function WantedTeleport()
     if not (arrow and arrow:IsShown()) or demo then return nil end
-    local leg = GPS.TeleportLeg()
-    return leg and leg.to.spell or nil
+    return CastOf(GPS.TeleportLeg())
+end
+
+-- What the cast is doing, shown as line 1 for a moment: requested, casting, interrupted.
+local castNote, castNoteUntil, casting = nil, 0, false
+local clickedAt = -100     -- when the button was last clicked: a cast starting just after is ours
+local function Note(text, seconds)
+    castNote, castNoteUntil = text, Clock() + (seconds or 0)
+    if arrow then arrow.redraw = true end
 end
 
 -- ---------------------------------------------------------------- drawing
@@ -232,78 +379,138 @@ end
 local function Draw(self, now, combat)
     local leg, legs = now.leg, now.legs
     local n = legs and #legs or 0
-    local total = legs and (legs.total or n) or 0
-    local stepText = (total > 1) and string.format(L("Étape %d sur %d"), math.max(1, total - n + 1), total) or Minutes(now.eta)
-
-    local button = nil
     local changed = false
     local function T(fs, t) if SetText(fs, t) then changed = true end end
+    local what, where, dist, route = "", "", "", ""
+    local button = nil
     self.turn = false
     self.arrived = now.arrived and true or false
+
+    local castLeg = leg and (leg.kind == "teleport" or leg.kind == "hearth") and not now.arrived
+    local kind, id
+    if castLeg then kind, id = CastOf(leg) end
+    if not id then kind = nil end
+    SetTeleport(kind, id)          -- waits for the end of the fight when in combat
+    local wantKey = kind and (kind .. ":" .. tostring(id)) or nil
+    local ready = wantKey ~= nil and shownSpell == wantKey
+
     if now.arrived then
-        SetHereIcon(self)
-        if SetTop(self, L("Tu y es")) then changed = true end
+        if SetVisual(self, "here") then changed = true end
+        what = L("Tu y es")
         local w = now.dest and now.dest.writ
-        T(self.step, w and w.npcName and string.format(L("Parle à %s"), w.npcName) or (now.dest and now.dest.name) or "")
-        T(self.sub, w and WP.ItemName(w.item, w.itemName) or "")
+        where = w and w.npcName and string.format(L("Parle à %s"), w.npcName) or (now.dest and now.dest.name) or ""
+        route = (w and w.item and WP.ItemName(w.item, w.itemName)) or (w and w.itemName) or ""
     elseif not now.map and IsInInstance and IsInInstance() then
-        -- inside a dungeon there is no map position: the step alone
-        SetPaintedIcon(self, ICON_DUNGEON)
-        if SetTop(self, L("Dans le donjon")) then changed = true end
-        T(self.step, now.dest and now.dest.name or "")
-        T(self.sub, "")
+        -- inside a dungeon there is no map position: the place alone
+        if SetVisual(self, "painted", ICON_DUNGEON) then changed = true end
+        what = L("Dans le donjon")
+        where = now.dest and now.dest.name or ""
+    elseif castLeg and kind then
+        -- the icon is the button; in combat before it was set, the icon alone (not clickable)
+        if SetVisual(self, ready and "cast" or "painted", ready and wantKey or CastIcon(kind, id)) then changed = true end
+        if casting then what = L("Téléportation en cours...")
+        elseif castNote and Clock() < castNoteUntil then what = castNote
+        else what = CastWhat(kind, id, leg) end
+        where = Place(leg.to and leg.to.name)
+        if combat then dist = S.Hex(C.warn) .. L("La téléportation attend la fin du combat.") .. "|r" end
     elseif leg and leg.kind == "fly" then
-        SetPaintedIcon(self, FlyIcon())
+        if SetVisual(self, "painted", FlyIcon()) then changed = true end
         local mapOpen = (TaxiFrame and TaxiFrame:IsShown()) or (FlightMapFrame and FlightMapFrame:IsShown())
-        local place = GPS.ShortPlace(leg.to.name)
-        if SetTop(self, L("Au maître de vol")) then changed = true end
-        T(self.step, mapOpen and "" or string.format(L("Prends le vol pour %s"), place))
-        local nxt = legs[2]
-        T(self.sub, nxt and GPS.DescribeNext(nxt) or stepText)
+        local place = Place(leg.to and leg.to.name)
         if mapOpen then
+            -- the map is open: the sentence names the place, the button takes the flight
+            what = GPS.Describe(leg)
             button = "fly"
-            -- the label keeps its verb; in combat the button is disabled and its reason says why
-            local label = string.format(L("Prendre le vol pour %s"), place)
-            if self.fly:GetText() ~= label then self.fly:SetText(label); changed = true end
+        else
+            what = L("Parle au maître de vol")
+            where = place ~= "" and string.format(L("Vol pour %s"), place) or ""
         end
-    elseif leg and leg.kind == "teleport" then
-        SetPaintedIcon(self, SpellIcon(leg.to.spell))
-        -- the destination alone in large type
-        if SetTop(self, GPS.ShortPlace(leg.to.name)) then changed = true end
-        T(self.step, L("Le chemin le plus rapide : la téléportation."))
-        T(self.sub, stepText)
-        button = "teleport"
     else
         -- riding (or waiting for a boat or zeppelin at its dock): the arrow
         local atDock = leg and leg.kind == "link" and now.dist and now.dist < 30
-        if atDock then
-            SetPaintedIcon(self, ICON_LINK)
-            local boat = leg.from and leg.from.link and leg.from.link.mode == "boat"
-            if SetTop(self, boat and L("Attends le bateau") or L("Attends le zeppelin")) then changed = true end
+        local mode = atDock and leg.from and leg.from.link and leg.from.link.mode
+        if atDock and mode == "flight" then
+            -- a druid's flight home: talk to the flight master
+            if SetVisual(self, "painted", FlyIcon()) then changed = true end
+            what = L("Parle au maître de vol")
+            local p = Place(leg.to and leg.to.name)
+            where = p ~= "" and string.format(L("Vol pour %s"), p) or ""
+        elseif atDock then
+            if SetVisual(self, "painted", ICON_LINK) then changed = true end
+            what = mode == "boat" and L("Attends le bateau") or L("Attends le zeppelin")
+            where = Place(leg.to and leg.to.name)
         else
-            self.icon:Hide(); self.tex:Show()
+            if SetVisual(self, "arrow") then changed = true end
             self.turn = true
-            if SetTop(self, now.dist and Distance(now.dist) or L("Autre continent"), now.dist ~= nil) then changed = true end
+            local final = not leg or (leg.kind == "ride" and leg.to and leg.to.kind ~= "taxi" and leg.to.kind ~= "dock")
+            local dest = now.dest
+            if final then
+                local w = dest and dest.writ
+                if w and w.npcName then what = string.format(L("Va voir %s"), w.npcName)
+                else what = GPS.UpperFirst(dest and dest.name or (leg and leg.to and leg.to.name) or "") end
+                -- the zone, when it is not the one you are in
+                if dest and dest.map and now.map and dest.map ~= now.map and WP.ZoneName then
+                    local z = WP.ZoneName(dest.map)
+                    if z ~= tostring(dest.map) and z ~= "?" then where = z end
+                end
+            else
+                what = GPS.Describe(leg)
+            end
+            dist = now.dist and DistLine(now.dist) or (S.Hex(C.muted) .. L("Autre continent") .. "|r")
         end
-        T(self.step, leg and GPS.Describe(leg) or (now.dest and now.dest.name) or "")
         if not legs then
-            T(self.sub, L("Pas d'itinéraire connu : la flèche va tout droit."))
+            route = L("Pas d'itinéraire connu : la flèche va tout droit.")
         elseif GPS.KnownFlights() == 0 then
-            T(self.sub, L("Parle à un maître de vol : le GPS apprendra tes trajets."))
-        else
-            local nxt = legs[2]
-            T(self.sub, nxt and GPS.DescribeNext(nxt) or stepText)
+            route = L("Parle à un maître de vol : le GPS apprendra tes trajets.")
         end
     end
 
-    -- the button row
+    -- the rest of the way in one muted line ("Vol jusqu'à Kargath → 300 m à pied"), when it has more
+    -- than one leg and you are not there yet: the leg under way is lines 1-3 already (its walk measured
+    -- along the trail there), so it is not told twice
+    if not now.arrived and legs and n > 1 and GPS.Itinerary then
+        local okR, items = pcall(GPS.Itinerary, legs)
+        if okR and type(items) == "table" then
+            local parts = {}
+            for _, it in ipairs(items) do
+                if it.leg ~= leg and type(it.text) == "string" and it.text ~= "" then
+                    parts[#parts + 1] = #parts == 0 and GPS.UpperFirst(it.text) or it.text
+                end
+            end
+            if #parts > 0 then route = table.concat(parts, " \226\134\146 ") end
+        end
+    end
+
+    T(self.what, what)
+    T(self.where, where)
+    -- the distance and the itinerary's walks count down every tick: lay the HUD out again only when a
+    -- line comes or goes, or the itinerary wraps to another number of lines
+    local was = self.dist.cur or ""
+    if SetText(self.dist, dist) and ((was == "") ~= (dist == "")) then changed = true end
+    was = self.route.cur or ""
+    if SetText(self.route, route) then
+        if (was == "") ~= (route == "") then
+            changed = true
+        elseif route ~= "" then
+            local okH, h = pcall(self.route.GetStringHeight, self.route)
+            if okH and Num(h) and math.abs(h - (self.routeH or 0)) > 0.5 then changed = true end
+        end
+    end
+
+    -- the flight button
     self.fly:SetShown(button == "fly")
     if button == "fly" then
         if combat then self.fly:Disable() else self.fly:Enable() end
+        self.flyTitle = GPS.Describe(leg, true)
     end
     if button ~= self.button then self.button = button; changed = true end
     if changed then Layout(self); PlaceTeleport() end
-    SetTeleport(button == "teleport" and leg.to.spell or nil)
+
+    -- the secure button follows the HUD's alpha; in combat, one left from a leg already done goes
+    -- transparent (it cannot hide before the fight ends)
+    if teleport and teleport:IsShown() then
+        teleport:SetAlpha((combat and shownSpell ~= wantKey) and 0 or self:GetAlpha())
+    end
 end
 
 -- Turns the arrow toward the target; red to green as you face it, amber in combat.
@@ -345,7 +552,7 @@ end
 -- ---------------------------------------------------------------- the frame
 
 local function SavePos(self)
-    -- kept as TOPLEFT so a taller HUD grows downward and the button row stays put
+    -- kept as TOPLEFT so a taller HUD grows downward and the icon stays put
     local left, top = self:GetLeft(), self:GetTop()
     if not (left and top) then return end
     self:ClearAllPoints()
@@ -354,11 +561,121 @@ local function SavePos(self)
     PlaceTeleport()
 end
 
+local function Line(parent, size, color, bold, maxLines)
+    local fs = S.Text(parent, size, color, bold)
+    fs.size = size
+    fs:SetJustifyH("CENTER"); fs:SetJustifyV("TOP")
+    fs:SetWidth(LINE_W)
+    if fs.SetMaxLines then fs:SetMaxLines(maxLines) end
+    root.Shadow(fs, true)
+    return fs
+end
+
+local function BuildTeleport()
+    -- the cast: a secure button that IS the big icon (48 px, square, 1 px accent ring)
+    teleport = CreateFrame("Button", "WLGPSTeleport", UIParent, "SecureActionButtonTemplate")
+    teleport.wlOwned = true
+    teleport:SetSize(ICON, ICON)
+    teleport:SetFrameStrata("HIGH")
+    teleport:SetFrameLevel(arrow:GetFrameLevel() + 5)
+    teleport:RegisterForClicks("AnyUp", "AnyDown")   -- the game acts on the press or the release (its "cast on key down" setting): both registered
+    S.Solid(teleport, "BACKGROUND", C.bg, 0.92):SetAllPoints()
+    local tex = teleport:CreateTexture(nil, "ARTWORK")
+    tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    tex:SetPoint("TOPLEFT", 1, -1); tex:SetPoint("BOTTOMRIGHT", -1, 1)
+    teleport.tex = tex
+    local ring = S.Border(teleport, C.accent, 0.55)
+    -- the cooldown's swipe over the icon, when readable
+    local okCd, cd = pcall(CreateFrame, "Cooldown", nil, teleport, "CooldownFrameTemplate")
+    if okCd and cd then
+        cd:SetAllPoints(tex)
+        pcall(cd.SetDrawEdge, cd, false)
+        teleport.cd = cd
+    end
+    -- what the click does, seen: lighter on hover, pressed look on click, then the cast's progress
+    local hover = S.Solid(teleport, "OVERLAY", C.hoverFill); hover:SetAllPoints(tex); hover:SetAlpha(0)
+    local press = S.Solid(teleport, "OVERLAY", C.pressFill); press:SetAllPoints(tex); press:Hide()
+    local fill = S.Solid(teleport, "OVERLAY", C.accent, 0.35)
+    fill:SetPoint("BOTTOMLEFT", 1, 1); fill:SetPoint("BOTTOMRIGHT", -1, 1); fill:SetHeight(1); fill:Hide()
+    teleport:HookScript("OnEnter", function(self)
+        hover:SetAlpha(1); ring(C.accent, 1)
+        local leg = GPS.TeleportLeg()
+        local name = CastName(shownKind, shownId, leg)
+        local lines = { (leg and leg.to and leg.to.name) or L("Lancer la téléportation"),
+            string.format(shownKind == "item" and L("Clic : utiliser %s") or L("Clic : lancer %s"), name) }
+        if InCombatLockdown() then lines[#lines + 1] = { L("La téléportation attend la fin du combat."), C.warn[1], C.warn[2], C.warn[3] } end
+        S.Tip(self, lines)
+    end)
+    teleport:HookScript("OnLeave", function() hover:SetAlpha(0); ring(C.accent, 0.55); S.HideTip() end)
+    teleport:HookScript("OnMouseDown", function()
+        press:Show(); tex:SetPoint("TOPLEFT", 2, -2); tex:SetPoint("BOTTOMRIGHT", 0, 0)
+    end)
+    teleport:HookScript("OnMouseUp", function()
+        press:Hide(); tex:SetPoint("TOPLEFT", 1, -1); tex:SetPoint("BOTTOMRIGHT", -1, 1)
+    end)
+    teleport:HookScript("OnClick", function()
+        if InCombatLockdown() then return end    -- the cast cannot start: no "requested"
+        clickedAt = Clock()
+        if not casting then Note(L("Téléportation demandée..."), 1.5) end
+    end)
+    teleport.ResetLook = function()
+        hover:SetAlpha(0); ring(C.accent, 0.55); press:Hide()
+        tex:SetPoint("TOPLEFT", 1, -1); tex:SetPoint("BOTTOMRIGHT", -1, 1)
+    end
+    teleport.ResetCast = function()
+        casting = false; fill:Hide(); fill:SetHeight(1)
+    end
+    -- the cast bar inside the icon, from the bottom: filled from the player's cast (numbers read
+    -- under pcall, they may be secret on this client)
+    local cev = CreateFrame("Frame", nil, teleport)
+    for _, e in ipairs({ "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_SUCCEEDED" }) do
+        pcall(cev.RegisterUnitEvent or cev.RegisterEvent, cev, e, "player")
+    end
+    pcall(cev.RegisterEvent, cev, "SPELL_UPDATE_COOLDOWN")
+    pcall(cev.RegisterEvent, cev, "BAG_UPDATE_COOLDOWN")
+    cev:SetScript("OnEvent", function(_, e, unit, _, spellID)
+        if e == "SPELL_UPDATE_COOLDOWN" or e == "BAG_UPDATE_COOLDOWN" then
+            if teleport:IsShown() then RefreshCooldown() end
+            return
+        end
+        if unit ~= "player" then return end
+        if e == "UNIT_SPELLCAST_START" then
+            -- only the button's own cast: its spell, or (an item, a secret id) one started just after
+            -- a click; a mount or any other spell is not the teleport
+            if not teleport:IsShown() then return end
+            local sid = Num(spellID)
+            local ours = (shownKind == "spell" and sid ~= nil and sid == shownId) or (Clock() - clickedAt < 2)
+            if not ours then return end
+            casting = true; fill:Show(); Note(nil)
+        elseif not casting then
+            return
+        elseif shownKind == "spell" and Num(spellID) and Num(spellID) ~= shownId then
+            return      -- another spell refused during the cast ("another action is in progress")
+        elseif e == "UNIT_SPELLCAST_SUCCEEDED" then
+            -- the end resets even when the button hid meanwhile (Stop pressed, leg changed)
+            casting = false; fill:Hide(); Note(nil)
+        else
+            casting = false; fill:Hide()
+            if teleport:IsShown() then Note(L("Interrompue : clique pour relancer"), 3) end
+        end
+    end)
+    teleport:HookScript("OnUpdate", function(self)
+        if not casting then return end
+        local ok, k = pcall(function()
+            local _, _, _, startMS, endMS = UnitCastingInfo("player")
+            if not (startMS and endMS) or endMS <= startMS then return nil end
+            return math.max(0, math.min(1, (GetTime() * 1000 - startMS) / (endMS - startMS)))
+        end)
+        if ok and k then fill:SetHeight(math.max(1, (ICON - 2) * k)) end
+    end)
+    teleport:Hide()
+end
+
 local function Build()
     arrow = CreateFrame("Frame", "WLGPSArrow", UIParent)
     arrow.wlOwned = true
     arrow.wlWorld = true            -- text drawn over the world: with a shadow
-    arrow:SetSize(HUD_W, 12 + ARROW_SIZE + 12)
+    arrow:SetSize(HUD_W, PAD + ICON + PAD)
     local pos = WLWritsDB.arrowPos
     if pos then arrow:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4]) else arrow:SetPoint("TOP", 0, -150) end
     arrow:SetFrameStrata("HIGH")   -- above unit frames and action bars (EllesmereUI and others draw at MEDIUM)
@@ -366,43 +683,34 @@ local function Build()
     arrow:SetMovable(true)
     arrow:EnableMouse(true)
     arrow:RegisterForDrag("LeftButton")
-    arrow:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    arrow:SetScript("OnDragStop", function(self) self:StopMovingOrSizing(); SavePos(self) end)
+    arrow:SetScript("OnDragStart", function(self)
+        -- in combat the cast button cannot follow: the HUD stays with it
+        if InCombatLockdown() and teleport and teleport:IsShown() then return end
+        self:StartMoving(); self.moving = true
+    end)
+    arrow:SetScript("OnDragStop", function(self) self:StopMovingOrSizing(); self.moving = nil; SavePos(self) end)
     arrow:SetScript("OnEnter", RouteTip)
     arrow:SetScript("OnLeave", S.HideTip)
     -- the optional box under the HUD (options: opacity, 0 by default)
     arrow.bg = S.Solid(arrow, "BACKGROUND", C.bg, 1)
     arrow.bg:SetAllPoints()
 
-    -- WL Helper's own HD arrow (Media/Arrow.tga, smooth at any scale)
+    -- WL Helper's own HD arrow (Media/Arrow.tga, smooth at any scale), centred at the top
     arrow.tex = arrow:CreateTexture(nil, "ARTWORK")
     arrow.tex:SetTexture("Interface\\AddOns\\WLHelper\\Media\\Arrow")
     arrow.tex:SetSize(ARROW_SIZE, ARROW_SIZE)
-    arrow.tex:SetPoint("TOPLEFT", 12, -12)
+    arrow.tex:SetPoint("TOPLEFT", ICON_X, -PAD)
+    -- or a painted icon (flight, boat, dungeon, a cast not clickable yet), or the check
     arrow.icon = arrow:CreateTexture(nil, "ARTWORK")
-    arrow.icon:SetSize(ARROW_SIZE, ARROW_SIZE)
+    arrow.icon:SetSize(ICON, ICON)
     arrow.icon:SetPoint("CENTER", arrow.tex, "CENTER")
     arrow.icon:Hide()
 
-    -- the distance: one hero number, its unit small and muted beside it
-    arrow.big = S.Text(arrow, S.F.hero, C.fg, true)
-    arrow.big:SetPoint("TOPLEFT", TEXT_X, -12)
-    arrow.big:SetJustifyH("LEFT")
-    arrow.big:SetWordWrap(false)
-    arrow.big:SetWidth(TEXT_W)
-    arrow.unit = S.Text(arrow, S.F.meta, C.muted)
-    arrow.unit:SetWordWrap(false)
-    arrow.unit:SetPoint("BOTTOMLEFT", arrow.big, "BOTTOMRIGHT", 3, 2)
-    -- or the state, a short sentence ("Tu y es", "Attends le zeppelin", a city) at heading size
-    arrow.state = S.Text(arrow, S.F.heading, C.fg, true)
-    arrow.state:SetPoint("TOPLEFT", TEXT_X, -12)
-    arrow.state:SetJustifyH("LEFT"); arrow.state:SetJustifyV("TOP")
-    -- the step and the next one wrap to two lines; the HUD grows with them
-    arrow.step = S.Text(arrow, S.F.label, C.fg)
-    arrow.step:SetJustifyH("LEFT"); arrow.step:SetJustifyV("TOP")
-    arrow.sub = S.Text(arrow, S.F.meta, C.muted)
-    arrow.sub:SetJustifyH("LEFT"); arrow.sub:SetJustifyV("TOP")
-    for _, fs in ipairs({ arrow.big, arrow.unit, arrow.state, arrow.step, arrow.sub }) do root.Shadow(fs, true) end
+    -- line 1 what to do, line 2 where, line 3 how far and how long, line 4 the whole way
+    arrow.what = Line(arrow, S.F.heading, C.fg, true, 2)
+    arrow.where = Line(arrow, S.F.label, C.gold, false, 2)
+    arrow.dist = Line(arrow, S.F.body, C.fg, true, 1)
+    arrow.route = Line(arrow, S.F.meta, C.muted, false, 3)
 
     local close = S.CloseButton(arrow, 28, nil, function()
         if demo then return { L("Fixer la flèche"), L("Clic : la fixer à cet endroit") } end
@@ -423,88 +731,24 @@ local function Build()
     end)
     arrow.close = close
 
-    arrow.fly = S.Button(arrow, "", HUD_W - 24, BTN_H, "primary", function() GPS.TakeFlight() end,
+    arrow.fly = S.Button(arrow, L("Prendre ce vol"), HUD_W - 2 * PAD, BTN_H, "primary", function() GPS.TakeFlight() end,
         function()
             if arrow.fly:IsEnabled() == false then return nil end   -- the label and its reason, once
-            return { arrow.fly:GetText(), L("Clic : prendre ce vol") }
+            return { arrow.flyTitle or L("Prendre ce vol"), L("Clic : prendre ce vol") }
         end)
     arrow.fly:SetIcon("flag")
     arrow.fly:SetDisabledReason(L("Indisponible en combat"))
     arrow.fly:Hide()
 
-    -- the teleport: a secure button drawn like a secondary button (fill, 1 px edge, HD portal icon)
-    teleport = CreateFrame("Button", "WLGPSTeleport", UIParent, "SecureActionButtonTemplate")
-    teleport.wlOwned = true
-    teleport:SetSize(HUD_W - 24, BTN_H)
-    teleport:SetFrameStrata("HIGH")
-    teleport:SetFrameLevel(arrow:GetFrameLevel() + 5)
-    teleport:RegisterForClicks("AnyUp", "AnyDown")   -- the game acts on the press or the release (its "cast on key down" setting): both registered
-    S.Solid(teleport, "BACKGROUND", C.bg, 0.92):SetAllPoints()
-    S.Solid(teleport, "BACKGROUND", C.btnFill):SetAllPoints()
-    local edge = S.Border(teleport, C.btnEdge)
-    -- what the click does, seen: lighter on hover, pressed look on click, then the cast's progress
-    local hover = S.Solid(teleport, "BORDER", C.hoverFill); hover:SetAllPoints(); hover:SetAlpha(0)
-    local press = S.Solid(teleport, "ARTWORK", C.pressFill); press:SetAllPoints(); press:Hide()
-    local fill = S.Solid(teleport, "BORDER", C.accent, 0.35)
-    fill:SetPoint("TOPLEFT", 1, -1); fill:SetPoint("BOTTOMLEFT", 1, 1); fill:SetWidth(1); fill:Hide()
-    local tl = S.Text(teleport, S.F.label, C.fg)
-    tl:SetWordWrap(false)
-    tl:SetPoint("CENTER", 11, 0)
-    local ti = S.Icon(teleport, "portal", 16, "OVERLAY", C.fg)
-    ti:SetPoint("RIGHT", tl, "LEFT", -6, 0)
-    local function Label(t) tl:SetText(t) end
-    Label(L("Lancer la téléportation"))
-    teleport.label = tl
-    teleport:HookScript("OnEnter", function(self)
-        hover:SetAlpha(1); edge(C.btnEdgeHover)
-        local lines = { L("Lancer la téléportation"), L("Clic : lancer le sort") }
-        if InCombatLockdown() then lines[#lines + 1] = { L("La téléportation attend la fin du combat."), C.warn[1], C.warn[2], C.warn[3] } end
-        S.Tip(self, lines)
-    end)
-    teleport:HookScript("OnLeave", function() hover:SetAlpha(0); edge(C.btnEdge); S.HideTip() end)
-    teleport:HookScript("OnMouseDown", function() press:Show(); tl:SetPoint("CENTER", 11, -1) end)
-    teleport:HookScript("OnMouseUp", function() press:Hide(); tl:SetPoint("CENTER", 11, 0) end)
-    teleport:HookScript("OnClick", function()
-        Label(L("Téléportation demandée..."))
-        C_Timer.After(1.5, function()
-            if not teleport.casting then Label(L("Lancer la téléportation")) end
-        end)
-    end)
-    -- the cast bar inside the button: filled from the player's cast (numbers read under pcall,
-    -- they may be secret on this client)
-    local cev = CreateFrame("Frame", nil, teleport)
-    for _, e in ipairs({ "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_SUCCEEDED" }) do
-        pcall(cev.RegisterUnitEvent or cev.RegisterEvent, cev, e, "player")
-    end
-    cev:SetScript("OnEvent", function(_, e, unit)
-        if unit ~= "player" or not teleport:IsShown() then return end
-        if e == "UNIT_SPELLCAST_START" then
-            teleport.casting = true
-            Label(L("Téléportation en cours...")); fill:Show()
-        elseif e == "UNIT_SPELLCAST_SUCCEEDED" then
-            teleport.casting = false; fill:Hide(); Label(L("Lancer la téléportation"))
-        else
-            if teleport.casting then
-                teleport.casting = false; fill:Hide()
-                Label(L("Interrompue : clique pour relancer"))
-                C_Timer.After(3, function() if not teleport.casting then Label(L("Lancer la téléportation")) end end)
-            end
-        end
-    end)
-    teleport:HookScript("OnUpdate", function(self)
-        if not self.casting then return end
-        local ok, k = pcall(function()
-            local _, _, _, startMS, endMS = UnitCastingInfo("player")
-            if not (startMS and endMS) or endMS <= startMS then return nil end
-            return math.max(0, math.min(1, (GetTime() * 1000 - startMS) / (endMS - startMS)))
-        end)
-        if ok and k then fill:SetWidth(math.max(1, (self:GetWidth() - 2) * k)) end
-    end)
-    teleport:Hide()
+    -- the secure button cannot be made in combat (size, strata, clicks are protected): after the fight
+    if not InCombatLockdown() then BuildTeleport() end
 
     local turnAcc, textAcc, pulse = 0, TEXT_EVERY, 0
     arrow:SetScript("OnUpdate", function(self, elapsed)
-        if demo then return end
+        if demo then
+            if self.moving then PlaceTeleport() end
+            return
+        end
         -- the only looping animation: a slow pulse on the check once you are there
         if self.arrived then
             pulse = (pulse + elapsed) % 1.2
@@ -513,6 +757,7 @@ local function Build()
             pulse = 0; self.icon:SetAlpha(1)
         end
         turnAcc, textAcc = turnAcc + elapsed, textAcc + elapsed
+        if self.redraw then self.redraw = nil; textAcc = TEXT_EVERY; turnAcc = TURN_EVERY end
         if turnAcc < TURN_EVERY then return end
         turnAcc = 0
         local now = GPS.Now()
@@ -521,12 +766,12 @@ local function Build()
         if combat ~= self.combat then
             self.combat = combat
             self:SetAlpha(combat and Opt("hideCombat", false) and 0 or 1)
-            -- the secure teleport button cannot hide in combat, but it can go transparent
-            if teleport then teleport:SetAlpha(self:GetAlpha()) end
             textAcc = TEXT_EVERY            -- redraw now: amber, buttons off
         end
+        if self.moving then PlaceTeleport() end
         if textAcc >= TEXT_EVERY then
             textAcc = 0
+            SampleSpeed(now)
             Draw(self, now, combat)
         end
         if self.turn then Turn(self, now, combat) end
@@ -541,12 +786,17 @@ local function Build()
     Layout(arrow)
 end
 
--- After combat: the teleport button catches up with what the HUD shows now.
+-- After combat: the cast button catches up with what the HUD shows now.
 local ev = CreateFrame("Frame")
 pcall(ev.RegisterEvent, ev, "PLAYER_REGEN_ENABLED")
 ev:SetScript("OnEvent", function()
-    -- restored here, not in SetTeleport (which returns early for the spell already shown)
-    if teleport then teleport:SetAlpha(1); PlaceTeleport(); SetTeleport(WantedTeleport()) end
+    if not teleport and arrow then BuildTeleport() end
+    if not teleport then return end
+    teleport.pending = nil
+    teleport:SetAlpha(arrow and arrow:GetAlpha() or 1)
+    PlaceTeleport()
+    SetTeleport(WantedTeleport())
+    if arrow then arrow.redraw = true end
 end)
 
 -- Size and background opacity from the options.
@@ -569,11 +819,14 @@ function GPS.UnlockArrow()
     GPS.ApplyLook()
     demo = true
     arrow.arrived = false
-    arrow.icon:Hide(); arrow.icon:SetAlpha(1); arrow.tex:Show(); arrow.tex:SetRotation(0.3)
+    arrow.icon:SetAlpha(1)
+    SetVisual(arrow, "arrow")
+    arrow.tex:SetRotation(0.3)
     arrow.tex:SetVertexColor(C.ok[1], C.ok[2], C.ok[3])
-    SetTop(arrow, L("Place la flèche"))
-    SetText(arrow.step, L("Glisse-la où tu veux."))
-    SetText(arrow.sub, L("Clique sur la croix pour la fixer ici."))
+    SetText(arrow.what, L("Place la flèche"))
+    SetText(arrow.where, L("Glisse-la où tu veux."))
+    SetText(arrow.dist, S.Hex(C.accentSoft) .. Distance(600) .. "|r" .. S.Hex(C.muted) .. "  \194\183  |r" .. Duration(70))
+    SetText(arrow.route, L("Clique sur la croix pour la fixer ici."))
     arrow.fly:Hide()
     arrow.button = nil
     Layout(arrow)
@@ -583,7 +836,10 @@ end
 
 function GPS.Lock()
     demo = false
-    if arrow then SetTop(arrow, ""); SetText(arrow.step, ""); SetText(arrow.sub, ""); arrow.icon.cur = nil end
+    if arrow then
+        for _, fs in ipairs({ arrow.what, arrow.where, arrow.dist, arrow.route }) do SetText(fs, "") end
+        arrow.visual = nil
+    end
     if arrow and not GPS.Active() then arrow:Hide() end
 end
 

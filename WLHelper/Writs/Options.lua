@@ -1,7 +1,13 @@
--- Writs/Options.lua: WL Helper's Settings window (/wlh options): one place for the quest guide, the
--- trading post (Writs), the GPS, the bags and the upgrades. A 640 px window: pages listed on the
--- left under a search box, settings cards on the right (label and description on the left, control
--- on the right), built lazily the first time it opens. The window fits the page it shows.
+-- Writs/Options.lua: the WL Helper window, "the Hub" (T-55, DESIGN 3.20): one window for Home and
+-- every settings page. 860 px wide (90 % of a narrow screen), a fixed height (80 % of the screen,
+-- 520 to 680), each page scrolls inside it. At the left a nav: the settings search, Home, then the
+-- activities (Writs/Hub.lua WP.HUB_GROUPS) with their settings pages; at the bottom Settings
+-- (General, About), "How do I...?", "What's new", "Write to us" and the version. At the right the
+-- page: a fixed header (title, one sentence) over its scrolled content. Home is built by
+-- Writs/Home.lua (WP.HomePage) into its page; the settings pages are cards of rows (label and
+-- description on the left, control on the right). Built the first time it opens.
+-- WLHelperHome and WLHelperOptions (the two windows it replaced) are aliases of WLHelperHub.
+-- No secure frame lives here: the Hub may open, close and change in combat.
 -- Also registers WL Helper in the game's own settings (Esc > Options > AddOns) and, when present,
 -- as an EllesmereUI plugin, both pointing back to this window.
 local ADDON, root = ...
@@ -13,8 +19,15 @@ local T = S.C
 local F = root.F
 
 ns.AddEnglish({
+    ["La flèche suit un vrai chemin autour des collines et par les portes, pour tous les guides (WL Helper Nav). Sans lui, elle va tout droit."] =
+        "The arrow follows a real path around hills and through gates, for every guide (WL Helper Nav). Without it, it goes straight.",
     -- window, nav and search
     ["Réglages"] = "Settings",
+    ["Accueil"] = "Home",
+    ["Où tu en es, et tout ce que WL Helper peut ouvrir."] = "Where you stand, and everything WL Helper can open.",
+    ["Chercher un réglage"] = "Search settings",
+    ["Quoi de neuf"] = "What's new",
+    ["Clic : ouvrir Quoi de neuf"] = "Click: open What's new",
     ["Général"] = "General", ["Donjons"] = "Dungeons", ["Writs"] = "Writs", ["GPS"] = "GPS",
     ["Sacs"] = "Bags", ["Améliorations"] = "Upgrades", ["À propos"] = "About",
     ["Modules, clics, langue et fenêtres."] = "Modules, clicks, language and windows.",
@@ -41,7 +54,6 @@ ns.AddEnglish({
     ["Ouvrir les Writs"] = "Open the Writs window",
     ["Allumer le module"] = "Turn the module on",
     ["Éteint : il ne montre plus rien. Tes réglages sont gardés."] = "Off: it shows nothing. Your settings are kept.",
-    ["Groupes de la guilde"] = "Guild groups",
     ["Le guide des quêtes de donjon, de raid et de classe, avec la route et la flèche."] =
         "The dungeon, raid and class quest guide, with the route and the arrow.",
     ["Les Writs à faire, la liste d'achat et la remise automatique."] = "The Writs to do, the shopping list and automatic turn-in.",
@@ -85,7 +97,7 @@ ns.AddEnglish({
     ["Même si tu l'avais fermé avant de te déconnecter."] = "Even if you closed it before logging out.",
     -- Dungeons
     ["Guide de quêtes"] = "Quest guide",
-    ["Réglages du guide"] = "Guide settings",
+    ["GPS et alertes"] = "GPS and alerts", ["Quêtes montrées"] = "Quests shown",
     ["Flèche du guide"] = "Guide arrow",
     ["Le GPS te mène à la prochaine étape du guide."] = "The GPS leads you to the guide's next step.",
     ["Alerte des monstres rares"] = "Rare monster alert",
@@ -106,21 +118,22 @@ ns.AddEnglish({
     ["Scanner l'HV à son ouverture"] = "Scan the AH when it opens",
     ["Seulement si la fenêtre Writs est ouverte et que les prix ont plus d'une heure."] =
         "Only when the Writs window is open and prices are over an hour old.",
-    ["Infos"] = "Info",
+    ["Rappels et infobulles"] = "Reminders and tooltips",
+    ["En parlant au PNJ. Garde Maj enfoncée pour le faire à la main."] = "When you talk to the NPC. Hold Shift to do it by hand.",
     ["Rappel à la connexion"] = "Reminder on login",
     ["Par exemple : « 3 Writs prêts à rendre, 1 enveloppe à ouvrir »."] = "For example: \"3 Writs ready to turn in, 1 envelope to open\".",
     ["Détails dans l'infobulle des enveloppes"] = "Details in envelope tooltips",
     ["Réputation, coût, à qui la rendre, et si tu l'as déjà rendue."] = "Reputation, cost, who to hand it to, and whether you already turned it in.",
-    ["Plan"] = "Plan",
+    ["Plan d'achat"] = "Shopping plan",
     ["Objectif de réputation"] = "Reputation goal",
     ["Le plan achète les Writs qu'il faut pour l'atteindre."] = "The plan buys the Writs needed to reach it.",
     ["Rang suivant"] = "Next standing",
     ["Masquer les zones trop hautes"] = "Hide zones above your level",
     ["Les zones au-dessus de ton niveau sortent du plan."] = "Zones above your level leave the plan.",
     ["Zones du plan"] = "Zones in the plan",
-    ["niv. %d+"] = "lvl %d+",
-    ["Pour écarter un seul Writ : clic droit dessus dans l'onglet « Tous les writs » des Writs."] =
-        "To set aside a single Writ: right-click it in the Writs window's \"All writs\" tab.",
+    ["dès le niv. %d"] = "from level %d",
+    ["Pour écarter un seul Writ : clic droit dessus dans l'onglet « %s » de la fenêtre Writs."] =
+        "To set aside a single Writ: right-click it in the Writs window's \"%s\" tab.",
     -- GPS
     ["Itinéraire"] = "Route",
     ["Calcul de l'itinéraire"] = "Route planner",
@@ -130,6 +143,7 @@ ns.AddEnglish({
         "Automatic keeps the WL Helper GPS and leaves your Zygor guide alone. Pick Zygor to use its travel system.",
     ["Trajet"] = "Travel",
     ["Utiliser mes téléportations"] = "Use my teleports",
+    ["Tes sorts de téléportation (mage, druide), quand ils sont prêts."] = "Your teleport spells (mage, druid), when they are ready.",
     ["Choisir le vol automatiquement"] = "Pick the flight automatically",
     ["Chez le maître de vol, le bon trajet est choisi pour toi."] = "At the flight master, the right route is picked for you.",
     ["Points de vol connus"] = "Known flight paths",
@@ -152,7 +166,7 @@ ns.AddEnglish({
     ["Vendre les gris chez les marchands"] = "Sell greys at merchants",
     ["Dès que tu ouvres la fenêtre d'un marchand."] = "As soon as you open a merchant's window.",
     ["Un autre de tes addons les vend déjà : WL Helper le laisse faire."] = "Another of your addons already sells them: WL Helper lets it.",
-    ["Le nettoyeur ne propose jamais un objet qui lance une quête. Pour libérer une place à la main, tape /wlh free."] =
+    ["Le nettoyeur ne propose jamais un objet qui lance une quête. Pour libérer une place à la main, tape /wlh place."] =
         "The cleaner never offers an item that starts a quest. To free a slot by hand, type /wlh free.",
     -- Upgrades
     ["Calcul"] = "Calculation",
@@ -281,20 +295,39 @@ end
 
 -- ---------------------------------------------------------------- layout constants
 
-local WIN_W, NAV_W = 640, 168
-local CONTENT_W = WIN_W - NAV_W - 1        -- the content column, right of the nav and its rule
+-- DESIGN 3.1 / 3.20: W = min(860, 90 % of the screen) (never under 640), H = 80 % of the screen
+-- between 520 and 680, the same on every page (the nav would jump otherwise). Recomputed when the
+-- screen or the UI scale changes.
+local NAV_W = 199                          -- the nav, then its 1 px rule
 local INSET = 16                           -- one left edge, one right edge
-local CARD_W = CONTENT_W - 2 * INSET       -- a settings card
 local NAV_ITEM_H, NAV_GAP, NAV_TOP = 32, 2, 12 + 28 + 12
-local PAGE_COUNT = 7
-local NAV_H = NAV_TOP + PAGE_COUNT * NAV_ITEM_H + (PAGE_COUNT - 1) * NAV_GAP + 12
 local HEADER_H = 44
+local PAGE_HEAD_H = 60                     -- a page's fixed header (title, sentence), its rule under it
+local WIN_W, WIN_H, CONTENT_W, CARD_W
+
+local function HubW()
+    local uw = num(UIParent:GetWidth()) or 1366
+    return math.max(640, math.min(860, math.floor(uw * 0.90)))
+end
+local function HubH()
+    local uh = num(UIParent:GetHeight()) or 768
+    return math.max(520, math.min(680, math.floor(uh * 0.80)))
+end
+local function Dims()
+    WIN_W, WIN_H = HubW(), HubH()
+    CONTENT_W = WIN_W - NAV_W - 1          -- the content column, right of the nav and its rule
+    CARD_W = CONTENT_W - 2 * INSET         -- a settings card, a Home row of two columns
+end
+Dims()
+ns.WP = ns.WP or {}
+ns.WP.HubW, ns.WP.HubH = HubW, HubH
 
 -- ---------------------------------------------------------------- search index
 -- Every row registers its page, section, label and description while the pages are built. Text is
 -- matched lower-cased and without accents, in both languages (the French key and its English text),
 -- plus a few keywords, so "arrow", "fleche" and "flèche" all find the arrow settings.
 local INDEX = {}
+local needsRebuild = false   -- the width changed while the Hub was hidden: rebuilt when it opens
 local BuildSearch   -- defined after ShowPage; builds the search box into the nav
 
 local FOLD = { ["à"] = "a", ["â"] = "a", ["ä"] = "a", ["é"] = "e", ["è"] = "e", ["ê"] = "e", ["ë"] = "e",
@@ -327,7 +360,7 @@ local KEYWORDS = {
     groupe = "lfg events evenement donjon raid", lfg = "groupes events", spe = "spec talents poids amelioration",
     spec = "spe talents", stuff = "ameliorations upgrades equipement", son = "sound alerte", alerte = "rare sound son",
     caisse = "crates faveur favor", faveur = "favor caisses", hv = "hotel des ventes auction scan prix",
-    prix = "price scan hv", police = "font", font = "police", comptoir = "writs trading post",
+    prix = "price scan hv", police = "font", font = "police", comptoir = "Writs trading post",
     invite = "inviter inv clic", inviter = "invite inv", tir = "shoot tirer", shoot = "tirer tir",
 }
 
@@ -341,22 +374,41 @@ local function Register(p, row, label, hint)
 end
 
 -- ---------------------------------------------------------------- pages
--- A page is the scrolled child of a scroll area filling the content column. Its items (section
--- headers, settings cards, notes, module card, free blocks) are stacked by p:Layout(), which measures
--- every text at its width and returns the page height; the window then fits it.
+-- A page fills the content column: a fixed header (title 16 fg at 16,-16, one sentence 11 muted
+-- under it, cut with the full text in its tooltip, a 1 px rule at y=-60), then a scroll area from
+-- y=-61 whose child is the page itself. Its items (section headers, settings cards, notes, module
+-- card, free blocks) are stacked by p:Layout(), which measures every text at its width and sets
+-- the scrolled height. The window never changes height for a page.
 
-local function NewPage(parent)
-    local sa = S.ScrollArea(parent)
-    sa:SetAllPoints()
-    sa:Hide()
+local function NewPage(parent, def)
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetAllPoints()
+    holder:Hide()
+    local head = CreateFrame("Frame", nil, holder)
+    head:SetPoint("TOPLEFT", 0, 0); head:SetPoint("TOPRIGHT", 0, 0); head:SetHeight(PAGE_HEAD_H)
+    head:EnableMouse(true)
+    head.title = S.Text(head, F.title, T.fg, true)
+    head.title:SetJustifyH("LEFT")
+    head.title:SetPoint("TOPLEFT", INSET, -16); head.title:SetPoint("RIGHT", -INSET, 0)
+    head.title:SetText(L(def.label))
+    S.ClampLabel(head.title, nil, head)
+    head.desc = S.Text(head, F.meta, T.muted)
+    head.desc:SetJustifyH("LEFT")
+    head.desc:SetPoint("TOPLEFT", head.title, "BOTTOMLEFT", 0, -2); head.desc:SetPoint("RIGHT", -INSET, 0)
+    head.desc:SetText(L(def.desc))
+    S.ClampLabel(head.desc, nil, head)
+    local rule = S.Rule(holder)
+    rule:SetPoint("TOPLEFT", 0, -PAGE_HEAD_H); rule:SetPoint("TOPRIGHT", 0, -PAGE_HEAD_H)
+    local sa = S.ScrollArea(holder)
+    sa:SetPoint("TOPLEFT", 0, -(PAGE_HEAD_H + 1)); sa:SetPoint("BOTTOMRIGHT", 0, 0)
     local p = sa.child
     p:SetWidth(CONTENT_W)
-    p.sa = sa
-    p.items, p.controls = {}, {}
-    function p:Show() sa:Show(); sa:ScrollTo(0, true) end
-    function p:Hide() sa:Hide() end
-    function p:SetShown(v) if v then self:Show() else sa:Hide() end end
-    function p:IsShown() return sa:IsShown() end
+    p.sa, p.holder, p.head = sa, holder, head
+    p.items, p.controls, p.anchors = {}, {}, {}
+    function p:Show() holder:Show(); sa:Show(); sa:ScrollTo(0, true) end
+    function p:Hide() holder:Hide() end
+    function p:SetShown(v) if v then self:Show() else holder:Hide() end end
+    function p:IsShown() return holder:IsShown() end
     -- every control re-reads its value when the page shows
     function p:Sync()
         for _, c in ipairs(self.controls) do
@@ -374,6 +426,7 @@ local function NewPage(parent)
             it.frame:SetPoint("TOPLEFT", self, "TOPLEFT", INSET, -y)
             it.frame:SetWidth(CARD_W)
             it.y = y
+            if it.kind ~= "card" then it.frame.pageY = y end
             y = y + (it.Layout(CARD_W, y) or 0)
         end
         y = math.ceil(y + 16)
@@ -396,6 +449,7 @@ local function Section(p, text)
     p.section = text
     local h = S.SectionHeader(p, text)
     Add(p, h, function() return 32 end, "head", 16)
+    p.anchors[text] = h   -- WP.OpenHub(page, anchor) scrolls here
 end
 
 -- One explanatory paragraph under a card: 11 muted, wraps without a line limit.
@@ -525,8 +579,8 @@ end
 
 -- A segmented control that turns into a dropdown when its labels would leave the row's texts less
 -- than 200 px. The dropdown is as wide as its longest choice.
-local CHOICE_MAX = CARD_W - 2 * INSET - 12 - 200
 local function Choice(p, row, options, get, set)
+    local CHOICE_MAX = CARD_W - 2 * INSET - 12 - 200
     local seg = S.Segmented(row, options, get, set)
     seg:SetMaxWidth(CHOICE_MAX)
     local d = seg.dropdown
@@ -607,29 +661,24 @@ end
 -- ---------------------------------------------------------------- pages
 
 -- Page icons (icon audit G5): the modules' own icons (Writs/Home.lua WP.MODULE_ICON, the same as
--- on the Home cards); General is the HD settings gear, as everywhere else Settings opens; GPS is the addon's GPS arrow, as on the HUD
--- and in the minimap menu; About is the neutral "info" glyph (the question mark read as Help).
+-- on the Home rows); Home is the HD house; General is the HD settings gear, as everywhere else
+-- Settings opens; GPS is the addon's GPS arrow, as on the HUD and in the minimap menu; About is the
+-- neutral "info" glyph (the question mark read as Help).
 -- An icon is a painted path or { hd = glyph name or path }.
+-- group: the activity (WP.HUB_GROUPS) the page sits under in the nav; "settings" for the bottom
+-- block; nil for Home (first, alone). The keys never change: /wlh, the gears and the tests use them.
 local MI = ns.WP.MODULE_ICON or {}
 local PAGES = {
-    { key = "general",  label = "Général",       icon = { hd = "gear" },                            desc = "Modules, clics, langue et fenêtres." },
-    { key = "dungeons", label = "Donjons",       icon = MI.dungeons or "Interface\\Icons\\INV_Misc_Map_01", desc = "La flèche, les alertes et les quêtes que montre le guide." },
-    { key = "comptoir", label = "Writs",      icon = MI.writs or "Interface\\Icons\\INV_Letter_15", desc = "Remise des Writs, rappels, objectif et zones." },
-    { key = "gps",      label = "GPS",           icon = { hd = root.ARROW },                          desc = "Itinéraire, vols, téléportations et flèche." },
-    { key = "bags",     label = "Sacs",          icon = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", desc = "Place dans les sacs et vente des objets gris." },
-    { key = "upgrades", label = "Améliorations", icon = MI.upgrades or { hd = "arrow_up", color = T.ok }, desc = "Calcul, spé et affichage des améliorations." },
-    { key = "about",    label = "À propos",      icon = { hd = "info" },                              desc = "Version, crédits, contact et commandes du chat." },
+    { key = "home",     label = "Accueil",       icon = { hd = "home" },                              desc = "Où tu en es, et tout ce que WL Helper peut ouvrir." },
+    { key = "dungeons", label = "Guide de quêtes", group = "quests", icon = MI.dungeons or "Interface\\Icons\\INV_Misc_Map_01", desc = "La flèche, les alertes et les quêtes que montre le guide." },
+    { key = "gps",      label = "GPS",           group = "travel", icon = { hd = root.ARROW },        desc = "Itinéraire, vols, téléportations et flèche." },
+    { key = "comptoir", label = "Writs",         group = "items", icon = MI.writs or "Interface\\Icons\\INV_Letter_15", desc = "Remise des Writs, rappels, objectif et zones." },
+    { key = "bags",     label = "Sacs",          group = "items", icon = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", desc = "Place dans les sacs et vente des objets gris." },
+    { key = "upgrades", label = "Améliorations", group = "items", icon = MI.upgrades or { hd = "arrow_up", color = T.ok }, desc = "Calcul, spé et affichage des améliorations." },
+    { key = "general",  label = "Général",       group = "settings", icon = { hd = "gear" },          desc = "Modules, clics, langue et fenêtres." },
+    { key = "about",    label = "À propos",      group = "settings", icon = { hd = "info" },          desc = "Version, crédits, contact et commandes du chat." },
 }
--- Draws a page or module icon: a painted path, or an HD glyph (its own colour, else `rest`).
--- -> true for a glyph
-local function PaintIcon(tex, icon, rest)
-    if type(icon) == "table" then
-        root.SetHDIcon(tex, icon.hd, icon.color or rest or T.muted)
-        return true
-    end
-    S.Painted(tex, icon); tex:SetVertexColor(1, 1, 1)
-    return false
-end
+local PaintIcon = S.PaintIcon
 
 -- What each module does, written for the Settings rows and the module card of its page.
 local MODULE_DESC = {
@@ -646,10 +695,10 @@ local MODULE_ICON = {
     bags = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", upgrades = MI.upgrades or { hd = "arrow_up", color = T.ok },
 }
 
--- A module's name: "Groupes" has two English texts (Events.lua says "LFG"), and WP.MODULES says
--- "Writs & Favor" for the trading post.
+-- A module's name, the one its window and its Home card show: "LFG" (WP.MODULES says "Groupes"),
+-- and "Writs" (WP.MODULES says "Writs & Favor" for the trading post).
 local function ModLabel(m)
-    if m.key == "events" then return L("Groupes de la guilde") elseif m.key == "writs" then return L("Writs") end
+    if m.key == "events" then return L("LFG") elseif m.key == "writs" then return L("Writs") end
     return L(m.label)
 end
 local function ModDesc(m)
@@ -766,7 +815,8 @@ function BUILD.general(p)
 end
 
 function BUILD.dungeons(p)
-    Section(p, L("Réglages du guide"))
+    -- the module card above names the guide: the sections say what their rows are about
+    Section(p, L("GPS et alertes"))
     SwitchRow(p, L("Flèche du guide"), function() return Guide().arrow ~= false end, SetGuideArrow,
         L("Le GPS te mène à la prochaine étape du guide."))
     SwitchRow(p, L("Alerte des monstres rares"), function() return Guide().rareAlert ~= false end, function(v) Guide().rareAlert = v end,
@@ -775,6 +825,7 @@ function BUILD.dungeons(p)
         function(v) Guide().autoWay = v; RefreshGuide() end,
         L("Les points de l'étape en cours sont posés tout seuls quand une nouvelle étape commence."))
     -- "useful" hides the repeatable reputation quests and the quests of professions you don't have
+    Section(p, L("Quêtes montrées"))
     local row = Row(p, L("Quêtes répétables ou d'un autre métier"), L("Masquées, elles sortent de la route et du compte de quêtes de chaque donjon."))
     Choice(p, row, { { true, L("Masquer") }, { false, L("Afficher") } },
         function() return Guide().useful ~= false end,
@@ -788,7 +839,8 @@ end
 
 function BUILD.comptoir(p)
     Section(p, L("Automatismes"))
-    SwitchRow(p, L("Rendre les Writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"))
+    SwitchRow(p, L("Rendre les Writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"),
+        L("En parlant au PNJ. Garde Maj enfoncée pour le faire à la main."))
     SwitchRow(p, L("Rendre les caisses automatiquement"), function() return Comfort().autoCrates ~= false end, SetComfort("autoCrates"),
         L("En parlant à Dokimi ou à Marcy Baker."))
     SwitchRow(p, L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
@@ -796,13 +848,13 @@ function BUILD.comptoir(p)
         function(v) Writs().autoRescan = v; RefreshWrits() end,
         L("Seulement si la fenêtre Writs est ouverte et que les prix ont plus d'une heure."))
 
-    Section(p, L("Infos"))
+    Section(p, L("Rappels et infobulles"))
     SwitchRow(p, L("Rappel à la connexion"), function() return Comfort().reminder end, SetComfort("reminder"),
         L("Par exemple : « 3 Writs prêts à rendre, 1 enveloppe à ouvrir »."))
     SwitchRow(p, L("Détails dans l'infobulle des enveloppes"), function() return Comfort().tooltip end, SetComfort("tooltip"),
         L("Réputation, coût, à qui la rendre, et si tu l'as déjà rendue."))
 
-    Section(p, L("Plan"))
+    Section(p, L("Plan d'achat"))
     local row = Row(p, L("Objectif de réputation"), L("Le plan achète les Writs qu'il faut pour l'atteindre."))
     Choice(p, row, {
         { 0, L("Rang suivant") }, { 6, L("Honoré") }, { 7, L("Révéré") },
@@ -826,11 +878,11 @@ function BUILD.comptoir(p)
     for _, map in ipairs(maps) do
         local lo = WP.ZoneMin(map)
         local label = WP.ZoneName(map)
-        if lo then label = label .. "  " .. muted .. string.format(L("niv. %d+"), lo) .. "|r" end
+        if lo then label = label .. "  " .. muted .. string.format(L("dès le niv. %d"), lo) .. "|r" end
         SwitchRow(p, label, function() return not WP.IsSkipped("zones", map) end,
             function(v) WP.SetSkipped("zones", map, not v) end)
     end
-    Note(p, L("Pour écarter un seul Writ : clic droit dessus dans l'onglet « Tous les writs » des Writs."))
+    Note(p, string.format(L("Pour écarter un seul Writ : clic droit dessus dans l'onglet « %s » de la fenêtre Writs."), L("Tous les Writs")))
 end
 
 function BUILD.gps(p)
@@ -853,7 +905,8 @@ function BUILD.gps(p)
     end
 
     Section(p, L("Trajet"))
-    SwitchRow(p, L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"))
+    SwitchRow(p, L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"),
+        L("Tes sorts de téléportation (mage, druide), quand ils sont prêts."))
     SwitchRow(p, L("Choisir le vol automatiquement"), function() return Gps().autoFlight end, SetGps("autoFlight"),
         L("Chez le maître de vol, le bon trajet est choisi pour toi."))
     row = Row(p, L("Points de vol connus"), L("Ceux que ce personnage a déjà découverts."))
@@ -869,7 +922,27 @@ function BUILD.gps(p)
     local GT, Way = ns.WP.GoTo, ns.WP.Way
     if GT and GT.WalkOn and GT.SetWalk then
         SwitchRow(p, L("Chemins à pied"), function() return GT.WalkOn() end, function(v) GT.SetWalk(v) end,
-            L("Pour « Aller à », la flèche suit un vrai chemin autour des collines et par les portes (WL Helper Nav). Sans lui, elle va tout droit."))
+            L("La flèche suit un vrai chemin autour des collines et par les portes, pour tous les guides (WL Helper Nav). Sans lui, elle va tout droit."))
+    end
+    local TR = ns.WP.Trail
+    if TR and TR.MapOn and TR.SetMap then
+        SwitchRow(p, L("Chemin à pied sur la carte"), function() return TR.MapOn() end, function(v) TR.SetMap(v) end,
+            L("Des points sur la carte du monde montrent le chemin à pied jusqu'au point du GPS, avec une épingle sur l'endroit exact (WL Helper Nav)."))
+        SwitchRow(p, L("Sur la minimap"), function() return TR.MinimapOn() end, function(v) TR.SetMinimap(v) end,
+            L("Les mêmes points sur la minimap, autour de toi."))
+    end
+    local WPn = ns.WP and ns.WP.WorldPin
+    if WPn and WPn.SetMode then
+        local desc = L("Une étiquette dans le monde, sur le point du GPS : le lieu, la distance et le temps qu'il reste. En automatique, elle ne s'affiche que si aucun autre addon ne le fait déjà.")
+            .. " " .. L("Si tu as déjà posé un repère sur la carte, il est gardé et l'étiquette ne s'affiche pas.")
+        local okO, who = pcall(WPn.Owner)
+        if okO and type(who) == "string" then desc = desc .. " " .. string.format(L("Déjà fait par %s."), who) end
+        local pinRow = Row(p, L("Repère dans le monde"), desc)
+        Choice(p, pinRow, {
+            { "auto", L("Automatique") },
+            { "always", L("Toujours") },
+            { "never", L("Jamais") },
+        }, function() return WPn.Mode() end, function(v) WPn.SetMode(v) end)
     end
     if Way and Way.SetTake then
         -- the setting itself, not who owns /way right now: /way is decided a few seconds after login
@@ -909,7 +982,7 @@ function BUILD.bags(p)
     SwitchRow(p, L("Vendre les gris chez les marchands"),
         function() return WLWritsDB.sellGreys ~= false end, function(v) WLWritsDB.sellGreys = v end,
         other and L("Un autre de tes addons les vend déjà : WL Helper le laisse faire.") or L("Dès que tu ouvres la fenêtre d'un marchand."))
-    Note(p, L("Le nettoyeur ne propose jamais un objet qui lance une quête. Pour libérer une place à la main, tape /wlh free."))
+    Note(p, L("Le nettoyeur ne propose jamais un objet qui lance une quête. Pour libérer une place à la main, tape /wlh place."))
 end
 
 -- Upgrades: the spec judged, the weights it uses at your level, when an arrow shows, the tooltip line.
@@ -1121,12 +1194,14 @@ local win, body, current
 
 -- A module page's first card: the module's painted icon, its name, what it does and a button to
 -- open it; when it is switched off, a sentence that says so and the button that turns it back on.
+-- A button that opens a window closes the Hub first (the window would open under it otherwise).
 local OPEN = {
     dungeons = { "Ouvrir le guide", function()
+        if win then win:Hide() end
         if root.GuideStatus and root.GuideStatus() then root.ShowGuide() elseif root.ShowPicker then root.ShowPicker() end
     end },
-    comptoir = { "Ouvrir les Writs", function() ns.WP.Open("writs") end },
-    bags = { "Nettoyer les sacs", function() if ns.WP.Cleaner then ns.WP.Cleaner.Toggle() end end },
+    comptoir = { "Ouvrir les Writs", function() if win then win:Hide() end; ns.WP.Open("writs") end },
+    bags = { "Nettoyer les sacs", function() if win then win:Hide() end; if ns.WP.Cleaner then ns.WP.Cleaner.Toggle() end end },
 }
 local function ModuleCard(p, pageKey, mod)
     local m = { key = mod, label = mod }
@@ -1185,7 +1260,11 @@ local function ModuleCard(p, pageKey, mod)
     c.pageY = 12
 end
 
--- Builds the nav and every page into a fresh body frame (again after a language change).
+-- Builds the nav and every page into a fresh body frame (again after a language change or a new
+-- width). The nav, from the top: the settings search (175 x 28 at 12,-12), Home, then each
+-- activity that has a page (its title 24 px, its pages 32 px, 2 apart); that part scrolls when the
+-- screen is short. Anchored at the bottom: "Settings" (General, About), then a 28 px row with
+-- "How do I...?", "What's new", "Write to us" and the version.
 local function BuildBody()
     for i = #INDEX, 1, -1 do INDEX[i] = nil end
     body = CreateFrame("Frame", nil, win)
@@ -1194,6 +1273,7 @@ local function BuildBody()
 
     local nav = CreateFrame("Frame", nil, body)
     nav:SetPoint("TOPLEFT"); nav:SetPoint("BOTTOMLEFT"); nav:SetWidth(NAV_W)
+    body.nav = nav
     local edge = S.Solid(body, "BORDER", T.divider)
     edge:SetPoint("TOPLEFT", NAV_W, 0); edge:SetPoint("BOTTOMLEFT", NAV_W, 0); edge:SetWidth(1)
     root.PixelLine(body, edge, false)
@@ -1202,89 +1282,150 @@ local function BuildBody()
     content:SetPoint("TOPLEFT", NAV_W + 1, 0); content:SetPoint("BOTTOMRIGHT")
     body.content = content
 
-    body.pages, body.tabs = {}, {}
-    for i, def in ipairs(PAGES) do
-        -- a nav item: painted icon 20 + label 12; selected: selection fill and bright label
-        local b = CreateFrame("Button", nil, nav)
-        local y = -(NAV_TOP + (i - 1) * (NAV_ITEM_H + NAV_GAP))
-        b:SetHeight(NAV_ITEM_H)
-        b:SetPoint("TOPLEFT", 8, y); b:SetPoint("TOPRIGHT", -8, y)
-        b.sel = S.Solid(b, "BACKGROUND", T.selFill); b.sel:SetAllPoints(); b.sel:Hide()
-        b.hl = S.Solid(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
-        b.press = S.Solid(b, "BORDER", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
-        b.iconFrame = CreateFrame("Frame", nil, b)
-        b.iconFrame:SetSize(20, 20); b.iconFrame:SetPoint("LEFT", 8, 0)
-        b.icon = b.iconFrame:CreateTexture(nil, "ARTWORK")
-        -- painted: 20 px in a 1 px edge; an HD glyph: 16 px, no edge, tinted like the label
-        b.hdIcon = PaintIcon(b.icon, def.icon)
-        b.hdColor = b.hdIcon and def.icon.color or nil
-        if b.hdIcon then
-            b.icon:SetSize(16, 16); b.icon:SetPoint("CENTER")
-        else
-            b.icon:SetAllPoints()
-            S.Border(b.iconFrame, T.cardEdge)
-        end
-        b.count = S.Counter(b)
-        b.count:SetPoint("RIGHT", -8, 0)
-        b.label = S.Text(b, F.label, T.muted)
-        b.label:SetPoint("LEFT", 36, 0); b.label:SetPoint("RIGHT", -8, 0)
-        b.label:SetJustifyH("LEFT")
-        b.label:SetText(L(def.label))
-        S.ClampLabel(b.label, L(def.label), b)
-        b.key = def.key
-        b:SetScript("OnEnter", function(self)
-            root.Tween(self.hl, num(self.hl:GetAlpha()) or 0, 1, 0.10, function(v) self.hl:SetAlpha(v) end)
-            self.hover = true
-            body.PaintNav()
-            S.Tip(self, { L(def.label), L(def.desc), L("Clic : afficher ces réglages") })
-        end)
-        b:SetScript("OnLeave", function(self)
-            root.Tween(self.hl, num(self.hl:GetAlpha()) or 0, 0, 0.10, function(v) self.hl:SetAlpha(v) end)
-            self.hover = nil
-            body.PaintNav()
-            S.HideTip()
-        end)
-        b:SetScript("OnMouseDown", function(self) self.press:Show() end)
-        b:SetScript("OnMouseUp", function(self) self.press:Hide() end)
-        b:SetScript("OnClick", function(self) ns.WP.ShowOptionsPage(self.key) end)
-        body.tabs[i] = b
+    -- the bottom row: two icons and the version ("How do I...?" is the header's "?": one way, not
+    -- two, and the info glyph stays About's)
+    local foot = CreateFrame("Frame", nil, nav)
+    foot:SetHeight(28)
+    foot:SetPoint("BOTTOMLEFT", 0, 12); foot:SetPoint("BOTTOMRIGHT", 0, 12)
+    body.foot = foot
+    local WP = ns.WP
+    local function Away(fn) return function() if win then win:Hide() end; fn() end end
+    foot.news = S.IconButton(foot, "star", 28, { L("Quoi de neuf"), L("Clic : ouvrir Quoi de neuf") },
+        Away(function() if root.ShowWhatsNew then root.ShowWhatsNew(WLDTDB and WLDTDB.newsFrom) end end))
+    foot.news:SetPoint("LEFT", 12, 0)
+    foot.mail = S.IconButton(foot, "mail", 28,
+        { L("Nous écrire"), L("Une idée, un bug ?"), L("Clic : ouvrir le formulaire pour nous écrire") },
+        Away(function() if WP.Feedback then WP.Feedback("idea") end end))
+    foot.mail:SetPoint("LEFT", 44, 0)
+    -- the version alone: "WL Helper 1.0.0-beta.72" would not fit beside the icons (full in the tooltip)
+    foot.version = S.Text(foot, F.foot, T.muted)
+    foot.version:SetJustifyH("RIGHT")
+    foot.version:SetPoint("RIGHT", -12, 0); foot.version:SetPoint("LEFT", 44 + 28 + 8, 0)
+    foot.version:SetText(Version())
+    S.ClampLabel(foot.version, "WL Helper " .. Version(), foot)
+    foot:EnableMouse(true)
+    foot:SetScript("OnEnter", function(self) S.Tip(self, { "WL Helper " .. Version() }) end)
+    foot:SetScript("OnLeave", S.HideTip)
 
-        local p = NewPage(content)
+    body.pages, body.tabs = {}, {}
+    local function PaintNavLater() if body.PaintNav then body.PaintNav() end end
+    local function Item(parent, def, y)
+        local b = S.NavItem(parent, {
+            key = def.key, label = L(def.label), icon = def.icon,
+            tip = { L(def.label), L(def.desc), def.key == "home" and L("Clic : ouvrir l'Accueil") or L("Clic : afficher ces réglages") },
+            onClick = function(self) ns.WP.OpenHub(self.key) end,
+            onHover = PaintNavLater,
+        })
+        b:SetPoint("TOPLEFT", 8, y); b:SetPoint("TOPRIGHT", -8, y)
+        body.tabs[#body.tabs + 1] = b
+        return b
+    end
+
+    -- the pages by activity, in the order of WP.HUB_GROUPS; a page whose activity is unknown (the
+    -- registry not loaded) still gets its item, after the others
+    local byGroup, order, known = {}, {}, {}
+    for _, g in ipairs(ns.WP.HUB_GROUPS or {}) do known[g.key] = true end
+    for _, def in ipairs(PAGES) do
+        local g = def.group or "home"
+        if not byGroup[g] then byGroup[g] = {}; order[#order + 1] = g end
+        table.insert(byGroup[g], def)
+    end
+
+    -- bottom block: "Settings" and its pages, above the bottom row
+    local settings = byGroup.settings or {}
+    local itemsH = #settings * NAV_ITEM_H + math.max(0, #settings - 1) * NAV_GAP
+    local bottomH = 12 + 28 + 8 + itemsH + (#settings > 0 and 24 or 0)
+    if #settings > 0 then
+        local head = S.NavHeader(nav, L("Réglages"))
+        head:SetPoint("BOTTOMLEFT", nav, "BOTTOMLEFT", 0, bottomH - 24)
+        head:SetPoint("BOTTOMRIGHT", nav, "BOTTOMRIGHT", 0, bottomH - 24)
+        body.settingsHead = head
+        local holder = CreateFrame("Frame", nil, nav)
+        holder:SetPoint("BOTTOMLEFT", 0, 12 + 28 + 8); holder:SetPoint("BOTTOMRIGHT", 0, 12 + 28 + 8)
+        holder:SetHeight(itemsH)
+        body.settingsBlock = holder
+    end
+    body.navBottomH = bottomH
+
+    -- top part: Home and the activities, scrolled when the screen is short
+    local top = S.ScrollArea(nav)
+    top:SetPoint("TOPLEFT", 0, -NAV_TOP)
+    top:SetPoint("BOTTOMRIGHT", nav, "BOTTOMRIGHT", 0, bottomH + 4)
+    local list = top.child
+    list:SetWidth(NAV_W)
+    body.navScroll = top
+    body.navHeads = {}
+    local y = 0
+    local function Group(gkey, label)
+        local defs = byGroup[gkey]
+        if not defs or #defs == 0 then return end   -- an activity without a page is not drawn
+        if label then
+            local h = S.NavHeader(list, label)
+            h:SetPoint("TOPLEFT", 0, -y); h:SetPoint("TOPRIGHT", 0, -y)
+            h.key = gkey
+            body.navHeads[#body.navHeads + 1] = h
+            y = y + 24
+        end
+        for _, def in ipairs(defs) do
+            Item(list, def, -y)
+            y = y + NAV_ITEM_H + NAV_GAP
+        end
+    end
+    Group("home")
+    for _, g in ipairs(ns.WP.HUB_GROUPS or {}) do Group(g.key, L(g.label)) end
+    for _, g in ipairs(order) do
+        if g ~= "home" and g ~= "settings" and not known[g] then Group(g) end
+    end
+    body.navTopH = math.max(0, y - NAV_GAP)
+    top:SetContentHeight(body.navTopH)
+
+    if body.settingsBlock then
+        local sy = 0
+        for _, def in ipairs(settings) do
+            Item(body.settingsBlock, def, -sy)
+            sy = sy + NAV_ITEM_H + NAV_GAP
+        end
+    end
+
+    -- the pages, in the PAGES order (Home first). Home is built at once; a settings page only the
+    -- first time it shows (the minimap click opens Home, and should not pay for every settings row),
+    -- or all of them the first time the search box is used (its index needs every row).
+    for _, def in ipairs(PAGES) do
+        local p = NewPage(content, def)
         p.key, p.pageLabel, p.pageIcon = def.key, L(def.label), def.icon
-        local mod = ({ dungeons = "dungeons", comptoir = "writs", bags = "bags", upgrades = "upgrades" })[def.key]
-        if mod then ModuleCard(p, def.key, mod) end
-        BUILD[def.key](p)
+        if def.key == "home" then
+            if ns.WP.HomePage then ns.WP.HomePage.Build(p, CONTENT_W, win) end
+            p.built = true
+        else
+            p.built = false
+            function p:Build()
+                if self.built then return end
+                self.built = true
+                local mod = ({ dungeons = "dungeons", comptoir = "writs", bags = "bags", upgrades = "upgrades" })[def.key]
+                if mod then ModuleCard(self, def.key, mod) end
+                BUILD[def.key](self)
+            end
+        end
         body.pages[def.key] = p
+    end
+    -- every settings page, in the nav's order (the search index)
+    function body.BuildAll()
+        for _, def in ipairs(PAGES) do
+            local p = body.pages[def.key]
+            if p and not p.built and p.Build then p:Build() end
+        end
     end
 
     -- Selected page: selection fill and bright label; hover: soft fill and bright label.
     function body.PaintNav()
-        for _, b in ipairs(body.tabs) do
-            local on = b.key == current
-            b.sel:SetShown(on)
-            local c = (on or b.hover) and T.fg or T.muted
-            b.label:SetTextColor(c[1], c[2], c[3])
-            if b.hdIcon and not b.hdColor then b.icon:SetVertexColor(c[1], c[2], c[3]) end
-            b.iconFrame:SetAlpha((on or b.hover) and 1 or 0.8)
-        end
+        for _, b in ipairs(body.tabs) do b:Paint(b.key == current) end
     end
     BuildSearch(nav, content)
 end
 
 local function PaintNav() if body and body.PaintNav then body.PaintNav() end end
 
--- Fits the window to the page (or the search results) and the nav, whichever is taller.
-local function FitNow()
-    if not (win and body) then return end
-    local h
-    local p = body.pages[current]
-    h = p and p.contentH or 0
-    -- while searching, never shorter than the page: the window does not jump at each key
-    if body.results and body.results:IsShown() then h = math.max(h, body.resultsH or 0) end
-    local bodyH = math.max(NAV_H, h)
-    win:FitHeight(bodyH - 24)   -- the window adds 12 above and 12 below the content
-end
-
+-- Lays the page shown (or the search results) out again; the window keeps its size.
 Relayout = function(later)
     if not (win and body) then return end
     local function go()
@@ -1294,30 +1435,71 @@ Relayout = function(later)
             local p = body.pages[current]
             if p then p:Layout() end
         end
-        FitNow()
     end
     go()
     -- wrapped text measures right once its width is applied: once more on the next frame
     if later ~= false and C_Timer and C_Timer.After then
-        C_Timer.After(0, function() if win and win:IsShown() then go() end end)
+        C_Timer.After(0, function()
+            if not (win and win:IsShown()) then return end
+            go()
+            -- a section just shown (ShowAnchor): scrolled to again, now that the rows above it are measured
+            local a = body.anchorPending
+            body.anchorPending = nil
+            local p = body.pages[current]
+            if a and p and p:IsShown() and not (body.results and body.results:IsShown()) then
+                p.sa:ScrollTo(math.max(0, (a.pageY or 0) - 8), true)
+            end
+        end)
     end
 end
 
+local function PlayerLine()
+    local okN, n = pcall(UnitName, "player")
+    local okL, lv = pcall(UnitLevel, "player")
+    n = (okN and type(n) == "string" and not secret(n)) and n or ""
+    lv = (okL and num(lv)) or 0
+    return string.format(L("%s, niv. %d"), n, lv)
+end
+
+-- The saved places of the two windows the Hub replaced: Home's place is kept for the Hub.
+local function Migrate()
+    local db = WLWritsDB
+    if type(db) ~= "table" then return end
+    db.hubPos = db.hubPos or db.homePos
+    db.homePos, db.optionsPos, db.homeToolsOpen = nil, nil, nil
+end
+
 local function BuildWindow()
-    win = S.Window("WLHelperOptions", WIN_W, 400, L("Réglages"), "WL Helper " .. Version(), WLWritsDB, "optionsPos",
-        { header = HEADER_H, minH = HEADER_H + 1 + NAV_H })
+    Migrate()
+    Dims()
+    win = S.Window("WLHelperHub", WIN_W, WIN_H, "WL Helper", PlayerLine(), WLWritsDB, "hubPos",
+        { header = HEADER_H, logo = true, minH = 520 })
+    -- "?": how do I...? (DESIGN 2.1: the info glyph), one click from every page
+    if ns.WP.Help then
+        -- the tip is read on hover: it follows a language change
+        win.help = S.IconButton(win.header, "info", 28, function()
+            return { L("Comment faire... ?"), L("Les gestes utiles, pas à pas"), L("Clic : ouvrir Comment faire... ?") }
+        end, function()
+            win:Hide(); if ns.WP.Help then ns.WP.Help.Toggle() end
+        end)
+        win:AddHeaderButton(win.help)
+    end
+    -- the names of the two windows it replaced
+    _G.WLHelperOptions = win
+    _G.WLHelperHome = win
     BuildBody()
 end
 
 Rebuild = function()
     if not win then return end
+    needsRebuild = false
     local keep = current
     body:Hide()
     body:SetParent(nil)   -- the old frames stay orphaned; a language change is rare
     BuildBody()
-    win.title:SetText(L("Réglages"))
+    win.title:SetText("WL Helper")
     current = nil
-    ns.WP.ShowOptionsPage(keep or "general")
+    ns.WP.OpenHub(keep or "home")
 end
 
 -- Shows the window on a page (builds it the first time).
@@ -1331,11 +1513,45 @@ ShowPage = function(key)
         if body.ClearSearch then body.ClearSearch() end
     end
     current = key
-    for k, p in pairs(body.pages) do p:SetShown(k == key) end
     local p = body.pages[key]
+    if not p.built and p.Build then p:Build() end
+    for k, pg in pairs(body.pages) do pg:SetShown(k == key) end
     p:Sync()
     PaintNav()
+    if key == "home" and ns.WP.HomePage then ns.WP.HomePage.Refresh(true) end
     Relayout()
+end
+
+-- Scrolls a page to a section (or a row) and makes it flash in the selection colour for 1.5 s
+-- (the search's "Click: show this setting").
+local function Flash(f)
+    if not f then return end
+    if not f.flash then f.flash = S.Solid(f, "BACKGROUND", T.selFill); f.flash:SetAllPoints() end
+    f.flash:SetAlpha(1)
+    root.Tween(f.flash, 1, 0, 1.5, function(v) f.flash:SetAlpha(v) end)
+end
+local function ShowAnchor(key, anchor)
+    local p = body and body.pages[key]
+    if not (p and anchor) then return end
+    local want = L(anchor)
+    local target, also = p.anchors and p.anchors[want], nil
+    if target then
+        -- the section header and the card under it
+        for i, it in ipairs(p.items) do
+            if it.frame == target then
+                local nx = p.items[i + 1]
+                also = nx and nx.kind == "card" and nx.frame or nil
+            end
+        end
+    else
+        for _, e in ipairs(INDEX) do
+            if e.page == key and e.label == want then target = e.row; break end
+        end
+    end
+    if not target then return end
+    p.sa:ScrollTo(math.max(0, (target.pageY or 0) - 8), true)
+    Flash(target); Flash(also)
+    body.anchorShown, body.anchorPending = target, target
 end
 
 -- ---------------------------------------------------------------- search
@@ -1346,6 +1562,10 @@ BuildSearch = function(nav, content)
     body.searchBox = box
     ns.WP.searchBox = box   -- for a key binding, and the offline tests
     box.wlBody = body
+    box:HookScript("OnEnter", function(self) S.Tip(self, { L("Chercher un réglage"), L("Ex. flèche") }) end)
+    box:HookScript("OnLeave", S.HideTip)
+    -- the index needs every settings page: built when the box takes the focus (or on the first search)
+    box:HookScript("OnEditFocusGained", function() if body.BuildAll then body.BuildAll() end end)
 
     -- results, in place of the page
     local sa = S.ScrollArea(content)
@@ -1476,6 +1696,7 @@ BuildSearch = function(nav, content)
     local function Update()
         local raw = box:GetText() or ""
         local q = Fold(raw)
+        if #q >= 2 and body.BuildAll then body.BuildAll() end
         if #q < 2 then
             local was = sa:IsShown()
             sa:Hide(); NavCounts(nil, false)
@@ -1616,9 +1837,7 @@ BuildSearch = function(nav, content)
     end)
 end
 
-ns.WP = ns.WP or {}
-
--- After a module is switched elsewhere (the home card), the open page shows it.
+-- After a module is switched elsewhere (a Home line, the minimap menu), the open page shows it.
 function ns.WP.SyncOptions()
     if win and win:IsShown() and body and body.pages[current] then
         body.pages[current]:Sync()
@@ -1626,22 +1845,69 @@ function ns.WP.SyncOptions()
     end
 end
 
-function ns.WP.ShowOptionsPage(key)
-    if not win then BuildWindow() end
+-- WP.OpenHub(page, anchor): shows the Hub on a page ("home", "dungeons", "gps", "comptoir",
+-- "bags", "upgrades", "general", "about"; Home by default, or the page it was on), built the first
+-- time. anchor: a section or a row label of that page (French key): scrolled to and flashed.
+function ns.WP.OpenHub(page, anchor)
+    if not win then BuildWindow()
+    elseif needsRebuild then
+        needsRebuild = false
+        local keep = current
+        body:Hide(); body:SetParent(nil); BuildBody(); current = keep
+    end
+    win.subtitle:SetText(PlayerLine())
     win:Show()
-    ShowPage(key or current or "general")
+    ShowPage(page or current or "home")
+    if anchor then ShowAnchor(current, anchor) end
+    if win.Raise then win:Raise() end
 end
 
--- Opens the options on a page ("general"|"dungeons"|"comptoir"|"gps"|"bags"|"upgrades"|"about");
--- closes them when they are already open on that page (or on any page when no page is given).
+function ns.WP.CloseHub() if win then win:Hide() end end
+
+-- -> the key of the page the Hub shows (or showed last), nil before it was opened
+function ns.WP.HubPage() return current end
+
+-- -> true when the Hub is on screen on that page (IsVisible: the window and the page shown)
+function ns.WP.HubShows(key)
+    if not (win and body and current == key) then return false end
+    local p = body.pages[key]
+    if not p then return false end
+    local ok, v = pcall(p.holder.IsVisible, p.holder)
+    if ok and type(v) == "boolean" then return v end
+    return win:IsShown() and p:IsShown()   -- clients (and test stubs) without IsVisible
+end
+
+-- The Settings page (Home is not one): the page given, else the settings page shown last.
+function ns.WP.ShowOptionsPage(key)
+    ns.WP.OpenHub(key or (current ~= "home" and current) or "general")
+end
+
+-- Opens the Hub on a settings page; closes it when it is already open on that page (or on any
+-- settings page when no page is given; from Home it goes to the settings).
 function ns.WP.OpenOptions(pageKey)
-    if win and win:IsShown() and (pageKey == nil or pageKey == current) then
+    if win and win:IsShown() and (pageKey == current or (pageKey == nil and current ~= "home")) then
         win:Hide()
         return
     end
     ns.WP.ShowOptionsPage(pageKey)
 end
 
+-- A new screen size or UI scale: the Hub takes its new size (and its pages the new width).
+local function OnScreenChanged()
+    if not win then return end
+    local w, h = HubW(), HubH()
+    if w == WIN_W and h == WIN_H then return end
+    local widthChanged = (w ~= WIN_W)
+    Dims()
+    win:SetSize(WIN_W, WIN_H)
+    if widthChanged then
+        -- hidden: rebuilt the next time it opens (a windowed client being resized sends many events)
+        if win:IsShown() then Rebuild() else needsRebuild = true end
+    else
+        Relayout()
+    end
+end
+ns.WP.HubScreenChanged = OnScreenChanged
 
 -- ---------------------------------------------------------------- the game's settings panel
 
@@ -1657,7 +1923,7 @@ end
 
 local function OpenFromOutside()
     CloseGameSettings()
-    ns.WP.ShowOptionsPage(current or "general")
+    ns.WP.OpenHub("general")
 end
 
 -- A small canvas: logo, name, one sentence and the button that opens our own window.
@@ -1747,9 +2013,22 @@ end
 -- ---------------------------------------------------------------- login
 
 local ev = CreateFrame("Frame")
+local screenTimer
 pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
-ev:SetScript("OnEvent", function(self)
+pcall(ev.RegisterEvent, ev, "DISPLAY_SIZE_CHANGED")
+pcall(ev.RegisterEvent, ev, "UI_SCALE_CHANGED")
+ev:SetScript("OnEvent", function(self, event)
+    if event ~= "PLAYER_LOGIN" then
+        -- the new size is known on the next frame; a window being dragged to a new size sends many
+        -- events: one resize, a quarter of a second after the last one
+        if screenTimer then screenTimer:Cancel(); screenTimer = nil end
+        if C_Timer and C_Timer.NewTimer then
+            screenTimer = C_Timer.NewTimer(0.25, function() screenTimer = nil; OnScreenChanged() end)
+        elseif C_Timer and C_Timer.After then C_Timer.After(0, OnScreenChanged) else OnScreenChanged() end
+        return
+    end
     self:UnregisterEvent("PLAYER_LOGIN")
+    Migrate()
     -- Main.lua shows the guide two seconds after login unless WLDTDB.hidden: clearing it here
     -- (this file loads last, so this runs after Main's handler) reopens a closed guide.
     if WLDTDB and WLDTDB.reopenGuide then WLDTDB.hidden = false end

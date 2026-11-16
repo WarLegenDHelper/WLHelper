@@ -17,20 +17,22 @@ local Way = {}
 WP.Way = Way
 
 ns.AddEnglish({
-    ["GPS : %s %s %s"] = "GPS: %s %s %s",
-    ["GPS : %s %s %s (%s)"] = "GPS: %s %s %s (%s)",
+    ["GPS : en route vers %s %s %s."] = "GPS: on the way to %s %s %s.",
+    ["GPS : en route vers %s (%s %s %s)."] = "GPS: on the way to %s (%s %s %s).",
     ["GPS arrêté."] = "GPS stopped.",
-    ["Aucun point /way en cours."] = "No /way point running.",
+    ["Aucun point /way en cours : rien à arrêter."] = "No /way point running: nothing to stop.",
     ["Tu y es : %s."] = "You're there: %s.",
-    ["Zone inconnue : %s."] = "Unknown zone: %s.",
-    ["Plusieurs zones possibles : %s."] = "Several zones match: %s.",
+    ["Zone inconnue : %s. Écris son nom comme sur la carte, par exemple /way Tanaris 52,4 31,2."] =
+        "Unknown zone: %s. Type its name as the map shows it, for example /way Tanaris 52.4 31.2.",
+    ["Plusieurs zones possibles : %s. Écris le nom en entier."] = "Several zones match: %s. Type the full name.",
     ["Je ne sais pas dans quelle zone tu es : ajoute son nom, par exemple /way Tanaris 52,4 31,2."] =
         "I can't tell which zone you're in: add its name, for example /way Tanaris 52.4 31.2.",
     ["Exemple : /way Tanaris 52,4 31,2, ou /way 52,4 31,2 dans ta zone. /way seul arrête le GPS."] =
         "Example: /way Tanaris 52.4 31.2, or /way 52.4 31.2 in your zone. /way alone stops the GPS.",
     ["Impossible de guider vers ce point : la carte de cette zone n'est pas lisible."] =
         "Can't guide you there: this zone's map can't be read.",
-    ["Le GPS de WL Helper n'est pas chargé."] = "WL Helper's GPS isn't loaded.",
+    ["Le GPS de WL Helper n'est pas chargé. Tape /reload pour recharger l'interface, puis réessaie."] =
+        "WL Helper's GPS isn't loaded. Type /reload to reload the interface, then try again.",
     ["un autre addon"] = "another addon",
 })
 
@@ -315,7 +317,7 @@ end
 -- quiet: no confirmation line. Returns true when the GPS took the point.
 function Way.Go(map, x, y, label, quiet)
     local GPS = WP.GPS
-    if not (GPS and GPS.GoPoint) then WP.Print(L("Le GPS de WL Helper n'est pas chargé.")); return false end
+    if not (GPS and GPS.GoPoint) then WP.Print(L("Le GPS de WL Helper n'est pas chargé. Tape /reload pour recharger l'interface, puis réessaie.")); return false end
     map, x, y = tonumber(map), tonumber(x), tonumber(y)
     if not (map and x and y) or x < 0 or x > 100 or y < 0 or y > 100 then
         WP.Print(L("Exemple : /way Tanaris 52,4 31,2, ou /way 52,4 31,2 dans ta zone. /way seul arrête le GPS."))
@@ -340,8 +342,9 @@ function Way.Go(map, x, y, label, quiet)
     if not watcher and C_Timer and C_Timer.NewTicker then watcher = C_Timer.NewTicker(1, Watch) end
     if not quiet then
         local zone, cx, cy = Way.ZoneName(map), Way.Coord(x), Way.Coord(y)
-        if label then WP.Print(string.format(L("GPS : %s %s %s (%s)"), zone, cx, cy, label))
-        else WP.Print(string.format(L("GPS : %s %s %s"), zone, cx, cy)) end
+        -- the place first when the player named it: "GPS : en route vers Camp Mojache (Féralas 30,5 40)."
+        if label then WP.Print(string.format(L("GPS : en route vers %s (%s %s %s)."), label, zone, cx, cy))
+        else WP.Print(string.format(L("GPS : en route vers %s %s %s."), zone, cx, cy)) end
     end
     return true
 end
@@ -354,7 +357,7 @@ function Way.Clear(quiet)
     local was = Mine()
     if was then WP.GPS.Stop(SOURCE) end
     ClearPin()
-    if not quiet then WP.Print(was and L("GPS arrêté.") or L("Aucun point /way en cours.")) end
+    if not quiet then WP.Print(was and L("GPS arrêté.") or L("Aucun point /way en cours : rien à arrêter.")) end
     return was
 end
 
@@ -379,9 +382,9 @@ function Way.Command(msg)
             if several then
                 local names = {}
                 for i = 1, math.min(#several, 4) do names[#names + 1] = Way.ZoneName(several[i]) end
-                WP.Print(string.format(L("Plusieurs zones possibles : %s."), table.concat(names, ", ")))
+                WP.Print(string.format(L("Plusieurs zones possibles : %s. Écris le nom en entier."), table.concat(names, ", ")))
             else
-                WP.Print(string.format(L("Zone inconnue : %s."), r.zone))
+                WP.Print(string.format(L("Zone inconnue : %s. Écris son nom comme sur la carte, par exemple /way Tanaris 52,4 31,2."), r.zone))
             end
             return
         end

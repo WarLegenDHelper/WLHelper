@@ -22,72 +22,75 @@ ns.AddEnglish({
     ["Writs"] = "Writs",
     ["Aujourd'hui"] = "Today",
     ["Achats"] = "Shopping",
-    ["Tous les writs"] = "All writs",
+    ["Tous les Writs"] = "All Writs",
     ["Réglages des Writs"] = "Writs settings",
     -- review 9
-    ["Rends ton writ prêt, puis achètes-en %d de plus."] = "Turn in your ready writ, then buy %d more.",
-    ["Il te faut encore 1 writ."] = "You need 1 more writ.",
-    ["Il te faut encore %d writs."] = "You need %d more writs.",
-    ["Il te faut encore 1 writ, pour environ %s."] = "You need 1 more writ, for about %s.",
-    ["Il te faut encore %d writs, pour environ %s."] = "You need %d more writs, for about %s.",
-    ["1 writ dépasse ton prix max : monte-le dans l'onglet Achats."] = "1 writ is above your max price: raise it in the Shopping tab.",
+    ["Rends ton Writ prêt, puis achètes-en %d de plus."] = "Turn in your ready Writ, then buy %d more.",
+    ["Il te faut encore 1 Writ."] = "You need 1 more Writ.",
+    ["Il te faut encore %d Writs."] = "You need %d more Writs.",
+    ["Il te faut encore 1 Writ, pour environ %s."] = "You need 1 more Writ, for about %s.",
+    ["Il te faut encore %d Writs, pour environ %s."] = "You need %d more Writs, for about %s.",
+    ["1 Writ dépasse ton prix max : monte-le dans l'onglet Achats."] = "1 Writ is above your max price: raise it in the Shopping tab.",
     ["Voir les achats"] = "See what to buy",
     ["Clic : voir l'onglet Achats"] = "Click: see the Shopping tab",
     ["Clic : guider vers %s"] = "Click: guide me to %s",
-    ["Clic : guider vers le premier writ de la zone"] = "Click: guide me to the zone's first writ",
+    ["Clic : guider vers le premier Writ de la zone"] = "Click: guide me to the zone's first Writ",
     ["le PNJ"] = "the NPC",
-    ["Aucun writ sous ton prix max"] = "No writ under your max price",
+    ["Aucun Writ sous ton prix max"] = "No Writ under your max price",
     ["Monte le prix max dans l'onglet Achats pour en voir plus."] = "Raise the max price in the Shopping tab to see more.",
     ["Monte le prix max ci-dessus pour en voir plus."] = "Raise the max price above to see more.",
-    ["Aucun writ n'est en vente pour ton objectif : scanne l'HV à nouveau plus tard."] = "No writ is for sale for your goal: scan the AH again later.",
-    ["1 writ pour plus tard"] = "1 writ for later",
-    ["%d writs pour plus tard"] = "%d writs for later",
-    ["Zones trop hautes pour ton niveau."] = "Zones too high for your level.",
-    ["Clic : voir ces writs"] = "Click: see these writs",
+    ["Aucun Writ n'est en vente pour ton objectif : scanne l'HV à nouveau plus tard."] = "No Writ is for sale for your goal: scan the AH again later.",
+    ["1 Writ pour plus tard"] = "1 Writ for later",
+    ["%d Writs pour plus tard"] = "%d Writs for later",
+    ["Clic : voir ces Writs"] = "Click: see these Writs",
     ["Sans"] = "None",
     ["1 objet n'est pas en vente à l'HV : scanne à nouveau plus tard ou laisse sa zone de côté."] = "1 item is not for sale at the AH: scan again later or set its zone aside.",
     ["%d objets ne sont pas en vente à l'HV : scanne à nouveau plus tard ou laisse leur zone de côté."] = "%d items are not for sale at the AH: scan again later or set their zones aside.",
     ["Enveloppe %s, objet %s, moins la bourse rendue (%s)"] = "Envelope %s, item %s, minus the pouch refund (%s)",
     ["Soit %s une fois les bourses ouvertes."] = "That is %s once the pouches are opened.",
     ["L'onglet Achats suit tes coches."] = "The Shopping tab follows your ticks.",
-    ["1 writ n'a pas encore de prix."] = "1 writ has no price yet.",
-    ["%d writs n'ont pas encore de prix."] = "%d writs have no price yet.",
+    ["1 Writ n'a pas encore de prix."] = "1 Writ has no price yet.",
+    ["%d Writs n'ont pas encore de prix."] = "%d Writs have no price yet.",
 
-    ["Clic : ouvrir les réglages des Writs"] = "Click: open the trading post settings",
+    ["Clic : ouvrir les réglages des Writs"] = "Click: open the Writs settings",
     ["Scan de l'HV : %d sur %d"] = "AH scan: %d of %d",
     -- Today
-    ["%s dans %s points"] = "%s in %s points",
+    ["Encore 1 point avant %s"] = "1 more point to %s",
+    ["Encore %s points avant %s"] = "%s more points to %s",
     ["%s atteint"] = "%s reached",
     ["Réputation introuvable"] = "Reputation not found",
     ["Ouvre ta fenêtre de personnage, onglet Réputation, une fois : WL Helper la lira ensuite."] =
-        "Open your character window, Reputation tab, once: the trading post will read it from then on.",
+        "Open your character window, Reputation tab, once: WL Helper will read it from then on.",
     ["Objectif atteint. Pour continuer, choisis un rang plus haut dans les réglages des Writs."] =
-        "Goal reached. To go on, pick a higher standing in the trading post settings.",
-    ["Rends ton writ prêt et c'est bon."] = "Turn in your ready writ and you're done.",
-    ["Rends tes %d writs prêts et c'est bon."] = "Turn in your %d ready writs and you're done.",
-    ["Rends tes writs prêts, puis achètes-en %d de plus."] = "Turn in your ready writs, then buy %d more.",
-    ["%d writs dépassent ton prix max : monte-le dans l'onglet Achats."] = "%d writs are above your max price: raise it in the Shopping tab.",
-    ["Aucun writ abordable aujourd'hui : les offres changent demain."] = "No affordable writ today: the offers change tomorrow.",
-    ["Nouveaux writs dans %d min"] = "New writs in %d min",
-    ["Nouveaux writs dans %d h"] = "New writs in %d h",
+        "Goal reached. To go on, pick a higher standing in the Writs settings.",
+    ["Rends ton Writ prêt et c'est bon."] = "Turn in your ready Writ and you're done.",
+    ["Rends tes %d Writs prêts et c'est bon."] = "Turn in your %d ready Writs and you're done.",
+    ["Rends tes Writs prêts, puis achètes-en %d de plus."] = "Turn in your ready Writs, then buy %d more.",
+    ["%d Writs dépassent ton prix max : monte-le dans l'onglet Achats."] = "%d Writs are above your max price: raise it in the Shopping tab.",
+    ["Aucun Writ abordable aujourd'hui : les offres changent demain."] = "No affordable Writ today: the offers change tomorrow.",
+    ["Nouveaux Writs dans %d min"] = "New Writs in %d min",
+    ["Nouveaux Writs dans %d h"] = "New Writs in %d h",
     ["À rendre maintenant"] = "To turn in now",
     ["Y aller"] = "Go there",
     ["Prêt à rendre à %s"] = "Ready to turn in to %s",
-    ["Prêt à rendre, %.0f, %.0f"] = "Ready to turn in, %.0f, %.0f",
-    ["Dans le sac, mais l'objet manque"] = "In bags, but the item is missing",
-    ["En cours : objet manquant, %s à l'HV"] = "In progress: item missing, %s at the AH",
-    ["En cours : objet manquant"] = "In progress: item missing",
+    ["Prêt à rendre · %.0f, %.0f"] = "Ready to turn in · %.0f, %.0f",
+    ["À prendre · objet dans le sac"] = "To take · item in bags",
+    ["À prendre · objet manquant"] = "To take · item missing",
+    ["Dans ton journal · objet manquant, %s à l'HV"] = "In your log · item missing, %s at the AH",
+    ["Dans ton journal · objet manquant"] = "In your log · item missing",
+    ["niv. %d à %d"] = "level %d-%d",
+    ["Zone trop haute pour ton niveau, ou lieu de remise inconnu."] = "Zone too high for your level, or turn-in spot unknown.",
     ["Ouvrir l'enveloppe"] = "Open the envelope",
     ["Clic : ouvrir l'enveloppe et prendre la quête"] = "Click: open the envelope and take the quest",
-    ["%d points de réputation · %s %.0f, %.0f"] = "%d reputation · %s %.0f, %.0f",
+    ["%s points de réputation · %s %.0f, %.0f"] = "%s reputation · %s %.0f, %.0f",
     ["À rendre à %s"] = "Turn in to %s",
     ["Lieu de remise sur la carte"] = "Turn-in spot on the map",
     ["Objet manquant : achète-le avant d'y aller."] = "Item missing: buy it before you go.",
     ["Clic : acheter l'objet"] = "Click: buy the item",
-    ["Aucun writ en main"] = "No writ in hand",
-    ["Les writs que tu achètes et ouvres apparaîtront ici, groupés par zone."] = "The writs you buy and open will show up here, grouped by zone.",
+    ["Aucun Writ en main"] = "No Writ in hand",
+    ["Les Writs que tu achètes et ouvres apparaîtront ici, groupés par zone."] = "The Writs you buy and open will show up here, grouped by zone.",
     ["Tout est rendu pour aujourd'hui"] = "Everything is turned in for today",
-    ["De nouveaux writs arrivent à la réinitialisation quotidienne."] = "New writs arrive at the daily reset.",
+    ["De nouveaux Writs arrivent à la réinitialisation quotidienne."] = "New Writs arrive at the daily reset.",
     ["Lancer la tournée GPS (%d à rendre)"] = "Start the GPS tour (%d to turn in)",
     ["Arrêter la tournée GPS"] = "Stop the GPS tour",
     ["Scanner l'HV"] = "Scan the AH",
@@ -100,22 +103,22 @@ ns.AddEnglish({
     ["Prix scannés il y a %d h"] = "Prices scanned %d h ago",
     -- Shopping
     ["Rien à acheter"] = "Nothing to buy",
-    ["Tes writs suffisent pour ton objectif du jour."] = "Your writs are enough for today's goal.",
-    ["Pour 1 writ, qui rapporte %d points de réputation."] = "For 1 writ, worth %d reputation.",
-    ["Pour %d writs, qui rapportent %d points de réputation."] = "For %d writs, worth %d reputation.",
+    ["Tes Writs suffisent pour ton objectif du jour."] = "Your Writs are enough for today's goal.",
+    ["Pour 1 Writ, qui rapporte %s points de réputation."] = "For 1 Writ, worth %s reputation.",
+    ["Pour %d Writs, qui rapportent %s points de réputation."] = "For %d Writs, worth %s reputation.",
     ["Prix max pour 100 points"] = "Max price per 100 points",
     ["%d pa"] = "%ds",
     ["%d po"] = "%dg",
     ["Zone"] = "Zone",
     ["Toutes les zones"] = "All zones",
-    ["1 writ"] = "1 writ",
-    ["%d writs"] = "%d writs",
+    ["1 Writ"] = "1 Writ",
+    ["%d Writs"] = "%d Writs",
     ["Clic : replier la zone"] = "Click: fold the zone",
-    ["Clic : afficher ces writs"] = "Click: show these writs",
-    ["Clic : masquer ces writs"] = "Click: hide these writs",
+    ["Clic : afficher ces Writs"] = "Click: show these Writs",
+    ["Clic : masquer ces Writs"] = "Click: hide these Writs",
     ["Clic : déplier la zone"] = "Click: unfold the zone",
     ["Exclure"] = "Leave out",
-    ["Laisser cette zone de côté : le plan prend d'autres writs, ailleurs."] = "Leave this zone out: the plan takes other writs elsewhere.",
+    ["Laisser cette zone de côté : le plan prend d'autres Writs, ailleurs."] = "Leave this zone out: the plan takes other Writs elsewhere.",
     ["Clic : laisser la zone de côté"] = "Click: leave the zone out",
     ["Enveloppe et objet"] = "Envelope and item",
     ["Objet seul"] = "Item only",
@@ -145,12 +148,12 @@ ns.AddEnglish({
     ["À faire, le moins cher d'abord"] = "To do, cheapest first",
     ["Plus tard : zones trop hautes ou lieu inconnu"] = "Later: zones too high or spot unknown",
     ["Rendus aujourd'hui"] = "Turned in today",
-    ["Aucun writ ne correspond"] = "No writ matches",
+    ["Aucun Writ ne correspond"] = "No Writ matches",
     ["Essaie un autre nom d'objet ou de zone."] = "Try another item or zone name.",
     ["Lieu inconnu"] = "Spot unknown",
-    [", niv. %d+"] = ", level %d+",
+    [" · dès le niv. %d"] = " · from level %d",
     ["Mis de côté"] = "Set aside",
-    ["%s · %s · %d points"] = "%s · %s · %d points",
+    ["%s · %s · %s points"] = "%s · %s · %s points",
     ["Tu sais le fabriquer"] = "You can craft it",
     ["Rendu"] = "Turned in",
     ["Prêt"] = "Ready",
@@ -161,10 +164,10 @@ ns.AddEnglish({
     ["Zone laissée de côté : remets-la depuis l'onglet Achats."] = "Zone left out: put it back from the Shopping tab.",
     ["Clic : le cocher pour ton plan"] = "Click: tick it for your plan",
     ["Clic : le décocher"] = "Click: untick it",
-    ["Coche les writs que tu veux faire"] = "Tick the writs you want to do",
+    ["Coche les Writs que tu veux faire"] = "Tick the Writs you want to do",
     ["Sans coche, le plan prend les moins chers pour ton objectif."] = "With none ticked, the plan takes the cheapest for your goal.",
-    ["1 writ coché · %s · %d points"] = "1 writ ticked · %s · %d points",
-    ["%d writs cochés · %s · %d points"] = "%d writs ticked · %s · %d points",
+    ["1 Writ coché · %s · %s points"] = "1 Writ ticked · %s · %s points",
+    ["%d Writs cochés · %s · %s points"] = "%d Writs ticked · %s · %s points",
     ["(%d sans prix)"] = "(%d without a price)",
     ["Tout décocher"] = "Untick all",
     -- Favor mode
@@ -184,7 +187,8 @@ local function Height(fs, minH)
     return math.max(h, minH or 0)
 end
 local function Width(fs) return root.TextWidth(fs) end
-local function Big(n) return BreakUpLargeNumbers and BreakUpLargeNumbers(n) or tostring(n) end
+-- 12 500 / 12,500 by the addon's language, the same helper as the summary (Overview.lua)
+local function Big(n) return root.BigNumber and root.BigNumber(n) or tostring(n) end
 
 -- ---------------------------------------------------------------- shared bits
 
@@ -344,17 +348,15 @@ local function EnvelopeButton(i)
     local press = S.Solid(b, "BORDER", C.pressFill); press:SetAllPoints(); press:Hide()
     b.label = S.Text(b, F.label, C.fg)
     b.label:SetWordWrap(false)
-    b.label:SetPoint("CENTER", 11, 0)
+    b.label:SetPoint("CENTER", 0, 0)
     b.label:SetText(L("Ouvrir l'enveloppe"))
-    local ic = S.Icon(b, "mail", 16, "ARTWORK", C.fg)
-    ic:SetPoint("RIGHT", b.label, "LEFT", -6, 0)
     b:HookScript("OnEnter", function(self)
         hl:SetAlpha(1); edge(C.btnEdgeHover)
         S.Tip(self, { L("Ouvrir l'enveloppe"), L("Clic : ouvrir l'enveloppe et prendre la quête") })
     end)
     b:HookScript("OnLeave", function() hl:SetAlpha(0); edge(C.btnEdge); S.HideTip() end)
-    b:HookScript("OnMouseDown", function() press:Show(); b.label:SetPoint("CENTER", 11, -1) end)
-    b:HookScript("OnMouseUp", function() press:Hide(); b.label:SetPoint("CENTER", 11, 0) end)
+    b:HookScript("OnMouseDown", function() press:Show(); b.label:SetPoint("CENTER", 0, -1) end)
+    b:HookScript("OnMouseUp", function() press:Hide(); b.label:SetPoint("CENTER", 0, 0) end)
     b:Hide()
     envelopes[i] = b
     return b
@@ -465,8 +467,7 @@ local function MakeZoneCard(parent)
     c.level = S.Pill(c)
     c.level:SetPoint("LEFT", c.name, "RIGHT", 8, 0)
     c.go = S.Button(c, L("Y aller"), 0, 24, "secondary", function() if c.first then WP.TravelTo(c.first) end end,
-        function() return { L("Y aller"), L("Clic : guider vers le premier writ de la zone") } end)
-    c.go:SetIcon("flag")
+        function() return { L("Y aller"), L("Clic : guider vers le premier Writ de la zone") } end)
     c.go:SetPoint("TOPRIGHT", -12, -10)
     c.eta = S.Text(c, F.meta, C.muted)
     c.eta:SetWordWrap(false)
@@ -506,7 +507,7 @@ local function BuildToday(p)
     today.later = S.Button(sc.child, "", 0, 24, "ghost", function()
         if WP.OpenAllFold then WP.OpenAllFold("later") end
         WP.ShowTab("all")
-    end, function() return { today.later.wlText or "", L("Zones trop hautes pour ton niveau."), L("Clic : voir ces writs") } end)
+    end, function() return { today.later.wlText or "", L("Zone trop haute pour ton niveau, ou lieu de remise inconnu."), L("Clic : voir ces Writs") } end)
     today.later:SetChevron(true)
     today.empty = S.EmptyState(sc.child, "mail", "", nil)
     today.empty:Hide()
@@ -558,8 +559,8 @@ local function TourAction()
             elseif r.state == "log" or r.state == "bag" then missing = missing + 1 end
         end
     end
-    if ready + bagOwned > 0 then return "gps", string.format(L("Lancer la tournée GPS (%d à rendre)"), ready + bagOwned), true, "flag" end
-    if #plan > 0 or missing > 0 then return "shop", L("Voir les achats"), true, "coin" end
+    if ready + bagOwned > 0 then return "gps", string.format(L("Lancer la tournée GPS (%d à rendre)"), ready + bagOwned), true, nil end
+    if #plan > 0 or missing > 0 then return "shop", L("Voir les achats"), true, nil end
     return nil
 end
 
@@ -596,36 +597,37 @@ local function RenderToday()
             today.goal:SetText(string.format(L("%s atteint"), WP.Reaction(goal or reaction)))
             today.message:SetText(L("Objectif atteint. Pour continuer, choisis un rang plus haut dans les réglages des Writs."))
         else
-            today.goal:SetText(string.format(L("%s dans %s points"), WP.Reaction(goal), Big(need)))
+            today.goal:SetText(need == 1 and string.format(L("Encore 1 point avant %s"), WP.Reaction(goal))
+                or string.format(L("Encore %s points avant %s"), Big(need), WP.Reaction(goal)))
             local ready = 0
             for _, r in ipairs(data) do if r.state == "ready" and r.w.map and not r.tooHigh then ready = ready + 1 end end
             if pending >= need and ready > 0 then
-                today.message:SetText(ready == 1 and L("Rends ton writ prêt et c'est bon.") or string.format(L("Rends tes %d writs prêts et c'est bon."), ready))
+                today.message:SetText(ready == 1 and L("Rends ton Writ prêt et c'est bon.") or string.format(L("Rends tes %d Writs prêts et c'est bon."), ready))
             elseif #plan > 0 and ready > 0 then
                 if ready == 1 then
-                    today.message:SetText(string.format(L("Rends ton writ prêt, puis achètes-en %d de plus."), #plan))
+                    today.message:SetText(string.format(L("Rends ton Writ prêt, puis achètes-en %d de plus."), #plan))
                 else
-                    today.message:SetText(string.format(L("Rends tes writs prêts, puis achètes-en %d de plus."), #plan))
+                    today.message:SetText(string.format(L("Rends tes Writs prêts, puis achètes-en %d de plus."), #plan))
                 end
             elseif #plan > 0 then
                 local cost = 0
                 for _, r in ipairs(plan) do cost = cost + (r.cost or 0) end
                 if cost <= 0 then
-                    today.message:SetText(#plan == 1 and L("Il te faut encore 1 writ.") or string.format(L("Il te faut encore %d writs."), #plan))
+                    today.message:SetText(#plan == 1 and L("Il te faut encore 1 Writ.") or string.format(L("Il te faut encore %d Writs."), #plan))
                 elseif #plan == 1 then
-                    today.message:SetText(string.format(L("Il te faut encore 1 writ, pour environ %s."), S.Money(cost)))
+                    today.message:SetText(string.format(L("Il te faut encore 1 Writ, pour environ %s."), S.Money(cost)))
                 else
-                    today.message:SetText(string.format(L("Il te faut encore %d writs, pour environ %s."), #plan, S.Money(cost)))
+                    today.message:SetText(string.format(L("Il te faut encore %d Writs, pour environ %s."), #plan, S.Money(cost)))
                 end
             else
                 -- nothing planned: say so when the price cap is what keeps writs out
                 local capped = CappedCount()
                 if capped == 1 then
-                    today.message:SetText(L("1 writ dépasse ton prix max : monte-le dans l'onglet Achats."))
+                    today.message:SetText(L("1 Writ dépasse ton prix max : monte-le dans l'onglet Achats."))
                 elseif capped > 1 then
-                    today.message:SetText(string.format(L("%d writs dépassent ton prix max : monte-le dans l'onglet Achats."), capped))
+                    today.message:SetText(string.format(L("%d Writs dépassent ton prix max : monte-le dans l'onglet Achats."), capped))
                 else
-                    today.message:SetText(L("Aucun writ abordable aujourd'hui : les offres changent demain."))
+                    today.message:SetText(L("Aucun Writ abordable aujourd'hui : les offres changent demain."))
                 end
             end
         end
@@ -644,9 +646,9 @@ local function RenderToday()
     y = y + math.max(S.FitText(today.message, 3, LIST_W, p), F.body + 2)
     local secs = WP.SecondsToReset()
     if secs < 3600 then
-        today.reset:SetText(string.format(L("Nouveaux writs dans %d min"), math.max(1, math.floor(secs / 60))))
+        today.reset:SetText(string.format(L("Nouveaux Writs dans %d min"), math.max(1, math.floor(secs / 60))))
     else
-        today.reset:SetText(string.format(L("Nouveaux writs dans %d h"), math.floor(secs / 3600)))
+        today.reset:SetText(string.format(L("Nouveaux Writs dans %d h"), math.floor(secs / 3600)))
     end
     y = y + 4
     today.reset:ClearAllPoints(); today.reset:SetPoint("TOPLEFT", INSET, -y)
@@ -681,7 +683,7 @@ local function RenderToday()
         c:ClearAllPoints(); c:SetPoint("TOPLEFT", 0, -ly); c:SetPoint("TOPRIGHT", 0, -ly)
         c.name:SetText(z.name)
         local lo = WP.ZoneMin(z.map)
-        if lo then c.level:Set(lo .. "-" .. (lo + 10), S.LevelColor(lo + 5)) else c.level:Hide() end
+        if lo then c.level:Set(string.format(L("niv. %d à %d"), lo, lo + 10), S.LevelColor(lo + 5)) else c.level:Hide() end
         c.first = z.rows[1].w
         local mins = minutes[i]
         c.eta:SetText(mins and string.format(L("~%d min"), mins) or "")
@@ -704,20 +706,20 @@ local function RenderToday()
             row.envItem = nil
             if r.state == "ready" then
                 S.HDIcon(row.status, "check", C.ok)
-                row.detail:SetText(w.npcName and string.format(L("Prêt à rendre à %s"), w.npcName) or string.format(L("Prêt à rendre, %.0f, %.0f"), w.x, w.y))
+                row.detail:SetText(w.npcName and string.format(L("Prêt à rendre à %s"), w.npcName) or string.format(L("Prêt à rendre · %.0f, %.0f"), w.x, w.y))
                 SetColor(row.detail, C.muted)
             elseif r.state == "bag" then
                 S.HDIcon(row.status, "mail", r.ownItem and C.muted or C.warn)
                 row.envItem = w.writ   -- PlaceEnvelopes lays the secure button over this row
-                row.detail:SetText(r.ownItem and L("Dans le sac") or L("Dans le sac, mais l'objet manque"))
+                row.detail:SetText(r.ownItem and L("À prendre · objet dans le sac") or L("À prendre · objet manquant"))
                 SetColor(row.detail, r.ownItem and C.muted or C.warn)
             else
                 S.HDIcon(row.status, "warning", C.warn)
                 local missingN = math.max(1, (w.count or 1) - (r.haveItems or 0))
-                row.detail:SetText(r.itemPrice and string.format(L("En cours : objet manquant, %s à l'HV"), S.Money(r.itemPrice * missingN)) or L("En cours : objet manquant"))
+                row.detail:SetText(r.itemPrice and string.format(L("Dans ton journal · objet manquant, %s à l'HV"), S.Money(r.itemPrice * missingN)) or L("Dans ton journal · objet manquant"))
                 SetColor(row.detail, C.warn)
             end
-            row.tip = { WP.ItemName(w.writ, w.writName), string.format(L("%d points de réputation · %s %.0f, %.0f"), w.rep, z.name, w.x, w.y),
+            row.tip = { WP.ItemName(w.writ, w.writName), string.format(L("%s points de réputation · %s %.0f, %.0f"), Big(w.rep), z.name, w.x, w.y),
                 w.npcName and string.format(L("À rendre à %s"), w.npcName) or L("Lieu de remise sur la carte") }
             if r.state == "bag" and not r.ownItem then
                 row.tip[#row.tip + 1] = { L("Objet manquant : achète-le avant d'y aller."), C.warn[1], C.warn[2], C.warn[3] }
@@ -743,11 +745,11 @@ local function RenderToday()
         today.empty:ClearAllPoints(); today.empty:SetPoint("TOP", today.scroll.child, "TOP", 0, -12)
         local eh
         if done > 0 and #plan == 0 then
-            eh = today.empty:Set("check", L("Tout est rendu pour aujourd'hui"), L("De nouveaux writs arrivent à la réinitialisation quotidienne."))
+            eh = today.empty:Set("check", L("Tout est rendu pour aujourd'hui"), L("De nouveaux Writs arrivent à la réinitialisation quotidienne."))
         elseif capped > 0 then
-            eh = today.empty:Set("coin", L("Aucun writ sous ton prix max"), L("Monte le prix max dans l'onglet Achats pour en voir plus."))
+            eh = today.empty:Set("coin", L("Aucun Writ sous ton prix max"), L("Monte le prix max dans l'onglet Achats pour en voir plus."))
         else
-            eh = today.empty:Set("mail", L("Aucun writ en main"), L("Les writs que tu achètes et ouvres apparaîtront ici, groupés par zone."))
+            eh = today.empty:Set("mail", L("Aucun Writ en main"), L("Les Writs que tu achètes et ouvres apparaîtront ici, groupés par zone."))
         end
         ly = 12 + eh + 12
     elseif ly > 0 then
@@ -755,8 +757,8 @@ local function RenderToday()
     end
     today.later:SetShown(later > 0)
     if later > 0 then
-        today.later.wlText = later == 1 and L("1 writ pour plus tard") or string.format(L("%d writs pour plus tard"), later)
-        today.later:SetText(later == 1 and L("1 writ pour plus tard") or string.format(L("%d writs pour plus tard"), later))
+        today.later.wlText = later == 1 and L("1 Writ pour plus tard") or string.format(L("%d Writs pour plus tard"), later)
+        today.later:SetText(later == 1 and L("1 Writ pour plus tard") or string.format(L("%d Writs pour plus tard"), later))
         ly = ly + 8
         today.later:ClearAllPoints(); today.later:SetPoint("TOPLEFT", 0, -ly)
         ly = ly + 24
@@ -812,7 +814,7 @@ local function BuildShop(p)
             WLWritsCharDB.shopFold[self.foldKey] = not WLWritsCharDB.shopFold[self.foldKey] or nil
             WP.Refresh()
         end, L("Exclure"), function(self) if self.map then WP.SetSkipped("zones", self.map, true) end end)
-        h.linkTip = { L("Exclure"), L("Laisser cette zone de côté : le plan prend d'autres writs, ailleurs."), L("Clic : laisser la zone de côté") }
+        h.linkTip = { L("Exclure"), L("Laisser cette zone de côté : le plan prend d'autres Writs, ailleurs."), L("Clic : laisser la zone de côté") }
         return h
     end)
     buy.outHead = S.SectionHeader(sc.child, L("Zones laissées de côté"))
@@ -862,7 +864,7 @@ local function BuildShop(p)
         end
         return r
     end)
-    buy.empty = S.EmptyState(sc.child, "check", L("Rien à acheter"), L("Tes writs suffisent pour ton objectif du jour."))
+    buy.empty = S.EmptyState(sc.child, "check", L("Rien à acheter"), L("Tes Writs suffisent pour ton objectif du jour."))
     buy.empty:Hide()
 
     -- one primary button opens every buy page in a row; the player still clicks the game's own Buy
@@ -881,7 +883,6 @@ local function BuildShop(p)
         if buy.all:IsEnabled() == false then return nil end
         return { buy.all:GetText(), L("Ouvre chaque page d'achat à la suite : tu cliques sur Acheter à chaque fois."), L("Clic : ouvrir la première page d'achat") }
     end)
-    buy.all:SetIcon("coin")
     buy.all:SetPoint("BOTTOMLEFT", INSET, 12)
     buy.rescan = ScanButton(p, ShopIDs)
     buy.rescan:SetPoint("BOTTOMRIGHT", -INSET + 2, 14)
@@ -900,8 +901,8 @@ local function RenderShop()
         buy.total:SetText(S.Money(shopTotal))
         buy.total:SetWidth(LIST_W)
         y = y + Height(buy.total, F.hero + 2)
-        buy.sub:SetText(#plan == 1 and string.format(L("Pour 1 writ, qui rapporte %d points de réputation."), rep)
-            or string.format(L("Pour %d writs, qui rapportent %d points de réputation."), #plan, rep))
+        buy.sub:SetText(#plan == 1 and string.format(L("Pour 1 Writ, qui rapporte %s points de réputation."), Big(rep))
+            or string.format(L("Pour %d Writs, qui rapportent %s points de réputation."), #plan, Big(rep)))
         y = y + 4
         buy.sub:ClearAllPoints(); buy.sub:SetPoint("TOPLEFT", INSET, -y)
         y = y + math.max(S.FitText(buy.sub, 2, LIST_W, p), F.body + 2)
@@ -984,7 +985,7 @@ local function RenderShop()
         h.map = groups[key][1] and groups[key][1].map
         h.foldKey = key
         if h.link then h.link:SetShown(h.map ~= nil) end
-        h:Set(key, (writs == 1 and L("1 writ") or string.format(L("%d writs"), writs)) .. " · " .. S.Money(zoneCost), true, folded)
+        h:Set(key, (writs == 1 and L("1 Writ") or string.format(L("%d Writs"), writs)) .. " · " .. S.Money(zoneCost), true, folded)
         if ly > 0 then ly = ly + 8 end
         h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -ly); h:SetPoint("TOPRIGHT", 0, -ly)
         ly = ly + 32 + 4
@@ -1034,7 +1035,8 @@ local function RenderShop()
         for i, map in ipairs(out) do
             local r = buy.outRows.Get(i)
             r.map = map
-            r:Set({ hd = "minus", name = WP.ZoneName(map), detail = L("Hors du plan") })
+            -- the section header already says these zones are left out: the name and "Remettre" only
+            r:Set({ name = WP.ZoneName(map) })
             r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -ly); r:SetPoint("TOPRIGHT", 0, -ly)
             ly = ly + r:Fit(LIST_W) + 2
         end
@@ -1048,11 +1050,11 @@ local function RenderShop()
         local capped = CappedCount()
         local eh
         if need and need > 0 and capped > 0 then
-            eh = buy.empty:Set("coin", L("Aucun writ sous ton prix max"), L("Monte le prix max ci-dessus pour en voir plus."))
+            eh = buy.empty:Set("coin", L("Aucun Writ sous ton prix max"), L("Monte le prix max ci-dessus pour en voir plus."))
         elseif need and need > 0 and #plan == 0 then
-            eh = buy.empty:Set("mail", L("Rien à acheter"), L("Aucun writ n'est en vente pour ton objectif : scanne l'HV à nouveau plus tard."))
+            eh = buy.empty:Set("mail", L("Rien à acheter"), L("Aucun Writ n'est en vente pour ton objectif : scanne l'HV à nouveau plus tard."))
         else
-            eh = buy.empty:Set("check", L("Rien à acheter"), L("Tes writs suffisent pour ton objectif du jour."))
+            eh = buy.empty:Set("check", L("Rien à acheter"), L("Tes Writs suffisent pour ton objectif du jour."))
         end
         ly = ly + 12 + eh + 12
     elseif ly > 0 then
@@ -1069,7 +1071,7 @@ local function RenderShop()
         buy.all:SetText(string.format(L("Arrêter les achats (%d sur %d)"), pos, total)); buy.all:SetIcon("close"); buy.all:Enable()
     elseif n > 0 then
         buy.all:SetText(n == 1 and L("Acheter l'objet") or string.format(L("Acheter les %d objets"), n))
-        buy.all:SetIcon("coin")
+        buy.all:SetIcon(nil)
         if not WP.AuctionHouseOpen() then
             buy.all:SetDisabledReason(L("L'hôtel des ventes est fermé.")); buy.all:Disable()
         else
@@ -1134,7 +1136,7 @@ local function MakeAllRow(parent)
             string.format(L("Enveloppe %s, objet %s, moins la bourse rendue (%s)"), x.ownWrit and L("possédée") or S.Money(x.writPrice),
                 (x.ownItem or x.state == "ready") and L("possédé") or S.Money(x.itemPrice and x.itemPrice * (w.count or 1)), S.Money((WP.PouchValue(w.tier)))) }
         if w.npcName then lines[#lines + 1] = string.format(L("À rendre à %s"), w.npcName) end
-        if Craftable(w.item) then lines[#lines + 1] = { L("Tu sais le fabriquer"), C.info[1], C.info[2], C.info[3] } end
+        if Craftable(w.item) then lines[#lines + 1] = { L("Tu sais le fabriquer"), C.fg[1], C.fg[2], C.fg[3] } end
         if w.map and WP.IsSkipped("zones", w.map) then
             lines[#lines + 1] = { L("Zone laissée de côté : remets-la depuis l'onglet Achats."), C.warn[1], C.warn[2], C.warn[3] }
         end
@@ -1185,11 +1187,11 @@ local function BuildAll(p)
     local sc = p.sa
     all.heads = Pool(function()
         local h = FoldHead(sc.child, function(self) all.open[self.key] = not all.open[self.key]; WP.Refresh() end)
-        h.tipOpen, h.tipClose = L("Clic : afficher ces writs"), L("Clic : masquer ces writs")
+        h.tipOpen, h.tipClose = L("Clic : afficher ces Writs"), L("Clic : masquer ces Writs")
         return h
     end)
     all.rows = Pool(function() return MakeAllRow(sc.child) end)
-    all.empty = S.EmptyState(sc.child, "search", L("Aucun writ ne correspond"), L("Essaie un autre nom d'objet ou de zone."))
+    all.empty = S.EmptyState(sc.child, "search", L("Aucun Writ ne correspond"), L("Essaie un autre nom d'objet ou de zone."))
     all.empty:Hide()
 
     all.pickLine = S.Text(p, F.body, C.fg)
@@ -1242,8 +1244,8 @@ local function RenderAll()
         b.box.check:SetShown(on)
         local w = r.w
         local where = w.map and string.format("%s %.0f, %.0f", r.zone, w.x, w.y) or L("Lieu inconnu")
-        if r.tooHigh and r.zoneMin then where = where .. string.format(L(", niv. %d+"), r.zoneMin) end
-        local detail = string.format(L("%s · %s · %d points"), where, WP.Tier(w.tier), w.rep)
+        if r.tooHigh and r.zoneMin then where = where .. string.format(L(" · dès le niv. %d"), r.zoneMin) end
+        local detail = string.format(L("%s · %s · %s points"), where, WP.Tier(w.tier), Big(w.rep))
         if r.skipped then detail = S.Hex(C.warn) .. L("Mis de côté") .. "|r · " .. detail end
         local value, vcol = "?", C.muted
         if r.state == "done" then value, vcol = L("Rendu"), C.muted
@@ -1254,7 +1256,8 @@ local function RenderAll()
             vcol = per < 0 and C.ok or C.fg
         end
         local name = WP.ItemName(w.item, w.itemName) .. ((w.count or 1) > 1 and (" x" .. w.count) or "")
-        if Craftable(w.item) then name = name .. " " .. S.IconMarkup("hammer", 14, C.info) end
+        -- the hammer means "you can craft it" (the tooltip says so); muted like any icon at rest
+        if Craftable(w.item) then name = name .. " " .. S.IconMarkup("hammer", 14, C.muted) end
         b:Set({ icon = S.ItemIcon(w.item), name = name, nameColor = S.QualityColor(w.item), detail = detail, value = value })
         SetColor(b.value, vcol)
         b:SetAlpha((r.state == "done" or r.skipped) and 0.5 or 1)
@@ -1288,15 +1291,15 @@ local function RenderAll()
     -- the bottom row: what you ticked, and a way to untick everything
     local n, cost, net, rep, unknown = WP.PickTotals(data)
     if n == 0 then
-        all.pickLine:SetText(L("Coche les writs que tu veux faire"))
+        all.pickLine:SetText(L("Coche les Writs que tu veux faire"))
         all.pickSub:SetText(L("Sans coche, le plan prend les moins chers pour ton objectif."))
         all.clear:Hide()
     else
-        all.pickLine:SetText(n == 1 and string.format(L("1 writ coché · %s · %d points"), S.Money(cost), rep)
-            or string.format(L("%d writs cochés · %s · %d points"), n, S.Money(cost), rep))
+        all.pickLine:SetText(n == 1 and string.format(L("1 Writ coché · %s · %s points"), S.Money(cost), Big(rep))
+            or string.format(L("%d Writs cochés · %s · %s points"), n, S.Money(cost), Big(rep)))
         local sub = string.format(L("Soit %s une fois les bourses ouvertes."), S.Money(net)) .. " " .. L("L'onglet Achats suit tes coches.")
-        if unknown == 1 then sub = sub .. " " .. L("1 writ n'a pas encore de prix.")
-        elseif unknown > 1 then sub = sub .. " " .. string.format(L("%d writs n'ont pas encore de prix."), unknown) end
+        if unknown == 1 then sub = sub .. " " .. L("1 Writ n'a pas encore de prix.")
+        elseif unknown > 1 then sub = sub .. " " .. string.format(L("%d Writs n'ont pas encore de prix."), unknown) end
         all.pickSub:SetText(sub)
         all.clear:Show()
     end
@@ -1336,7 +1339,7 @@ local function Build()
         if WP.OpenOptions then WP.OpenOptions("comptoir") end
     end)
     frame:AddHeaderButton(opts)
-    tabs = S.Tabs(frame, { { "today", L("Aujourd'hui") }, { "shop", L("Achats") }, { "all", L("Tous les writs") } },
+    tabs = S.Tabs(frame, { { "today", L("Aujourd'hui") }, { "shop", L("Achats") }, { "all", L("Tous les Writs") } },
         function() return current end, WP.ShowTab, function(key)
             if key ~= "shop" then return nil end
             local n = 0

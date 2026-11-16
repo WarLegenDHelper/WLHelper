@@ -51,7 +51,7 @@ local ICON = {
   take  = { { "QuestNormal" }, "Interface\\GossipFrame\\AvailableQuestIcon" },
   turn  = { { "QuestTurnin" }, "Interface\\GossipFrame\\ActiveQuestIcon" },
   boss  = { hd = "skull", c = T.fg },     -- neutral: red stays for blocked lines
-  map   = { hd = "flag", c = T.info },
+  map   = { hd = "flag", c = T.muted },   -- a place to reach (info stays the info icon's colour)
   check = { hd = "flag", c = T.muted },
   pin   = { hd = "pin", c = T.fg },
   miss  = { hd = "warning", c = T.warn },
@@ -310,7 +310,6 @@ end
 -- Chapters of the route: before / inside / after each dungeon (Engine.lua sets the phases).
 -- -> key, phase, dungeon of a step (nil when the engine has no phases)
 local PH_S = { before = "PH_BEFORE_S", inside = "PH_INSIDE_S", after = "PH_AFTER_S" }
-local PH_F = { before = "PH_BEFORE", inside = "PH_INSIDE", after = "PH_AFTER" }
 local function StepChapter(st)
   if not (st and ns.StepPhase) then return nil end
   local ph = ns.StepPhase(st)
@@ -331,6 +330,20 @@ local function ChapterCounts(log)
     end
   end
   return out
+end
+
+-- how many dungeons the route goes through (the chapter names its dungeon only when there are several)
+local function RouteDungeons()
+  local r = ns.route
+  if not r then return 0 end
+  if r.wlDungeons and r.wlDungeonsN == #(r.steps or {}) then return r.wlDungeons end
+  local seen, n = {}, 0
+  for _, st in ipairs(r.steps or {}) do
+    local dk = ns.StepDungeon and ns.StepDungeon(st) or (st.d or st.gate or st.ins)
+    if dk and not seen[dk] then seen[dk] = true; n = n + 1 end
+  end
+  r.wlDungeons, r.wlDungeonsN = n, #(r.steps or {})
+  return n
 end
 
 -- What a check-list still misses: quests not in the log, and whether a needed key is missing.
@@ -446,7 +459,7 @@ local function ZoneName(m)
   return info and info.name or ""
 end
 
--- noZone: the card already shows the zone in its "Outside: Mulgore" chip
+-- noZone: the card says the place on its own line (the step list and the tracker keep "Zone: NPC")
 local function StepTitle(st, noZone)
   if st.gate then return L.GATE_T:format(ns.DName(st.gate)) end
   if st.split then
@@ -518,6 +531,57 @@ end
 
 -- A text's size from the type scale (kept when the looks change: ns.ApplyLooks reads fs._size).
 local function Size(fs, size) if fs._size ~= size then fs._size = size; ns.SetFont(fs) end end
+
+-- A quest's level in the summary's words (Overview.lua writes the same line on its cards):
+-- "Quête niv. 36 · facile · se prend dès le niv. 30", or the level you still need, in orange.
+-- The band follows the game's own quest colours, else the same thresholds as the summary.
+local BAND_OF = { impossible = "red", verydifficult = "orange", difficult = "yellow", standard = "green", trivial = "grey" }
+local function LevelBand(ql, plvl)
+  if GetQuestDifficultyColor and type(QuestDifficultyColors) == "table" then
+    local ok, c = pcall(GetQuestDifficultyColor, ql)
+    if ok and c then
+      for k, v in pairs(QuestDifficultyColors) do if v == c and BAND_OF[k] then return BAND_OF[k] end end
+    end
+  end
+  local d = ql - plvl
+  if d >= 5 then return "red" elseif d >= 3 then return "orange" elseif d >= -2 then return "yellow" end
+  local g
+  if GetQuestGreenRange then local ok, v = pcall(GetQuestGreenRange); g = ok and num(v) or nil end
+  g = g or (plvl <= 5 and 5 or plvl < 40 and 5 + math.floor(plvl / 10) or 1 + math.floor(plvl / 5))
+  return (-d <= g) and "green" or "grey"
+end
+-- the summary's strings are there only once Overview.lua loaded (a missing key reads as its name)
+local function HasL(k) local v = L[k]; return type(v) == "string" and v ~= k end
+local function LevelFact(qid, s)
+  local q = ns.Q[qid]
+  local ql = q and num(q.l)
+  if not (ql and HasL("SUM_FACT_LV")) then return nil end
+  local okL, plvl = pcall(function() return num(UnitLevel("player")) end)
+  plvl = (okL and plvl) or 1
+  local seg = {}
+  local band = (s ~= "done") and LevelBand(ql, plvl) or nil
+  local bw = band and HasL("SUM_BAND_" .. band:upper()) and L["SUM_BAND_" .. band:upper()] or nil
+  local lc = SW().LevelColor and SW().LevelColor(ql) or T.text
+  seg[1] = Hex(lc) .. L.SUM_FACT_LV:format(ql) .. (bw and (" · " .. bw) or "") .. "|r"
+  local r = num(q.r)
+  if s == "none" and r and r > plvl and HasL("SUM_NEED") then
+    seg[#seg + 1] = Hex(T.warn) .. L.SUM_NEED:format(r, plvl) .. "|r"
+  elseif s == "none" and r and r < ql and HasL("SUM_FROM") then
+    seg[#seg + 1] = L.SUM_FROM:format(r)
+  end
+  return table.concat(seg, " · ")
+end
+ns.GuideLevelFact = LevelFact
+-- true when the level line already says "se prend au niv. N, tu es niv. M" (SUM_NEED): only then is
+-- the red BLOCKED line a repeat; any other reason PrereqProblem gives still shows
+local function NeedShown(qid, s)
+  local q = ns.Q[qid]
+  local r = q and num(q.r)
+  if not (r and s == "none" and HasL("SUM_NEED") and LevelFact(qid, s)) then return false end
+  local okL, plvl = pcall(function() return num(UnitLevel("player")) end)
+  plvl = (okL and plvl) or 1
+  return r > plvl
+end
 
 -- The step's points on the map and the arrow (the big button, the Actions menu, the key binding).
 -- Without TomTom, a second press goes to the step's next point.
@@ -926,7 +990,7 @@ function ns.RowTip(row)
   local mute, txt = T.muted, T.text
   -- title and pill
   local pill, pc
-  if n.pre or q.role == "pre" then pill, pc = L.PRE, T.info elseif q.d and n.kind ~= "i" then pill, pc = L.MAIN, T.gold end
+  if n.pre or q.role == "pre" then pill, pc = L.PRE, T.fg elseif q.d and n.kind ~= "i" then pill, pc = L.MAIN, T.gold end
   add({ n.label or ns.QName(n.q), T.fg[1], T.fg[2], T.fg[3], right = pill, rc = pc })
   local other = (GetLocale and GetLocale() == "frFR" and q.n) or (ns.lang == "fr" and q.nf) or nil
   if other and other ~= (n.label or ns.QName(n.q)) then add(other) end
@@ -934,8 +998,15 @@ function ns.RowTip(row)
   local kc = KCOL[n.kind] or T.text
   local kt = ({ a = L.TT_TAKE, c = L.TT_DO, o = L.TT_DO, t = L.TT_TURN, h = L.TT_HAVE, i = L.TT_ITEM })[n.kind]
   if kt then
-    local st = (n.kind ~= "i" and SLABEL[s]) and (Hex(mute) .. "  ·  " .. L[SLABEL[s]] .. "|r") or ""
+    -- "Accept the quest · To take" said the same thing twice: the state only when it adds something
+    local showSt = n.kind ~= "i" and SLABEL[s] and not (n.kind == "a" and s == "none")
+    local st = showSt and (Hex(mute) .. "  ·  " .. L[SLABEL[s]] .. "|r") or ""
     add(Hex(kc) .. kt .. "|r" .. st)
+  end
+  -- the quest's level in the summary's words ("Quête niv. 36 · facile · se prend dès le niv. 30")
+  if n.kind ~= "i" then
+    local lf = LevelFact(n.q, s)
+    if lf then add(lf) end
   end
   if q.c then
     for tok in q.c:gmatch("[^,]+") do local cn, cc = ns.ClassInfo(tok); add({ L.CLASSQ:format(cn), cc[1], cc[2], cc[3] }) end
@@ -986,11 +1057,18 @@ function ns.RowTip(row)
   local money = q.rw and q.rw ~= "" and q.rw or nil
   -- the XP this player really gets (less on a grey quest, none at the cap), as the summary shows it
   local xp = q.xp and q.xp > 0 and q.xp or nil
+  local xpWhy
   if xp and ns.QuestXPFor then
     local okL, lv = pcall(function() return tonumber(UnitLevel("player")) end)
     lv = okL and lv or 1
-    local ok, got = pcall(ns.QuestXPFor, n.q, lv)
-    if ok and type(got) == "number" then xp = got > 0 and got or nil end
+    local ok, got, base, diff = pcall(ns.QuestXPFor, n.q, lv)
+    if ok and type(got) == "number" then
+      -- why it is less than the quest's own XP (the summary's sentence)
+      if got > 0 and type(base) == "number" and got < base and s ~= "done" and HasL("SUM_XP_LESS_TT") and ns.BigNumber then
+        xpWhy = L.SUM_XP_LESS_TT:format(ns.BigNumber(got), ns.BigNumber(base), diff or 0)
+      end
+      xp = got > 0 and got or nil
+    end
   end
   if xp and ns.BigNumber then xp = ns.BigNumber(xp) end
   if xp or money or (q.ri and q.ri[1]) then
@@ -998,12 +1076,14 @@ function ns.RowTip(row)
     if xp and money then add(L.TT_XPMONEY:format(xp, money))
     elseif xp then add(L.TT_XP:format(xp))
     elseif money then add({ L.TT_REWARD:format(money), T.gold[1], T.gold[2], T.gold[3] }) end
+    if xpWhy then add({ xpWhy, T.warn[1], T.warn[2], T.warn[3] }) end
     if q.ri and q.ri[1] then add({ L.TT_REWARD:format(table.concat(q.ri, q.rc and " / " or ", ")), T.gold[1], T.gold[2], T.gold[3] }) end
   end
   -- the chain, what blocks it
   local chain = {}
-  if n.pre and n.ci and n.cn and n.forQ and n.forQ[1] then chain[#chain + 1] = { L.CH_BEFORE:format(n.ci, n.cn, ns.QName(n.forQ[1])), T.info[1], T.info[2], T.info[3] } end
-  local pb = n.kind == "a" and ns.PrereqProblem(n.q)
+  if n.pre and n.ci and n.cn and n.forQ and n.forQ[1] then chain[#chain + 1] = { L.CH_BEFORE:format(n.ci, n.cn, ns.QName(n.forQ[1])), txt[1], txt[2], txt[3] } end
+  -- the level it needs is already in the level line under the title
+  local pb = n.kind == "a" and not NeedShown(n.q, s) and ns.PrereqProblem(n.q)
   if pb then chain[#chain + 1] = { L.BLOCKED:format(pb), T.bad[1], T.bad[2], T.bad[3] } end
   if q.conf then chain[#chain + 1] = L.TT_CONFLICT end
   if #chain > 0 then gap(); for _, c in ipairs(chain) do add(c) end end
@@ -1018,10 +1098,31 @@ end
 local FOCUS_KEY = { a = "FOCUS_A", t = "FOCUS_T", c = "FOCUS_C", o = "FOCUS_O", h = "FOCUS_H", i = "FOCUS_I" }
 local LINE_KEY = { a = "LINE_A", t = "LINE_T", c = "LINE_C", o = "LINE_O", h = "LINE_H", i = "LINE_I" }
 local NEXT_MAX = 16
-local FOCUS_X = 44
+local FOCUS_X = 36            -- the card's text edge inside the block (icon 20 at x 8, then 8)
+local SEP = "  ·  "
+
+-- an objective's verb and icon, the tracker's words (Tracker.lua TR.Action uses the same keys)
+local OBJ_KIND = { kill = "kill", item = "loot", object = "use", talk = "talk", event = "go" }
+local OBJ_TEXT = { kill = "TR_KILL", loot = "TR_LOOT", use = "TR_USE", talk = "TR_TALK", go = "TR_GO" }
+local OBJ_ICON = { kill = "sword", loot = "bag", use = "hammer", talk = "user", go = "flag" }
+local CHECK_T = "|TInterface\\AddOns\\WLHelper\\Media\\Icons\\check:14:14:0:-1|t "
 
 local function NodeName(nd) return nd.label or ns.QName(nd.q) end
 local function NpcShort(nd) return nd.npc and (nd.npc:gsub(",.*$", "")) or nil end
+
+-- the first letter up or down (a part that starts a line, or follows another one); é/É too
+local function Cap(s)
+  if type(s) ~= "string" or s == "" then return s end
+  local c = s:match("^|c%x%x%x%x%x%x%x%x")
+  if c then return c .. Cap(s:sub(#c + 1)) end
+  if s:sub(1, 2) == "\195\169" then return "\195\137" .. s:sub(3) end
+  return s:sub(1, 1):upper() .. s:sub(2)
+end
+local function Low(s)
+  if type(s) ~= "string" or s == "" then return s end
+  if s:sub(1, 2) == "\195\137" then return "\195\169" .. s:sub(3) end
+  return s:sub(1, 1):lower() .. s:sub(2)
+end
 
 -- the current action of a step: its first unfinished line (else its last one: all done)
 local function FocusIndex(st, log)
@@ -1044,16 +1145,438 @@ local function ArrowSource(nd)
 end
 ns.ArrowSource = ArrowSource
 
+-- The point a line leads to, as the arrow follows it (StepPoints): the game's quest area first for
+-- an objective. -> m, x, y (nil when nothing places it)
+local function NodePoint(nd)
+  if nd.loc and nd.loc.m then
+    if nd.kind == "o" then
+      local gx, gy = GamePOI(nd.q, nd.loc.m)
+      if gx then return nd.loc.m, gx, gy end
+    end
+    return nd.loc.m, nd.loc.x, nd.loc.y
+  end
+  if nd.noLoc and nd.kind == "o" then
+    local here = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+    for _, m in ipairs({ here or false, nd.mapHint or false }) do
+      if m then
+        local gx, gy = GamePOI(nd.q, m)
+        if gx then return m, gx, gy end
+      end
+    end
+  end
+end
+
+-- How far a point is from you: "350 m", "1,2 km" (the GPS's own words), "Autre continent"; nil
+-- inside an instance, with no position, or when the position is secret.
+local function DistText(m, x, y)
+  if not (m and x and y and ns.PlayerWorld and ns.World) then return nil end
+  if IsInInstance then
+    local okI, inst = pcall(IsInInstance)
+    if okI and inst == true then return nil end
+  end
+  local okH, here = pcall(ns.PlayerWorld)
+  local okT, there = pcall(ns.World, m, x, y)
+  if not (okH and okT and type(here) == "table" and type(there) == "table") then return nil end
+  local okD, far, yd = pcall(function()
+    if here[1] ~= there[1] then return true, nil end
+    return false, math.sqrt((here[2] - there[2]) ^ 2 + (here[3] - there[3]) ^ 2)
+  end)
+  if not okD then return nil end
+  if far then return L.ARROW_FAR end
+  if type(yd) ~= "number" or (issecretvalue and issecretvalue(yd)) then return nil end
+  local GPS = ns.WP and ns.WP.GPS
+  if GPS and GPS.Distance then
+    local okG, t = pcall(GPS.Distance, yd)
+    if okG and type(t) == "string" then return t end
+  end
+  local m2 = yd * 0.9144
+  if m2 >= 1000 then
+    local t = ("%.1f km"):format(m2 / 1000)
+    return (ns.lang == "fr") and (t:gsub("%.", ",")) or t
+  end
+  return L.YARDS:format(math.floor(m2 + 0.5))
+end
+ns.GuideDistText = DistText
+
+-- "Shadowforge Surveyor, Shadowforge Ruffian, Shadowforge Digger (8 %)" or "A 8 % · B 3 %", 3 names
+local function DropsText(o)
+  if not (o and o.src and o.src[1]) then return nil end
+  local same, p0 = true, nil
+  for k2, x in ipairs(o.src) do
+    local p = x[2] and math.floor(x[2] + 0.5) or nil
+    if k2 == 1 then p0 = p elseif p ~= p0 then same = false end
+  end
+  local names = {}
+  for k2, x in ipairs(o.src) do
+    if k2 > 3 then break end
+    local p = x[2] and math.floor(x[2] + 0.5) or nil
+    local pct = (not same and p and p > 0 and p < 100) and (" " .. p .. " %") or ""
+    names[#names + 1] = x[1] .. pct
+  end
+  local t = table.concat(names, same and ", " or " · ")
+  if #o.src > 3 then t = t .. " " .. L.CARD_PLUS:format(#o.src - 3) end
+  if same and p0 and p0 > 0 and p0 < 100 then t = t .. " (" .. p0 .. " %)" end
+  return L.TT_DROPS:format(t)
+end
+
+-- The name of an objective as the player reads it: ours (translated), else in French the game's own
+-- words when the quest is in the log and the game names the same objective.
+local function ObjName(nd, o, log, s)
+  local nm = o.n and (ns.T(o.n) or o.n) or nil
+  if ns.lang == "fr" and o.n and nm == o.n and (s == "on" or s == "ready") then
+    local lines, fromGame = ObjectiveBlock({ kind = "o", q = nd.q, obj = o }, log, s)
+    if fromGame and type(lines[1]) == "string" then
+      local g = lines[1]:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("%s*:%s*%d+%s*/%s*%d+%s*$", "")
+      if g ~= "" then nm = g end
+    end
+  end
+  return nm
+end
+
+-- the tracker names an objective the same way (Tracker.lua TR.Action)
+ns.ObjDisplayName = function(nd, o, log, s)
+  if s == nil and log and nd and nd.q then s = ns.State(log, nd.q) end
+  return ObjName(nd, o, log, s)
+end
+
+-- "Tuer : Shadowforge Surveyor  ·  3 sur 8" (the count in green once done). A count of one says
+-- nothing: the check mark already tells it is done.
+local function ObjLine(nd, o, log, s)
+  local kind = OBJ_KIND[o.k] or "go"
+  local nm = ObjName(nd, o, log, s)
+  local t = nm and L[OBJ_TEXT[kind]]:format(nm) or L.TR_DO:format(ns.QName(nd.q))
+  local a, b, fin = ns.ObjCount(log, nd.q, o)
+  if a and type(b) == "number" and b > 1 then
+    t = t .. Hex(T.muted) .. SEP .. "|r" .. Hex(fin and T.ok or T.muted) .. L.CARD_COUNT:format(a, b) .. "|r"
+  end
+  return t, kind, nm
+end
+
+-- an "Ensuite" line: the objective's own verb for an objective (as the card's title), else the kind
+local function LineText(a, log)
+  if (a.kind == "c" or a.kind == "o") and log then
+    local o = a.oneObj or (a.kind == "o" and a.obj) or nil
+    if o then
+      local nm = ObjName(a, o, log, ns.State(log, a.q))
+      if nm then return L[OBJ_TEXT[OBJ_KIND[o.k] or "go"]]:format(nm) end
+    end
+  end
+  local lk = LINE_KEY[a.kind]
+  return lk and L[lk]:format(NodeName(a)) or NodeName(a)
+end
+
+-- The XP and money of a quest (the summary's numbers), for the turn-in's details
+local function RewardText(qid)
+  local q = ns.Q[qid] or {}
+  local money = q.rw and q.rw ~= "" and q.rw or nil
+  local xp = q.xp and q.xp > 0 and q.xp or nil
+  if xp and ns.QuestXPFor then
+    local okL, lv = pcall(function() return tonumber(UnitLevel("player")) end)
+    local ok, got = pcall(ns.QuestXPFor, qid, okL and lv or 1)
+    if ok and type(got) == "number" then xp = got > 0 and got or nil end
+  end
+  if xp and ns.BigNumber then xp = ns.BigNumber(xp) end
+  local out = {}
+  if xp and money then out[#out + 1] = L.TT_XPMONEY:format(xp, money)
+  elseif xp then out[#out + 1] = L.TT_XP:format(xp)
+  elseif money then out[#out + 1] = L.TT_REWARD:format(money) end
+  if q.ri and q.ri[1] then out[#out + 1] = Hex(T.gold) .. L.TT_REWARD:format(table.concat(q.ri, q.rc and " / " or ", ")) .. "|r" end
+  return #out > 0 and table.concat(out, "\n") or nil
+end
+
+-- What the card says about the current action, each fact once (docs: T-37). It answers WHAT (the
+-- title), WHERE (NPC for a giver or a turn-in, zone, distance), WHY (one muted line: the quest, the
+-- chain), then the details, folded. -> table:
+--   title, icon (HD name, nil = the kind's own mark), lead, drops, where, placeBase, pt {m,x,y},
+--   noFar, travel, why {..}, objs {..}, details {..}, desc, gpsTip {..}, ok
+local function FocusModel(card, nd, log, dkey, st)
+  local q = ns.Q[nd.q] or {}
+  local s = ns.State(log, nd.q)
+  local ok = ns.NodeOK(log, nd)
+  local inLog = (s == "on" or s == "ready")
+  local tx, mt = Hex(T.text), Hex(T.muted)
+  local M = { why = {}, objs = {}, details = {}, gpsTip = {}, ok = ok }
+  local qn = nd.q and ns.QName(nd.q) or ""
+  local kind = nd.kind
+  local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
+  local desc
+  if inLog and ns.GameQuestText then
+    local gdesc, gobj = ns.GameQuestText(nd.q, log)
+    if not obj then obj = gobj end
+    -- our data is thin (no objectives, no note): the game's own description says where to go
+    if gdesc and not q.ne and not (q.o and #q.o > 0) then desc = gdesc end
+  end
+  M.desc = desc
+
+  -- WHAT: the action, never the NPC
+  local o, objName
+  local objMoved = false
+  if kind == "a" or kind == "t" or kind == "h" or kind == "i" then
+    M.title = L[FOCUS_KEY[kind]]:format(NodeName(nd))
+  else
+    o = nd.oneObj or (kind == "o" and nd.obj) or nil
+    if not o then
+      for _, x in ipairs(q.o or {}) do if not ns.ObjDone(log, nd.q, x) then o = x; break end end
+    end
+    if o then
+      local t, ok2, nm = ObjLine(nd, o, log, s)
+      M.title, M.icon, objName = t, OBJ_ICON[ok2], nm
+    else
+      local game = (inLog and ns.GameObjectives) and ns.GameObjectives(nd.q, log) or {}
+      local g
+      for _, x in ipairs(game) do if not x.fin then g = x; break end end
+      if g then M.title = g.text
+      else
+        M.title = L.TR_DO:format(qn)
+        -- nothing says what to do but the quest's sentence: it shows, not folded
+        if obj and not ok then M.lead = obj; objMoved = true end
+      end
+    end
+  end
+  -- the drops of the objective in the title
+  M.drops = o and DropsText(o) or nil
+
+  -- WHERE: the NPC who gives or takes the quest, the zone, the distance
+  local m, x, y = NodePoint(nd)
+  local src = ArrowSource(nd)
+  local place = {}
+  local npc = NpcShort(nd)
+  if npc and kind ~= "c" and kind ~= "o" then place[#place + 1] = npc end
+  if m then
+    local zn = ZoneName(m)
+    if zn ~= "" then place[#place + 1] = zn end
+    M.pt = { m, x, y }
+  end
+  if src == "log" then
+    M.placeBase = Hex(T.warn) .. L.ARROW_LOG .. "|r"
+  else
+    M.placeBase = table.concat(place, SEP)
+  end
+  M.noFar = st and st.travel == "TRAVEL_CONT" or nil
+  local dist = M.pt and DistText(m, x, y) or nil
+  if dist == L.ARROW_FAR and M.noFar then dist = nil end
+  M.dist = dist
+  if dist then
+    M.where = (M.placeBase ~= "" and (M.placeBase .. SEP) or "") .. mt .. dist .. "|r"
+  else
+    M.where = M.placeBase ~= "" and M.placeBase or nil
+  end
+  M.travel = st and st.travel and L[st.travel] or nil
+
+  -- WHY: one muted line, the quest then the chain. When the title already names the quest (a
+  -- turn-in, "Faire « X »"), the line keeps the fact (a dungeon quest) and not the name again.
+  local why = {}
+  local titleQ = qn ~= "" and type(M.title) == "string" and M.title:find(qn, 1, true) ~= nil
+  if (kind == "c" or kind == "o" or kind == "t" or kind == "i") and qn ~= "" then
+    local main = q.role ~= "pre" and q.d and not nd.pre
+    if titleQ then
+      if main then why[#why + 1] = L.CARD_WHY_MAIN_S end
+    elseif main then why[#why + 1] = L.CARD_WHY_MAIN:format(qn)
+    else why[#why + 1] = L.CARD_WHY_Q:format(qn) end
+  elseif s == "none" then
+    local lf = LevelFact(nd.q, s)
+    if lf then why[#why + 1] = lf .. mt end
+  end
+  if nd.pre then
+    local lead = nd.forQ and nd.forQ[1]
+    if nd.ci and nd.cn and lead then
+      why[#why + 1] = L.CARD_CHAIN:format(nd.ci, nd.cn, ns.QName(lead)) .. ((#nd.forQ > 1) and L.CARD_PLUS_P:format(#nd.forQ - 1) or "")
+    elseif nd.ci and nd.cn then why[#why + 1] = L.CARD_PRE_N:format(nd.ci, nd.cn)
+    else why[#why + 1] = Low(L.PRE) end
+  elseif kind == "a" and ns.ChainState then
+    local cs = ns.ChainState(nd.q)
+    if cs.total == 0 then why[#why + 1] = Low(L.CH_NONE)
+    elseif cs.done >= cs.total then why[#why + 1] = Hex(T.ok) .. Low(L.CH_ALLDONE) .. "|r" .. mt
+    else why[#why + 1] = Hex(T.warn) .. Low(L.ST_PRE:format(cs.done + 1, cs.total)) .. "|r" .. mt end
+  end
+  if nd.d and nd.d ~= dkey then why[#why + 1] = L.CARD_FOR_DG:format(ns.DName(nd.d) or nd.d) end
+  if #why > 0 then
+    why[1] = Cap(why[1])
+    M.why[1] = mt .. table.concat(why, SEP) .. "|r"
+  end
+  -- every action done (the step waits on something else): the muted title and the WHY line only
+  if ok then
+    M.drops, M.where, M.placeBase, M.pt, M.dist, M.travel, M.lead = nil, nil, nil, nil, nil, nil, nil
+    return M
+  end
+  -- then, each in its own colour: what blocks it, the state when it is not the expected one, the
+  -- party, the class
+  if kind == "a" and s == "none" and not NeedShown(nd.q, s) then
+    local pb = ns.PrereqProblem(nd.q)
+    if pb then M.why[#M.why + 1] = Hex(T.bad) .. L.BLOCKED:format(pb) .. "|r" end
+  end
+  if (kind == "c" or kind == "o" or kind == "t") and s == "none" then
+    M.why[#M.why + 1] = Hex(T.warn) .. L.CARD_NOTLOG .. "|r"
+  elseif kind == "t" and s == "on" then
+    M.why[#M.why + 1] = Hex(T.warn) .. L.CARD_NOTREADY .. "|r"
+  end
+  if nd.unknown and src ~= "log" then M.why[#M.why + 1] = Hex(T.warn) .. L.TRAVEL_UNK .. "|r" end
+  if ns.PartyLine then
+    local pl = ns.PartyLine(nd.q)
+    if pl then M.why[#M.why + 1] = tx .. pl .. "|r" end
+  end
+  if q.c and not (card and card.clsChip and card.clsChip:IsShown()) then
+    local tok = q.c:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
+    M.why[#M.why + 1] = ns.ClassIconText(tok, 12) .. Hex(cc) .. L.CLASS_TAG:format(cn) .. "|r"
+  end
+
+  -- the other objectives (2 or more), or what is left before a turn-in
+  if kind == "t" and s == "on" then
+    local lines = ObjectiveBlock(nd, log, s)
+    for _, l2 in ipairs(lines) do if type(l2) == "string" then M.objs[#M.objs + 1] = l2 end end
+    if #M.objs == 0 then
+      for _, r2 in ipairs(q.req or {}) do
+        M.objs[#M.objs + 1] = r2[1] .. (r2[2] and r2[2] > 1 and (" x" .. r2[2]) or "") .. (r2[3] and (L.COLON .. ns.T(r2[3])) or "")
+      end
+    end
+  elseif (kind == "c" or kind == "o") and not (nd.oneObj or (kind == "o" and nd.obj)) then
+    local list = q.o or {}
+    if #list >= 2 and o then
+      for _, x2 in ipairs(list) do
+        if x2 ~= o then
+          local t = ObjLine(nd, x2, log, s)
+          if ns.ObjDone(log, nd.q, x2) then
+            t = CHECK_T .. mt .. t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. "|r"
+          end
+          M.objs[#M.objs + 1] = t
+        end
+      end
+    elseif #list == 0 and inLog and ns.GameObjectives then
+      local game = ns.GameObjectives(nd.q, log)
+      if #game >= 2 then
+        for _, g in ipairs(game) do
+          if g.text ~= M.title then
+            M.objs[#M.objs + 1] = g.fin and (CHECK_T .. mt .. g.text .. "|r") or g.text
+          end
+        end
+      end
+    end
+  end
+
+  -- DETAILS, folded: what the quest will ask (a quest to take), the reward (a turn-in), our notes,
+  -- the journal's note, the game's text
+  local H = Hex(T.fg)
+  local det = M.details
+  if obj and not objMoved then
+    if kind == "a" or kind == "h" then det[#det + 1] = H .. L.CARD_ASKS .. "|r\n" .. obj
+    elseif kind ~= "t" then det[#det + 1] = obj end
+  end
+  if kind == "t" then
+    local rw = RewardText(nd.q)
+    if rw then det[#det + 1] = H .. L.CARD_GETS .. "|r\n" .. rw end
+  end
+  if q.ne and kind ~= "t" then det[#det + 1] = ns.T(q.ne) end
+  if nd.extra then det[#det + 1] = nd.extra end
+  if kind == "a" and q.si then det[#det + 1] = q.si .. (q.sih and (L.COLON .. ns.T(q.sih)) or "") end
+  if kind == "c" and ns.BossLines and not nd.oneObj then
+    local bl2 = {}
+    for _, bl in ipairs(ns.BossLines(nd.q) or {}) do
+      bl2[#bl2 + 1] = H .. L.BOSS .. L.COLON .. bl[1] .. "|r" .. (bl[2] and ("  " .. bl[2]) or "")
+    end
+    if #bl2 > 0 then det[#det + 1] = table.concat(bl2, "\n") end
+  end
+  -- ForeverDungeonJournal's note only when we have none of our own (each said once)
+  local fdj = (not q.ne) and ns.FDJNote and ns.FDJNote(nd.q) or nil
+  if fdj then det[#det + 1] = mt .. L.FDJ_NOTE .. "|r\n" .. fdj end
+  if desc then det[#det + 1] = H .. L.GAME_TEXT .. "|r\n" .. desc end
+
+  -- the GPS button's tooltip: where it leads, how the arrow finds it, the click
+  if nd.loc then
+    local who = (kind == "a" or kind == "t" or kind == "h") and (npc or qn) or (objName or npc or qn)
+    M.gpsTip[1] = L.TT_GPS:format(who, x or nd.loc.x, y or nd.loc.y)
+    if src == "game" then M.gpsTip[#M.gpsTip + 1] = mt .. L.ARROW_GAME .. "|r" end
+    M.gpsTip[#M.gpsTip + 1] = L.TT_GPS_CLICK
+  elseif src == "game" then
+    M.gpsTip[1] = mt .. L.ARROW_GAME .. "|r"
+  end
+  return M
+end
+ns.FocusModel = function(nd, log, dkey, st) return FocusModel(f and f.card, nd, log, dkey, st) end
+
+-- The old flat list (the tests read it): title, lead, drops, where, why, objectives, details, GPS
+-- tooltip. -> lines, the game's description (or nil)
+local function FocusParts(card, nd, log, dkey)
+  local M = FocusModel(card, nd, log, dkey)
+  local flat = {}
+  local function add(v) if v and v ~= "" then flat[#flat + 1] = v end end
+  add(M.title); add(M.lead); add(M.drops); add(M.where)
+  for _, l2 in ipairs(M.why) do add(l2) end
+  for _, l2 in ipairs(M.objs) do add(l2) end
+  for _, l2 in ipairs(M.details) do add(l2) end
+  for _, l2 in ipairs(M.gpsTip) do add(l2) end
+  return flat, M.desc
+end
+ns.FocusParts = function(nd, log, dkey) return FocusParts(f and f.card, nd, log, dkey) end
+
+-- the distance on the WHERE line follows you (1 s), and the card re-lays out only when that line's
+-- height changes or the line appears (at most once a second; one that comes too soon waits for the
+-- next tick). Text only: no secure frame, nothing else in combat.
+local function FocusTick(fo, el)
+  fo.tick = (fo.tick or 0) + (type(el) == "number" and el or 0)
+  if fo.tick < 1 then return end
+  fo.tick = 0
+  local now = GetTime and GetTime() or 0
+  local function Relayout()
+    if not fo.relaidAt or now - fo.relaidAt >= 1 then
+      fo.relaidAt = now; fo.relayoutDue = nil; ns.Render()
+    else fo.relayoutDue = true end
+  end
+  if fo.relayoutDue then Relayout(); return end
+  local M = fo.model
+  if not (M and M.pt and fo.node and fo:IsShown()) then return end
+  local d = DistText(M.pt[1], M.pt[2], M.pt[3])
+  if d == L.ARROW_FAR and M.noFar then d = nil end
+  if d == M.dist then return end
+  M.dist = d
+  -- the line was empty (no zone name, no distance yet): the card makes room for it
+  if not fo.place:IsShown() then
+    if d then Relayout() end
+    return
+  end
+  local base = M.placeBase or ""
+  local t = d and ((base ~= "" and (base .. SEP) or "") .. Hex(T.muted) .. d .. "|r") or base
+  local h0 = num(fo.place:GetStringHeight())
+  fo.place:SetText(t)
+  local h1 = ns.FitText(fo.place, 2, fo.placeW, fo.cutSink)
+  if h0 and h1 and math.abs(h1 - h0) > 0.5 then Relayout() end
+end
+
+-- the check-list's entrance line ("Entrée : Terres Ingrates 42.1, 13.3 · 1,2 km") follows you the
+-- same way (1 s, text only)
+local function WhereTick(self, el)
+  self.t = (self.t or 0) + (type(el) == "number" and el or 0)
+  if self.t < 1 then return end
+  self.t = 0
+  local card = self.card
+  local p = card and card.wlPt
+  if not (p and card.whereLine and card.whereLine:IsShown()) then return end
+  local d = DistText(p[1], p[2], p[3])
+  if d == card.wlDist then return end
+  card.wlDist = d
+  local h0 = num(card.whereLine:GetStringHeight())
+  card.whereLine:SetText((card.wlBase or "") .. (d and (Hex(T.muted) .. SEP .. d .. "|r") or ""))
+  local h1 = ns.FitText(card.whereLine, 2, card.wlW or TextW(), card)
+  if h0 and h1 and math.abs(h1 - h0) > 0.5 then ns.Render() end
+end
+
 local function MakeFocus(card)
   local fo = CreateFrame("Button", nil, card)
-  fo.bg = Tex(fo, "BACKGROUND", { 1, 1, 1, 0.03 }); fo.bg:SetAllPoints()
+  -- no box inside the card: hover, press and "followed" tints only
   fo.wpOn = Tex(fo, "BACKGROUND", T.selFill); fo.wpOn:SetAllPoints(); fo.wpOn:Hide()
   fo.hl = Tex(fo, "HIGHLIGHT", T.hoverFill); fo.hl:SetAllPoints()
   fo.press = Tex(fo, "ARTWORK", T.pressFill); fo.press:SetAllPoints(); fo.press:Hide()
-  fo.icon = fo:CreateTexture(nil, "ARTWORK"); fo.icon:SetSize(24, 24); fo.icon:SetPoint("TOPLEFT", 10, -10)
-  fo.head = Text(fo, ns.F.heading, T.fg)
-  fo.place = Text(fo, ns.F.meta, T.muted)
-  fo.body = Text(fo, ns.F.label, T.text); fo.body:SetSpacing(3)
+  fo.icon = fo:CreateTexture(nil, "ARTWORK"); fo.icon:SetSize(20, 20); fo.icon:SetPoint("TOPLEFT", 8, -8)
+  fo.head = Text(fo, ns.F.title, T.fg); Size(fo.head, ns.F.title)
+  fo.lead = Text(fo, ns.F.label, T.text); fo.lead:Hide()
+  fo.drops = Text(fo, ns.F.meta, T.muted); fo.drops:Hide()
+  fo.place = Text(fo, ns.F.body, T.text)
+  fo.travel = Text(fo, ns.F.meta, T.text); fo.travel:Hide()
+  fo.body = Text(fo, ns.F.meta, T.muted); fo.body:SetSpacing(3)
+  fo.objs = Text(fo, ns.F.body, T.text); fo.objs:SetSpacing(4); fo.objs:Hide()
+  -- the opened details sit in their own frame: a click there reads, it does not start the GPS
+  fo.detBox = CreateFrame("Frame", nil, fo); fo.detBox:EnableMouse(true); fo.detBox:Hide()
+  fo.details = Text(fo.detBox, ns.F.label, T.text); fo.details:SetSpacing(4); fo.details:Hide()
+  -- older name (the game's text now sits in the details)
   fo.gtext = Text(fo, ns.F.meta, T.muted); fo.gtext:SetSpacing(2); fo.gtext:Hide()
   -- the block's tooltip (RowTip) already says the name, the place and the game's description in
   -- its own blocks: their cut labels are kept apart, not put first in the tooltip
@@ -1061,21 +1584,31 @@ local function MakeFocus(card)
   local gb
   gb = LabelBtn(fo, "GPS", 24, "secondary", function(self) local n = self.row.node; if n and n.loc then ns.SetOne(n) end end,
     function()
-      local n = gb and gb.row and gb.row.node
-      if not (n and n.loc) then return nil end
-      return { L.TT_GPS:format(n.npc or ns.QName(n.q), n.loc.x, n.loc.y), L.TT_GPS_CLICK }
+      local M = gb and gb.row and gb.row.model
+      if not (M and M.gpsTip and M.gpsTip[1]) then return nil end
+      return M.gpsTip
     end)
   if gb.SetIcon then gb:SetIcon("pin") end
   gb.row = fo
   fo.gb = gb
+  -- "Détails" (a ghost link with its chevron): the details stay open from step to step
+  local more
+  more = LabelBtn(fo, L.CARD_MORE, 16, "ghost", function()
+    WLDTDB.cardDetails = (not WLDTDB.cardDetails) or nil
+    ns.Render()
+  end, function() return { WLDTDB.cardDetails and L.CARD_LESS_TT or L.CARD_MORE_TT } end)
+  more:Hide()
+  fo.more = more
   fo:SetScript("OnClick", function(self) local n = self.node; if n and n.loc then ns.SetOne(n) end end)
   fo:SetScript("OnMouseDown", function(self) if self.node and self.node.loc then self.press:Show() end end)
   fo:SetScript("OnMouseUp", function(self) self.press:Hide() end)
   fo:SetScript("OnEnter", function(self) ns.RowTip(self) end)
   fo:SetScript("OnLeave", ns.HideTip)
+  fo:SetScript("OnUpdate", FocusTick)
   fo:Hide()
   card.focus = fo
-  -- "Then at Mordent Evenshade:" and one small line per other action
+  -- a 1 px rule, then "Then at Mordent Evenshade:" and one small line per other action
+  card.nextRule = Tex(card, "ARTWORK", T.divider); card.nextRule:SetHeight(1); card.nextRule:Hide()
   card.nextHdr = Text(card, ns.F.label, T.fg); card.nextHdr:Hide()
   card.lines = {}
   for k = 1, NEXT_MAX do
@@ -1100,155 +1633,91 @@ end
 
 local function HideFocus(card)
   if not card.focus then return end
-  card.focus.node = nil; card.focus:Hide(); card.nextHdr:Hide(); card.doneLine:Hide(); card.doneIcon:Hide()
+  local fo = card.focus
+  fo.node = nil; fo.model = nil; fo:Hide(); card.nextHdr:Hide(); card.nextRule:Hide(); card.doneLine:Hide(); card.doneIcon:Hide()
+  for _, x in ipairs({ fo.lead, fo.drops, fo.travel, fo.objs, fo.details, fo.detBox, fo.gtext, fo.more }) do x:Hide() end
   for _, ln in ipairs(card.lines) do ln.node = nil; ln:Hide() end
 end
 
--- The detail lines of the current action, each said once: state and chain, what blocks it, the
--- objectives (ours live, else the game's), the quest text, our note, ForeverDungeonJournal's note,
--- where the arrow goes. -> list of lines, the game's description to show under them (or nil)
-local function FocusParts(card, nd, log, dkey)
-  local q = ns.Q[nd.q] or {}
-  local s = ns.State(log, nd.q)
-  local ok = ns.NodeOK(log, nd)
-  local tx, mt = Hex(T.text), Hex(T.muted)
-  local parts, tags = {}, {}
-  if nd.kind ~= "i" then tags[#tags + 1] = Hex(SCOL[s] or T.muted) .. L[SLABEL[s] or "S_NONE"] .. "|r" end
-  if nd.d and nd.d ~= dkey then tags[#tags + 1] = mt .. (ns.DName(nd.d) or nd.d) .. "|r" end
-  if nd.pre then
-    -- where you are in the chain, and what it leads to: "Step 3 of 9 before Agamaggan's Blood"
-    local lead = nd.forQ and nd.forQ[1]
-    local t = (nd.ci and nd.cn and lead) and L.CH_BEFORE:format(nd.ci, nd.cn, ns.QName(lead))
-      or (nd.ci and nd.cn) and L.CH_STEP:format(nd.ci, nd.cn) or L.PRE
-    tags[#tags + 1] = Hex(T.info) .. t .. "|r"
-  elseif nd.kind == "a" and not ok and ns.ChainState then
-    local cs = ns.ChainState(nd.q)
-    if cs.total == 0 then tags[#tags + 1] = mt .. L.CH_NONE .. "|r"
-    elseif cs.done >= cs.total then tags[#tags + 1] = Hex(T.ok) .. L.CH_ALLDONE .. "|r"
-    else tags[#tags + 1] = Hex(T.warn) .. L.ST_PRE:format(cs.done + 1, cs.total) .. "|r" end
-  end
-  if q.c and not card.clsChip:IsShown() then
-    local tok = q.c:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
-    tags[#tags + 1] = ns.ClassIconText(tok, 12) .. Hex(cc) .. L.CLASS_TAG:format(cn) .. "|r"
-  end
-  if #tags > 0 then parts[#parts + 1] = table.concat(tags, mt .. "  ·  |r") end
-  if ok then return parts, nil end
-  if nd.pre and nd.forQ and nd.forQ[1] then
-    local u = (#nd.forQ == 1) and L.CH_UNLOCKS:format(ns.QName(nd.forQ[1])) or L.CH_UNLOCKS_MORE:format(ns.QName(nd.forQ[1]), #nd.forQ - 1)
-    parts[#parts + 1] = tx .. u .. "|r"
-  end
-  if nd.kind == "a" and s == "none" then
-    local pb = ns.PrereqProblem(nd.q)
-    if pb then parts[#parts + 1] = Hex(T.bad) .. L.BLOCKED:format(pb) .. "|r" end
-  end
-  local inLog = (s == "on" or s == "ready")
-  local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
-  local desc
-  if inLog and ns.GameQuestText then
-    local gdesc, gobj = ns.GameQuestText(nd.q, log)
-    if not obj then obj = gobj end
-    -- our data is thin (no objectives, no note): the game's own description says where to go
-    if gdesc and not q.ne and not (q.o and #q.o > 0) then desc = gdesc end
-  end
-  if nd.kind == "h" then
-    local A = q.s and q.s.n or q.st
-    if A then parts[#parts + 1] = tx .. L.GIVER:format(A) .. "|r" end
-  elseif not (nd.kind == "t" and s == "ready") then
-    local objs = (nd.kind ~= "a") and ObjectiveBlock(nd, log, s) or {}
-    if obj then parts[#parts + 1] = tx .. obj .. "|r" end
-    for _, l2 in ipairs(objs) do
-      if type(l2) == "table" then parts[#parts + 1] = "    " .. l2.src else parts[#parts + 1] = tx .. "- " .. l2 .. "|r" end
-    end
-    if #objs == 0 and nd.kind ~= "a" then
-      for _, r2 in ipairs(q.req or {}) do
-        parts[#parts + 1] = "- " .. r2[1] .. (r2[2] and r2[2] > 1 and (" x" .. r2[2]) or "") .. (r2[3] and (L.COLON .. ns.T(r2[3])) or "")
-      end
-    end
-    if nd.kind == "a" and q.si then parts[#parts + 1] = q.si .. (q.sih and (L.COLON .. ns.T(q.sih)) or "") end
-    if q.ne then parts[#parts + 1] = tx .. ns.T(q.ne) .. "|r" end
-    if nd.extra then parts[#parts + 1] = nd.extra end
-    if nd.kind == "c" and ns.BossLines and not nd.oneObj then
-      for _, bl in ipairs(ns.BossLines(nd.q) or {}) do
-        parts[#parts + 1] = tx .. L.BOSS .. L.COLON .. bl[1] .. "|r" .. (bl[2] and ("  " .. bl[2]) or "")
-      end
-    end
-  end
-  -- ForeverDungeonJournal's note only when we have none of our own (each said once)
-  local fdj = (not q.ne) and ns.FDJNote and ns.FDJNote(nd.q) or nil
-  if fdj then parts[#parts + 1] = mt .. L.FDJ_NOTE .. "|r\n" .. tx .. fdj .. "|r" end
-  local src = ArrowSource(nd)
-  if src == "game" then parts[#parts + 1] = Hex(T.info) .. L.ARROW_GAME .. "|r"
-  elseif src == "log" then parts[#parts + 1] = Hex(T.warn) .. L.ARROW_LOG .. "|r" end
-  if nd.unknown then parts[#parts + 1] = L.TRAVEL_UNK end
-  if ns.PartyLine then
-    local pl = ns.PartyLine(nd.q)
-    if pl then parts[#parts + 1] = Hex(T.info) .. pl .. "|r" end
-  end
-  return parts, desc
-end
-ns.FocusParts = function(nd, log, dkey) return FocusParts(f.card, nd, log, dkey) end
-
--- Draws the current action at y and the list of the others; returns the new y.
+-- Draws the current action at y (the block's top) and the list of the others; returns the new y.
 local function RenderFocus(card, st, log, y, dkey)
   local fo = card.focus
   local rowW = CardW() - 8
   local k = FocusIndex(st, log)
   local nd = st.acts[k]
-  local ok = ns.NodeOK(log, nd)
-  fo.node = nd
+  local M = FocusModel(card, nd, log, dkey, st)
+  local ok = M.ok
+  fo.node, fo.model = nd, M
   -- hover feedback only when a click does something (a place to follow)
   fo.hl:SetShown(nd.loc ~= nil)
   fo.icon:SetVertexColor(1, 1, 1)
   if ok then ns.SetHDIcon(fo.icon, "check", T.ok)
+  elseif M.icon then ns.SetHDIcon(fo.icon, M.icon, T.muted)
   -- no kind icon: an empty slot (alpha 0) rather than a dot that says nothing
   elseif not SetKindIcon(fo.icon, nd) then ns.SetHDIcon(fo.icon, "dot", T.muted, 0) end
-  local key = FOCUS_KEY[nd.kind]
-  fo.head:SetText(key and L[key]:format(NodeName(nd)) or NodeName(nd))
-  local hc = ok and T.muted or T.fg
-  fo.head:SetTextColor(hc[1], hc[2], hc[3])
-  -- the GPS button at the top right; followed: the block is selected and the button says so
-  local x = -12
+  -- the GPS button at the top right, centred on the title's first line; followed: the block is
+  -- selected and the button says so
   local isActive = nd.loc and ns.active[ns.PKey(nd.loc.m, nd.loc.x, nd.loc.y)] and not ok
   fo.wpOn:SetShown(isActive and true or false)
-  if nd.loc then
-    fo.gb:SetText(isActive and (L.GPS_ON or "GPS") or "GPS")
-    fo.gb:ClearAllPoints(); fo.gb:SetPoint("TOPRIGHT", fo, "TOPRIGHT", x, -10); fo.gb:Show()
-    x = x - (num(fo.gb:GetWidth()) or 60) - 8
+  local gpsW = 0
+  if nd.loc and not ok then
+    fo.gb:SetText(isActive and L.GPS_ON or "GPS")
+    fo.gb:ClearAllPoints(); fo.gb:SetPoint("TOPRIGHT", fo, "TOPRIGHT", -12, -6); fo.gb:Show()
+    gpsW = (num(fo.gb:GetWidth()) or 60) + 8
   else fo.gb:Hide() end
-  local headW = math.max(80, rowW - FOCUS_X + x)
+  local headW = math.max(80, rowW - FOCUS_X - 12 - gpsW)
   local bodyW = rowW - FOCUS_X - 12
-  local yy = 10
+  local yy = 8
+  fo.head:SetText(M.title or NodeName(nd))
+  local hc = ok and T.muted or T.fg
+  fo.head:SetTextColor(hc[1], hc[2], hc[3])
   fo.head:ClearAllPoints(); fo.head:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -yy)
-  yy = yy + ns.FitText(fo.head, 3, headW, fo.cutSink)
-  -- NPC and place: "Mordent Evenshade  ·  Desolace 35.0, 46.4"
-  local place = {}
-  local npc = NpcShort(nd)
-  if npc then place[#place + 1] = npc end
-  if nd.loc and nd.loc.m then
-    local zn = ZoneName(nd.loc.m)
-    place[#place + 1] = ("%s%.1f, %.1f"):format(zn ~= "" and (zn .. " ") or "", nd.loc.x, nd.loc.y)
+  yy = yy + ns.FitText(fo.head, 2, headW, fo.cutSink)
+  if fo.gb:IsShown() then yy = math.max(yy, 6 + 24) end
+  local function Put(fs, text, gap, maxLines, w)
+    if text and text ~= "" then
+      fs:SetText(text)
+      fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -(yy + gap)); fs:Show()
+      yy = yy + gap + ns.FitText(fs, maxLines, w or bodyW, fo.cutSink)
+    else fs:SetText(""); fs:Hide() end
   end
-  if #place > 0 then
-    fo.place:SetText(table.concat(place, "  ·  ")); fo.place:Show()
-    fo.place:ClearAllPoints(); fo.place:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -(yy + 3))
-    yy = yy + 3 + ns.FitText(fo.place, 2, headW, fo.cutSink)
-  else fo.place:Hide() end
-  -- under the GPS button at least
-  if nd.loc then yy = math.max(yy, 10 + 24) end
-  local parts, desc = FocusParts(card, nd, log, dkey)
-  local body = table.concat(parts, "\n")
-  if body ~= "" then
-    fo.body:SetText(body); fo.body:Show()
-    fo.body:ClearAllPoints(); fo.body:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -(yy + 8))
-    yy = yy + 8 + ns.FitText(fo.body, f.compactIn and 4 or 0, bodyW, fo)
-  else fo.body:Hide() end
-  if desc then
-    fo.gtext:SetText(Hex(T.text) .. L.GAME_TEXT .. "|r\n" .. desc); fo.gtext:Show()
-    fo.gtext:ClearAllPoints(); fo.gtext:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X, -(yy + 8))
-    yy = yy + 8 + ns.FitText(fo.gtext, f.compactIn and 3 or 8, bodyW, fo.cutSink)
-  else fo.gtext:Hide() end
-  local fh = math.max(44, math.ceil(yy + 12))
+  Put(fo.lead, M.lead, 4, 0)
+  Put(fo.drops, M.drops, 3, 2)
+  fo.placeW = bodyW
+  Put(fo.place, M.where, 8, 2)
+  Put(fo.travel, M.travel, 3, 0)
+  Put(fo.body, table.concat(M.why, "\n"), 8, f.compactIn and 4 or 0)
+  Put(fo.objs, table.concat(M.objs, "\n"), 12, 0)
+  -- the details, folded under "Détails"
+  local hasDet = #M.details > 0
+  local open = hasDet and WLDTDB.cardDetails and true or false
+  if hasDet then
+    fo.more:SetText(open and L.CARD_LESS or L.CARD_MORE)
+    ns.SetHDIcon(fo.more.chev, open and "chevron_up" or "chevron_down", T.accentSoft); fo.more.chev:Show()
+    if fo.more.Fit then fo.more:Fit() end
+    if fo.more.Paint then fo.more.Paint() end
+    -- the label's left edge on the text edge (the link keeps its 12 px padding)
+    fo.more:ClearAllPoints(); fo.more:SetPoint("TOPLEFT", fo, "TOPLEFT", FOCUS_X - 12, -(yy + 12)); fo.more:Show()
+    yy = yy + 12 + 16
+  else fo.more:Hide() end
+  local detTop = yy
+  Put(fo.details, open and table.concat(M.details, "\n\n") or nil, 8, 0)
+  fo.gtext:Hide()
+  local fh = math.max(44, math.ceil(yy + 10))
   fo:SetWidth(rowW); fo:SetHeight(fh)
+  -- hover and press cover the part a click acts on; the opened details are text to read
+  fo.hl:ClearAllPoints(); fo.press:ClearAllPoints()
+  if fo.details:IsShown() then
+    fo.detBox:ClearAllPoints()
+    fo.detBox:SetPoint("TOPLEFT", fo, "TOPLEFT", 0, -detTop); fo.detBox:SetPoint("BOTTOMRIGHT", fo, "BOTTOMRIGHT", 0, 0)
+    fo.detBox:Show()
+    for _, x in ipairs({ fo.hl, fo.press }) do
+      x:SetPoint("TOPLEFT", fo, "TOPLEFT", 0, 0); x:SetPoint("BOTTOMRIGHT", fo, "TOPRIGHT", 0, -detTop)
+    end
+  else
+    fo.detBox:Hide()
+    fo.hl:SetAllPoints(); fo.press:SetAllPoints()
+  end
   fo:ClearAllPoints(); fo:SetPoint("TOPLEFT", card, "TOPLEFT", 4, -y); fo:Show()
   y = y + fh
   -- the other actions of the step: open ones under "Then at <NPC>:", finished ones on one line
@@ -1259,12 +1728,16 @@ local function RenderFocus(card, st, log, y, dkey)
     end
   end
   local TW = TextW()
+  local npc = NpcShort(nd)
+  local atNpc = npc and (nd.kind == "a" or nd.kind == "t" or nd.kind == "h") and npc or nil
   if #others > 0 then
-    y = y + 10
-    card.nextHdr:SetText(npc and L.NEXT_AT:format(npc) or L.NEXT_PLAIN)
+    y = y + 16
+    card.nextRule:ClearAllPoints(); card.nextRule:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.nextRule:SetWidth(TW); card.nextRule:Show()
+    y = y + 1 + 12
+    card.nextHdr:SetText(atNpc and L.NEXT_AT:format(atNpc) or L.NEXT_PLAIN)
     card.nextHdr:ClearAllPoints(); card.nextHdr:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.nextHdr:Show()
     y = y + ns.FitText(card.nextHdr, 2, TW, card) + 4
-  else card.nextHdr:Hide() end
+  else card.nextHdr:Hide(); card.nextRule:Hide() end
   for j, ln in ipairs(card.lines) do
     local a = others[j]
     if a then
@@ -1272,10 +1745,9 @@ local function RenderFocus(card, st, log, y, dkey)
       ln.hl:SetShown(a.loc ~= nil)
       ln.icon:SetVertexColor(1, 1, 1)
       if not SetKindIcon(ln.icon, a) then ns.SetHDIcon(ln.icon, "dot", T.muted, 0) end
-      local lk = LINE_KEY[a.kind]
-      local t = lk and L[lk]:format(NodeName(a)) or NodeName(a)
+      local t = LineText(a, log)
       local an = NpcShort(a)
-      if an and an ~= npc then t = t .. Hex(T.muted) .. "  ·  " .. an .. "|r" end
+      if an and an ~= atNpc then t = t .. Hex(T.muted) .. SEP .. an .. "|r" end
       ln.text:SetText(t)
       ln:SetWidth(rowW)
       ln:ClearAllPoints(); ln:SetPoint("TOPLEFT", card, "TOPLEFT", 4, -y); ln:Show()
@@ -1284,10 +1756,7 @@ local function RenderFocus(card, st, log, y, dkey)
   end
   if #done > 0 then
     local names = {}
-    for _, a in ipairs(done) do
-      local lk = LINE_KEY[a.kind]
-      names[#names + 1] = lk and L[lk]:format(NodeName(a)) or NodeName(a)
-    end
+    for _, a in ipairs(done) do names[#names + 1] = LineText(a, log) end
     y = y + 8
     card.doneIcon:ClearAllPoints(); card.doneIcon:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -(y + 1)); card.doneIcon:Show()
     card.doneLine:SetText(L.DONE_HERE:format(table.concat(names, ", ")))
@@ -1368,6 +1837,8 @@ local function Build()
   -- (full text in the header's tooltip)
   local TITLE_X = 6 + 28 + 6
   function f.LayoutTitle(hasSub)
+    -- the leftmost header button on screen (the summary and the pick buttons hide with no route)
+    leftmost = (f.ovBtn and f.ovBtn:IsShown() and f.ovBtn) or (f.pickBtn:IsShown() and f.pickBtn) or f.gearBtn
     h.title:ClearAllPoints(); h.sub:ClearAllPoints()
     if hasSub then
       -- the buttons are centred on the header: their top sits (44 - height) / 2 down
@@ -1382,7 +1853,7 @@ local function Build()
   end
   f.LayoutTitle(false)
 
-  -- progress: "Step 3 / 26 · 23 left", the percentage, the step list button, a thin bar
+  -- progress: "Step 3 / 26 · 23 left", the step list button, a thin bar
   local y0 = HEADER + 1 + GAP
   f.prog = CreateFrame("Frame", nil, f)
   f.prog:SetPoint("TOPLEFT", PAD, -y0); f.prog:SetPoint("TOPRIGHT", -PAD, -y0); f.prog:SetHeight(24)
@@ -1393,7 +1864,9 @@ local function Build()
   f.listToggle:SetPoint("RIGHT", 0, 0)
   f.progPct = Text(f.prog, ns.F.meta, T.muted); f.progPct:SetPoint("RIGHT", f.listToggle, "LEFT", -12, 0); f.progPct:SetJustifyH("RIGHT"); f.progPct:SetJustifyV("MIDDLE")
   ns.ClampLabel(f.progPct, nil, f.prog)
-  f.progLabel = Text(f.prog, ns.F.body, T.text); f.progLabel:SetPoint("LEFT", 0, 0); f.progLabel:SetPoint("RIGHT", f.progPct, "LEFT", -12, 0); f.progLabel:SetJustifyV("MIDDLE")
+  -- (no percentage beside it: the label and the bar already say how far the route is)
+  f.progPct:Hide()
+  f.progLabel = Text(f.prog, ns.F.body, T.text); f.progLabel:SetPoint("LEFT", 0, 0); f.progLabel:SetPoint("RIGHT", f.listToggle, "LEFT", -12, 0); f.progLabel:SetJustifyV("MIDDLE")
   ns.ClampLabel(f.progLabel, nil, f.prog)
   local bar = CreateFrame("StatusBar", nil, f)
   bar:SetPoint("TOPLEFT", PAD, -(y0 + 24 + 6)); bar:SetPoint("TOPRIGHT", -PAD, -(y0 + 24 + 6)); bar:SetHeight(4)
@@ -1493,7 +1966,10 @@ local function Build()
   card.title = Text(card, ns.F.title, T.fg)
   -- never shown now (the travel line is text only); kept so the code that hides it stays valid
   card.travelIcon = ns.Icon(card, "info", 14, "ARTWORK", T.info); card.travelIcon:Hide()
-  card.travel = Text(card, ns.F.label, T.text)
+  card.travel = Text(card, ns.F.meta, T.text)
+  -- under a check-list's or a dungeon step's title: the entrance (zone, distance), or the area
+  card.whereLine = Text(card, ns.F.body, T.text); card.whereLine:Hide()
+  card.wlTick = CreateFrame("Frame", nil, card); card.wlTick.card = card; card.wlTick:SetScript("OnUpdate", WhereTick)
   -- check-list status: a banner (tint of its colour, 1 px edge, HD icon) with state, why, what next
   card.readyBox = CreateFrame("Frame", nil, card)
   card.readyBg = Tex(card.readyBox, "BACKGROUND", { T.ok[1], T.ok[2], T.ok[3], 0.16 }); card.readyBg:SetAllPoints()
@@ -1836,6 +2312,8 @@ function ns.RenderReadyBtn(log)
   b:SetText(L.B_READY)
   local ti = ReadyTarget()
   local st = ti and Steps()[ti]
+  -- a route with no check-list: the footer leaves the button out instead of a grey one that never works
+  f.readyHas = st ~= nil
   if not st then
     b:SetEnabled(false); if b.SetIcon then b:SetIcon("check") end
     b.disabledReason = L.NO_READY
@@ -1873,10 +2351,13 @@ local function LayoutFoot(full, centred)
     f.go:SetPoint("TOPLEFT", f.foot, "TOPLEFT", 0, 0)
     f.go:SetWidth(share and math.max(120, CW - (num(f.shareFoot:GetWidth()) or 150) - 8) or CW)
   end
-  for _, b in ipairs({ f.prev, f.next, f.readyBtn, f.moreBtn }) do b:SetShown(full) end
+  for _, b in ipairs({ f.prev, f.next, f.moreBtn }) do b:SetShown(full) end
+  local ready = full and f.readyHas ~= false
+  f.readyBtn:SetShown(ready)
   if full then
-    local rw, mw = num(f.readyBtn:GetWidth()) or 100, num(f.moreBtn:GetWidth()) or 90
-    f.next:SetWidth(math.max(80, CW - 28 - rw - mw - 12))
+    -- previous (28) and next on the left, then the check-list (when the route has one) and Actions
+    local rw, mw = ready and ((num(f.readyBtn:GetWidth()) or 100) + 4) or 0, num(f.moreBtn:GetWidth()) or 90
+    f.next:SetWidth(math.max(80, CW - 28 - rw - mw - 8))
   end
   local fh = full and FOOT_H or FOOT_SMALL
   f.foot:SetHeight(fh)
@@ -1901,7 +2382,7 @@ end
 local function HideStepParts(card)
   card.where:Hide(); card.clsChip:Hide(); card.badgePill:Hide(); card.prePill:Hide(); card.chapter:Hide()
   card.travel:Hide(); card.travelIcon:Hide(); card.readyBox:Hide(); card.after:Hide(); card.shareBtn:Hide()
-  card.model:Hide(); card.modelBg:Hide()
+  card.model:Hide(); card.modelBg:Hide(); card.whereLine:Hide()
   for _, row in ipairs(card.rows) do row.node = nil; row:Hide() end
   HideFocus(card)
 end
@@ -1912,7 +2393,7 @@ local function CentredBlock(card, icon, color, title, text)
   card.bigIcon:ClearAllPoints(); card.bigIcon:SetPoint("TOP", card, "TOP", 0, -24)
   ns.SetHDIcon(card.bigIcon, icon, color); card.bigIcon:Show()
   Size(card.title, ns.F.heading); card.title:SetJustifyH("CENTER")
-  card.title:SetText(title)
+  card.title:SetText(title); card.title:Show()
   card.title:ClearAllPoints(); card.title:SetPoint("TOP", card, "TOP", 0, -(24 + 32 + 8))
   local y = 24 + 32 + 8 + ns.FitText(card.title, 2, w, card)
   card.note:SetJustifyH("CENTER"); card.note:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
@@ -1932,6 +2413,11 @@ Render = function()
   local h = f.header
   h.title:SetText(L.DUNGEONS)
   local sub = ns.route and ns.route.label or ""
+  -- no route: the empty card's one button picks the dungeons, so the header does not repeat it,
+  -- and there is no dungeon to sum up yet
+  local anyRoute = #steps > 0
+  f.pickBtn:SetShown(anyRoute)
+  if f.ovBtn then f.ovBtn:SetShown(anyRoute and GuideDungeon() ~= nil) end
   h.sub:SetText(sub); f.LayoutTitle(sub ~= "")
   if f.miniBtn.SetIcon then f.miniBtn:SetIcon(f.mini and "plus" or "minus") end
   f:SetWidth(W)
@@ -2006,8 +2492,8 @@ Render = function()
   f.bar:SetValue(total > 0 and n / total or 0)
   f.bar:SetStatusBarColor(T.ok[1], T.ok[2], T.ok[3])
   -- the route's names are already in the header: the step and what is left
-  f.progLabel:SetText(L.STEP_LEFT:format(math.min(i, total), total, total - n))
-  f.progPct:SetText(L.PCT:format(total > 0 and math.floor(n / total * 100 + 0.5) or 0))
+  f.progLabel:SetText(L.STEP_LEFT:format(math.min(i, total), total))
+  f.progPct:SetText("")
   -- every step done and the card after the last step on screen: the "route finished" card
   -- (previous and the step list still show every step, done ones included)
   local finished = total > 0 and n == total and (st == nil)
@@ -2030,7 +2516,7 @@ Render = function()
   f.list:SetShown(WLDTDB.list ~= false)
 
   if finished then
-    f.progLabel:SetText(ns.Plural(#steps, "FIN_PROG1", "FIN_PROG", #steps)); f.progPct:SetText(L.PCT:format(100))
+    f.progLabel:SetText(ns.Plural(#steps, "FIN_PROG1", "FIN_PROG", #steps)); f.progPct:SetText("")
     f.bar:SetValue(1)
     HideStepParts(card)
     local ch = CentredBlock(card, "check", T.ok, L.FIN_T, L.FIN_TXT:format(ns.route.label or ""))
@@ -2048,12 +2534,17 @@ Render = function()
   end
 
   local dkey = st.d or st.gate or st.ins
-  -- top line: state pill on the right, where (and class) on the left
+  -- top line: the chapter on the left, then the class (class quests) or "Optional"; the step's state
+  -- on the right only when this is not the current step (the current one is the normal case)
+  card.where:Hide()
+  local showBadge = true
   if done then card.badgePill:Set(L.B_DONE, T.ok, "check")
-  elseif i == f.auto then card.badgePill:Set(L.B_CUR, T.accentSoft)
+  elseif i == f.auto then showBadge = false
   elseif f.auto and i < f.auto then card.badgePill:Set(L.B_LATE, T.warn)
   else card.badgePill:Set(L.B_NEXT, T.fg) end
-  card.badgePill:ClearAllPoints(); card.badgePill:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CI, -CI)
+  if showBadge then
+    card.badgePill:ClearAllPoints(); card.badgePill:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CI, -CI); card.badgePill:Show()
+  else card.badgePill:Hide() end
 
   local hasModel = false
   if st.bossModel and card.model.SetDisplayInfo then
@@ -2064,34 +2555,20 @@ Render = function()
     end
     if hasModel and card.model.SetPortraitZoom then pcall(card.model.SetPortraitZoom, card.model, 0.85) end
   end
-  -- room for the pills: the text width minus the state pill
-  local avail = TW - (num(card.badgePill:GetWidth()) or 60) - 8
+  -- room on the top line: the text width minus the state pill
+  local avail = TW - (showBadge and ((num(card.badgePill:GetWidth()) or 60) + 8) or 0)
   local dn = ns.DName(dkey) or ""
-  -- the chapter: "Before the dungeon: Zul'Farrak 3/18" (a line over the title; inside, the pill)
+  -- the chapter: "Avant le donjon · 3/18 étapes", with the dungeon's name when the route has more
+  -- than one; inside, the band above the card already says it
   local chKey, chPh, chDk = StepChapter(st)
   local chText
-  if chKey then
+  if chKey and bandH == 0 then
     local c = ChapterCounts(log)[chKey] or { done = 0, total = 0 }
-    chText = L[PH_F[chPh]]:format(ns.DName(chDk) or chDk, c.done, c.total)
+    local K = "CARD_PH_" .. chPh:upper()
+    if RouteDungeons() > 1 then chText = L[K .. "_D"]:format(ns.DName(chDk) or chDk, c.done, c.total)
+    else chText = L[K]:format(c.done, c.total) end
   end
-  local chInPill = false
-  card.where:Show()
-  if st.gate then
-    -- the title already says "Before entering X": the pill gives the entrance's zone, or nothing
-    local zn = (st.loc and ZoneName(st.loc.m)) or ""
-    if zn ~= "" then card.where:Set(L.OUT:format(zn), T.fg) else card.where:Hide() end
-  elseif st.ins then
-    local allOuter = true
-    for _, nd in ipairs(st.acts) do if nd.kind ~= "c" or nd.outer == false then allOuter = false end end
-    if allOuter then card.where:Set(L.OUTER:format(dn), T.fg)
-    elseif chText and chPh == "inside" then
-      local c = ChapterCounts(log)[chKey] or { done = 0, total = 0 }
-      card.where:Set(L.PH_INSIDE_P:format(c.done, c.total), T.info, "portal"); chInPill = true
-    else card.where:Set(L.IN_DUNGEON:format(dn), T.info, "portal") end
-  else
-    card.where:Set(L.OUT:format((st.loc and ZoneName(st.loc.m)) or ""), T.fg)
-  end
-  card.where:ClearAllPoints(); card.where:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -CI)
+  local chips = {}
   local cls
   local allCls = #st.acts > 0
   for _, nd in ipairs(st.acts) do local q = ns.Q[nd.q]; if not (q and q.c) then allCls = false else cls = q.c end end
@@ -2099,49 +2576,73 @@ Render = function()
   if allCls and cls then
     local tok = cls:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
     card.clsChip:Set(ns.ClassIconText(tok, 12) .. L.CLASSQ:format(cn), cc)
-    card.clsChip:ClearAllPoints(); card.clsChip:SetPoint("LEFT", card.where, "RIGHT", 6, 0)
-    -- no room on the line: the class goes into the rows' detail lines instead (never cut)
-    if (num(card.where:GetWidth()) or 0) + 6 + (num(card.clsChip:GetWidth()) or 0) > avail then card.clsChip:Hide() end
-  end
-  -- a prerequisite step: "Prerequisite 2 of 4" after the other pills (dropped when the line is full:
-  -- the rows' detail lines say it too)
-  card.prePill:Hide(); card.prePill.tip = nil
-  local preNode
-  for _, nd in ipairs(st.acts) do if nd.pre and nd.ci and nd.cn then preNode = nd break end end
-  if preNode and not st.gate then
-    card.prePill:Set(L.CH_STEP:format(preNode.ci, preNode.cn), T.fg)
-    local mainQ = preNode.forQ and preNode.forQ[1]
-    card.prePill.tip = { L.CH_STEP:format(preNode.ci, preNode.cn), mainQ and L.CH_BEFORE:format(preNode.ci, preNode.cn, ns.QName(mainQ)) or L.PRE }
-    local prev = card.clsChip:IsShown() and card.clsChip or (card.where:IsShown() and card.where or nil)
-    card.prePill:ClearAllPoints()
-    if prev then card.prePill:SetPoint("LEFT", prev, "RIGHT", 6, 0) else card.prePill:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -CI) end
-    local used = (card.where:IsShown() and ((num(card.where:GetWidth()) or 0) + 6) or 0) + (card.clsChip:IsShown() and ((num(card.clsChip:GetWidth()) or 0) + 6) or 0)
-    if used + (num(card.prePill:GetWidth()) or 0) > avail then card.prePill:Hide() end
+    chips[#chips + 1] = card.clsChip
   end
   -- a boss with nothing for you: "Optional" (or "Rare"), it can be skipped
+  card.prePill:Hide(); card.prePill.tip = nil
   if st.bossStep and not done and (st.bossFlag == "rare" or ns.BossStepOptional(st, log)) then
     local word = st.bossFlag == "rare" and L.BOSS_RARE_TAG or L.BOSS_OPT
     card.prePill:Set(word, T.muted)
     card.prePill.tip = { word, L.BOSS_OPT_TT }
-    local prev = card.clsChip:IsShown() and card.clsChip or (card.where:IsShown() and card.where or nil)
-    card.prePill:ClearAllPoints()
-    if prev then card.prePill:SetPoint("LEFT", prev, "RIGHT", 6, 0) else card.prePill:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -CI) end
-    card.prePill:Show()
+    chips[#chips + 1] = card.prePill
   end
-  local y = CI + 18 + 8
-  if chText and not chInPill then
-    card.chapter:SetText(chText)
-    card.chapter:ClearAllPoints(); card.chapter:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y)
+  local function ChipsW() local w = 0; for _, c in ipairs(chips) do w = w + (num(c:GetWidth()) or 0) + 6 end return w end
+  local chW0 = 0
+  if chText then card.chapter:SetText(chText); chW0 = (ns.TextWidth(card.chapter) or 0) + 2 end
+  -- no room on the line: the class goes into the detail lines instead (never cut)
+  if chips[1] == card.clsChip and (chText and (chW0 + 6) or 0) + ChipsW() - 6 > avail then
+    card.clsChip:Hide(); table.remove(chips, 1)
+  end
+  local topH = (showBadge or chText or #chips > 0) and 18 or 0
+  local x0 = CI
+  if chText then
+    local cw = math.max(80, math.min(chW0, avail - ChipsW()))
+    card.chapter:ClearAllPoints(); card.chapter:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -(CI + 2))
     card.chapter:Show()
-    y = y + ns.FitText(card.chapter, 2, TW, card) + 4
+    local chH = ns.FitText(card.chapter, 2, cw, card)
+    topH = math.max(18, math.ceil(chH + 4))
+    x0 = CI + cw + 6
   else card.chapter:Hide() end
+  for _, c in ipairs(chips) do
+    c:ClearAllPoints(); c:SetPoint("TOPLEFT", card, "TOPLEFT", x0, -CI); c:Show()
+    x0 = x0 + (num(c:GetWidth()) or 0) + 6
+  end
+  -- the block under the top line (or at the card's inset when the line is empty)
+  local yTop = (topH > 0) and (CI + topH + 8) or CI
+  local y = yTop
+  -- an ordinary step (one NPC or one place): its title is the current action, in the block
+  local focusMode = not st.gate and not st.ins and not st.split and #st.acts > 0
 
   card.model:SetShown(hasModel); card.modelBg:SetShown(hasModel)
   if hasModel then card.modelBg:ClearAllPoints(); card.modelBg:SetPoint("TOPRIGHT", card, "TOPRIGHT", -CI, -y) end
-  card.title:SetText(StepTitle(st, not st.gate and not st.ins))
-  card.title:ClearAllPoints(); card.title:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y)
-  y = y + ns.FitText(card.title, 0, hasModel and (TW - 84) or TW, card)
-  if hasModel then y = math.max(y, CI + 18 + 8 + 76) end
+  card.whereLine:Hide(); card.wlPt, card.wlBase, card.wlDist = nil, nil, nil
+  if focusMode then card.title:SetText(""); card.title:Hide()
+  else
+    card.title:SetText(StepTitle(st, true)); card.title:Show()
+    card.title:ClearAllPoints(); card.title:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y)
+    y = y + ns.FitText(card.title, 0, hasModel and (TW - 84) or TW, card)
+    -- under it: the entrance of a check-list (zone, distance), or the area of a dungeon step
+    local wl
+    local d = st.gate and ns.D[st.gate]
+    if d and d.e and d.e.m then
+      local zn = ZoneName(d.e.m)
+      wl = L.CARD_ENTRY:format(("%s%.1f, %.1f"):format(zn ~= "" and (zn .. " ") or "", d.e.x, d.e.y))
+      local dist = DistText(d.e.m, d.e.x, d.e.y)
+      card.wlBase, card.wlPt, card.wlDist = wl, { d.e.m, d.e.x, d.e.y }, dist
+      card.wlW = hasModel and (TW - 84) or TW
+      if dist then wl = wl .. Hex(T.muted) .. SEP .. dist .. "|r" end
+    elseif st.ins and not st.split and bandH == 0 then
+      local allOuter = true
+      for _, nd in ipairs(st.acts) do if nd.kind ~= "c" or nd.outer == false then allOuter = false end end
+      wl = allOuter and L.OUTER:format(dn) or L.IN_DUNGEON:format(dn)
+    end
+    if wl then
+      card.whereLine:SetText(wl)
+      card.whereLine:ClearAllPoints(); card.whereLine:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -(y + 4)); card.whereLine:Show()
+      y = y + 4 + ns.FitText(card.whereLine, 2, hasModel and (TW - 84) or TW, card)
+    end
+    if hasModel then y = math.max(y, yTop + 76) end
+  end
 
   -- the check-list "before entering": a banner (state, why, what next).
   -- Inside the dungeon it is over: the "inside the dungeon" band above the card takes its place.
@@ -2170,12 +2671,10 @@ Render = function()
   else card.ready:Hide(); card.readyIcon:Hide(); card.readyBox:Hide() end
 
   card.travelIcon:Hide()
-  -- the travel sentence is plain text: an info or check icon before it said nothing more
-  -- (icon audit: "info" is for neutral info icons only, "check" for done)
-  if done and f.auto and i ~= f.auto then
-    -- a finished step looked at again: say so (the big button goes back to the current one)
-    card.travel:SetText(L.DONE_VIEW); card.travel:SetTextColor(T.text[1], T.text[2], T.text[3])
-  elseif st.travel then
+  -- the travel sentence is plain text (icon audit); on an ordinary step it sits in the block, and a
+  -- finished step looked at again needs none (its pill says "Faite", the big button goes back)
+  Size(card.travel, ns.F.meta)
+  if st.travel and not focusMode and not done then
     card.travel:SetText(L[st.travel]); card.travel:SetTextColor(T.text[1], T.text[2], T.text[3])
   else card.travel:SetText("") end
   if card.travel:GetText() and card.travel:GetText() ~= "" then
@@ -2199,9 +2698,7 @@ Render = function()
   local grouped = IsInGroup and IsInGroup() and true or false
   local H1 = Hex(T.fg)
   if st.gate then
-    -- the quests counter over the rows (the footer button's tooltip says what the check-list
-    -- checks), then key / entrance / group under them
-    note = H1 .. L.CL_QUESTS:format(clTotal - clMiss, clTotal) .. "|r"
+    -- the banner and the rows already count the quests: key / entrance / group under the rows
     -- a run with no quest: nothing to check, only the way in (and no quest to share)
     if st.run and clTotal == 0 then note = L.RUN_GATE_N end
     local parts = {}
@@ -2257,8 +2754,8 @@ Render = function()
 
   -- an ordinary step (one NPC or one place): the current action big and clear, the others as a
   -- short list. Check-lists and steps inside a dungeon keep one row per line (bosses in order).
-  local focusMode = not st.gate and not st.ins and not st.split and #st.acts > 0
-  if focusMode then y = RenderFocus(card, st, log, y, dkey) else HideFocus(card) end
+  -- (the block has its own 8 px top pad: it starts 8 px over the top line's gap)
+  if focusMode then y = RenderFocus(card, st, log, yTop - 8, dkey) else HideFocus(card) end
   local rowW = CardW() - 8
   local subW = rowW - ROW_NAME_X - 12
   local view = focusMode and {} or ns.StepView(st, log)
@@ -2307,7 +2804,7 @@ Render = function()
       local title = card.title:GetText() or ""
       if npcShort and title:find(npcShort, 1, true) then npcShort = nil end
       local sc = SCOL[s] or T.muted
-      local right = npcShort or (Hex(sc) .. L[SLABEL[s] or "S_NONE"] .. "|r")
+      local right = npcShort or ((nd.kind == "a" and s == "none") and "" or (Hex(sc) .. L[SLABEL[s] or "S_NONE"] .. "|r"))
       -- check-list row: plainly "In your log" (green) or "To take" (orange)
       if nd.kind == "h" then right = ok and (Hex(T.ok) .. L.CL_HAVE .. "|r") or (Hex(T.warn) .. L.CL_TAKE .. "|r") end
       row.npc:SetText(right)
@@ -2347,9 +2844,10 @@ Render = function()
       if nd.pre then
         -- where you are in the chain, and what it leads to: "Step 3 of 9 before Agamaggan's Blood"
         local lead = nd.forQ and nd.forQ[1]
-        local txt = (nd.ci and nd.cn and lead) and L.CH_BEFORE:format(nd.ci, nd.cn, ns.QName(lead))
+        local txt = (nd.ci and nd.cn and lead) and (L.CH_BEFORE:format(nd.ci, nd.cn, ns.QName(lead))
+            .. ((#nd.forQ > 1) and L.CARD_PLUS_P:format(#nd.forQ - 1) or ""))
           or (nd.ci and nd.cn) and L.CH_STEP:format(nd.ci, nd.cn) or L.PRE
-        table.insert(tags, "|cff8fb7ff" .. txt .. "|r")
+        table.insert(tags, Hex(T.text) .. txt .. "|r")
       elseif (nd.kind == "a" or nd.kind == "h") and not ok and ns.ChainState then
         -- a dungeon quest to take: does it have prerequisites, and are they done?
         local cs = ns.ChainState(nd.q)
@@ -2363,11 +2861,6 @@ Render = function()
         table.insert(tags, ns.ClassIconText(tok, 12) .. Hex(cc) .. L.CLASS_TAG:format(cn) .. "|r")
       end
       if #tags > 0 then table.insert(parts, table.concat(tags, mt .. "  ·  |r")) end
-      -- a prerequisite: the dungeon quest it opens ("Unlocks: Troll Temper")
-      if nd.pre and nd.forQ and nd.forQ[1] and not ok then
-        local u = (#nd.forQ == 1) and L.CH_UNLOCKS:format(ns.QName(nd.forQ[1])) or L.CH_UNLOCKS_MORE:format(ns.QName(nd.forQ[1]), #nd.forQ - 1)
-        table.insert(parts, Hex(T.text) .. u .. "|r")
-      end
       local tx = Hex(T.text)
       if not ok then
         if nd.kind == "a" and s == "none" then
@@ -2622,7 +3115,7 @@ local function BuildActionBar()
         if GameTooltip.SetItemByID then GameTooltip:SetItemByID(a.item) end
         GameTooltip:AddLine(L.TT_USE, (T.hint or T.muted)[1], (T.hint or T.muted)[2], (T.hint or T.muted)[3]); GameTooltip:Show()
       else
-        ns.ShowTip(self, { L.TT_TARGET, L.TT_TARGET2:format(table.concat(a.names, " / ")), L.TT_RAID, L.TT_TARGET_CLICK })
+        ns.ShowTip(self, { L.TT_TARGET, L.TT_TARGET2:format(table.concat(a.names, " / ")), L.TT_TARGET_CLICK })
       end
     end)
     b:SetScript("OnLeave", ns.HideTip)

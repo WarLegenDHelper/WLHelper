@@ -181,6 +181,31 @@ local ev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_LOGIN", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE",
   "PLAYER_LEVEL_UP", "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA" }) do pcall(ev.RegisterEvent, ev, e) end
 pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED")
+
+-- A loading screen (teleport, portal, instance, /reload) closes the game's special windows, the
+-- guide with them: that hide is not the player's choice. Whether the guide was open is noted when
+-- the world is left, the hide during the loading screen does not count as "closed", and the guide
+-- comes back once the new world is there.
+local loading = CreateFrame("Frame")
+pcall(loading.RegisterEvent, loading, "PLAYER_LEAVING_WORLD")
+pcall(loading.RegisterEvent, loading, "PLAYER_ENTERING_WORLD")
+loading:SetScript("OnEvent", function(_, e)
+  local f = ns.frame
+  if e == "PLAYER_LEAVING_WORLD" then
+    ns.openAtLeave = (f and f:IsShown()) and true or false
+    if ns.openAtLeave then ns.quietHide = true end
+  elseif ns.openAtLeave ~= nil then
+    local wasOpen = ns.openAtLeave
+    ns.openAtLeave = nil
+    C_Timer.After(0.5, function()
+      ns.quietHide = nil
+      if wasOpen and ns.frame and not ns.frame:IsShown() and WLDTDB and (not ns.GuideOn or ns.GuideOn()) then
+        ns.frame:Show(); WLDTDB.hidden = false
+        if ns.Refresh then ns.Refresh() end
+      end
+    end)
+  end
+end)
 local pending, sawQuest, replanWanted
 -- a replan that had to wait (combat, inside an instance) runs once it can
 local function ReplanLater()

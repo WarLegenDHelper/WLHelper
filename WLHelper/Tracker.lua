@@ -24,8 +24,10 @@ local function Hex(c) return ns.Hex and ns.Hex(c) or "|cffffffff" end
 -- =====================================================================
 -- take and turn in use the game's own quest marks (SetActIcon); "have" ("keep this quest in your
 -- log") gets no icon: the bag already means loot, and one icon keeps one meaning (icon audit G1).
--- No letter for a quest to take, no link icon for a trip, no flag for a quest you keep
-local AICON = { turn = "check", kill = "sword", loot = "bag", use = "hammer", talk = "user", go = "pin",
+-- No letter for a quest to take, no link icon for a trip, no flag for a quest you keep.
+-- "go" (reach a place) is the flag, as in the guide: the pin means "GPS to this point" only, and a
+-- click on a tracker line opens the guide, it does not start the GPS.
+local AICON = { turn = "check", kill = "sword", loot = "bag", use = "hammer", talk = "user", go = "flag",
   enter = "portal", boss = "skull", item = "bag", ["do"] = "sword" }
 -- the game's quest marks, used when the guide's icon helper is not there
 local QUEST_MARK = { take = "Interface\\GossipFrame\\AvailableQuestIcon", turn = "Interface\\GossipFrame\\ActiveQuestIcon" }
@@ -46,7 +48,9 @@ local function Where(n)
   return who or where
 end
 
-function TR.Action(n, st)
+-- log (optional): the quest log, so an objective has the card's name (the game's French words
+-- when our data has no translation)
+function TR.Action(n, st, log)
   local qn = n.q and ns.QName(n.q) or ""
   local a = { node = n, st = st }
   local o = n.oneObj or (n.kind == "o" and n.obj) or nil
@@ -59,7 +63,12 @@ function TR.Action(n, st)
   elseif o then
     a.obj = o
     a.kind = OBJ_KIND[o.k] or "go"
-    if o.n then a.text = L[OBJ_TEXT[a.kind]]:format(ns.T(o.n) or o.n)
+    local nm = o.n and (ns.T(o.n) or o.n) or nil
+    if o.n and log and ns.ObjDisplayName then
+      local ok, g = pcall(ns.ObjDisplayName, n, o, log)
+      if ok and type(g) == "string" and g ~= "" then nm = g end
+    end
+    if nm then a.text = L[OBJ_TEXT[a.kind]]:format(nm)
     else a.text = L.TR_DO:format(qn) end
     a.sub = qn
   elseif n.kind == "c" then
@@ -102,7 +111,7 @@ function TR.StepActions(i, st, log)
   end
   for _, n in ipairs(acts) do
     if n.kind ~= "b" then
-      local a = TR.Action(n, st)
+      local a = TR.Action(n, st, log)
       a.i = i
       if n.vok ~= nil then a.done = n.vok and true or false else a.done = ns.NodeOK(log, n) and true or false end
       out[#out + 1] = a
@@ -425,7 +434,7 @@ local function Draw(m)
   local title = m.title or L.TR_TITLE
   if collapsed and m.cur and m.cur.text then
     local prog = (m.title or ""):match("(%d+/%d+)%s*$")
-    title = m.cur.text .. (prog and ("  |cff9a9ea6" .. prog .. "|r") or "")
+    title = m.cur.text .. (prog and ("  " .. Hex(T.muted) .. prog .. "|r") or "")
   end
   head.title:SetText(title)
   local headH = math.max(HEAD_H, TextH(head.title, F.label) + 16)

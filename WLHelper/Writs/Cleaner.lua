@@ -12,9 +12,12 @@ local WP = ns.WP
 local L = ns.L
 
 ns.AddEnglish({
-    ["Objet rare : à détruire toi-même"] = "Rare item: destroy it yourself",
-    ["Quête inconnue dans ton journal : à détruire toi-même"] = "Unknown quest in your log: destroy it yourself",
-    ["Pas lié à une quête rendue : à détruire toi-même si tu es sûr"] = "Not tied to a turned-in quest: destroy it yourself if you are sure",
+    -- reasons under the "À détruire toi-même" header: they say why, not the header again
+    ["Objet rare : le jeu demande une confirmation écrite"] = "Rare item: the game asks for a typed confirmation",
+    ["Une quête de ton journal est inconnue : elle en a peut-être besoin"] = "A quest in your log is unknown: it may still need it",
+    ["Aucune quête rendue ne l'utilise : détruis-le seulement si tu es sûr"] = "No turned-in quest uses it: destroy it only if you are sure",
+    ["Ces objets ne servent plus, mais le jeu les fait détruire à la main, depuis tes sacs."] =
+        "These items are no longer needed, but the game has you destroy them by hand, from your bags.",
     ["Sacs"] = "Bags",
     ["Objets de quête qui ne servent plus"] = "Quest items you no longer need",
     ["Aucune quête de ton journal n'a besoin de ces objets. Coche ceux à détruire : le jeu en détruit un par clic."] =
@@ -337,7 +340,7 @@ local function Scan()
                         elseif KEEP[id] then
                             e = nil                      -- to keep (the Zul'Farrak mallet...): not listed
                         elseif e.quality >= MANUAL_QUALITY then
-                            e.manual, e.reason = true, L("Objet rare : à détruire toi-même")
+                            e.manual, e.reason = true, L("Objet rare : le jeu demande une confirmation écrite")
                         elseif usableCache[id] and not done then
                             -- it does something when used: maybe a summon, a key, a teleport
                             e.amber, e.reason = true, L("Objet utilisable : lis son infobulle avant de le jeter")
@@ -356,8 +359,8 @@ local function Scan()
                             -- whose item is destroyed, so this one is only listed, never destroyed here
                             e.manual = true
                             e.reason = unknownQuest
-                                and L("Quête inconnue dans ton journal : à détruire toi-même")
-                                or L("Pas lié à une quête rendue : à détruire toi-même si tu es sûr")
+                                and L("Une quête de ton journal est inconnue : elle en a peut-être besoin")
+                                or L("Aucune quête rendue ne l'utilise : détruis-le seulement si tu es sûr")
                         end
                         if e then
                             if unsure and not e.manual then e.amber = true end
@@ -625,10 +628,17 @@ local function Build()
     win.destroy = destroy
 
     function win.Fit()
+        -- only items to destroy by hand: a sentence that says so, and no button to press
+        local tickable = false
+        for _, e in ipairs(entries) do if not e.manual then tickable = true end end
+        win.intro:SetText(tickable
+            and L("Aucune quête de ton journal n'a besoin de ces objets. Coche ceux à détruire : le jeu en détruit un par clic.")
+            or L("Ces objets ne servent plus, mais le jeu les fait détruire à la main, depuis tes sacs."))
         local introH = S.FitText(win.intro, 0, LIST_W, win)
         if introH < S.F.body then introH = S.F.body + 2 end
         local listTop = top + introH + 12
-        local bottom = 12 + 32
+        local btnH = tickable and 32 or 0
+        local bottom = 12 + btnH
         local stepH = 0
         if win.step:IsShown() then stepH = win.step:Fit(LIST_W) end
         local content
@@ -640,8 +650,8 @@ local function Build()
             win:FitHeight(content)
             return
         end
-        win.intro:Show(); destroy:Show()
-        content = introH + 12 + (win.listH or 0) + 12 + (stepH > 0 and (stepH + 8) or 0) + 32
+        win.intro:Show(); destroy:SetShown(tickable)
+        content = introH + 12 + (win.listH or 0) + (tickable and 12 or 0) + (stepH > 0 and (stepH + 8) or 0) + btnH
         win:FitHeight(content)
         -- the list takes what is left between the sentence and the bottom row (scrolls when capped)
         if stepH > 0 then
@@ -651,7 +661,7 @@ local function Build()
         end
         win.list:ClearAllPoints()
         win.list:SetPoint("TOPLEFT", INSET, -listTop)
-        win.list:SetPoint("BOTTOMRIGHT", -INSET, bottom + 12)
+        win.list:SetPoint("BOTTOMRIGHT", -INSET, bottom + (tickable and 12 or 0))
         win.list.child:SetWidth(LIST_W)
         win.list:SetContentHeight(win.listH or 0)
         destroy:ClearAllPoints(); destroy:SetPoint("BOTTOMLEFT", INSET, 12)

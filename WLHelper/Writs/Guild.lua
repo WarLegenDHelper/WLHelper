@@ -19,7 +19,9 @@
 --            Each kill is put on a place (the battleground, or the zone): the top 6 per period.
 --            K/D/A: battlegrounds from the player's own scoreboard row (once per match, assists =
 --            HK - KB, an estimate); open world: deaths while an enemy player was around. A row
---            shows the top places and the K/D/A in a muted line, its tooltip the whole breakdown.
+--            shows the top places, then killing blows and deaths in words ("Champs de bataille :
+--            6 coups fatals, 5 morts"), in muted lines; its tooltip the whole breakdown. No "KB" or
+--            "K/D/A" code on screen: "VH" is the list's unit, named once in the line above it.
 -- The combat log is closed to addons on this client: nothing here reads it (no open-world KB).
 -- Only counts, places, levels and the version travel; nothing else about the character.
 local ADDON, root = ...
@@ -73,13 +75,14 @@ ns.AddEnglish({
     ["Clic : montrer toutes les zones"] = "Click: show every zone",
     ["Rôle connu pour 1 membre sur %d : seuls ceux qui ont WL Helper et ont choisi leur spé le partagent."] = "Role known for 1 member of %d: only those who have WL Helper and picked their spec share it.",
     ["Rôle connu pour %d membres sur %d : seuls ceux qui ont WL Helper et ont choisi leur spé le partagent."] = "Role known for %d members of %d: only those who have WL Helper and picked their spec share it.",
+    ["Aucun rôle connu parmi ces %d membres : seuls ceux qui ont WL Helper et ont choisi leur spé le partagent."] = "No role known among these %d members: only those who have WL Helper and picked their spec share it.",
     ["Enlever les filtres"] = "Clear filters",
     ["Niv."] = "Lv",
     ["Zone ou dernière connexion"] = "Zone or last seen",
     -- members: the rows and their tooltip
     ["Inviter"] = "Invite",
     ["Invité"] = "Invited",
-    ["Niveau %s, %s"] = "Level %s, %s",
+    ["Niv. %s, %s"] = "Level %s, %s",
     ["En ligne : %s"] = "Online: %s",
     ["Vu %s"] = "Last seen %s",
     ["Rang : %s"] = "Rank: %s",
@@ -95,7 +98,6 @@ ns.AddEnglish({
     ["hier"] = "yesterday",
     -- members: empty states
     ["Aucun membre ne correspond"] = "No member matches",
-    ["Le rôle n'est connu que pour les membres qui ont WL Helper et ont choisi leur spé."] = "A role is only known for members who have WL Helper and picked their spec.",
     ["La recherche porte sur le nom, la zone et le rang."] = "The search looks at names, zones and ranks.",
     ["Personne d'autre n'est en ligne avec ces filtres."] = "Nobody else is online with these filters.",
     ["Tu n'es dans aucune guilde"] = "You are not in a guild",
@@ -108,7 +110,7 @@ ns.AddEnglish({
     ["Clic : classer les victoires de la saison (le mois en cours)"] = "Click: rank this season's kills (the current month)",
     ["Clic : classer toutes les victoires depuis le début"] = "Click: rank every kill since the start",
     ["Saison %s"] = "Season %s",
-    ["Toi : %s cette semaine, %s cette saison, %s au total."] = "You: %s this week, %s this season, %s in total.",
+    ["Tes victoires honorables (VH) : %s cette semaine, %s cette saison, %s au total."] = "Your honorable kills (HK): %s this week, %s this season, %s in total.",
     ["Saison précédente (%s) : %s"] = "Last season (%s): %s",
     ["%s (toi)"] = "%s (you)",
     ["VH"] = "HK",
@@ -122,25 +124,29 @@ ns.AddEnglish({
     ["Autres"] = "Other",
     ["1 mort"] = "1 death",
     ["%s morts"] = "%s deaths",
-    ["Champs de bataille : %s / %s / %s (KB / morts / assist.)"] = "Battlegrounds: %s / %s / %s (KB / deaths / assists)",
+    ["1 coup fatal"] = "1 killing blow",
+    ["%s coups fatals"] = "%s killing blows",
+    ["Champs de bataille : %s, %s"] = "Battlegrounds: %s, %s",
     ["Monde ouvert : %s VH, %s"] = "Open world: %s HK, %s",
     ["D'où viennent les victoires :"] = "Where the kills come from:",
     ["Lieux suivis depuis la mise à jour : %s victoires sur %s."] = "Places tracked since the update: %s of %s kills.",
     ["Champs de bataille, 1 partie"] = "Battlegrounds, 1 match",
     ["Champs de bataille, %s parties"] = "Battlegrounds, %s matches",
-    ["Coups fatals (KB)"] = "Killing blows (KB)",
+    ["Coups fatals"] = "Killing blows",
     ["Morts"] = "Deaths",
     ["Assistances (estimation)"] = "Assists (estimate)",
-    ["Ratio KB / morts"] = "KB / deaths ratio",
+    ["Coups fatals par mort"] = "Killing blows per death",
     ["Honneur gagné"] = "Honor gained",
     ["Assistances : victoires honorables moins coups fatals, lues au tableau des scores. Une estimation."] = "Assists: honorable kills minus killing blows, read from the scoreboard. An estimate.",
     ["Monde ouvert"] = "Open world",
     ["Victoires honorables"] = "Honorable kills",
     ["Morts face à un joueur"] = "Deaths to a player",
     ["Les coups fatals en monde ouvert restent invisibles aux addons."] = "Open-world killing blows stay hidden from addons.",
-    ["Lieux et K/D/A : visibles quand ce membre aura la dernière version de WL Helper."] = "Places and K/D/A: shown once this member has the latest WL Helper.",
-    ["Ton K/D en champ de bataille : %s / %s (%s)."] = "Your battleground K/D: %s / %s (%s).",
-    ["Ton K/D en champ de bataille : %s / %s."] = "Your battleground K/D: %s / %s.",
+    ["Lieux, coups fatals et morts : visibles quand ce membre aura la dernière version de WL Helper."] = "Places, killing blows and deaths: shown once this member has the latest WL Helper.",
+    ["En champ de bataille cette semaine : %s."] = "In battlegrounds this week: %s.",
+    ["En champ de bataille cette saison : %s."] = "In battlegrounds this season: %s.",
+    ["En champ de bataille depuis toujours : %s."] = "In battlegrounds, all time: %s.",
+    ["ratio %s"] = "ratio %s",
     ["Les victoires honorables des membres qui ont WL Helper apparaîtront ici."] = "Honorable kills of the members who have WL Helper will show up here.",
     -- chat
     ["Victoire honorable en monde ouvert : la 1re de la semaine."] = "Open-world honorable kill: your first this week.",
@@ -600,9 +606,11 @@ local function InWorld()
     local _, kind = InstanceKind()
     return kind ~= "pvp" and kind ~= "arena"
 end
--- 12500 -> "12 500" in French, "12,500" in English (DESIGN 4.3)
+-- 12500 -> "12 500" in French, "12,500" in English (DESIGN 4.3): the summary's helper
+-- (Overview.lua, a no-break space), the local fallback only if it is missing
 local function Thousands(n)
     n = tonumber(n) or 0
+    if root.BigNumber then return root.BigNumber(n) end
     local s = tostring(math.floor(math.abs(n) + 0.5))
     local sep = (root.lang == "en") and "," or " "
     local out = s:reverse():gsub("(%d%d%d)", "%1" .. sep):reverse()
@@ -896,7 +904,7 @@ local function MemberRow(parent)
         local sp = SpecName(m.class, m.spec)
         local c = ClassColor(m.class)
         local lines = { { m.name, c[1], c[2], c[3] } }
-        lines[#lines + 1] = string.format(L("Niveau %s, %s"), m.level or "?", ClassName(m.class) .. (sp and (" " .. sp) or ""))
+        lines[#lines + 1] = string.format(L("Niv. %s, %s"), m.level or "?", ClassName(m.class) .. (sp and (" " .. sp) or ""))
         lines[#lines + 1] = m.online and string.format(L("En ligne : %s"), (m.zone and m.zone ~= "") and m.zone or "?")
             or string.format(L("Vu %s"), Ago(m.away))
         if m.rank and m.rank ~= "" then lines[#lines + 1] = string.format(L("Rang : %s"), m.rank) end
@@ -1015,7 +1023,9 @@ local function RenderMembers()
         for _, c in ipairs(ui.zoneChips) do c:Hide() end
         ui.zonesLabel:Hide()
         ui.roleInfo:Show()
-        ui.roleInfo:SetText(known == 1
+        ui.roleInfo:SetText((known or 0) == 0
+            and string.format(L("Aucun rôle connu parmi ces %d membres : seuls ceux qui ont WL Helper et ont choisi leur spé le partagent."), total or 0)
+            or known == 1
             and string.format(L("Rôle connu pour 1 membre sur %d : seuls ceux qui ont WL Helper et ont choisi leur spé le partagent."), total or 0)
             or string.format(L("Rôle connu pour %d membres sur %d : seuls ceux qui ont WL Helper et ont choisi leur spé le partagent."), known or 0, total or 0))
         Place(ui.roleInfo, PAD + 20, y)
@@ -1116,7 +1126,8 @@ local function RenderMembers()
     ui.noMatch:SetShown(#list == 0)
     if #list == 0 then
         local sub
-        if roleOn then sub = L("Le rôle n'est connu que pour les membres qui ont WL Helper et ont choisi leur spé.")
+        -- with a role filter the line above already says why (how many roles are known): not twice
+        if roleOn then sub = nil
         elseif searchText ~= "" then sub = L("La recherche porte sur le nom, la zone et le rang.")
         elseif WLWritsDB.guildOnline ~= false then sub = L("Personne d'autre n'est en ligne avec ces filtres.") end
         local hasFilter = filtered
@@ -1148,6 +1159,7 @@ local function Ratio(kb, d)
     return root.lang == "en" and s or (s:gsub("%.", ","))
 end
 local function Deaths(n) return n == 1 and L("1 mort") or string.format(L("%s morts"), Thousands(n)) end
+local function Blows(n) return n == 1 and L("1 coup fatal") or string.format(L("%s coups fatals"), Thousands(n)) end
 -- as many parts as fit on one line of `width`; a part too wide is left to the tooltip.
 -- `inOrder`: stop at the first one that does not fit (places, most first)
 local function FitParts(parts, width, inOrder)
@@ -1163,8 +1175,8 @@ local function FitParts(parts, width, inOrder)
 end
 local function BgLine(kd)
     if not (kd and (kd[KD_M] or 0) > 0) then return nil end
-    return string.format(L("Champs de bataille : %s / %s / %s (KB / morts / assist.)"),
-        Thousands(kd[KD_KB]), Thousands(kd[KD_D]), Thousands(kd[KD_AS]))
+    -- in words, no KB / K/D/A codes; the assists (an estimate) stay in the tooltip
+    return string.format(L("Champs de bataille : %s, %s"), Blows(kd[KD_KB] or 0), Deaths(kd[KD_D] or 0))
 end
 local function WorldLine(ow, kd)
     local od = kd and kd[KD_OD] or 0
@@ -1201,10 +1213,10 @@ local function RowTip(e)
         local m = kd[KD_M]
         t[#t + 1] = { gap = true }
         t[#t + 1] = { m == 1 and L("Champs de bataille, 1 partie") or string.format(L("Champs de bataille, %s parties"), Thousands(m)), fg[1], fg[2], fg[3] }
-        t[#t + 1] = { L("Coups fatals (KB)"), mu[1], mu[2], mu[3], right = Thousands(kd[KD_KB]) }
+        t[#t + 1] = { L("Coups fatals"), mu[1], mu[2], mu[3], right = Thousands(kd[KD_KB]) }
         t[#t + 1] = { L("Morts"), mu[1], mu[2], mu[3], right = Thousands(kd[KD_D]) }
         t[#t + 1] = { L("Assistances (estimation)"), mu[1], mu[2], mu[3], right = Thousands(kd[KD_AS]) }
-        if (kd[KD_D] or 0) > 0 then t[#t + 1] = { L("Ratio KB / morts"), mu[1], mu[2], mu[3], right = Ratio(kd[KD_KB], kd[KD_D]) } end
+        if (kd[KD_D] or 0) > 0 then t[#t + 1] = { L("Coups fatals par mort"), mu[1], mu[2], mu[3], right = Ratio(kd[KD_KB], kd[KD_D]) } end
         if (kd[KD_HON] or 0) > 0 then t[#t + 1] = { L("Honneur gagné"), mu[1], mu[2], mu[3], right = Thousands(kd[KD_HON]) } end
         t[#t + 1] = L("Assistances : victoires honorables moins coups fatals, lues au tableau des scores. Une estimation.")
     end
@@ -1218,7 +1230,7 @@ local function RowTip(e)
     end
     if not e.known then
         t[#t + 1] = { gap = true }
-        t[#t + 1] = L("Lieux et K/D/A : visibles quand ce membre aura la dernière version de WL Helper.")
+        t[#t + 1] = L("Lieux, coups fatals et morts : visibles quand ce membre aura la dernière version de WL Helper.")
     end
     return t
 end
@@ -1230,26 +1242,35 @@ local function RenderPvP()
     Share()
     local list = Ranking(mode)
     local w, s, hk = WP.GuildMine()
-    ui.seasonPill:Set(string.format(L("Saison %s"), SeasonName(Season())), nil, "calendar")
+    -- a word pill: the calendar icon only repeated "Saison"
+    ui.seasonPill:Set(string.format(L("Saison %s"), SeasonName(Season())))
     local y = 12 + 28 + 12
     Place(ui.mine, PAD, y)
-    local mineText = string.format(L("Toi : %s cette semaine, %s cette saison, %s au total."), Thousands(w), Thousands(s), Thousands(hk))
-    -- my K/D in battlegrounds over the selected period
+    -- my numbers first (the unit named once: "VH" is the unit of the list below), then, one size
+    -- down, my battlegrounds over the selected period, in words
+    ui.mine:SetText(string.format(L("Tes victoires honorables (VH) : %s cette semaine, %s cette saison, %s au total."), Thousands(w), Thousands(s), Thousands(hk)))
+    y = y + S.FitText(ui.mine, 2, CW, p)
     local mine = Board()[Me()]
     local _, myKd = PeriodData(mine or {}, mode, mode == "week" and Week() or mode == "season" and Season() or nil)
     if myKd and (myKd[KD_M] or 0) > 0 then
-        mineText = mineText .. " " .. ((myKd[KD_D] or 0) > 0
-            and string.format(L("Ton K/D en champ de bataille : %s / %s (%s)."), Thousands(myKd[KD_KB]), Thousands(myKd[KD_D]), Ratio(myKd[KD_KB], myKd[KD_D]))
-            or string.format(L("Ton K/D en champ de bataille : %s / %s."), Thousands(myKd[KD_KB]), Thousands(myKd[KD_D] or 0)))
+        local body = Blows(myKd[KD_KB] or 0) .. ", " .. Deaths(myKd[KD_D] or 0)
+        if (myKd[KD_D] or 0) > 0 then body = body .. " (" .. string.format(L("ratio %s"), Ratio(myKd[KD_KB], myKd[KD_D])) .. ")" end
+        local fmt = mode == "week" and L("En champ de bataille cette semaine : %s.")
+            or mode == "season" and L("En champ de bataille cette saison : %s.") or L("En champ de bataille depuis toujours : %s.")
+        ui.mineKd:SetText(string.format(fmt, body))
+        y = y + 3
+        Place(ui.mineKd, PAD, y)
+        y = y + S.FitText(ui.mineKd, 2, CW, p)
+        ui.mineKd:Show()
+    else
+        ui.mineKd:SetText(""); ui.mineKd:Hide()
     end
-    ui.mine:SetText(mineText)
-    y = y + S.FitText(ui.mine, 2, CW, p)
     -- the last season's podium
     local past, pastKey = Seasons().list, nil
     for k in pairs(past or {}) do if not pastKey or k > pastKey then pastKey = k end end
     if pastKey and #past[pastKey] > 0 then
         local t = {}
-        for i, e in ipairs(past[pastKey]) do t[#t + 1] = i .. ". " .. e[1] .. " (" .. e[2] .. ")" end
+        for i, e in ipairs(past[pastKey]) do t[#t + 1] = i .. ". " .. e[1] .. " (" .. Thousands(e[2]) .. " " .. L("VH") .. ")" end
         -- no star before it: it was decoration (icon audit, Guild)
         ui.past:SetText(string.format(L("Saison précédente (%s) : %s"), SeasonName(pastKey), table.concat(t, ", ")))
         y = y + 4
@@ -1433,6 +1454,7 @@ local function Build()
     ui.seasonPill = S.Pill(p)
     ui.seasonPill:SetPoint("RIGHT", p, "TOPRIGHT", -PAD, -26)
     ui.mine = S.Text(p, F.body, C.text)
+    ui.mineKd = S.Text(p, F.meta, C.muted); ui.mineKd:Hide()
     ui.past = S.Text(p, F.meta, C.muted)
     ui.measure = S.Text(p, F.meta, C.muted); ui.measure:SetWordWrap(false); ui.measure:Hide()
     ui.rank = List(p, RankRow)

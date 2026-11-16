@@ -3,9 +3,12 @@
 -- sit on the dungeon's instance map (ns.D[k].inst = the client Map id LibForeverData stores for
 -- instance spawns), ranked boss (3) or rare (2 rare elite, 4 rare), plus the bosses of the walk
 -- order (ns.WALK / ns.BossOrder: most 5-player bosses are only "elite" in the data).
--- The panel: a header (the dungeon's name, the dungeon's map, a "new run" button, close), the current run's numbers
--- (time since entering, XP and gold gained inside), then a grid of ROUND creature portraits, five per
--- row in dungeon order, and the rares under a "Rares" label. Every creature gets a face: its display
+-- The panel: a 44 px header like the guide's (the dungeon's name, "Bosses and rares" under it; on
+-- the right the dungeon's map, a "new run" button during the run, close), the current run's numbers
+-- (time since entering, XP and gold gained inside; one sentence instead before the run starts),
+-- then a grid of ROUND creature portraits, five per row in dungeon order, and the rares under a
+-- "Rares" label. Moved away from the guide, a "Dock to the guide" text link sits under the grid
+-- (a word, not the pin: the pin means GPS only). Every creature gets a face: its display
 -- id (the dungeon journal's model, the game's encounter journal, or a one-time hidden model lookup
 -- made outside instances and kept in WLDTDB.bossDisplay) drawn with
 -- SetPortraitTextureFromCreatureDisplayID; once the creature is seen as a unit its live portrait;
@@ -765,9 +768,10 @@ end
 
 -- 38200 -> "38 200" (fr) / "38,200" (en)
 local function FmtNum(n)
+  if ns.BigNumber then return ns.BigNumber(n) end   -- the summary's (no-break space), one format everywhere
   n = math.floor((n or 0) + 0.5)
   local s = tostring(n)
-  local sep = ns.lang == "fr" and " " or ","
+  local sep = ns.lang == "fr" and "94p" or ","
   local out = s:reverse():gsub("(%d%d%d)", "%1" .. sep):reverse()
   if out:sub(1, #sep) == sep then out = out:sub(#sep + 1) end
   return out
@@ -1068,7 +1072,8 @@ local pending = {}    -- what waits for the end of combat
 local dismissed = {}  -- instance IDs whose panel you closed during this visit
 local SIZE, GAP, PAD, COLS = 40, 6, 12, 5
 local W = PAD + COLS * SIZE + (COLS - 1) * GAP + PAD   -- 248: fixed, like the reference panels
-local HEADER, STATS_Y, RULE_Y, GRID_Y, LABEL = 30, 34, 70, 78, 18
+local HEADER, STATS_Y, RULE_Y, GRID_Y, LABEL = 44, 54, 90, 98, 18
+local ATTACH_H = 20   -- the "dock to the guide" link under the grid
 
 local function Marker(rec)
   local db = DB()
@@ -1104,7 +1109,9 @@ local function HeadTip(head)
   local rec = head.rec
   if not rec then return end
   local lines = { rec.name or rec.en }
-  local sub = (not rec.rare and head.n) and L.BOSS_N:format(head.n) or RankWord(rec)
+  -- "Boss 3 of 7 · level 45": the number in the same words as the guide's tracker
+  local nb = (P and P.res and P.res.bosses) and #P.res.bosses or 0
+  local sub = (not rec.rare and head.n) and ((nb >= head.n) and L.TR_BOSS_N:format(head.n, nb) or L.BOSS_N:format(head.n)) or RankWord(rec)
   local lv = LevelText(rec)
   if lv then sub = sub .. " · " .. lv end
   lines[#lines + 1] = sub
@@ -1394,19 +1401,23 @@ local function UpdateStats()
   local s = P.stats
   if P.armed then
     for _, c in ipairs(s) do c.label:Hide(); c.value:Hide() end
+    if P.noRun then P.noRun:Hide() end
     P.confirm:Show()
     return
   end
   P.confirm:Hide()
+  local fg = T.fg
+  -- no run here yet (outside, or the last run was elsewhere): one sentence, not three dashes
+  if not st then
+    for _, c in ipairs(s) do c.label:Hide(); c.value:Hide(); c.value:SetText("") end
+    s[3].value.wlFull, s[3].value.wlFullAuto = nil, true
+    if P.noRun then P.noRun:Show() end
+    return
+  end
+  if P.noRun then P.noRun:Hide() end
   for i, c in ipairs(s) do
     local on = not (i == 2 and P.capXP)
     c.label:SetShown(on); c.value:SetShown(on)
-  end
-  local fg = T.fg
-  if not st then
-    for _, c in ipairs(s) do c.value:SetText("-"); c.value:SetTextColor(T.faint[1], T.faint[2], T.faint[3]) end
-    s[3].value.wlFull, s[3].value.wlFullAuto = nil, true
-    return
   end
   local tc = st.done and T.ok or fg
   s[1].value:SetText(FmtClock(st.secs)); s[1].value:SetTextColor(tc[1], tc[2], tc[3])
@@ -1416,6 +1427,30 @@ local function UpdateStats()
   s[3].value.wlFullAuto = false
 end
 ns.BossUpdateStats = UpdateStats
+
+-- The run in one line for the panel's tooltip: "12:30 · 950 XP (18 % of a level) · 12 g · 3 of 7
+-- bosses" (nil before the run). The share of a level is read from the bar's size now.
+local function RunLine()
+  if not P then return nil end
+  local st = ns.BossRunStats(P.dkey, P.res)
+  if not st then return nil end
+  local parts = { FmtClock(st.secs) }
+  if not AtCap() then
+    local _, m = ReadXP()
+    local pct = (m and m > 0) and (st.xp * 100 / m) or nil
+    -- "environ 1,0 niveaux" read wrong: whole levels only from 1.95, below that the share of one
+    if pct and pct >= 195 then
+      local lv = ("%.1f"):format(pct / 100)
+      if ns.lang == "fr" then lv = lv:gsub("%.", ",") end
+      parts[#parts + 1] = L.RUN_XP_LVN:format(FmtNum(st.xp), lv)
+    elseif pct and pct >= 1 then parts[#parts + 1] = L.RUN_XP_PCT:format(FmtNum(st.xp), math.floor(pct + 0.5))
+    else parts[#parts + 1] = FmtNum(st.xp) .. " XP" end
+  end
+  parts[#parts + 1] = (ns.S and ns.S.Money) and ns.S.Money(st.money) or MoneyWords(st.money)
+  if st.total > 0 then parts[#parts + 1] = ns.Plural(st.total, "RUN_KILLS1", "RUN_KILLS", st.killed, st.total) end
+  return L.RUN_TIP_LINE:format(table.concat(parts, " · "))
+end
+ns.BossRunLine = RunLine
 
 -- the "new run" button: the first click asks (in the panel), the second within 4 s starts over
 local function Disarm()
@@ -1710,29 +1745,42 @@ local function Build()
     if not InCombat() then P:StopMovingOrSizing() end
     P.SavePos()
   end)
+  -- the tooltip: the dungeon, what the panel is, the run in one line, how it is counted, the drag
   P:SetScript("OnEnter", function(self)
-    local lines = { P.dkey and ns.DName(P.dkey) or L.BOSS_TITLE, L.BOSS_TITLE }
+    local lines = { P.dkey and ns.DName(P.dkey) or L.BOSS_TITLE }
+    if P.dkey then lines[#lines + 1] = L.BOSS_TITLE end
+    local run = RunLine()
+    if run then lines[#lines + 1] = { run, T.fg[1], T.fg[2], T.fg[3] } end
     lines[#lines + 1] = { L.RUN_STATS_TIP, T.muted[1], T.muted[2], T.muted[3] }
     lines[#lines + 1] = P.attached and L.BOSS_DRAG or L.BOSS_DRAG2
     ns.ShowTip(self, lines)
   end)
   P:SetScript("OnLeave", ns.HideTip)
   local S = ns.S
-  -- header: the dungeon (portal icon, name), then new run / attach / close on the right
-  -- no decorative icon: the dungeon name alone (an invisible 1 px anchor keeps the title's place code)
+  -- header (44, like the guide's: the tops line up when docked): the dungeon's name, "Bosses and
+  -- rares" under it so the panel says what it is, then map / new run / close on the right.
+  -- No decorative icon (an invisible 1 px anchor keeps the title's place code).
   P.icon = P:CreateTexture(nil, "ARTWORK"); P.icon:SetSize(1, 16); P.icon:SetAlpha(0)
-  P.icon:SetPoint("TOPLEFT", PAD - 6, -8)
-  P.title = ns.Text(P, ns.F.heading, T.gold, true)
+  P.icon:SetPoint("TOPLEFT", PAD - 6, -6)
+  P.title = ns.Text(P, ns.F.heading, T.fg, true)
   P.title:SetPoint("LEFT", P.icon, "RIGHT", 6, 0)
   P.title:SetWordWrap(false)
   ns.ClampLabel(P.title, nil, P)
+  P.sub = ns.Text(P, ns.F.meta, T.muted, false)
+  P.sub:SetPoint("TOPLEFT", P.title, "BOTTOMLEFT", 0, -2)
+  P.sub:SetWordWrap(false)
+  P.sub:SetText(L.BOSS_TITLE)
+  P.hrule = ns.Rule(P, T.line)
+  P.hrule:SetPoint("TOPLEFT", P, "TOPLEFT", 0, -HEADER); P.hrule:SetPoint("TOPRIGHT", P, "TOPRIGHT", 0, -HEADER)
   P.close = S.CloseButton(P, 24, function() ns.HideBosses(true) end, { L.BOSS_TITLE, L.BOSS_CLOSE_CLICK })
-  P.close:SetPoint("TOPRIGHT", -4, -3)
-  P.attach = S.IconButton(P, "pin", 24, { L.BOSS_ATTACH, L.BOSS_ATTACH_CLICK }, function()
+  P.close:SetPoint("TOPRIGHT", -4, -10)
+  -- back beside the guide after a move: a text link under the grid (T-22: the pin means GPS only)
+  P.attach = S.Button(P, L.BOSS_ATTACH, 0, ATTACH_H, "ghost", function()
     if InCombat() then return end
-    DB().bossDetached = false   -- pinned to the guide on purpose (nil means "free, the default")
+    DB().bossDetached = false   -- docked to the guide on purpose (nil means "free, the default")
     ns.RefreshBosses()
-  end)
+  end, { L.BOSS_ATTACH, L.BOSS_ATTACH_TT, L.BOSS_ATTACH_CLICK })
+  P.attach:Hide()
   P.reset = S.IconButton(P, "refresh", 24, function()
     if P.armed then return { L.RUN_RESET, { L.RUN_RESET_CONFIRM, T.warn[1], T.warn[2], T.warn[3] } } end
     return { L.RUN_RESET, L.RUN_RESET_TIP, { L.RUN_RESET_CLICK, T.hint[1], T.hint[2], T.hint[3] } }
@@ -1754,6 +1802,13 @@ local function Build()
     if i == 3 then ns.ClampLabel(c.value, nil, P) end
     P.stats[i] = c
   end
+  -- before the run: what the numbers will be, in one sentence (2 lines at most)
+  P.noRun = ns.Text(P, ns.F.meta, T.muted, false)
+  P.noRun:SetJustifyH("LEFT")
+  P.noRun:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -(STATS_Y + 2))
+  P.noRun:SetText(L.RUN_NONE)
+  ns.FitText(P.noRun, 2, W - 2 * PAD, P)
+  P.noRun:Hide()
   P.confirm = ns.Text(P, ns.F.label, T.warn, false)
   P.confirm:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -(STATS_Y + 6))
   P.confirm:SetWidth(W - 2 * PAD)
@@ -1762,8 +1817,8 @@ local function Build()
   P.rule = ns.Rule(P, T.divider)
   P.rule:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -RULE_Y)
   P.rule:SetPoint("TOPRIGHT", P, "TOPRIGHT", -PAD, -RULE_Y)
-  -- the rares' label (gold, like the journal's)
-  P.secRare = ns.Text(P, ns.F.meta, T.gold, true)
+  -- the rares' label (gold is for money only: a plain label)
+  P.secRare = ns.Text(P, ns.F.meta, T.fg, true)
   ns.ClampLabel(P.secRare, nil, P)
   -- nothing to show: one short sentence
   P.empty = ns.Text(P, ns.F.meta, T.muted, false)
@@ -1850,8 +1905,10 @@ local function RenderNow()
   if ns.BossWatchReset then ns.BossWatchReset() end
   local nb, nr = #res.bosses, #res.rares
   P.cols = COLS
-  -- header: name, then from the right close, attach (when moved away), new run (during the run)
+  -- header: name and "Bosses and rares" under it, then from the right close, new run (during the
+  -- run), map; the dock link (moved away from the guide) goes under the grid
   P.title:SetText(dkey and ns.DName(dkey) or L.BOSS_TITLE)
+  P.sub:SetShown(dkey ~= nil)
   local showAttach = host ~= nil and db.bossDetached == true
   local live = RunLive(dkey)
   if not live and P.armed then P.armed = nil; if P.reset.SetIcon then P.reset:SetIcon("refresh") end end
@@ -1862,13 +1919,14 @@ local function RenderNow()
   local showMap = dkey ~= nil and okMap and mapKind ~= nil
   P.map:SetShown(showMap)
   local prev, right = P.close, 4 + 24
-  for _, btn in ipairs({ showAttach and P.attach or false, live and P.reset or false, showMap and P.map or false }) do
+  for _, btn in ipairs({ live and P.reset or false, showMap and P.map or false }) do
     if btn then
       btn:ClearAllPoints(); btn:SetPoint("RIGHT", prev, "LEFT", -2, 0)
       prev, right = btn, right + 2 + 24
     end
   end
   P.title:SetWidth(math.max(40, W - (PAD + 16 + 6) - right - 4))
+  P.sub:SetWidth(math.max(40, W - (PAD + 16 + 6) - right - 4))
   -- the numbers: three columns, or two at the level cap (no XP)
   P.capXP = AtCap()
   local cols = P.capXP and 2 or 3
@@ -1926,6 +1984,12 @@ local function RenderNow()
     b:Hide(); b.rec = nil
     if b.pooled then Release(b.pooled); b.pooled = nil end
     b.liveFor = nil
+  end
+  if showAttach then
+    -- the ghost label sits 12 px inside its button: the text lines up with the portraits
+    y = y + 8
+    P.attach:ClearAllPoints(); P.attach:SetPoint("TOPLEFT", P, "TOPLEFT", PAD - 12, -y)
+    y = y + ATTACH_H
   end
   P:SetWidth(W)
   P:SetHeight(math.ceil(y + PAD))
@@ -2133,14 +2197,13 @@ local function BuildAlertButton()
   AB:SetAttribute("type", "macro")
   ns.Flat(AB, T.btnFill, T.btnEdge)
   AB.hl = ns.Tex(AB, "BACKGROUND", T.hoverFill); AB.hl:SetAllPoints(); AB.hl:SetAlpha(0)
-  AB.icon = AB:CreateTexture(nil, "OVERLAY"); AB.icon:SetSize(14, 14); AB.icon:SetPoint("LEFT", 8, 0)
-  ns.SetHDIcon(AB.icon, "star", T.silver)
+  -- a labelled button: no star (the banner's star already says "rare", icon audit G3)
   AB.label = ns.Text(AB, ns.F.label, T.fg, false)
-  AB.label:SetPoint("LEFT", AB.icon, "RIGHT", 6, 0); AB.label:SetWordWrap(false)
+  AB.label:SetPoint("LEFT", 12, 0); AB.label:SetWordWrap(false)
   AB.label:SetText(L.BOSS_TARGET)
   local okW, sw = pcall(AB.label.GetStringWidth, AB.label)
   sw = okW and num(sw) or 96
-  AB:SetWidth(math.ceil(8 + 14 + 6 + sw + 12))
+  AB:SetWidth(math.ceil(12 + sw + 12))
   AB:SetPoint("BOTTOMRIGHT", UIParent, "TOP", ALERT_W / 2 - 8, ALERT_Y - ALERT_H + 8)
   AB:SetScript("OnEnter", function(self)
     self.hl:SetAlpha(1); if self._edgeSet then self._edgeSet(T.btnEdgeHover) end

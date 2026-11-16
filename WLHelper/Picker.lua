@@ -519,7 +519,8 @@ Render = function()
         end
         if soon and not dateTop then table.insert(parts, L.PICK_OPENS:format(date(L.PICK_DATE, d.up))) end
         c.lvl:SetText(table.concat(parts, "  ·  "))
-        local qline = n > 0 and ns.Plural(n, "PICK_QN1", "PICK_QN", done, n)
+        -- "1 quête rendue sur 3" agrees with the quests turned in; "1 of 3 quests turned in" with the total
+        local qline = n > 0 and ns.Plural(ns.lang == "fr" and done or n, "PICK_QN1", "PICK_QN", done, n)
         -- how many of the quests left need earlier quests ("5 quests · 2 with prerequisites")
         local npre = (n > done) and PreCount(k) or 0
         if qline and npre > 0 then qline = qline .. " · " .. ns.Plural(npre, "OV_CARD_PRE1", "OV_CARD_PRE", npre) end
@@ -530,12 +531,14 @@ Render = function()
         local lc = (c.section == "later" or c.section == "below") and T.muted or T.text
         c.lvl:SetTextColor(lc[1], lc[2], lc[3])
         local sel = Selected()[k] and true or false
-        if sel then c.picked:Set(L.PICK_PICKED, T.accentSoft, "check"); c.picked:Show() else c.picked:Hide() end
+        -- a word, no check: the check means "done" (the finished dungeon's mark), not "picked"
+        if sel then c.picked:Set(L.PICK_PICKED, T.accentSoft); c.picked:Show() else c.picked:Hide() end
         -- the level line leaves room for the pill only while it shows; it wraps to 2 lines
         local pillW = sel and ((num(c.picked:GetWidth()) or 80) + 8) or 0
         local lvlH = ns.FitText(c.lvl, 2, CW - 24 - pillW, c)
         if lvlH < 11 then lvlH = 13 end
-        local infoH = ns.FitText(c.info, 1, CW - 24, c)
+        -- "3 of 7 quests turned in · 2 waiting on a prerequisite" may need a second line
+        local infoH = ns.FitText(c.info, 2, CW - 24, c)
         if infoH < 12 then infoH = 15 end
         c.botBand:SetHeight(math.max(30, 10 + lvlH + 3 + infoH + 6))
         c.selEdge(T.accent, sel and 1 or 0)
@@ -573,7 +576,8 @@ Render = function()
   local nSel = SelCount()
   p.selText:SetText(nSel == 0 and L.PICK_SEL0 or ns.Plural(nSel, "PICK_SEL1", "PICK_SEL", nSel))
   -- no pin: this button opens the summary, it starts no GPS (the pin means GPS, icon audit G1)
-  p.go:SetText(nSel == 0 and L.PICK_GO or ns.Plural(nSel, "PICK_GO1", "PICK_GON", nSel))
+  -- the count is already in the footer ("12 donjons choisis"): the button says what it does
+  p.go:SetText(L.PICK_GO)
   p.go:SetEnabled(nSel > 0)
   p.none:SetEnabled(nSel > 0)
 end
@@ -603,7 +607,9 @@ function ns.HidePicker() if p then p:Hide() end end
 -- =====================================================================
 local QROWS, QH, QW = 22, 28, 420
 local QSTATUS = 130                       -- the status column ("Prerequisites done" at 11 px fits)
-local QTXT_W = (QW - 16) - 60 - 8 - QSTATUS - 8   -- the quest name: from x 60 to the status column
+local QLV_W = 40                          -- the level column, with its unit ("niv. 30")
+local QTXT_X = 32 + QLV_W + 4
+local QTXT_W = (QW - 16) - QTXT_X - 8 - QSTATUS - 8   -- the quest name: up to the status column
 local function BuildQuests()
   local S = SW()
   qp = CreateFrame("Frame", "WLDTQuestPicker", UIParent)
@@ -632,13 +638,13 @@ local function BuildQuests()
     row.box = Tex(row.boxF, "BACKGROUND", T.panel); row.box:SetAllPoints()
     row.boxEdge = ns.Outline(row.boxF, T.btnEdge)
     row.tick = ns.Icon(row.boxF, "check", 12, "ARTWORK", T.fg); row.tick:SetPoint("CENTER")
-    row.lvl = Text(row, ns.F.meta, T.muted); row.lvl:SetPoint("LEFT", 32, 0); row.lvl:SetWidth(24); row.lvl:SetJustifyV("MIDDLE")
+    row.lvl = Text(row, ns.F.meta, T.muted); row.lvl:SetPoint("LEFT", 32, 0); row.lvl:SetWidth(QLV_W); row.lvl:SetJustifyV("MIDDLE")
     -- the prerequisite status, right-aligned in a fixed column: none, N, done, level needed
     row.status = Text(row, ns.F.meta, T.muted); row.status:SetPoint("RIGHT", -8, 0); row.status:SetWidth(QSTATUS)
     row.status:SetJustifyH("RIGHT"); row.status:SetJustifyV("MIDDLE")
     ns.ClampLabel(row.status, nil, row)
     -- the name wraps to 2 lines; the row grows with it
-    row.txt = Text(row, ns.F.label, T.fg); row.txt:SetPoint("LEFT", 60, 0); row.txt:SetWidth(QTXT_W); row.txt:SetJustifyV("MIDDLE")
+    row.txt = Text(row, ns.F.label, T.fg); row.txt:SetPoint("LEFT", QTXT_X, 0); row.txt:SetWidth(QTXT_W); row.txt:SetJustifyV("MIDDLE")
     row:SetScript("OnClick", function(self)
       -- ticked by hand: the summary's level default no longer applies to it (OffPick first: it
       -- keeps the older unticks as hand-made before this one is added)
@@ -668,7 +674,8 @@ local function BuildQuests()
           -- "to take" is a normal state, not an alert: gold, like the tracker's take line
           local wc = (s == "done" and T.muted) or (s == "ready" and T.ok) or (s == "on" and T.fg) or T.gold
           local pq = ns.Q[pid] or {}
-          local txt = ns.QName(pid) .. " · " .. Hex(wc) .. word .. "|r" .. (pq.l and (" · " .. L.PICK_LV1:format(pq.l)) or "")
+          -- the quest's level in the summary's words ("niv. 30")
+          local txt = ns.QName(pid) .. " · " .. Hex(wc) .. word .. "|r" .. (pq.l and (" · " .. L.PICK_QLV:format(pq.l)) or "")
           if i == 1 and pq.s and pq.s.m and C_Map and C_Map.GetMapInfo then
             local ok, mi = pcall(C_Map.GetMapInfo, pq.s.m)
             if ok and type(mi) == "table" and mi.name then txt = txt .. " · " .. mi.name end
@@ -705,7 +712,7 @@ function ns.OpenQuests(dkey, keep)
     if qid then
       local q = ns.Q[qid]
       row.qid = qid
-      row.lvl:SetText(q.l or "")
+      row.lvl:SetText(q.l and L.PICK_QLV:format(q.l) or "")
       local tag = ""
       if q.c then local cn, cc = ns.ClassInfo(q.c:match("^[^,]+")); tag = "  " .. Hex(cc) .. cn .. "|r" end
       if ns.IsDone(qid) then tag = tag .. "  " .. Hex(T.ok) .. L.S_DONE .. "|r" end

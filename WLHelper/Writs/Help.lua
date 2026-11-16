@@ -16,16 +16,15 @@ ns.AddEnglish({
     ["Comment faire... ?"] = "How do I...?",
     ["Montre-moi"] = "Show me",
     ["Clic : ouvrir la fenêtre et montrer le bouton"] = "Click: open the window and point at the button",
-    ["Ouvre la fenêtre et fait briller le bouton à utiliser."] = "Opens the window and highlights the button to click.",
     ["Questions fréquentes"] = "Common questions",
     ["Commandes du chat"] = "Chat commands",
     ["Clic : lancer la commande"] = "Click: run the command",
     ["Une question sans réponse ? Écris-nous"] = "A question we missed? Tell us",
     -- the tasks (a quoted label comes from the button's own text: they cannot drift apart)
     ["Faire mes quêtes de donjon"] = "Do my dungeon quests",
-    ["Sur l'Accueil, clique sur la tuile Guide de quêtes pour choisir tes donjons."] = "On Home, click the Quest guide tile to pick your dungeons.",
+    ["Sur l'Accueil, clique sur la ligne Guide de quêtes pour choisir tes donjons."] = "On Home, click the Quest guide line to pick your dungeons.",
     ["Clique sur les donjons que tu veux faire. Plusieurs donjons donnent une seule route."] = "Click the dungeons you want to do. Several dungeons make one route.",
-    ["Clique sur « %s » (le nombre suit tes choix) : la route part de là où tu es."] = "Click \"%s\" (the number follows what you picked): the route starts where you are.",
+    ["Clique sur « %s » : la route part de là où tu es."] = "Click \"%s\": the route starts where you are.",
     ["Suis les étapes : « %s » lance le GPS vers l'étape en cours."] = "Follow the steps: \"%s\" starts the GPS to the current step.",
     ["Monter ma réputation avec les Writs"] = "Raise my reputation with Writs",
     ["À l'hôtel des ventes, ouvre les Writs, onglet Achats."] = "At the Auction House, open the Writs window, Shopping tab.",
@@ -43,14 +42,14 @@ ns.AddEnglish({
     ["Clique sur « %s » : un objet par clic, jusqu'au bout de la liste."] = "Click \"%s\": one item per click, down to the end of the list.",
     ["Si tes sacs sont pleins quand tu ramasses du butin, un bouton « %s » apparaît : un clic jette l'objet le moins cher (gris, ou arme ou armure blanche)."] =
         "If your bags are full when you loot, a \"%s\" button shows up: one click throws away the cheapest item (grey, or a white weapon or armor).",
-    ["Chez un marchand, tes objets gris se vendent tout seuls (Réglages, Sacs)."] = "At a merchant, your grey items sell by themselves (Settings, Bags).",
+    ["Chez un marchand, tes objets gris se vendent tout seuls (WL Helper, Sacs)."] = "At a merchant, your grey items sell by themselves (WL Helper, Bags).",
     ["Organiser un donjon avec la guilde"] = "Organize a dungeon with the guild",
-    ["Ouvre LFG, onglet Créer."] = "Open Events, Create tab.",
+    ["Ouvre LFG, onglet Créer."] = "Open LFG, Create tab.",
     ["Choisis le donjon, le jour, l'heure et les places par rôle."] = "Pick the dungeon, the day, the time and the slots per role.",
     ["Clique sur « %s » : toute la guilde le voit et peut s'inscrire."] = "Click \"%s\": the whole guild sees it and can sign up.",
     ["À l'heure, « %s » forme le groupe en un clic."] = "When it is time, \"%s\" forms the group in one click.",
     ["Savoir si un objet est une amélioration"] = "Check if an item is an upgrade",
-    ["Ouvre Réglages, Améliorations, et choisis ta spé."] = "Open Settings, Upgrades, and pick your spec.",
+    ["Ouvre WL Helper, Améliorations, et choisis ta spé."] = "Open WL Helper, Upgrades, and pick your spec.",
     ["Une flèche verte marque les objets meilleurs que les tiens : sacs, marchands, récompenses de quête."] = "A green arrow marks items better than yours: bags, merchants, quest rewards.",
     ["Survole l'objet : son infobulle donne le gain en %."] = "Hover the item: its tooltip gives the gain in %.",
     ["Aller quelque part (GPS)"] = "Go somewhere (GPS)",
@@ -68,14 +67,14 @@ ns.AddEnglish({
     ["Il cherche le trajet le plus rapide depuis là où tu es : à cheval, par les vols que tu connais, les bateaux, les zeppelins et les portails de mage. Un détour par un maître de vol est souvent plus court que la ligne droite. Le trajet est recalculé en continu, pendant que tu avances."] =
         "It looks for the fastest way from where you are: riding, the flight paths you know, boats, zeppelins and mage portals. A detour through a flight master is often shorter than the straight line. The route is worked out again all the time, as you move.",
     ["Comment déplacer la flèche ?"] = "How do I move the arrow?",
-    ["Fais-la glisser avec le clic gauche : sa place est gardée. Sans route en cours, Réglages, GPS, « Déplacer la flèche » l'affiche pour que tu la places."] =
-        "Drag it with the left mouse button: its spot is saved. With no route running, Settings, GPS, \"Move the arrow\" shows it so you can place it.",
+    ["Fais-la glisser avec le clic gauche : sa place est gardée. Sans route en cours, WL Helper, GPS, « Déplacer la flèche » l'affiche pour que tu la places."] =
+        "Drag it with the left mouse button: its spot is saved. With no route running, WL Helper, GPS, \"Move the arrow\" shows it so you can place it.",
     ["Comment éteindre un module ?"] = "How do I turn a module off?",
-    ["Réglages, Général, Modules : un interrupteur par module. Un module éteint disparaît partout, sauf sa tuile grisée sur l'Accueil : un clic dessus le rallume."] =
-        "Settings, General, Modules: one switch per module. A module that is off disappears everywhere except its greyed-out tile on Home: a click on it turns it back on.",
+    ["Réglages, Général, Modules : un interrupteur par module. Un module éteint disparaît partout, sauf sa ligne grisée sur l'Accueil : un clic dessus le rallume."] =
+        "Settings, General, Modules: one switch per module. A module that is off disappears everywhere except its greyed-out line on Home: a click on it turns it back on.",
     ["Mètres ou yards ?"] = "Meters or yards?",
-    ["Les distances sont en mètres et en kilomètres. Pour les yards du jeu : Réglages, GPS, « Distances en yards »."] =
-        "Distances are in meters and kilometers. For the game's yards: Settings, GPS, \"Distances in yards\".",
+    ["Les distances sont en mètres et en kilomètres. Pour les yards du jeu : WL Helper, GPS, « Distances en yards »."] =
+        "Distances are in meters and kilometers. For the game's yards: WL Helper, GPS, \"Distances in yards\".",
     -- the commands (French words in French, English words in English: both work)
     ["/wlh"] = "/wlh",
     ["/wlh donjons"] = "/wlh dungeons",
@@ -96,7 +95,7 @@ ns.AddEnglish({
     ["/wlh tri"] = "/wlh triage", ["Les quêtes à abandonner quand le journal est plein"] = "Quests to abandon when the log is full",
     ["Ouvrir l'Accueil"] = "Open Home",
     ["Ouvrir le guide de quêtes"] = "Open the quest guide",
-    ["Choisir les donjons"] = "Pick dungeons",
+    ["Choisir un guide"] = "Pick a guide",
     ["Ouvrir les Writs"] = "Open the Writs window",
     ["Trier les objets de quête"] = "Sort out quest items",
     ["Ouvrir les commandes"] = "Open orders",
@@ -274,13 +273,19 @@ end
 local function Win(name) return function() return _G[name] end end
 local function ModuleOn(key) return not WP.ModuleOn or WP.ModuleOn(key) end
 local function PickerGo() return _G.WLDTPicker and _G.WLDTPicker.go end
+-- A task's icon is its module's own (Writs/Home.lua WP.MODULE_ICON, the same as on Home, in the
+-- minimap menu and in Settings), so the card is recognised at a glance; the GPS is the addon's arrow.
+local function ModIcon(key, fallback)
+    local MI = WP.MODULE_ICON or {}
+    return MI[key] or fallback
+end
 
 -- A step that quotes a button: the label is the button's own text (same key), so they never drift.
 local function Quote(sentence, ...) return string.format(L(sentence), ...) end
 
--- the Options' "Spé évaluée" control (its row's choice), not the sidebar's page description
+-- the Upgrades page's "Spé évaluée" control (its row's choice), not the nav's page description
 local function SpecControl()
-    local w = _G.WLHelperOptions
+    local w = _G.WLHelperHub
     if not w then return nil end
     local want = L("Spé évaluée")
     local row = Find(w, function(f) return f.label and TextOf(f.label) == want end)
@@ -289,16 +294,16 @@ end
 
 local function Tasks()
     return {
-        { key = "dungeons", icon = "Interface\\Icons\\INV_Misc_Map_01", title = L("Faire mes quêtes de donjon"),
-          steps = { L("Sur l'Accueil, clique sur la tuile Guide de quêtes pour choisir tes donjons."),
+        { key = "dungeons", icon = ModIcon("dungeons", "Interface\\Icons\\INV_Misc_Map_01"), title = L("Faire mes quêtes de donjon"),
+          steps = { L("Sur l'Accueil, clique sur la ligne Guide de quêtes pour choisir tes donjons."),
                     L("Clique sur les donjons que tu veux faire. Plusieurs donjons donnent une seule route."),
-                    Quote("Clique sur « %s » (le nombre suit tes choix) : la route part de là où tu es.", string.format(GuideWord("PICK_GON"), 3)),
+                    Quote("Clique sur « %s » : la route part de là où tu es.", GuideWord("PICK_GO")),
                     Quote("Suis les étapes : « %s » lance le GPS vers l'étape en cours.", GuideWord("GO")) },
           show = function()
               ShowMe(function() if root.ShowPicker then root.ShowPicker() end end, Win("WLDTPicker"),
                   { PickerGo, { GuideWord("PICK_GO") } })
           end },
-        { key = "writs", icon = "Interface\\Icons\\INV_Letter_15", title = L("Monter ma réputation avec les Writs"),
+        { key = "writs", icon = ModIcon("writs", "Interface\\Icons\\INV_Letter_15"), title = L("Monter ma réputation avec les Writs"),
           steps = { L("À l'hôtel des ventes, ouvre les Writs, onglet Achats."),
                     Quote("La fenêtre Writs choisit les Writs les moins chers. Clique sur « %s » (le nombre suit ta liste) : chaque page d'achat s'ouvre à la suite, et tu valides avec le bouton Acheter du jeu.",
                         string.format(L("Acheter les %d objets"), 3)),
@@ -307,7 +312,7 @@ local function Tasks()
           show = function()
               ShowMe(function() WP.Open("writs"); if WP.ShowTab then WP.ShowTab("shop") end end, Win("WLHelperComptoir"), { "primary" })
           end },
-        { key = "orders", icon = "Interface\\Icons\\Trade_BlackSmithing", title = L("Faire fabriquer un objet"),
+        { key = "orders", icon = ModIcon("orders", "Interface\\Icons\\Trade_BlackSmithing"), title = L("Faire fabriquer un objet"),
           steps = { L("Ouvre Commandes, onglet Artisans."),
                     L("Tape le nom de l'objet, ou fais Maj-clic sur l'objet dans le chat."),
                     Quote("Clique sur « %s », puis dis ce que tu fournis et ce que tu paies.", L("Commander")),
@@ -315,18 +320,18 @@ local function Tasks()
           show = function()
               ShowMe(function() if WP.ShowOrdersTab then WP.ShowOrdersTab("find") end end, Win("WLHelperOrders"), { "editbox" })
           end },
-        { key = "bags", icon = "Interface\\Icons\\INV_Misc_Bag_08", title = L("Mes sacs sont pleins"),
+        { key = "bags", icon = ModIcon("bags", "Interface\\Icons\\INV_Misc_Bag_08"), title = L("Mes sacs sont pleins"),
           steps = { L("Ouvre Sacs : la liste des objets de quête qui ne servent plus."),
                     Quote("Clique sur « %s » : un objet par clic, jusqu'au bout de la liste.", L("Détruire")),
                     Quote("Si tes sacs sont pleins quand tu ramasses du butin, un bouton « %s » apparaît : un clic jette l'objet le moins cher (gris, ou arme ou armure blanche).", L("Libérer une place")),
-                    L("Chez un marchand, tes objets gris se vendent tout seuls (Réglages, Sacs).") },
+                    L("Chez un marchand, tes objets gris se vendent tout seuls (WL Helper, Sacs).") },
           show = function()
               ShowMe(function()
                   local w = _G.WLHelperCleaner
                   if not (w and w:IsShown()) and WP.Cleaner then WP.Cleaner.Toggle() end
               end, Win("WLHelperCleaner"), { "primary" })
           end },
-        { key = "events", icon = "Interface\\Icons\\Ability_Warrior_BattleShout", title = L("Organiser un donjon avec la guilde"),
+        { key = "events", icon = ModIcon("events", "Interface\\Icons\\INV_Misc_GroupNeedMore"), title = L("Organiser un donjon avec la guilde"),
           steps = { L("Ouvre LFG, onglet Créer."),
                     L("Choisis le donjon, le jour, l'heure et les places par rôle."),
                     Quote("Clique sur « %s » : toute la guilde le voit et peut s'inscrire.", L("Publier l'événement")),
@@ -334,15 +339,15 @@ local function Tasks()
           show = function()
               ShowMe(function() if WP.ShowEventsTab then WP.ShowEventsTab("create") end end, Win("WLHelperEvents"), { "primary" })
           end },
-        { key = "upgrades", icon = "Interface\\Icons\\INV_Chest_Cloth_17", title = L("Savoir si un objet est une amélioration"),
-          steps = { L("Ouvre Réglages, Améliorations, et choisis ta spé."),
+        { key = "upgrades", icon = ModIcon("upgrades", { hd = "arrow_up", color = C.ok }), title = L("Savoir si un objet est une amélioration"),
+          steps = { L("Ouvre WL Helper, Améliorations, et choisis ta spé."),
                     L("Une flèche verte marque les objets meilleurs que les tiens : sacs, marchands, récompenses de quête."),
                     L("Survole l'objet : son infobulle donne le gain en %.") },
           show = function()
-              ShowMe(function() if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end end, Win("WLHelperOptions"),
+              ShowMe(function() if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end end, Win("WLHelperHub"),
                   { SpecControl })
           end },
-        { key = "gps", icon = "Interface\\Icons\\Ability_Tracking", title = L("Aller quelque part (GPS)"),
+        { key = "gps", icon = { hd = root.ARROW }, title = L("Aller quelque part (GPS)"),
           steps = { Quote("Dans le guide de quêtes, clique sur « %s » ; dans la fenêtre Writs, sur « %s ».", GuideWord("GO"), L("Y aller")),
                     L("La flèche montre où aller et à quelle distance. Le trajet passe par les vols, bateaux, zeppelins et portails."),
                     L("Elle devient verte quand tu vas dans la bonne direction ; à l'arrivée, une coche verte s'affiche."),
@@ -369,11 +374,11 @@ local function Questions()
         { L("Pourquoi le GPS m'envoie par là ?"),
           L("Il cherche le trajet le plus rapide depuis là où tu es : à cheval, par les vols que tu connais, les bateaux, les zeppelins et les portails de mage. Un détour par un maître de vol est souvent plus court que la ligne droite. Le trajet est recalculé en continu, pendant que tu avances.") },
         { L("Comment déplacer la flèche ?"),
-          L("Fais-la glisser avec le clic gauche : sa place est gardée. Sans route en cours, Réglages, GPS, « Déplacer la flèche » l'affiche pour que tu la places.") },
+          L("Fais-la glisser avec le clic gauche : sa place est gardée. Sans route en cours, WL Helper, GPS, « Déplacer la flèche » l'affiche pour que tu la places.") },
         { L("Comment éteindre un module ?"),
-          L("Réglages, Général, Modules : un interrupteur par module. Un module éteint disparaît partout, sauf sa tuile grisée sur l'Accueil : un clic dessus le rallume.") },
+          L("Réglages, Général, Modules : un interrupteur par module. Un module éteint disparaît partout, sauf sa ligne grisée sur l'Accueil : un clic dessus le rallume.") },
         { L("Mètres ou yards ?"),
-          L("Les distances sont en mètres et en kilomètres. Pour les yards du jeu : Réglages, GPS, « Distances en yards ».") },
+          L("Les distances sont en mètres et en kilomètres. Pour les yards du jeu : WL Helper, GPS, « Distances en yards ».") },
     }
 end
 
@@ -382,7 +387,7 @@ local function Commands()
     return {
         { L("/wlh"), L("Ouvrir l'Accueil"), "" },
         { L("/wlh donjons"), L("Ouvrir le guide de quêtes"), "dungeons" },
-        { L("/wlh choisir"), L("Choisir les donjons"), "pick" },
+        { L("/wlh choisir"), L("Choisir un guide"), "pick" },
         { L("/wlh comptoir"), L("Ouvrir les Writs"), "trade" },
         { L("/wlh sacs"), L("Trier les objets de quête"), "bags" },
         { L("/wlh commandes"), L("Ouvrir les commandes"), "orders" },
@@ -410,21 +415,27 @@ local function CardBase(parent)
     return c
 end
 
--- A task card: painted icon, the need as title, "Montre-moi" at the right, numbered steps.
+-- A task card: the module's icon, the need as title, "Montre-moi" at the right, numbered steps.
 local function TaskCard(parent, task, onShow)
     local c = CardBase(parent)
     c.key = task.key
     c.iconFrame = CreateFrame("Frame", nil, c)
     c.iconFrame:SetSize(32, 32); c.iconFrame:SetPoint("TOPLEFT", PAD, -PAD)
     c.icon = c.iconFrame:CreateTexture(nil, "ARTWORK"); c.icon:SetAllPoints()
-    S.Painted(c.icon, task.icon)
+    -- a painted icon fills its edged box; an HD glyph sits 6 px inside it (as on the Home card)
+    if type(task.icon) == "table" then
+        root.SetHDIcon(c.icon, task.icon.hd, task.icon.color or C.fg)
+        c.icon:ClearAllPoints(); c.icon:SetPoint("TOPLEFT", 6, -6); c.icon:SetPoint("BOTTOMRIGHT", -6, 6)
+    else
+        S.Painted(c.icon, task.icon)
+    end
     S.Border(c.iconFrame, C.cardEdge)
     c.title = S.Text(c, F.heading, C.fg)
     c.title:SetJustifyH("LEFT"); c.title:SetJustifyV("TOP")
     c.title:SetText(task.title)
     c.show = S.Button(c, L("Montre-moi"), 0, 24, "secondary", function() onShow(task) end,
-        { L("Montre-moi"), L("Ouvre la fenêtre et fait briller le bouton à utiliser."), L("Clic : ouvrir la fenêtre et montrer le bouton") })
-    c.show:SetIcon("search")
+        { L("Montre-moi"), L("Clic : ouvrir la fenêtre et montrer le bouton") })
+    -- labelled: no magnifier beside the verb (icon audit G3: a search glyph was the wrong metaphor)
     c.show:SetPoint("TOPRIGHT", -PAD, -(PAD + 4))
     c.steps = {}
     for i, text in ipairs(task.steps) do

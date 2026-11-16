@@ -29,7 +29,7 @@ ns.AddEnglish({
     ["Passeport des clés"] = "Key passport",
     ["Clés"] = "Keys",
     ["Clés et accès des donjons et raids, et qui les a dans la guilde"] = "Dungeon and raid keys and attunements, and who has them in the guild",
-    ["Pas encore de clé, sur %d"] = "No keys yet, out of %d",
+    ["Aucune clé pour l'instant (0 sur %d)"] = "No keys yet (0 of %d)",
     ["1 clé sur %d"] = "1 key of %d",
     ["%d clés sur %d"] = "%d keys of %d",
     ["Pour entrer"] = "To get in",
@@ -44,8 +44,8 @@ ns.AddEnglish({
     ["Accès débloqué"] = "Access unlocked",
     ["Étape %d sur %d : %s"] = "Step %d of %d: %s",
     ["Pas commencée. Première étape : %s"] = "Not started. First step: %s",
-    ["%s, dès le niveau %d"] = "%s, from level %d",
-    ["Lâchée par %s (%s)"] = "Dropped by %s (%s)",
+    ["%s (se prend dès le niv. %d)"] = "%s (available from level %d)",
+    ["Tombe sur %s, dans %s"] = "Drops from %s in %s",
     ["Pas dans le guide pour ce personnage."] = "Not in the guide for this character.",
     ["La chaîne de l'Alliance n'est pas encore dans le guide. Elle commence dans %s."] = "The Alliance chain is not in the guide yet. It starts in %s.",
     ["Commencée. La chaîne de l'Alliance n'est pas encore dans le guide."] = "Started. The Alliance chain is not in the guide yet.",
@@ -78,7 +78,7 @@ ns.AddEnglish({
     ["%s et %d autres"] = "%s and %d more",
     ["En ligne : %s"] = "Online: %s",
     ["Hors ligne : %s"] = "Offline: %s",
-    ["En route : %s"] = "On the way: %s",
+    ["Chaîne commencée : %s"] = "Chain started: %s",
     ["Clic : ouvrir ton passeport des clés"] = "Click: open your key passport",
     -- for Home and Settings (the integration step wires them)
     ["Clic : ouvrir le passeport des clés"] = "Click: open the key passport",
@@ -535,7 +535,7 @@ end
 local function StepName(qid, lvl)
     local n = root.QName and root.QName(qid) or tostring(qid)
     local mine = Num(UnitLevel and UnitLevel("player")) or 60
-    if lvl and lvl > mine then return string.format(L("%s, dès le niveau %d"), n, lvl) end
+    if lvl and lvl > mine then return string.format(L("%s (se prend dès le niv. %d)"), n, lvl) end
     return n
 end
 -- the status line and its colour
@@ -551,7 +551,7 @@ function K.StateText(k, st)
     end
     if st.state == "prog" then return string.format(L("Étape %d sur %d : %s"), st.step, st.total, StepName(st.next, st.lvl)), C.text end
     if k.quest then return string.format(L("Pas commencée. Première étape : %s"), StepName(st.next, st.lvl)), C.muted end
-    return string.format(L("Lâchée par %s (%s)"), k.bossn or "?", DName(k.src or k.dg[1])), C.muted
+    return string.format(L("Tombe sur %s, dans %s"), k.bossn or "?", DName(k.src or k.dg[1])), C.muted
 end
 
 -- ---------------------------------------------------------------- the passport window
@@ -654,7 +654,7 @@ end
 local function Subtitle()
     local n = 0
     for _, k in ipairs(LIST) do if K.Status(k).state == "have" then n = n + 1 end end
-    if n == 0 then return string.format(L("Pas encore de clé, sur %d"), #LIST) end
+    if n == 0 then return string.format(L("Aucune clé pour l'instant (0 sur %d)"), #LIST) end
     if n == 1 then return string.format(L("1 clé sur %d"), #LIST) end
     return string.format(L("%d clés sur %d"), n, #LIST)
 end
@@ -761,7 +761,7 @@ local function GuildRowTip(k, h, roster)
     if #h.have == 0 then t[#t + 1] = L("Personne pour l'instant") end
     if #on > 0 then t[#t + 1] = string.format(L("En ligne : %s"), table.concat(on, ", ")) end
     if #off > 0 then t[#t + 1] = string.format(L("Hors ligne : %s"), table.concat(off, ", ")) end
-    if #h.prog > 0 then t[#t + 1] = string.format(L("En route : %s"), table.concat(h.prog, ", ")) end
+    if #h.prog > 0 then t[#t + 1] = string.format(L("Chaîne commencée : %s"), table.concat(h.prog, ", ")) end
     if k.need then t[#t + 1] = k.each and L("Chaque joueur du raid a besoin de la sienne.") or L("Un seul membre du groupe en a besoin.") end
     t[#t + 1] = L("Clic : ouvrir ton passeport des clés")
     return t

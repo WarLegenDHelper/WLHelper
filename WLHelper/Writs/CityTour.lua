@@ -30,6 +30,9 @@ ns.AddEnglish({
     ["Tournée en ville"] = "City tour",
     ["Lancer la tournée"] = "Start the tour",
     ["Arrêter la tournée"] = "Stop the tour",
+    ["Le GPS te mène d'une étape à l'autre, la plus proche d'abord. Chaque étape se coche toute seule."] =
+        "The GPS takes you from one stop to the next, nearest first. Each stop is ticked off when you reach it.",
+    ["Le GPS s'arrête ; les étapes restent dans la liste."] = "The GPS stops; the stops stay in the list.",
     ["1 chose à faire ici, dans l'ordre du chemin."] = "1 thing to do here, in walking order.",
     ["%d choses à faire ici, dans l'ordre du chemin."] = "%d things to do here, in walking order.",
     ["Tout est fait ici. Bonne route !"] = "All done here. Safe travels!",
@@ -827,7 +830,7 @@ end
 
 local function Build()
     win = S.Window("WLHelperCityTour", W, 200, L("Tournée en ville"), nil, WLWritsDB, "cityTourPos",
-        { header = 44, noHome = true, minH = 120 })
+        { header = 44, minH = 120 })
     if not (WLWritsDB and WLWritsDB.cityTourPos) then
         win:ClearAllPoints()
         win:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -220, -200)
@@ -838,6 +841,9 @@ local function Build()
     win.empty:SetWrapWidth(CW)
     win.button = S.Button(win, L("Lancer la tournée"), 0, 32, "primary", function()
         if CT.TourOn() then CT.StopTour() else CT.StartTour() end
+    end, function()
+        if CT.TourOn() then return { L("Arrêter la tournée"), L("Le GPS s'arrête ; les étapes restent dans la liste.") } end
+        return { L("Lancer la tournée"), L("Le GPS te mène d'une étape à l'autre, la plus proche d'abord. Chaque étape se coche toute seule.") }
     end)
     -- closed by the player: not again for this visit
     win:SetScript("OnHide", function()

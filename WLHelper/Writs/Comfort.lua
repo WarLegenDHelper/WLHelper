@@ -77,7 +77,9 @@ local CRATE_QUESTS = { [91899] = true, [91900] = true, [91901] = true, [91902] =
 local CRATE_NPCS = { [256386] = true, [256390] = true }
 local function AtIntake()
     local guid = UnitGUID and UnitGUID("npc")
-    local id = guid and tonumber(guid:match("%-(%d+)%-%x+$"))
+    -- inside instances the NPC's GUID comes back secret: no reading it (the title test still works)
+    if type(guid) ~= "string" or (issecretvalue and issecretvalue(guid)) then return false end
+    local id = tonumber(guid:match("%-(%d+)%-%x+$"))
     return id and CRATE_NPCS[id] or false
 end
 local function CrateQuest(id) return id and CRATE_QUESTS[id] or false end
