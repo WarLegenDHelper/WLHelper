@@ -191,6 +191,8 @@ if Register then pcall(Register, PREFIX) end
 local function Me() return (UnitName("player")) end
 -- "Name-Realm" or "Name Realm": the name alone
 local function Short(n) return n and (n:gsub("[%- ].*$", "")) end
+-- the board's key for a name: alone for my realm, "Name-Realm" for another (nil: unreadable)
+local function Key(n) if root.SenderKey then return root.SenderKey(n) end return n and Short(n) end
 -- The week follows the server's weekly reset (like the game's weekly kill counter), not the calendar.
 -- The key is the date the current week started: the same on every client, the reset is server-wide.
 local function Week()
@@ -267,13 +269,14 @@ local function Board()
         if next(b) == nil then for name, e in pairs(WLWritsDB.guild) do b[name] = e end end
         WLWritsDB.guild = nil
     end
-    -- old entries saved as "Name Realm" or "Name-Realm": folded into the short name, newest kept
+    -- old entries saved as "Name Realm" or "Name-Realm" of my realm: folded into the short name,
+    -- newest kept; another realm's stay "Name-Realm" (root.SenderKey), anything unreadable goes
     local long = {}
-    for name in pairs(b) do if Short(name) ~= name then long[#long + 1] = name end end
+    for name in pairs(b) do if Key(name) ~= name then long[#long + 1] = name end end
     for _, name in ipairs(long) do
-        local e, short = b[name], Short(name)
-        local cur = b[short]
-        if not cur or (e.t or 0) > (cur.t or 0) then b[short] = e end
+        local e, short = b[name], Key(name)
+        local cur = short and b[short]
+        if short and type(e) == "table" and (not cur or (e.t or 0) > (cur.t or 0)) then b[short] = e end
         b[name] = nil
     end
     return b
@@ -594,22 +597,27 @@ local function OnMessage(msg, sender)
         local wk, w, sk, s, hk, kb, owk, lvl, ver = msg:match("^S|([%d%-]+)|(%d+)|([%d%-]+)|(%d+)|(%d+)|(%d+)|(%d+)|(%d+)|([^|]*)")
         if wk then
             local spec = msg:match("^S|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|(%a*)")
-            Put(sender, { wk = wk, w = tonumber(w), sk = sk, s = tonumber(s), hk = tonumber(hk), kb = tonumber(kb),
-                week = tonumber(owk), lvl = tonumber(lvl), ver = ver, spec = spec ~= "" and spec or nil, t = time() })
+            -- whole numbers in range, short dates, a plain version: nothing else is kept
+            if #wk > 10 or #sk > 10 then return end
+            ver = ver:match("^[%w%.%-]+$") and ver:sub(1, 24) or nil
+            spec = spec and spec:sub(1, 16)
+            Put(sender, { wk = wk, w = Cap(w, 1e9), sk = sk, s = Cap(s, 1e9), hk = Cap(hk, 1e9), kb = Cap(kb, 1e9),
+                week = Cap(owk, 1e9), lvl = Cap(lvl, 100), ver = ver, spec = spec ~= "" and spec or nil, t = time() })
             WP.RefreshGuildSoon()
         end
     elseif kind == "P" then
         -- an older copy: all-time total and open-world counts only (an "S" from the same player wins)
         local kb, week, wk, hk, lvl, ver = msg:match("^P|(%d+)|(%d+)|([%d%-]+)|(%d+)|(%d+)|([^|]*)$")
         local cur = Board()[sender]
-        if kb and not (cur and cur.sk) then
-            Put(sender, { kb = tonumber(kb), week = tonumber(week), wk = wk, hk = tonumber(hk), lvl = tonumber(lvl), ver = ver, t = time() })
+        if kb and not (cur and cur.sk) and #wk <= 10 then
+            ver = ver:match("^[%w%.%-]+$") and ver:sub(1, 24) or nil
+            Put(sender, { kb = Cap(kb, 1e9), week = Cap(week, 1e9), wk = wk, hk = Cap(hk, 1e9), lvl = Cap(lvl, 100), ver = ver, t = time() })
             WP.RefreshGuildSoon()
         end
     elseif kind == "Q" then
         -- the places of one period: "Q|w|2026-11-10|Goulet des Chanteguerres:12;Hautebrande:3;~:2"
         local per, key, body = msg:match("^Q|(%a)|([%d%-]*)|(.*)$")
-        if per == "a" or per == "w" or per == "s" then
+        if (per == "a" or per == "w" or per == "s") and #key <= 10 then
             local l = {}
             for item in body:gmatch("[^;]+") do
                 local name, n = item:match("^([^:]+):(%d+)$")
@@ -627,7 +635,7 @@ local function OnMessage(msg, sender)
         -- K|week|season| then for all time, the week, the season: matches, KB, HK, deaths, assists,
         -- honor, open-world deaths; then the season's open-world kills. Fields added later are ignored.
         local wk, sk, rest = msg:match("^K|([%d%-]+)|([%d%-]+)|(.*)$")
-        if wk then
+        if wk and #wk <= 10 and #sk <= 10 then
             local v = {}
             for x in (rest .. "|"):gmatch("([^|]*)|") do v[#v + 1] = Cap(x) end
             if #v >= 21 then
@@ -804,7 +812,7 @@ local function Roster(onlineOnly, filter, sort, raw)
             local short = Short(name)
             local hit = not filter or short:lower():find(filter, 1, true) or (zone or ""):lower():find(filter, 1, true)
                 or (rank or ""):lower():find(filter, 1, true)
-            local b0 = board[short]
+            local b0 = board[Key(name) or short]
             local classOk = not wantClass or wantClass == class
             local roleOk = HasRole(b0 and b0.spec, wantRole)
             if hit and classOk and (isOnline or not onlineOnly) then
@@ -1900,7 +1908,8 @@ ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
         pcall(ObserveHours)
         WP.RefreshGuildSoon()
     elseif prefix == PREFIX and channel == "GUILD" and type(msg) == "string" and sender then
-        local who = Short(sender)
-        if who ~= Me() then OnMessage(msg, who) end
+        -- my realm's members by name, another realm's as "Name-Realm"; a secret or odd name: dropped
+        local who = Key(sender)
+        if who and who ~= Me() and not Secret(msg) then OnMessage(msg, who) end
     end
 end)

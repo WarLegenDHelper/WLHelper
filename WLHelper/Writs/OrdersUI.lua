@@ -383,8 +383,98 @@ local STATUS_ICON = { delivered = "check", declined = "warning" }
 
 -- ---------------------------------------------------------------- shared pieces
 
+-- an item's own game tooltip (stats, level, quality; a negative id: the enchant's spell), then our
+-- lines after it (lines[1], the name, is the game's first line already); Shift held: the
+-- comparison with what is worn, when the client offers it. Returns false when the game had
+-- nothing to show (the caller shows our lines alone).
+-- an item not in the client's cache yet: our lines now, the game's tooltip once the item arrives
+-- (if the same owner still holds the tooltip); the compare tooltips go with the game's
+local tipPend, tipCompared
+local tipEv = CreateFrame("Frame")
+pcall(tipEv.RegisterEvent, tipEv, "GET_ITEM_INFO_RECEIVED")
+local function ItemCached(id)
+    local gi = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    if not gi then return true end
+    local okc, name = pcall(gi, id)
+    return not okc or name ~= nil
+end
+local hideHooked = false
+local function HookCompareHide(GT)
+    if hideHooked or not GT.HookScript then return end
+    hideHooked = true
+    pcall(GT.HookScript, GT, "OnHide", function()
+        if not tipCompared then return end
+        tipCompared = nil
+        for _, n in ipairs({ "ShoppingTooltip1", "ShoppingTooltip2", "ShoppingTooltip3" }) do
+            local st = _G[n]
+            if st and st.Hide then st:Hide() end
+        end
+    end)
+end
+local function ShowItemTip(owner, id, lines)
+    local GT = GameTooltip
+    if not (GT and GT.SetOwner and type(id) == "number" and id ~= 0) then return false end
+    if root.HookTooltip then root.HookTooltip() end
+    HookCompareHide(GT)
+    GT:SetOwner(owner, "ANCHOR_RIGHT")
+    if GT.ClearLines then GT:ClearLines() end
+    local cached = id < 0 or ItemCached(id)
+    local shown = false
+    if id > 0 and GT.SetItemByID then shown = pcall(GT.SetItemByID, GT, id)
+    elseif id < 0 and GT.SetSpellByID then shown = pcall(GT.SetSpellByID, GT, -id) end
+    -- nothing (or only "Retrieving item information") from the game: the caller shows our lines,
+    -- the game's tooltip replaces them when the item arrives
+    local n = GT.NumLines and GT:NumLines()
+    if shown and type(n) == "number" and n < 1 then shown = false end
+    if not shown or not cached then
+        if id > 0 and not cached then tipPend = { owner = owner, id = id, lines = lines } end
+        return false
+    end
+    tipPend = nil
+    local mute, hint = C.muted, C.hint or C.muted
+    for i = 2, #(lines or {}) do
+        local l = lines[i]
+        if type(l) == "table" and l.gap then GT:AddLine(" ")
+        elseif type(l) == "table" and l.right and GT.AddDoubleLine then
+            local rc = l.rc or mute
+            GT:AddDoubleLine(l[1], l.right, l[2] or C.fg[1], l[3] or C.fg[2], l[4] or C.fg[3], rc[1], rc[2], rc[3])
+        elseif type(l) == "table" then GT:AddLine(l[1], l[2], l[3], l[4], true)
+        elseif type(l) == "string" then
+            local c = (root.IsMouseLine and root.IsMouseLine(l)) and hint or mute
+            if i == 2 then GT:AddLine(" ") end
+            GT:AddLine(l, c[1], c[2], c[3], true)
+        end
+    end
+    GT:Show()
+    local shift = (IsModifiedClick and IsModifiedClick("COMPAREITEMS")) or (IsShiftKeyDown and IsShiftKeyDown())
+    if shift and id > 0 and GameTooltip_ShowCompareItem then
+        tipCompared = true
+        pcall(GameTooltip_ShowCompareItem, GT)
+    end
+    return true
+end
+tipEv:SetScript("OnEvent", function(_, _, itemID)
+    local p = tipPend
+    if not (p and (itemID == nil or itemID == p.id)) then return end
+    local GT = GameTooltip
+    local owned = GT and GT:IsShown() and (not GT.GetOwner or GT:GetOwner() == p.owner)
+    if not (owned and p.owner.IsVisible and p.owner:IsVisible()) then tipPend = nil; return end
+    -- a reused row now showing another item: not this tooltip any more
+    local cur = p.owner.tipItem or p.owner.id
+    if cur ~= nil and cur ~= p.id then tipPend = nil; return end
+    if ItemCached(p.id) then tipPend = nil; ShowItemTip(p.owner, p.id, p.lines) end
+end)
+-- the tooltip of a row or card: its item's game tooltip (self.tipItem) with our lines, or our lines
+local function ShowTipOf(self, t)
+    if type(t) ~= "table" then return false end
+    if self.tipItem and ShowItemTip(self, self.tipItem, t) then return true end
+    S.Tip(self, t)
+    return true
+end
+WP.OrdersItemTip = ShowItemTip
+
 -- hover fill (0.10 s), pressed fill, and the tooltip (self.tip: lines or a function; self.tipFill
--- runs first) on anything clickable
+-- runs first; self.tipItem: the item's game tooltip first) on anything clickable
 local function Feedback(b)
     b.hl = S.Solid(b, "BORDER", C.hoverFill); b.hl:SetAllPoints(); b.hl:SetAlpha(0)
     b.press = S.Solid(b, "BORDER", C.pressFill); b.press:SetAllPoints(); b.press:Hide()
@@ -394,7 +484,7 @@ local function Feedback(b)
         if self.tipFill then self.tipFill() end
         local t = self.tip
         if type(t) == "function" then t = t(self) end
-        if type(t) == "table" then S.Tip(self, t)
+        if ShowTipOf(self, t) then return
         elseif self.wlClamped then local cut = root.CutLines(self); if #cut > 0 then S.Tip(self, cut) end end
     end)
     b:SetScript("OnLeave", function(self)
@@ -582,6 +672,7 @@ end
 -- a member's row: the class icon and the class colour on the name
 local function SetClass(row, name)
     local cls = name and O.ClassOf(name)
+    row.tipItem = nil
     row.iconFrame:Hide()
     if cls and S.ClassIcon(row.cls, cls) then row.cls:Show() else row.cls:Hide() end
     local cc = cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls]
@@ -589,6 +680,7 @@ local function SetClass(row, name)
 end
 local function SetItem(row, tex, id)
     row.cls:Hide(); row.iconFrame:Show(); S.Painted(row.icon, tex)
+    row.tipItem = (type(id) == "number" and id ~= 0) and id or nil   -- the hover shows the game's item tooltip
     local qc = (id and id > 0) and S.QualityColor(id) or C.fg
     row.name:SetTextColor(qc[1], qc[2], qc[3])
     return qc
@@ -2243,6 +2335,9 @@ H.SMALL_GRID = { minW = 150, gap = 8, rowGap = 2, maxCols = 2, minPx = 150 }
 H.TOP_GRID = { minW = 314, gap = 12, rowGap = 2, maxCols = 2, minPx = 200 }
 function H.Home(f)
     local hm = H.BuildHome(f)
+    -- the home shares its list with the pages (online crafters, a profile, the search): their
+    -- rows go, or they stay drawn over the tiles once back home
+    f.list.HideFrom(1)
     local set = O.CrafterSet()
     f.set = set
     local W = findW
@@ -3524,6 +3619,24 @@ local function BuildNew(p)
     n.name:SetPoint("TOPLEFT", n.iconFrame, "TOPRIGHT", 12, 0)
     n.sub = S.Text(c, F.meta, C.muted); n.sub:SetJustifyH("LEFT"); n.sub:SetJustifyV("TOP")
     n.sub:SetPoint("TOPLEFT", n.name, "BOTTOMLEFT", 0, -3)
+    -- the item's icon and name: its game tooltip (stats) on hover, shift-click links it in the chat
+    n.itemHit = CreateFrame("Button", nil, c)
+    n.itemHit:SetPoint("TOPLEFT", n.iconFrame, "TOPLEFT", 0, 0); n.itemHit:SetSize(40, 40)
+    n.itemHit:SetScript("OnEnter", function(self)
+        local id = draft and draft.item
+        local t = { id and Name(id) or "" }
+        if id and id > 0 then t[2] = L("Maj-clic : le lier dans le chat") end
+        if not (id and ShowItemTip(self, id, t)) then S.Tip(self, t) end
+    end)
+    n.itemHit:SetScript("OnLeave", S.HideTip)
+    n.itemHit:SetScript("OnClick", function()
+        local id = draft and draft.item
+        if not (id and id > 0 and IsShiftKeyDown and IsShiftKeyDown()) then return end
+        local gi = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+        local link = gi and select(2, gi(id))
+        local insert = (ChatFrameUtil and ChatFrameUtil.InsertLink) or ChatEdit_InsertLink
+        if link and insert then pcall(insert, link) end
+    end)
     n.qtyBox = NumberBox(c, 64, L("Quantité"))
     n.qtyBox:SetPoint("TOPRIGHT", 0, -LBL)
     n.qtyBox:HookScript("OnTextChanged", function(self, user) if user then draft.qty = math.max(1, tonumber(self:GetText() or "") or 1); WP.RefreshOrders() end end)
@@ -3601,6 +3714,7 @@ local function RenderNew()
     n.name:SetText(Name(draft.item)); n.name:SetTextColor(qc[1], qc[2], qc[3])
     local nameW = CW - 52 - 64 - 16
     local y = S.FitText(n.name, 2, nameW, c)
+    n.itemHit:SetSize(52 + math.min(nameW, (root.TextWidth(n.name) or 0) + 1), math.max(40, y))
     -- the crafter picked in the list
     n.sub:SetShown(draft.crafter ~= nil)
     if draft.crafter then
@@ -3649,6 +3763,7 @@ local function RenderNew()
             local pr = WP.Price and WP.Price(rg[1])
             if pr then total = total + pr * need else priced = false end
             S.Painted(r.iconFrame.tex, S.ItemIcon(rg[1]))
+            r.tipItem = rg[1]
             r.name:SetText(need .. "× " .. Name(rg[1]))
             local gives = draft.crafterGives[rg[1]]
             if gives then
@@ -3784,6 +3899,12 @@ local function BuildAsk(p)
     -- what the text was recognised as (never the typed text itself: it could be any length)
     a.foundIcon = c:CreateTexture(nil, "ARTWORK"); a.foundIcon:SetSize(16, 16)
     a.found = S.Text(c, F.meta, C.muted); a.found:SetJustifyH("LEFT"); a.found:SetJustifyV("TOP")
+    -- the recognised item: its game tooltip (stats) on hover
+    a.foundHit = CreateFrame("Frame", nil, c); a.foundHit:EnableMouse(true); a.foundHit:Hide()
+    a.foundHit:SetScript("OnEnter", function(self)
+        if self.id and not ShowItemTip(self, self.id, { Name(self.id) }) then S.Tip(self, { Name(self.id) }) end
+    end)
+    a.foundHit:SetScript("OnLeave", S.HideTip)
     -- the profession: its icons, and "I don't know"
     a.profLabel = S.Text(c, F.meta, C.muted); a.profLabel:SetText(L("Métier")); S.ClampLabel(a.profLabel, nil, c)
     a.profName = S.Text(c, F.label, C.fg); a.profName:SetJustifyH("LEFT")
@@ -3900,7 +4021,12 @@ local function RenderAsk()
     local fx = a.foundIcon:IsShown() and 22 or 0
     a.foundIcon:ClearAllPoints(); a.foundIcon:SetPoint("TOPLEFT", 0, -y)
     a.found:ClearAllPoints(); a.found:SetPoint("TOPLEFT", fx, -(y + 1))
-    y = y + math.max(16, S.FitText(a.found, 2, CW - fx, c)) + 16
+    local fh = math.max(16, S.FitText(a.found, 2, CW - fx, c))
+    a.foundHit.id = id
+    a.foundHit:ClearAllPoints(); a.foundHit:SetPoint("TOPLEFT", 0, -y)
+    a.foundHit:SetSize(fx + math.min(CW - fx, (root.TextWidth(a.found) or 0) + 1), fh)
+    a.foundHit:SetShown(id ~= nil)
+    y = y + fh + 16
     -- the profession picked: selection fill and accent border; the others dimmed while one is picked
     local cur = askState.prof or ""
     a.profLabel:ClearAllPoints(); a.profLabel:SetPoint("TOPLEFT", 0, -y)
@@ -4034,7 +4160,7 @@ local function OrderCard(parent)
     c:SetScript("OnEnter", function(self)
         local t = { self.title:GetText() or "" }
         if self.feeTip then t[#t + 1] = self.feeTip end
-        S.Tip(self, t)
+        ShowTipOf(self, t)   -- the item's game tooltip (stats) first, when the order names one
     end)
     c:SetScript("OnLeave", S.HideTip)
     c.who = S.Text(c, F.meta, C.muted); c.who:SetJustifyH("LEFT"); c.who:SetJustifyV("TOP")
@@ -4135,6 +4261,7 @@ local function PaintOrder(c, o, side, width)
         tex = pk and ProfIcon(pk) or "Interface\\Icons\\INV_Misc_QuestionMark"
     end
     S.Painted(c.icon, tex)
+    c.tipItem = item ~= 0 and item or nil
     local qc = item > 0 and S.QualityColor(item) or C.fg
     c.title:SetTextColor(qc[1], qc[2], qc[3])
     c.title:SetText((o.qty or 1) .. "× " .. Name(o))
@@ -4624,6 +4751,12 @@ function WP.RefreshMailPanel()
         if not r then
             r = CreateFrame("Frame", nil, panel)
             r.iconFrame = Painted(r, 28); r.iconFrame:SetPoint("TOPLEFT", 0, 0)
+            -- the item's game tooltip (stats) on its icon
+            r.iconFrame:EnableMouse(true)
+            r.iconFrame:SetScript("OnEnter", function(self)
+                if self.id and not ShowItemTip(self, self.id, { Name(self.id) }) then S.Tip(self, { Name(self.id) }) end
+            end)
+            r.iconFrame:SetScript("OnLeave", S.HideTip)
             r.text = S.Text(r, F.label, C.fg); r.text:SetJustifyH("LEFT"); r.text:SetJustifyV("TOP")
             r.text:SetPoint("TOPLEFT", 36, 0)
             r.sub = S.Text(r, F.meta, C.muted); r.sub:SetJustifyH("LEFT"); r.sub:SetJustifyV("TOP")
@@ -4649,6 +4782,7 @@ function WP.RefreshMailPanel()
         r.act = a
         r:SetWidth(cw)
         S.Painted(r.iconFrame.tex, ItemTex(a.o.item or 0))
+        r.iconFrame.id = (a.o.item or 0) ~= 0 and a.o.item or nil
         r.text:SetText((a.o.qty or 1) .. "× " .. Name(a.o))
         local qc = (a.o.item or 0) > 0 and S.QualityColor(a.o.item) or C.fg
         r.text:SetTextColor(qc[1], qc[2], qc[3])

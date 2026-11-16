@@ -389,8 +389,9 @@ local lastSent, lastMsg, queued, lastAnswer, answerQueued = 0, nil, false, -1000
 -- a line from another member; anything that does not look right is dropped
 function K.OnMessage(msg, sender)
     if type(msg) ~= "string" or #msg > 250 or type(sender) ~= "string" then return end
-    sender = Short(sender)
-    if not sender or sender == "" or #sender > 48 or sender:find("[|%c]") then return end
+    -- my realm's members by name, another realm's as "Name-Realm" (a namesake keeps its own line)
+    sender = (root.SenderKey or Short)(sender)
+    if not sender or sender == "" or #sender > 64 or sender:find("[|%c]") then return end
     if msg == "R" then
         -- a member who just logged in asks: answer even when my keys did not change since my last
         -- line (they never heard it). Every copy in the guild hears the same request, so answering
@@ -449,7 +450,7 @@ local function Roster()
     for i = 1, (Num(Call(GetNumGuildMembers)) or 0) do
         local name, _, _, _, _, _, _, _, online, _, class = GetGuildRosterInfo(i)
         if type(name) == "string" and not Secret(name) then
-            out[Short(name)] = { class = class, online = (not Secret(online)) and online and true or false }
+            out[(root.SenderKey and root.SenderKey(name)) or Short(name)] = { class = class, online = (not Secret(online)) and online and true or false }
         end
     end
     return out
@@ -928,8 +929,8 @@ ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
         end
     elseif e == "CHAT_MSG_ADDON" then
         if prefix == PREFIX and channel == "GUILD" and type(sender) == "string" then
-            local who = Short(sender)
-            if who ~= Me() and On() then K.OnMessage(msg, who) end
+            local who = (root.SenderKey or Short)(sender)
+            if who and who ~= Me() and On() then K.OnMessage(msg, who) end
         end
     elseif e == "GUILD_ROSTER_UPDATE" then
         -- the Guild window refreshes itself on this event

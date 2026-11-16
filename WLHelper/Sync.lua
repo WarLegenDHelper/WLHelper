@@ -50,8 +50,10 @@ function ns.GroupMembers()
     local unit = (raid and "raid" or "party") .. k
     local nm = UnitName and UnitName(unit)
     if type(nm) == "string" and not secret(nm) then
+      -- by the name alone: PartyQuests and the summary look members up the same way (a group
+      -- holds one player of a name in practice)
       nm = Short(nm)
-      if nm ~= me then
+      if nm and nm ~= me then
         local cls
         if UnitClass then cls = select(2, UnitClass(unit)) end
         out[#out + 1] = { name = nm, unit = unit, class = (type(cls) == "string" and not secret(cls)) and cls or nil }
@@ -253,12 +255,31 @@ local buf = {}
 local function InGroup(who)
   return (UnitInParty and UnitInParty(who)) or (UnitInRaid and UnitInRaid(who))
 end
+-- The group member of that name is the sender (same realm): data is kept by the name alone, so a
+-- namesake of another realm (a battleground's instance chat) never writes over a member's entry.
+-- true when no unit of that name is found (the game's own InGroup check decides then).
+local function SameRealm(key, who)
+  if not ns.SenderKey or not UnitName then return true end
+  local n = (GetNumGroupMembers and GetNumGroupMembers()) or 0
+  local raid = IsInRaid and IsInRaid()
+  for k = 1, raid and n or math.min(4, n) do
+    local nm, realm = UnitName((raid and "raid" or "party") .. k)
+    if type(nm) == "string" and not secret(nm) and Short(nm) == who then
+      local full = nm
+      if type(realm) == "string" and realm ~= "" and not secret(realm) then full = nm .. "-" .. realm end
+      return ns.SenderKey(full) == key
+    end
+  end
+  return true
+end
 local function OnMessage(prefix, msg, channel, sender)
   if prefix ~= PREFIX or type(msg) ~= "string" or secret(msg) or secret(sender) then return end
   -- only your group's members, on the group's channels
   if channel ~= "PARTY" and channel ~= "RAID" and channel ~= "INSTANCE_CHAT" then return end
-  local who = Short(sender)
-  if not who or not InGroup(who) then return end
+  -- by the name alone, like GroupMembers and PartyQuests; a secret or malformed name is dropped
+  local key = ns.SenderKey and ns.SenderKey(sender)
+  local who = (key or not ns.SenderKey) and Short(sender) or nil
+  if not who or not InGroup(who) or (key and not SameRealm(key, who)) then return end
   if type(who) == "string" and (who:match("^([^%-%s]+)") or who) == ((Me() or ""):match("^([^%-%s]+)") or Me()) then return end   -- our own message, whatever the name form
   if msg == "HELLO" then lastSent = ""; Schedule(); return end
   local want = msg:match("^W:(.*)$")
@@ -275,12 +296,26 @@ local function OnMessage(prefix, msg, channel, sender)
   if not i then return end
   i, n = tonumber(i), tonumber(n)
   if not i or not n or n > 20 or i > n or i < 1 then return end
-  if i == 1 then
-    buf[who] = { st = {}, pre = {}, keys = {}, v = v2 and 2 or 1 }
-    for k in (keys or ""):gmatch("[^,]+") do buf[who].keys[k] = true end
-  end
+  -- every part is counted once: a message is committed only when all its n parts came. A part 1
+  -- repeated within 2.5 s (a copy never does that: its parts are 0.2 s apart, its next message 3 s
+  -- later) drops the half-read one; later, it starts the next message (a sender whose part failed
+  -- sends it all again 3 s later)
+  local now = Now()
   local b = buf[who]
+  if b and (b.n ~= n or (b.v == 2) ~= v2) then buf[who] = nil; b = nil end
+  if i == 1 then
+    if b and now - (b.at or 0) < 2.5 then buf[who] = nil; return end
+    b = { st = {}, pre = {}, keys = {}, v = v2 and 2 or 1, n = n, got = {}, count = 0, at = now }
+    buf[who] = b
+    local nk = 0
+    for k in (keys or ""):gmatch("[^,]+") do
+      if nk < 20 and #k <= 40 then b.keys[k] = true; nk = nk + 1 end
+    end
+  end
   if not b then return end   -- the first part was missed: wait for the next full message
+  if b.got[i] then buf[who] = nil; return end   -- a part seen twice: the message is not trusted
+  b.got[i] = true
+  b.count = b.count + 1
   for tok in body:gmatch("[^,]+") do
     if tok:sub(1, 1) == "@" then
       -- the member's current guide step
@@ -298,6 +333,7 @@ local function OnMessage(prefix, msg, channel, sender)
       if id then b.st[tonumber(id)] = (star == "*") and "ready" or "on" end
     end
   end
+  if i == n and b.count < n then buf[who] = nil; return end   -- a part is missing: wait for the next message
   if i == n then
     ns.party[who], ns.partyPre[who], ns.partyKeys[who] = b.st, b.pre, b.keys
     ns.partyStep[who] = b.step

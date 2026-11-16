@@ -2,6 +2,18 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.91", date = "2026-11-16", items = {
+    { s = "add", fr = { "« Quoi de neuf » en grand", "Fenêtre large et redimensionnable (largeur et hauteur, taille retenue), versions à gauche avec un point sur celles pas encore vues, changements en cartes sur 2 ou 3 colonnes avec « Voir plus », résumé à la connexion, filtres Tout / Nouveau / Changé / Corrigé, et « Ne plus afficher à la connexion »." }, en = { "Wide, resizable What's new with a version list, card grid, filters.", "" } },
+    { s = "add", fr = { "Pierre de foyer", "Par défaut, la pierre de foyer et le Rappel astral ne sont utilisés que s'ils font gagner au moins 3 min (sinon le GPS prend par exemple le zeppelin d'Orgrimmar pour Grom'gol). La flèche et la carte du guide donnent la durée du trajet et un « Autre trajet » ; Alt-clic sur la flèche pour le prendre." }, en = { "Hearthstone policy (default", "Only if it saves 3 min), trip time and an alternative route." } },
+    { s = "add", fr = { "Commandes", "Survoler un objet affiche l'infobulle du jeu avec ses statistiques (Maj : comparaison), partout dans les Commandes." }, en = { "Item tooltips with stats everywhere in Orders.", "" } },
+    { s = "add", fr = { "/wlh diag carte", "Dit pourquoi le chemin s'affiche ou non sur la carte du monde." }, en = { "New map diagnostic command.", "" } },
+    { s = "chg", fr = { "GPS et Zygor", "Le choix Automatique / WL Helper / Zygor devient un seul interrupteur « Envoyer les destinations à la flèche de Zygor », visible seulement si Zygor est installé, désactivé par défaut." }, en = { "One Zygor switch, off by default.", "" } },
+    { s = "chg", fr = { "Liste des étapes", "Une croix pour la fermer, et le bouton « Étapes » devient « Fermer les étapes » quand elle est ouverte." }, en = { "Close button on the step list.", "" } },
+    { s = "fix", fr = { "Pointillés sur la carte du monde avec OpenMap", "Ils étaient dessinés sous la carte assemblée d'OpenMap ; ils passent maintenant au-dessus (chemin à pied et patrouilles)." }, en = { "World map path dots now draw above OpenMap's stitched map.", "" } },
+    { s = "fix", fr = { "Accueil des Commandes", "La liste des artisans en ligne restait affichée par-dessus les tuiles en revenant à l'accueil." }, en = { "Orders home no longer shows the online list over the tiles.", "" } },
+    { s = "fix", fr = { "Fenêtres hors de l'écran", "Une position enregistrée hors de l'écran est ramenée ; la barre de titre reste toujours visible." }, en = { "Windows saved off-screen are brought back.", "" } },
+    { s = "fix", fr = { "Messages de guilde renforcés", "Un message mal formé ne peut plus casser les Commandes, l'Agenda ou l'Accueil (les données abîmées sont nettoyées) ; seul l'organisateur peut modifier ou annuler son événement ; on ne peut plus inventer d'étoiles ; un homonyme d'un autre royaume n'écrase plus les données d'un membre ; moins d'annonces et de rafraîchissements quand beaucoup de messages arrivent." }, en = { "Guild sync hardened against malformed messages, spoofing and floods.", "" } },
+  } },
   { v = "1.0.0-beta.90", date = "2026-11-16", items = {
     { s = "fix", fr = { "Sorts appris reconnus sur Forever", "Le GPS propose de nouveau tes sorts de voyage (téléports, Rappel astral), les recharges de métier sont suivies, et le tir automatique du chasseur est bien utilisé." }, en = { "Known spells detected on Forever", "Travel spells, profession cooldowns, hunter Auto Shot." } },
     { s = "fix", fr = { "Clés de donjon", "La clé a son nom en jeu, son icône, et « possédée » quand elle est dans tes sacs." }, en = { "Dungeon keys show their name, icon and \"owned\" again.", "" } },
@@ -119,8 +131,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.77", date = "2026-11-16", items = {
     { s = "fix", fr = { "Centaur Pariah (Maraudon)", "Il fait des allers-retours sur le chemin au sud du Convent de Mannoroc. Le repère est maintenant au milieu de son trajet, et l'étape dit de suivre le chemin vers l'ouest s'il n'est pas là." }, en = { "Centaur Pariah patrols", "The marker is now mid-path, with a note to follow the path." } },
-  } },
-  { v = "1.0.0-beta.76", date = "2026-11-16", items = {
-    { s = "fix", fr = { "« Le jeu a bloqué SetRaidTarget() »", "La macro « DG_Cible » créée par une ancienne version gardait sa ligne de marque de raid ; elle est nettoyée à la connexion et ne fait plus que cibler." }, en = { "The old \"DG_Cible\" macro is cleaned at login", "Targeting only, no more blocked marker error." } },
   } },
 }

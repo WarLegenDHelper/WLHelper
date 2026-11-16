@@ -37,6 +37,7 @@ local C = S and S.C or {}
 
 local Trail = {}
 WP.Trail = Trail
+local function L(x) return ns.L and ns.L(x) or x end
 
 ns.AddEnglish({
     ["Chemin à pied sur la carte"] = "Walking path on the map",
@@ -53,6 +54,18 @@ ns.AddEnglish({
     ["Rouge"] = "Red",
     ["Jaune"] = "Yellow",
     ["Cyan"] = "Cyan",
+    -- /wlh diag carte
+    ["oui"] = "yes", ["non"] = "no", ["aucun"] = "none",
+    ["WL Helper, chemin sur la carte : réglage %s, minimap %s"] = "WL Helper, path on the map: setting %s, minimap %s",
+    ["Chemin : %d points (GPS %s, épingle %s)"] = "Path: %d points (GPS %s, pin %s)",
+    ["Carte du monde : affichée %s, carte %s"] = "World map: shown %s, map %s",
+    ["OpenMap : chargé %s, assemblée %s, haut de l'art %s"] = "OpenMap: loaded %s, stitched %s, art top %s",
+    ["Canevas : %s, %.0f x %.0f, échelle %.3f, strate %s, niveau %s"] = "Canvas: %s, %.0f x %.0f, scale %.3f, strata %s, level %s",
+    ["Calque des points : niveau %s (voulu %s), affiché %s, visible %s"] = "Dot layer: level %s (wanted %s), shown %s, visible %s",
+    ["Points : %d créés, %d affichés, %d dessinés, taille %.1f"] = "Dots: %d made, %d shown, %d drawn, size %.1f",
+    ["Point %d : %.0f, %.0f (parent %s, dans la vue %s)"] = "Dot %d: %.0f, %.0f (parent %s, in view %s)",
+    ["Erreur : %s"] = "Error: %s",
+    ["Aucune erreur."] = "No error.",
 })
 
 local NAV_ADDON = "WLHelper_Nav"
@@ -915,6 +928,7 @@ end
 local function PlaceDot(t, rel, point, x, y, alpha)
     t:ClearAllPoints()
     t:SetPoint("CENTER", rel, point, x, y)
+    t.wlX, t.wlY = x, y
     t:SetAlpha(alpha)
     t.wlRing:SetAlpha(alpha * RING_ALPHA)
     t:Show(); t.wlRing:Show()
@@ -943,6 +957,40 @@ local function ShowPin(p, rel, point, x, y, head, ring, r, g, b)
     p:Show(); p.wlRing:Show()
 end
 local function HidePin(p) if p then p:Hide(); p.wlRing:Hide() end end
+
+-- The world map's dot frame level. Blizzard's own map: the canvas's level + 2000 (and never under its
+-- quest areas, from the map's pin level manager, as Polestar's route does). OpenMap's stitched art sits
+-- on the same canvas at levels ABOVE canvas + 2000 (its own Compat.lua says so of another addon's icons
+-- made there, which it has to lift): our frame goes over the top of its art, OpenMapAPI.ArtTopLevel().
+-- That level is known only once OpenMap has built its map (the first opening), so it is asked again on
+-- every draw. Patrol.lua's frame goes one level under this.
+local LEVEL_CAP = 9400
+function Trail.MapLevel(canvas)
+    local level = ((canvas and canvas.GetFrameLevel and Num(canvas:GetFrameLevel())) or 1) + 2000
+    local W = rawget(_G, "WorldMapFrame")
+    local okF, fl = false, nil
+    if W and W.GetPinFrameLevelsManager then okF, fl = pcall(W.GetPinFrameLevelsManager, W) end
+    if okF and type(fl) == "table" and fl.GetValidFrameLevel then
+        local ok, l = pcall(fl.GetValidFrameLevel, fl, "PIN_FRAME_LEVEL_QUEST_BLOB")
+        l = ok and Num(l) or nil
+        if l and l + 1 > level then level = l + 1 end
+    end
+    local O = rawget(_G, "OpenMapAPI")
+    if type(O) == "table" and type(O.ArtTopLevel) == "function" then
+        local ok, top = pcall(O.ArtTopLevel)
+        top = ok and Num(top) or nil
+        if top and top + 2 > level then level = top + 2 end
+    end
+    return math.min(level, LEVEL_CAP)
+end
+-- A frame's level set to `want` (a level change on the map may be refused in combat: tried again on
+-- the next draw).
+local function Lift(f, want)
+    if not f or f.wlLevel == want then return end
+    if f.wlLevel and InCombat() then return end
+    if pcall(f.SetFrameLevel, f, want) then f.wlLevel = want end
+end
+Trail._Lift = Lift
 
 -- World map: one frame over the map canvas, textures placed in canvas units. A dot's canvas size is its
 -- UI size times UIParent's effective scale over the canvas's: the same on screen at every zoom.
@@ -981,7 +1029,8 @@ local function ViewClip(canvas, w, h)
     return { (fl * fs - cl * cs) * kx, (ct * cs - ft * fs) * ky, (fr * fs - cl * cs) * kx, (ct * cs - fb * fs) * ky }
 end
 
-function Trail.RefreshMap()
+local mapErr          -- the last error of a world map draw (for /wlh diag carte)
+local function RefreshMap()
     local W, canvas = Canvas()
     local shown = W and W.IsShown and W:IsShown()
     local map = shown and W.GetMapID and W:GetMapID()
@@ -997,10 +1046,12 @@ function Trail.RefreshMap()
         if not canvas or (#dots == 0 and not pin) then drawn.map, drawn.mapPin = 0, false; return end
         wm.frame = CreateFrame("Frame", nil, canvas)
         wm.frame:SetAllPoints(canvas)
-        wm.frame:SetFrameLevel((canvas.GetFrameLevel and canvas:GetFrameLevel() or 1) + 2000)
+        if wm.frame.EnableMouse then pcall(wm.frame.EnableMouse, wm.frame, false) end
         wm.pin = MakePin(wm.frame)
     end
     local f = wm.frame
+    -- over OpenMap's art (built after this frame was made, at the map's first opening): on every draw
+    if canvas then wm.want = Trail.MapLevel(canvas); Lift(f, wm.want) end
     local r, g, b = Color()
     local dot, ring = size / k, RING.map / k             -- canvas units
     Pool(f, wm.dots, #dots, dot, ring, r, g, b)
@@ -1013,6 +1064,79 @@ function Trail.RefreshMap()
         HidePin(wm.pin)
     end
     drawn.map, drawn.mapPin = #dots, pin ~= nil
+end
+function Trail.RefreshMap()
+    local ok, err = pcall(RefreshMap)
+    if ok then mapErr = nil; return end      -- (a draw that worked: an old error is no longer the story)
+    mapErr = tostring(err)
+    error(err, 0)
+end
+
+-- /wlh diag carte: why the world map shows (or not) the walking path. Lines in chat (12 at most),
+-- also returned (tests).
+local function YesNo(v) return v and L("oui") or L("non") end
+local function Get(o, m, ...)
+    if type(o) ~= "table" or type(o[m]) ~= "function" then return nil end
+    local ok, v = pcall(o[m], o, ...)
+    if ok then return v end
+end
+function Trail.DiagMap()
+    local out = {}
+    local function add(fmt, ...)
+        local ok, s = pcall(string.format, L(fmt), ...)
+        out[#out + 1] = ok and s or fmt
+    end
+    -- drawn now, so what is said is what the map shows
+    local okR, errR = pcall(Trail.RefreshMap)
+    local ok, err = pcall(function()
+        add("WL Helper, chemin sur la carte : réglage %s, minimap %s", YesNo(Trail.MapOn()), YesNo(Trail.MinimapOn()))
+        local _, line, dest = Line()
+        add("Chemin : %d points (GPS %s, épingle %s)", line and #line or 0,
+            YesNo(GPS.Active and GPS.Active()), YesNo(dest ~= nil))
+        local W, canvas = Canvas()
+        add("Carte du monde : affichée %s, carte %s", YesNo(W and Get(W, "IsShown")), tostring(W and Get(W, "GetMapID") or "-"))
+        local O = rawget(_G, "OpenMapAPI")
+        local stitched = Stitched() ~= nil
+        local top
+        if type(O) == "table" and type(O.ArtTopLevel) == "function" then
+            local okT, t = pcall(O.ArtTopLevel)
+            top = okT and Num(t) or nil
+        end
+        add("OpenMap : chargé %s, assemblée %s, haut de l'art %s", YesNo(type(O) == "table"), YesNo(stitched),
+            tostring(top or "-"))
+        local w, h = Num(canvas and Get(canvas, "GetWidth")) or 0, Num(canvas and Get(canvas, "GetHeight")) or 0
+        if canvas then
+            add("Canevas : %s, %.0f x %.0f, échelle %.3f, strate %s, niveau %s",
+                tostring(Get(canvas, "GetName") or "WorldMapFrame.ScrollContainer.Child"), w, h, Eff(canvas) or 0,
+                tostring(Get(canvas, "GetFrameStrata") or "?"), tostring(Get(canvas, "GetFrameLevel") or "?"))
+        end
+        local f = wm.frame
+        add("Calque des points : niveau %s (voulu %s), affiché %s, visible %s", tostring(f and (Get(f, "GetFrameLevel") or f.wlLevel) or "-"),
+            tostring(canvas and Trail.MapLevel(canvas) or "-"), YesNo(f and Get(f, "IsShown")), YesNo(f and Get(f, "IsVisible")))
+        local okC, clip = false, nil
+        if canvas then okC, clip = pcall(ViewClip, canvas, w, h) end
+        if not okC then clip = nil end
+        local shown = {}
+        for _, t in ipairs(wm.dots) do if Get(t, "IsShown") then shown[#shown + 1] = t end end
+        add("Points : %d créés, %d affichés, %d dessinés, taille %.1f", #wm.dots, #shown, drawn.map or 0, drawn.mapDot or 0)
+        for i = 1, math.min(3, #shown) do
+            local t = shown[i]
+            local x, y = t.wlX or 0, -(t.wlY or 0)
+            local p = Get(t, "GetParent")
+            local pname = (f and p == f) and "WL" or tostring(p and Get(p, "GetName") or L("aucun"))
+            -- in the part of the canvas the map shows (stitched: past 0..1 too), else in the canvas
+            local c = clip or { 0, 0, 1, 1 }
+            local inside = w > 0 and h > 0 and x / w >= c[1] and x / w <= c[3] and y / h >= c[2] and y / h <= c[4]
+            add("Point %d : %.0f, %.0f (parent %s, dans la vue %s)", i, x, y, pname, YesNo(inside))
+        end
+    end)
+    if not ok then add("Erreur : %s", tostring(err))
+    elseif not okR then add("Erreur : %s", tostring(errR))
+    elseif mapErr then add("Erreur : %s", mapErr)
+    else add("Aucune erreur.") end
+    while #out > 12 do table.remove(out, #out - 1) end
+    for _, s in ipairs(out) do if print then print("|cffce1918WL|r " .. s) end end
+    return out
 end
 
 -- The world map tells us when its map, zoom or data change (a data provider, as the game's own pins);

@@ -531,11 +531,20 @@ function Patrol.RefreshMap()
         if not canvas or #dots == 0 then drawn.map, drawn.label = 0, nil; return end
         wm.frame = CreateFrame("Frame", nil, canvas)
         wm.frame:SetAllPoints(canvas)
-        -- under the walking path's dots (Trail.lua: canvas + 2000)
-        wm.frame:SetFrameLevel((canvas.GetFrameLevel and canvas:GetFrameLevel() or 1) + 1999)
+        if wm.frame.EnableMouse then pcall(wm.frame.EnableMouse, wm.frame, false) end
         wm.label = MakeLabel(wm.frame)
     end
     local f = wm.frame
+    -- one level under the walking path's dots (Trail.MapLevel: canvas + 2000, or over OpenMap's
+    -- stitched art once it is built), asked again on every draw
+    if canvas then
+        local T = Trail()
+        local want = (T and T.MapLevel and T.MapLevel(canvas)
+            or ((canvas.GetFrameLevel and Num(canvas:GetFrameLevel()) or 1) + 2000)) - 1
+        if f.wlLevel ~= want and not (f.wlLevel and InCombatLockdown and InCombatLockdown()) then
+            if pcall(f.SetFrameLevel, f, want) then f.wlLevel = want end
+        end
+    end
     local r, g, b = Color()
     local dot, ring = size / k, RING.map / k
     Pool(f, wm.dots, #dots, dot, ring, r, g, b)

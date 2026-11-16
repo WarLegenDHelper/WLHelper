@@ -200,6 +200,18 @@ local function GroupChannel()
 end
 
 local told = false
+-- the home page is redrawn when what it shows changes (the version or its count), once per second
+-- at most: a burst of reports never redraws it for each one
+local shown, homeQueued = nil, false
+local function HomeChanged(best, n)
+    local sig = tostring(best) .. "/" .. tostring(n)
+    if sig == shown or not WP.RefreshHome then return end
+    shown = sig
+    if homeQueued then return end
+    if not (C_Timer and C_Timer.After) then WP.RefreshHome(); return end
+    homeQueued = true
+    C_Timer.After(1, function() homeQueued = false; if WP.RefreshHome then WP.RefreshHome() end end)
+end
 local function Seen(version, channel, sender)
     local mine = Mine()
     if WP.NewerVersion(version, mine) then
@@ -228,7 +240,7 @@ local function Seen(version, channel, sender)
             told = true
             WP.Print(string.format(L("La version %s de WL Helper est sortie, vue chez %d membres (tu as la %s). Mets-la à jour dans WowUp, puis tape /reload pour la charger."), best, n, mine))
         end
-        if best and WP.RefreshHome then WP.RefreshHome() end
+        if best then HomeChanged(best, n) end
     elseif WP.NewerVersion(mine, version) then
         Announce(channel)   -- an older copy answered: tell it ours
     end

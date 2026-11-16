@@ -73,6 +73,15 @@ ns.AddEnglish({
     ["Bateau pour %s"] = "Boat to %s",
     ["Zeppelin pour %s"] = "Zeppelin to %s",
     ["%s, puis %s"] = "%s, then %s",
+    -- the runner-up (the arrow's tooltip, the guide card): "Autre trajet : zeppelin pour Grom'gol, puis vol
+    -- jusqu'à Kargath (~10 min)"
+    ["Autre trajet : %s (%s)"] = "Other route: %s (%s)",
+    ["Ce trajet : %s"] = "This route: %s",
+    ["pierre de foyer jusqu'à %s"] = "Hearthstone to %s",
+    ["rappel astral jusqu'à %s"] = "Astral Recall to %s",
+    ["à pied"] = "on foot",
+    ["sur ta monture"] = "on your mount",
+    ["Trajet changé : %s"] = "Route changed: %s",
 })
 
 -- "Brackenwall Village, Dustwallow Marsh" -> "Brackenwall Village": the place without its zone, for
@@ -119,6 +128,13 @@ local RUNE = 17031
 -- The Hearthstone (item, and the spell it casts) and a shaman's Astral Recall: both to your inn.
 local HEARTH_ITEM, HEARTH_SPELL, ASTRAL_RECALL = 6948, 8690, 556
 local HEARTH_COOLDOWN = 3600       -- seconds: the Hearthstone's cooldown, when the client hides it
+-- The Hearthstone's (and Astral Recall's) policy, WLWritsDB.gpsOpts.hearth (Settings > GPS):
+-- "always" when faster, "gain" (the default) only when it saves at least HEARTH_GAIN seconds over the
+-- best way without it (its hour of cooldown is worth keeping for a real gain), "never". Old values:
+-- false = "never", true = the default. A mage's teleports have no long cooldown: not concerned.
+local HEARTH_GAIN = 180
+-- The runner-up shown beside the plan: another first leg, at most 50% slower.
+local ALT_SPAN = 1.5
 
 -- The inns: innkeeper's NPC id, continent, world yards (north, west), then the names GetBindLocation
 -- gives for that inn (its subzone; English, then French). Positions: LibForeverData 2026.11.1 (forever-db,
@@ -201,6 +217,15 @@ local function Opt(key, default)
     if v == nil then return default end
     return v
 end
+
+-- "always" | "gain" | "never" (see HEARTH_GAIN)
+local function HearthPolicy()
+    local v = Opt("hearth")
+    if v == false or v == "never" then return "never" end
+    if v == "always" then return "always" end
+    return "gain"
+end
+GPS.HearthPolicy = HearthPolicy
 
 -- ---------------------------------------------------------------- positions
 
@@ -529,9 +554,9 @@ end
 local function FlyCost(d) return d * FLY_DETOUR / FLY + FLY_STOP end
 
 -- What the Hearthstone (or Astral Recall) may do now: the inn and how ("item" / spell id), or nil.
-local function HearthWay(dead)
-    if dead then return nil end
-    local useStone = Opt("hearth", true) and HearthReady()
+local function HearthWay(dead, pol)
+    if dead or (pol or HearthPolicy()) == "never" then return nil end
+    local useStone = HearthReady()
     local useRecall = not useStone and Opt("teleports", true) and SpellReady(ASTRAL_RECALL)
     if not (useStone or useRecall) then return nil end
     local inn = GPS.InnPoint()
@@ -543,7 +568,11 @@ end
 -- One Dijkstra over every pair of points (a few dozen), from where you stand. With `firstOnly` it
 -- stops at the nearest of `dests`; otherwise it prices every destination. `exclude`: points left out
 -- (the next best plans).
-local function Search(dests, firstOnly, exclude)
+local function Excluded(exclude, p)
+    return exclude ~= nil and (exclude[p] or exclude[NodeKey(p)]) and true or false
+end
+
+local function Search(dests, firstOnly, exclude, pol)
     local cont, px, py = PlayerWorld()
     if not cont or not dests or #dests == 0 then return nil end
     if not fixed then BuildFixed() end
@@ -554,7 +583,7 @@ local function Search(dests, firstOnly, exclude)
     local nodes = { start }
     local isDest = {}
     local function Add(p)
-        if exclude and exclude[p] then return end
+        if Excluded(exclude, p) then return end
         p._key = NodeKey(p)
         nodes[#nodes + 1] = p
     end
@@ -569,8 +598,8 @@ local function Search(dests, firstOnly, exclude)
             if (not p.rune or hasRune) and SpellReady(p.spell) then Add(p) end
         end
     end
-    local inn, via = HearthWay(dead)
-    if inn and exclude and exclude[inn] then inn = nil end
+    local inn, via = HearthWay(dead, pol)
+    if inn and Excluded(exclude, inn) then inn = nil end
     if inn then Add(inn) end
 
     local n, speed = #nodes, RideSpeed()
@@ -614,11 +643,17 @@ end
 
 -- Seconds to each of `dests` from where you stand (nil when unreachable), in one search.
 function GPS.CostsTo(dests)
-    local _, cost = Search(dests, false)
+    local pol = HearthPolicy()
+    local _, cost, _, _, _, via = Search(dests, false, nil, pol)
+    -- "gain": the way without the Hearthstone too, kept unless the stone saves HEARTH_GAIN seconds
+    local cost2
+    if cost and via and pol == "gain" then _, cost2 = Search(dests, false, nil, "never") end
     local out = {}
     if cost then
         for i = 1, #dests do
             local c = cost[i + 1]
+            local c2 = cost2 and cost2[i + 1]
+            if c2 and c2 < math.huge and (not c or c2 - c < HEARTH_GAIN) then c = c2 end
             if c and c < math.huge then out[i] = c end
         end
     end
@@ -629,8 +664,8 @@ end
 -- { kind = "ride"|"fly"|"link"|"teleport"|"hearth", from, to, seconds }, the seconds it takes and the
 -- destination reached. A "hearth" leg says how: item = 6948 (the Hearthstone) or spell = 556 (Astral
 -- Recall). `exclude`: points the way may not use.
-function GPS.FindPath(dests, exclude)
-    local nodes, cost, prev, how, reached, via = Search(dests, true, exclude)
+local function PathWith(dests, exclude, pol)
+    local nodes, cost, prev, how, reached, via = Search(dests, true, exclude, pol)
     if not reached then return nil end
     local legs, v = {}, reached
     while prev[v] do
@@ -647,6 +682,21 @@ function GPS.FindPath(dests, exclude)
         if not (leg.kind == "ride" and Dist(leg.from, leg.to) < NEAR and leg.to.kind ~= "dest") then out[#out + 1] = leg end
     end
     return out, cost[reached], nodes[reached]
+end
+
+-- The plan under a Hearthstone policy: with "gain", a plan that starts with the Hearthstone (or Astral
+-- Recall) gives way to the best one without it unless the cast saves HEARTH_GAIN seconds.
+local function PathPol(dests, exclude, pol)
+    local legs, eta, reached = PathWith(dests, exclude, pol)
+    if legs and pol == "gain" and legs[1] and legs[1].kind == "hearth" then
+        local l2, e2, r2 = PathWith(dests, exclude, "never")
+        if l2 and e2 - eta < HEARTH_GAIN then return l2, e2, r2 end
+    end
+    return legs, eta, reached
+end
+
+function GPS.FindPath(dests, exclude)
+    return PathPol(dests, exclude, HearthPolicy())
 end
 
 -- What a plan costs now, from where you stand and with what is known now (the walks priced since,
@@ -983,9 +1033,12 @@ end
 -- puis 1,2 km". `dest`: a GPS point (GPS.Point) or map, x, y in percent (and a name). When the GPS
 -- guides there, the plan the arrow follows (the card and the arrow say the same); else the best way
 -- now (kept 8 seconds per place). nil when there is no way, or no flight, boat or cast on it (only a
--- ride: the card's distance says it). Second value: the legs.
+-- ride: the card's distance says it). Then the legs, the trip's time ("~4 min") and its runner-up's line
+-- ("Autre trajet : zeppelin pour Grom'gol, puis vol jusqu'à Kargath (~6 min)", or nil).
 local tripCache, tripCount = {}, 0
-function GPS.TripSummary(dest, x, y, name)
+-- The plan to a place for a card: the legs, its time ("~4 min") and its runner-up's line ("Autre trajet :
+-- ...", or nil). When the GPS guides there, the arrow's own plan and runner-up.
+local function TripPlan(dest, x, y, name)
     local p
     if type(dest) == "table" and dest.cont and dest.wx and dest.wy then
         p = dest
@@ -993,23 +1046,34 @@ function GPS.TripSummary(dest, x, y, name)
         p = Point(dest, x, y, { kind = "dest", name = name })
     end
     if not p then return nil end
-    local legs
     local d = state.dest
     if d and not state.zygor and type(state.legs) == "table" and d.cont == p.cont and d.wx and Dist(d, p) < NEAR then
-        legs = state.legs
-    else
-        local key = tostring(p.cont) .. ":" .. math.floor(p.wx + 0.5) .. ":" .. math.floor(p.wy + 0.5)
-        local c = tripCache[key]
-        if c and Clock() - c.at < REPLAN_EVERY then
-            legs = c.legs
-        else
-            local ok, found = pcall(GPS.FindPath, { p })
-            legs = ok and found or false
-            if tripCount >= 20 then tripCache, tripCount = {}, 0 end
-            if not c then tripCount = tripCount + 1 end
-            tripCache[key] = { at = Clock(), legs = legs }
-        end
+        local alt = GPS.Alternative and GPS.Alternative()
+        return state.legs, GPS.TripMinutes(), alt and alt.text or nil
     end
+    local key = tostring(p.cont) .. ":" .. math.floor(p.wx + 0.5) .. ":" .. math.floor(p.wy + 0.5)
+    local c = tripCache[key]
+    if not (c and Clock() - c.at < REPLAN_EVERY) then
+        local ok, found, eta = pcall(GPS.FindPath, { p })
+        local legs = ok and found or false
+        local altText
+        if legs and type(eta) == "number" then
+            local okA, alt = pcall(GPS._Alternative, p, legs, eta)
+            if okA and alt then
+                local w, m = GPS.WayWords(alt.legs), GPS.Minutes(alt.eta)
+                if w and m then altText = string.format(L("Autre trajet : %s (%s)"), w, m) end
+            end
+        end
+        if tripCount >= 20 then tripCache, tripCount = {}, 0 end
+        if not c then tripCount = tripCount + 1 end
+        c = { at = Clock(), legs = legs, minutes = legs and GPS.Minutes(eta) or nil, alt = altText }
+        tripCache[key] = c
+    end
+    return c.legs, c.minutes, c.alt
+end
+
+function GPS.TripSummary(dest, x, y, name)
+    local legs, minutes, alt = TripPlan(dest, x, y, name)
     if type(legs) ~= "table" or #legs == 0 then return nil end
     local parts, last = {}, nil
     for _, it in ipairs(GPS.Itinerary(legs)) do
@@ -1035,7 +1099,119 @@ function GPS.TripSummary(dest, x, y, name)
     if #parts == 0 then return nil end
     local s = table.concat(parts, ", ")
     if last and last.yards then s = string.format(L("%s, puis %s"), s, DistanceText(last.yards)) end
-    return s, legs
+    return s, legs, minutes, alt
+end
+
+-- ---------------------------------------------------------------- the runner-up
+
+-- "~10 min" (at least 1)
+function GPS.Minutes(seconds)
+    if type(seconds) ~= "number" or seconds ~= seconds or seconds == math.huge then return nil end
+    return string.format(L("~%d min"), math.max(1, math.floor(seconds / 60 + 0.5)))
+end
+
+-- A plan in a few words, its casts, flights and crossings only: "zeppelin pour Grom'gol, puis vol jusqu'à
+-- Kargath"; a plan of rides only: "à pied" / "sur ta monture".
+function GPS.WayWords(legs)
+    local parts = {}
+    local walks = 0
+    for _, it in ipairs(GPS.Itinerary(legs)) do
+        local P = GPS.ShortPlace(it.leg and it.leg.to and it.leg.to.name)
+        local part
+        if it.kind == "hearth" then
+            part = string.format(it.leg.item and L("pierre de foyer jusqu'à %s") or L("rappel astral jusqu'à %s"), P)
+        elseif it.kind == "teleport" or it.kind == "fly" or it.kind == "boat" or it.kind == "zeppelin" then
+            part = it.text
+        else
+            walks = walks + 1
+        end
+        if part then parts[#parts + 1] = part end
+    end
+    if #parts == 0 then
+        if walks == 0 then return nil end
+        return RideSpeed() <= RUN and L("à pied") or L("sur ta monture")
+    end
+    local s = parts[1]
+    for i = 2, #parts do s = string.format(L("%s, puis %s"), s, parts[i]) end
+    return s
+end
+
+-- The runner-up of a plan to `dest`: { legs, eta, choice } when a way with another first leg exists at
+-- most ALT_SPAN times as long; choice: what Replan follows once it is taken (the stop to avoid, and the
+-- Hearthstone allowed even under "gain": the player picked it). While the player follows such a choice
+-- (`chosen`), the runner-up is the plan the settings make (taking it drops the choice).
+function GPS._Alternative(dest, legs, eta, chosen)
+    if not dest or type(legs) ~= "table" or not legs[1] or type(eta) ~= "number" then return nil end
+    local first = legs[1].to
+    if not first or first == dest or first.kind == "dest" then return nil end
+    local pol = HearthPolicy()
+    local a, aEta, choice
+    if chosen then
+        a, aEta = PathPol({ dest }, nil, pol)
+        choice = false
+    else
+        local altPol = pol == "never" and "never" or "always"
+        a, aEta = PathPol({ dest }, { [first] = true }, altPol)
+        choice = { avoid = { [NodeKey(first)] = true }, pol = altPol }
+    end
+    if not (a and a[1] and a[1].to and aEta) then return nil end
+    if a[1].to == first or NodeKey(a[1].to) == NodeKey(first) then return nil end
+    -- the way back to the plan the settings make is always offered; a new runner-up only when close
+    if not chosen and aEta > eta * ALT_SPAN then return nil end
+    -- the same words as the plan (another flight master next to it, then the same flight): no choice
+    local okW, w1, w2 = pcall(function() return GPS.WayWords(a), GPS.WayWords(legs) end)
+    if okW and w1 and w1 == w2 then return nil end
+    if choice then choice.dest = dest end
+    return { legs = a, eta = aEta, choice = choice }
+end
+
+-- The runner-up of the trip the arrow follows: { legs, eta, text = "Autre trajet : ... (~6 min)" }, or nil.
+function GPS.Alternative()
+    local alt = state.dest and not state.zygor and state.alt
+    if not alt then return nil end
+    if alt.text == nil then
+        local w = GPS.WayWords(alt.legs)
+        local m = GPS.Minutes(alt.eta)
+        alt.text = (w and m) and string.format(L("Autre trajet : %s (%s)"), w, m) or false
+    end
+    if not alt.text then return nil end
+    return alt
+end
+
+-- The trip the arrow follows, its time now: "~4 min" (nil when unknown).
+function GPS.TripMinutes()
+    if not state.dest or state.zygor or type(state.legs) ~= "table" then return nil end
+    local ok, c = pcall(PlanCost, state.legs)
+    return GPS.Minutes(ok and c or state.eta)
+end
+
+-- Takes the runner-up: the arrow follows it until the destination changes (taken again: back to the
+-- plan the settings make). True when it changed.
+function GPS.TakeAlternative()
+    local alt = GPS.Alternative()
+    if not (alt and state.dest) then return false end
+    state.choice = alt.choice or nil
+    state.legs, state.eta, state.planFor = alt.legs, alt.eta, state.dest
+    state.legs.total = #state.legs + (state.doneLegs or 0)
+    local okA, nextAlt = pcall(GPS._Alternative, state.dest, state.legs, state.eta, state.choice)
+    state.alt = okA and nextAlt or nil
+    state.plannedAt = GetTime()
+    if WP.Trail and WP.Trail.Clear then pcall(WP.Trail.Clear) end
+    if WP.Print then
+        local w = GPS.WayWords(state.legs)
+        if w then WP.Print(string.format(L("Trajet changé : %s"), w)) end
+    end
+    if GPS.OnChanged then GPS.OnChanged() end
+    if WP.RefreshHome then WP.RefreshHome() end
+    return true
+end
+
+-- A setting that changes the plans (the Hearthstone's policy): the plan is made again from scratch.
+function GPS.ResetPlan()
+    tripCache, tripCount = {}, 0
+    if not state.dest or state.zygor then return end
+    state.legs, state.choice, state.alt = nil, nil, nil
+    GPS.Replan()
 end
 
 local function Changed()
@@ -1049,7 +1225,15 @@ end
 function GPS.Replan()
     if not state.dest or state.zygor then return end
     if UnitOnTaxi and UnitOnTaxi("player") then return end
-    local legs, eta = GPS.FindPath({ state.dest })
+    -- the other trip the player took (Alt-click on the arrow) holds until the destination changes
+    local choice = state.choice
+    if choice and choice.dest ~= state.dest then choice = nil; state.choice = nil end
+    local legs, eta
+    if choice then
+        legs, eta = PathPol({ state.dest }, choice.avoid, choice.pol or HearthPolicy())
+        if not legs then state.choice = nil end
+    end
+    if not legs then legs, eta = GPS.FindPath({ state.dest }) end
     local old = state.legs
     if legs and old and #old > 0 and state.planFor == state.dest and Signature(legs) ~= Signature(old) then
         local oldCost = PlanCost(old)
@@ -1058,13 +1242,16 @@ function GPS.Replan()
     state.legs, state.eta, state.planFor = legs, eta, state.dest
     -- "step 2 of 4" keeps counting across plans: legs already done plus the legs left
     if state.legs then state.legs.total = #state.legs + (state.doneLegs or 0) end
+    -- the runner-up (another first leg, at most 50% slower): told in the tooltip, Alt-click takes it
+    local okA, alt = pcall(GPS._Alternative, state.dest, state.legs, eta, state.choice)
+    state.alt = okA and alt or nil
     state.plannedAt = GetTime()
     Changed()
     -- then the real walks of the best ways, asked in the background (never in combat)
     if state.legs then pcall(AskWalks, state.dest) end
 end
 
--- Zygor's travel system, when the options ask for it (or "auto" and it is on).
+-- Zygor's arrow, when the player turned on "Send destinations to Zygor's arrow" (provider "zygor").
 local function Zygor()
     local Z = rawget(_G, "ZGV")
     if type(Z) == "table" and type(Z.Pointer) == "table" and Z.Pointer.SetWaypoint and Z.Pointer.ArrowFrame then return Z end
@@ -1072,9 +1259,16 @@ end
 function GPS.UseZygor()
     local Z = Zygor()
     if not Z then return false end
-    -- only when the player picked Zygor: on "auto" our point used to replace the waypoint of the
-    -- Zygor guide the player was following, and our stop button was hidden with our arrow
-    return Opt("provider", "auto") == "zygor"
+    -- only when the player asked for it: our point replaces the waypoint of the Zygor guide the
+    -- player follows, and our own arrow, path and dots step aside
+    return Opt("provider") == "zygor"
+end
+
+-- beta.74: the 3-way choice ("auto" | "wl" | "zygor") is one switch; "auto" and "wl" both meant
+-- our GPS since beta.73, so they become nil (off). Only "zygor" is kept.
+function GPS.MigrateProvider()
+    local o = WLWritsDB and WLWritsDB.gpsOpts
+    if type(o) == "table" and o.provider ~= nil and o.provider ~= "zygor" then o.provider = nil end
 end
 
 -- Several events in a row (a loading screen fires a few) make one plan.
@@ -1103,6 +1297,7 @@ local function Start(dest, source)
         state.suspended = nil
     end
     state.dest, state.source, state.doneLegs, state.zygor = dest, source, 0, nil
+    state.choice, state.alt = nil, nil
     if not ticker then ticker = C_Timer.NewTicker(2, Tick) end
     if GPS.UseZygor() then
         local Z = Zygor()
@@ -1185,6 +1380,7 @@ function GPS.Stop(source)
     end
     state.pin = nil
     state.dest, state.source, state.legs, state.eta, state.zygor, state.suspended = nil, nil, nil, nil, nil, nil
+    state.choice, state.alt = nil, nil
     -- the walking path and its dots go with it
     if WP.Trail and WP.Trail.Clear then WP.Trail.Clear() end
     if ticker then ticker:Cancel(); ticker = nil end
@@ -1547,6 +1743,7 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3)
         if C_Timer and C_Timer.After then C_Timer.After(1, function() pcall(GPS._OnLanded) end) end
     end
     if event == "PLAYER_LOGIN" then
+        pcall(GPS.MigrateProvider)
         -- A tour does not survive a reload: start it again from the button.
         if WLWritsCharDB then WLWritsCharDB.gps = false end
     elseif event == "TAXIMAP_OPENED" then

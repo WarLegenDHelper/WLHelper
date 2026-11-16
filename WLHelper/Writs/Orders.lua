@@ -110,6 +110,9 @@ end
 local function Me() return (UnitName("player")) end
 -- "Name-Realm" or "Name Realm": the name alone
 local function Short(n) return n and (n:gsub("[%- ].*$", "")) end
+-- a name from the network as the key its data is kept under: alone for my realm, "Name-Realm" for
+-- another (a namesake never takes a member's entry); nil when secret or malformed
+local function Key(n) if root.SenderKey then return root.SenderKey(n) end return n and Short(n) end
 
 -- ---------------------------------------------------------------- storage
 local function DB()
@@ -161,8 +164,12 @@ local function Pump()
     if pumpAgain then pumping = false end
     pumpDepth = 0
 end
+-- a large recipe list is many parts (one a second): the cap only stops a runaway queue
+local OUTBOX_MAX = 500
 local function Send(msg, channel, target)
     if not channel then return end
+    for _, m in ipairs(outbox) do if m[1] == msg and m[2] == channel and m[3] == target then return end end
+    if #outbox >= OUTBOX_MAX then return end
     outbox[#outbox + 1] = { msg, channel, target }
     if not pumping then pumping = true; C_Timer.After(0.05, Pump) end
 end
@@ -441,6 +448,23 @@ local FIELDS = { "id", "from", "to", "item", "qty", "give", "crafter", "fee", "t
     "title", "prof" }
 local NOTE_AT, TITLE_AT = 15, 16
 local NUMERIC = { qty = true, fee = true, tip = true, paid = true, expires = true, item = true }
+-- the range of each number (item: an item ID, or an enchant's spell ID kept negative; money in copper)
+local RANGE = { item = { -10000000, 10000000 }, qty = { 0, 10000 }, fee = { 0, 1e10 }, tip = { 0, 1e10 }, paid = { 0, 1e10 },
+    expires = { 0, 4e9 } }
+local function GoodNumber(k, v)
+    local r = RANGE[k]
+    return type(v) == "number" and v == v and v == math.floor(v) and v >= r[1] and v <= r[2]
+end
+O.GoodNumber = GoodNumber
+-- an order as saved can be used: its numbers are numbers (older copies stored anything they got)
+local function Sane(o)
+    if type(o) ~= "table" or type(o.id) ~= "string" then return false end
+    for k in pairs(NUMERIC) do
+        if o[k] ~= nil and not GoodNumber(k, o[k]) then return false end
+    end
+    return true
+end
+O.Sane = Sane
 
 -- A request's title: one short line with none of the wire's separators, at most 40 bytes (whole
 -- UTF-8 characters).
@@ -525,7 +549,15 @@ local function Parse(s)
     for v in (s .. "~"):gmatch("(.-)~") do
         i = i + 1
         local k = FIELDS[i]
-        if k and v ~= "" then o[k] = NUMERIC[k] and tonumber(v) or v end
+        if k and v ~= "" then
+            if NUMERIC[k] then
+                local n = tonumber(v)
+                if not GoodNumber(k, n) then return nil end
+                o[k] = n
+            else
+                o[k] = v
+            end
+        end
     end
     if o.prof == "*" then o.prof = "" end
     if o.title == TITLE_MARK then
@@ -817,9 +849,11 @@ function O.Lists()
     local me = Me()
     local mine, forMe = {}, {}
     local now = time()
-    for _, o in pairs(d.list) do
-        if o.status == "open" and o.expires and o.expires < now then o.status = "expired" end
-        if o.from == me then mine[#mine + 1] = o
+    for id, o in pairs(d.list) do
+        if not Sane(o) then d.list[id] = nil; o = nil end
+        if o and o.status == "open" and o.expires and o.expires < now then o.status = "expired" end
+        if not o then
+        elseif o.from == me then mine[#mine + 1] = o
         elseif o.by == me then forMe[#forMe + 1] = o   -- taken by me, even from the board's full list
         elseif (o.to == me or (not o.to and O.CanServe(me, o))) and not (d.hidden and d.hidden[o.id]) then
             if o.status == "open" then forMe[#forMe + 1] = o end
@@ -896,8 +930,8 @@ function O.OnlineGuild(force)
     if not (IsInGuild and IsInGuild() and GetNumGuildMembers and GetGuildRosterInfo) then return onlineCache end
     for i = 1, (GetNumGuildMembers() or 0) do
         local name, _, _, level, _, zone, _, _, online, status, cls = GetGuildRosterInfo(i)
-        if name then
-            local n = Short(name)
+        local n = name and (Key(name) or Short(name))
+        if n then
             onlineCache[n] = online and true or false
             if cls then classCache[n] = cls end
             -- status: 1/2 (or "<AFK>"/"<DND>") = away or busy
@@ -2086,13 +2120,36 @@ local function RefreshSoon()
 end
 -- "[text]" at the end of a chat line, a link to an Orders tab (FinderPeople.lua reads it)
 local function Link(text, tab) return (WP.AddonLink and tab) and (" " .. WP.AddonLink(text, "orders", tab)) or "" end
+-- A profession's name as a copy sends it (the game's name, any language): letters, spaces and
+-- apostrophes, never digits or separators; 8 professions per member at most.
+local MAX_PROFS, MAX_RECIPES = 8, 2000
+local function GoodProf(prof)
+    return type(prof) == "string" and #prof >= 2 and #prof <= 32 and not prof:find("[%d%c|~:;,=]")
+end
+local function ProfSlot(d, sender, prof)
+    if not GoodProf(prof) then return nil end
+    local ps = d.crafters[sender]
+    if ps and ps[prof] then return ps end
+    local n = 0
+    for _ in pairs(ps or {}) do n = n + 1 end
+    if n >= MAX_PROFS then return nil end
+    ps = ps or {}
+    d.crafters[sender] = ps
+    return ps
+end
 local function OnPayload(sender, key, payload)
     local prof, hash = key:match("^R:(.-):(%x+)$")
-    if prof then
-        local recipes = {}
-        for id, re in payload:gmatch("(%-?%d+)=([%d:,]*)") do recipes[tonumber(id)] = re end
+    if prof and #hash <= 16 then
+        local recipes, n = {}, 0
+        for id, re in payload:gmatch("(%-?%d+)=([%d:,]*)") do
+            id = tonumber(id)
+            if id and id == math.floor(id) and math.abs(id) <= 10000000 and #re <= 120 and n < MAX_RECIPES then
+                if recipes[id] == nil then n = n + 1 end
+                recipes[id] = re
+            end
+        end
         local d = DB()
-        d.crafters[sender] = d.crafters[sender] or {}
+        if not ProfSlot(d, sender, prof) then return end
         local c = d.crafters[sender][prof] or {}
         -- a first list for this member and profession (first sync, after the 30-day prune, a fresh
         -- install) says nothing new: it only marks the watched recipes as seen
@@ -2107,16 +2164,31 @@ local function OnPayload(sender, key, payload)
 end
 
 local askedW
+local unknownStars = {}
+local resendAt, resendQueued = -1e9, false
+-- A new order from another member: open, expiring within a month, 25 running per customer and
+-- 300 of the others' open orders in all (the oldest finished ones are pruned at login).
+local function NewOrderOk(d, o, sender)
+    if o.from ~= sender or #o.id > 64 or (o.to and not Key(o.to)) then return false end
+    if not o.expires then return false end
+    local mine, all = 0, 0
+    for _, x in pairs(d.list) do
+        if x.from ~= Me() and (x.status == "open" or Running(x)) then
+            all = all + 1
+            if x.from == sender then mine = mine + 1 end
+        end
+    end
+    return mine < 25 and all < 300
+end
 local function OnMessage(msg, channel, sender)
     local d = DB()
     local kind, rest = msg:match("^(%u)|(.*)$")
     if kind == "H" and channel == "GUILD" then
         -- a member's profession hash: ask for the list when ours is older
         local prof, rank, max, hash = rest:match("^(.-)|(%d+)|(%d+)|(%x+)$")
-        if prof then
-            d.crafters[sender] = d.crafters[sender] or {}
+        if prof and #hash <= 16 and ProfSlot(d, sender, prof) then
             local c = d.crafters[sender][prof] or {}
-            c.rank, c.max, c.t = tonumber(rank), tonumber(max), time()   -- seen now, even if the list did not change
+            c.rank, c.max, c.t = math.min(tonumber(rank) or 0, 1000), math.min(tonumber(max) or 0, 1000), time()   -- seen now, even if the list did not change
             d.crafters[sender][prof] = c
             -- ask for the list on the guild channel, naming its owner: no whisper (a whisper to a name
             -- without its realm fails with "No player named ..." for members of a connected realm).
@@ -2134,6 +2206,8 @@ local function OnMessage(msg, channel, sender)
     elseif kind == "W" then
         -- "W|prof|owner" on the guild (1.0.0-beta.29+): only the owner answers; "W|prof" by whisper
         -- from older copies: answered too (the list itself always goes on the guild channel)
+        -- by whisper: only from a member of the guild (a stranger never makes me post to the guild)
+        if channel == "WHISPER" and O.OnlineGuild()[sender] == nil then return end
         local prof, owner = rest:match("^(.-)|([^|]+)$")
         if prof then
             if owner == Me() then SendRecipes(prof) end
@@ -2142,12 +2216,23 @@ local function OnMessage(msg, channel, sender)
         end
     elseif kind == "P" and channel == "GUILD" then
         local key, i, n, chunk = rest:match("^(.-)|(%d+)|(%d+)|(.*)$")
-        if key then
-            i, n = tonumber(i), tonumber(n)
-            local id = sender .. key
+        i, n = tonumber(i), tonumber(n)
+        -- a part numbered 1..n, n at most 200 (40 KB), for a key no longer than a profession's
+        if key and #key <= 60 and i and n and n >= 1 and n <= 200 and i >= 1 and i <= n then
+            local id = sender .. "|" .. key
             local now = GetTime()
-            for k, p in pairs(parts) do if now - (p.t or now) > 120 then parts[k] = nil end end
-            parts[id] = parts[id] or {}
+            local open, own = 0, 0
+            for k, p in pairs(parts) do
+                if now - (p.t or now) > 120 then parts[k] = nil
+                else open = open + 1; if p.who == sender then own = own + 1 end end
+            end
+            -- a list announced with another number of parts starts again
+            if parts[id] and parts[id].n ~= n then parts[id] = nil end
+            if not parts[id] then
+                -- 400 lists in progress at most (a fresh install hears the whole guild), 8 per member
+                if open >= 400 or own >= 8 then return end
+                parts[id] = { n = n, who = sender }
+            end
             parts[id].t = now
             parts[id][i] = chunk
             local all = true
@@ -2160,6 +2245,12 @@ local function OnMessage(msg, channel, sender)
         end
     elseif kind == "O" and channel == "GUILD" then
         local o = Parse(rest)
+        -- the names a copy writes for itself (its name without the realm) are the sender's key here
+        if o and o.from and o.from ~= sender and root.NameIs and root.NameIs(o.from, sender) then o.from = sender end
+        if o and o.by and o.by ~= sender and root.NameIs and root.NameIs(o.by, sender) then o.by = sender end
+        -- an order lasts 3 days at most: one expiring in more than a month did not come from WL Helper
+        if o and o.expires and o.expires > time() + 31 * 86400 then o = nil end
+        if o and not d.list[o.id] and not NewOrderOk(d, o, sender) then o = nil end
         if o and Allowed(o, sender) then
             -- an order I was making for someone else: told if it slips away (cancelled, taken by another)
             local was = d.list[o.id]
@@ -2186,7 +2277,22 @@ local function OnMessage(msg, channel, sender)
         -- a thank-you: one star per delivered order, given by its customer only
         local id, crafter = rest:match("^([^|]+)|([^|]+)$")
         local o = id and d.list[id]
-        if crafter and (not o or (o.from == sender and o.by == crafter)) then
+        -- the crafter as this copy keeps him (an older copy writes the name without the realm)
+        if crafter and o and o.by and o.by ~= crafter and root.NameIs and root.NameIs(crafter, o.by) then crafter = o.by
+        else crafter = crafter and Key(crafter) end
+        -- an order I know: its customer thanks its crafter, once it was crafted or delivered; an order
+        -- I never saw (pruned, before my install): its id must be the sender's, 20 such stars a session
+        local ok = false
+        if crafter and crafter ~= sender and #id <= 64 then
+            if o then ok = o.from == sender and o.by == crafter and (Running(o) or o.status == "delivered")
+            else
+                local short = sender:match("^([^%-%s]+)") or sender
+                unknownStars[sender] = unknownStars[sender] or 0
+                ok = id:match("^(.-)%-%d+%-%d+$") == short and unknownStars[sender] < 20
+                if ok then unknownStars[sender] = unknownStars[sender] + 1 end
+            end
+        end
+        if ok then
             d.stars = d.stars or {}
             d.stars[crafter] = d.stars[crafter] or {}
             d.stars[crafter][id] = true
@@ -2198,10 +2304,17 @@ local function OnMessage(msg, channel, sender)
     elseif kind == "S" and channel == "GUILD" then
         -- someone just logged in: resend the running orders I published or I am crafting
         if K.Presence then pcall(K.Presence, sender) end
-        local me = Me()
-        for _, o in pairs(d.list) do
-            if (o.from == me and o.status == "open") or ((o.from == me or o.by == me) and Running(o)) then Broadcast(o) end
-        end
+        -- answered once a few seconds later; requests inside the next 30 s get one more answer when
+        -- they end (several members logging in together get the same lines, once)
+        if resendQueued then return end
+        resendQueued = true
+        C_Timer.After(math.max(1 + math.random() * 4, resendAt + 30 - GetTime()), function()
+            resendQueued = false; resendAt = GetTime()
+            local me = Me()
+            for _, o in pairs(DB().list) do
+                if Sane(o) and ((o.from == me and o.status == "open") or ((o.from == me or o.by == me) and Running(o))) then Broadcast(o) end
+            end
+        end)
     elseif kind == "A" and channel == "GUILD" then
         -- a member's crafter profile (T-60); older copies have no "A" branch and ignore it
         if K.OnProfile then pcall(K.OnProfile, sender, rest) end
@@ -2213,8 +2326,12 @@ local function Prune()
     local d = DB()
     local now = time()
     for id, o in pairs(d.list) do
-        local done = (STATUS_RANK[o.status] or 0) >= 4 or (o.status == "open" and (o.expires or 0) < now)
-        if done and (o.expires or 0) < now - 7 * 86400 then d.list[id] = nil; if d.hidden then d.hidden[id] = nil end end
+        if not Sane(o) then
+            d.list[id] = nil; if d.hidden then d.hidden[id] = nil end
+        else
+            local done = (STATUS_RANK[o.status] or 0) >= 4 or (o.status == "open" and (o.expires or 0) < now)
+            if done and (o.expires or 0) < now - 7 * 86400 then d.list[id] = nil; if d.hidden then d.hidden[id] = nil end end
+        end
     end
     for name, profs in pairs(d.crafters) do
         local recent = false
@@ -2249,6 +2366,7 @@ end
 K.Say = Say
 
 -- One chat line when an order concerns you.
+local newsAt, newsN, bannerAt = -1e9, 0, -1e9
 function O.Notify(o)
     if WP.ModuleOn and not WP.ModuleOn("orders") then return end
     local me = Me()
@@ -2261,8 +2379,16 @@ function O.Notify(o)
         local fee = money > 0 and string.format(L("%s de commission"), S.Money(money)) or L("sans commission")
         local msg = (o.prof and string.format(L("Nouvelle demande de %s : %s ×%d (%s), %s."), o.from, name, o.qty or 1, O.ProfName(o.prof), fee)
             or string.format(L("Nouvelle commande de %s : %s ×%d, %s."), o.from, name, o.qty or 1, fee)) .. Link(L("Voir la commande"), "recv")
-        -- the banner and the sound only with a new chat line (not for each copy of the same order)
-        if Say(msg, o, "recv") and WLWritsDB.ordersAlert ~= false then
+        -- a burst of new orders: 4 lines a minute at most (the Orders window lists them all)
+        local t = GetTime and GetTime() or 0
+        if t - newsAt >= 60 then newsAt, newsN = t, 0 end
+        if newsN >= 4 then return end
+        -- the banner and the sound only with a new chat line (not for each copy of the same order),
+        -- once every 20 s
+        local said = Say(msg, o, "recv")
+        if said then newsN = newsN + 1 end
+        if said and t - bannerAt >= 20 and WLWritsDB.ordersAlert ~= false then
+            bannerAt = t
             -- the centre of the screen: the short line only
             local short = o.prof and string.format(L("Nouvelle demande de %s : %s ×%d"), o.from, name, o.qty or 1)
                 or string.format(L("Nouvelle commande de %s : %s ×%d"), o.from, name, o.qty or 1)
@@ -2418,8 +2544,8 @@ f:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
     elseif e == "MAIL_CLOSED" then
         inboxReady = false
     elseif prefix == PREFIX and type(msg) == "string" and sender then
-        local who = Short(sender)
-        if who == Me() then return end
+        local who = Key(sender)
+        if not who or who == Me() or (root.Readable and not root.Readable(msg)) then return end
         if channel ~= "GUILD" and channel ~= "WHISPER" then return end
         OnMessage(msg, channel, who)
     end

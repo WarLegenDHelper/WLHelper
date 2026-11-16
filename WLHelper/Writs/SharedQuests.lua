@@ -155,6 +155,14 @@ local function Changed()
     if Sh.Refresh then Sh.Refresh() end
     for _, fn in ipairs(listeners) do pcall(fn) end
 end
+-- the guild's lists come in bursts (every copy answers "R"): one redraw half a second after the first
+local changeQueued = false
+local function ChangedSoon()
+    if not (C_Timer and C_Timer.After) then Changed(); return end
+    if changeQueued then return end
+    changeQueued = true
+    C_Timer.After(0.5, function() changeQueued = false; Changed() end)
+end
 
 -- ---------------------------------------------------------------- sending
 -- Cuts the id list in parts of whole ids, each well under the 255-byte limit.
@@ -225,7 +233,7 @@ end
 local function Commit(who, ids)
     local board = DB().board
     if #ids == 0 then board[who] = nil else board[who] = { t = Now(), q = ids } end
-    Changed()
+    ChangedSoon()
 end
 local lastAnswer = -1e9
 local function OnMessage(msg, who)
@@ -295,7 +303,8 @@ local function Roster()
     if not (InGuild() and GetNumGuildMembers and GetGuildRosterInfo) then return out, 0 end
     for i = 1, (Num(GetNumGuildMembers()) or 0) do
         local name, _, _, level, _, zone, _, _, isOnline, _, class = GetGuildRosterInfo(i)
-        local short = Short(name)
+        -- the key the members' lists are kept under: alone for my realm, "Name-Realm" for another
+        local short = Str(name) and ((root.SenderKey and root.SenderKey(name)) or Short(name))
         if short then
             n = n + 1
             out[short] = { online = (not Secret(isOnline)) and isOnline and true or false, class = Str(class), level = Num(level),
@@ -754,8 +763,9 @@ ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
         end)
     elseif e == "CHAT_MSG_ADDON" then
         if prefix ~= PREFIX or channel ~= "GUILD" or type(msg) ~= "string" or Secret(msg) or not ModuleOn() then return end
-        local who = Short(sender)
-        if not who or who == "" or #who > 48 or who:find("[|%c]") or who == Me() then return end
+        -- my realm's members by name, another realm's as "Name-Realm" (a namesake keeps its own list)
+        local who = (root.SenderKey or Short)(sender)
+        if not who or who == "" or #who > 64 or who:find("[|%c]") or who == Me() then return end
         OnMessage(msg, who)
     elseif e == "GUILD_ROSTER_UPDATE" then
         RefreshSoon()

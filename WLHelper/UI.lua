@@ -813,7 +813,12 @@ local function BuildList()
   ns.Flat(l, T.bg, T.cardEdge)
   l.head = CreateFrame("Frame", nil, l)
   l.head:SetPoint("TOPLEFT"); l.head:SetPoint("TOPRIGHT"); l.head:SetHeight(HEADER)
-  l.title = Text(l.head, ns.F.heading, T.fg); l.title:SetPoint("LEFT", 16, 0); l.title:SetPoint("RIGHT", -12, 0); l.title:SetJustifyV("MIDDLE")
+  -- an X at the right of its header closes it (players never found the "Steps" button to fold it)
+  l.close = SW().IconButton(l.head, "close", 20, function() return { L.TT_LIST_CLOSE, L.TT_LIST_CLOSE_CLICK } end, function()
+    l:Hide(); WLDTDB.list = false; Render()
+  end)
+  l.close:SetPoint("RIGHT", -10, 0)
+  l.title = Text(l.head, ns.F.heading, T.fg); l.title:SetPoint("LEFT", 16, 0); l.title:SetPoint("RIGHT", l.close, "LEFT", -8, 0); l.title:SetJustifyV("MIDDLE")
   l.title:SetText(L.STEPS)
   ns.ClampLabel(l.title, nil, l.head)
   l.rule = ns.Rule(l, T.line); l.rule:SetPoint("TOPLEFT", 0, -HEADER); l.rule:SetPoint("TOPRIGHT", 0, -HEADER)
@@ -898,7 +903,7 @@ end
 ns.PlaceGuideList = PlaceList
 -- the "Steps" button's chevron points to where the list opens (or back, to close it)
 local function ListChevron()
-  local shown = f.list:IsShown()
+  local shown = WLDTDB.list == true
   local right = (f.listSide == "right")
   if shown then return right and "chevron_left" or "chevron_right" end
   return right and "chevron_right" or "chevron_left"
@@ -1376,15 +1381,21 @@ ns.GuideDistText = DistText
 
 -- The travel sentence of a step: for another continent, the planned trip in short ("Zeppelin pour
 -- Orgrimmar, puis 1,2 km", GPS.TripSummary) when the GPS finds one; else the generic hint
--- (TRAVEL_CONT / TRAVEL_FAR). nil when the step has no travel hint.
+-- (TRAVEL_CONT / TRAVEL_FAR). nil when the step has no travel hint. The trip's time follows it ("(~10 min)")
+-- and, on a line of its own, its runner-up ("Autre trajet : pierre de foyer jusqu'à Grom'gol, puis vol
+-- jusqu'à Kargath (~7 min)", TripSummary's 3rd and 4th values) when there is one.
 local function TravelText(st, m, x, y)
   if not (st and st.travel) then return nil end
   if st.travel == "TRAVEL_CONT" and type(m) == "number" and type(x) == "number" and type(y) == "number" then
     local WP = ns.Writs and ns.Writs.WP
     local GPS = WP and WP.GPS
     if GPS and GPS.TripSummary then
-      local ok, t = pcall(GPS.TripSummary, m, x, y)
-      if ok and type(t) == "string" and t ~= "" then return t end
+      local ok, t, _, mins, alt = pcall(GPS.TripSummary, m, x, y)
+      if ok and type(t) == "string" and t ~= "" then
+        if type(mins) == "string" and mins ~= "" then t = t .. " (" .. mins .. ")" end
+        if type(alt) == "string" and alt ~= "" then t = t .. "\n" .. alt end
+        return t
+      end
     end
   end
   return L[st.travel]
@@ -2226,10 +2237,16 @@ local function Build()
   f.prog = CreateFrame("Frame", nil, f)
   f.prog:SetPoint("TOPLEFT", PAD, -y0); f.prog:SetPoint("TOPRIGHT", -PAD, -y0); f.prog:SetHeight(24)
   f.listToggle = LabelBtn(f.prog, L.LIST, 24, "secondary", function()
-    f.list:SetShown(not f.list:IsShown()); WLDTDB.list = f.list:IsShown(); Render()
-  end, function() return { L.M_LIST, L.TT_HLIST } end)
+    WLDTDB.list = not (WLDTDB.list == true); f.list:SetShown(WLDTDB.list); Render()
+  end, function()
+    if WLDTDB.list == true then return { L.LIST_CLOSE, L.TT_LIST_CLOSE_CLICK } end
+    return { L.M_LIST, L.TT_HLIST }
+  end)
   if f.listToggle.SetIcon then f.listToggle:SetIcon("chevron_left") end
   f.listToggle:SetPoint("RIGHT", 0, 0)
+  -- the list open: the button looks pressed (as the Checklist button) and says it closes it
+  f.listToggle.onFill = Tex(f.listToggle, "BORDER", T.selFill); f.listToggle.onFill:SetAllPoints(); f.listToggle.onFill:Hide()
+  f.listToggle.onEdge = ns.Outline(f.listToggle, T.accentSoft, 0, "OVERLAY")
   f.progPct = Text(f.prog, ns.F.meta, T.muted); f.progPct:SetPoint("RIGHT", f.listToggle, "LEFT", -12, 0); f.progPct:SetJustifyH("RIGHT"); f.progPct:SetJustifyV("MIDDLE")
   ns.ClampLabel(f.progPct, nil, f.prog)
   -- (no percentage beside it: the label and the bar already say how far the route is)
@@ -3043,7 +3060,10 @@ RenderNow = function()
     TOP = TOP + bandH + 8
   else f.inBand:Hide() end
   f.prog:SetShown(hasRoute and not f.mini); f.bar:SetShown(hasRoute)
-  f.listToggle:SetText(L.LIST)
+  -- the list open: "Close the steps", pressed; closed: "Steps"
+  local listOn = WLDTDB.list == true
+  f.listToggle:SetText(listOn and L.LIST_CLOSE or L.LIST)
+  if f.listToggle.onFill then f.listToggle.onFill:SetShown(listOn); f.listToggle.onEdge(T.accentSoft, listOn and 0.9 or 0) end
   -- the header's labels follow a live language switch too (S.Button's SetText refits the width)
   if f.pickBtn then f.pickBtn:SetText(L.DUNGEONS_BTN) end
   PlaceList()

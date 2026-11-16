@@ -62,6 +62,7 @@ ns.AddEnglish({
     ["En vol vers %s"] = "Flying to %s",
     -- the itinerary line comes after the leg under way: "Puis 690 m jusqu'à Dran Droffers"
     ["puis %s"] = "then %s",
+    ["Alt-clic : prendre l'autre trajet"] = "Alt-click: take the other route",
 })
 
 local arrow, teleport, demo
@@ -572,9 +573,19 @@ local function RouteTip(self)
             if d ~= "" then lines[#lines + 1] = i .. ". " .. d end
         end
     end
+    -- the time of this trip and the runner-up ("Autre trajet : zeppelin pour Grom'gol, puis vol jusqu'à
+    -- Kargath (~6 min)"): Alt-click takes it
+    local mins = GPS.TripMinutes and GPS.TripMinutes()
+    local alt = GPS.Alternative and GPS.Alternative()
+    if mins then lines[#lines + 1] = { string.format(L("Ce trajet : %s"), mins), C.fg[1], C.fg[2], C.fg[3] } end
+    if alt then
+        lines[#lines + 1] = { alt.text, C.gold[1], C.gold[2], C.gold[3] }
+        lines[#lines + 1] = L("Alt-clic : prendre l'autre trajet")
+    end
     lines[#lines + 1] = L("Glisser : déplacer la flèche")
     S.Tip(self, lines)
 end
+GPS._RouteTip = function(self) return RouteTip(self) end
 
 -- ---------------------------------------------------------------- the frame
 
@@ -720,9 +731,20 @@ local function Build()
     arrow:EnableMouse(true)
     arrow:RegisterForDrag("LeftButton")
     arrow:SetScript("OnDragStart", function(self)
+        self.dragged = true
         -- in combat the cast button cannot follow: the HUD stays with it
         if InCombatLockdown() and teleport and teleport:IsShown() then return end
         self:StartMoving(); self.moving = true
+    end)
+    -- Alt-click: the other trip (the runner-up the tooltip tells); a drag is no click
+    arrow:SetScript("OnMouseDown", function(self) self.dragged = nil end)
+    arrow:SetScript("OnMouseUp", function(self, button)
+        if demo or self.dragged or button ~= "LeftButton" then return end
+        if not (IsAltKeyDown and IsAltKeyDown()) then return end
+        if GPS.TakeAlternative and GPS.TakeAlternative() then
+            self.redraw = true
+            if GameTooltip and GameTooltip.IsOwned and GameTooltip:IsOwned(self) then RouteTip(self) end
+        end
     end)
     arrow:SetScript("OnDragStop", function(self) self:StopMovingOrSizing(); self.moving = nil; SavePos(self) end)
     arrow:SetScript("OnEnter", RouteTip)

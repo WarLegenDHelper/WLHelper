@@ -6,6 +6,34 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.91] — 2026-11-16
+
+### Ajouté / Added
+- **« Quoi de neuf » en grand** : fenêtre large et redimensionnable (largeur et hauteur, taille retenue), versions à gauche avec un point sur celles pas encore vues, changements en cartes sur 2 ou 3 colonnes avec « Voir plus », résumé à la connexion, filtres Tout / Nouveau / Changé / Corrigé, et « Ne plus afficher à la connexion ».
+  *Wide, resizable What's new with a version list, card grid, filters.*
+- **Pierre de foyer** (Réglages > GPS) : par défaut, la pierre de foyer et le Rappel astral ne sont utilisés que s'ils font gagner au moins 3 min (sinon le GPS prend par exemple le zeppelin d'Orgrimmar pour Grom'gol). La flèche et la carte du guide donnent la durée du trajet et un « Autre trajet » ; Alt-clic sur la flèche pour le prendre.
+  *Hearthstone policy (default: only if it saves 3 min), trip time and an alternative route.*
+- **Commandes** : survoler un objet affiche l'infobulle du jeu avec ses statistiques (Maj : comparaison), partout dans les Commandes.
+  *Item tooltips with stats everywhere in Orders.*
+- **`/wlh diag carte`** : dit pourquoi le chemin s'affiche ou non sur la carte du monde.
+  *New map diagnostic command.*
+
+### Modifié / Changed
+- **GPS et Zygor** : le choix Automatique / WL Helper / Zygor devient un seul interrupteur « Envoyer les destinations à la flèche de Zygor », visible seulement si Zygor est installé, désactivé par défaut.
+  *One Zygor switch, off by default.*
+- **Liste des étapes** : une croix pour la fermer, et le bouton « Étapes » devient « Fermer les étapes » quand elle est ouverte.
+  *Close button on the step list.*
+
+### Corrigé / Fixed
+- **Pointillés sur la carte du monde avec OpenMap** : ils étaient dessinés sous la carte assemblée d'OpenMap ; ils passent maintenant au-dessus (chemin à pied et patrouilles).
+  *World map path dots now draw above OpenMap's stitched map.*
+- **Accueil des Commandes** : la liste des artisans en ligne restait affichée par-dessus les tuiles en revenant à l'accueil.
+  *Orders home no longer shows the online list over the tiles.*
+- **Fenêtres hors de l'écran** : une position enregistrée hors de l'écran est ramenée ; la barre de titre reste toujours visible.
+  *Windows saved off-screen are brought back.*
+- **Messages de guilde renforcés** : un message mal formé ne peut plus casser les Commandes, l'Agenda ou l'Accueil (les données abîmées sont nettoyées) ; seul l'organisateur peut modifier ou annuler son événement ; on ne peut plus inventer d'étoiles ; un homonyme d'un autre royaume n'écrase plus les données d'un membre ; moins d'annonces et de rafraîchissements quand beaucoup de messages arrivent.
+  *Guild sync hardened against malformed messages, spoofing and floods.*
+
 ## [1.0.0-beta.90] — 2026-11-16
 
 ### Corrigé / Fixed

@@ -38,8 +38,8 @@ local DEFAULTS = {
     pouch = 10000,           -- what a Coin Pouch is worth, in copper, until one is measured
     usePouchMeasured = true,
     autoRescan = true,
-    -- GPS: provider "auto" (Zygor when its travel system is on, else ours) | "wl" | "zygor"
-    gpsOpts = { provider = "auto", teleports = true, autoFlight = false, scale = 1, alpha = 0, hideCombat = false },
+    -- GPS: provider "zygor" sends the destinations to Zygor's arrow; nil (the default) keeps ours
+    gpsOpts = { teleports = true, autoFlight = false, scale = 1, alpha = 0, hideCombat = false },
     -- Comptoir comforts
     comfort = { autoTurnIn = true, autoAccept = true, reminder = true, tooltip = true, autoCrates = true },
     modules = { dungeons = true, writs = true, bags = true, orders = true, upgrades = true, guild = true, events = true },   -- Settings > General > Modules       -- rescan the shopping list when the auction house opens

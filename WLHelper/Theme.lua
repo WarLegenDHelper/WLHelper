@@ -101,6 +101,33 @@ function ns.Readable(v)
   end
   return true
 end
+-- SenderKey(name): the key a player's data is kept under when it comes from the network. A player
+-- of my realm (or a name with no realm) by the name alone, as always; a player of another realm as
+-- "Name-Realm", so a namesake from a connected realm never writes over a member's entry. nil for a
+-- secret, empty or malformed value (the handlers then drop the message).
+local function RealmOnly(r) return (tostring(r or ""):gsub("[%s%-']", ""):lower()) end
+function ns.SenderKey(n)
+  if type(n) ~= "string" or secret(n) or not ns.Readable(n) or n == "" or #n > 64 or n:find("[|%c]") then return nil end
+  local name, realm = n:match("^([^%-%s]+)[%-%s](.*)$")
+  if not name then return n end
+  realm = RealmOnly(realm)
+  if realm == "" then return name end
+  local mine = GetNormalizedRealmName and GetNormalizedRealmName()
+  mine = (type(mine) == "string" and ns.Readable(mine)) and RealmOnly(mine) or ""
+  local full = GetRealmName and GetRealmName()
+  full = (type(full) == "string" and ns.Readable(full)) and RealmOnly(full) or ""
+  if (mine == "" and full == "") or realm == mine or realm == full then return name end
+  -- the realm as the game wrote it (spaces out), so an invite or a whisper to the key still works
+  return name .. "-" .. n:match("^[^%-%s]+[%-%s](.*)$"):gsub("%s", "")
+end
+-- NameIs(field, sender): a name written inside a message names its sender (sender is a SenderKey).
+-- Copies send their own name without the realm: that short form is accepted for the sender, and
+-- the data is then kept under the sender's key, never under the bare name.
+function ns.NameIs(field, sender)
+  if type(field) ~= "string" or type(sender) ~= "string" or secret(field) or not ns.Readable(field) then return false end
+  if field == sender or ns.SenderKey(field) == sender then return true end
+  return not field:find("[%-%s]") and field == sender:match("^([^%-%s]+)")
+end
 -- the same for several values at once (geometry, multiple returns)
 function ns.ReadableAll(...)
   if canaccessallvalues then

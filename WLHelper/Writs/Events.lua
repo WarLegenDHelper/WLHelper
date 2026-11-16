@@ -239,7 +239,13 @@ end
 
 -- ---------------------------------------------------------------- dates
 local DAYS = { fr = { "dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam." }, en = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" } }
-local function DayStart(t) local d = date("*t", t); d.hour, d.min, d.sec = 0, 0, 0; return time(d) end
+-- a date the system cannot read (a time far out of range) gives 0, never an error
+local function DayStart(t)
+    local d = type(t) == "number" and date("*t", t)
+    if type(d) ~= "table" then return 0 end
+    d.hour, d.min, d.sec = 0, 0, 0
+    return time(d) or 0
+end
 -- 24 h in French ("21:00"), 12 h in English ("9:00 PM")
 local function Clock(h, m)
     if root.lang == "en" then
@@ -252,7 +258,8 @@ end
 -- "Demain 21:00", "sam. 15/11 21:00" ("Tomorrow 9:00 PM", "Sat 11/15 9:00 PM");
 -- lower: inside a sentence ("demain 21:00")
 local function When(t, lower)
-    local d = date("*t", t)
+    local d = type(t) == "number" and date("*t", t)
+    if type(d) ~= "table" then return "?" end
     local today = DayStart(time())
     local day
     if DayStart(t) == today then day = lower and L("aujourd'hui") or L("Aujourd'hui")
@@ -271,8 +278,12 @@ local function Pump()
     if SendRaw then pcall(SendRaw, PREFIX, m, "GUILD") end
     C_Timer.After(1, Pump)
 end
+local OUTBOX_MAX = 100
 local function Send(msg)
     if not (IsInGuild and IsInGuild()) then return end
+    -- the same line already waiting goes once; the queue never grows past 100 lines
+    for _, m in ipairs(outbox) do if m == msg then return end end
+    if #outbox >= OUTBOX_MAX then return end
     outbox[#outbox + 1] = msg
     if not pumping then pumping = true; C_Timer.After(0.1, Pump) end
 end
@@ -287,12 +298,20 @@ end
 local function SignupMsg(id, name, s) return table.concat({ "J", id, s.role or "x", s.cls or "", s.lvl or 0, name }, "|") end
 
 -- ---------------------------------------------------------------- the data
+-- What another copy may store here: an event at most a year ahead, 99 places per role (the form's
+-- two digits), 20 events planned per organizer, 120 events of the others in all, 20 sign-ups
+-- waiting for their event.
+local MAX_AHEAD = 366 * 86400
+local MAX_ROLE, MAX_PER_ORGANIZER, MAX_EVENTS, MAX_STUBS = 99, 20, 120, 20
 local function Prune()
     local d, now = DB(), time()
     for id, e in pairs(d.list) do
         -- a stub holds signups that came before their event: an hour to get the event, then gone
         local old
-        if e.stub then old = e.stub < now - 3600 else old = (e.when or 0) < now - 6 * 3600 end
+        if type(e) ~= "table" then old = true
+        elseif e.stub then old = type(e.stub) ~= "number" or e.stub < now - 3600
+        -- a date far out of range (an older copy kept anything) can never come: gone
+        else old = type(e.when) ~= "number" or e.when < now - 6 * 3600 or e.when > now + MAX_AHEAD end
         if old then d.list[id] = nil; d.reminded[id] = nil; d.reminded1h[id] = nil end
     end
     -- my own search is renewed while it is on (Remind), so it never fades here
@@ -408,7 +427,7 @@ local function OnlineMap()
     for i = 1, n do
         local name, _, _, _, _, _, _, _, isOnline = GetGuildRosterInfo(i)
         if type(name) == "string" and not (secret and (secret(name) or secret(isOnline))) then
-            map[Short(name)] = isOnline and true or false
+            map[root.SenderKey(name) or Short(name)] = isOnline and true or false
         end
     end
     return map
@@ -605,22 +624,80 @@ local function CountSignups(e) local n = 0; for _ in pairs(e.signups or {}) do n
 
 -- when I last asked the guild (Q): the answers that follow are not news, no chat line for them
 local askedAt = -60
+-- News lines (a new event, a new search) from the guild: 4 a minute at most, so a burst of
+-- messages never floods the chat (the window still lists everything).
+local newsAt, newsN = -1e9, 0
+local function News(msg)
+    local now = GetTime and GetTime() or 0
+    if now - newsAt >= 60 then newsAt, newsN = now, 0 end
+    if newsN >= 4 then return end
+    newsN = newsN + 1
+    Say(msg)
+end
+-- a number from a message: an integer in [lo, hi], else nil
+local function Int(v, lo, hi)
+    v = tonumber(v)
+    if not v or v ~= v or v ~= math.floor(v) or v < lo or v > hi then return nil end
+    return v
+end
+-- the event ids a copy makes start with its organizer's name ("Name-time-nnn")
+local function IdOf(id, sender)
+    local short = sender:match("^([^%-%s]+)") or sender
+    return id:sub(1, #short + 1) == short .. "-"
+end
+-- events planned by this sender, by all the others, and sign-ups waiting for their event
+local function Count(d, sender)
+    local mine, others, stubs = 0, 0, 0
+    for _, e in pairs(d.list) do
+        if e.stub then stubs = stubs + 1
+        elseif e.by ~= Me() then
+            others = others + 1
+            if e.by == sender then mine = mine + 1 end
+        end
+    end
+    return mine, others, stubs
+end
+-- "Q" (someone logged in) is answered once, a few seconds later; requests inside the next 30 s
+-- get one more answer when they end, never one per request
+local answerAt, answerQueued = -1e9, false
+local function AnswerAsk()
+    local d = DB()
+    for _, e in pairs(d.list) do
+        if e.when then
+            if e.by == Me() and e.when > time() - 3600 then Send(EventMsg(e)) end
+            local s = e.signups and e.signups[Me()]
+            if s and e.when > time() then Send(SignupMsg(e.id, Me(), s)) end
+        end
+    end
+    local l = d.lfg[Me()]
+    if l then local n, k = LookingMsgs(l); Send(n); Send(k) end
+end
 local function OnMessage(msg, sender)
     local d = DB()
     local kind = msg:match("^(%u)")
     if kind == "E" then
         local id, by, when, tank, heal, dps, status, title, note = msg:match("^E|([^|]+)|([^|]+)|(%d+)|(%d+)|(%d+)|(%d+)|(%a+)|([^|]*)|?(.*)$")
-        if not id or Short(by) ~= sender then return end
+        if not id or #id > 64 or not root.NameIs(by, sender) then return end
+        local now = time()
+        when, tank, heal, dps = Int(when, 0, now + MAX_AHEAD), Int(tank, 0, MAX_ROLE), Int(heal, 0, MAX_ROLE), Int(dps, 0, MAX_ROLE)
+        if not (when and tank and heal and dps) or (status ~= "open" and status ~= "cancelled") then return end
         local cur = d.list[id]
+        -- only its organizer changes or cancels an event
+        if cur and cur.stub == nil and cur.by ~= sender then return end
         local isNew = not cur or cur.stub ~= nil
+        if isNew then
+            if not IdOf(id, sender) or when < now - 6 * 3600 then return end
+            local mine, others = Count(d, sender)
+            if mine >= MAX_PER_ORGANIZER or others >= MAX_EVENTS then return end
+        end
         local wasOpen = cur and cur.stub == nil and cur.status == "open"
         cur = cur or { signups = {} }
-        cur.id, cur.by, cur.when, cur.tank, cur.heal, cur.dps = id, sender, tonumber(when), tonumber(tank), tonumber(heal), tonumber(dps)
-        cur.status, cur.title, cur.note = status, title, note
+        cur.id, cur.by, cur.when, cur.tank, cur.heal, cur.dps = id, sender, when, tank, heal, dps
+        cur.status, cur.title, cur.note = status, Clean(title, 60), Clean(note, 120)
         cur.stub = nil   -- signups that came first are kept
         d.list[id] = cur
-        if isNew and status == "open" and cur.when > time() and On() then
-            Say(string.format(L("Nouvel événement de %s : %s, %s."), sender, cur.title, When(cur.when, true)) .. Link(L("S'inscrire"), "event", id))
+        if isNew and status == "open" and cur.when > now and On() then
+            News(string.format(L("Nouvel événement de %s : %s, %s."), sender, cur.title, When(cur.when, true)) .. Link(L("S'inscrire"), "event", id))
         end
         -- an event I signed up for is cancelled: in the chat and on screen
         if wasOpen and status == "cancelled" and cur.signups and cur.signups[Me()] and On() then
@@ -631,14 +708,23 @@ local function OnMessage(msg, sender)
         RefreshSoon()
     elseif kind == "J" then
         local id, role, cls, lvl, name = msg:match("^J|([^|]+)|(%a+)|(%u*)|(%d+)|([^|]+)$")
-        local e = id and d.list[id]
-        if not id or Short(name) ~= sender then return end
-        -- the event itself may come a little later (each copy sends one line a second): keep the signup
-        if not e then e = { id = id, signups = {}, stub = time() }; d.list[id] = e end
+        if not id or #id > 64 or #cls > 12 or not root.NameIs(name, sender) then return end
+        if role ~= "x" and not ROLE_LABEL[role] then return end
+        lvl = Int(lvl, 0, 100)
+        if not lvl then return end
+        local e = d.list[id]
+        -- the event itself may come a little later (each copy sends one line a second): keep the signup,
+        -- in a stub that waits an hour (20 such stubs at most)
+        if not e then
+            if role == "x" then return end
+            local _, _, stubs = Count(d, sender)
+            if stubs >= MAX_STUBS then return end
+            e = { id = id, signups = {}, stub = time() }; d.list[id] = e
+        end
         e.signups = e.signups or {}
         local before = e.signups[sender]
         if role == "x" then e.signups[sender] = nil
-        else e.signups[sender] = { role = role, cls = cls, lvl = tonumber(lvl), t = time() } end
+        else e.signups[sender] = { role = role, cls = cls, lvl = lvl, t = time() } end
         -- the organizer is told who comes and who leaves (not the repeats sent at each login)
         if not e.stub and e.by == Me() and On() then
             if role ~= "x" and not (before and before.role == role) then
@@ -652,19 +738,23 @@ local function OnMessage(msg, sender)
         RefreshSoon()
     elseif kind == "N" then
         local role, cls, lvl, what = msg:match("^N|(%a+)|(%u*)|(%d*)|(.*)$")
-        if not role then return end
+        if not role or #cls > 12 then return end
+        if role ~= "x" and not ROLE_LABEL[role] then return end
         local was = d.lfg[sender]
         if role == "x" then d.lfg[sender] = nil
         else
+            -- what the sender typed is shown as plain text: no colours, textures or links
+            what = Clean(what, 80)
+            lvl = Int(lvl, 0, 100)
             -- the keys a K message gave stay (N is sent again at each renewal, its K follows)
-            d.lfg[sender] = { role = role, cls = cls, lvl = tonumber(lvl), what = what, t = time(), keys = was and was.keys or nil }
+            d.lfg[sender] = { role = role, cls = cls, lvl = lvl, what = what, t = time(), keys = was and was.keys or nil }
             -- a new search: one line in the chat (not the answers to my own question at login)
             if not was and On() and GetTime() - askedAt > 20 then
-                local who, rl, lv = ClassHex(cls) .. sender .. "|r", L(ROLE_LABEL[role] or "DPS"), lvl ~= "" and lvl or "?"
+                local who, rl, lv = ClassHex(cls) .. sender .. "|r", L(ROLE_LABEL[role] or "DPS"), lvl and tostring(lvl) or "?"
                 if what ~= "" then
-                    Say(string.format(L("%s cherche un groupe pour %s (%s, niv. %s)."), who, what, rl, lv) .. Link(L("Voir"), "finder", "find"))
+                    News(string.format(L("%s cherche un groupe pour %s (%s, niv. %s)."), who, what, rl, lv) .. Link(L("Voir"), "finder", "find"))
                 else
-                    Say(string.format(L("%s cherche un groupe (%s, niv. %s)."), who, rl, lv) .. Link(L("Voir"), "finder", "find"))
+                    News(string.format(L("%s cherche un groupe (%s, niv. %s)."), who, rl, lv) .. Link(L("Voir"), "finder", "find"))
                 end
             end
         end
@@ -673,27 +763,23 @@ local function OnMessage(msg, sender)
         -- "K|role|cls|lvl|key1,key2|what": the same search with the guide's dungeon keys; the N sent
         -- with it already said the news in the chat
         local role, cls, lvl, keys, what = msg:match("^K|(%a+)|(%u*)|(%d*)|([%w_,]*)|(.*)$")
-        if not role then return end
+        if not role or #cls > 12 then return end
         if role == "x" then d.lfg[sender] = nil; RefreshSoon(); return end
+        if not ROLE_LABEL[role] then return end
         local list = {}
-        for k in keys:gmatch("[%w_]+") do list[#list + 1] = k end
+        for k in keys:gmatch("[%w_]+") do list[#list + 1] = k; if #list >= 8 then break end end
         local l = d.lfg[sender] or { t = time() }
-        l.role, l.cls, l.lvl, l.what = role, cls, tonumber(lvl), what
+        l.role, l.cls, l.lvl, l.what = role, cls, Int(lvl, 0, 100), Clean(what, 80)
         l.keys = CleanKeys(list)
         l.t = time()
         d.lfg[sender] = l
         RefreshSoon()
     elseif kind == "Q" then
         -- someone logged in: what I organize, what I signed up for, whether I'm looking
-        for _, e in pairs(d.list) do
-            if e.when then
-                if e.by == Me() and e.when > time() - 3600 then Send(EventMsg(e)) end
-                local s = e.signups and e.signups[Me()]
-                if s and e.when > time() then Send(SignupMsg(e.id, Me(), s)) end
-            end
-        end
-        local l = d.lfg[Me()]
-        if l then local n, k = LookingMsgs(l); Send(n); Send(k) end
+        if answerQueued then return end
+        answerQueued = true
+        local wait = math.max(1 + math.random() * 4, answerAt + 30 - GetTime())
+        C_Timer.After(wait, function() answerQueued = false; answerAt = GetTime(); pcall(AnswerAsk) end)
     end
 end
 
@@ -1871,7 +1957,8 @@ ev:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
             if SendRaw and IsInGuild and IsInGuild() then pcall(SendRaw, PREFIX, "N|x|||", "GUILD") end
         end
     elseif prefix == PREFIX and channel == "GUILD" and type(msg) == "string" and sender then
-        local who = Short(sender)
-        if who ~= Me() then OnMessage(msg, who) end
+        -- my realm's members by name, another realm's as "Name-Realm"; a secret or odd name: dropped
+        local who = root.SenderKey(sender)
+        if who and who ~= Me() and root.Readable(msg) then OnMessage(msg, who) end
     end
 end)

@@ -161,16 +161,20 @@ ns.AddEnglish({
         "To set aside a single Writ: right-click it in the Writs window's \"%s\" tab.",
     -- GPS
     ["Itinéraire"] = "Route",
-    ["Calcul de l'itinéraire"] = "Route planner",
-    ["WL Helper"] = "WL Helper", ["Zygor"] = "Zygor",
-    ["Pas installé"] = "Not installed",
-    ["Automatique garde le GPS de WL Helper et laisse ton guide Zygor tranquille. Choisis Zygor pour passer par son système de trajet."] =
-        "Automatic keeps the WL Helper GPS and leaves your Zygor guide alone. Pick Zygor to use its travel system.",
+    ["Envoyer les destinations à la flèche de Zygor"] = "Send destinations to Zygor's arrow",
+    ["Pour ceux qui préfèrent la flèche de Zygor."] = "For those who prefer Zygor's arrow.",
+    ["Zygor calcule le trajet et le montre avec sa flèche. La flèche de WL Helper, son chemin et ses pointillés se cachent pendant ce temps."] =
+        "Zygor plans the trip and shows it with its arrow. WL Helper's arrow, path and dots step aside meanwhile.",
     ["Trajet"] = "Travel",
     ["Utiliser mes téléportations"] = "Use my teleports",
     ["Tes sorts de téléportation (mage, druide), quand ils sont prêts."] = "Your teleport spells (mage, druid), when they are ready.",
     ["Choisir le vol automatiquement"] = "Pick the flight automatically",
     ["Chez le maître de vol, le bon trajet est choisi pour toi."] = "At the flight master, the right route is picked for you.",
+    ["Toujours si plus rapide"] = "Always when faster",
+    ["Seulement si elle fait gagner au moins 3 min"] = "Only if it saves at least 3 min",
+    ["Une heure de recharge : à garder pour un vrai gain."] = "An hour's cooldown: keep it for a real gain.",
+    ["La pierre de foyer a une heure de recharge : par défaut, le GPS ne la propose que si elle fait gagner au moins 3 minutes sur le meilleur trajet sans elle. Le Rappel astral du chaman suit le même réglage ; les téléportations du mage, sans recharge, ne sont pas concernées. Le trajet écarté reste dans la bulle d'aide de la flèche (Alt-clic pour le prendre)."] =
+        "The Hearthstone has an hour's cooldown: by default the GPS only suggests it when it saves at least 3 minutes over the best route without it. The shaman's Astral Recall follows the same setting; the mage's teleports, with no cooldown, are not affected. The route set aside stays in the arrow's tooltip (Alt-click to take it).",
     ["Points de vol connus"] = "Known flight paths",
     ["Ceux que ce personnage a déjà découverts."] = "Already discovered by this character.",
     ["Distances en yards"] = "Distances in yards",
@@ -255,7 +259,6 @@ ns.AddEnglish({
     ["Ouvrir les réglages"] = "Open settings",
     ["Les réglages les plus utilisés. Tous les autres sont dans la fenêtre Réglages de WL Helper."] =
         "The most used settings. All the others are in WL Helper's Settings window.",
-    ["Utiliser Zygor quand il est installé"] = "Use Zygor when it is installed",
     ["Masquer la flèche en combat"] = "Hide the arrow in combat",
     -- names read through WP.MODULES (Core.lua) and older keys other windows still use
     ["Guide des quêtes de donjon, route, flèche"] = "Dungeon quest guide, route, arrow",
@@ -307,7 +310,6 @@ ns.AddEnglish({
     ["Moyenne sur 60 jours, dans l'infobulle."] = "60-day average, in the tooltip.",
     ["Le plan achète de quoi l'atteindre."] = "The plan buys what it takes to get there.",
     ["Au-dessus de ton niveau : hors du plan."] = "Above your level: left out of the plan.",
-    ["Automatique laisse Zygor tranquille."] = "Automatic leaves Zygor alone.",
     ["Mage, druide : quand elles sont prêtes."] = "Mage, druid: when they're ready.",
     ["Chez le maître de vol."] = "At the flight master.",
     ["La flèche contourne collines et murs."] = "The arrow goes around hills and walls.",
@@ -459,7 +461,7 @@ end
 -- Words people type for things the labels say differently.
 local KEYWORDS = {
     arrow = "fleche pointeur", fleche = "arrow pointeur", flight = "vol taxi", vol = "flight taxi",
-    teleport = "teleportation portail mage", zygor = "guide pointeur", tooltip = "infobulle",
+    teleport = "teleportation portail mage", zygor = "guide pointeur fleche itineraire", tooltip = "infobulle",
     raccourci = "touche keybind binding bind", touche = "raccourci keybind binding", keybind = "raccourci touche binding",
     infobulle = "tooltip", writ = "enveloppe comptoir", minimap = "carte bouton", langue = "language english francais",
     language = "langue", sac = "bags clean nettoyeur", bags = "sacs nettoyeur", reglage = "settings options",
@@ -1472,31 +1474,45 @@ function BUILD.comptoir(p)
 end
 
 function BUILD.gps(p)
-    Section(p, L("Itinéraire"))
-    local row = Row(p, L("Calcul de l'itinéraire"), L("Automatique laisse Zygor tranquille."),
-        L("Automatique garde le GPS de WL Helper et laisse ton guide Zygor tranquille. Choisis Zygor pour passer par son système de trajet."),
-        { wide = true })
-    local seg = Choice(p, row, {
-        { "auto", L("Automatique") },
-        { "wl", L("WL Helper") },
-        { "zygor", L("Zygor"), not ZygorPresent() },
-    }, function() return Gps().provider or "auto" end, SetGps("provider"))
-    for _, b in ipairs(seg.buttons or {}) do
-        if b.value == "zygor" then b.tip = { L("Zygor"), L("Pas installé") } end
+    -- Zygor's arrow (provider "zygor", nil = ours): a row only for players who have Zygor
+    local zygorBuilt = ZygorPresent()
+    if zygorBuilt then
+        Section(p, L("Itinéraire"))
+        SwitchRow(p, L("Envoyer les destinations à la flèche de Zygor"), function() return Gps().provider == "zygor" end,
+            function(v) SetGps("provider")(v and "zygor" or nil) end, L("Pour ceux qui préfèrent la flèche de Zygor."),
+            L("Zygor calcule le trajet et le montre avec sa flèche. La flèche de WL Helper, son chemin et ses pointillés se cachent pendant ce temps."))
     end
-    -- Zygor can finish loading after the window was built: re-check each time the page shows.
-    function seg:Sync()
-        self:SetDisabled("zygor", not ZygorPresent())
-        for _, b in ipairs(self.buttons or {}) do
-            if b.value == "zygor" then b.tip = (not ZygorPresent()) and { L("Zygor"), L("Pas installé") } or nil end
+    -- Zygor can finish loading after the window was built (or be gone): the page is rebuilt once
+    -- when it shows and the row no longer matches
+    local rebuilding = false
+    p.controls[#p.controls + 1] = { Sync = function()
+        if rebuilding or ZygorPresent() == zygorBuilt then return end
+        rebuilding = true
+        if C_Timer and C_Timer.After and ns.WP.RebuildHubPage then
+            C_Timer.After(0, function() ns.WP.RebuildHubPage("gps") end)
         end
-    end
+    end }
 
     Section(p, L("Trajet"))
     SwitchRow(p, L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"),
         L("Mage, druide : quand elles sont prêtes."), L("Tes sorts de téléportation (mage, druide), quand ils sont prêts."))
     SwitchRow(p, L("Choisir le vol automatiquement"), function() return Gps().autoFlight end, SetGps("autoFlight"),
         L("Chez le maître de vol."), L("Chez le maître de vol, le bon trajet est choisi pour toi."))
+    -- the Hearthstone's policy (Route.lua HearthPolicy): "always" | "gain" (default, nil) | "never"
+    Choice(p, Row(p, L("Pierre de foyer"), L("Une heure de recharge : à garder pour un vrai gain."),
+        L("La pierre de foyer a une heure de recharge : par défaut, le GPS ne la propose que si elle fait gagner au moins 3 minutes sur le meilleur trajet sans elle. Le Rappel astral du chaman suit le même réglage ; les téléportations du mage, sans recharge, ne sont pas concernées. Le trajet écarté reste dans la bulle d'aide de la flèche (Alt-clic pour le prendre)."),
+        { wide = true }), {
+        { "always", L("Toujours si plus rapide") },
+        { "gain", L("Seulement si elle fait gagner au moins 3 min") },
+        { "never", L("Jamais") },
+    }, function()
+        local G = ns.WP and ns.WP.GPS
+        return G and G.HearthPolicy and G.HearthPolicy() or "gain"
+    end, function(v)
+        Gps().hearth = (v ~= "gain") and v or nil
+        local G = ns.WP and ns.WP.GPS
+        if G and G.ResetPlan then pcall(G.ResetPlan) end
+    end, true)
     row = Row(p, L("Points de vol connus"), L("Ceux que ce personnage a déjà découverts."))
     local known = ValueText(row, 80)
     function known:Sync()
@@ -2747,8 +2763,10 @@ local function RegisterEllesmere()
                     toggle(L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
 
                     _, h = W:SectionHeader(parent, L("GPS"), y); y = y - h
-                    toggle(L("Utiliser Zygor quand il est installé"), function() return Gps().provider == "zygor" end,
-                        function(v) SetGps("provider")(v and "zygor" or "auto") end)
+                    if ZygorPresent() then
+                        toggle(L("Envoyer les destinations à la flèche de Zygor"), function() return Gps().provider == "zygor" end,
+                            function(v) SetGps("provider")(v and "zygor" or nil) end)
+                    end
                     toggle(L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"))
                     toggle(L("Masquer la flèche en combat"), function() return Gps().hideCombat end, SetGps("hideCombat"))
 

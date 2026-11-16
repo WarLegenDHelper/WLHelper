@@ -2037,6 +2037,26 @@ local function KeepTop(f)
     f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
 end
 
+-- Brings a window back on screen: its title bar never above the top (a saved position from a
+-- larger screen or a smaller UI scale), the whole window inside when it fits. The clamped
+-- position is saved. SetClampedToScreen only acts while the window is dragged.
+local function KeepOnScreen(f)
+    -- a window holding secure buttons cannot move in combat (it is clamped on the next show)
+    if f.wlSecure and InCombatLockdown and InCombatLockdown() then return end
+    local l, t = num(f:GetLeft()), num(f:GetTop())
+    local w, h = num(f:GetWidth()), num(f:GetHeight())
+    local sw, sh = num(UIParent:GetWidth()), num(UIParent:GetHeight())
+    if not (l and t and w and h and sw and sh) or sw <= 0 or sh <= 0 then return end
+    local nl = math.max(0, math.min(l, sw - w))
+    local nt = math.max(math.min(h, sh), math.min(t, sh))
+    if math.abs(nl - l) < 0.5 and math.abs(nt - t) < 0.5 then return end
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", nl, nt)
+    local d, pk = f.wlDb, f.wlPosKey
+    if d and pk then d[pk] = { "TOPLEFT", "BOTTOMLEFT", nl, nt } end
+end
+S.KeepOnScreen = KeepOnScreen
+
 -- Lowest visible point of the window's content (not anchored to the window's bottom), for
 -- windows that do not give their content height.
 local function MeasureBottom(f)
@@ -2145,6 +2165,7 @@ function S.MakeResizable(f, tier, db, key, opts)
         end
         self.wlBounds = { minW, minH, maxW, maxH }
         if self.wlTier == "workspace" then self:SetSize(w, h) else self:SetWidth(w); self:SetHeight(h) end
+        KeepOnScreen(self)
         return w, h
     end
     function f:ResetSize()
@@ -2391,7 +2412,7 @@ function S.Window(name, width, height, title, subtitle, db, posKey, opts)
     -- Two windows open at once must not mix: the one clicked or opened last comes on top, whole.
     f:SetToplevel(true)
     local raiser = CreateFrame("Frame", nil, f)
-    raiser:SetScript("OnShow", function() f:Raise() end)
+    raiser:SetScript("OnShow", function() f:Raise(); KeepOnScreen(f) end)
     f:Hide()
     return f
 end

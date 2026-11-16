@@ -10,6 +10,8 @@
 --   groupes / groups         Writs/Events.lua    the Groupes window (Main.lua also takes lfg, evenements)
 --   altclick                 Writs/AltClick.lua  what Alt + click does for this character
 --   carte / map              Bosses.lua          the map of the dungeon you are in
+--   diag carte / diag map    Writs/Trail.lua     why the walking path shows (or not) on the world map
+--                                                (any other "diag" goes on to Diag.lua)
 -- Each tool checks its own module switch: nothing is decided twice here.
 local ADDON, root = ...
 local ns = root.Writs
@@ -68,12 +70,20 @@ Route({ "carte", "map" }, function()
     Run(root.OpenDungeonMap, type(inside) == "string" and inside or nil)
 end)
 
+-- "diag carte": the walking path on the world map (Trail.lua); a route returning false passes the
+-- word on (plain "diag" is Diag.lua's)
+Route({ "diag" }, function(rest)
+    local w = Word(rest:match("^(%S*)"))
+    if w ~= "carte" and w ~= "map" then return false end
+    if WP.Trail and WP.Trail.DiagMap then Run(WP.Trail.DiagMap) end
+end)
+
 -- exposed for the tests and for Help.lua's clickable commands
 WP.ToolCommand = function(msg)
     local w, rest = (msg or ""):match("^%s*(%S*)%s*(.-)%s*$")
     local fn = ROUTES[Word(w)]
     if not fn then return false end
-    fn(rest or "")
+    if fn(rest or "") == false then return false end
     return true
 end
 
@@ -85,5 +95,20 @@ hook:SetScript("OnEvent", function()
     SlashCmdList.WLDUNGEONTOOL = function(msg, ...)
         if WP.ToolCommand(msg) then return end
         return orig(msg, ...)
+    end
+    -- Diag.lua wraps /wlh at the same login and takes every "diag ...": should it come out on top of
+    -- this wrapper, "diag carte" is caught once more over it, on the next frame
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, function()
+            local top = SlashCmdList and SlashCmdList.WLDUNGEONTOOL
+            if not top then return end
+            SlashCmdList.WLDUNGEONTOOL = function(msg, ...)
+                local w, rest = (msg or ""):match("^%s*(%S*)%s*(%S*)")
+                if Word(w) == "diag" and (Word(rest) == "carte" or Word(rest) == "map") then
+                    if WP.ToolCommand(msg) then return end
+                end
+                return top(msg, ...)
+            end
+        end)
     end
 end)
