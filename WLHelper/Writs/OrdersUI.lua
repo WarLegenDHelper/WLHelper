@@ -45,6 +45,8 @@ ns.AddEnglish({
         "Members who have WL Helper share their professions when they log in.",
     ["Faire une demande"] = "Make a request",
     ["Partager mes recettes"] = "Share my recipes",
+    ["Choisis un métier à gauche pour voir son catalogue, ou cherche un objet ci-dessus."] =
+        "Pick a profession on the left to see its catalogue, or search for an item above.",
     ["Tu n'as pas encore de métier lu par l'addon. Ouvre ta fenêtre de métier une fois."] =
         "The addon has not read any of your professions yet. Open your profession window once.",
     ["%s %d : %s"] = "%s %d: %s",
@@ -314,9 +316,21 @@ ns.AddEnglish({
 -- one window, 640 wide (a wide tool: five tabs with their counters fit); content inset 16
 local W, PAD = 640, 16
 local CW = W - 2 * PAD
+-- The Crafters tab in two columns (T-55, T-57): the professions on the left (200), a 1 px rule at
+-- x = 216 of the page, what you look at on the right (376, from x = 232): the search and your
+-- sharing, a profession's catalogue, a search's results or a crafter's recipes.
+-- 200 + 16 + 1 + 15 + 376 = 608. While nobody shares anything, the page stays one column.
+local LW = 200
+local RULE_X = LW + 16
+local RX = RULE_X + 1 + 15
+local RW = CW - RX
+local findW = CW   -- the width of the Crafters tab's right side (CW while it is one column)
 local win, tabs, pages, current = nil, nil, {}, "find"
 local ui = { find = {}, mine = {}, recv = {}, new = {}, board = {}, ask = {} }
 WP.OrdersUI = ui   -- the pages' widgets, for the offline tests
+-- the crafters' home and its pages (T-60): its functions, filled before RenderFind
+local H = {}
+ui.H = H
 
 local function secret(v) return root.IsSecret and root.IsSecret(v) end
 local function num(v) return type(v) == "number" and not secret(v) and v or nil end
@@ -377,7 +391,16 @@ local function List(page, make)
     local l = { sf = sa, content = sa.child, items = {} }
     function l.Get(i) local f = l.items[i]; if not f then f = make(sa.child); l.items[i] = f end; f:Show(); return f end
     function l.HideFrom(i) for j = i, #l.items do l.items[j]:Hide() end end
-    function l.Top(y) sa:ClearAllPoints(); sa:SetPoint("TOPLEFT", 0, -y); sa:SetPoint("BOTTOMRIGHT", 0, 0) end
+    -- l.Top(y): the page's width; l.Top(y, x, w): a column x from the page's left, w wide
+    function l.Top(y, x, w)
+        sa:ClearAllPoints()
+        if x then
+            sa:SetPoint("TOPLEFT", x, -y); sa:SetPoint("BOTTOMLEFT", x, 0)
+            sa:SetWidth(w); sa.child:SetWidth(w)
+        else
+            sa:SetPoint("TOPLEFT", 0, -y); sa:SetPoint("BOTTOMRIGHT", 0, 0); sa.child:SetWidth(CW)
+        end
+    end
     function l.Reset() sa:ScrollTo(0, true) end
     return l
 end
@@ -386,7 +409,8 @@ end
 local function Fit(page, list, listH)
     listH = math.max(0, math.ceil(listH or 0))
     local sa = list and (list.sf or list)
-    if win then win:FitHeight((page.topH or 0) + listH) end
+    -- page.sideH: a column beside the list (the professions of the Crafters tab) that may be taller
+    if win then win:FitHeight(math.max((page.topH or 0) + listH, page.sideH or 0)) end
     if sa then sa:SetContentHeight(listH) end
 end
 
@@ -420,6 +444,14 @@ local function Row(parent)
                 right = right + (num(b:GetWidth()) or 80) + 8
             end
         end
+        -- icon actions (watch, favourite, remove), left of the buttons; never counted as buttons
+        for i = #(self.acts or {}), 1, -1 do
+            local b = self.acts[i]
+            if b:IsShown() then
+                b:ClearAllPoints(); b:SetPoint("RIGHT", self, "RIGHT", -right, 0)
+                right = right + 24 + 4
+            end
+        end
         local textW = math.max(80, width - x - right)
         local nameH = S.FitText(self.name, 2, textW, self)
         local detH = 0
@@ -445,7 +477,7 @@ end
 -- the empty state of a list, placed at the top of its content; returns the height it takes
 local function Empty(e, on, icon, title, text, label, click, kind)
     if not on then e:Hide(); return 0 end
-    e:SetWrapWidth(CW)
+    e:SetWrapWidth(e.wlW or CW)
     local h = e:Set(icon, title, text, label, click, kind or "primary")
     e:Show()
     return 24 + (h or 0) + 12
@@ -534,15 +566,55 @@ end
 
 -- ---------------------------------------------------------------- the guild's crafts
 local GRID_PROFS = { "alchemy", "blacksmithing", "tailoring", "leatherworking", "engineering", "enchanting", "cooking", "firstaid", "mining" }
-local GRID_COLS, GRID_GAP = 4, 12
+
 local CAT_MAX = 200   -- catalogue rows drawn at most (the search narrows the rest)
 
 -- The guild's crafts by profession, read once per render:
 -- [key] = { crafters = { c }, items = { [id] = { id, re, who = { c }, online } }, nItems, nOnline, unshared = { names } }
 -- c = { name, prof, rank, online, me, n = recipes shared, stars }
+-- Kept between renders while nothing it reads has changed: a keystroke in the search redraws the
+-- left column without building every item again. The stamp reads the crafters' entries (each list
+-- arrives as a new table with its hash), a checksum of each list (one walk, nothing allocated),
+-- their rank and stars, and who is online (a new table every 30 s).
+local gcCache, gcStamp
+local function CraftsStamp(on, me)
+    local s = { on, me }
+    local function Put(name, prof, p)
+        s[#s + 1] = name; s[#s + 1] = prof; s[#s + 1] = p
+        if type(p) == "table" then
+            -- a list changed in place still shows: its count, the sum of its ids and of its reagent lengths
+            local n, ids, len = 0, 0, 0
+            if type(p.recipes) == "table" then
+                for id, re in pairs(p.recipes) do
+                    n = n + 1
+                    if type(id) == "number" then ids = ids + id end
+                    if type(re) == "string" then len = len + #re end
+                end
+            end
+            s[#s + 1] = p.recipes or false; s[#s + 1] = n; s[#s + 1] = ids; s[#s + 1] = len
+            s[#s + 1] = p.hash or false; s[#s + 1] = p.rank or 0
+        end
+    end
+    for name, profs in pairs(O.DB().crafters) do
+        s[#s + 1] = profs
+        if type(profs) == "table" then
+            s[#s + 1] = O.Stars(name)
+            for prof, p in pairs(profs) do Put(name, prof, p) end
+        end
+    end
+    for prof, p in pairs(O.DB().mine or {}) do Put(me, prof, p) end
+    return s
+end
+local function SameStamp(a, b)
+    if not a or not b or #a ~= #b then return false end
+    for i = 1, #a do if a[i] ~= b[i] then return false end end
+    return true
+end
 local function GuildCrafts()
     local on = O.OnlineGuild()
     local me = UnitName("player")
+    local stamp = CraftsStamp(on, me)
+    if gcCache and SameStamp(stamp, gcStamp) then return gcCache end
     local out = {}
     local function Add(name, prof, p, mine)
         local key = ProfKey(prof)
@@ -578,6 +650,7 @@ local function GuildCrafts()
         end
         table.sort(e.unshared)
     end
+    gcCache, gcStamp = out, stamp
     return out
 end
 
@@ -818,7 +891,8 @@ local function CatHead(parent, sub)
         self.label:SetText(text or "")
         self.count:SetText(n or ""); self.count:SetShown(n ~= nil)
         local w = root.TextWidth(self.label)
-        self.label:SetWidth(math.max(40, math.min((w > 0 and w or 100) + 1, CW - indent - 18 - 48)))
+        self:SetWidth(findW - indent)
+        self.label:SetWidth(math.max(40, math.min((w > 0 and w or 100) + 1, findW - indent - 18 - 48)))
     end
     return b
 end
@@ -827,19 +901,32 @@ end
 local function BuildFind(p)
     local f = ui.find
     -- the item search, on top of the grid and of the results
-    f.box = S.Input(p, CW, { search = true, placeholder = L("Ex. Sac en étoffe runique, ou Maj-clic sur un objet") })
+    -- players, items and materials (Enter keeps the search among the recent ones)
+    f.box = S.Input(p, CW, { search = true, placeholder = L("Ex. Brakk, Heaume cœur-de-lion, Étoffe runique"),
+        onEnter = function(t) if O.AddSearch then O.AddSearch(t) end end })
     f.box:SetPoint("TOPLEFT", 0, 0)
-    -- a real query typed here wins over a crafter's view or a catalogue
+    -- a real query typed here wins over a crafter's view, a catalogue or a page of the home
     f.box:HookScript("OnTextChanged", function(self)
         local t = ((self:GetText() or ""):gsub("^%s+", ""):gsub("%s+$", ""))
-        if #t >= 2 or t:match("item:%d+") then f.view, f.prof = nil, nil end
+        if #t >= 2 or t:match("item:%d+") then f.view, f.prof, f.page = nil, nil, nil end
+        if t ~= f.lastQuery then f.lastQuery, f.searchCaps = t, nil end
         WP.RefreshOrders()
     end)
-    -- out of a crafter's recipes: back to the profession's catalogue, or to the grid
+    -- focused and empty: the recent searches under it (hidden a moment after, so a click lands)
+    f.box:HookScript("OnEditFocusGained", function() WP.RefreshOrders() end)
+    f.box:HookScript("OnEditFocusLost", function()
+        if C_Timer and C_Timer.After then C_Timer.After(0.2, function() WP.RefreshOrders() end) end
+    end)
+    -- out of a crafter's recipes: back to the profession's catalogue, the crafter's page or the home;
+    -- out of a page of the home: back where it was opened from
     f.back = S.Button(p, L("Tous les métiers"), 0, 24, "ghost", function()
-        f.view = nil; f.list.Reset(); WP.RefreshOrders()
+        if f.view then f.view = nil
+        elseif f.page then f.page, f.pageFrom = f.pageFrom, nil end
+        f.list.Reset(); WP.RefreshOrders()
     end, function()
-        return { f.back:GetText(), f.prof and string.format(L("Clic : revenir au catalogue %s"), ProfLabel(f.prof)) or L("Clic : revenir à la liste des métiers") }
+        if f.view and f.prof then return { f.back:GetText(), string.format(L("Clic : revenir au catalogue %s"), ProfLabel(f.prof)) } end
+        if f.view and f.page == "crafter" then return { f.back:GetText(), string.format(L("Clic : revenir à la fiche de %s"), f.cpName or "?") } end
+        return { f.back:GetText(), L("Clic : revenir à l'accueil des artisans") }
     end)
     f.back:SetIcon("chevron_left")
     f.back:SetPoint("TOPLEFT", 0, -36); f.back:Hide()
@@ -851,8 +938,19 @@ local function BuildFind(p)
             if r.item then WP.NewOrder(r.item, r.crafter)
             elseif r.open then ui.find.view = r.open; f.list.Reset(); WP.RefreshOrders() end
         end, function() return r.btnTip or { r.btn:GetText() } end)
+        -- icon actions of the home's rows: watch a recipe, a favourite, remove (hidden by default)
+        local function Act(icon, tipKey, fnKey)
+            local b = S.IconButton(r, icon, 24, function() return r[tipKey] end, function() if r[fnKey] then r[fnKey](r) end end)
+            b:Hide()
+            return b
+        end
+        r.flag = Act("flag", "flagTip", "onFlag")
+        r.trash = Act("trash", "trashTip", "onTrash")
+        r.star = Act("star", "starTip", "onStar")
+        r.acts = { r.flag, r.trash, r.star }
         -- on a crafter's recipe, shift-click asks the whole guild for it (the Request form filled in)
         r:SetScript("OnClick", function(self)
+            if self.onRowClick then self.onRowClick(self); return end
             if self.askProf and self.item and IsShiftKeyDown and IsShiftKeyDown() and WP.AskOrder then WP.AskOrder(self.item, self.askProf); return end
             if self.btn:IsShown() then self.btn:Click() end
         end)
@@ -861,51 +959,91 @@ local function BuildFind(p)
     f.empty = S.EmptyState(f.list.content, "search", "", nil, nil, nil)
     f.listHead = Header(f.list.content)
 
-    -- the grid: one tile per profession
+    -- the professions, a list on the left (f.grid, its old name: a grid of tiles before T-57): one
+    -- row per profession, 200 wide; the open one in selFill, no side band
     f.grid = List(p, function(parent)
         local t = CreateFrame("Button", nil, parent)
         t.wlOwned = true
+        t:SetWidth(LW)
         S.Solid(t, "BACKGROUND", C.cardFill):SetAllPoints()
-        S.Border(t, C.cardEdge)
+        t.sel = S.Solid(t, "BACKGROUND", C.selFill, nil); t.sel:SetDrawLayer("BACKGROUND", 1); t.sel:SetAllPoints(); t.sel:Hide()
         Feedback(t)
-        t.iconFrame = Painted(t, 32); t.icon = t.iconFrame.tex
-        t.iconFrame:SetPoint("TOP", 0, -12)
-        t.name = S.Text(t, F.body, C.fg); t.name:SetJustifyH("CENTER"); t.name:SetJustifyV("TOP")
-        t.count = S.Text(t, F.meta, C.muted); t.count:SetJustifyH("CENTER"); t.count:SetJustifyV("TOP")
-        t.online = S.Text(t, F.meta, C.ok); t.online:SetJustifyH("CENTER"); t.online:SetJustifyV("TOP")
+        t.iconFrame = Painted(t, 28); t.icon = t.iconFrame.tex
+        t.iconFrame:SetPoint("TOPLEFT", 8, -8)
+        t.name = S.Text(t, F.body, C.fg); t.name:SetJustifyH("LEFT"); t.name:SetJustifyV("TOP")
+        t.count = S.Text(t, F.meta, C.muted); t.count:SetJustifyH("LEFT"); t.count:SetJustifyV("TOP")
+        t.online = S.Text(t, F.meta, C.ok); t.online:SetJustifyH("LEFT"); t.online:SetJustifyV("TOP")
         t:SetScript("OnClick", function(self)
             -- empty the box before f.prof is set: its hook then renders nothing, one render below
             if (f.cbox:GetText() or "") ~= "" then f.cbox:SetText("") end
-            f.prof, f.view = self.key, nil
+            f.prof, f.view, f.page = self.key, nil, nil
             f.cat.Reset()
             WP.RefreshOrders()
         end)
         return t
     end)
+    -- the crafters' home, first row of the left column (not one of f.grid.items: those are professions)
+    local hr = CreateFrame("Button", nil, f.grid.content)
+    hr.wlOwned = true
+    hr:SetSize(LW, 36)
+    S.Solid(hr, "BACKGROUND", C.cardFill):SetAllPoints()
+    hr.sel = S.Solid(hr, "BACKGROUND", C.selFill, nil); hr.sel:SetDrawLayer("BACKGROUND", 1); hr.sel:SetAllPoints(); hr.sel:Hide()
+    Feedback(hr)
+    hr.icon = S.Icon(hr, "home", 16, "ARTWORK", C.muted); hr.icon:SetPoint("LEFT", 14, 0)
+    hr.name = S.Text(hr, F.body, C.fg); hr.name:SetJustifyH("LEFT"); hr.name:SetWordWrap(false)
+    hr.name:SetPoint("LEFT", 44, 0); hr.name:SetText(L("Accueil"))
+    hr.tip = { L("Accueil"), L("Artisans, favoris, recherche"), L("Clic : revenir à l'accueil des artisans") }
+    hr:SetScript("OnClick", function()
+        f.prof, f.view, f.page, f.pageFrom = nil, nil, nil, nil
+        if (f.box:GetText() or "") ~= "" then f.box:SetText("") end
+        f.list.Reset(); WP.RefreshOrders()
+    end)
+    hr:Hide()
+    f.homeRow = hr
     f.gridEmpty = S.EmptyState(f.grid.content, "hammer", "", nil, nil, nil)
-    -- sharing my recipes (on by default): a settings row under the grid, with what was read of mine
-    local sh = CreateFrame("Button", nil, f.grid.content)
+    f.gridEmpty.wlW = CW
+    -- a second action under the empty state (secondary)
+    f.gridEmpty.second = S.Button(f.gridEmpty, "", 0, 28, "secondary", function() if f.gridEmpty.onSecond then f.gridEmpty.onSecond() end end)
+    f.gridEmpty.second:Hide()
+    -- the 1 px rule between the two columns
+    f.rule = S.Solid(p, "BORDER", C.divider)
+    f.rule:SetPoint("TOPLEFT", RULE_X, 0); f.rule:SetPoint("BOTTOMLEFT", RULE_X, 0); f.rule:SetWidth(1)
+    if root.PixelLine then root.PixelLine(p, f.rule, false) end
+    f.rule:Hide()
+    -- the right side before a profession is open: one sentence, then sharing my recipes
+    f.pickHint = S.Text(f.list.content, F.label, C.muted)
+    f.pickHint:SetJustifyH("LEFT"); f.pickHint:SetJustifyV("TOP"); f.pickHint:SetWordWrap(true)
+    f.pickHint:SetText(L("Choisis un métier à gauche pour voir son catalogue, ou cherche un objet ci-dessus."))
+    f.pickHint:Hide()
+    -- sharing my recipes (on by default): a settings row, with what was read of mine
+    local sh = CreateFrame("Button", nil, f.list.content)
     sh.wlOwned = true
     S.Solid(sh, "BACKGROUND", C.cardFill):SetAllPoints(); S.Border(sh, C.cardEdge)
-    sh.label = S.Text(sh, F.body, C.fg); sh.label:SetPoint("TOPLEFT", 12, -12); sh.label:SetText(L("Partager mes recettes"))
+    sh.label = S.Text(sh, F.body, C.fg); sh.label:SetPoint("TOPLEFT", 12, -12); sh.label:SetJustifyH("LEFT"); sh.label:SetText(L("Partager mes recettes"))
     S.ClampLabel(sh.label, nil, sh)
     sh.desc = S.Text(sh, F.meta, C.muted); sh.desc:SetJustifyH("LEFT"); sh.desc:SetJustifyV("TOP")
     sh.desc:SetPoint("TOPLEFT", sh.label, "BOTTOMLEFT", 0, -3)
     sh.switch = S.Switch(sh, function() return WLWritsDB.ordersShare ~= false end,
-        function(v) WLWritsDB.ordersShare = v; if v then O.Announce() end; WP.RefreshOrders() end)
-    sh.switch:SetPoint("RIGHT", -12, 0)
+        function(v)
+            WLWritsDB.ordersShare = v
+            if v then O.Announce() end
+            if O.ShareChanged then O.ShareChanged() end   -- the profile says it too
+            WP.RefreshOrders()
+        end)
+    sh.switch:SetPoint("TOPRIGHT", -12, -12)
     sh.switch:AttachRow(sh)
+    sh:Hide()
     f.share = sh
 
     -- a profession's catalogue: back, online filter, the profession, its search
     local h = CreateFrame("Frame", nil, p)
     h:SetPoint("TOPLEFT"); h:SetPoint("TOPRIGHT"); h:SetHeight(108); h:Hide()
     f.chead = h
-    f.cback = S.Button(h, L("Tous les métiers"), 0, 24, "ghost", function()
-        f.prof, f.view = nil, nil
+    f.cback = S.Button(h, L("Accueil"), 0, 24, "ghost", function()
+        f.prof, f.view, f.page = nil, nil, nil
         f.grid.Reset()
         WP.RefreshOrders()
-    end, { L("Tous les métiers"), L("Clic : revenir à la liste des métiers") })
+    end, { L("Accueil"), L("Clic : revenir à l'accueil des artisans") })
     f.cback:SetIcon("chevron_left")
     f.cback:SetPoint("TOPLEFT", 0, 0)
     local ol = CreateFrame("Button", nil, h)
@@ -944,6 +1082,10 @@ local function BuildFind(p)
         local r = Row(parent)
         r.who = r.detail
         r.btn = RowButton(r, L("Commander"), function() Act(r) end, function() return r.btnTip or { r.btn:GetText() } end)
+        -- watch the recipe (the flag): told when a member learns it
+        r.flag = S.IconButton(r, "flag", 24, function() return r.flagTip end, function() if r.onFlag then r.onFlag(r) end end)
+        r.flag:Hide()
+        r.acts = { r.flag }
         r:SetScript("OnClick", Act)
         return r
     end)
@@ -971,112 +1113,168 @@ local function BuildFind(p)
     f.catMore:SetJustifyH("LEFT"); f.catMore:SetJustifyV("TOP"); f.catMore:Hide()
 end
 
--- which of the page's areas shows: the result list, the grid, or a catalogue; and where it starts
+-- which of the page's areas shows: the result list, the professions, or a catalogue; where it
+-- starts. Two columns (f.split, someone shares): the professions always on the left, the mode's
+-- area on the right ("grid" there: the search, a sentence and the sharing row, in f.list).
 local function SetMode(f, mode)
     local p = pages.find
-    f.list.sf:SetShown(mode == "list"); f.grid.sf:SetShown(mode == "grid"); f.cat.sf:SetShown(mode == "cat")
+    local split = f.split and true or false
+    findW = split and RW or CW
+    local x = split and RX or 0
+    f.grid.sf:SetShown(split or mode == "grid")
+    f.list.sf:SetShown(mode == "list" or (split and mode == "grid"))
+    f.cat.sf:SetShown(mode == "cat")
+    f.rule:SetShown(split)
     local cat = mode == "cat"
     f.chead:SetShown(cat); f.box:SetShown(not cat)
-    f.back:SetShown(mode == "list" and f.view ~= nil)
+    f.back:SetShown(mode == "list" and (f.view ~= nil or f.page ~= nil))
+    f.box:ClearAllPoints(); f.box:SetPoint("TOPLEFT", x, 0); f.box:SetWidth(findW)
+    f.back:ClearAllPoints(); f.back:SetPoint("TOPLEFT", x, -36)
+    f.chead:ClearAllPoints(); f.chead:SetPoint("TOPLEFT", x, 0); f.chead:SetWidth(findW)
+    f.cbox:SetWidth(findW); f.ctitle:SetWidth(findW - 40); f.ccount:SetWidth(findW - 40)
+    f.listHead:SetWidth(findW)
+    f.empty.wlW, f.catEmpty.wlW = findW, findW
+    if not (split and mode == "grid") then f.pickHint:Hide(); f.share:Hide() end
     p.topH = cat and ((f.cheadH or 108) + 12) or (f.back:IsShown() and (28 + 8 + 24 + 12) or (28 + 12))
-    local l = mode == "list" and f.list or (mode == "grid" and f.grid or f.cat)
-    l.Top(p.topH)
+    p.sideH = nil
+    if split then f.grid.Top(0, 0, LW) end
+    local l = mode == "list" and f.list or (mode == "grid" and (split and f.list or f.grid) or f.cat)
+    if split then l.Top(p.topH, RX, RW) else l.Top(p.topH) end
     return l
 end
 
-local function RenderGrid(f, g)
+-- the professions shown (mining only when someone shares it), and whether anyone shares anything
+local function ProfKeys(g)
     local keys = {}
     for _, k in ipairs(GRID_PROFS) do
         if k ~= "mining" or (g.mining and g.mining.nItems > 0) then keys[#keys + 1] = k end
     end
     local anyone = false
     for _, key in ipairs(keys) do if g[key] and #g[key].crafters > 0 then anyone = true end end
-    local tw = math.floor((CW - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS)
-    local th = 0
-    if anyone then
-        for i, key in ipairs(keys) do
-            local e = g[key]
-            local nC, nI, nO = e and #e.crafters or 0, e and e.nItems or 0, e and e.nOnline or 0
-            local t = f.grid.Get(i)
-            t.key = key
-            S.Painted(t.icon, ProfIcon(key)); t.icon:SetDesaturated(nC == 0); t.icon:SetAlpha(nC == 0 and 0.5 or 1)
-            t.name:SetText(ProfLabel(key))
-            local nc = nC > 0 and C.fg or C.muted
-            t.name:SetTextColor(nc[1], nc[2], nc[3])
-            local counts = nC == 0 and L("Aucun artisan") or (P(nC, L("1 artisan"), L("%d artisans")) .. " · " .. P(nI, L("1 objet"), L("%d objets")))
-            t.count:SetText(counts)
-            local onNames = {}
-            if e then
-                table.sort(e.crafters, ByCrafter)
-                for _, c in ipairs(e.crafters) do if c.online and not c.me then onNames[#onNames + 1] = c.name end end
-            end
-            if nO > 0 then
-                t.online:SetText(P(nO, L("1 en ligne"), L("%d en ligne"))); t.online:SetTextColor(C.ok[1], C.ok[2], C.ok[3])
-            else
-                t.online:SetText(nC > 0 and L("Personne en ligne") or ""); t.online:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
-            end
-            t.online:SetShown(nC > 0)
-            t.tip = { ProfLabel(key), counts }
-            if #onNames > 0 then t.tip[#t.tip + 1] = string.format(L("En ligne : %s"), table.concat(onNames, ", ")) end
-            t.tip[#t.tip + 1] = L("Clic : ouvrir le catalogue du métier")
-            -- every text wraps inside the tile; the tallest tile sets the row height
-            local y = 12 + 32 + 8
-            t.name:ClearAllPoints(); t.name:SetPoint("TOP", 0, -y)
-            y = y + S.FitText(t.name, 2, tw - 16, t) + 3
-            t.count:ClearAllPoints(); t.count:SetPoint("TOP", 0, -y)
-            y = y + S.FitText(t.count, 2, tw - 16, t)
-            if t.online:IsShown() then
-                y = y + 3
-                t.online:ClearAllPoints(); t.online:SetPoint("TOP", 0, -y)
-                y = y + S.FitText(t.online, 2, tw - 16, t)
-            end
-            y = y + 12
-            if y > th then th = y end
+    return keys, anyone
+end
+
+-- the left column: one row per profession (icon 28, its name, the counts, who is online); returns
+-- its height, also kept in pages.find.sideH so the window fits the taller column
+local function RenderProfList(f, g, keys)
+    local tw = LW - 44 - 8
+    -- the home first: selected on the home and its pages
+    local hr = f.homeRow
+    hr:ClearAllPoints(); hr:SetPoint("TOPLEFT", 0, 0); hr:Show()
+    local atHome = f.prof == nil and (f.view == nil or f.page ~= nil)
+    hr.sel:SetShown(atHome)
+    hr.tip[3] = (not atHome or f.page or f.view) and L("Clic : revenir à l'accueil des artisans") or nil
+    local y = 36 + 2
+    for i, key in ipairs(keys) do
+        local e = g[key]
+        local nC, nI, nO = e and #e.crafters or 0, e and e.nItems or 0, e and e.nOnline or 0
+        local t = f.grid.Get(i)
+        t.key = key
+        S.Painted(t.icon, ProfIcon(key)); t.icon:SetDesaturated(nC == 0); t.icon:SetAlpha(nC == 0 and 0.5 or 1)
+        t.name:SetText(ProfLabel(key))
+        local nc = nC > 0 and C.fg or C.muted
+        t.name:SetTextColor(nc[1], nc[2], nc[3])
+        local counts = nC == 0 and L("Aucun artisan") or (P(nC, L("1 artisan"), L("%d artisans")) .. " · " .. P(nI, L("1 objet"), L("%d objets")))
+        t.count:SetText(counts)
+        local onNames = {}
+        if e then
+            table.sort(e.crafters, ByCrafter)
+            for _, c in ipairs(e.crafters) do if c.online and not c.me then onNames[#onNames + 1] = c.name end end
         end
-        th = math.max(108, math.ceil(th))
-        for i = 1, #keys do
-            local t = f.grid.Get(i)
-            local col, row = (i - 1) % GRID_COLS, math.floor((i - 1) / GRID_COLS)
-            t:SetSize(tw, th); t:ClearAllPoints(); t:SetPoint("TOPLEFT", col * (tw + GRID_GAP), -row * (th + GRID_GAP))
+        if nO > 0 then
+            t.online:SetText(P(nO, L("1 en ligne"), L("%d en ligne"))); t.online:SetTextColor(C.ok[1], C.ok[2], C.ok[3])
+        else
+            t.online:SetText(nC > 0 and L("Personne en ligne") or ""); t.online:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
         end
-        f.grid.HideFrom(#keys + 1)
-    else
-        f.grid.HideFrom(1)
+        t.online:SetShown(nC > 0)
+        t.tip = { ProfLabel(key), counts }
+        if #onNames > 0 then t.tip[#t.tip + 1] = string.format(L("En ligne : %s"), table.concat(onNames, ", ")) end
+        if f.prof ~= key then t.tip[#t.tip + 1] = L("Clic : ouvrir le catalogue du métier") end
+        t.sel:SetShown(f.prof == key)
+        -- every text wraps inside the row; the row grows with it
+        local ty = 8
+        t.name:ClearAllPoints(); t.name:SetPoint("TOPLEFT", 44, -ty)
+        ty = ty + S.FitText(t.name, 2, tw, t) + 2
+        t.count:ClearAllPoints(); t.count:SetPoint("TOPLEFT", 44, -ty)
+        ty = ty + S.FitText(t.count, 2, tw, t)
+        if t.online:IsShown() then
+            ty = ty + 2
+            t.online:ClearAllPoints(); t.online:SetPoint("TOPLEFT", 44, -ty)
+            ty = ty + S.FitText(t.online, 2, tw, t)
+        end
+        local h = math.max(44, math.ceil(ty + 8))
+        t:SetSize(LW, h); t:ClearAllPoints(); t:SetPoint("TOPLEFT", 0, -y)
+        y = y + h + 2
     end
-    local y = anyone and (math.ceil(#keys / GRID_COLS) * (th + GRID_GAP) - GRID_GAP) or 0
-    y = y + Empty(f.gridEmpty, not anyone, "hammer", L("Aucun artisan connu"),
+    f.grid.HideFrom(#keys + 1)
+    y = math.max(0, y - 2)
+    f.grid.sf:SetContentHeight(y)
+    pages.find.sideH = y
+    return y
+end
+
+-- the right side before a profession is open (two columns): a sentence, then the sharing row
+local function RenderPickHome(f)
+    f.list.HideFrom(1)
+    f.pickHint:Show()
+    f.pickHint:ClearAllPoints(); f.pickHint:SetPoint("TOPLEFT", 0, 0)
+    local y = S.FitText(f.pickHint, 0, findW, f.list.content) + 16
+    local sh = f.share
+    local mineT, noRecipe = {}, true
+    for prof, pr in pairs(O.DB().mine or {}) do
+        local n = 0
+        for _ in pairs(pr.recipes or {}) do n = n + 1 end
+        if n > 0 then noRecipe = false end
+        mineT[#mineT + 1] = string.format(L("%s %d : %s"), ProfLabel(ProfKey(prof), prof), pr.rank or 0,
+            n > 0 and P(n, L("1 recette"), L("%d recettes")) or L("pas encore lues"))
+    end
+    table.sort(mineT)
+    local desc
+    if #mineT == 0 then desc = L("Tu n'as pas encore de métier lu par l'addon. Ouvre ta fenêtre de métier une fois.")
+    else
+        desc = table.concat(mineT, " · ") .. ". "
+        if noRecipe then desc = desc .. L("Ouvre ta fenêtre de métier une fois pour les partager.")
+        elseif WLWritsDB.ordersShare ~= false then desc = desc .. L("Les autres membres voient ce que tu sais fabriquer et peuvent te commander.")
+        else desc = desc .. L("Tes recettes restent sur ton ordinateur.") end
+    end
+    sh.desc:SetText(desc)
+    sh.switch:Update()
+    sh:SetWidth(findW)
+    local textW = findW - 12 - 40 - 12 - 12
+    local lh = S.FitText(sh.label, 2, textW, sh)
+    local dh = S.FitText(sh.desc, 0, textW, sh)
+    local hh = math.max(44, math.ceil(12 + lh + 3 + dh + 12))
+    sh:SetHeight(hh)
+    sh:ClearAllPoints(); sh:SetPoint("TOPLEFT", 0, -y)
+    sh:Show()
+    y = y + hh
+    f.list.content:SetHeight(math.max(1, y))
+    return y
+end
+
+-- one column (nobody shares anything yet): the empty state where the professions would be
+local function RenderGrid(f, g)
+    f.grid.HideFrom(1)
+    f.homeRow:Hide()
+    f.share:Hide(); f.pickHint:Hide()
+    local e = f.gridEmpty
+    e:ClearAllPoints(); e:SetPoint("TOP", f.grid.content, "TOP", 0, -24)
+    local y = Empty(e, true, "hammer", L("Aucun artisan connu"),
         L("Les membres qui ont WL Helper partagent leurs métiers en se connectant."),
         L("Faire une demande"), function() WP.ShowOrdersTab("ask") end)
-    -- your own professions, as this copy read them, and the sharing switch
-    local sh = f.share
-    if anyone then
-        local mineT, noRecipe = {}, true
-        for prof, pr in pairs(O.DB().mine or {}) do
-            local n = 0
-            for _ in pairs(pr.recipes or {}) do n = n + 1 end
-            if n > 0 then noRecipe = false end
-            mineT[#mineT + 1] = string.format(L("%s %d : %s"), ProfLabel(ProfKey(prof), prof), pr.rank or 0,
-                n > 0 and P(n, L("1 recette"), L("%d recettes")) or L("pas encore lues"))
-        end
-        table.sort(mineT)
-        local desc
-        if #mineT == 0 then desc = L("Tu n'as pas encore de métier lu par l'addon. Ouvre ta fenêtre de métier une fois.")
-        else
-            desc = table.concat(mineT, " · ") .. ". "
-            if noRecipe then desc = desc .. L("Ouvre ta fenêtre de métier une fois pour les partager.")
-            elseif WLWritsDB.ordersShare ~= false then desc = desc .. L("Les autres membres voient ce que tu sais fabriquer et peuvent te commander.")
-            else desc = desc .. L("Tes recettes restent sur ton ordinateur.") end
-        end
-        sh.desc:SetText(desc)
-        sh.switch:Update()
-        sh:SetWidth(CW)
-        local dh = S.FitText(sh.desc, 0, CW - 12 - 40 - 12 - 12, sh)
-        local hh = math.max(44, math.ceil(12 + F.body + 3 + dh + 12))
-        sh:SetHeight(hh)
-        sh:ClearAllPoints(); sh:SetPoint("TOPLEFT", 0, -(y + 16))
-        sh:Show()
-        y = y + 16 + hh
-    else sh:Hide() end
+    -- second way out: share my recipes (sharing off), else my crafter profile
+    local off = WLWritsDB.ordersShare == false
+    e.second:SetText(off and L("Partager mes recettes") or L("Ma fiche d'artisan"))
+    e.onSecond = function()
+        if off then
+            WLWritsDB.ordersShare = true; O.Announce()
+            if O.ShareChanged then O.ShareChanged() end
+            WP.RefreshOrders()
+        elseif WP.OpenCrafterPage then WP.OpenCrafterPage(nil) end
+    end
+    e.second:ClearAllPoints(); e.second:SetPoint("TOP", e, "TOP", 0, -((e.blockH or 0) + 8))
+    e.second:Show()
+    y = y + 8 + 28
     f.grid.content:SetHeight(math.max(1, y))
     return y
 end
@@ -1120,7 +1318,7 @@ local function CrafterChip(parent)
         self.wlNeed = tw
         self.label:ClearAllPoints(); self.label:SetPoint("LEFT", left, 0)
         local w = left + tw + 8
-        if w > CW then tw = CW - left - 8; w = CW end   -- one pill wider than the window: the tooltip has the name
+        if w > findW then tw = findW - left - 8; w = findW end   -- one pill wider than its column: the tooltip has the name
         self.label:SetWidth(tw); self.wlTextW = tw
         self:SetWidth(w); self.wlW = w
         return w
@@ -1474,11 +1672,11 @@ local function CrafterStrip(f, e, key)
                 local t = Tail(rest)
                 return t > 0 and (w + CHIP_GAP + t) or w
             end
-            if x > indent and x + Need() > CW then
+            if x > indent and x + Need() > findW then
                 if line >= cap then cut = i; break end
                 line, x = line + 1, indent
             end
-            if line >= cap and x > indent and x + Need() > CW then cut = i; break end
+            if line >= cap and x > indent and x + Need() > findW then cut = i; break end
             Place(ch, w)
             used = i
         end
@@ -1497,7 +1695,7 @@ local function CrafterStrip(f, e, key)
                 more.onClick = function() f.chipsAll[key] = true; WP.RefreshOrders() end
             end
             more.tip = tip
-            if x + mw > CW then line, x = line + 1, indent end
+            if x + mw > findW then line, x = line + 1, indent end
             Place(more, mw)
         else
             more:Hide()
@@ -1508,7 +1706,7 @@ local function CrafterStrip(f, e, key)
             fold.quiet = nil; fold:Paint()
             fold.tip = { L("Réduire"), L("Clic : n'afficher que les premiers artisans") }
             fold.onClick = function() f.chipsAll[key] = nil; WP.RefreshOrders() end
-            if x > indent and x + fw > CW then line, x = line + 1, indent end
+            if x > indent and x + fw > findW then line, x = line + 1, indent end
             Place(fold, fw)
         else
             fold:Hide()
@@ -1614,7 +1812,8 @@ local function RenderCatalog(f, g)
             return ItemTip(id, re, who, crafter)
         end
         r.tipFill = nil
-        local rh = r:Fit(CW)
+        H.SetFlag(r, it.id)
+        local rh = r:Fit(findW)
         r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
         y = y + rh + 2
     end
@@ -1659,7 +1858,7 @@ local function RenderCatalog(f, g)
     if cut then
         f.catMore:SetText(string.format(L("Affine la recherche pour voir la suite (%d objets affichés sur %d)."), drawn, #items))
         f.catMore:ClearAllPoints(); f.catMore:SetPoint("TOPLEFT", 0, -(y + 6))
-        y = y + 6 + S.FitText(f.catMore, 0, CW, f.cat.content)
+        y = y + 6 + S.FitText(f.catMore, 0, findW, f.cat.content)
         f.catMore:Show()
     else f.catMore:Hide() end
     f.cat.HideFrom(i + 1)
@@ -1678,18 +1877,1312 @@ local function CrafterCount()
     return string.format(L("%d artisans connus, dont %d en ligne"), crafters, online)
 end
 
+-- ---------------------------------------------------------------- the crafters' home (T-60)
+-- The right side when nothing is open: my crafter card, the search (above), four tiles (crafters
+-- online, favourites, my recent orders, watched recipes) and the week's top crafters; the
+-- professions stay on the left. Pages reached from it: the crafters online, a crafter's profile,
+-- my profile, the search results. Every number of a render reads one O.CrafterSet().
+H.SCOL = { a = C.ok, b = C.warn, o = C.fg, d = C.fg }
+function H.En() return ns.English and ns.English() or false end
+function H.Quote(s) return H.En() and ('"' .. s .. '"') or ("« " .. s .. " »") end
+-- "12 min", "3 h", "2 j"
+function H.Ago(secs)
+    secs = math.max(0, secs or 0)
+    if secs < 3600 then return string.format(L("%d min"), math.max(1, math.floor(secs / 60))) end
+    if secs < 86400 then return string.format(L("%d h"), math.floor(secs / 3600)) end
+    return string.format(L("%d j"), math.floor(secs / 86400))
+end
+-- a status as a pill (nil: no pill, "online" alone says it); returns the pill's width
+function H.SetPill(p, s)
+    if not s or not O.StatusWord(s) then p:Hide(); return 0 end
+    p:Set(O.StatusWord(s), H.SCOL[s], s == "d" and "clock" or nil)
+    p:Show()
+    return num(p:GetWidth()) or 60
+end
+-- a crafter's state in words, coloured (rows)
+function H.StatusText(g)
+    if not g.online then return S.Hex(C.muted) .. L("hors ligne") .. "|r" end
+    if not g.status then return S.Hex(C.ok) .. L("En ligne") .. "|r" end
+    return S.Hex(H.SCOL[g.status]) .. O.StatusWord(g.status) .. "|r"
+end
+-- "Forge 300 · Alchimie 285"
+function H.ProfText(profs, max)
+    local t = {}
+    for i, pr in ipairs(profs or {}) do
+        if i > (max or 3) then break end
+        local raw = pr.raw or pr.key
+        t[#t + 1] = string.format(L("%s %d"), ProfLabel(ProfKey(raw) or ProfKey(pr.key), raw), pr.rank or 0)
+    end
+    return table.concat(t, " · ")
+end
+-- "Niveau 60 · Forge 300 · +2 rerolls · Tanaris · « note »" (offline: when last seen, no zone)
+function H.GroupDetail(g, offline)
+    local t = {}
+    if g.level then t[#t + 1] = string.format(L("Niveau %d"), g.level) end
+    local pt = H.ProfText(g.profs, 3)
+    if pt ~= "" then t[#t + 1] = pt end
+    if (g.alts or 0) > 0 then t[#t + 1] = P(g.alts, L("+1 reroll"), L("+%d rerolls")) end
+    if offline then
+        if g.lastOnline then t[#t + 1] = string.format(L("Vu il y a %s"), H.Ago(g.lastOnline)) end
+    elseif g.zone then t[#t + 1] = g.zone end
+    if g.note then t[#t + 1] = H.Quote(g.note) end
+    return table.concat(t, " · ")
+end
+function H.ClassText(name, cls)
+    local cc = cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls]
+    if not cc then return name end
+    return string.format("|cff%02x%02x%02x", math.floor(cc.r * 255 + 0.5), math.floor(cc.g * 255 + 0.5), math.floor(cc.b * 255 + 0.5)) .. name .. "|r"
+end
+
+-- every widget of the home and its pages: hidden at the start of each render, shown by its page
+function H.Own(f, w) f.hx = f.hx or {}; f.hx[#f.hx + 1] = w; w:Hide(); return w end
+function H.Reset(f)
+    for _, w in ipairs(f.hx or {}) do w:Hide() end
+    for _, r in ipairs(f.list.items) do
+        r.star:Hide(); r.flag:Hide(); r.trash:Hide()
+        r.onRowClick, r.onStar, r.onFlag, r.onTrash = nil, nil, nil, nil
+        r:SetAlpha(1)
+    end
+    for _, r in ipairs(f.cat.items) do r.flag:Hide() end
+    if f.homeRow then f.homeRow:Hide() end
+    if f.gridEmpty and f.gridEmpty.second then f.gridEmpty.second:Hide() end
+end
+
+-- the watch flag on an item row (16 in a 24 hit area): muted, accentSoft when watched
+function H.SetFlag(r, id)
+    if not (r.flag and id and O.IsWatched) then return end
+    local on = O.IsWatched(id)
+    local full = not on and O.WatchCount() >= O.WATCH_MAX
+    r.flag:SetToggled(on)
+    if full then r.flag:Disable() else r.flag:Enable() end
+    r.flagTip = { L("Surveiller cette recette"), L("Tu seras prévenu quand un membre de la guilde saura la faire."),
+        full and (S.Hex(C.warn) .. L("30 recettes surveillées au plus : retire-en une d'abord.") .. "|r")
+        or (on and L("Clic : ne plus surveiller") or L("Clic : surveiller")) }
+    r.onFlag = function() O.ToggleWatch(id); WP.RefreshOrders() end
+    r.flag:Show()
+end
+-- the favourite star on a crafter's row: a player with alts is one favourite
+function H.ToggleFav(g)
+    if g.fav then
+        for _, c in ipairs(g.chars or { { name = g.name } }) do if O.IsFav(c.name) then O.ToggleFav(c.name) end end
+    else
+        local ok = O.ToggleFav(g.name)
+        if not ok then WP.Print(L("50 favoris au plus : retire-en un d'abord.")) end
+    end
+    WP.RefreshOrders()
+end
+function H.SetStar(r, g)
+    r.star:SetToggled(g.fav)
+    r.starTip = { g.fav and L("Retirer des favoris") or L("Ajouter aux favoris"),
+        g.fav and L("Clic : retirer des favoris") or L("Clic : ajouter aux favoris") }
+    r.onStar = function() H.ToggleFav(g) end
+    r.star:Show()
+end
+
+-- opens a page of the home: "online", "crafter" (name), "me"
+function H.Open(f, page, name)
+    if page == "crafter" then
+        f.pageFrom = (f.page == "online") and "online" or nil
+        f.cpName = name
+    else
+        f.pageFrom = nil
+    end
+    f.page, f.view, f.prof = page, nil, nil
+    if (f.box:GetText() or "") ~= "" then f.box:SetText("") end
+    f.list.Reset(); WP.RefreshOrders()
+end
+-- a crafter's profile from anywhere (a toast's link); nil or my name: my profile
+function WP.OpenCrafterPage(name)
+    if WP.ModuleOff and WP.ModuleOff("orders") then return end
+    if not win then WP.ShowOrdersTab("find") end
+    local f = ui.find
+    f.page, f.pageFrom, f.view, f.prof = nil, nil, nil, nil
+    if (f.box:GetText() or "") ~= "" then f.box:SetText("") end
+    if not name or name == UnitName("player") then f.page = "me" else f.page, f.cpName = "crafter", name end
+    WP.ShowOrdersTab("find")
+end
+
+-- a row of the crafters lists (online page, favourites, search): class icon, name and state,
+-- the details, the star; a click opens the profile
+function H.FillGroupRow(f, r, g, offline)
+    r.item, r.crafter, r.open, r.askProf = nil, nil, nil, nil
+    r.name:SetText(g.name .. "  " .. H.StatusText(g))
+    SetClass(r, g.name)
+    if not O.ClassOf(g.name) and g.class and S.ClassIcon(r.cls, g.class) then r.cls:Show() end
+    local det = H.GroupDetail(g, offline)
+    r.detail:SetText(det); r.detail:SetShown(det ~= "")
+    r.btn:Hide()
+    H.SetStar(r, g)
+    r.tip = { H.ClassText(g.name, g.class) }
+    if det ~= "" then r.tip[2] = det end
+    r.tip[#r.tip + 1] = string.format(L("Clic : voir la fiche de %s"), g.name)
+    r.tipFill = nil
+    r.onRowClick = function() H.Open(f, "crafter", g.name) end
+    r:SetAlpha(offline and 0.6 or 1)
+end
+
+-- ---- the home
+function H.BuildHome(f)
+    if f.hm then return f.hm end
+    local c = f.list.content
+    local hm = {}
+    -- my crafter card: class icon, name, status pill, professions and note, "My profile"
+    local card = H.Own(f, CreateFrame("Button", nil, c))
+    card.wlOwned = true
+    S.Solid(card, "BACKGROUND", C.cardFill):SetAllPoints(); S.Border(card, C.cardEdge)
+    Feedback(card)
+    if card.RegisterForClicks then pcall(card.RegisterForClicks, card, "LeftButtonUp", "RightButtonUp") end
+    card.clsFrame = CreateFrame("Frame", nil, card); card.clsFrame:SetSize(32, 32); S.Border(card.clsFrame, C.cardEdge)
+    card.clsFrame:SetPoint("LEFT", 12, 0)
+    card.cls = card.clsFrame:CreateTexture(nil, "ARTWORK"); card.cls:SetAllPoints()
+    card.name = S.Text(card, F.heading, C.fg); card.name:SetJustifyH("LEFT"); card.name:SetWordWrap(false)
+    card.pill = S.Pill(card)
+    card.detail = S.Text(card, F.meta, C.muted); card.detail:SetJustifyH("LEFT"); card.detail:SetJustifyV("TOP")
+    card.chev = S.Icon(card, "chevron_right", 10, "ARTWORK", C.muted); card.chev:SetPoint("RIGHT", -12, 0)
+    card.link = S.Text(card, F.label, C.text); card.link:SetWordWrap(false); card.link:SetText(L("Ma fiche"))
+    card.link:SetPoint("RIGHT", card.chev, "LEFT", -4, 0)
+    card:SetScript("OnClick", function(_, button)
+        if button == "RightButton" then O.CycleStatus(); return end
+        H.Open(f, "me")
+    end)
+    card.tip = { L("Ma fiche d'artisan"), L("Ce que la guilde voit de toi."), L("Clic : modifier ma fiche"), L("Clic droit : changer d'état") }
+    hm.card = card
+    -- recent searches (the box focused and empty)
+    hm.recentHead = H.Own(f, S.Text(c, F.meta, C.muted)); hm.recentHead:SetText(L("Recherches récentes"))
+    hm.recentClear = H.Own(f, S.Button(c, L("Effacer"), 0, 24, "ghost", function()
+        local d = O.DB(); d.searches = {}; WP.RefreshOrders()
+    end, { L("Effacer"), L("Clic : oublier les recherches récentes") }))
+    hm.chips = {}
+    -- the four tiles
+    hm.tiles = {}
+    for i, icon in ipairs({ "group", "star", "clock", "flag" }) do
+        local t = H.Own(f, CreateFrame("Button", nil, c))
+        t.wlOwned = true
+        S.Solid(t, "BACKGROUND", C.cardFill):SetAllPoints(); S.Border(t, C.cardEdge)
+        Feedback(t)
+        t.icon = S.Icon(t, icon, 16, "ARTWORK", C.muted); t.icon:SetPoint("TOPLEFT", 12, -12)
+        t.title = S.Text(t, F.heading, C.fg); t.title:SetJustifyH("LEFT"); t.title:SetWordWrap(false); t.title:SetPoint("TOPLEFT", 36, -10)
+        t.counter = S.Counter(t); t.counter:SetPoint("TOPRIGHT", -32, -11)
+        t.chev = S.Icon(t, "chevron_right", 16, "ARTWORK", C.muted); t.chev:SetPoint("RIGHT", -8, 0)
+        t.state = S.Text(t, F.body, C.text); t.state:SetJustifyH("LEFT"); t.state:SetWordWrap(false); t.state:SetPoint("TOPLEFT", 12, -31)
+        t.next = S.Text(t, F.meta, C.muted); t.next:SetJustifyH("LEFT"); t.next:SetWordWrap(false)
+        t.next:SetPoint("TOPLEFT", t.state, "BOTTOMLEFT", 0, -3)
+        t:SetScript("OnClick", function(self) if self.onClick then self.onClick() end end)
+        hm.tiles[i] = t
+    end
+    -- the week's top crafters
+    hm.topHead = H.Own(f, S.SectionHeader(c, L("Meilleurs artisans de la semaine"), nil, L("Tout voir"), function()
+        H.Filter().seg = "all"; f.onlineSort = "week"; H.Open(f, "online")
+    end, true))
+    hm.topRows = {}
+    hm.topEmpty = H.Own(f, S.Text(c, F.meta, C.muted)); hm.topEmpty:SetJustifyH("LEFT"); hm.topEmpty:SetJustifyV("TOP")
+    hm.topEmpty:SetText(L("Personne n'a encore livré de commande cette semaine."))
+    -- nobody known but me
+    hm.empty = H.Own(f, S.EmptyState(c, "hammer", "", nil, nil, nil))
+    f.hm = hm
+    return hm
+end
+function H.TopRow(f, i)
+    local hm = f.hm
+    local r = hm.topRows[i]
+    if r then return r end
+    r = H.Own(f, CreateFrame("Button", nil, f.list.content))
+    r.wlOwned = true
+    r:SetHeight(36)
+    S.Solid(r, "BACKGROUND", C.cardFill):SetAllPoints()
+    Feedback(r)
+    r.rank = S.Text(r, F.label, C.muted); r.rank:SetPoint("LEFT", 4, 0); r.rank:SetWidth(24); r.rank:SetJustifyH("CENTER")
+    r.dot = S.Icon(r, "dot", 8, "ARTWORK", C.ok); r.dot:SetPoint("LEFT", 32, 0)
+    r.unit = S.Text(r, F.meta, C.muted); r.unit:SetPoint("RIGHT", -8, 0); r.unit:SetWordWrap(false)
+    r.num = S.Text(r, F.label, C.fg); r.num:SetPoint("RIGHT", r.unit, "LEFT", -4, 0); r.num:SetWordWrap(false); r.num:SetJustifyH("RIGHT")
+    r.name = S.Text(r, F.label, C.fg); r.name:SetPoint("TOPLEFT", 48, -4); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
+    r.detail = S.Text(r, F.meta, C.muted); r.detail:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
+    r.detail:SetJustifyH("LEFT"); r.detail:SetWordWrap(false)
+    r:SetScript("OnClick", function(self) if self.onClick then self.onClick() end end)
+    hm.topRows[i] = r
+    return r
+end
+
+-- my card: returns its height
+function H.FillCard(f, card, W)
+    local me = UnitName("player")
+    local cls = select(2, UnitClass("player"))
+    if not S.ClassIcon(card.cls, cls) then card.cls:SetTexture(nil) end
+    card.name:SetText(H.ClassText(me, cls))
+    -- my profile as the guild sees it: professions, then the note (or what to add)
+    local mine = {}
+    for prof, pr in pairs(O.DB().mine or {}) do mine[#mine + 1] = { raw = prof, key = prof, rank = pr.rank or 0 } end
+    table.sort(mine, function(a, b) if a.rank ~= b.rank then return a.rank > b.rank end return a.raw < b.raw end)
+    local note = O.Profile().note
+    local det
+    if #mine == 0 then det = L("Aucun métier lu : ouvre ta fenêtre de métier une fois.")
+    else det = H.ProfText(mine, 3) .. " · " .. ((note ~= "") and H.Quote(note) or L("Ajoute une note pour les acheteurs.")) end
+    card.detail:SetText(det)
+    card:SetWidth(W)
+    local linkW = (root.TextWidth(card.link) or 50) + 4 + 10 + 12
+    local textW = math.max(80, W - 56 - linkW - 12)
+    card.pill.maxW = 120
+    local pw = H.SetPill(card.pill, (O.MyStatus()))
+    local nw = math.min((root.TextWidth(card.name) or 80) + 2, textW - (pw > 0 and pw + 8 or 0))
+    card.name:SetWidth(math.max(40, nw))
+    card.name:ClearAllPoints(); card.name:SetPoint("TOPLEFT", 56, -12)
+    card.pill:ClearAllPoints(); card.pill:SetPoint("LEFT", card.name, "RIGHT", 8, 0)
+    card.detail:ClearAllPoints(); card.detail:SetPoint("TOPLEFT", card.name, "BOTTOMLEFT", 0, -3)
+    local dh = S.FitText(card.detail, 2, textW, card)
+    local h = math.max(64, math.ceil(12 + F.heading + 3 + dh + 12))
+    card:SetHeight(h)
+    card:Show()
+    return h
+end
+
+-- a tile: title, counter, state line, next line, tooltip (the whole text, then the click), click
+function H.FillTile(t, w, title, n, urgent, state, nxt, tip, onClick)
+    t:SetSize(w, 72)
+    t.title:SetText(title)
+    t.counter:SetCount(n, urgent)
+    local cw = (n and n > 0) and ((num(t.counter:GetWidth()) or 18) + 8) or 0
+    S.FitText(t.title, 1, math.max(40, w - 36 - 32 - cw), t)
+    t.state:SetText(state or ""); S.FitText(t.state, 1, math.max(40, w - 12 - 32), t)
+    t.next:SetText(nxt or ""); S.FitText(t.next, 1, math.max(40, w - 12 - 32), t)
+    local lines = { title }
+    if state and state ~= "" then lines[#lines + 1] = state end
+    if nxt and nxt ~= "" then lines[#lines + 1] = nxt end
+    for _, l in ipairs(tip or {}) do lines[#lines + 1] = l end
+    t.tip = lines
+    t.onClick = onClick
+    t:Show()
+end
+
+-- the next step of a recent order, in the words of the order cards
+function H.RecentOrderLine(e)
+    local st, who = e.st, e.who or "?"
+    if e.side == "in" then return string.format(L("De %s"), who) .. " · " .. L(STATUS[st] or "Ouverte") end
+    if st == "delivered" then return string.format(L("Livrée par %s"), who) end
+    if st == "accepted" then return string.format(L("Prise par %s"), who) end
+    if st == "crafted" then return string.format(L("Fabriquée par %s"), who) end
+    if st == "declined" then return string.format(L("Refusée par %s"), who) end
+    if st == "open" then return e.who and string.format(L("Envoyée à %s"), who) or L("Ouverte à toute la guilde") end
+    return L(STATUS[st] or "Ouverte")
+end
+
+function H.Home(f)
+    local hm = H.BuildHome(f)
+    local set = O.CrafterSet()
+    f.set = set
+    local W = findW
+    local d = O.DB()
+    local c = f.list.content
+    local y = H.FillCard(f, hm.card, W)
+    hm.card:ClearAllPoints(); hm.card:SetPoint("TOPLEFT", 0, 0)
+    y = y + 12
+    -- recent searches, while the box is focused and empty
+    local searches = d.searches or {}
+    if f.box.HasFocus and f.box:HasFocus() and (f.box:GetText() or "") == "" and #searches > 0 then
+        hm.recentHead:ClearAllPoints(); hm.recentHead:SetPoint("TOPLEFT", 0, -(y + 6)); hm.recentHead:Show()
+        hm.recentClear:ClearAllPoints(); hm.recentClear:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -y); hm.recentClear:Show()
+        y = y + 24 + 4
+        local x = 0
+        for i, q in ipairs(searches) do
+            local b = hm.chips[i]
+            if not b then
+                b = H.Own(f, S.Button(c, "", 0, 24, "secondary", function(self) f.box:SetText(self.q or "") end))
+                hm.chips[i] = b
+            end
+            b.q = q
+            b:SetText(q)
+            local bw = num(b:GetWidth()) or 80
+            if x > 0 and x + bw > W then x, y = 0, y + 24 + 4 end
+            b:ClearAllPoints(); b:SetPoint("TOPLEFT", x, -y); b:Show()
+            x = x + bw + 4
+        end
+        y = y + 24 + 12
+    end
+    -- nobody known but me: one composed block, two ways out
+    if set.known == 0 then
+        local off = WLWritsDB.ordersShare == false
+        return H.SecondaryEmpty(f, hm.empty, y, W, "hammer", L("Aucun artisan connu"),
+            L("Les métiers des membres qui utilisent WL Helper apparaîtront ici."),
+            off and L("Partager mes recettes") or L("Faire une demande"), function()
+                if off then H.ShareOn() else WP.ShowOrdersTab("ask") end
+            end,
+            off and L("Faire une demande") or L("Ma fiche d'artisan"), function()
+                if off then WP.ShowOrdersTab("ask") else H.Open(f, "me") end
+            end)
+    end
+    -- the tiles: 2 x 2 when the side is wide, else one under the other
+    local cols = W >= 560 and 2 or 1
+    local tw = cols == 2 and math.floor((W - 12) / 2) or W
+    local function Place(i, t)
+        local col, line = (i - 1) % cols, math.floor((i - 1) / cols)
+        t:ClearAllPoints(); t:SetPoint("TOPLEFT", col * (tw + 12), -(y + line * (72 + 12)))
+    end
+    local T = hm.tiles
+    H.TileOnline(f, T[1], tw, set); Place(1, T[1])
+    H.TileFavs(f, T[2], tw, set, d); Place(2, T[2])
+    H.TileRecent(f, T[3], tw, d); Place(3, T[3])
+    H.TileWatch(f, T[4], tw, d); Place(4, T[4])
+    y = y + math.ceil(4 / cols) * (72 + 12) - 12
+    -- the week's top crafters (self-reported, one per customer per day)
+    return H.Top(f, hm, set, y + 16, W)
+end
+
+-- A. crafters online: "2 available of 3 online", "1 in your zone"
+function H.TileOnline(f, t, tw, set)
+    local avail = {}
+    for _, g in ipairs(set.list) do if g.available then avail[#avail + 1] = g.name end end
+    table.sort(avail)
+    local state, nxt
+    if set.online == 0 then
+        state = L("Personne en ligne pour l'instant")
+        nxt = P(set.known, L("1 artisan connu dans la guilde"), L("%d artisans connus dans la guilde"))
+    else
+        state = set.avail == 1 and string.format(L("1 disponible sur %d en ligne"), set.online)
+            or string.format(L("%d disponibles sur %d en ligne"), set.avail, set.online)
+        nxt = P(set.zone, L("1 dans ta zone"), L("%d dans ta zone"))
+    end
+    local tip = {}
+    if #avail > 0 then
+        tip[1] = string.format(L("Disponibles : %s"), table.concat(avail, ", ", 1, math.min(8, #avail)) .. (#avail > 8 and (" +" .. (#avail - 8)) or ""))
+    end
+    tip[#tip + 1] = L("Clic : voir les artisans en ligne")
+    H.FillTile(t, tw, L("Artisans en ligne"), set.online, false, state, nxt, tip,
+        function() H.Filter().seg = "all"; f.onlineSort = nil; H.Open(f, "online") end)
+end
+-- B. favourites: who of them is online
+function H.TileFavs(f, t, tw, set, d)
+    local nFav = 0
+    for _ in pairs(d.favs or {}) do nFav = nFav + 1 end
+    local on = {}
+    for _, g in ipairs(set.list) do if g.fav and g.online then on[#on + 1] = g.name end end
+    table.sort(on)
+    local state, nxt
+    if nFav == 0 then state, nxt = L("Aucun favori"), L("Mets une étoile sur un artisan pour le garder ici.")
+    else
+        nxt = P(nFav, L("1 favori"), L("%d favoris"))
+        if #on == 0 then state = L("Aucun favori en ligne")
+        elseif #on == 1 then state = string.format(L("%s en ligne"), on[1])
+        elseif #on == 2 then state = string.format(L("%s et %s en ligne"), on[1], on[2])
+        elseif #on == 3 then state = string.format(L("%s, %s et 1 autre en ligne"), on[1], on[2])
+        else state = string.format(L("%s, %s et %d autres en ligne"), on[1], on[2], #on - 2) end
+    end
+    H.FillTile(t, tw, L("Favoris"), #on, false, state, nxt, { L("Clic : voir mes favoris") },
+        function() H.Filter().seg = "fav"; f.onlineSort = nil; H.Open(f, "online") end)
+end
+-- C. my recent orders (14 days): the newest one and its step
+function H.TileRecent(f, t, tw, d)
+    local list, now = {}, time()
+    for _, e in ipairs(d.recent or {}) do if type(e) == "table" and (e.t or 0) >= now - 14 * 86400 then list[#list + 1] = e end end
+    local state, nxt
+    local first = list[1]
+    if not first then state, nxt = L("Aucune commande récente"), L("Tes commandes des deux dernières semaines apparaîtront ici.")
+    else
+        local id = first.item or 0
+        local qc = id > 0 and S.QualityColor(id) or C.fg
+        local nm = (id ~= 0) and Name(id) or (first.title or "?")
+        state = S.Hex(qc) .. nm .. "|r ×" .. (first.qty or 1) .. " · " .. string.format(L("il y a %s"), H.Ago(now - (first.t or now)))
+        nxt = H.RecentOrderLine(first)
+    end
+    local inSide = first and first.side == "in"
+    H.FillTile(t, tw, L("Mes commandes récentes"), #list, false, state, nxt,
+        { inSide and L("Clic : voir les commandes pour moi") or L("Clic : voir mes commandes") },
+        function() WP.ShowOrdersTab(inSide and "recv" or "mine") end)
+end
+-- D. watched recipes: the counter (accent: something to act on) = those someone online makes
+function H.TileWatch(f, t, tw, d)
+    local ids = {}
+    for id in pairs(d.watch or {}) do ids[#ids + 1] = id end
+    table.sort(ids)
+    local ready, firstWho, firstId, anyone = 0, nil, nil, false
+    for _, id in ipairs(ids) do
+        local onName
+        for _, c in ipairs(O.Crafters(id)) do
+            if not c.me then
+                anyone = true
+                if c.online and not onName then onName = c.name end
+            end
+        end
+        if onName then
+            ready = ready + 1
+            if not firstWho then firstWho, firstId = onName, id end
+        end
+    end
+    local state, nxt
+    if #ids == 0 then state, nxt = L("Aucune recette surveillée"), L("Le drapeau sur un objet te prévient quand un membre l'apprend.")
+    elseif firstWho then
+        state = string.format(L("%s sait faire %s"), firstWho, Name(firstId))
+        nxt = string.format(L("%s est en ligne maintenant."), firstWho)
+    else
+        state = P(#ids, L("1 recette surveillée"), L("%d recettes surveillées"))
+        nxt = anyone and L("Personne en ligne ne sait les faire.") or L("Personne ne sait encore les faire.")
+    end
+    H.FillTile(t, tw, L("Recettes surveillées"), ready, ready > 0, state, nxt, { L("Clic : voir mes recettes surveillées") },
+        function() H.Open(f, "me") end)
+end
+-- the week's top 5: delivered orders as each crafter reports them
+function H.Top(f, hm, set, y, W)
+    local hd = hm.topHead
+    hd:SetWidth(W); hd:ClearAllPoints(); hd:SetPoint("TOPLEFT", 0, -y); hd:Show()
+    hd.link:SetShown(#set.top > 0)
+    y = y + 24 + 8
+    local n = math.min(5, #set.top)
+    for i = 1, n do
+        local g = set.top[i]
+        local r = H.TopRow(f, i)
+        r:SetWidth(W)
+        r.rank:SetText(tostring(i))
+        local rc = i <= 3 and C.gold or C.muted
+        r.rank:SetTextColor(rc[1], rc[2], rc[3])
+        local dc = (not g.online) and C.faint or (g.available and C.ok or C.warn)
+        r.dot:SetVertexColor(dc[1], dc[2], dc[3])
+        r.name:SetText(H.ClassText(g.name, g.class))
+        r.detail:SetText(H.ProfText(g.profs, 1) .. (g.stars > 0 and (" · " .. STAR .. " " .. g.stars) or ""))
+        r.num:SetText(tostring(g.week))
+        r.unit:SetText(g.week == 1 and L("livrée") or L("livrées"))
+        local rw = (root.TextWidth(r.num) or 20) + (root.TextWidth(r.unit) or 40) + 4 + 8 + 12
+        S.FitText(r.name, 1, math.max(40, W - 48 - rw), r)
+        S.FitText(r.detail, 1, math.max(40, W - 48 - rw), r)
+        r.tip = { H.ClassText(g.name, g.class), string.format(L("%d commandes livrées ces 7 jours, %d en tout."), g.week, g.tot),
+            string.format(L("Annoncé par %s ; tu en as vu %d."), g.name, g.seen), L("Clic : voir sa fiche") }
+        r.onClick = function() H.Open(f, "crafter", g.name) end
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
+        y = y + 36 + 2
+    end
+    if n == 0 then
+        hm.topEmpty:ClearAllPoints(); hm.topEmpty:SetPoint("TOPLEFT", 0, -y)
+        y = y + S.FitText(hm.topEmpty, 0, W, f.list.content)
+        hm.topEmpty:Show()
+    else y = y - 2 end
+    return y + 4
+end
+
+-- ---- the pages
+function H.Filter()
+    local t = WLWritsDB.ordersOnlineFilter
+    if type(t) ~= "table" then t = {}; WLWritsDB.ordersOnlineFilter = t end
+    if t.seg ~= "all" and t.seg ~= "avail" and t.seg ~= "fav" then t.seg = "all" end
+    if type(t.prof) ~= "string" then t.prof = "" end
+    return t
+end
+function H.ShareOn()
+    WLWritsDB.ordersShare = true
+    O.Announce()
+    if O.ShareChanged then O.ShareChanged() end
+    WP.RefreshOrders()
+end
+-- a page's title (14) and its sentence (11 muted); returns where the page goes on
+function H.PageTitle(f, key, text, sentence, y, W)
+    f.pt = f.pt or {}
+    local t = f.pt[key]
+    if not t then
+        t = { title = H.Own(f, S.Text(f.list.content, F.heading, C.fg)), sub = H.Own(f, S.Text(f.list.content, F.meta, C.muted)) }
+        t.title:SetJustifyH("LEFT"); t.title:SetJustifyV("TOP"); t.sub:SetJustifyH("LEFT"); t.sub:SetJustifyV("TOP")
+        f.pt[key] = t
+    end
+    t.title:SetText(text); t.title:ClearAllPoints(); t.title:SetPoint("TOPLEFT", 0, -y); t.title:Show()
+    y = y + S.FitText(t.title, 2, W, f.list.content)
+    if sentence then
+        t.sub:SetText(sentence); t.sub:ClearAllPoints(); t.sub:SetPoint("TOPLEFT", 0, -(y + 3)); t.sub:Show()
+        y = y + 3 + S.FitText(t.sub, 0, W, f.list.content)
+    end
+    return y
+end
+-- an empty state with a primary action and, when given, a secondary one under it
+function H.SecondaryEmpty(f, e, y, W, icon, title, text, label, click, label2, click2)
+    e:ClearAllPoints(); e:SetPoint("TOP", f.list.content, "TOP", 0, -(y + 12))
+    e:SetWrapWidth(W)
+    local h = e:Set(icon, title, text, label, click, "primary") or 0
+    e:Show()
+    if not e.second then e.second = S.Button(e, "", 0, 28, "secondary", function() if e.onSecond then e.onSecond() end end) end
+    if label2 then
+        e.second:SetText(label2); e.onSecond = click2
+        e.second:ClearAllPoints(); e.second:SetPoint("TOP", e, "TOP", 0, -(h + 8)); e.second:Show()
+        h = h + 8 + 28
+    else e.second:Hide() end
+    return y + 12 + h + 12
+end
+
+-- crafters online ("See all"): All / Available / Favourites, a profession, my zone only
+function H.Online(f, set)
+    local W = findW
+    f.onl = f.onl or {}
+    local o = f.onl
+    local flt = H.Filter()
+    local c = f.list.content
+    if not o.seg then
+        o.seg = H.Own(f, S.Segmented(c, { { "all", L("Tous") }, { "avail", L("Disponibles") }, { "fav", L("Favoris") } },
+            function() return H.Filter().seg end, function(v) H.Filter().seg = v; WP.RefreshOrders() end))
+        local opts = { { "", L("Tous les métiers") } }
+        for _, k in ipairs(GRID_PROFS) do opts[#opts + 1] = { k, ProfLabel(k) } end
+        o.prof = H.Own(f, S.Dropdown(c, opts, function() return H.Filter().prof end, function(v) H.Filter().prof = v; WP.RefreshOrders() end, 160))
+        o.zoneRow = H.Own(f, CreateFrame("Button", nil, c))
+        o.zoneRow:SetHeight(28)
+        o.zone = S.Switch(o.zoneRow, function() return H.Filter().zone and true or false end,
+            function(v) H.Filter().zone = v and true or nil; WP.RefreshOrders() end, { L("Ma zone seulement"), L("Seulement les artisans dans ta zone") })
+        o.zone:SetPoint("RIGHT", 0, 0)
+        o.zoneLabel = S.Text(o.zoneRow, F.label, C.text); o.zoneLabel:SetPoint("RIGHT", o.zone, "LEFT", -8, 0); o.zoneLabel:SetText(L("Ma zone seulement"))
+        o.zoneLabel:SetWordWrap(false)
+        o.zone:AttachRow(o.zoneRow)
+        o.offHead = H.Own(f, Header(c))
+        o.empty = H.Own(f, S.EmptyState(c, "group", "", nil, nil, nil))
+    end
+    local y = H.PageTitle(f, "online", L("Artisans en ligne"), nil, 0, W) + 8
+    o.seg:SetMaxWidth(W); o.seg:Update()
+    o.seg:ClearAllPoints(); o.seg:SetPoint("TOPLEFT", 0, -y); o.seg:Show()
+    y = y + 28 + 8
+    o.prof:Update(); o.prof:ClearAllPoints(); o.prof:SetPoint("TOPLEFT", 0, -y); o.prof:Show()
+    local lw = root.TextWidth(o.zoneLabel) or 100
+    if lw <= 0 then lw = 100 end
+    o.zoneRow:SetWidth(40 + 8 + lw); o.zone:Update()
+    if W < 160 + 12 + 40 + 8 + lw then y = y + 28 + 8; o.zoneRow:ClearAllPoints(); o.zoneRow:SetPoint("TOPLEFT", 0, -y)
+    else o.zoneRow:ClearAllPoints(); o.zoneRow:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -y) end
+    o.zoneRow:Show()
+    y = y + 28 + 12
+    -- who shows: online, then the filters; the Favourites segment adds the offline ones under them
+    local myZone = GetRealZoneText and GetRealZoneText() or nil
+    local function HasProf(g)
+        if flt.prof == "" then return true end
+        for _, pr in ipairs(g.profs) do if ProfKey(pr.raw or pr.key) == flt.prof or ProfKey(pr.key) == flt.prof then return true end end
+        return false
+    end
+    local function Keep(g)
+        if flt.seg == "avail" and not g.available then return false end
+        if flt.seg == "fav" and not g.fav then return false end
+        if flt.zone and g.zone ~= myZone then return false end
+        return HasProf(g)
+    end
+    local list, offline = {}, {}
+    for _, g in ipairs(set.list) do
+        if g.online and Keep(g) then list[#list + 1] = g
+        elseif not g.online and flt.seg == "fav" and g.fav and HasProf(g) then offline[#offline + 1] = g end
+    end
+    local function Best(g) return g.profs[1] and g.profs[1].rank or 0 end
+    table.sort(list, function(a, b)
+        if f.onlineSort == "week" and a.week ~= b.week then return a.week > b.week end
+        if a.available ~= b.available then return a.available end
+        if a.fav ~= b.fav then return a.fav end
+        local za, zb = (myZone ~= nil and a.zone == myZone), (myZone ~= nil and b.zone == myZone)
+        if za ~= zb then return za end
+        if a.week ~= b.week then return a.week > b.week end
+        if Best(a) ~= Best(b) then return Best(a) > Best(b) end
+        return a.name < b.name
+    end)
+    table.sort(offline, function(a, b)
+        if (a.lastOnline or 1e12) ~= (b.lastOnline or 1e12) then return (a.lastOnline or 1e12) < (b.lastOnline or 1e12) end
+        return a.name < b.name
+    end)
+    local i = 0
+    for _, g in ipairs(list) do
+        if i >= 100 then break end
+        i = i + 1
+        local r = f.list.Get(i)
+        H.FillGroupRow(f, r, g, false)
+        local rh = r:Fit(W)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+        y = y + rh + 2
+    end
+    if #offline > 0 then
+        o.offHead:SetWidth(W); o.offHead:Set(L("Hors ligne"), #offline)
+        o.offHead:ClearAllPoints(); o.offHead:SetPoint("TOPLEFT", 0, -(y + 8)); o.offHead:Show()
+        y = y + 8 + 32 + 8
+        for _, g in ipairs(offline) do
+            if i >= 150 then break end
+            i = i + 1
+            local r = f.list.Get(i)
+            H.FillGroupRow(f, r, g, true)
+            local rh = r:Fit(W)
+            r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+            y = y + rh + 2
+        end
+    end
+    f.list.HideFrom(i + 1)
+    if i == 0 then
+        if set.online == 0 then
+            -- nobody online at all: a request still reaches them when they log in
+            local off = WLWritsDB.ordersShare == false
+            y = H.SecondaryEmpty(f, o.empty, y, W, "group", L("Aucun artisan en ligne"),
+                L("Ta demande reste ouverte : les artisans la verront en se connectant."),
+                L("Faire une demande"), function() WP.ShowOrdersTab("ask") end,
+                off and L("Partager mes recettes") or nil, H.ShareOn)
+        else
+            y = H.SecondaryEmpty(f, o.empty, y, W, "search", L("Aucun artisan ne correspond à ces filtres."), nil,
+                L("Voir tous les artisans en ligne"), function()
+                    local t = H.Filter(); t.seg, t.prof, t.zone = "all", "", nil; WP.RefreshOrders()
+                end)
+        end
+    end
+    return y
+end
+
+-- a crafter's profile: who, where, their note and counts, the star; then one row per character
+-- and profession (a click shows the recipes)
+function H.Crafter(f, set)
+    local W = findW
+    local name = f.cpName or "?"
+    local g = set.byName[name]
+    f.cp = f.cp or {}
+    local cp = f.cp
+    local c = f.list.content
+    if not cp.head then
+        local h = H.Own(f, CreateFrame("Frame", nil, c))
+        h.wlOwned = true
+        S.Solid(h, "BACKGROUND", C.cardFill):SetAllPoints(); S.Border(h, C.cardEdge)
+        h.clsFrame = CreateFrame("Frame", nil, h); h.clsFrame:SetSize(40, 40); S.Border(h.clsFrame, C.cardEdge)
+        h.clsFrame:SetPoint("TOPLEFT", 12, -12)
+        h.cls = h.clsFrame:CreateTexture(nil, "ARTWORK"); h.cls:SetAllPoints()
+        h.name = S.Text(h, F.heading, C.fg); h.name:SetJustifyH("LEFT"); h.name:SetWordWrap(false)
+        h.pill = S.Pill(h)
+        h.line = S.Text(h, F.meta, C.muted); h.line:SetJustifyH("LEFT"); h.line:SetJustifyV("TOP")
+        h.note = S.Text(h, F.body, C.text); h.note:SetJustifyH("LEFT"); h.note:SetJustifyV("TOP")
+        h.stats = S.Text(h, F.meta, C.muted); h.stats:SetJustifyH("LEFT"); h.stats:SetJustifyV("TOP")
+        h.star = S.IconButton(h, "star", 28, function() return h.starTip end, function() if h.onStar then h.onStar() end end)
+        h.star:SetPoint("TOPRIGHT", -8, -8)
+        cp.head = h
+        cp.profHead = H.Own(f, Header(c))
+    end
+    local h = cp.head
+    local m = O.Member(name) or {}
+    local cls = (g and g.class) or m.class or O.ClassOf(name)
+    if not S.ClassIcon(h.cls, cls) then h.cls:SetTexture(nil) end
+    h.name:SetText(H.ClassText(name, cls))
+    local online = (g and g.online) or (m.online and true) or false
+    local textW = W - 64 - 40
+    h.pill.maxW = 120
+    local pw = H.SetPill(h.pill, online and g and g.status or nil)
+    h.name:SetWidth(math.max(40, math.min((root.TextWidth(h.name) or 80) + 2, textW - (pw > 0 and pw + 8 or 0))))
+    h.name:ClearAllPoints(); h.name:SetPoint("TOPLEFT", 64, -12)
+    h.pill:ClearAllPoints(); h.pill:SetPoint("LEFT", h.name, "RIGHT", 8, 0)
+    local lvl = (g and g.level) or m.level
+    local line = {}
+    if lvl then
+        local cn = cls and LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[cls]
+        line[#line + 1] = cn and string.format(L("Niveau %d %s"), lvl, cn) or string.format(L("Niveau %d"), lvl)
+    end
+    if not online then
+        local lo = (g and g.lastOnline) or m.lastOnline
+        line[#line + 1] = lo and string.format(L("Vu il y a %s"), H.Ago(lo)) or L("hors ligne")
+    elseif g and g.zone then line[#line + 1] = g.zone end
+    if g and g.alts > 0 then line[#line + 1] = P(g.alts, L("+1 reroll"), L("+%d rerolls")) end
+    h.line:SetText(table.concat(line, " · ")); h.line:SetShown(#line > 0)
+    local y = 12 + F.heading + 4
+    h.line:ClearAllPoints(); h.line:SetPoint("TOPLEFT", 64, -y)
+    if #line > 0 then y = y + S.FitText(h.line, 2, textW, h) end
+    local note = g and g.note
+    h.note:SetShown(note ~= nil)
+    if note then
+        h.note:SetText(H.Quote(note)); h.note:ClearAllPoints(); h.note:SetPoint("TOPLEFT", 64, -(y + 4))
+        y = y + 4 + S.FitText(h.note, 3, textW, h)
+    end
+    local stars = g and g.stars or O.Stars(name)
+    h.stats:SetText(STAR .. " " .. stars .. " · " .. string.format(L("%d livrées cette semaine · %d en tout"), g and g.week or 0, g and g.tot or 0))
+    h.stats:ClearAllPoints(); h.stats:SetPoint("TOPLEFT", 64, -(y + 4))
+    y = y + 4 + S.FitText(h.stats, 1, textW, h)
+    local grp = g or { name = name, fav = O.IsFav(name), chars = { { name = name } } }
+    h.star:SetToggled(grp.fav)
+    h.starTip = { grp.fav and L("Retirer des favoris") or L("Ajouter aux favoris"), grp.fav and L("Clic : retirer des favoris") or L("Clic : ajouter aux favoris") }
+    h.onStar = function() H.ToggleFav(grp) end
+    local hh = math.max(64, math.ceil(y + 12))
+    h:SetSize(W, hh); h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, 0); h:Show()
+    y = hh + 16
+    cp.profHead:SetWidth(W); cp.profHead:Set(L("Métiers"))
+    cp.profHead:ClearAllPoints(); cp.profHead:SetPoint("TOPLEFT", 0, -y); cp.profHead:Show()
+    y = y + 32 + 8
+    local rows = {}
+    for _, ch in ipairs((g and g.chars) or { { name = name } }) do
+        for pname, pr in pairs(O.DB().crafters[ch.name] or {}) do
+            if type(pr) == "table" then
+                local n = 0
+                for _ in pairs(pr.recipes or {}) do n = n + 1 end
+                rows[#rows + 1] = { char = ch.name, raw = pname, rank = pr.rank or 0, n = n }
+            end
+        end
+    end
+    table.sort(rows, function(a, b)
+        if (a.char == name) ~= (b.char == name) then return a.char == name end
+        if a.rank ~= b.rank then return a.rank > b.rank end
+        if a.raw ~= b.raw then return a.raw < b.raw end
+        return a.char < b.char
+    end)
+    for i, e in ipairs(rows) do
+        local r = f.list.Get(i)
+        local key = ProfKey(e.raw) or ProfKey(O.ProfKeyOf(e.raw))
+        r.item, r.crafter, r.open, r.askProf = nil, nil, nil, nil
+        SetItem(r, ProfIcon(key), nil)
+        local label = string.format(L("%s %d"), ProfLabel(key, e.raw), e.rank)
+        if e.char ~= name then label = label .. " · " .. string.format(L("%s (reroll)"), e.char) end
+        r.name:SetText(label)
+        r.detail:SetText(e.n > 0 and P(e.n, L("1 recette"), L("%d recettes")) or L("rien de partagé")); r.detail:Show()
+        r.btn:Hide()
+        r.tip = { label, e.n > 0 and string.format(L("Clic : voir les recettes de %s"), e.char)
+            or string.format(L("Pas encore de recettes partagées par %s. Elles arrivent quand ce membre ouvre sa fenêtre de métier."), e.char) }
+        r.tipFill = nil
+        r.onRowClick = function()
+            if e.n == 0 then return end   -- nothing to show: the tooltip says why
+            f.view = { name = e.char, prof = e.raw }; f.list.Reset(); WP.RefreshOrders()
+        end
+        local rh = r:Fit(W)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+        y = y + rh + 2
+    end
+    f.list.HideFrom(#rows + 1)
+    if #rows == 0 then
+        cp.profHead:Hide()
+        local eh = Empty(f.empty, true, "clock", L("Recettes pas encore arrivées"), L("Elles arrivent quand ce membre ouvre sa fenêtre de métier."))
+        f.empty:ClearAllPoints(); f.empty:SetPoint("TOP", c, "TOP", 0, -(hh + 16 + 24))
+        y = hh + 16 + eh
+    end
+    return y
+end
+
+-- a settings row of my profile: label 13, sentence 11 under it, the switch (or a control) at the right
+function H.SwitchRow(f, label, desc, get, set, tip)
+    local r = H.Own(f, CreateFrame("Button", nil, f.list.content))
+    r.wlOwned = true
+    S.Solid(r, "BACKGROUND", C.cardFill):SetAllPoints(); S.Border(r, C.cardEdge)
+    r.label = S.Text(r, F.body, C.fg); r.label:SetPoint("TOPLEFT", 12, -10); r.label:SetJustifyH("LEFT"); r.label:SetText(label)
+    S.ClampLabel(r.label, nil, r)
+    r.desc = S.Text(r, F.meta, C.muted); r.desc:SetJustifyH("LEFT"); r.desc:SetJustifyV("TOP")
+    r.desc:SetPoint("TOPLEFT", r.label, "BOTTOMLEFT", 0, -3); r.desc:SetText(desc)
+    if get then
+        r.switch = S.Switch(r, get, set, tip)
+        r.switch:SetPoint("RIGHT", -12, 0)
+        r.switch:AttachRow(r)
+    end
+    -- rightW: the control's width at the right (40 for a switch)
+    function r:Fit(width, rightW)
+        self:SetWidth(width)
+        local tw = width - 12 - (rightW or 40) - 24
+        self.label:SetWidth(math.max(40, tw))
+        local dh = S.FitText(self.desc, 2, math.max(40, tw), self)
+        local h = math.max(44, math.ceil(10 + F.body + 3 + dh + 10))
+        self:SetHeight(h)
+        if self.switch then self.switch:Update() end
+        return h
+    end
+    return r
+end
+
+-- a dense row of my profile (a profession, a watched recipe, a favourite) from the list's pool
+function H.DenseRow(f, i, y, W, tex, id, name, detail, tip)
+    local r = f.list.Get(i)
+    r.item, r.crafter, r.open, r.askProf = nil, nil, nil, nil
+    SetItem(r, tex, id)
+    r.name:SetText(name)
+    r.detail:SetText(detail or ""); r.detail:SetShown(detail ~= nil and detail ~= "")
+    r.btn:Hide()
+    r.tip, r.tipFill = tip, nil
+    return r
+end
+
+-- ---- my crafter profile: status, note, my professions, what I share, alerts, watched, favourites
+function H.Me(f)
+    local W = findW
+    local c = f.list.content
+    f.me = f.me or {}
+    local m = f.me
+    if not m.seg then
+        m.seg = H.Own(f, S.Segmented(c, { { "a", O.StatusWord("a") }, { "b", O.StatusWord("b") }, { "o", O.StatusWord("o") } },
+            function() return O.BaseStatus() end, function(v) O.SetCrafterStatus(v) end))
+        m.banner = H.Own(f, S.Banner(c, "info", ""))
+        m.note = H.Own(f, S.Input(c, W, { label = L("Note pour les acheteurs"), placeholder = L("Ex. Je fournis le charbon, 5 po la pièce."),
+            onEnter = function(t) H.SaveNote(f, t) end }))
+        m.note:SetMaxLetters(200)
+        if m.note.label then H.Own(f, m.note.label) end
+        m.note:HookScript("OnEditFocusLost", function(self) H.SaveNote(f, self:GetText() or "") end)
+        m.note:HookScript("OnTextChanged", function(self)
+            m.count:SetText(string.format("%d/50", math.min(50, O.NoteLength(O.CleanNote(self:GetText() or "")))))
+        end)
+        m.count = H.Own(f, S.Text(c, F.foot or F.meta, C.muted)); m.count:SetJustifyH("RIGHT")
+        m.noteErr = H.Own(f, S.Text(c, F.meta, C.bad)); m.noteErr:SetJustifyH("LEFT"); m.noteErr:SetJustifyV("TOP")
+        m.noteErr:SetText(L("Les liens ne passent pas dans la note : écris le nom en toutes lettres."))
+        m.profHead = H.Own(f, Header(c))
+        m.setHead = H.Own(f, Header(c))
+        m.alertHead = H.Own(f, Header(c))
+        m.watchHead = H.Own(f, Header(c))
+        m.favHead = H.Own(f, Header(c))
+        local p = function() return O.Profile() end
+        m.rows = {
+            share = H.SwitchRow(f, L("Partager mes recettes"), L("La guilde voit ce que tu sais fabriquer."),
+                function() return WLWritsDB.ordersShare ~= false end, function(v) if v then H.ShareOn() else WLWritsDB.ordersShare = false; O.ShareChanged(); WP.RefreshOrders() end end),
+            hideAlts = H.SwitchRow(f, L("Cacher mes rerolls"), L("Tes autres personnages n'apparaissent pas sous ton nom."),
+                function() return p().hideAlts end, function(v) O.SetProfileFlag("hideAlts", v and true or false) end),
+            showZone = H.SwitchRow(f, L("Montrer ma zone"), L("Ta zone s'affiche sur ta fiche d'artisan. La liste de guilde du jeu la montre quand même."),
+                function() return p().showZone ~= false end, function(v) O.SetProfileFlag("showZone", v and true or false) end),
+            quiet = H.SwitchRow(f, L("Mode calme en donjon"), L("En donjon, raid ou champ de bataille, les commandes attendent sans bruit ; l'acheteur sait où tu es."),
+                function() return p().quiet end, function(v) O.SetProfileFlag("quiet", v and true or false) end),
+            autoBusy = H.SwitchRow(f, L("Occupé tout seul"), L("Quand tu es absent (AFK) ou en file d'attente. Ton état revient ensuite."),
+                function() return p().autoBusy end, function(v) O.SetProfileFlag("autoBusy", v and true or false) end),
+            main = H.SwitchRow(f, L("Personnage principal"), L("Tes rerolls sont regroupés sous ce nom.")),
+            alertFav = H.SwitchRow(f, L("Prévenir quand un favori se connecte"), L("Une alerte au plus toutes les 30 min par favori."),
+                function() return WLWritsDB.ordersAlertFav ~= false end, function(v) WLWritsDB.ordersAlertFav = v and true or false end),
+            alertWatch = H.SwitchRow(f, L("Prévenir quand une recette surveillée est apprise"), L("Une fois par membre et par recette."),
+                function() return WLWritsDB.ordersAlertWatch ~= false end, function(v) WLWritsDB.ordersAlertWatch = v and true or false end),
+        }
+        m.mainDD = S.Dropdown(m.rows.main, { { "", L("Automatique") } }, function() return O.Profile().main or "" end,
+            function(v) O.SetProfileFlag("main", (v ~= "" and v) or nil) end, 160)
+        m.mainDD:SetPoint("RIGHT", -12, 0)
+        m.empty = H.Own(f, S.Text(c, F.meta, C.muted)); m.empty:SetJustifyH("LEFT"); m.empty:SetJustifyV("TOP")
+        m.empty2 = H.Own(f, S.Text(c, F.meta, C.muted)); m.empty2:SetJustifyH("LEFT"); m.empty2:SetJustifyV("TOP")
+    end
+    local y = H.PageTitle(f, "me", L("Ma fiche d'artisan"), L("Ce que la guilde voit quand elle cherche un artisan."), 0, W) + 12
+    -- state
+    m.seg:SetMaxWidth(W); m.seg:Update()
+    m.seg:ClearAllPoints(); m.seg:SetPoint("TOPLEFT", 0, -y); m.seg:Show()
+    y = y + 28
+    local s, why = O.MyStatus()
+    local bt = (why == "afk" and L("Occupé tout seul : tu es absent (AFK).")) or (why == "queue" and L("Occupé tout seul : tu es en file d'attente."))
+        or (why == "inst" and L("En donjon : tes commandes attendent sans bruit.")) or nil
+    if bt then
+        m.banner:SetText(bt, "info"); m.banner:SetWidth(W)
+        m.banner:ClearAllPoints(); m.banner:SetPoint("TOPLEFT", 0, -(y + 8)); m.banner:Show()
+        y = y + 8 + m.banner:Fit(W)
+    end
+    -- the note (saved on Enter or when the box loses the focus)
+    y = y + 16
+    m.note:SetWidth(W)
+    m.note:ClearAllPoints(); m.note:SetPoint("TOPLEFT", 0, -(y + 16)); m.note:Show()
+    if m.note.label then m.note.label:Show() end
+    if not m.note:HasFocus() then m.note:SetText(O.Profile().note or "") end
+    y = y + 16 + 28
+    m.count:SetText(string.format("%d/50", O.NoteLength(O.CleanNote(m.note:GetText() or ""))))
+    m.count:ClearAllPoints(); m.count:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -(y + 4)); m.count:Show()
+    if m.linkErr then
+        m.noteErr:ClearAllPoints(); m.noteErr:SetPoint("TOPLEFT", 0, -(y + 4)); m.noteErr:Show()
+        y = y + 4 + S.FitText(m.noteErr, 2, W - 48, c)
+    else y = y + 4 + 12 end
+    -- my professions
+    y = y + 16
+    m.profHead:SetWidth(W); m.profHead:Set(L("Mes métiers"))
+    m.profHead:ClearAllPoints(); m.profHead:SetPoint("TOPLEFT", 0, -y); m.profHead:Show()
+    y = y + 32 + 8
+    local mine = {}
+    for prof, pr in pairs(O.DB().mine or {}) do
+        if type(pr) == "table" then
+            local n = 0
+            for _ in pairs(pr.recipes or {}) do n = n + 1 end
+            mine[#mine + 1] = { raw = prof, rank = pr.rank or 0, max = pr.max or 0, n = n }
+        end
+    end
+    table.sort(mine, function(a, b) if a.rank ~= b.rank then return a.rank > b.rank end return a.raw < b.raw end)
+    local i = 0
+    local share = WLWritsDB.ordersShare ~= false
+    for _, e in ipairs(mine) do
+        i = i + 1
+        local key = ProfKey(e.raw) or ProfKey(O.ProfKeyOf(e.raw))
+        local label = ProfLabel(key, e.raw) .. " " .. e.rank .. (e.max > 0 and ("/" .. e.max) or "")
+        local det = share and P(e.n, L("1 recette partagée"), L("%d recettes partagées")) or P(e.n, L("1 recette, non partagée"), L("%d recettes, non partagées"))
+        local r = H.DenseRow(f, i, y, W, ProfIcon(key), nil, label, det, { label, det })
+        local rh = r:Fit(W)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+        y = y + rh + 2
+    end
+    if #mine == 0 then
+        m.empty:SetText(L("Aucun métier lu : ouvre ta fenêtre de métier une fois."))
+        m.empty:ClearAllPoints(); m.empty:SetPoint("TOPLEFT", 0, -y); m.empty:Show()
+        y = y + S.FitText(m.empty, 0, W, c) + 2
+    end
+    -- what the guild sees
+    y = y + 14
+    m.setHead:SetWidth(W); m.setHead:Set(L("Ce que la guilde voit"))
+    m.setHead:ClearAllPoints(); m.setHead:SetPoint("TOPLEFT", 0, -y); m.setHead:Show()
+    y = y + 32 + 8
+    -- the alts it hides, in the tooltip of its row
+    local alts = {}
+    for n in pairs(O.Profile().alts) do if n ~= UnitName("player") then alts[#alts + 1] = n end end
+    table.sort(alts)
+    m.rows.hideAlts.tip = { L("Cacher mes rerolls"), #alts > 0 and string.format(L("Mes rerolls : %s"), table.concat(alts, ", "))
+        or L("Aucun reroll connu : chacun s'ajoute en se connectant dans la guilde."), L("Clic : changer") }
+    local opts = { { "", L("Automatique") } }
+    local allAlts = {}
+    for n in pairs(O.Profile().alts) do allAlts[#allAlts + 1] = n end
+    table.sort(allAlts)
+    for _, n in ipairs(allAlts) do opts[#opts + 1] = { n, n } end
+    m.mainDD.options = opts
+    m.mainDD:Update()
+    for _, k in ipairs({ "share", "hideAlts", "showZone", "quiet", "autoBusy", "main" }) do
+        local r = m.rows[k]
+        local rh = r:Fit(W, k == "main" and 160 or 40)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
+        y = y + rh + 2
+    end
+    -- alerts
+    y = y + 14
+    m.alertHead:SetWidth(W); m.alertHead:Set(L("Alertes"))
+    m.alertHead:ClearAllPoints(); m.alertHead:SetPoint("TOPLEFT", 0, -y); m.alertHead:Show()
+    y = y + 32 + 8
+    for _, k in ipairs({ "alertFav", "alertWatch" }) do
+        local r = m.rows[k]
+        local rh = r:Fit(W, 40)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
+        y = y + rh + 2
+    end
+    -- watched recipes
+    local d = O.DB()
+    local ids = {}
+    for id in pairs(d.watch or {}) do ids[#ids + 1] = id end
+    table.sort(ids, function(a, b) return Name(a) < Name(b) end)
+    y = y + 14
+    m.watchHead:SetWidth(W); m.watchHead:Set(L("Recettes surveillées"), #ids > 0 and #ids or nil)
+    m.watchHead:ClearAllPoints(); m.watchHead:SetPoint("TOPLEFT", 0, -y); m.watchHead:Show()
+    y = y + 32 + 8
+    for _, id in ipairs(ids) do
+        i = i + 1
+        local who, on = {}, false
+        for _, cr in ipairs(O.Crafters(id)) do
+            if not cr.me then who[#who + 1] = cr.name; if cr.online then on = true end end
+        end
+        local det = #who == 0 and L("Personne ne sait la faire")
+            or (table.concat(who, ", ", 1, math.min(3, #who)) .. (#who > 3 and (" +" .. (#who - 3)) or "") .. (on and L(" · en ligne") or ""))
+        local qc = id > 0 and S.QualityColor(id) or C.fg
+        local r = H.DenseRow(f, i, y, W, ItemTex(id), id, Name(id), det, { S.Hex(qc) .. Name(id) .. "|r", det,
+            #who > 0 and L("Clic : commander") or L("Clic : faire une demande à la guilde") })
+        r.trash:Show()
+        r.trashTip = { L("Ne plus surveiller"), L("Clic : ne plus surveiller") }
+        r.onTrash = function() O.ToggleWatch(id); WP.RefreshOrders() end
+        r.onRowClick = function()
+            if #who > 0 then WP.NewOrder(id, nil) elseif WP.AskOrder then WP.AskOrder(id) end
+        end
+        local rh = r:Fit(W)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+        y = y + rh + 2
+    end
+    if #ids == 0 then
+        m.empty2:SetText(L("Le drapeau sur un objet te prévient quand un membre l'apprend."))
+        m.empty2:ClearAllPoints(); m.empty2:SetPoint("TOPLEFT", 0, -y); m.empty2:Show()
+        y = y + S.FitText(m.empty2, 0, W, c) + 2
+    end
+    -- favourites (offline ones too)
+    local favs = {}
+    for n in pairs(d.favs or {}) do favs[#favs + 1] = n end
+    table.sort(favs)
+    y = y + 14
+    m.favHead:SetWidth(W); m.favHead:Set(L("Favoris"), #favs > 0 and #favs or nil)
+    m.favHead:ClearAllPoints(); m.favHead:SetPoint("TOPLEFT", 0, -y); m.favHead:Show()
+    y = y + 32 + 8
+    local set = f.set or O.CrafterSet()
+    for _, n in ipairs(favs) do
+        i = i + 1
+        local g = set.byName[n] or { name = n, fav = true, chars = { { name = n } }, profs = {}, alts = 0, online = O.OnlineGuild()[n] and true or false }
+        local r = f.list.Get(i)
+        H.FillGroupRow(f, r, g, not g.online)
+        if g.name ~= n then r.name:SetText(n .. "  " .. H.StatusText(g)) end
+        local rh = r:Fit(W)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+        y = y + rh + 2
+    end
+    f.list.HideFrom(i + 1)
+    if #favs == 0 then y = y + 0 else y = y - 2 end
+    return y + 4
+end
+function H.SaveNote(f, t)
+    local cur = O.Profile().note or ""
+    local _, link = O.SetNote(t)
+    f.me = f.me or {}
+    f.me.linkErr = link and true or nil
+    if link or O.Profile().note ~= cur then WP.RefreshOrders() end
+end
+
+-- ---- search results: players, items, materials (each group capped, "See N more")
+function H.Search(f, q)
+    local W = findW
+    local c = f.list.content
+    f.sr = f.sr or { heads = {}, more = {} }
+    local sr = f.sr
+    local set = O.CrafterSet()
+    f.set = set
+    f.searchCaps = f.searchCaps or {}
+    local res = O.Search(q, f.searchCaps, set)
+    local y, i, gi = 0, 0, 0
+    local function Head(label, total)
+        gi = gi + 1
+        local h = sr.heads[gi]
+        if not h then h = H.Own(f, S.SectionHeader(c, "", nil, nil, nil, true)); sr.heads[gi] = h end
+        h:SetWidth(W); h:Set(label, total)
+        h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -(y + (y > 0 and 16 or 0))); h:Show()
+        y = y + (y > 0 and 16 or 0) + 24 + 8
+    end
+    local function More(key, g)
+        if g.total <= #g.list then return end
+        local b = sr.more[key]
+        if not b then
+            b = H.Own(f, S.Button(c, "", 0, 24, "ghost", function() f.searchCaps[key] = 200; WP.RefreshOrders() end))
+            sr.more[key] = b
+        end
+        b:SetText(string.format(L("Voir les %d autres"), g.total - #g.list))
+        b.tip = { b:GetText(), L("Clic : tout montrer") }
+        b:ClearAllPoints(); b:SetPoint("TOPLEFT", 0, -(y + 2)); b:Show()
+        y = y + 2 + 24
+    end
+    local function Save() O.AddSearch(f.box:GetText() or "") end
+    -- players
+    if res.players.total > 0 then
+        Head(L("Joueurs"), res.players.total)
+        for _, g in ipairs(res.players.list) do
+            i = i + 1
+            local r = f.list.Get(i)
+            H.FillGroupRow(f, r, g, not g.online)
+            r.onRowClick = function() Save(); H.Open(f, "crafter", g.name) end
+            local rh = r:Fit(W)
+            r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+            y = y + rh + 2
+        end
+        y = y - 2
+        More("players", res.players)
+    end
+    -- items
+    if res.items.total > 0 or res.use ~= nil then
+        local useName = res.use and Name(res.use)
+        Head(useName and string.format(L("Objets faits avec %s"), useName) or L("Objets"), res.items.total)
+        for _, it in ipairs(res.items.list) do
+            i = i + 1
+            local id = it.id
+            local det = it.online and string.format(L("%s · %s en ligne"), P(it.n, L("1 artisan"), L("%d artisans")), it.online)
+                or string.format(L("%s · personne en ligne"), P(it.n, L("1 artisan"), L("%d artisans")))
+            local r = H.DenseRow(f, i, y, W, ItemTex(id), id, it.name, det, nil)
+            r.item, r.crafter = id, nil
+            r.btn:SetText(L("Commander")); r.btn:Show()
+            r.btnTip = { L("Commander"), L("Toute la guilde verra ta commande."), L("Clic : commander à la guilde") }
+            local qc = id > 0 and S.QualityColor(id) or C.fg
+            r.tip = { S.Hex(qc) .. it.name .. "|r", det, L("Clic : voir qui le fabrique"), id > 0 and L("Maj-clic : le lier dans la discussion") or nil }
+            H.SetFlag(r, id)
+            r.onRowClick = function()
+                Save()
+                local link = id > 0 and select(2, GetItemInfo(id))
+                if IsShiftKeyDown and IsShiftKeyDown() and link and ChatEdit_InsertLink then
+                    if not f.box:HasFocus() then ChatEdit_InsertLink(link) end
+                    return
+                end
+                if id > 0 then f.box:SetText(link or ("item:" .. id)) else WP.NewOrder(id, nil) end
+            end
+            local rh = r:Fit(W)
+            r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+            y = y + rh + 2
+        end
+        y = y - 2
+        More("items", res.items)
+    end
+    -- materials
+    if res.mats.total > 0 then
+        Head(L("Composants"), res.mats.total)
+        for _, mt in ipairs(res.mats.list) do
+            i = i + 1
+            local det = P(mt.n, L("Utilisé dans 1 recette"), L("Utilisé dans %d recettes"))
+            local r = H.DenseRow(f, i, y, W, S.ItemIcon(mt.id), mt.id, mt.name, det,
+                { mt.name, det, L("Clic : voir les objets faits avec") })
+            r.onRowClick = function() Save(); f.box:SetText(L("Utilise : ") .. mt.name) end
+            local rh = r:Fit(W)
+            r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+            y = y + rh + 2
+        end
+        y = y - 2
+        More("mats", res.mats)
+    end
+    f.list.HideFrom(i + 1)
+    -- nothing: what the search covers, and asking the guild instead
+    if i == 0 then
+        if not sr.empty then sr.empty = H.Own(f, S.EmptyState(c, "search", "", nil, nil, nil, "secondary")) end
+        local text = (tostring(q or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+        local short = text
+        if #short > 40 then short = short:sub(1, 40):gsub("[\192-\255][\128-\191]*$", "") end
+        y = H.SecondaryEmpty(f, sr.empty, 0, W, "search", string.format(L("Rien pour %s"), H.Quote(short)),
+            L("La recherche couvre les joueurs, les objets et les composants de la guilde."),
+            string.format(L("Demander %s à la guilde"), H.Quote(short)), function()
+                if WP.AskOrder then WP.AskOrder(nil) end
+                if ui.ask and ui.ask.box then ui.ask.box:SetText(text) end
+            end)
+        sr.empty.button:SetKind("secondary")
+    end
+    return y + 4
+end
+
+-- a page of the home (f.page): the crafters online, a crafter's profile, my profile
+function H.RenderPage(f)
+    local set = O.CrafterSet()
+    f.set = set
+    f.back:SetText(f.pageFrom == "online" and L("Artisans en ligne") or L("Accueil"))
+    local y
+    if f.page == "online" then y = H.Online(f, set)
+    elseif f.page == "crafter" then y = H.Crafter(f, set)
+    else y = H.Me(f) end
+    f.list.content:SetHeight(math.max(1, y))
+    return y
+end
+
+-- the crafters' home (T-60): its words in English
+ns.AddEnglish({
+    ["Artisans, favoris, recherche"] = "Crafters, favourites, search",
+    ["Clic : revenir à l'accueil des artisans"] = "Click: back to the crafters' home",
+    ["Clic : revenir à la fiche de %s"] = "Click: back to %s's profile",
+    ["Ex. Brakk, Heaume cœur-de-lion, Étoffe runique"] = "E.g. Brakk, Lionheart Helm, Runecloth",
+    ["Recherches récentes"] = "Recent searches",
+    ["Clic : oublier les recherches récentes"] = "Click: forget the recent searches",
+    ["Ma fiche"] = "My profile",
+    ["Ma fiche d'artisan"] = "My crafter profile",
+    ["Ce que la guilde voit de toi."] = "What the guild sees about you.",
+    ["Clic : modifier ma fiche"] = "Click: edit my profile",
+    ["Clic droit : changer d'état"] = "Right-click: change status",
+    ["Aucun métier lu : ouvre ta fenêtre de métier une fois."] = "No profession read yet: open your profession window once.",
+    ["Ajoute une note pour les acheteurs."] = "Add a note for buyers.",
+    ["%d min"] = "%d min",
+    ["%d h"] = "%d h",
+    ["%d j"] = "%d d",
+    ["il y a %s"] = "%s ago",
+    ["Vu il y a %s"] = "Seen %s ago",
+    ["Niveau %d"] = "Level %d",
+    ["Niveau %d %s"] = "Level %d %s",
+    ["+1 reroll"] = "+1 alt",
+    ["+%d rerolls"] = "+%d alts",
+    ["%s (reroll)"] = "%s (alt)",
+    ["Ajouter aux favoris"] = "Add to favourites",
+    ["Retirer des favoris"] = "Remove from favourites",
+    ["Clic : ajouter aux favoris"] = "Click: add to favourites",
+    ["Clic : retirer des favoris"] = "Click: remove from favourites",
+    ["50 favoris au plus : retire-en un d'abord."] = "50 favourites at most: remove one first.",
+    ["Clic : voir la fiche de %s"] = "Click: open %s's profile",
+    ["Surveiller cette recette"] = "Watch this recipe",
+    ["Tu seras prévenu quand un membre de la guilde saura la faire."] = "You will be told when a guild member can make it.",
+    ["30 recettes surveillées au plus : retire-en une d'abord."] = "30 watched recipes at most: remove one first.",
+    ["Clic : surveiller"] = "Click: watch",
+    ["Clic : ne plus surveiller"] = "Click: stop watching",
+    ["Ne plus surveiller"] = "Stop watching",
+    -- tiles
+    ["Artisans en ligne"] = "Crafters online",
+    ["Personne en ligne pour l'instant"] = "Nobody online right now",
+    ["1 artisan connu dans la guilde"] = "1 crafter known in the guild",
+    ["%d artisans connus dans la guilde"] = "%d crafters known in the guild",
+    ["1 disponible sur %d en ligne"] = "1 available of %d online",
+    ["%d disponibles sur %d en ligne"] = "%d available of %d online",
+    ["1 dans ta zone"] = "1 in your zone",
+    ["%d dans ta zone"] = "%d in your zone",
+    ["Disponibles : %s"] = "Available: %s",
+    ["Clic : voir les artisans en ligne"] = "Click: see crafters online",
+    ["Favoris"] = "Favourites",
+    ["Aucun favori"] = "No favourites",
+    ["Mets une étoile sur un artisan pour le garder ici."] = "Star a crafter to keep them here.",
+    ["1 favori"] = "1 favourite",
+    ["%d favoris"] = "%d favourites",
+    ["Aucun favori en ligne"] = "No favourites online",
+    ["%s en ligne"] = "%s online",
+    ["%s et %s en ligne"] = "%s and %s online",
+    ["%s, %s et 1 autre en ligne"] = "%s, %s and 1 other online",
+    ["%s, %s et %d autres en ligne"] = "%s, %s and %d others online",
+    ["Clic : voir mes favoris"] = "Click: see my favourites",
+    ["Mes commandes récentes"] = "My recent orders",
+    ["Aucune commande récente"] = "No recent orders",
+    ["Tes commandes des deux dernières semaines apparaîtront ici."] = "Your orders from the last two weeks will show up here.",
+    ["Livrée par %s"] = "Delivered by %s",
+    ["Prise par %s"] = "Taken by %s",
+    ["Fabriquée par %s"] = "Crafted by %s",
+    ["Refusée par %s"] = "Declined by %s",
+    ["Envoyée à %s"] = "Sent to %s",
+    ["Ouverte à toute la guilde"] = "Open to the whole guild",
+    ["Clic : voir mes commandes"] = "Click: see my orders",
+    ["Clic : voir les commandes pour moi"] = "Click: see the orders for me",
+    ["Recettes surveillées"] = "Watched recipes",
+    ["Aucune recette surveillée"] = "No watched recipes",
+    ["Le drapeau sur un objet te prévient quand un membre l'apprend."] = "The flag on an item tells you when a member learns it.",
+    ["%s sait faire %s"] = "%s can make %s",
+    ["%s est en ligne maintenant."] = "%s is online now.",
+    ["1 recette surveillée"] = "1 watched recipe",
+    ["%d recettes surveillées"] = "%d watched recipes",
+    ["Personne en ligne ne sait les faire."] = "Nobody online can make them.",
+    ["Personne ne sait encore les faire."] = "Nobody can make them yet.",
+    ["Clic : voir mes recettes surveillées"] = "Click: see my watched recipes",
+    ["Meilleurs artisans de la semaine"] = "Top crafters this week",
+    ["Tout voir"] = "See all",
+    ["livrée"] = "delivered",
+    ["livrées"] = "delivered",
+    ["%d commandes livrées ces 7 jours, %d en tout."] = "%d orders delivered in the last 7 days, %d in all.",
+    ["Annoncé par %s ; tu en as vu %d."] = "As reported by %s; you saw %d.",
+    ["Clic : voir sa fiche"] = "Click: open their profile",
+    ["Personne n'a encore livré de commande cette semaine."] = "Nobody has delivered an order this week yet.",
+    ["Les métiers des membres qui utilisent WL Helper apparaîtront ici."] = "The professions of members who use WL Helper will show up here.",
+    -- crafters online, a crafter's profile
+    ["Disponibles"] = "Available",
+    ["Ma zone seulement"] = "My zone only",
+    ["Seulement les artisans dans ta zone"] = "Only crafters in your zone",
+    ["Aucun artisan en ligne"] = "No crafters online",
+    ["Ta demande reste ouverte : les artisans la verront en se connectant."] = "Your request stays open: crafters will see it when they log in.",
+    ["Aucun artisan ne correspond à ces filtres."] = "No crafter matches these filters.",
+    ["Voir tous les artisans en ligne"] = "See all crafters online",
+    ["%d livrées cette semaine · %d en tout"] = "%d delivered this week · %d in all",
+    ["Métiers"] = "Professions",
+    -- my profile
+    ["Ce que la guilde voit quand elle cherche un artisan."] = "What the guild sees when looking for a crafter.",
+    ["Occupé tout seul : tu es absent (AFK)."] = "Busy automatically: you are AFK.",
+    ["Occupé tout seul : tu es en file d'attente."] = "Busy automatically: you are queued.",
+    ["En donjon : tes commandes attendent sans bruit."] = "In a dungeon: your orders wait silently.",
+    ["Note pour les acheteurs"] = "Note for buyers",
+    ["Ex. Je fournis le charbon, 5 po la pièce."] = "E.g. I bring the coal, 5 g each.",
+    ["Les liens ne passent pas dans la note : écris le nom en toutes lettres."] = "Links don't fit in the note: type the name instead.",
+    ["Mes métiers"] = "My professions",
+    ["1 recette partagée"] = "1 recipe shared",
+    ["%d recettes partagées"] = "%d recipes shared",
+    ["1 recette, non partagée"] = "1 recipe, not shared",
+    ["%d recettes, non partagées"] = "%d recipes, not shared",
+    ["Ce que la guilde voit"] = "What the guild sees",
+    ["La guilde voit ce que tu sais fabriquer."] = "The guild sees what you can craft.",
+    ["Cacher mes rerolls"] = "Hide my alts",
+    ["Tes autres personnages n'apparaissent pas sous ton nom."] = "Your other characters are not listed under your name.",
+    ["Mes rerolls : %s"] = "My alts: %s",
+    ["Aucun reroll connu : chacun s'ajoute en se connectant dans la guilde."] = "No alts known yet: each one adds itself when it logs in to the guild.",
+    ["Clic : changer"] = "Click: change",
+    ["Montrer ma zone"] = "Show my zone",
+    ["Ta zone s'affiche sur ta fiche d'artisan. La liste de guilde du jeu la montre quand même."] = "Your zone shows on your crafter card. The game's guild list shows it anyway.",
+    ["Mode calme en donjon"] = "Quiet in dungeons",
+    ["En donjon, raid ou champ de bataille, les commandes attendent sans bruit ; l'acheteur sait où tu es."] =
+        "In a dungeon, raid or battleground, orders wait silently; the buyer knows where you are.",
+    ["Occupé tout seul"] = "Busy automatically",
+    ["Quand tu es absent (AFK) ou en file d'attente. Ton état revient ensuite."] = "When you are AFK or queued. Your status comes back afterwards.",
+    ["Personnage principal"] = "Main character",
+    ["Tes rerolls sont regroupés sous ce nom."] = "Your alts are grouped under this name.",
+    ["Alertes"] = "Alerts",
+    ["Prévenir quand un favori se connecte"] = "Tell me when a favourite logs in",
+    ["Une alerte au plus toutes les 30 min par favori."] = "One alert at most every 30 min per favourite.",
+    ["Prévenir quand une recette surveillée est apprise"] = "Tell me when a watched recipe is learned",
+    ["Une fois par membre et par recette."] = "Once per member and recipe.",
+    ["Personne ne sait la faire"] = "Nobody can make it",
+    [" · en ligne"] = " · online",
+    ["Clic : commander"] = "Click: order",
+    ["Clic : faire une demande à la guilde"] = "Click: make a request to the guild",
+    -- search
+    ["Joueurs"] = "Players",
+    ["Objets"] = "Items",
+    ["Objets faits avec %s"] = "Items made with %s",
+    ["%s · %s en ligne"] = "%s · %s online",
+    ["%s · personne en ligne"] = "%s · nobody online",
+    ["Clic : voir qui le fabrique"] = "Click: see who makes it",
+    ["Maj-clic : le lier dans la discussion"] = "Shift-click: link it in chat",
+    ["Utilisé dans 1 recette"] = "Used in 1 recipe",
+    ["Utilisé dans %d recettes"] = "Used in %d recipes",
+    ["Clic : voir les objets faits avec"] = "Click: see the items made with it",
+    ["Voir les %d autres"] = "See %d more",
+    ["Clic : tout montrer"] = "Click: show them all",
+    ["Rien pour %s"] = "Nothing for %s",
+    ["La recherche couvre les joueurs, les objets et les composants de la guilde."] = "Search covers the guild's players, items and materials.",
+    ["Demander %s à la guilde"] = "Ask the guild for %s",
+    -- buyer side: a crafter in a dungeon
+    ["%s est en donjon : ta commande attendra sa sortie."] = "%s is in a dungeon: your order will wait until they are out.",
+})
+
 local function RenderFind()
     local f = ui.find
     local p = pages.find
     local q = (f.box:GetText() or ""):lower()
     win.subtitle:SetText(CrafterCount())
     f.listHead:Hide(); f.empty:Hide()
+    H.Reset(f)   -- the home's own widgets and the rows' icon actions, shown again by what uses them
+    -- two columns as soon as someone shares a profession: the professions stay on the left
+    local g = GuildCrafts()
+    local keys, anyone = ProfKeys(g)
+    f.split = anyone
+    local function Left() if f.split then RenderProfList(f, g, keys) end end
     -- one crafter picked: what they make (when their recipe list arrived)
     if f.view and #q < 2 then
         local v = f.view
-        f.back:SetText(f.prof and ProfLabel(f.prof) or L("Tous les métiers"))
+        f.back:SetText(f.prof and ProfLabel(f.prof) or (f.page == "crafter" and f.cpName) or L("Accueil"))
         f.back:Show()
         local l = SetMode(f, "list")
+        Left()
         local pr = v.me and O.DB().mine[v.prof] or (O.DB().crafters[v.name] or {})[v.prof]
         local items = {}
         for id in pairs(pr and pr.recipes or {}) do items[#items + 1] = { id = id, name = Name(id) } end
@@ -1722,7 +3215,8 @@ local function RenderFind()
             row.btn:SetText(L("Commander")); row.btn:SetShown(not v.me)
             row.btnTip = crafter and { L("Commander"), string.format(L("Clic : commander à %s"), crafter) } or nil
             row.askProf = (not v.me) and v.prof or nil
-            local rh = row:Fit(CW)
+            if not v.me then H.SetFlag(row, id) end
+            local rh = row:Fit(findW)
             row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y)
             y = y + rh + 2
             shown = i
@@ -1740,9 +3234,10 @@ local function RenderFind()
     end
     -- a profession picked in the grid: its catalogue
     if f.prof then
-        local g = GuildCrafts()
+        findW = f.split and RW or CW          -- the strip wraps at the right side's width
         CrafterStrip(f, g[f.prof], f.prof)   -- sets the header's height before the list is placed
         local l = SetMode(f, "cat")
+        Left()
         Fit(p, l, RenderCatalog(f, g))
         return
     end
@@ -1750,6 +3245,7 @@ local function RenderFind()
     local linked = tonumber((f.box:GetText() or ""):match("item:(%d+)"))
     if linked then
         local l = SetMode(f, "list")
+        Left()
         local who = O.Possible(linked)
         local row = f.list.Get(1)
         row.item, row.crafter, row.open = linked, nil, nil
@@ -1760,7 +3256,7 @@ local function RenderFind()
         row.tip, row.tipFill = { S.Hex(qc) .. Name(linked) .. "|r", L("Toute la guilde verra ta commande."), L("Clic : commander à la guilde") }, nil
         row.btn:SetText(L("Commander à la guilde")); row.btn:Show(); row.askProf = nil
         row.btnTip = { L("Commander à la guilde"), L("Toute la guilde verra ta commande."), L("Clic : commander à la guilde") }
-        local y = row:Fit(CW)
+        local y = row:Fit(findW)
         row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, 0)
         -- each possible crafter: exact (shared recipe) or by profession, online first
         local shown = 0
@@ -1784,7 +3280,7 @@ local function RenderFind()
             cr.tip, cr.tipFill = tip, nil
             cr.btn:SetText(L("Commander")); cr.btn:Show(); cr.askProf = nil
             cr.btnTip = { L("Commander"), string.format(L("Clic : commander à %s"), c.name) }
-            local rh = cr:Fit(CW)
+            local rh = cr:Fit(findW)
             cr:ClearAllPoints(); cr:SetPoint("TOPLEFT", 0, -y)
             y = y + rh + 2
             shown = i
@@ -1795,59 +3291,31 @@ local function RenderFind()
         Fit(p, l, y)
         return
     end
-    -- nothing typed: the profession grid
+    -- nothing typed: a page of the home (online crafters, a crafter, my profile), or the home itself
+    -- (the professions on the left, the home on the right); nobody shares anything yet: one
+    -- column and its empty state
     if #q < 2 then
+        if f.page then
+            local l = SetMode(f, "list")
+            Left()
+            Fit(p, l, H.RenderPage(f))
+            return
+        end
         local l = SetMode(f, "grid")
-        Fit(p, l, RenderGrid(f, GuildCrafts()))
+        if f.split then
+            Left()
+            f.grid.content:SetHeight(math.max(1, pages.find.sideH or 1))
+            f.gridEmpty:Hide()
+            Fit(p, l, H.Home(f))
+        else
+            Fit(p, l, RenderGrid(f, g))
+        end
         return
     end
-    -- a name typed: every shared recipe whose item matches, one row per crafter
+    -- two letters or more: players, items and materials of the guild
     local l = SetMode(f, "list")
-    local catalog = O.Catalog()
-    local rows, names = {}, {}
-    for id, prof in pairs(catalog) do
-        local n = Name(id)
-        if n:lower():find(q, 1, true) then
-            names[id] = n
-            for _, c in ipairs(O.Crafters(id)) do rows[#rows + 1] = { item = id, prof = prof, c = c } end
-        end
-    end
-    table.sort(rows, function(a, b)
-        if a.item ~= b.item then return names[a.item] < names[b.item] end
-        if a.c.online ~= b.c.online then return a.c.online end
-        return a.c.rank > b.c.rank
-    end)
-    local y, shown = 0, 0
-    for i, r in ipairs(rows) do
-        local row = f.list.Get(i)
-        row.item, row.crafter, row.open = r.item, not r.c.me and r.c.name or nil, nil
-        SetItem(row, ItemTex(r.item), r.item)
-        row.name:SetText(names[r.item])
-        row.detail:SetText((r.c.me and L("toi") or (r.c.name .. Stars(r.c.name))) .. " · "
-            .. string.format(L("%s %d"), ProfLabel(ProfKey(r.c.prof), r.c.prof), r.c.rank or 0) .. " · " .. Where(r.c.online, r.c.seen)); row.detail:Show()
-        local qc = r.item > 0 and S.QualityColor(r.item) or C.fg
-        local tip = { S.Hex(qc) .. names[r.item] .. "|r", row.detail:GetText() }
-        if row.crafter then tip[#tip + 1] = string.format(L("Clic : commander à %s"), row.crafter) end
-        row.tip, row.tipFill = tip, nil
-        row.btn:SetText(L("Commander")); row.btn:SetShown(not r.c.me); row.askProf = nil
-        row.btnTip = row.crafter and { L("Commander"), string.format(L("Clic : commander à %s"), row.crafter) } or nil
-        local rh = row:Fit(CW)
-        row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y)
-        y = y + rh + 2
-        shown = i
-        if i >= 60 then break end
-    end
-    f.list.HideFrom(shown + 1)
-    if next(catalog) == nil then
-        y = Empty(f.empty, true, "hammer", L("Aucune recette partagée"),
-            L("Les membres qui ont WL Helper partagent leurs métiers en se connectant."),
-            L("Faire une demande"), function() WP.AskOrder(nil, nil, { title = O.CleanTitle(f.box:GetText() or "") }) end)
-    elseif #rows == 0 then
-        y = Empty(f.empty, true, "search", L("Personne n'a partagé cette recette"), L("Une demande prévient quand même les artisans du métier."),
-            L("Faire une demande"), function() WP.AskOrder(nil, nil, { title = O.CleanTitle(f.box:GetText() or "") }) end)
-    end
-    f.list.content:SetHeight(math.max(1, y))
-    Fit(p, l, y)
+    Left()
+    Fit(p, l, H.Search(f, f.box:GetText() or ""))
 end
 
 -- ---------------------------------------------------------------- page: a new order
@@ -1977,8 +3445,12 @@ local function RenderNew()
     if draft.crafter then
         local knows = false
         for _, cr in ipairs(O.Crafters(draft.item)) do if cr.name == draft.crafter then knows = true end end
-        n.sub:SetText(string.format(knows and L("Recette connue de %s") or L("%s a le métier, recette pas encore partagée"), draft.crafter))
-        y = y + 3 + S.FitText(n.sub, 2, nameW, c)
+        local sub = string.format(knows and L("Recette connue de %s") or L("%s a le métier, recette pas encore partagée"), draft.crafter)
+        -- in a dungeon (quiet mode): the order waits until they are out
+        local dun = O.StatusOf and O.StatusOf(draft.crafter) == "d"
+        if dun then sub = sub .. "\n" .. string.format(L("%s est en donjon : ta commande attendra sa sortie."), draft.crafter) end
+        n.sub:SetText(sub)
+        y = y + 3 + S.FitText(n.sub, dun and 4 or 2, nameW, c)
     end
     if not n.qtyBox:HasFocus() then n.qtyBox:SetText(tostring(draft.qty or 1)) end
     y = math.max(40, y, LBL + 28) + 16
@@ -2550,6 +4022,11 @@ local function PaintOrder(c, o, side)
         nxt = L("Commande terminée.")
     elseif side == "mine" and stt == "declined" then
         nxt = string.format(L("Refusée par %s : Commander à nouveau la propose à toute la guilde."), o.by or "?")
+    end
+    -- my crafter is in a dungeon (quiet mode): the order waits, and where it stands in their line
+    local qx = side == "mine" and not mineTurn and (stt == "open" or stt == "accepted") and (o.by or o.to) or nil
+    if qx and O.StatusOf and O.StatusOf(qx) == "d" then
+        nxt = string.format(L("%s est en donjon : ta commande attend, tu es %s dans sa file."), qx, O.Ordinal(O.PlaceInLine(o) or 1))
     end
     -- your turn: a warning icon before the sentence, the sentence itself in the text colour
     c.next:SetText((mineTurn and nxt ~= "") and (S.IconMarkup("warning", 14, C.warn) .. " " .. nxt) or nxt); c.next:SetShown(nxt ~= "")

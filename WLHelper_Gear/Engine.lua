@@ -5,8 +5,8 @@
 -- version 3, see LICENSE.txt. Quest, drop, and recipe data comes from QuestieDB
 -- by the Questie team (https://github.com/Questie/Questie), also GPLv3.
 --
--- WL Helper Gear: this file is the scoring part of Geared Forever 1.1's Core.lua,
--- modified by WaR LegenD on 2026-11-15 (see NOTICE.md). Still GPLv3.
+-- WL Helper Gear: this file is the scoring part of Geared Forever 1.1.1's Core.lua,
+-- modified by WaR LegenD on 2026-11-15 and 2026-11-16 (see NOTICE.md). Still GPLv3.
 -- Modifications copyright (C) 2026 WaR LegenD, GPLv3.
 --   * The window, tooltips, minimap button, slash commands, starred items, zone
 --     reminder and saved settings were removed: this is an engine with no UI.
@@ -261,7 +261,10 @@ local TALENT_MODS = {
         ele = { { names = { "Elemental Fury", "Fureur élémentaire" }, field = "crit", full = 1 } },
         enh = {
             { names = { "Mental Dexterity", "Dextérité mentale" }, field = "intAP", full = 1.0 },
-            { names = { "Mental Quickness", "Rapidité mentale", "Vivacité mentale" }, field = "intAP", full = 0.3 * 1.4 },
+            -- Upstream 1.1.1: spell power is 0.8 up to 50 and fades to 1.4 at 60, so the talent's
+            -- 30% of it follows (full is a function of the spec's options).
+            { names = { "Mental Quickness", "Rapidité mentale", "Vivacité mentale" }, field = "intAP",
+              full = function(o) return 0.3 * (o.sp or 1.4) end },
             { names = { "Ancestral Knowledge", "Savoir ancestral" }, field = "intPct", full = 0.1 },
         },
     },
@@ -391,7 +394,9 @@ local function Adjust(o)
                 copy = {}
                 for k, v in pairs(o) do copy[k] = v end
             end
-            local v = (copy[m.field] or 0) - (m.up or m.full) + m.full * share
+            -- WL Helper change (1.3.0): full can depend on the spec's options (Mental Quickness).
+            local full = type(m.full) == "function" and m.full(o) or m.full
+            local v = (copy[m.field] or 0) - (m.up or full) + full * share
             if math.abs(v) < 1e-9 then v = 0 end
             -- Physical() only adds Intellect attack power when intAP is set.
             if m.field == "intAP" and v <= 0 then v = nil end
@@ -411,6 +416,38 @@ local function HitHave(o, race, kind)
     end
     return have
 end
+
+-- Leveling (below 60) you fight alone and stop to eat, so Stamina counts for more
+-- than raid sims say. At 60 the raid numbers take over.
+-- 1.1.1: no hard switch at 60. Leveling weights count in full up to 50, then fade evenly
+-- into the level 60 weights (55 = half). So a 60 BiS item you can wear at 56 still ranks
+-- near the top instead of losing to a Stamina item.
+local function LevelFade(level)
+    level = level or 60
+    if level <= 50 then return 1 end
+    if level >= 60 then return 0 end
+    return (60 - level) / 10
+end
+ns.LevelFade = LevelFade
+
+local function Blend(level, endgame, leveling)
+    local t = LevelFade(level)
+    return endgame + (leveling - endgame) * t
+end
+
+local function LevelingSta(level, base, solo)
+    return Blend(level, base, math.max(base, solo))
+end
+
+-- Leveling overrides (below 60): o.lvl = { stat = value } replaces the raid number.
+-- From the WoW Forever leveling guides (Warcraft Tavern, Nov 2026): Stamina right after the
+-- main stat, Spirit for mana classes, wands for casters.
+local function ApplyLeveling(level, w, lvl)
+    if not lvl or LevelFade(level) == 0 then return end
+    for k, v in pairs(lvl) do w[k] = Blend(level, w[k] or 0, v) end
+end
+
+local HUNTER_RANGED = { statsOnly = { [26] = true } }   -- 26 = thrown
 
 -- Physical damage dealers. o: the spec's details.
 --   critBonus: extra crit damage from talents (Impale +20% -> 1.1)
@@ -432,7 +469,9 @@ local function Physical(level, race, cls, o)
     local agiAP = o.ranged and (c.agiRAP or 0) or (o.agiAP or c.agiAP or 0)
     w.str = o.ranged and 0.1 or strAP
     w.agi = (agiAP + critVal / PerPct(c.agi, level)) * (1 + (o.agiPct or 0)) + 2 * 0.01
-    w.ap = o.ranged and 0.1 or 1
+    -- Plain "+Attack Power" on gear counts for melee and ranged alike, so hunters get it in full.
+    -- Only "+ranged Attack Power" (rap) is ranged only.
+    w.ap = 1
     w.rap = o.ranged and 1 or 0
     w.crit = critVal / 14
     local hitHave = HitHave(o, race, o.ranged and "ranged" or "melee")   -- WL Helper change: real hit
@@ -445,13 +484,15 @@ local function Physical(level, race, cls, o)
     else
         w.exp = pct * (o.exp or 0.8) / 10
     end
-    w.armor = 0.01
-    w.sta = o.sta or 0.3
+    -- Armor matters when you're the one getting hit, which is every pull while leveling.
+    w.armor = Blend(level, 0.01, 0.03)
+    w.sta = LevelingSta(level, o.sta or 0.3, 0.8)
     if o.intAP then w.int = o.intAP * (1 + (o.intPct or 0)) + 0.1 end
     w.int = (w.int or 0) + (o.int or 0)
     w.spi = o.spi
     w.sp, w.sdmg = o.sp, o.sp
     if o.school then w[o.school] = o.sp end
+    ApplyLeveling(level, w, o.lvl)
     -- WL Helper change (v2): role and the worth of 1% melee damage, for proc effects.
     local wt = W(w)
     wt.role, wt.mdmg = "phys", o.ranged and 0 or pct
@@ -479,12 +520,19 @@ local function Caster(level, race, cls, o)
     w.haste = pct * (o.haste or 0.8) / 10
     w.spi = (o.spi or 0.1) * (race == "Human" and 1.1 or 1)
     w.mp5 = o.mp5 or 0.25
-    w.sta = o.sta or 0.15
+    w.sta = LevelingSta(level, o.sta or 0.15, 0.4)
     -- Spell penetration matters against raid bosses; leveling mobs barely resist.
     w.spen = o.spen or (level >= 58 and 0.3 or 0.05)
+    -- Leveling: Intellect and Spirit keep you casting instead of drinking, and the wand
+    -- does a big share of the damage (priests, warlocks, early mages). Fades out 50 to 60.
+    w.int = Blend(level, w.int, math.max(w.int, o.lvlInt or 0.55))
+    w.spi = Blend(level, w.spi or 0, math.max(w.spi or 0, o.lvlSpi or 0.35))
+    ApplyLeveling(level, w, o.lvl)
+    local wand = o.wand or 1.2
+    if o.wand ~= 0 then wand = Blend(level, wand, math.max(wand, 2)) end
     local wt = W(w)
     wt.role, wt.mdmg = "caster", 0   -- WL Helper change (v2): for proc effects
-    return 0, 0, o.wand or 1.2, false, wt
+    return 0, 0, wand, false, wt
 end
 
 -- Healers: healing power and spell power count in full.
@@ -505,7 +553,7 @@ local function Healer(level, race, cls, o)
     local spi = (o.regen or 0.3) * 0.9 + (o.spiHeal or 0)
     w.spi = spi * (1 + (o.spiPct or 0)) * (race == "Human" and 1.1 or 1)
     w.mp5 = o.mp5 or 0.9
-    w.sta = 0.1
+    w.sta = LevelingSta(level, 0.1, 0.3)
     w.armor = o.armor
     local wt = W(w)
     wt.role, wt.mdmg = "healer", 0   -- WL Helper change (v2): for proc effects
@@ -560,6 +608,7 @@ local function Tank(level, race, cls, o)
     w.haste = pct * 0.5 / 10
     w.sp, w.sdmg, w.holy = o.sp, o.sp, o.sp
     w.int = o.int
+    ApplyLeveling(level, w, o.lvl)
     if not opts.neutral then
         -- WL Helper change (v2): bears can't parry or block, so defense only adds miss and dodge.
         if o.bear then
@@ -600,13 +649,14 @@ local SPECS = {
         -- Weaponmaster: axes and polearms +5% crit, maces and staves ignore 15% armor. Impale +20% crit damage.
         { key = "arms", label = "Arms", weights = function(level, race)
             return Physical(level, race, "WARRIOR", { critBonus = 1.1, mh = 1, rg = 0.03, slow = true, haste = 0.65, exp = "hit", hitMult = 0.85,
+                lvl = { sta = 1.3 },   -- leveling: Strength > Stamina > Agility
                 prefer = { [11] = 1.06, [16] = 1.06, [15] = 1.04, [20] = 1.04, [10] = 1.06, [14] = 1.04 } })
         end },
         -- Dual Wield Specialization +25% off-hand damage, Furious Precision +10% off-hand hit.
         -- Nov 3: Flurry is 30% attack speed after a crit and no longer needs Death Wish, so crit is worth more.
         { key = "fury", label = "Fury", weights = function(level, race)
             return Physical(level, race, "WARRIOR", { mh = 1, oh = 0.62, rg = 0.03, slow = true, haste = 0.6, exp = "hit", hitMult = 0.8,
-                critBonus = 1.15 })
+                critBonus = 1.15, lvl = { sta = 1.3 } })
         end },
         -- Shield Slam scales with block value; Revenge with attack power. Anticipation +20 Defense.
         { key = "prot", label = "Protection", weights = function(level, race)
@@ -622,7 +672,9 @@ local SPECS = {
         -- Threat is mostly Holy damage (Righteous Fury, Holy Shield, Consecration, Holy Strike),
         -- so spell power ranks under Stamina and Defense. Precision +3% hit, Toughness +10% item armor.
         { key = "prot", label = "Protection", weights = function(level, race)
-            return Tank(level, race, "PALADIN", { str = 0.35, bv = 0.4, blockVal = 0.7, armor = 0.077, hit = 3, sp = 0.5, int = 0.25, mh = 2 })
+            -- Leveling (Warcraft Tavern): Spell Power > Stamina > Intellect > Strength.
+            return Tank(level, race, "PALADIN", { str = 0.35, bv = 0.4, blockVal = 0.7, armor = 0.077, hit = 3, sp = 0.5, int = 0.25, mh = 2,
+                lvl = { sp = 1.2, sdmg = 1.2, holy = 1.2, sta = 1.0, int = 0.6, str = 0.4 } })
         end },
         -- Champion of the Light: 60% of Intellect as spell damage. Divine Strength +10% Strength.
         -- Two-Handed Weapon Specialization +6% physical damage. Seal of Command: Holy damage from the weapon.
@@ -634,26 +686,32 @@ local SPECS = {
             -- haste above crit. Its high expertise came from parries; from behind it's dodge only (Nov 11).
             return Physical(level, race, "PALADIN", { mh = 1.05, slow = true, strPct = 0.1, sp = 2.2, school = "holy", critBonus = 1.1,
                 intAP = 0.6 * 2.2, intPct = 0, int = 0.08, sta = 0.3, haste = 0.85, exp = "hit", hitMult = 0.85,
+                -- Leveling: Strength and Spell Power about even (Icy Veins: Spell Power "one of your most
+                -- effective stats"; Wowhead: "aim for both"), Stamina right after (Warcraft Tavern).
+                lvl = { sta = 1.3, sp = 1.8, sdmg = 1.8, holy = 1.8, int = 0.6 },
                 prefer = { [11] = 1.06, [15] = 1.06, [16] = 1.06, [18] = 1.06 } })
         end },
     },
     HUNTER = {
         { key = "bm", label = "Beast Mastery", weights = function(level, race)
             -- Intellect: mana to keep shooting; Forever sims put it at about half of Agility.
-            return Physical(level, race, "HUNTER", { ranged = true, mh = 0.15, oh = 0.07, rg = 1, int = 1.8, exp = 0.55, haste = 0.45 })
+            return Physical(level, race, "HUNTER", { ranged = true, prefer = HUNTER_RANGED, mh = 0.15, oh = 0.07, rg = 1, int = 1.8, exp = 0.55, haste = 0.45,
+                lvl = { int = 1.0, spi = 0.8, sta = 0.6 } })   -- leveling: Agility > AP > Crit > Int > Spirit > Stamina
         end },
         -- Careful Aim: attack power equal to 100% of Intellect. Mortal Shots +30% ranged crit damage.
         { key = "mm", label = "Marksmanship", weights = function(level, race)
-            return Physical(level, race, "HUNTER", { ranged = true, mh = 0.15, oh = 0.07, rg = 1.05, critBonus = 1.15,
-                intAP = 1, int = 0.4, haste = 0.66, exp = 0.45 })
+            return Physical(level, race, "HUNTER", { ranged = true, prefer = HUNTER_RANGED, mh = 0.15, oh = 0.07, rg = 1.05, critBonus = 1.15,
+                intAP = 1, int = 0.4, haste = 0.66, exp = 0.45, lvl = { spi = 0.8, sta = 0.6 } })
         end },
         -- Melee and ranged. Surefooted +3% hit, Lightning Reflexes +10% Agility, Predator's Edge +50% off-hand damage.
         { key = "surv", label = "Survival", weights = function(level, race)
             local mh, oh, rg, slow, w = Physical(level, race, "HUNTER", { mh = 0.7, oh = 0.5, rg = 0.5, hit = 3,
-                agiPct = 0.15, critBonus = 1.15, int = 1.2, haste = 0.7, exp = 0.75 })   -- Nov 3: Lightning Reflexes +15% Agility
+                agiPct = 0.15, critBonus = 1.15, int = 1.2, haste = 0.7, exp = 0.75,
+                lvl = { int = 0.8, spi = 0.6, sta = 0.6 } })   -- Nov 3: Lightning Reflexes +15% Agility
             w[STAT.rap] = 0.5
+            w[STAT.ap] = w[STAT.ap] + 0.5    -- plain attack power also feeds the bow
             w[STAT.agi] = w[STAT.agi] + 1     -- Agility feeds both melee and ranged attack power
-            return mh, oh, rg, slow, w
+            return mh, oh, rg, slow, w, HUNTER_RANGED
         end },
     },
     ROGUE = {
@@ -705,8 +763,11 @@ local SPECS = {
             -- every 8 sec (was 150% every 6); Maelstrom Weapon procs 6 to 10 times a minute (was 20).
             -- Blizzard's goal: Strength is Enhancement's best stat again, Intellect and spell power after it.
             -- Spell power drops to about 1.4 attack power with far fewer instant Lightning Bolts.
-            return Physical(level, race, "SHAMAN", { mh = 1.1, slow = true, intAP = 1.0 + 0.3 * 1.4, intPct = 0.1,
-                sp = 1.4, school = "nature", haste = 0.9, exp = "hit", hitMult = 0.85, sta = 0.3 })
+            -- Leveling solo you rarely have the mana for Lightning Bolts, so spell power counts
+            -- for less until 60 (Nov 15, from player feedback: cloth caster gear ranked too high).
+            local sp = Blend(level, 1.4, 0.8)
+            return Physical(level, race, "SHAMAN", { mh = 1.1, slow = true, intAP = 1.0 + 0.3 * sp, intPct = 0.1,
+                sp = sp, school = "nature", haste = 0.9, exp = "hit", hitMult = 0.85, sta = 0.3 })
         end },
         -- Mindfulness 50% regen while casting; Tidal Focus.
         { key = "resto", label = "Restoration", weights = function(level, race)
@@ -719,7 +780,7 @@ local SPECS = {
         -- the couple of points their usual builds put there.
         { key = "arcane", label = "Arcane", weights = function(level, race)
             return Caster(level, race, "MAGE", { schools = { { "arcane", 1 }, { "fire", 0.15 }, { "frost", 0.15 } },
-                crit = 2, intSP = level >= 20 and 0.48 or 0, intPct = 0.1, mana = 0.8, hit = 2, haste = 0.75 })
+                crit = 2, intSP = level >= 20 and 0.48 or 0, intPct = 0.1, mana = 0.8, hit = 2, haste = 0.75, lvlSpi = 0.5, lvlInt = 0.9 })
         end },
         { key = "fire", label = "Fire", weights = function(level, race)
             return Caster(level, race, "MAGE", { schools = { { "fire", 1 } }, crit = 2, hit = 2, haste = 0.8 })
@@ -734,18 +795,18 @@ local SPECS = {
         -- Damage over time can crit in WoW Forever; Pandemic +100% crit damage on them. Suppression +5% hit.
         -- Life Tap scales with Spirit.
         { key = "affli", label = "Affliction", weights = function(level, race)
-            return Caster(level, race, "WARLOCK", { schools = { { "shadow", 1 } }, crit = 2, hit = 5, spi = 0.3, sta = 0.2,
+            return Caster(level, race, "WARLOCK", { schools = { { "shadow", 1 } }, crit = 2, hit = 5, spi = 0.3, sta = 0.2, lvlSpi = 0.6,
                 haste = 0.65 })
         end },
         -- Demonic Embrace +15% Stamina. Nov 3: pets get 2 health per Stamina (was 7.5).
         { key = "demo", label = "Demonology", weights = function(level, race)
             -- Crit as valued by MythicSim's Forever sim of a Demonic Pact build.
-            return Caster(level, race, "WARLOCK", { schools = { { "shadow", 1 }, { "fire", 0.35 } }, crit = 2, spi = 0.3, sta = 0.2,
+            return Caster(level, race, "WARLOCK", { schools = { { "shadow", 1 }, { "fire", 0.35 } }, crit = 2, spi = 0.3, sta = 0.2, lvlSpi = 0.6,
                 haste = 0.77 })
         end },
         -- Ruin +100% Destruction crit damage.
         { key = "destro", label = "Destruction", weights = function(level, race)
-            return Caster(level, race, "WARLOCK", { schools = { { "shadow", 0.75 }, { "fire", 0.6 } }, crit = 2, spi = 0.25,
+            return Caster(level, race, "WARLOCK", { schools = { { "shadow", 0.75 }, { "fire", 0.6 } }, crit = 2, spi = 0.25, lvlSpi = 0.5, lvlInt = 0.7,
                 haste = 0.95 })
         end },
     },
@@ -1168,6 +1229,9 @@ end
 local function SectionScore(item, sec, base, mh, oh, rg, slowBonus, prefer)
     local dpsWeight = (sec == SEC_RANGED and rg) or (sec == SEC_OFFHAND and oh) or mh
     local dps = item.dps
+    -- Hunters can equip thrown weapons, but Auto Shot and their shots only work with
+    -- bows, guns and crossbows. So a thrown weapon is just its stats for them.
+    if prefer and prefer.statsOnly and prefer.statsOnly[item.kind] then dps = 0 end
     if slowBonus then dps = dps * SpeedBonus(sec, item.spd) end
     local score = base + dps * dpsWeight
     if prefer and prefer[item.kind] then score = score * prefer[item.kind] end
@@ -1243,6 +1307,12 @@ end
 -- GetItemStats doesn't report. Read it off the item's own tooltip instead.
 local liveCache = {}
 local scanTip
+
+-- WL Helper change (1.3.0): true on an English client (Data.lua's names are English).
+local function EnglishClient()
+    local ok, loc = pcall(GetLocale or function() return "enUS" end)
+    return not ok or type(loc) ~= "string" or loc:sub(1, 2) == "en"
+end
 local function TooltipLines(link)
     local lines = {}
     if C_TooltipInfo and C_TooltipInfo.GetHyperlink then
@@ -1328,7 +1398,19 @@ end
 local function LiveItem(id, link)
     ns.Parse()
     local known = ns.byId[id]
-    if known and not HasSuffix(link) then return known end
+    if known and not HasSuffix(link) then
+        -- Forever can put the random suffix ("of Agility") somewhere else in the link, so
+        -- also read it live when the list's copy has no stats or the name is longer.
+        local bare = true
+        for k = 1, #known.st do if known.st[k] ~= 0 then bare = false break end end
+        local linkName = type(link) == "string" and link:match("|h%[(.-)%]|h")
+        -- WL Helper change (1.3.0): the list's names are English, so the name test only runs
+        -- on English clients; elsewhere (frFR) every name would differ and every item would
+        -- be read live instead of from the checked list.
+        local renamed = linkName and known.name and linkName ~= known.name and EnglishClient()
+        if not bare and not renamed then return known end
+        if not link then return known end
+    end
     if not link or not GetStats then return known end
     if liveCache[link] then return liveCache[link] end
     -- WL Helper change: an item the client hasn't loaded yet gives empty stats. Ask for it
@@ -1398,7 +1480,9 @@ local function LiveItem(id, link)
         item = merged
     end
     -- WL Helper change: empty stats are not cached (the item may still be loading).
-    if next(stats) ~= nil then liveCache[link] = item end
+    -- WL Helper change (1.3.0): a listed item with no stats (effect-only trinket, relic) is
+    -- final once its data is loaded (ItemDataReady passed above), so it is cached too.
+    if next(stats) ~= nil or known then liveCache[link] = item end
     return item
 end
 

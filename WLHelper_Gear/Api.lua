@@ -10,8 +10,8 @@
 --
 -- API (global table WLHelperGear)
 --
---   WLHelperGear.VERSION                      "1.1.0"
---   WLHelperGear.UPSTREAM                     "Geared Forever 1.1"
+--   WLHelperGear.VERSION                      "1.3.0"
+--   WLHelperGear.UPSTREAM                     "Geared Forever 1.1.1"
 --
 --   WLHelperGear.Spec() -> classToken, specKey, specName, auto
 --       Your class ("MAGE"), spec key ("frost"), spec name ("Frost") and whether the
@@ -61,7 +61,8 @@
 --   WLHelperGear.Weights(level?) -> table
 --       { class, spec, level, stats = { str =, agi =, sta =, ... },
 --         mainHand, offHand, ranged (weapon DPS weights), slowBonus,
---         prefer = { Axe = 1.06, ... }, hitHave = { melee, ranged, spell } }
+--         prefer = { Axe = 1.06, ... }, statsOnly = { Thrown = true } or nil (weapon types
+--         scored on their stats only: thrown for hunters), hitHave = { melee, ranged, spell } }
 --       stat keys: armor str agi sta ap crit hit haste exp def dodge parry block bv int spi
 --                  sp heal sdmg mp5 rap fire frost shadow arcane nature holy spen
 --
@@ -106,8 +107,8 @@ local E = ns.engine
 local API = {}
 WLHelperGear = API
 
-API.VERSION = "1.1.0"
-API.UPSTREAM = "Geared Forever 1.1"
+API.VERSION = "1.3.0"
+API.UPSTREAM = "Geared Forever 1.1.1"
 
 local STAT_NAMES = {}
 for name, index in pairs(E.STAT) do STAT_NAMES[index] = name end
@@ -320,11 +321,19 @@ function API.Weights(level)
     for i = 1, E.NUM_STATS do
         if w[i] and w[i] ~= 0 then stats[STAT_NAMES[i]] = w[i] end
     end
-    local pref = {}
-    for kind, mult in pairs(prefer or {}) do pref[E.KIND_NAME[kind] or kind] = mult end
+    local pref, statsOnly = {}, nil
+    for kind, mult in pairs(prefer or {}) do
+        if type(mult) == "number" then pref[E.KIND_NAME[kind] or kind] = mult end
+    end
+    -- Geared Forever 1.1.1: weapon types scored on their stats only (thrown for hunters).
+    if prefer and type(prefer.statsOnly) == "table" then
+        statsOnly = {}
+        for kind in pairs(prefer.statsOnly) do statsOnly[E.KIND_NAME[kind] or kind] = true end
+    end
     return {
         class = cls.token, spec = key, level = lvl, stats = stats,
         mainHand = mh, offHand = oh, ranged = rg, slowBonus = slowBonus == true, prefer = pref,
+        statsOnly = statsOnly,
         hitHave = { melee = E.OwnedHit("melee"), ranged = E.OwnedHit("ranged"), spell = E.OwnedHit("spell") },
         -- WL Helper change (v2): the hit caps used and the defense read.
         hitCap = { melee = E.HitCap(lvl, false), spell = E.HitCap(lvl, true) },

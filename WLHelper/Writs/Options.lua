@@ -78,8 +78,8 @@ ns.AddEnglish({
     ["Sur un ennemi, lance ton tir à distance : arc, fusil, arbalète, arme de jet ou baguette."] =
         "On an enemy, starts your ranged attack: bow, gun, crossbow, thrown weapon or wand.",
     ["Touche pour tirer"] = "Key to shoot",
-    ["Garde-la enfoncée, puis fais un clic droit sur l'ennemi. Avec « Aucune », le clic droit seul tire."] =
-        "Hold it down, then right-click the enemy. With \"None\", right-click alone shoots.",
+    ["Garde-la enfoncée, puis fais un clic droit sur l'ennemi. Avec « Aucune », le clic droit seul tire : pratique avec une baguette."] =
+        "Hold it, then right-click the enemy. With \"None\", right-click alone shoots: handy with a wand.",
     ["Un autre addon le fait déjà : ce réglage reste sans effet."] = "Another addon already does this: this setting has no effect.",
     ["Langue"] = "Language",
     ["Langue de l'addon"] = "Addon language",
@@ -103,6 +103,9 @@ ns.AddEnglish({
     ["Alerte des monstres rares"] = "Rare monster alert",
     ["Dans un donjon, un message et un son quand un monstre rare apparaît."] = "In a dungeon, a message and a sound when a rare monster shows up.",
     ["Points GPS à chaque étape"] = "GPS points at each step",
+    ["Suivi du guide"] = "Guide tracker",
+    ["Une petite fenêtre avec l'action à faire, quand la fenêtre du guide est fermée."] =
+        "A small window with what to do now, while the guide window is closed.",
     ["Les points de l'étape en cours sont posés tout seuls quand une nouvelle étape commence."] =
         "The current step's points are set on their own when a new step starts.",
     ["Quêtes répétables ou d'un autre métier"] = "Repeatable or other-profession quests",
@@ -169,11 +172,6 @@ ns.AddEnglish({
     ["Le nettoyeur ne propose jamais un objet qui lance une quête. Pour libérer une place à la main, tape /wlh place."] =
         "The cleaner never offers an item that starts a quest. To free a slot by hand, type /wlh free.",
     -- Upgrades
-    ["Calcul"] = "Calculation",
-    ["Méthode de calcul"] = "Method",
-    ["Poids WL Helper"] = "WL Helper weights",
-    ["Prend les classements de ton addon d'équipement s'il y en a un, sinon les poids de WL Helper."] =
-        "Uses your gear addon's rankings when you have one, otherwise WL Helper's weights.",
     ["Spé"] = "Spec",
     ["Spé évaluée"] = "Rated spec",
     ["Auto"] = "Auto",
@@ -670,11 +668,13 @@ end
 local MI = ns.WP.MODULE_ICON or {}
 local PAGES = {
     { key = "home",     label = "Accueil",       icon = { hd = "home" },                              desc = "Où tu en es, et tout ce que WL Helper peut ouvrir." },
+    { key = "welcome",  label = "Bienvenue",     icon = { hd = "flag" },                              desc = "Tout régler pas à pas, et la visite guidée." },
     { key = "dungeons", label = "Guide de quêtes", group = "quests", icon = MI.dungeons or "Interface\\Icons\\INV_Misc_Map_01", desc = "La flèche, les alertes et les quêtes que montre le guide." },
     { key = "gps",      label = "GPS",           group = "travel", icon = { hd = root.ARROW },        desc = "Itinéraire, vols, téléportations et flèche." },
     { key = "comptoir", label = "Writs",         group = "items", icon = MI.writs or "Interface\\Icons\\INV_Letter_15", desc = "Remise des Writs, rappels, objectif et zones." },
     { key = "bags",     label = "Sacs",          group = "items", icon = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", desc = "Place dans les sacs et vente des objets gris." },
     { key = "upgrades", label = "Améliorations", group = "items", icon = MI.upgrades or { hd = "arrow_up", color = T.ok }, desc = "Calcul, spé et affichage des améliorations." },
+    { key = "groups",   label = "Groupes",       group = "guild", icon = { hd = "group" },             desc = "Messages, chuchotements et notes de Trouver un groupe." },
     { key = "general",  label = "Général",       group = "settings", icon = { hd = "gear" },          desc = "Modules, clics, langue et fenêtres." },
     { key = "about",    label = "À propos",      group = "settings", icon = { hd = "info" },          desc = "Version, crédits, contact et commandes du chat." },
 }
@@ -710,6 +710,16 @@ local Relayout  -- defined with the window: re-measures the page shown and fits 
 
 local BUILD = {}
 
+-- the Groups page: Writs/FinderPeople.lua draws it (templates and switches of Trouver un groupe)
+function BUILD.groups(p)
+    if ns.WP.GroupsPage then ns.WP.GroupsPage.Build(p, CONTENT_W) end
+end
+
+-- the Welcome page: Writs/Tour.lua draws it (the checklist of Writs/Hub.lua and the guided tour)
+function BUILD.welcome(p)
+    if ns.WP.WelcomePage then ns.WP.WelcomePage.Build(p, CONTENT_W) end
+end
+
 function BUILD.general(p)
     Section(p, L("Modules"))
     for _, m in ipairs(ns.WP.MODULES) do
@@ -733,16 +743,12 @@ function BUILD.general(p)
             inviteBy and taken or L("Ajouté aux messages qui demandent une invitation, comme « inv »."))
         SwitchRow(p, L("Clic droit pour tirer"), function() return Clicks().shoot end, setClick("shoot"),
             shootBy and taken or L("Sur un ennemi, lance ton tir à distance : arc, fusil, arbalète, arme de jet ou baguette."))
-        local mrow = Row(p, L("Touche pour tirer"), L("Garde-la enfoncée, puis fais un clic droit sur l'ennemi. Avec « Aucune », le clic droit seul tire."))
-        Choice(p, mrow, ns.WP.ShootKeys(), function() return Clicks().shootMod end, setClick("shootMod"))
-        -- wand users: a plain right-click on an enemy can shoot too (OfferWand first, so the
-        -- welcome step never overrides the choice made here)
-        if ns.WP.WandOption and ns.WP.WandOption() then
-            SwitchRow(p, L("Clic droit simple = baguette"), function() return Clicks().wandRight end, function(v)
-                if ns.WP.OfferWand then ns.WP.OfferWand() end
-                setClick("wandRight")(v)
-            end, L("Sans touche, un clic droit sur un ennemi lance ta baguette au lieu du corps-à-corps. La touche choisie tire toujours. Maintenu sur un ennemi, il ne tourne plus la caméra."))
-        end
+        local mrow = Row(p, L("Touche pour tirer"), L("Garde-la enfoncée, puis fais un clic droit sur l'ennemi. Avec « Aucune », le clic droit seul tire : pratique avec une baguette."))
+        -- OfferWand first, so the welcome step never overrides the key chosen here
+        Choice(p, mrow, ns.WP.ShootKeys(), function() return Clicks().shootMod end, function(v)
+            if ns.WP.OfferWand then ns.WP.OfferWand() end
+            setClick("shootMod")(v)
+        end)
         local AC = ns.WP.AltClick
         if AC and AC.On and AC.SetOn then
             SwitchRow(p, L("Alt-clic pour désenchanter / crocheter"), function() return AC.On() end, function(v) AC.SetOn(v) end,
@@ -824,6 +830,33 @@ function BUILD.dungeons(p)
     SwitchRow(p, L("Points GPS à chaque étape"), function() return Guide().autoWay and true or false end,
         function(v) Guide().autoWay = v; RefreshGuide() end,
         L("Les points de l'étape en cours sont posés tout seuls quand une nouvelle étape commence."))
+    -- the guide tracker (Tracker.lua): its switch left the guide's Actions menu (T-74), it lives here
+    SwitchRow(p, L("Suivi du guide"), function() return Guide().tracker == true end,
+        function(v)
+            local TR = _G.WLHelperTracker
+            if TR and TR.SetShown then TR.SetShown(v) else Guide().tracker = v and true or false end
+        end,
+        L("Une petite fenêtre avec l'action à faire, quand la fenêtre du guide est fermée."))
+    -- the route's quests taken, handed in and shared by themselves (Writs/GuideQuests.lua)
+    local GQ = ns.WP and ns.WP.GuideQuests
+    if GQ then
+        local function Desc(text, kind)
+            local ok, note = pcall(GQ.OwnerNote, kind)
+            return (ok and note) and (text .. " " .. note) or text
+        end
+        local function Sw(label, key, desc)
+            SwitchRow(p, L(label), function() return GQ.On(key) end, function(v) GQ.Set(key, v) end, desc)
+        end
+        Section(p, L("Quêtes du guide"))
+        Sw("Prendre les quêtes du guide tout seul", "questAutoAccept",
+            Desc(L("En parlant au PNJ, seulement les quêtes de ta route. Garde Maj enfoncée pour le faire à la main."), "accept"))
+        Sw("Rendre les quêtes du guide tout seul", "questAutoTurnIn",
+            Desc(L("La récompense est prise toute seule quand il n'y a pas de choix. Garde Maj enfoncée pour le faire à la main."), "turnin"))
+        Sw("Partager les quêtes du guide avec le groupe", "questAutoShare",
+            Desc(L("Une quête de ta route que tu prends en groupe est partagée une fois, hors combat."), "share"))
+        Sw("Choisir la récompense tout seul (la meilleure amélioration)", "questAutoReward",
+            L("Quand une quête du guide offre un choix, la meilleure amélioration pour ta spé est prise. Éteint, un message te dit laquelle choisir."))
+    end
     -- "useful" hides the repeatable reputation quests and the quests of professions you don't have
     Section(p, L("Quêtes montrées"))
     local row = Row(p, L("Quêtes répétables ou d'un autre métier"), L("Masquées, elles sortent de la route et du compte de quêtes de chaque donjon."))
@@ -930,6 +963,18 @@ function BUILD.gps(p)
             L("Des points sur la carte du monde montrent le chemin à pied jusqu'au point du GPS, avec une épingle sur l'endroit exact (WL Helper Nav)."))
         SwitchRow(p, L("Sur la minimap"), function() return TR.MinimapOn() end, function(v) TR.SetMinimap(v) end,
             L("Les mêmes points sur la minimap, autour de toi."))
+        if TR.SetMapSize and TR.SetMinimapSize and TR.SetColor then
+            local function Sizes()
+                return { { "small", L("Petits") }, { "medium", L("Moyens") }, { "large", L("Grands") } }
+            end
+            Choice(p, Row(p, L("Taille des points sur la carte")), Sizes(),
+                function() return TR.MapSize() end, function(v) TR.SetMapSize(v) end)
+            Choice(p, Row(p, L("Taille des points sur la minimap")), Sizes(),
+                function() return TR.MinimapSize() end, function(v) TR.SetMinimapSize(v) end)
+            Choice(p, Row(p, L("Couleur du chemin")),
+                { { "accent", L("Rouge") }, { "yellow", L("Jaune") }, { "cyan", L("Cyan") } },
+                function() return TR.Color() end, function(v) TR.SetColor(v) end)
+        end
     end
     local WPn = ns.WP and ns.WP.WorldPin
     if WPn and WPn.SetMode then
@@ -1003,18 +1048,13 @@ function BUILD.upgrades(p)
     end
     local function Refresh() if ns.WP.RefreshUpgrades then ns.WP.RefreshUpgrades() end end
     local function ApplyTip() if ns.WP.ApplyGFTip then ns.WP.ApplyGFTip() end end
-    Section(p, L("Calcul"))
-    local crow = Row(p, L("Méthode de calcul"), L("Prend les classements de ton addon d'équipement s'il y en a un, sinon les poids de WL Helper."))
-    Choice(p, crow, { { "auto", L("Automatique") }, { "wl", L("Poids WL Helper") } },
-        function() return WLWritsDB.upgradeSource == "wl" and "wl" or "auto" end,
-        function(v) WLWritsDB.upgradeSource = v; Refresh() end)
+    -- the judge is not a setting: WL Helper Gear when loaded, else WL Helper's weights (Upgrades.lua)
+    -- the spec rated, then for dual or triple spec the other specs of the class ticked here
+    Section(p, L("Spés à comparer"))
     local srow = Row(p, L("Spé évaluée"), L("Auto : l'arbre de talents où tu as le plus de points."))
     Choice(p, srow, Wt.SpecChoices(),
         function() local db, c = SpecDB(); return db[c] or "auto" end,
         function(v) local db, c = SpecDB(); db[c] = v; Refresh(); if Rebuild then C_Timer.After(0, Rebuild) end end)
-
-    -- dual or triple spec: the main spec always, the other specs of the class ticked here
-    Section(p, L("Spés à comparer"))
     local mrow = Row(p, L("Spé principale"), L("Celle de tes talents, ou celle choisie plus haut. Toujours sur la première ligne."))
     local mainName = ValueText(mrow, 200)
     function mainName:Sync() self:SetText(Wt.SpecName()) end
@@ -1312,7 +1352,8 @@ local function BuildBody()
     local function Item(parent, def, y)
         local b = S.NavItem(parent, {
             key = def.key, label = L(def.label), icon = def.icon,
-            tip = { L(def.label), L(def.desc), def.key == "home" and L("Clic : ouvrir l'Accueil") or L("Clic : afficher ces réglages") },
+            tip = { L(def.label), L(def.desc), def.key == "home" and L("Clic : ouvrir l'Accueil")
+                or def.key == "welcome" and L("Clic : ouvrir Bienvenue") or L("Clic : afficher ces réglages") },
             onClick = function(self) ns.WP.OpenHub(self.key) end,
             onHover = PaintNavLater,
         })
@@ -1863,6 +1904,9 @@ function ns.WP.OpenHub(page, anchor)
 end
 
 function ns.WP.CloseHub() if win then win:Hide() end end
+
+-- -> the section or row WP.OpenHub(page, anchor) last scrolled to (the Welcome page lights it)
+function ns.WP.HubAnchor() return body and body.anchorShown or nil end
 
 -- -> the key of the page the Hub shows (or showed last), nil before it was opened
 function ns.WP.HubPage() return current end

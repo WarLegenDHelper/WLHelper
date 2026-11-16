@@ -20,6 +20,15 @@ ns.AddEnglish({
     ["Commandes du chat"] = "Chat commands",
     ["Clic : lancer la commande"] = "Click: run the command",
     ["Une question sans réponse ? Écris-nous"] = "A question we missed? Tell us",
+    -- the guided tour card (Writs/Tour.lua)
+    ["Visite guidée"] = "Guided tour",
+    ["Des bulles sur les vraies fenêtres te montrent où est chaque chose, en deux minutes. Tu peux la refaire quand tu veux."] = "Bubbles on the real windows show you where everything is, in two minutes. You can take it again whenever you like.",
+    ["Faire la visite"] = "Take the tour",
+    ["Clic : lancer la visite guidée"] = "Click: start the guided tour",
+    ["Ouvrir Bienvenue"] = "Open Welcome",
+    ["Clic : ouvrir la page Bienvenue, tout régler pas à pas"] = "Click: open the Welcome page, set everything up step by step",
+    ["/wlh visite"] = "/wlh tour", ["Refaire la visite guidée"] = "Take the guided tour again",
+    ["/wlh suivi"] = "/wlh tracker", ["Afficher ou cacher le suivi du guide"] = "Show or hide the guide tracker",
     -- the tasks (a quoted label comes from the button's own text: they cannot drift apart)
     ["Faire mes quêtes de donjon"] = "Do my dungeon quests",
     ["Sur l'Accueil, clique sur la ligne Guide de quêtes pour choisir tes donjons."] = "On Home, click the Quest guide line to pick your dungeons.",
@@ -154,6 +163,9 @@ local function BuildSpot()
     spot:Hide()
 end
 
+-- WP.SpotlightOff(): takes the ring away now (the guided tour moves it from bubble to bubble)
+function WP.SpotlightOff() if spot then spot:Hide(); spot.target = nil end end
+
 function WP.Spotlight(target, seconds)
     if not target then return end
     if not spot then BuildSpot() end
@@ -263,6 +275,10 @@ local function ShowMe(open, windowFn, targets)
     end
     if C_Timer and C_Timer.After then C_Timer.After(0.2, Glow) else Glow() end
 end
+-- shared with the Welcome page and the guided tour (Writs/Tour.lua): the same way to open a window
+-- and light its button, and the same way to find a button by its words
+WP.ShowMe = ShowMe
+WP.FindIn = function(win, what) return Resolve(win, what) end
 
 -- ---------------------------------------------------------------- the content
 
@@ -401,6 +417,8 @@ local function Commands()
         { L("/wlh tri"), L("Les quêtes à abandonner quand le journal est plein"), "triage" },
         { L("/wlh reglages"), L("Ouvrir les réglages"), "options" },
         { L("/wlh idee"), L("Envoyer une idée ou un bug"), "idea" },
+        { L("/wlh visite"), L("Refaire la visite guidée"), "visite" },
+        { L("/wlh suivi"), L("Afficher ou cacher le suivi du guide"), "tracker" },
         { L("/wlh aide"), L("Afficher cette page et la liste dans le chat"), nil },
     }
 end
@@ -475,33 +493,42 @@ local function TaskCard(parent, task, onShow)
     return c
 end
 
--- The questions: one card, a question (13 fg) then its answer (12 muted) per block, rules between.
+-- The guided tour: one card at the top, its sentence and two buttons (the tour, the Welcome page).
+-- The tour is the view's one main action: the task cards' buttons are secondary.
+local function TourCard(parent, onTour, onWelcome)
+    local c = CardBase(parent)
+    c.stack = root.TextStack(c)
+    c.go = S.Button(c, L("Faire la visite"), 0, 28, "primary", onTour, { L("Faire la visite"), L("Clic : lancer la visite guidée") })
+    c.more = S.Button(c, L("Ouvrir Bienvenue"), 0, 28, "ghost", onWelcome,
+        { L("Ouvrir Bienvenue"), L("Clic : ouvrir la page Bienvenue, tout régler pas à pas") })
+    function c:Fit(width)
+        local stk = self.stack
+        stk:Begin(PAD, PAD, width - 2 * PAD)
+        stk:Heading(L("Visite guidée"))
+        stk:Body(L("Des bulles sur les vraies fenêtres te montrent où est chaque chose, en deux minutes. Tu peux la refaire quand tu veux."))
+        local y = PAD + stk:End() + 12
+        self.go:ClearAllPoints(); self.go:SetPoint("TOPLEFT", PAD, -y)
+        self.more:ClearAllPoints(); self.more:SetPoint("LEFT", self.go, "RIGHT", 8, 0)
+        local total = math.ceil(y + 28 + PAD)
+        self:SetHeight(total)
+        return total
+    end
+    return c
+end
+
+-- The questions: one card, each question a block heading (gold, DESIGN 3.21) over its answer (13
+-- text); the heading's own space above sets the questions apart, no rule between them.
 local function FaqCard(parent, list)
     local c = CardBase(parent)
-    c.items = {}
-    for i, q in ipairs(list) do
-        local it = {}
-        it.q = S.Text(c, F.body, C.fg); it.q:SetJustifyH("LEFT"); it.q:SetJustifyV("TOP"); it.q:SetText(q[1])
-        it.a = S.Text(c, F.label, C.muted); it.a:SetJustifyH("LEFT"); it.a:SetJustifyV("TOP")
-        it.a:SetWordWrap(true); it.a:SetText(q[2])
-        if i > 1 then it.rule = S.Rule(c) end
-        c.items[i] = it
-    end
+    c.list = list
+    c.stack = root.TextStack(c)
     function c:Fit(width)
-        local textW = width - 2 * PAD
-        local y = PAD
-        for _, it in ipairs(self.items) do
-            if it.rule then
-                it.rule:ClearAllPoints()
-                it.rule:SetPoint("TOPLEFT", PAD, -(y + 6)); it.rule:SetPoint("TOPRIGHT", -PAD, -(y + 6))
-                y = y + 12
-            end
-            it.q:ClearAllPoints(); it.q:SetPoint("TOPLEFT", PAD, -y)
-            y = y + math.ceil(S.FitText(it.q, 2, textW, self)) + 4
-            it.a:ClearAllPoints(); it.a:SetPoint("TOPLEFT", PAD, -y)
-            y = y + math.ceil(S.FitText(it.a, 0, textW, self))
+        local stk = self.stack
+        stk:Begin(PAD, PAD, width - 2 * PAD)
+        for _, q in ipairs(self.list) do
+            stk:Heading(q[1]); stk:Body(q[2])
         end
-        local total = math.ceil(y + PAD)
+        local total = math.ceil(PAD + stk:End() + PAD)
         self:SetHeight(total)
         return total
     end
@@ -579,6 +606,7 @@ local function Layout()
         f:SetHeight(h)
         y = y + h + (gap or 0)
     end
+    if win.tour then Place(win.tour, win.tour:Fit(CW), 16) end
     for i, card in ipairs(win.tasks) do
         Place(card, card:Fit(CW), i < #win.tasks and 12 or 0)
     end
@@ -613,6 +641,10 @@ local function Build()
         win:Hide()
         task.show()
     end
+    if WP.Tour and WP.Tour.Start then
+        win.tour = TourCard(win.inner, function() win:Hide(); WP.Tour.Start() end,
+            function() win:Hide(); if WP.OpenHub then WP.OpenHub("welcome") end end)
+    end
     win.tasks = {}
     for _, t in ipairs(Tasks()) do win.tasks[#win.tasks + 1] = TaskCard(win.inner, t, onShow) end
     win.faqHead = S.SectionHeader(win.inner, L("Questions fréquentes"))
@@ -637,6 +669,8 @@ WP.Help = {
         win:Show()
         Layout()
     end,
+    -- the Upgrades page's spec control (the Welcome page and the tour light it too)
+    SpecControl = SpecControl,
     -- runs a task's "Montre-moi" without the window (WP.Help.ShowMe("bags")); false if unknown.
     -- A switched-off module only gets Core's chat line.
     ShowMe = function(key)

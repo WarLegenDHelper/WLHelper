@@ -11,16 +11,22 @@
 -- The router is never loaded nor asked in combat: the question waits for the end of the fight. It is
 -- loaded on the frame after the first question (not inside the arrow's update), once a session.
 --
--- The path is drawn as small dots in the accent colour on the world map (for the map shown, refreshed
--- twice a second while it is open) and on the minimap (10 times a second, rotating minimap, zoom and
--- indoor scale honoured, round or square), fading near you, with a pin on the exact destination.
+-- The path is drawn as dots ringed in black on the world map (for the map shown, refreshed twice a
+-- second while it is open, and on each zoom) and on the minimap (10 times a second, rotating minimap,
+-- zoom and indoor scale honoured, round or square), fading a little near you, with a pin on the exact
+-- destination. A dot keeps its size on screen whatever the map's zoom (its canvas size is worked out
+-- from the canvas's and UIParent's effective scales), and the dots sit about GAP diameters apart on
+-- screen too (on the world map in steps of sqrt(2), so a small zoom does not move them); never under
+-- MIN_SHARE of their size at 1080p and UI scale 1, however small the UI scale.
 -- "Aller à" (GoTo.lua) still follows its own trail: its trail is drawn here, it is not asked twice.
 --
 -- API: WP.Trail.For(target) -> trail | nil (target: { map, x, y } in percent or { cont, wx, wy });
 -- WP.Trail.Clear(); WP.Trail.Current() -> nil | { cont, pts = { { cont, wx, wy }, ... }, at, target,
 -- yards }; WP.Trail.OnReady(fn) (fn(trail) when a path arrives); WP.Trail.Apply(now) (GPS.Now calls it);
 -- WP.Trail.WalkCost(a, b, fn) -> asked? (fn(yards) | fn(nil, reason)): a walk's real length, for Route.lua's plans.
--- Settings: WLWritsDB.trail = { map = true, minimap = true }: Trail.MapOn / SetMap, MinimapOn / SetMinimap.
+-- Settings: WLWritsDB.trail = { map = true, minimap = true, mapSize, minimapSize = "small" | "medium" |
+-- "large", color = "accent" | "yellow" | "cyan" }: Trail.MapOn / SetMap, MinimapOn / SetMinimap,
+-- MapSize / SetMapSize, MinimapSize / SetMinimapSize, Color / SetColor.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -38,6 +44,15 @@ ns.AddEnglish({
     ["Des points sur la carte du monde montrent le chemin à pied jusqu'au point du GPS, avec une épingle sur l'endroit exact (WL Helper Nav)."] =
         "Dots on the world map show the walking path to the GPS point, with a pin on the exact spot (WL Helper Nav).",
     ["Les mêmes points sur la minimap, autour de toi."] = "The same dots on the minimap, around you.",
+    ["Taille des points sur la carte"] = "Dot size on the map",
+    ["Taille des points sur la minimap"] = "Dot size on the minimap",
+    ["Couleur du chemin"] = "Path colour",
+    ["Petits"] = "Small",
+    ["Moyens"] = "Medium",
+    ["Grands"] = "Large",
+    ["Rouge"] = "Red",
+    ["Jaune"] = "Yellow",
+    ["Cyan"] = "Cyan",
 })
 
 local NAV_ADDON = "WLHelper_Nav"
@@ -57,10 +72,32 @@ local NAV_CONTS = { [0] = true, [1] = true, [2991] = true }
 local SIMPLIFY = 2.5         -- yards: corners that do not bend the path by this much are dropped
 local THIN = 8               -- yards: a corner this near the previous one is dropped
 local MAP_EVERY, MM_EVERY = 0.5, 0.1
-local MAP_SPACING, MAP_DIVS, MAP_CAP = 18, 90, 400   -- world map: 18 yd apart, or the map's width / 90
-local MM_SPACING, MM_CAP = 20, 80
-local MAP_DOT, MAP_PIN, MM_DOT, MM_PIN = 7, 22, 4, 14
-local FADE = 45              -- yards: the dots fade in over this distance from you
+local MAP_CAP, MM_CAP = 400, 120                       -- most dots drawn
+-- Dot sizes (the disc's width): world map in UIParent units (x1.4 = pixels at 1080p, UI scale 1),
+-- minimap in the minimap's units; the pin's head likewise.
+local SIZES = {
+    map = { small = 6, medium = 8, large = 11 },
+    minimap = { small = 4, medium = 5, large = 7 },
+}
+local PINS = {
+    map = { small = 13, medium = 16, large = 20 },
+    minimap = { small = 9, medium = 11, large = 13 },
+}
+local RING = { map = 1.5, minimap = 1 }  -- the black ring's width round a dot, same units
+local RING_ALPHA = 0.85
+local GAP = 2.5               -- dots this many diameters apart on screen
+local MIN_STEP = 2            -- yards: the world map's dots never nearer than this (steps of sqrt(2) above)
+local MM_MIN_STEP = 3         -- yards: the minimap's
+local REF_PX = 1080 / 768     -- physical pixels per UI unit at 1080p and UI scale 1
+local MIN_SHARE = 0.8         -- a dot never shows under this share of its size there, whatever the UI scale
+local MAP_UI = 1000           -- the map's width in UI units when no canvas says it (tests)
+-- dot.tga's disc (half opacity) spans 48 of its 128 px, pin.tga's head 64: the textures are drawn this
+-- much bigger than the disc wanted (the old 7 px dot texture showed a 2.6 px disc)
+local DOT_FILL, PIN_FILL = 48 / 128, 64 / 128
+local PIN_TIP = 14 / 128      -- pin.tga's tip sits on its row 113 of 128
+local FADE = 45              -- yards: the dots fade a little over this distance from you
+local NEAR_ALPHA = 0.5       -- the opacity of a dot under your feet (1 from FADE yards on)
+local COLORS = { yellow = { 1, 0.82, 0.15 }, cyan = { 0.25, 0.85, 1 } }   -- "accent": the theme's red
 local MEDIA = "Interface\\AddOns\\WLHelper\\Media\\Icons\\"
 -- the minimap's diameter in yards per zoom level, for a client without C_Minimap.GetViewRadius
 local OUTDOOR = { [0] = 466 + 2 / 3, 400, 333 + 1 / 3, 266 + 2 / 3, 200, 133 + 1 / 3 }
@@ -87,6 +124,21 @@ function Trail.MapOn() return Opts().map ~= false end
 function Trail.MinimapOn() return Opts().minimap ~= false end
 function Trail.SetMap(on) Opts().map = on and true or false; Trail.Refresh() end
 function Trail.SetMinimap(on) Opts().minimap = on and true or false; Trail.Refresh() end
+local SIZE_OK = { small = true, medium = true, large = true }
+local COLOR_OK = { accent = true, yellow = true, cyan = true }
+local function Pick(key, ok, default)
+    local v = Opts()[key]
+    return ok[v] and v or default
+end
+function Trail.MapSize() return Pick("mapSize", SIZE_OK, "medium") end
+function Trail.MinimapSize() return Pick("minimapSize", SIZE_OK, "medium") end
+function Trail.Color() return Pick("color", COLOR_OK, "accent") end
+local function Setter(key, ok)
+    return function(v) if ok[v] then Opts()[key] = v; if Trail.Refresh then Trail.Refresh() end end end
+end
+Trail.SetMapSize = Setter("mapSize", SIZE_OK)
+Trail.SetMinimapSize = Setter("minimapSize", SIZE_OK)
+Trail.SetColor = Setter("color", COLOR_OK)
 -- the walking router may be turned off in the options ("Chemins à pied", WLWritsDB.gotoWalk)
 local function WalkOn() return not (WLWritsDB and WLWritsDB.gotoWalk == false) end
 
@@ -603,10 +655,57 @@ function Trail.Dots(line, spacing, cap, cx, cy, r)
 end
 
 local function Fade(along)
-    return 0.25 + 0.65 * math.min(1, math.max(0, (along or FADE) / FADE))
+    return NEAR_ALPHA + (1 - NEAR_ALPHA) * math.min(1, math.max(0, (along or FADE) / FADE))
 end
 
-local function Accent() local a = C.accent or { 0.808, 0.098, 0.094 }; return a[1], a[2], a[3] end
+local function Color()
+    local c = COLORS[Trail.Color()]
+    if c then return c[1], c[2], c[3] end
+    local a = C.accent or { 0.808, 0.098, 0.094 }
+    return a[1], a[2], a[3]
+end
+
+-- A frame's effective scale, nil when unknown (0 or a secret).
+local function Eff(f)
+    if type(f) ~= "table" or not f.GetEffectiveScale then return nil end
+    local ok, s = pcall(f.GetEffectiveScale, f)
+    s = ok and Num(s) or nil
+    if s and s > 0 then return s end
+end
+
+-- Physical pixels per unit of a frame whose effective scale is `eff`, nil when unknown.
+local function PxPerUnit(eff)
+    if not (eff and GetPhysicalScreenSize) then return nil end
+    local ok, _, h = pcall(GetPhysicalScreenSize)
+    h = ok and Num(h) or nil
+    if h and h > 0 then return eff * h / 768 end
+end
+
+-- A dot's width for `kind` ("map": UIParent units, "minimap": the minimap's), from the setting; raised
+-- so it shows at least MIN_SHARE of the pixels it has at 1080p and UI scale 1 (eff: the frame's scale).
+local function DotSize(kind, eff)
+    local size = SIZES[kind][kind == "map" and Trail.MapSize() or Trail.MinimapSize()]
+    local px = PxPerUnit(eff)
+    if px then size = math.max(size, size * REF_PX * MIN_SHARE / px) end
+    return size
+end
+-- The pin's head, grown with the dot when the UI scale raised it.
+local function PinSize(kind, dot)
+    local key = kind == "map" and Trail.MapSize() or Trail.MinimapSize()
+    return PINS[kind][key] * dot / SIZES[kind][key]
+end
+Trail._DotSize = DotSize
+
+-- Yards between two world map dots: GAP diameters on screen, in steps of sqrt(2) from MIN_STEP (a zoom
+-- within a step keeps the dots in place). size: the dot (UI units), mapUI: the map's width on screen
+-- (UI units), yards: the map's width in yards.
+local LOG_STEP = math.log(math.sqrt(2))
+local function MapStep(size, mapUI, yards)
+    local raw = GAP * size * yards / mapUI
+    if raw <= MIN_STEP then return MIN_STEP end
+    return MIN_STEP * math.sqrt(2) ^ math.floor(math.log(raw / MIN_STEP) / LOG_STEP + 0.5)
+end
+Trail._MapStep = MapStep
 
 -- A map's rectangle in world yards (constant, kept): world -> map 0..1 is affine on every zone map.
 local rects = {}
@@ -628,26 +727,48 @@ local function ToMap(r, wx, wy)
     return (wy - r.a.wy) / (r.b.wy - r.a.wy), (wx - r.a.wx) / (r.b.wx - r.a.wx)
 end
 
--- The world map's dots for map `map`: { { x, y (0..1), alpha }, ... }, and the pin { x, y } or nil.
-function Trail.MapDots(map)
+-- The world map's dots for map `map`: { { x, y (0..1), alpha }, ... }, the pin { x, y } or nil, and the
+-- spacing in yards. view (optional): { size = the dot (UI units), mapUI = the map's width on screen (UI
+-- units), clip = { x0, y0, x1, y1 } the part of the map in view (0..1) }; without it, a medium dot on
+-- a MAP_UI-wide map, all of it in view. Zoomed in, only the dots in view (and a margin) are made.
+function Trail.MapDots(map, view)
     local dots, pin = {}, nil
     if not (map and Trail.MapOn()) then return dots, pin end
     local cont, line, dest = Line()
     local r = cont and Rect(map)
     if not (r and r.cont == cont) then return dots, pin end
+    local spacing
     if line then
+        view = view or {}
         local width = math.abs(r.b.wy - r.a.wy)
-        local spacing = math.max(MAP_SPACING, width / MAP_DIVS)
-        for _, d in ipairs(Trail.Dots(line, spacing, MAP_CAP)) do
+        spacing = MapStep(view.size or SIZES.map.medium, view.mapUI or MAP_UI, width)
+        local c = view.clip
+        local x0, y0, x1, y1 = 0, 0, 1, 1
+        local list
+        if c and (c[3] - c[1] < 0.95 or c[4] - c[2] < 0.95) then
+            -- zoomed in: the view and a fifth of it again round it, the dots made only in a circle round that
+            local mx, my = (c[3] - c[1]) * 0.2, (c[4] - c[2]) * 0.2
+            x0, y0, x1, y1 = c[1] - mx, c[2] - my, c[3] + mx, c[4] + my
+            local wyA, wyB = r.a.wy + x0 * (r.b.wy - r.a.wy), r.a.wy + x1 * (r.b.wy - r.a.wy)
+            local wxA, wxB = r.a.wx + y0 * (r.b.wx - r.a.wx), r.a.wx + y1 * (r.b.wx - r.a.wx)
+            list = Trail.Dots(line, spacing, nil, (wxA + wxB) / 2, (wyA + wyB) / 2, Yards(wxA, wyA, wxB, wyB) / 2)
+            x0, y0, x1, y1 = math.max(0, x0), math.max(0, y0), math.min(1, x1), math.min(1, y1)
+        else
+            list = Trail.Dots(line, spacing, MAP_CAP)
+        end
+        for _, d in ipairs(list) do
             local x, y = ToMap(r, d.wx, d.wy)
-            if x >= 0 and x <= 1 and y >= 0 and y <= 1 then dots[#dots + 1] = { x = x, y = y, alpha = Fade(d.along) } end
+            if x >= x0 and x <= x1 and y >= y0 and y <= y1 then
+                dots[#dots + 1] = { x = x, y = y, alpha = Fade(d.along) }
+                if #dots >= MAP_CAP then break end
+            end
         end
     end
     if dest then
         local x, y = ToMap(r, dest.wx, dest.wy)
         if x >= 0 and x <= 1 and y >= 0 and y <= 1 then pin = { x = x, y = y } end
     end
-    return dots, pin
+    return dots, pin, spacing
 end
 
 -- What the minimap shows: radius in yards, its half width in pixels, facing (rotating) or nil, square.
@@ -695,7 +816,8 @@ local function Inside(x, y, lim, square)
     return x * x + y * y <= lim * lim
 end
 
--- The minimap's dots: { { x, y (pixels from its centre), alpha }, ... } and the pin { x, y } or nil.
+-- The minimap's dots: { { x, y (pixels from its centre), alpha }, ... }, the pin { x, y } or nil, the
+-- dot's width (minimap units) and the spacing in yards (GAP diameters at this zoom).
 local mmLive = false     -- the last MinimapDots had a GPS answer (else its timer stops)
 function Trail.MinimapDots()
     local dots, pin = {}, nil
@@ -706,9 +828,11 @@ function Trail.MinimapDots()
     mmLive = true
     local radius, half, facing, square, blind = MinimapView()
     if blind then return dots, pin end
+    local size = DotSize("minimap", Eff(rawget(_G, "Minimap")))
+    local spacing = math.max(MM_MIN_STEP, GAP * size * radius / half)
     if line then
-        local lim = half - MM_DOT
-        for _, d in ipairs(Trail.Dots(line, MM_SPACING, nil, px, py, radius * 1.5)) do
+        local lim = half - size / 2 - RING.minimap - 1
+        for _, d in ipairs(Trail.Dots(line, spacing, nil, px, py, radius * 1.5)) do
             local x, y = Project(d.wx, d.wy, px, py, radius, half, facing)
             if Inside(x, y, lim, square) then
                 dots[#dots + 1] = { x = x, y = y, alpha = Fade(d.along) }
@@ -718,9 +842,9 @@ function Trail.MinimapDots()
     end
     if dest then
         local x, y = Project(dest.wx, dest.wy, px, py, radius, half, facing)
-        if Inside(x, y, half - MM_PIN / 2, square) then pin = { x = x, y = y } end
+        if Inside(x, y, half - PinSize("minimap", size) / 2, square) then pin = { x = x, y = y } end
     end
-    return dots, pin
+    return dots, pin, size, spacing
 end
 
 -- ---------------------------------------------------------------- textures
@@ -728,22 +852,67 @@ end
 local drawn = { map = 0, mapPin = false, minimap = 0, minimapPin = false }
 function Trail._Drawn() return drawn end
 
-local function Pool(host, list, n, texture, size, r, g, b)
+-- n dots on `host`: a disc `size` wide over a black ring `ring` wider on each side (both from dot.tga,
+-- in the host's units); textures made once and kept, restyled only when the size or colour changes.
+local function Pool(host, list, n, size, ring, r, g, b)
+    local tex, back = size / DOT_FILL, (size + 2 * ring) / DOT_FILL
     for i = 1, n do
         local t = list[i]
         if not t then
-            t = host:CreateTexture(nil, "OVERLAY")
-            t:SetTexture(texture)
+            t = host:CreateTexture(nil, "OVERLAY", nil, 2)
+            t:SetTexture(MEDIA .. "dot")
+            local k = host:CreateTexture(nil, "OVERLAY", nil, 1)
+            k:SetTexture(MEDIA .. "dot")
+            k:SetVertexColor(0, 0, 0)
+            k:SetPoint("CENTER", t, "CENTER", 0, 0)
+            t.wlRing = k
             list[i] = t
         end
-        t:SetSize(size, size)
-        t:SetVertexColor(r, g, b)
+        if t.wlTex ~= tex or t.wlBack ~= back then
+            t:SetSize(tex, tex); t.wlRing:SetSize(back, back)
+            t.wlTex, t.wlBack = tex, back
+        end
+        if t.wlR ~= r or t.wlG ~= g or t.wlB ~= b then
+            t:SetVertexColor(r, g, b)
+            t.wlR, t.wlG, t.wlB = r, g, b
+        end
     end
-    for i = n + 1, #list do list[i]:Hide() end
+    for i = n + 1, #list do list[i]:Hide(); list[i].wlRing:Hide() end
+end
+local function PlaceDot(t, rel, point, x, y, alpha)
+    t:ClearAllPoints()
+    t:SetPoint("CENTER", rel, point, x, y)
+    t:SetAlpha(alpha)
+    t.wlRing:SetAlpha(alpha * RING_ALPHA)
+    t:Show(); t.wlRing:Show()
 end
 
--- World map: one frame over the map canvas, textures placed in canvas pixels; the size is kept on
--- screen when the map is zoomed (the canvas is scaled).
+-- The destination pin and its black shadow (a bigger pin behind it).
+local function MakePin(host)
+    local p = host:CreateTexture(nil, "OVERLAY", nil, 7)
+    p:SetTexture(MEDIA .. "pin")
+    local k = host:CreateTexture(nil, "OVERLAY", nil, 6)
+    k:SetTexture(MEDIA .. "pin")
+    k:SetVertexColor(0, 0, 0)
+    k:SetPoint("CENTER", p, "CENTER", 0, 0)
+    p.wlRing = k
+    return p
+end
+-- The pin's tip on (x, y) from rel's `point`; head: its head's width, ring: the shadow's (host units).
+local function ShowPin(p, rel, point, x, y, head, ring, r, g, b)
+    local s, k = head / PIN_FILL, (head + 2 * ring) / PIN_FILL
+    p:SetSize(s, s); p.wlRing:SetSize(k, k)
+    p:SetVertexColor(r, g, b)
+    p:ClearAllPoints()
+    -- pin.tga's tip is PIN_TIP of its height above its bottom edge: the texture goes down that much
+    p:SetPoint("BOTTOM", rel, point, x, y - s * PIN_TIP)
+    p.wlRing:SetAlpha(RING_ALPHA)
+    p:Show(); p.wlRing:Show()
+end
+local function HidePin(p) if p then p:Hide(); p.wlRing:Hide() end end
+
+-- World map: one frame over the map canvas, textures placed in canvas units. A dot's canvas size is its
+-- UI size times UIParent's effective scale over the canvas's: the same on screen at every zoom.
 local wm = { dots = {} }
 local function Canvas()
     local W = rawget(_G, "WorldMapFrame")
@@ -754,47 +923,61 @@ local function Canvas()
     if type(c) ~= "table" then c = nil end
     return W, c
 end
+
+-- UI units per canvas unit: the effective scales, else the scroll container's canvas scale.
+local function CanvasK(W, canvas)
+    local ce, ue = Eff(canvas), Eff(rawget(_G, "UIParent"))
+    if ce and ue then return ce / ue end
+    local sc = W and W.ScrollContainer
+    if type(sc) == "table" and sc.GetCanvasScale then
+        local ok, s = pcall(sc.GetCanvasScale, sc)
+        if ok and Num(s) and s > 0 then return s end
+    end
+    return 1
+end
+
+-- The part of the canvas its scroll frame shows, 0..1 of the map: { x0, y0, x1, y1 }, or nil (unknown).
+local function ViewClip(canvas, w, h)
+    local frame = canvas.GetParent and canvas:GetParent()
+    if type(frame) ~= "table" or not frame.GetLeft or w <= 0 or h <= 0 then return nil end
+    local cs, fs = Eff(canvas), Eff(frame)
+    local cl, ct = Num(canvas:GetLeft()), Num(canvas:GetTop())
+    local fl, ft, fr, fb = Num(frame:GetLeft()), Num(frame:GetTop()), Num(frame:GetRight()), Num(frame:GetBottom())
+    if not (cs and fs and cl and ct and fl and ft and fr and fb) or fr <= fl or ft <= fb then return nil end
+    local kx, ky = 1 / (w * cs), 1 / (h * cs)
+    return { (fl * fs - cl * cs) * kx, (ct * cs - ft * fs) * ky, (fr * fs - cl * cs) * kx, (ct * cs - fb * fs) * ky }
+end
+
 function Trail.RefreshMap()
     local W, canvas = Canvas()
     local shown = W and W.IsShown and W:IsShown()
     local map = shown and W.GetMapID and W:GetMapID()
     local dots, pin = {}, nil
-    if map and canvas then dots, pin = Trail.MapDots(map) end
+    local w, h = Num(canvas and canvas:GetWidth()) or 0, Num(canvas and canvas:GetHeight()) or 0
+    local k = canvas and CanvasK(W, canvas) or 1
+    local size = DotSize("map", Eff(rawget(_G, "UIParent")))
+    if map and canvas then
+        local okC, clip = pcall(ViewClip, canvas, w, h)
+        dots, pin = Trail.MapDots(map, { size = size, mapUI = w > 0 and w * k or nil, clip = okC and clip or nil })
+    end
     if not wm.frame then
         if not canvas or (#dots == 0 and not pin) then drawn.map, drawn.mapPin = 0, false; return end
         wm.frame = CreateFrame("Frame", nil, canvas)
         wm.frame:SetAllPoints(canvas)
         wm.frame:SetFrameLevel((canvas.GetFrameLevel and canvas:GetFrameLevel() or 1) + 2000)
-        wm.pin = wm.frame:CreateTexture(nil, "OVERLAY", nil, 7)
-        wm.pin:SetTexture(MEDIA .. "pin")
+        wm.pin = MakePin(wm.frame)
     end
     local f = wm.frame
-    local w, h = Num(canvas and canvas:GetWidth()) or 0, Num(canvas and canvas:GetHeight()) or 0
-    local scale = 1
-    local sc = W and W.ScrollContainer
-    if type(sc) == "table" and sc.GetCanvasScale then
-        local ok, s = pcall(sc.GetCanvasScale, sc)
-        if ok and Num(s) and s > 0 then scale = s end
-    end
-    local r, g, b = Accent()
-    Pool(f, wm.dots, #dots, MEDIA .. "dot", MAP_DOT / scale, r, g, b)
-    for i, d in ipairs(dots) do
-        local t = wm.dots[i]
-        t:ClearAllPoints()
-        t:SetPoint("CENTER", f, "TOPLEFT", d.x * w, -d.y * h)
-        t:SetAlpha(d.alpha)
-        t:Show()
-    end
+    local r, g, b = Color()
+    local dot, ring = size / k, RING.map / k             -- canvas units
+    Pool(f, wm.dots, #dots, dot, ring, r, g, b)
+    for i, d in ipairs(dots) do PlaceDot(wm.dots[i], f, "TOPLEFT", d.x * w, -d.y * h, d.alpha) end
+    -- kept for the tests: the dot's width in canvas units and on screen (UI units)
+    drawn.mapDot, drawn.mapDotUI = dot, size
     if pin then
-        local s = MAP_PIN / scale
-        wm.pin:SetSize(s, s)
-        wm.pin:SetVertexColor(r, g, b)
-        wm.pin:ClearAllPoints()
-        -- the pin's tip on the spot
-        wm.pin:SetPoint("BOTTOM", f, "TOPLEFT", pin.x * w, -pin.y * h)
-        wm.pin:Show()
+        ShowPin(wm.pin, f, "TOPLEFT", pin.x * w, -pin.y * h, PinSize("map", size) / k, ring, r, g, b)
     else
-        wm.pin:Hide()
+        HidePin(wm.pin)
     end
     drawn.map, drawn.mapPin = #dots, pin ~= nil
 end
@@ -826,6 +1009,13 @@ local function HookMap()
         function p:RemoveAllData() end
         function p:OnMapChanged() pcall(Trail.RefreshMap) end
         function p:OnCanvasScaleChanged() pcall(Trail.RefreshMap) end
+        -- zoomed in, only the dots in view are made: a pan brings the rest, once per 0.15 s at most
+        local panWait = false
+        function p:OnCanvasPanChanged()
+            if panWait or not (C_Timer and C_Timer.After) then return end
+            panWait = true
+            C_Timer.After(0.15, function() panWait = false; pcall(Trail.RefreshMap) end)
+        end
         pcall(W.AddDataProvider, W, p)
     end
     if W.HookScript then
@@ -836,10 +1026,10 @@ local function HookMap()
 end
 Trail._HookMap = HookMap
 
--- Minimap: one frame over it, textures from its centre in pixels.
+-- Minimap: one frame over it, textures from its centre in its own units.
 local mm = { dots = {} }
 function Trail.RefreshMinimap()
-    local dots, pin = Trail.MinimapDots()
+    local dots, pin, size = Trail.MinimapDots()
     -- nothing to follow (GPS stopped, Zygor guiding, the switch off): the timer stops; Apply starts it again
     if minimapTicker and (not mmLive or not (GPS.Active and GPS.Active())) then
         minimapTicker:Cancel(); minimapTicker = nil
@@ -851,26 +1041,17 @@ function Trail.RefreshMinimap()
         mm.frame = CreateFrame("Frame", nil, M)
         mm.frame:SetAllPoints(M)
         mm.frame:SetFrameLevel((M.GetFrameLevel and M:GetFrameLevel() or 1) + 5)
-        mm.pin = mm.frame:CreateTexture(nil, "OVERLAY", nil, 7)
-        mm.pin:SetTexture(MEDIA .. "pin")
-        mm.pin:SetSize(MM_PIN, MM_PIN)
+        mm.pin = MakePin(mm.frame)
     end
-    local r, g, b = Accent()
-    Pool(mm.frame, mm.dots, #dots, MEDIA .. "dot", MM_DOT, r, g, b)
-    for i, d in ipairs(dots) do
-        local t = mm.dots[i]
-        t:ClearAllPoints()
-        t:SetPoint("CENTER", M, "CENTER", d.x, d.y)
-        t:SetAlpha(d.alpha)
-        t:Show()
-    end
+    size = size or DotSize("minimap", Eff(M))
+    local r, g, b = Color()
+    Pool(mm.frame, mm.dots, #dots, size, RING.minimap, r, g, b)
+    for i, d in ipairs(dots) do PlaceDot(mm.dots[i], M, "CENTER", d.x, d.y, d.alpha) end
+    drawn.minimapDot = size
     if pin then
-        mm.pin:SetVertexColor(r, g, b)
-        mm.pin:ClearAllPoints()
-        mm.pin:SetPoint("BOTTOM", M, "CENTER", pin.x, pin.y)
-        mm.pin:Show()
+        ShowPin(mm.pin, M, "CENTER", pin.x, pin.y, PinSize("minimap", size), RING.minimap, r, g, b)
     else
-        mm.pin:Hide()
+        HidePin(mm.pin)
     end
     drawn.minimap, drawn.minimapPin = #dots, pin ~= nil
 end

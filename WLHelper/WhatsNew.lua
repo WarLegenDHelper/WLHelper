@@ -2,6 +2,22 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.79", date = "2026-11-16", items = {
+    { s = "add", fr = { "Trouver un groupe", "La fenêtre Groupes a un onglet de recherche de groupe pensé pour ton guide (donjons de ta route, de tes quêtes, de ton niveau), avec la guilde en premier : membres qui cherchent le même donjon, qui ont les mêmes quêtes, événement prévu. Filtres (rôle, classe, niveau, langue), notes des joueurs, messages groupés par personne, joueurs récents. /wlh lfg." }, en = { "Group finder in the Groups window, built around your guide and your guild: filters, player ratings, whispers by person, recent players.", "" } },
+    { s = "add", fr = { "Bienvenue et visite guidée", "Une page Bienvenue avec les réglages à faire pas à pas, et une visite qui montre chaque fonction à l'écran. /wlh bienvenue, /wlh visite." }, en = { "Welcome page with step-by-step setup and a replayable guided tour.", "" } },
+    { s = "add", fr = { "Quêtes du guide automatiques", "Accepter, rendre et partager les quêtes du guide tout seul (Réglages › Quêtes du guide)." }, en = { "Auto accept, turn in and share the guide's quests.", "" } },
+    { s = "add", fr = { "Les PNJ qui patrouillent", "Leur chemin est tracé sur la carte et la carte du guide dit « Il se déplace le long d'un chemin »." }, en = { "Patrolling NPCs", "Their path is drawn on the map." } },
+    { s = "add", fr = { "Budget des writs", "Indique le maximum à dépenser, le plan choisit les writs les plus rentables et les plus proches dans ce budget." }, en = { "Writs budget", "Set a max spend, the plan picks the best and nearest writs within it." } },
+    { s = "add", fr = { "Accueil des commandes", "Façon Mastercraft : fiche artisan, recherche, tuiles par métier, top de la semaine." }, en = { "Orders home", "Crafter card, search, profession tiles, weekly top." } },
+    { s = "add", fr = { "Marques BiS de Naowh", "Si NaowhForever est installé, ses listes BiS servent pour les marques ; ses poids de stats ne servent que pour une spé dont tu as changé les poids dans Naowh (mention « poids Naowh »). Sinon le % reste celui de notre outil (caps de toucher et défense, montée de niveau)." }, en = { "Naowh BiS lists used when installed; Naowh stat weights only for specs you customized there.", "" } },
+    { s = "chg", fr = { "Portraits", "Le bouton Cibler montre le visage du PNJ (ou une caisse pour un objet) au lieu d'une tête de mort." }, en = { "Target button shows the NPC portrait instead of a skull.", "" } },
+    { s = "chg", fr = { "Menu Actions", "Réduit à 4 entrées : étape faite, recalculer, flèche, boss du donjon." }, en = { "Actions menu down to 4 entries.", "" } },
+    { s = "chg", fr = { "Chaîne de quêtes en frise", "Dans l'Overview : numéros, trait, état, une ligne d'infos, détails au clic." }, en = { "Overview chain as a timeline.", "" } },
+    { s = "chg", fr = { "Choisir un guide", "En 3 ou 4 colonnes selon l'écran ; **modules du Hub** en deux colonnes ; **textes** mieux structurés (titres, puces) partout." }, en = { "Guide picker in 3-4 columns, hub modules in two columns, better text structure.", "" } },
+    { s = "chg", fr = { "Points du chemin", "Plus visibles et réglables (taille carte, minimap, couleur) ; **étiquette dans le monde** plus soignée (tige, anneau, grande distance)." }, en = { "Bigger, configurable path dots; polished world label.", "" } },
+    { s = "chg", fr = { "Équipement", "WL Helper Gear suit Geared Forever 1.1.1. Le réglage « baguette » est fusionné en un seul, et le choix « Méthode » des améliorations disparaît (automatique)." }, en = { "Gear synced to Geared Forever 1.1.1; wand settings merged; upgrade method is automatic.", "" } },
+    { s = "fix", fr = { "", "Les messages des commandes ne peuvent plus boucler quand beaucoup partent d'un coup." }, en = { "Orders messages can no longer loop when many are sent at once.", "" } },
+  } },
   { v = "1.0.0-beta.78", date = "2026-11-16", items = {
     { s = "fix", fr = { "Échap ne ferme plus le guide", "On le suit en jouant, il se ferme avec sa croix. Ça règle aussi pour de bon sa fermeture après un téléport." }, en = { "Escape no longer closes the guide; close it with its X.", "" } },
   } },
@@ -82,9 +98,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.65", date = "2026-11-15", items = {
     { s = "fix", fr = { "Fenêtre des boss", "Plus de croissant gris à droite des portraits (l'anneau n'est gardé que pour les rares, en argent) ; le survol éclaircit doucement au lieu de blanchir le portrait ; la fenêtre se place par défaut en haut à droite de l'écran (comme le minuteur Mythique+), l'épingle la colle au guide si tu préfères." }, en = { "Boss panel", "No grey crescents, softer hover, top-right by default." } },
-  } },
-  { v = "1.0.0-beta.64", date = "2026-11-15", items = {
-    { s = "chg", fr = { "Fenêtre des boss façon Dungeon Journal", "En haut, la sortie en cours (Temps, XP, Or) avec « Nouveau run » ; puis les boss en **portraits ronds**, 5 par ligne, dans l'ordre du donjon (tués : grisés avec une coche) ; puis les **Rares** en silhouettes grises tant que tu ne les as pas vus, en couleur avec un anneau argenté ensuite. Chaque créature a un vrai visage (modèle du jeu, portrait vu en jeu, ou icône de sa famille). Un clic sur un portrait le cible et le marque. /wlh boss." }, en = { "Boss panel like Dungeon Journal", "Run stats, round portraits, rares greyed until seen." } },
-    { s = "chg", fr = { "Bilan de sortie", "En quittant le donjon, une ligne dans le chat (« Zul'Farrak : 32 min · 38 200 XP · 12 po · 7/7 boss »)." }, en = { "", "" } },
   } },
 }

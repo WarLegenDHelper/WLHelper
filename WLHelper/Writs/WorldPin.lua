@@ -1,8 +1,10 @@
 -- Writs/WorldPin.lua: the in-world marker. While WL Helper's GPS guides you (any source: the dungeon
 -- guide, the Comptoir, GoTo, the city tour...) and the point of the leg you walk is on your continent,
 -- the game's own map pin is set there and tracked, so the game draws its navigation marker in the 3D
--- world; our label rides on it: a small dark panel with the place, the distance left (the walking
--- path when WL Helper Nav found one) and a time estimate from your real speed, over an accent pin.
+-- world; our label rides on it: a small dark panel with the place (line 1) and, big in the soft
+-- accent, the distance left (the walking path when WL Helper Nav found one) with a small muted time
+-- estimate from your real speed (line 2); under it the accent pin, a 1 px stem and a small flat ring
+-- on the ground at the exact spot. The stem shortens as you come near (40 px far, 16 px close).
 -- The idea is the same as Naowh Forever's Waypoint Pin; the code and the look are our own.
 --
 -- It steps in only when no other addon already does this job (Auto, the default): Naowh's Waypoint
@@ -16,7 +18,8 @@
 -- walking path. Inside instances, on a taxi and while another addon owns it: nothing at all.
 --
 -- Cost: no frame update without a GPS target. While the label shows, its alpha (on screen, at the
--- edge) is checked 20 times a second and its text twice a second, redrawn only when it changes.
+-- edge) is checked 20 times a second and its text (and the stem length) 4 times a second, redrawn
+-- only when it changes. The marker hangs on the game's navigation frame: no per-frame placement.
 -- The map pin is never moved in combat (not protected, but the move waits for the end of the fight).
 local ADDON, root = ...
 root.Writs = root.Writs or {}
@@ -44,15 +47,20 @@ ns.AddEnglish({
     ["Déjà fait par %s."] = "Already done by %s.",
 })
 
-local UPDATE_EVERY, TEXT_EVERY, SYNC_EVERY = 0.05, 0.5, 1
+local UPDATE_EVERY, TEXT_EVERY, SYNC_EVERY = 0.05, 0.25, 1
 local SAME = 0.0005          -- map fraction: the same pin (about half a yard on a zone map)
 local EDGE_ALPHA = 0.40      -- the label at the edge of the screen (the point is behind or off screen)
 local FADE = 0.5             -- share of the gap closed per update (about 0.10 s at 20 updates a second)
 local STILL = 0.1            -- yards a second: below, you stand still and the time is hidden
 local SMOOTH = 0.35          -- moving average of the speed (one sample per text update)
-local PAD, GAP, LINE_GAP = 8, 6, 3
+local PAD, GAP, LINE_GAP = 8, 6, 2
 local NAME_W, MIN_W = 200, 72
+local NAME_SIZE, DIST_SIZE, ETA_SIZE = 12, 16, 11
 local PIN_SIZE, LIFT = 20, 4
+local STEM_W, STEM_ALPHA = 1, 0.6
+local STEM_FAR, STEM_NEAR = 40, 16        -- px: the stem at FAR_YD and beyond, at NEAR_YD and closer
+local FAR_YD, NEAR_YD = 150, 15
+local RING_W, RING_H, RING_ALPHA = 24, 8, 0.9   -- the ring on the ground: the HD ring drawn flat
 local GAME_PARTS = { "Icon", "IconBorder", "DistanceText" }   -- the game's marker art; its edge arrow stays
 
 -- ---------------------------------------------------------------- helpers
@@ -353,11 +361,25 @@ local function Build()
     if f.SetFrameStrata then f:SetFrameStrata("BACKGROUND") end
     if f.EnableMouse then f:EnableMouse(false) end
     f:Hide()
-    -- the accent pin, its tip on the spot
+    -- the ring on the ground, centred on the spot (the frame's bottom sits half a ring under it)
+    local ring = f:CreateTexture(nil, "BORDER")
+    ring:SetSize(RING_W, RING_H)
+    if root.SetHDIcon then root.SetHDIcon(ring, "ring", T.accent, RING_ALPHA) else ring:SetColorTexture(Color(T.accent, RING_ALPHA)) end
+    ring:SetPoint("BOTTOM", f, "BOTTOM", 0, 0)
+    ring:Show()
+    f.ring = ring
+    -- the 1 px stem from the ring up to the pin's tip
+    local stem = f:CreateTexture(nil, "BORDER")
+    stem:SetColorTexture(Color(T.accent, STEM_ALPHA))
+    stem:SetSize(STEM_W, STEM_FAR)
+    stem:SetPoint("BOTTOM", ring, "CENTER", 0, 0)
+    stem:Show()
+    f.stem, f.stemLen = stem, STEM_FAR
+    -- the accent pin, its tip on the stem
     local mark = f:CreateTexture(nil, "ARTWORK")
     mark:SetSize(PIN_SIZE, PIN_SIZE)
     if root.SetHDIcon then root.SetHDIcon(mark, "pin", T.accent) else mark:SetColorTexture(Color(T.accent)) end
-    mark:SetPoint("BOTTOM", f, "BOTTOM", 0, 0)
+    mark:SetPoint("BOTTOM", stem, "TOP", 0, 0)
     f.mark = mark
     -- the panel above it
     local card = CreateFrame("Frame", nil, f)
@@ -371,17 +393,18 @@ local function Build()
     fill:SetColorTexture(Color(T.cardFill))
     fill:SetAllPoints()
     if root.Outline then root.Outline(card, T.cardEdge) end
-    card.name = Text(card, 13, T.fg)
+    card.name = Text(card, NAME_SIZE, T.fg)
     card.name:SetPoint("TOPLEFT", card, "TOPLEFT", PAD, -PAD)
     card.name:SetWidth(NAME_W)
     if card.name.SetJustifyH then card.name:SetJustifyH("LEFT") end
     if card.name.SetWordWrap then card.name:SetWordWrap(true) end
     if card.name.SetMaxLines then card.name:SetMaxLines(2) end
-    card.dist = Text(card, 12, T.fg)
+    -- line 2: the distance big in the soft accent, the time small and muted on its baseline
+    card.dist = Text(card, DIST_SIZE, T.accentSoft or T.accent)
     card.dist:SetPoint("TOPLEFT", card.name, "BOTTOMLEFT", 0, -LINE_GAP)
     if card.dist.SetWordWrap then card.dist:SetWordWrap(false) end
-    card.eta = Text(card, 11, T.muted)
-    card.eta:SetPoint("BOTTOMLEFT", card.dist, "BOTTOMRIGHT", GAP, 0)
+    card.eta = Text(card, ETA_SIZE, T.muted)
+    card.eta:SetPoint("BOTTOMLEFT", card.dist, "BOTTOMRIGHT", GAP, 1)
     if card.eta.SetWordWrap then card.eta:SetWordWrap(false) end
     f.card = card
     pin = f
@@ -400,14 +423,24 @@ local function Layout()
     local lineW = Width(card.dist) + ((shown.eta or "") ~= "" and (GAP + Width(card.eta)) or 0)
     local w = math.max(MIN_W, math.ceil(math.max(nameW, lineW)) + 2 * PAD)
     card.name:SetWidth(math.max(1, w - 2 * PAD))
-    local nameH = Num(Call(card.name.GetStringHeight, card.name)) or 13
-    local distH = Num(Call(card.dist.GetStringHeight, card.dist)) or 12
-    if nameH <= 0 then nameH = 13 end
-    if distH <= 0 then distH = 12 end
+    local nameH = Num(Call(card.name.GetStringHeight, card.name)) or NAME_SIZE
+    local distH = Num(Call(card.dist.GetStringHeight, card.dist)) or DIST_SIZE
+    if nameH <= 0 then nameH = NAME_SIZE end
+    if distH <= 0 then distH = DIST_SIZE end
     local h = math.ceil(PAD + nameH + LINE_GAP + distH + PAD)
     card:SetSize(w, h)
-    pin:SetSize(w, h + LIFT + PIN_SIZE)
+    card.h = h
+    pin:SetSize(math.max(w, RING_W), h + LIFT + PIN_SIZE + pin.stemLen + RING_H / 2)
 end
+
+-- The stem's length for a distance: STEM_FAR at FAR_YD and beyond, STEM_NEAR at NEAR_YD and closer.
+local function StemFor(yards)
+    if not yards or yards >= FAR_YD then return STEM_FAR end
+    if yards <= NEAR_YD then return STEM_NEAR end
+    local k = (yards - NEAR_YD) / (FAR_YD - NEAR_YD)
+    return math.floor(STEM_NEAR + (STEM_FAR - STEM_NEAR) * k + 0.5)
+end
+WorldPin._StemFor = StemFor
 
 local function SetFS(fs, t)
     t = t or ""
@@ -459,6 +492,8 @@ local function Paint(now)
     changed = SetFS(card.dist, yards and DistanceText(yards) or "") or changed
     shown.eta = (yards and speed and spd and spd >= STILL) and EtaText(yards / speed) or ""
     changed = SetFS(card.eta, shown.eta) or changed
+    local len = StemFor(yards)
+    if len ~= pin.stemLen then pin.stemLen = len; pin.stem:SetHeight(len); changed = true end
     if changed then Layout() end
 end
 WorldPin._Paint = Paint
@@ -478,6 +513,12 @@ local function OnUpdate(self, elapsed)
     alpha = alpha + (target - alpha) * FADE
     if math.abs(target - alpha) < 0.02 then alpha = target end
     self:SetAlpha(alpha)
+    -- at the edge of the screen the spot is not there: no stem, no ring (changed only when it flips)
+    local onSpot = target == 1
+    if onSpot ~= self.onSpot then
+        self.onSpot = onSpot
+        self.stem:SetShown(onSpot); self.ring:SetShown(onSpot)
+    end
     textAt = textAt + dt
     if textAt >= TEXT_EVERY then
         textAt = 0
@@ -496,13 +537,18 @@ local function ShowLabel(now, target, key)
     Build()
     if pin.anchor ~= nav then
         pin:ClearAllPoints()
-        pin:SetPoint("BOTTOM", nav, "CENTER", 0, 0)
+        -- the ring's centre on the navigation frame's point (the spot in the world)
+        pin:SetPoint("BOTTOM", nav, "CENTER", 0, -RING_H / 2)
         pin.anchor = nav
     end
     if shown.key ~= key then speed = nil end
     shown.key, shown.name = key, NameOf(now, target)
     Paint(now)
-    if not pin:IsShown() then alpha = 1; pin:SetAlpha(1); pin:Show() end
+    if not pin:IsShown() then
+        alpha = 1; pin:SetAlpha(1)
+        pin.onSpot = true; pin.stem:Show(); pin.ring:Show()
+        pin:Show()
+    end
     pin:SetScript("OnUpdate", OnUpdate)
     FadeGame(true)
     return true
@@ -583,6 +629,7 @@ end
 function WorldPin._Mine() return mine end
 function WorldPin._Frame() return pin end
 function WorldPin._Alpha() return alpha end
+function WorldPin._Stem() return pin and pin.stemLen end
 
 -- ---------------------------------------------------------------- wiring
 

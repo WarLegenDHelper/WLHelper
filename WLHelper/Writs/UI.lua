@@ -1,10 +1,11 @@
--- Writs/UI.lua: the Comptoir (Writs), 420 wide, sized to its content, with three tabs:
---   Aujourd'hui    the reputation goal, then the writs to turn in now grouped by zone, and one
---                  primary action (the GPS tour, or buying the plan);
+-- Writs/UI.lua: the Comptoir (Writs), 640 wide, sized to its content, with three tabs:
+--   Aujourd'hui    the reputation goal, then the writs to turn in now grouped by zone (the zone
+--                  cards in two columns, T-55 / T-58), and one primary action (the GPS tour, or
+--                  buying the plan);
 --   Achats         what to buy for today's plan, grouped by turn-in zone; a click opens the
 --                  auction house's buy page;
 --   Tous les writs every writ, cheapest first, then those for later and those done today.
--- The Merchant's Favor page (Favor.lua) lives in the same window, without tabs.
+-- The Merchant's Favor page (Favor.lua) lives in the same window, without tabs, 420 wide.
 -- Built from Style.lua's components; frames are pooled and filled again on each refresh. Each page
 -- measures its top block, its list and its bottom row; the window then fits them (and the list
 -- scrolls once the window reaches 80 % of the screen height).
@@ -107,6 +108,18 @@ ns.AddEnglish({
     ["Pour 1 Writ, qui rapporte %s points de réputation."] = "For 1 Writ, worth %s reputation.",
     ["Pour %d Writs, qui rapportent %s points de réputation."] = "For %d Writs, worth %s reputation.",
     ["Prix max pour 100 points"] = "Max price per 100 points",
+    -- budget (T-70)
+    ["Budget"] = "Budget",
+    ["Sans limite"] = "No limit",
+    ["Autre (po)"] = "Other (g)",
+    ["Préférer"] = "Prefer",
+    ["la réputation"] = "reputation",
+    ["le moins de trajet"] = "the least travel",
+    ["Avec %s : 1 Writ, %s de réputation, ~%d min de trajet"] = "With %s: 1 Writ, %s reputation, ~%d min of travel",
+    ["Avec %s : %d Writs, %s de réputation, ~%d min de trajet"] = "With %s: %d Writs, %s reputation, ~%d min of travel",
+    ["Avec %s : les objets de tes Writs en cours coûtent déjà %s."] = "With %s: the items for the Writs you hold already cost %s.",
+    ["Rien dans ton budget"] = "Nothing within your budget",
+    ["Monte le budget ci-dessus pour voir des Writs."] = "Raise the budget above to see Writs.",
     ["%d pa"] = "%ds",
     ["%d po"] = "%dg",
     ["Zone"] = "Zone",
@@ -174,8 +187,15 @@ ns.AddEnglish({
     ["Faveur du marchand"] = "Merchant's Favor",
 })
 
-local W, INSET = 420, 16
+-- 640 for the writs (a wide tool: two columns of zone cards on Today), 420 for the Favor page
+-- (Favor.lua lays out a single 388 list). Today's cards: two columns of 296, 16 apart; each card
+-- goes in the column that ends higher (the left one on a tie), so the list is half as long.
+local W, FAVOR_W, INSET = 640, 420, 16
 local LIST_W = W - 2 * INSET
+local COL_GAP = 16
+local COL_W = math.floor((LIST_W - COL_GAP) / 2)
+local TEXT_W = math.min(LIST_W, 480)   -- a sentence never runs wider (DESIGN 4.2)
+local curW = W                         -- the window's width now (W, or FAVOR_W on the Favor page)
 local frame, tabs, pages = nil, nil, {}
 local data, plan, shop, shopTotal = {}, {}, {}, 0
 local need, pending, readyRep = nil, 0, 0
@@ -240,7 +260,7 @@ local function Page(key)
         self.sa:ClearAllPoints()
         self.sa:SetPoint("TOPLEFT", INSET, -top)
         self.sa:SetPoint("BOTTOMRIGHT", -INSET, bottom)
-        self.sa.child:SetWidth(LIST_W)
+        self.sa.child:SetWidth(curW - 2 * INSET)
         self.sa:SetContentHeight(listH)
         local content = topH + (topH > 0 and 12 or 0) + listH + (bottomH > 0 and 12 or 0) + bottomH
         frame:FitHeight(content)
@@ -456,22 +476,22 @@ local function MakeWritRow(parent)
     return r
 end
 
+-- A zone card, one column wide (COL_W): the zone's name (wraps to two lines) and "Y aller" at the
+-- right; under the name, the zone's level pill and "~N min"; then its writ rows.
 local function MakeZoneCard(parent)
     local c = CreateFrame("Frame", nil, parent)
     c.wlOwned = true
-    c:SetWidth(LIST_W)
+    c:SetWidth(COL_W)
     S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
     S.Border(c, C.cardEdge)
     c.name = S.Text(c, F.heading, C.fg)
     c.name:SetPoint("TOPLEFT", 12, -15)
     c.level = S.Pill(c)
-    c.level:SetPoint("LEFT", c.name, "RIGHT", 8, 0)
     c.go = S.Button(c, L("Y aller"), 0, 24, "secondary", function() if c.first then WP.TravelTo(c.first) end end,
         function() return { L("Y aller"), L("Clic : guider vers le premier Writ de la zone") } end)
     c.go:SetPoint("TOPRIGHT", -12, -10)
     c.eta = S.Text(c, F.meta, C.muted)
     c.eta:SetWordWrap(false)
-    c.eta:SetPoint("RIGHT", c.go, "LEFT", -8, 0)
     c.rows = Pool(function() return MakeWritRow(c) end)
     return c
 end
@@ -512,7 +532,7 @@ local function BuildToday(p)
     today.empty = S.EmptyState(sc.child, "mail", "", nil)
     today.empty:Hide()
 
-    today.tour = S.Button(p, L("Lancer la tournée GPS"), LIST_W - 28 - 8, 32, "primary", function()
+    today.tour = S.Button(p, L("Lancer la tournée GPS"), COL_W, 32, "primary", function()
         if today.tour.action == "gps" then WP.ToggleGPS() elseif today.tour.action == "shop" then WP.ShowTab("shop") end
     end)
     today.tour:SetPoint("BOTTOMLEFT", INSET, 12)
@@ -643,7 +663,7 @@ local function RenderToday()
     end
     y = y + 8
     today.message:ClearAllPoints(); today.message:SetPoint("TOPLEFT", INSET, -y)
-    y = y + math.max(S.FitText(today.message, 3, LIST_W, p), F.body + 2)
+    y = y + math.max(S.FitText(today.message, 3, TEXT_W, p), F.body + 2)
     local secs = WP.SecondsToReset()
     if secs < 3600 then
         today.reset:SetText(string.format(L("Nouveaux Writs dans %d min"), math.max(1, math.floor(secs / 60))))
@@ -678,22 +698,39 @@ local function RenderToday()
         ly = 32 + 8
     end
     local minutes = MinutesTo(order)
+    -- two columns, read in the route's order: cards 1 and 2 side by side, top-aligned, then 3 and 4
+    -- under the taller of the two (like the Keys tiles)
+    local rowTop, rowEnd = ly, ly
     for i, z in ipairs(order) do
         local c = today.cards.Get(i)
-        c:ClearAllPoints(); c:SetPoint("TOPLEFT", 0, -ly); c:SetPoint("TOPRIGHT", 0, -ly)
+        local col = (i % 2 == 1) and 1 or 2
+        if col == 1 and i > 1 then rowTop = rowEnd end
+        c:ClearAllPoints(); c:SetPoint("TOPLEFT", (col - 1) * (COL_W + COL_GAP), -rowTop)
+        c:SetWidth(COL_W)
         c.name:SetText(z.name)
         local lo = WP.ZoneMin(z.map)
         if lo then c.level:Set(string.format(L("niv. %d à %d"), lo, lo + 10), S.LevelColor(lo + 5)) else c.level:Hide() end
         c.first = z.rows[1].w
         local mins = minutes[i]
         c.eta:SetText(mins and string.format(L("~%d min"), mins) or "")
-        -- a long zone name stops before the level pill, "~N min" and the button (full name in the tooltip)
-        local room = LIST_W - 12 - 12 - (num(c.go:GetWidth()) or 90) - 8 - Width(c.eta) - 8
-            - (c.level:IsShown() and ((num(c.level:GetWidth()) or 40) + 8) or 0)
-        -- a long zone name wraps to two lines (never cut) and pushes the rows down
+        -- the name stops before the button; a long one wraps to two lines (never cut) and pushes the
+        -- rows down
+        local room = COL_W - 12 - 12 - (num(c.go:GetWidth()) or 90) - 8
         local nameH = S.FitText(c.name, 2, math.max(40, room), c)
         if Width(c.name) + 2 < room then c.name:SetWidth(Width(c.name) + 2) end
-        local ry = 15 + math.max(nameH, F.heading + 2) + 13
+        local ry = math.max(15 + math.max(nameH, F.heading + 2), 10 + 24)
+        -- under the name: the level pill, then "~N min"
+        local eta = (c.eta:GetText() or "") ~= ""
+        c.eta:SetShown(eta)
+        if c.level:IsShown() or eta then
+            ry = ry + 6
+            c.level:ClearAllPoints(); c.level:SetPoint("TOPLEFT", 12, -ry)
+            c.eta:ClearAllPoints()
+            if c.level:IsShown() then c.eta:SetPoint("LEFT", c.level, "RIGHT", 8, 0)
+            else c.eta:SetPoint("TOPLEFT", 12, -(ry + 3)) end
+            ry = ry + 18
+        end
+        ry = ry + 13
         for j, r in ipairs(z.rows) do
             local row = c.rows.Get(j)
             row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -ry); row:SetPoint("TOPRIGHT", 0, -ry)
@@ -729,12 +766,13 @@ local function RenderToday()
             else
                 row.tip[#row.tip + 1] = string.format(L("Clic : guider vers %s"), w.npcName or z.name)
             end
-            ry = ry + row:Fit(LIST_W)
+            ry = ry + row:Fit(COL_W)
         end
         c.rows.HideFrom(#z.rows + 1)
         c:SetHeight(ry + 2)
-        ly = ly + ry + 2 + 12
+        rowEnd = math.max(rowEnd, rowTop + ry + 2 + 12)
     end
+    if #order > 0 then ly = rowEnd end
     today.cards.HideFrom(#order + 1)
     today.empty:SetShown(#order == 0)
     if #order == 0 then
@@ -802,6 +840,44 @@ local function BuildShop(p)
         function() return WLWritsCharDB.shopZone or false end,
         function(v) WLWritsCharDB.shopZone = v or nil; WP.Refresh() end, 140)
     buy.zoneLabel:SetPoint("BOTTOMLEFT", buy.zone, "TOPLEFT", 0, 4)
+    -- the budget (T-70): the plan spends at most this much, on the writs that bring the most
+    -- reputation for the trip they ask (Core.lua WP.BudgetPick); a field takes any amount in gold
+    buy.budgetLabel = S.Text(p, F.meta, C.muted)
+    buy.budgetLabel:SetText(L("Budget"))
+    buy.budgetLabel:SetWordWrap(false)
+    local steps = { }
+    for _, c in ipairs(WP.BUDGET_STEPS) do steps[#steps + 1] = { c, string.format(L("%d po"), c / 10000) } end
+    steps[#steps + 1] = { 0, L("Sans limite") }
+    buy.budget = S.Segmented(p, steps,
+        function() return WLWritsDB.budget or 0 end,
+        function(v) WLWritsDB.budget = v; buy.budgetInput:SetText(""); WP.Refresh() end, 28)
+    buy.budgetLabel:SetPoint("BOTTOMLEFT", buy.budget, "TOPLEFT", 0, 4)
+    local function TypedBudget(text)
+        text = (text or ""):gsub(",", ".")
+        if not text:match("%d") then
+            -- an empty field clears a typed amount, never a preset you picked with the buttons
+            local b = WLWritsDB.budget or 0
+            for _, c in ipairs(WP.BUDGET_STEPS) do if c == b then return end end
+        end
+        local n = tonumber(text:match("%d*%.?%d+") or "")
+        local v = n and math.max(0, math.min(100000 * 10000, math.floor(n * 10000 + 0.5))) or 0
+        if v == (WLWritsDB.budget or 0) then return end
+        WLWritsDB.budget = v
+        WP.Refresh()
+    end
+    buy.budgetInput = S.Input(p, 88, { placeholder = L("Autre (po)"), onEnter = TypedBudget })
+    buy.budgetInput:SetScript("OnEditFocusLost", function(self)
+        self.focused = nil; if self.Paint then self.Paint() end
+        local t = self:GetText() or ""
+        if t ~= "" then TypedBudget(t) end
+    end)
+    buy.prefLabel = S.Text(p, F.meta, C.muted)
+    buy.prefLabel:SetText(L("Préférer"))
+    buy.prefLabel:SetWordWrap(false)
+    buy.pref = S.Segmented(p, { { "rep", L("la réputation") }, { "trip", L("le moins de trajet") } },
+        function() return WLWritsDB.budgetPref or "rep" end,
+        function(v) WLWritsDB.budgetPref = v; WP.Refresh() end, 28)
+    buy.prefLabel:SetPoint("BOTTOMLEFT", buy.pref, "TOPLEFT", 0, 4)
     buy.absent = S.Banner(p, "warn", "")
     buy.absent:Hide()
 
@@ -869,7 +945,7 @@ local function BuildShop(p)
 
     -- one primary button opens every buy page in a row; the player still clicks the game's own Buy
     -- button each time (the addon buys nothing by itself)
-    buy.all = S.Button(p, "", LIST_W - 28 - 8, 32, "primary", function()
+    buy.all = S.Button(p, "", COL_W, 32, "primary", function()
         local pos = WP.Scan.QueueState()
         if (pos or 0) > 0 or WP.Scan.QueueLeft() > 0 then WP.Scan.ClearQueue(); return end
         local list = {}
@@ -901,11 +977,20 @@ local function RenderShop()
         buy.total:SetText(S.Money(shopTotal))
         buy.total:SetWidth(LIST_W)
         y = y + Height(buy.total, F.hero + 2)
-        buy.sub:SetText(#plan == 1 and string.format(L("Pour 1 Writ, qui rapporte %s points de réputation."), Big(rep))
-            or string.format(L("Pour %d Writs, qui rapportent %s points de réputation."), #plan, Big(rep)))
+        local bi = WP.budgetInfo
+        if bi and bi.over then
+            buy.sub:SetText(string.format(L("Avec %s : les objets de tes Writs en cours coûtent déjà %s."), S.Money(bi.budget), S.Money(bi.committed)))
+        elseif bi then
+            local min = math.max(1, math.floor((bi.seconds or 0) / 60 + 0.5))
+            buy.sub:SetText(#plan == 1 and string.format(L("Avec %s : 1 Writ, %s de réputation, ~%d min de trajet"), S.Money(bi.budget), Big(rep), min)
+                or string.format(L("Avec %s : %d Writs, %s de réputation, ~%d min de trajet"), S.Money(bi.budget), #plan, Big(rep), min))
+        else
+            buy.sub:SetText(#plan == 1 and string.format(L("Pour 1 Writ, qui rapporte %s points de réputation."), Big(rep))
+                or string.format(L("Pour %d Writs, qui rapportent %s points de réputation."), #plan, Big(rep)))
+        end
         y = y + 4
         buy.sub:ClearAllPoints(); buy.sub:SetPoint("TOPLEFT", INSET, -y)
-        y = y + math.max(S.FitText(buy.sub, 2, LIST_W, p), F.body + 2)
+        y = y + math.max(S.FitText(buy.sub, 2, TEXT_W, p), F.body + 2)
         y = y + 12
     end
     -- the two controls side by side, each with its label above
@@ -933,6 +1018,32 @@ local function RenderShop()
     buy.cap:ClearAllPoints(); buy.cap:SetPoint("TOPLEFT", INSET, -y)
     buy.cap:SetMaxWidth(LIST_W - zoneW - 12)
     buy.cap:Update()
+    y = y + 28
+
+    -- the budget beside it, its own field, and (with a budget) what to favour
+    y = y + 12
+    local budget = WLWritsDB.budget or 0
+    local preset = budget == 0
+    for _, c in ipairs(WP.BUDGET_STEPS) do if c == budget then preset = true end end
+    if not buy.budgetInput.focused then
+        local g = budget / 10000
+        buy.budgetInput:SetText(preset and "" or (g == math.floor(g) and tostring(g) or string.format("%.2f", g)))
+        if buy.budgetInput.Paint then buy.budgetInput.Paint() end
+    end
+    y = y + F.meta + 2 + 4
+    buy.budget:ClearAllPoints(); buy.budget:SetPoint("TOPLEFT", INSET, -y)
+    buy.budget:SetMaxWidth(LIST_W - 88 - 8)
+    buy.budget:Update()
+    local bw = num(buy.budget:GetWidth()) or 280
+    buy.budgetInput:ClearAllPoints(); buy.budgetInput:SetPoint("TOPLEFT", INSET + bw + 8, -y)
+    buy.prefLabel:SetShown(budget > 0)
+    buy.pref:SetShown(budget > 0)
+    if budget > 0 then
+        local room = LIST_W - bw - 8 - 88 - 12
+        buy.pref:ClearAllPoints(); buy.pref:SetPoint("TOPRIGHT", -INSET, -y)
+        buy.pref:SetMaxWidth(room)
+        buy.pref:Update()
+    end
     y = y + 28
 
     -- items the last scan found nowhere: said once, above the list
@@ -1049,7 +1160,9 @@ local function RenderShop()
         -- say why the list is empty: the goal is covered, the price cap leaves nothing, or no offer
         local capped = CappedCount()
         local eh
-        if need and need > 0 and capped > 0 then
+        if need and need > 0 and WP.budgetInfo and (WP.budgetInfo.cands or 0) > 0 and #plan == 0 and need > pending then
+            eh = buy.empty:Set("coin", L("Rien dans ton budget"), L("Monte le budget ci-dessus pour voir des Writs."))
+        elseif need and need > 0 and capped > 0 then
             eh = buy.empty:Set("coin", L("Aucun Writ sous ton prix max"), L("Monte le prix max ci-dessus pour en voir plus."))
         elseif need and need > 0 and #plan == 0 then
             eh = buy.empty:Set("mail", L("Rien à acheter"), L("Aucun Writ n'est en vente pour ton objectif : scanne l'HV à nouveau plus tard."))
@@ -1327,6 +1440,9 @@ end
 
 function WP.ShowTab(key)
     current = key
+    -- a writs tab asked while the Favor page showed (Scan.lua at the auction house): back to 640
+    local w = (key == "favor") and FAVOR_W or W
+    if frame and curW ~= w then curW = w; frame:SetWidth(w) end
     for k, p in pairs(pages) do p:SetShown(k == key) end
     tabs:Update()
     WP.Refresh()
@@ -1440,7 +1556,7 @@ function WP.PaintScan()
         frame.scanBar:ClearAllPoints()
         frame.scanBar:SetPoint("TOPLEFT", 0, -top); frame.scanBar:SetPoint("TOPRIGHT", 0, -top)
         frame.scanBar:Show()
-        frame.scanFill:SetWidth(math.max(1, W * done / tot))
+        frame.scanFill:SetWidth(math.max(1, curW * done / tot))
     else
         frame.scanBar:Hide()
     end
@@ -1470,6 +1586,9 @@ function WP.WritsMode() return current ~= "favor" end
 function WP.Open(mode)
     if WP.ModuleOff("writs") then return end
     if not frame then Build() end
+    -- the Favor page keeps its 420 (one list); the writs take 640 (Today in two columns)
+    curW = (mode == "favor") and FAVOR_W or W
+    frame:SetWidth(curW)
     if mode == "favor" then
         frame.title:SetText(L("Faveur du marchand"))
         tabs:Hide()

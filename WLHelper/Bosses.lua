@@ -1072,7 +1072,8 @@ local pending = {}    -- what waits for the end of combat
 local dismissed = {}  -- instance IDs whose panel you closed during this visit
 local SIZE, GAP, PAD, COLS = 40, 6, 12, 5
 local W = PAD + COLS * SIZE + (COLS - 1) * GAP + PAD   -- 248: fixed, like the reference panels
-local HEADER, STATS_Y, RULE_Y, GRID_Y, LABEL = 44, 54, 90, 98, 18
+-- LABEL: a list's block heading (2 above its text, the text, 4 under it: 20 at 14 px)
+local HEADER, STATS_Y, RULE_Y, GRID_Y, LABEL = 44, 54, 90, 98, ns.TY.head.size + 6
 local ATTACH_H = 20   -- the "dock to the guide" link under the grid
 
 local function Marker(rec)
@@ -1817,8 +1818,9 @@ local function Build()
   P.rule = ns.Rule(P, T.divider)
   P.rule:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -RULE_Y)
   P.rule:SetPoint("TOPRIGHT", P, "TOPRIGHT", -PAD, -RULE_Y)
-  -- the rares' label (gold is for money only: a plain label)
-  P.secRare = ns.Text(P, ns.F.meta, T.fg, true)
+  -- the rares' label: a block heading (design system 3.21: 14, the heading colour). The bosses
+  -- above it have none, like the game's dungeon journal (the portraits say what they are)
+  P.secRare = ns.Text(P, ns.TY.head.size, T.head, true)
   ns.ClampLabel(P.secRare, nil, P)
   -- nothing to show: one short sentence
   P.empty = ns.Text(P, ns.F.meta, T.muted, false)
@@ -1887,7 +1889,7 @@ local function GridHeight(nb, nr, cols)
   local h = GRID_Y
   local function rows(n) return math.ceil(n / cols) * (SIZE + GAP) - GAP end
   if nb > 0 then h = h + rows(nb) end
-  if nr > 0 then h = h + (nb > 0 and 10 or 0) + LABEL + rows(nr) end
+  if nr > 0 then h = h + (nb > 0 and ns.TY.head.top - 2 or 0) + LABEL + rows(nr) end
   return h + PAD
 end
 ns.BossGridHeight = GridHeight
@@ -1971,7 +1973,7 @@ local function RenderNow()
     P.empty:Hide()
     if nb > 0 then place(res.bosses, true) end
     if nr > 0 then
-      if nb > 0 then y = y + 10 end
+      if nb > 0 then y = y + ns.TY.head.top - 2 end   -- 14 above the heading (it sits 2 lower)
       P.secRare:SetText(L.BOSS_RARES)
       P.secRare:ClearAllPoints(); P.secRare:SetPoint("TOPLEFT", P, "TOPLEFT", PAD, -(y + 2))
       P.secRare:SetWidth(W - 2 * PAD); P.secRare:Show()
@@ -2133,6 +2135,136 @@ local function NpcIdOf(unit)
   local kind, id = guid:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)")
   if kind == "Creature" or kind == "Vehicle" then return tonumber(id) end
   return nil
+end
+
+-- ---------------------------------------------------------------- portraits for other windows
+-- ns.NpcPortrait(tex, name, npcId, kind): the face of the NPC or mob called `name` on a texture
+-- (the guide's "Target and items" buttons). Its portrait when its display id is known (once the
+-- model had time to load: until then, and with no display id, the plain head); the unit's own live
+-- portrait once it is targeted, under the mouse or its nameplate shows. kind "object" (a chest,
+-- an herb, an urn): the neutral object icon. Without a name the texture is let go. Textures only:
+-- fine in combat.
+do
+  local PORTRAIT_HEAD = "Interface\\Icons\\" .. SILHOUETTE
+  local PORTRAIT_OBJECT = "Interface\\Icons\\INV_Box_01"
+  local wanted = setmetatable({}, { __mode = "k" })   -- [texture] = { name, id, did }
+  local nameIds = {}                                   -- name -> NPC id, from the units seen
+  local warm = {}                                      -- [displayId] = "loading" | "ready" | false
+  local function Plain(tex, path)
+    tex:SetTexture(path); tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  end
+  local function WarmApply(did)
+    for tex, w in pairs(wanted) do
+      if w.did == did and not w.live then
+        if pcall(SetPortraitTextureFromCreatureDisplayID, tex, did) then tex:SetTexCoord(0.12, 0.88, 0.12, 0.88) end
+      end
+    end
+  end
+  -- the portrait is first drawn off-screen (Forever paints a black square until the model is loaded)
+  local function Warm(did)
+    if warm[did] ~= nil then return warm[did] == "ready" end
+    if not (SetPortraitTextureFromCreatureDisplayID and C_Timer and C_Timer.After) then warm[did] = false return false end
+    local tex = Stage():CreateTexture(nil, "ARTWORK")
+    tex:SetAllPoints(Stage())
+    if not pcall(SetPortraitTextureFromCreatureDisplayID, tex, did) then warm[did] = false; tex:Hide() return false end
+    warm[did] = "loading"
+    C_Timer.After(PORTRAIT_WAIT, function() warm[did] = "ready"; tex:Hide(); WarmApply(did) end)
+    return warm[did] == "ready"
+  end
+
+  function ns.NpcPortrait(tex, name, npcId, kind)
+    if not tex then return end
+    name = str(name)
+    if not name then wanted[tex] = nil return end
+    if kind == "object" then wanted[tex] = nil; Plain(tex, PORTRAIT_OBJECT) return end
+    local id = num(npcId) or nameIds[name]
+    local w = wanted[tex]
+    -- the live portrait already on it stays while it shows the same creature
+    if w and w.live and w.name == name then return end
+    local did = id and DisplayFor({ en = name, name = name, id = id, ids = { id } }) or nil
+    wanted[tex] = { name = name, id = id, did = did }
+    if did and Warm(did) and pcall(SetPortraitTextureFromCreatureDisplayID, tex, did) then
+      tex:SetTexCoord(0.12, 0.88, 0.12, 0.88)
+    else
+      Plain(tex, PORTRAIT_HEAD)
+    end
+  end
+
+  -- a unit shows (target, mouse, nameplate): the textures waiting for that creature take its face
+  local function PortraitUnit(unit)
+    if not (unit and next(wanted) and SetPortraitTexture) then return end
+    local id = NpcIdOf(unit)
+    local okN, nm = pcall(UnitName, unit)
+    nm = okN and str(nm) or nil
+    if not (id or nm) then return end
+    if id and nm then nameIds[nm] = id end
+    local okV, vis = pcall(UnitIsVisible, unit)
+    local okD, dead = pcall(UnitIsDead, unit)
+    if (okV and not secret(vis) and vis == false) or (okD and not secret(dead) and dead == true) then return end
+    local hit = false
+    for tex, w in pairs(wanted) do
+      if not w.live and ((id and w.id == id) or (nm and w.name == nm)) then
+        if pcall(SetPortraitTexture, tex, unit) then
+          tex:SetTexCoord(0.12, 0.88, 0.12, 0.88)
+          w.live, w.id = true, w.id or id
+          hit = true
+        end
+      end
+    end
+    if hit and id then LearnUnit(unit, id) end
+  end
+  ns.NpcPortraitUnit = PortraitUnit
+
+  -- What a guide target is: ("npc", id) or ("object", id), from the dungeon's bosses and rares, then
+  -- the quest's own start, end and objectives in LibForeverData (read live); nil when not known.
+  local entCache = {}
+  function ns.TargetEntity(name, qid, dkey)
+    name = str(name)
+    if not name then return nil end
+    local key = name .. "|" .. tostring(qid or "") .. "|" .. tostring(dkey or "")
+    local c = entCache[key]
+    if c ~= nil then if c then return c[1], c[2] end return nil end
+    local kind, id
+    local res = dkey and mobsCache[dkey]
+    if res then
+      for _, list in ipairs({ res.bosses or {}, res.rares or {} }) do
+        for _, r in ipairs(list) do
+          if (r.en == name or r.name == name) and not kind then kind, id = "npc", r.ids and r.ids[1] end
+        end
+      end
+    end
+    local lib = (not kind) and num(qid) and Lib()
+    local low = name:lower()
+    local function same(k, x)
+      local okN, n = pcall(lib.Name, k, x)
+      return okN and type(n) == "string" and n:lower() == low
+    end
+    if lib then
+      local okQ, q = pcall(lib.Get, "quest", qid)
+      if okQ and type(q) == "table" then
+        local cands = {}
+        for _, e in ipairs(q.start or {}) do cands[#cands + 1] = e end
+        for _, e in ipairs(q.finish or {}) do cands[#cands + 1] = e end
+        for _, ob in ipairs(q.objectives or {}) do
+          if (ob.kind == "npc" or ob.kind == "object") and ob.target then
+            cands[#cands + 1] = { kind = ob.kind, id = ob.target }
+          elseif ob.kind == "item" and ob.target then
+            local okI, it = pcall(lib.Get, "item", ob.target)
+            if okI and type(it) == "table" then
+              for _, x in ipairs(it.npcDrops or {}) do cands[#cands + 1] = { kind = "npc", id = x } end
+              for _, x in ipairs(it.objectDrops or {}) do cands[#cands + 1] = { kind = "object", id = x } end
+            end
+          end
+        end
+        for _, e in ipairs(cands) do
+          if (e.kind == "npc" or e.kind == "object") and e.id and same(e.kind, e.id) then kind, id = e.kind, e.id break end
+        end
+      end
+    end
+    -- the bosses' list may come later (built a few hundred NPCs per frame): a miss is not kept
+    if kind or not dkey or mobsCache[dkey] then entCache[key] = kind and { kind, id } or false end
+    return kind, id
+  end
 end
 
 local function IsRareUnit(unit)
@@ -2757,14 +2889,17 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
     Touch()
     SeenCheck("target")
     TargetCheck("target")
+    ns.NpcPortraitUnit("target")
   elseif e == "UPDATE_MOUSEOVER_UNIT" then
     SeenCheck("mouseover")
     TargetCheck("mouseover")
+    ns.NpcPortraitUnit("mouseover")
   elseif e == "NAME_PLATE_UNIT_ADDED" then
     local unit = str(a1)
     if unit then
       SeenCheck(unit)
       ns.RareAlert(unit)
+      ns.NpcPortraitUnit(unit)
     end
   elseif e == "UNIT_HEALTH" then
     -- the target always (as before); the others only while there are bosses to watch (Watch is

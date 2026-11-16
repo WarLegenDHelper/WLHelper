@@ -31,6 +31,7 @@ local T = {
   gold = { 0.902, 0.800, 0.502 },           -- #E6CC80
   info = { 0.478, 0.722, 0.961 },           -- #7AB8F5
   silver = { 0.800, 0.820, 0.860 },         -- #CCD1DB rare mobs (frame and icon)
+  head = { 0.902, 0.800, 0.502 },           -- = gold: block headings inside cards (ns.TyHeading)
   -- alpha layers (white or black over bg)
   cardFill     = { 1, 1, 1, 0.030 },
   cardEdge     = { 0, 0, 0, 0.70 },
@@ -85,6 +86,32 @@ end
 
 local function secret(v) return issecretvalue ~= nil and issecretvalue(v) end
 ns.IsSecret = secret
+
+-- Readable(v): true when our (always tainted) code may compare, join, format, count or use v as a
+-- table key. canaccessvalue is the strict test (a value can be unreadable without being a secret);
+-- issecretvalue the older one; on a client with neither, every value is readable.
+function ns.Readable(v)
+  if canaccessvalue then
+    local ok, r = pcall(canaccessvalue, v)
+    return ok and r == true
+  end
+  if issecretvalue then
+    local ok, r = pcall(issecretvalue, v)
+    return ok and r == false
+  end
+  return true
+end
+-- the same for several values at once (geometry, multiple returns)
+function ns.ReadableAll(...)
+  if canaccessallvalues then
+    local ok, r = pcall(canaccessallvalues, ...)
+    return ok and r == true
+  end
+  for i = 1, select("#", ...) do
+    if not ns.Readable((select(i, ...))) then return false end
+  end
+  return true
+end
 
 function ns.Hex(c)
   local function b(v) return math.floor(math.max(0, math.min(1, v)) * 255 + 0.5) end
@@ -427,6 +454,309 @@ function ns.FitText(fs, maxLines, width, owner)
   local okH, h = pcall(fs.GetStringHeight, fs)
   if not okH or type(h) ~= "number" or secret(h) then return 0 end
   return h
+end
+
+-- =====================================================================
+--  Text structure (design system 3.21): block heading, body, muted line, bullets, facts, stat.
+--  Every piece is placed on `parent` at TOPLEFT (x, -y), y counted downward from the parent's top,
+--  and returns the height it uses so callers stack: y = y + piece:Place(...). Pieces never take the
+--  mouse (no frame, no tooltip hook): they can sit inside a clickable card. Text wraps without a
+--  line limit (reading text, 4.1).
+-- =====================================================================
+ns.TY = {
+  -- a heading is one step above the text under it (14 over 13) and gold: size, colour and space
+  -- set it apart (the client has one face, so `bold` changes nothing without EllesmereUI's font)
+  head = { size = ns.F.heading, color = "head", bold = true, top = 14, bottom = 4, icon = 12, iconGap = 4 },
+  body = { size = 13, color = "text" },
+  muted = { size = 11, color = "muted" },
+  gap = 4,                                    -- between two pieces that are not a heading
+  bullet = { dot = 5, indent = 12, gap = 4, color = "muted", mark = 12, markColor = "ok" },
+  fact = { size = 12, label = "muted", value = "fg", gap = 8, minValue = 64, stackGap = 2 },
+  stat = { size = 12, label = "muted", count = "fg", barTop = 4, bar = 2, subTop = 4,
+           track = { 1, 1, 1, 0.08 }, fill = "ok" },
+}
+local TY = ns.TY
+local function Col(c) if type(c) == "string" then return T[c] or T.text end return c or T.text end
+local function Str(s) return type(s) == "string" and s ~= "" and not secret(s) end
+-- height of a wrapped text at `width`: whole pixels, at least one line when there is text
+local function Measure(fs, width, size)
+  local h = ns.FitText(fs, 0, width)
+  if type(h) ~= "number" or h < size then h = size end
+  return math.ceil(h)
+end
+local function At(r, parent, x, y)
+  r:ClearAllPoints(); r:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
+end
+local function NewFS(parent, size, color, bold)
+  local fs = ns.Text(parent, size, Col(color), bold)
+  fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
+  return fs
+end
+local function Paint(fs, c) c = Col(c); fs:SetTextColor(c[1], c[2], c[3], c[4] or 1) end
+
+-- ns.TyHeading(parent) -> h. h:Place(text, x, y, width [, opts]) -> used height
+--   = (opts.first and 0 or 14) + text height (14 a line) + 4. opts.icon: an HD icon name drawn 12 px in the
+--   heading colour before the words (text starts 16 further right). opts.first: no space above.
+--   The text itself starts at y + top: h.top tells the caller where it went.
+function ns.TyHeading(parent)
+  local s = TY.head
+  local h = { parent = parent }
+  h.fs = NewFS(parent, s.size, s.color, s.bold)
+  function h:Place(text, x, y, width, opts)
+    opts = opts or {}
+    if not Str(text) then self:Hide(); return 0 end
+    local top = opts.first and 0 or s.top
+    local tx = x
+    if opts.icon then
+      self.icon = self.icon or parent:CreateTexture(nil, "ARTWORK")
+      self.icon:SetSize(s.icon, s.icon)
+      ns.SetHDIcon(self.icon, opts.icon, Col(s.color))
+      At(self.icon, parent, x, y + top + math.floor((s.size - s.icon) / 2))   -- on the line's middle
+      self.icon:Show()
+      tx = x + s.icon + s.iconGap
+    elseif self.icon then self.icon:Hide() end
+    self.fs:SetText(text); Paint(self.fs, opts.color or s.color)
+    At(self.fs, parent, tx, y + top)
+    local th = Measure(self.fs, width - (tx - x), s.size)
+    self.fs:Show()
+    self.top, self.textH, self.x = top, th, tx
+    return top + th + s.bottom
+  end
+  function h:Hide() self.fs:Hide(); if self.icon then self.icon:Hide() end end
+  return h
+end
+
+-- ns.TyBody(parent [, kind]) -> b, kind "body" (13 text, default) or "muted" (11 muted).
+-- b:Place(text, x, y, width [, color [, size]]) -> text height (no margin). `size` overrides the
+-- kind's size for this render (a muted line kept at 12 on a small UI scale).
+function ns.TyBody(parent, kind)
+  local s = TY[kind == "muted" and "muted" or "body"]
+  local b = { kind = kind or "body" }
+  b.fs = NewFS(parent, s.size, s.color, false)
+  function b:Place(text, x, y, width, color, size)
+    if not Str(text) then self.fs:Hide(); return 0 end
+    size = size or s.size
+    if self.fs._size ~= size then self.fs._size = size; ns.SetFont(self.fs) end
+    self.fs:SetText(text); Paint(self.fs, color or s.color)
+    At(self.fs, parent, x, y)
+    self.fs:Show()
+    return Measure(self.fs, width, size)
+  end
+  function b:Hide() self.fs:Hide() end
+  return b
+end
+
+-- ns.TyBullets(parent) -> l. l:Place(items, x, y, width [, opts]) -> height: sum of item heights
+--   + 4 between items. Each item: a 5 px dot (HD "dot", muted) at x, its text at x + 12 with width
+--   - 12, so wrapped lines align under the first word. opts.size (13), opts.color (text),
+--   opts.colors[i] (one item's colour, e.g. an item quality), opts.marks[i] (an HD icon name drawn
+--   12 px in `ok` in place of that item's dot, e.g. "check" for a done objective: one marker per
+--   item, the words still at x + 12). l.rows[i] = { dot, mark, fs, y, h }.
+function ns.TyBullets(parent)
+  local s = TY.bullet
+  local l = { rows = {} }
+  function l:Place(items, x, y, width, opts)
+    opts = opts or {}
+    local size = opts.size or TY.body.size
+    local used, n = 0, 0
+    for _, text in ipairs(items or {}) do
+      if Str(text) then
+        n = n + 1
+        local r = self.rows[n]
+        if not r then
+          r = { dot = ns.Icon(parent, "dot", s.dot, "ARTWORK", Col(s.color)), fs = NewFS(parent, size, TY.body.color, false) }
+          self.rows[n] = r
+        end
+        if r.fs._size ~= size then r.fs._size = size; ns.SetFont(r.fs) end
+        if n > 1 then used = used + s.gap end
+        local iy = y + used
+        r.fs:SetText(text); Paint(r.fs, (opts.colors and opts.colors[n]) or opts.color or TY.body.color)
+        At(r.fs, parent, x + s.indent, iy)
+        local ih = Measure(r.fs, width - s.indent, size)
+        -- the dot (or the mark) sits on the middle of the first line, on whole pixels
+        local mark = opts.marks and opts.marks[n]
+        if mark then
+          r.mark = r.mark or parent:CreateTexture(nil, "ARTWORK")
+          r.mark:SetSize(s.mark, s.mark)
+          ns.SetHDIcon(r.mark, mark, Col(s.markColor))
+          At(r.mark, parent, x - math.floor((s.mark - s.dot) / 2 + 0.5), iy + math.floor((size - s.mark) / 2 + 0.5))
+          r.mark:Show(); r.dot:Hide()
+        else
+          if r.mark then r.mark:Hide() end
+          At(r.dot, parent, x, iy + math.floor((size - s.dot) / 2 + 0.5))
+          r.dot:Show()
+        end
+        r.fs:Show()
+        r.y, r.h = iy, ih
+        used = used + ih
+      end
+    end
+    for j = n + 1, #self.rows do
+      local r = self.rows[j]; r.fs:Hide(); r.dot:Hide(); if r.mark then r.mark:Hide() end
+    end
+    self.n = n
+    return used
+  end
+  function l:Hide() for _, r in ipairs(self.rows) do r.fs:Hide(); r.dot:Hide(); if r.mark then r.mark:Hide() end end end
+  return l
+end
+
+-- ns.TyFact(parent) -> f. f:Place(label, value, x, y, width [, opts]) -> height.
+--   Label 12 muted at x, value 12 fg at x + labelW + 8 ("Niveau conseillé  37-46"). labelW is
+--   opts.labelW (to line up a column of facts) or the label's own width. When the value would get
+--   less than 64 px it goes under the label (2 px gap). Height = max(label, value), or label + 2
+--   + value when stacked. opts.valueColor (fg). f.stacked tells which layout was used.
+function ns.TyFact(parent)
+  local s = TY.fact
+  local f = {}
+  f.label = NewFS(parent, s.size, s.label, false)
+  f.value = NewFS(parent, s.size, s.value, false)
+  function f:Place(label, value, x, y, width, opts)
+    opts = opts or {}
+    if not Str(label) and not Str(value) then self:Hide(); return 0 end
+    if not Str(value) then value = "" end
+    label = Str(label) and label or ""
+    local lw = opts.labelW or ns.TextWidth(self.label, label)
+    if lw > width then lw = width end
+    self.label:SetText(label); Paint(self.label, s.label)
+    self.value:SetText(value); Paint(self.value, opts.valueColor or s.value)
+    At(self.label, parent, x, y)
+    local lh = label ~= "" and Measure(self.label, lw + 1, s.size) or 0
+    local vx = x + (label ~= "" and (lw + s.gap) or 0)
+    local vw = width - (vx - x)
+    local h
+    if value == "" then self.value:Hide(); h = lh; self.stacked = false
+    elseif vw < s.minValue then
+      At(self.value, parent, x, y + lh + s.stackGap)
+      h = lh + s.stackGap + Measure(self.value, width, s.size)
+      self.stacked = true
+    else
+      At(self.value, parent, vx, y)
+      h = math.max(lh, Measure(self.value, vw, s.size))
+      self.stacked = false
+    end
+    self.label:SetShown(label ~= ""); if value ~= "" then self.value:Show() end
+    self.vx, self.labelW = vx, lw
+    return h
+  end
+  function f:Hide() self.label:Hide(); self.value:Hide() end
+  return f
+end
+
+-- ns.TyStat(parent) -> st. st:Place(label, done, total, x, y, width [, opts]) -> height
+--   = row (12) + 4 + bar 2 [+ 4 + sub line]. Row: label 12 muted at x (wraps in width - count - 8),
+--   count "done/total" 12 fg right-aligned at x + width. Bar: track white 0.08 across width, fill
+--   `ok` for done/total (hidden at 0). opts.count (text instead of "5/6"), opts.sub (an 11 muted
+--   line under the bar, e.g. "1 attend un prérequis"), opts.subSize (12 on a small UI scale),
+--   opts.fill (colour token). The count never wraps: 2 px of slack against pixel snapping.
+function ns.TyStat(parent)
+  local s = TY.stat
+  local st = {}
+  st.label = NewFS(parent, s.size, s.label, false)
+  st.count = NewFS(parent, s.size, s.count, false)
+  st.count:SetJustifyH("RIGHT"); st.count:SetWordWrap(false)
+  st.track = Tex(parent, "ARTWORK", s.track)
+  st.fill = Tex(parent, "OVERLAY", Col(s.fill))
+  st.sub = ns.TyBody(parent, "muted")
+  function st:Place(label, done, total, x, y, width, opts)
+    opts = opts or {}
+    done, total = tonumber(done) or 0, tonumber(total) or 0
+    local ctext = opts.count or (total > 0 and (done .. "/" .. total) or "")
+    self.count:SetText(ctext)
+    local cw = ctext ~= "" and ns.TextWidth(self.count, ctext) or 0
+    if cw > 0 then cw = math.ceil(cw) end
+    At(self.count, parent, x + width - cw - 2, y)
+    if cw > 0 then self.count:SetWidth(cw + 2); self.count:Show() else self.count:Hide() end
+    self.label:SetText(Str(label) and label or ""); Paint(self.label, s.label)
+    At(self.label, parent, x, y)
+    local rowH = Str(label) and Measure(self.label, width - (cw > 0 and cw + 8 or 0), s.size) or s.size
+    self.label:SetShown(Str(label))
+    local by = y + rowH + s.barTop
+    At(self.track, parent, x, by); self.track:SetSize(width, s.bar); self.track:Show()
+    local p = total > 0 and math.min(1, math.max(0, done / total)) or 0
+    local fc = Col(opts.fill or s.fill)
+    self.fill:SetColorTexture(fc[1], fc[2], fc[3], fc[4] or 1)
+    At(self.fill, parent, x, by)
+    self.fill:SetSize(math.max(1, math.floor(width * p + 0.5)), s.bar)
+    self.fill:SetShown(p > 0)
+    self.p, self.barY = p, by
+    local h = rowH + s.barTop + s.bar
+    local sh = self.sub:Place(opts.sub, x, by + s.bar + s.subTop, width, nil, opts.subSize)
+    if sh > 0 then h = h + s.subTop + sh end
+    return h
+  end
+  function st:Hide() self.label:Hide(); self.count:Hide(); self.track:Hide(); self.fill:Hide(); self.sub:Hide() end
+  return st
+end
+
+-- ns.TextStack(parent) -> stack, built once; every render:
+--   stack:Begin(x, y, width)          -- forget the last render
+--   stack:Heading(text [, icon])      -- 14 above (0 when first), 4 below
+--   stack:Body(text [, color]) / stack:Muted(text [, color])
+--   stack:Bullets(items [, opts]) / stack:Fact(label, value [, opts])
+--   stack:Stat(label, done, total [, opts]) / stack:Gap(px)
+--   local h = stack:End()             -- total height from y; unused pieces are hidden
+-- Each call returns the height it added (its gap included). A non-heading piece after another
+-- piece gets 4 above (none right under a heading: the heading's 4 below is the gap). Empty text
+-- adds nothing.
+function ns.TextStack(parent)
+  local stk = { parent = parent, pools = {}, used = {} }
+  local MAKE = { head = ns.TyHeading, body = function(p) return ns.TyBody(p, "body") end,
+    muted = function(p) return ns.TyBody(p, "muted") end, bullets = ns.TyBullets, fact = ns.TyFact, stat = ns.TyStat }
+  local function Take(kind)
+    local pool = stk.pools[kind] or {}; stk.pools[kind] = pool
+    local n = (stk.used[kind] or 0) + 1; stk.used[kind] = n
+    pool[n] = pool[n] or MAKE[kind](parent)
+    return pool[n]
+  end
+  local function Add(self, h, isHead)
+    if h > 0 then self.y = self.y + h; self.n = self.n + 1; self.lastHead = isHead end
+    return h
+  end
+  -- the gap before a non-heading piece
+  local function Lead(self) return (self.n > 0 and not self.lastHead) and TY.gap or 0 end
+  function stk:Begin(x, y, width)
+    self.x, self.y0, self.y, self.w, self.n, self.lastHead = x or 0, y or 0, y or 0, width or 100, 0, false
+    for k in pairs(self.used) do self.used[k] = 0 end
+    return self
+  end
+  function stk:Heading(text, icon)
+    if not Str(text) then return 0 end
+    local h = Take("head"):Place(text, self.x, self.y, self.w, { first = self.n == 0, icon = icon })
+    return Add(self, h, true)
+  end
+  local function Simple(kind)
+    return function(self, text, color)
+      if not Str(text) then return 0 end
+      local lead = Lead(self)
+      local h = Take(kind):Place(text, self.x, self.y + lead, self.w, color)
+      return Add(self, h > 0 and lead + h or 0, false)
+    end
+  end
+  stk.Body, stk.Muted = Simple("body"), Simple("muted")
+  function stk:Bullets(items, opts)
+    local lead = Lead(self)
+    local h = Take("bullets"):Place(items, self.x, self.y + lead, self.w, opts)
+    return Add(self, h > 0 and lead + h or 0, false)
+  end
+  function stk:Fact(label, value, opts)
+    local lead = Lead(self)
+    local h = Take("fact"):Place(label, value, self.x, self.y + lead, self.w, opts)
+    return Add(self, h > 0 and lead + h or 0, false)
+  end
+  function stk:Stat(label, done, total, opts)
+    local lead = Lead(self)
+    local h = Take("stat"):Place(label, done, total, self.x, self.y + lead, self.w, opts)
+    return Add(self, h > 0 and lead + h or 0, false)
+  end
+  function stk:Gap(px) self.y = self.y + (px or 0); return px or 0 end
+  function stk:End()
+    for kind, pool in pairs(self.pools) do
+      for i = (self.used[kind] or 0) + 1, #pool do pool[i]:Hide() end
+    end
+    return self.y - self.y0
+  end
+  return stk
 end
 
 -- =====================================================================

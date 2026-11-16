@@ -5,11 +5,9 @@
 --     that ask for one ("inv", "invite"...).
 --   Shoot: modifier + right-click on a living enemy targets it and starts your ranged attack
 --     (Auto Shot, wand, gun, crossbow, bow or throw, from the ranged slot).
---     "Plain right-click = wand": with a wand in the ranged slot, right-click alone on a living
---     enemy starts Shoot instead of melee; the modifier keeps working too. Off until the row that
---     explains it is shown: turning shooting on in the welcome screen switches it on for mages,
---     priests and warlocks (WP.OfferWand), with the row and its text right under; any class with
---     a wand can turn it on. Shooting turned on elsewhere keeps right-click alone as it was.
+--     The key is per class (Shift by default); with "None", right-click alone shoots. Turning
+--     shooting on in the welcome screen sets "None" for mages, priests and warlocks, the first
+--     time only (WP.OfferWand): right-click alone starts their wand.
 -- Bindings only exist while the cursor is over the right kind of unit (secure state drivers), so
 -- every other click keeps its normal behaviour. When the stand-alone addon is still loaded, its
 -- feature here stays off: no double invite, no double binding.
@@ -29,17 +27,9 @@ ns.AddEnglish({
     ["Seul le chef du groupe peut inviter : demande-lui d'inviter %s ou de te passer chef."] =
         "Only the party leader can invite: ask them to invite %s or to make you leader.",
     ["Ton groupe est plein : passe-le en raid pour inviter plus de monde."] = "Your party is full: convert it to a raid to invite more people.",
-    -- the plain right-click wand option (Settings > General > Clicks and the welcome screen)
-    ["Clic droit simple = baguette"] = "Plain right-click = wand",
-    ["Sans touche, un clic droit sur un ennemi lance ta baguette au lieu du corps-à-corps. La touche choisie tire toujours."] =
-        "With no key held, right-clicking an enemy starts your wand instead of melee. The chosen key still shoots.",
-    ["Sans touche, un clic droit sur un ennemi lance ta baguette au lieu du corps-à-corps. La touche choisie tire toujours. Maintenu sur un ennemi, il ne tourne plus la caméra."] =
-        "With no key held, right-clicking an enemy starts your wand instead of melee. The chosen key still shoots. Held down over an enemy, it no longer turns the camera.",
-    ["Avec une baguette, un clic droit seul sur un ennemi lance Tir au lieu de ton attaque au corps-à-corps. Maintenu sur un ennemi, il ne tourne plus la caméra."] =
-        "With a wand, a plain right-click on an enemy starts Shoot instead of your melee attack. Held down over an enemy, it no longer turns the camera.",
 })
 
--- the wand classes: plain right-click shoots the wand once offered in the welcome screen
+-- the wand classes: the welcome screen sets their key to "None" (right-click alone shoots)
 local WAND_CLASSES = { MAGE = true, PRIEST = true, WARLOCK = true }
 
 local function IsSecret(v) return issecretvalue ~= nil and issecretvalue(v) end
@@ -58,18 +48,23 @@ local function DB()
         d.v = 1
     end
     for _, k in ipairs({ "chat", "world", "link", "shoot" }) do if d[k] == nil then d[k] = false end end
-    -- the key and the wand option are per class (saved in d.mods and d.wands at each apply):
-    -- every class holds Shift by default; right-click alone stays melee until the wand option is
-    -- turned on (WP.OfferWand, or its switch). A beta caster on "NONE" keeps it: Settings shows
-    -- "None", which is what right-click does.
+    -- the key is per class (saved in d.mods at each apply): every class holds Shift by default;
+    -- "None" makes right-click alone shoot (WP.OfferWand sets it for the wand classes, once).
     if not modsLoaded then
         modsLoaded = true
         local _, class = UnitClass("player")
         d.mods = type(d.mods) == "table" and d.mods or {}
-        d.wands = type(d.wands) == "table" and d.wands or {}
         d.wandOffered = type(d.wandOffered) == "table" and d.wandOffered or {}
+        -- the former "plain right-click = wand" switch, once: a class that had it on gets "None"
+        -- (right-click alone keeps shooting), and the switch is gone
+        if d.wands ~= nil then
+            if type(d.wands) == "table" then
+                for c, on in pairs(d.wands) do if on then d.mods[c] = "NONE" end end
+            end
+            d.wands = nil
+        end
+        d.wandRight = nil
         d.shootMod = d.mods[class] or "SHIFT"
-        d.wandRight = d.wands[class] and true or false
     end
     if type(d.words) ~= "table" or #d.words == 0 then d.words = { "inv", "invite", "invit", "invi" } end
     return d
@@ -216,27 +211,16 @@ local function ShotSpell()
     if not spell then return nil end
     return (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spell)) or (GetSpellInfo and GetSpellInfo(spell)), spell
 end
-local SHOOT_WAND = 5019
-
--- Whether the "plain right-click = wand" option means something here: a wand class, or any class
--- with a wand in the ranged slot (the Settings row and the welcome line show only then).
-function WP.WandOption()
-    if WP.ClickOwner("shoot") then return false end
-    local _, class = UnitClass("player")
-    if WAND_CLASSES[class] then return true end
-    local _, id = ShotSpell()
-    return id == SHOOT_WAND
-end
 
 -- The welcome screen turns shooting on: the first time for this class, mages, priests and
--- warlocks get the wand option on too (its row and text show right under the switch). Once per
--- class, so a later choice is never overwritten; the wand switch calls it too.
+-- warlocks get the key "None", so right-click alone starts their wand. Once per class, so a later
+-- choice is never overwritten; choosing a key (Settings or welcome screen) calls it first too.
 function WP.OfferWand()
     local d = DB()
     local _, class = UnitClass("player")
     if d.wandOffered[class] then return end
     d.wandOffered[class] = true
-    if WAND_CLASSES[class] then d.wandRight = true end
+    if WAND_CLASSES[class] then d.shootMod = "NONE" end
 end
 
 local shootButton = CreateFrame("Button", "WLHelperShootButton", UIParent, "SecureActionButtonTemplate")
@@ -244,7 +228,7 @@ shootButton:RegisterForClicks("AnyDown", "AnyUp")
 shootButton:SetAttribute("type", "macro")
 local shootDriver = CreateFrame("Frame", "WLHelperShootDriver", UIParent, "SecureHandlerStateTemplate")
 shootDriver:SetFrameRef("button", shootButton)
--- "on": the chosen key + right-click; "plain": right-click alone (the wand option); "off": nothing
+-- "on": the chosen key + right-click; "plain": right-click alone (the key "None"); "off": nothing
 shootDriver:SetAttribute("_onstate-shoot", [[
     self:ClearBindings()
     if newstate == "on" then self:SetBindingClick(true, self:GetAttribute("key"), self:GetFrameRef("button"))
@@ -261,28 +245,18 @@ function WP.ApplyClicks()
     local _, class = UnitClass("player")
     d.mods = type(d.mods) == "table" and d.mods or {}
     d.mods[class] = d.shootMod
-    d.wands = type(d.wands) == "table" and d.wands or {}
-    d.wandRight = d.wandRight and true or false
-    d.wands[class] = d.wandRight
     UnregisterStateDriver(inviteDriver, "invite"); inviteDriver:SetAttribute("state-invite", "off"); ClearOverrideBindings(inviteDriver)
     if InviteOn("world") then RegisterStateDriver(inviteDriver, "invite", "[@mouseover,help,nodead] on; off") end
     UnregisterStateDriver(shootDriver, "shoot"); shootDriver:SetAttribute("state-shoot", "off"); ClearOverrideBindings(shootDriver)
-    local spell, id = ShotSpell()
+    local spell = ShotSpell()
     if d.shoot and not WP.ClickOwner("shoot") and spell then
         shootButton:SetAttribute("macrotext", "/target [@mouseover,harm,nodead]\n/cast !" .. spell)   -- "!" never toggles Auto Shot / Shoot off
         if d.shootMod == "NONE" then
             -- right-click alone on an enemy; with any key held, right-click does what it always did
-            shootDriver:SetAttribute("key", "BUTTON2")
-            RegisterStateDriver(shootDriver, "shoot", "[@mouseover,harm,nodead,nomod] on; off")
+            RegisterStateDriver(shootDriver, "shoot", "[@mouseover,harm,nodead,nomod] plain; off")
         else
-            local held = "[@mouseover,harm,nodead,mod:" .. d.shootMod:lower() .. "] on; off"
             shootDriver:SetAttribute("key", d.shootMod .. "-BUTTON2")
-            if d.wandRight and id == SHOOT_WAND then
-                -- the wand: right-click alone shoots too; any other key held keeps its own click
-                RegisterStateDriver(shootDriver, "shoot", "[@mouseover,harm,nodead,nomod] plain; " .. held)
-            else
-                RegisterStateDriver(shootDriver, "shoot", held)
-            end
+            RegisterStateDriver(shootDriver, "shoot", "[@mouseover,harm,nodead,mod:" .. d.shootMod:lower() .. "] on; off")
         end
     end
 end

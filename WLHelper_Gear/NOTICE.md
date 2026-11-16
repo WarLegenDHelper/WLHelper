@@ -5,8 +5,9 @@ WaR LegenD on WoW Forever. It has no window, tooltip, slash command or chat mess
 of its own: WL Helper calls its public API (`WLHelperGear`, documented at the top of
 `Api.lua`).
 
-It is a modified version of **Geared Forever** by **Nathan**, version **1.1**
-(Geared Forever's `## Version: 1.1`), and is distributed under the same licence,
+It is a modified version of **Geared Forever** by **Nathan**, version **1.1.1**
+(Geared Forever's `## Version: 1.1.1`, released 2026-11-16; the fork was first made
+from version 1.1), and is distributed under the same licence,
 the **GNU General Public License version 3** (full text in `LICENSE.txt`).
 
 WL Helper itself is a separate addon under its own licence (CC BY-NC-SA 4.0). It
@@ -17,21 +18,25 @@ section 5).
 ## Credits
 
 - **Geared Forever** by Nathan: stat weights, spec models, scoring, item list.
-  Copyright (C) 2026 Nathan, GPLv3. The unmodified original (version 1.1) is
+  Copyright (C) 2026 Nathan, GPLv3. The unmodified original (version 1.1.1) is
   distributed by its author Nathan as the `GearedForever` addon.
 - **ForeverDB**: item data from the WoW Forever launch client (1.60.1.70707), as
   compiled by Geared Forever (`Data.lua`).
 - **QuestieDB** by the Questie team and contributors (https://github.com/Questie/QuestieDB),
-  GPLv3: quest data (`QuestData.lua`), WoW Forever data set, commit 4dde6c4.
+  GPLv3: quest data (`QuestData.lua`), WoW Forever data set, commit 4dbb824 (as shipped
+  with Geared Forever 1.1.1).
 - **Wowhead Forever**: item stats, weapon damage and sources checked by Geared Forever.
 
 ## Modifications (GPLv3 section 5a)
 
-All changes made by WaR LegenD on **2026-11-15**, starting from Geared Forever 1.1.
+Changes 1 to 34 made by WaR LegenD on **2026-11-15**, starting from Geared Forever 1.1;
+changes 35 to 37 on **2026-11-16**, when Geared Forever 1.1.1 was ported (see the last
+section).
 
 Files:
 
-- `Data.lua`, `QuestData.lua`: copied unchanged, with one credit line added at the top.
+- `Data.lua`, `QuestData.lua`: copied unchanged from Geared Forever 1.1.1, with one credit
+  line added at the top.
 - `Engine.lua`: the scoring part of Geared Forever's `Core.lua` (class and spec tables,
   stat weights, hit caps and curves, `Physical` / `Caster` / `Healer` / `Tank`,
   `SpeedBonus`, item parsing, ranking, live item reading, equipped comparison).
@@ -165,5 +170,55 @@ and `Api.lua`. Scores are not affected.
     compact string per quest (about 1,200); a quest's table is made only when asked for.
     The data does not say which rewards are a choice: WL Helper uses its own data for that.
 
+### Geared Forever 1.1.1 ported, version 1.3.0 (2026-11-16)
+
+Every change from Geared Forever 1.1 to 1.1.1 (2026-11-16) in its scoring and data was
+ported (checked against Geared Forever 1.1.1 itself: same item list, same weights for every
+spec and level). Its window, tooltip and settings changes
+(starred items and Starred tab, per-character level ranges, window scale, Shift-only
+tooltip, "special effect, not rated" tooltip line, minimap right-click, settings command)
+are not, as this addon has none of those.
+
+Ported from Geared Forever 1.1.1 (Nathan's work, unchanged):
+
+- **Leveling weights fade 50 to 60** (`LevelFade`, `Blend`, `LevelingSta`, `ApplyLeveling`):
+  leveling numbers count in full up to 50 and fade evenly into the level 60 numbers (55 = half).
+  Stamina is worth more while leveling for every role (physical 0.8, casters 0.4, healers 0.3),
+  armor 0.03 for physical specs (0.01 at 60); casters get Intellect 0.55 and Spirit 0.35 at
+  least, and their wand weight 2 (was 1.2).
+- **Per-spec leveling overrides** (`lvl`): Arms and Fury Stamina 1.3; Protection paladin spell
+  power 1.2, Stamina 1.0, Intellect 0.6, Strength 0.4; Retribution Stamina 1.3, spell power 1.8,
+  Intellect 0.6; Beast Mastery Intellect 1.0, Spirit 0.8, Stamina 0.6; Marksmanship Spirit 0.8,
+  Stamina 0.6; Survival Intellect 0.8, Spirit 0.6, Stamina 0.6; Arcane Spirit 0.5 and
+  Intellect 0.9; Affliction and Demonology Spirit 0.6; Destruction Spirit 0.5, Intellect 0.7.
+- **Enhancement shaman**: spell power 0.8 while leveling, fading to 1.4 at 60 (and the
+  Intellect attack power that follows it).
+- **Hunters**: plain "+Attack Power" counts in full (1, was 0.1); Survival gets +0.5 more for
+  the bow; thrown weapons count their stats only (no DPS), as hunter shots need a bow, gun or
+  crossbow (`HUNTER_RANGED`, `prefer.statsOnly` in `SectionScore`).
+- **Live items**: an item from the list is also read from its link when the list has no stats
+  for it or the link's name differs (random suffix placed elsewhere in the link).
+- **Data**: `Data.lua` from 1.1.1 (stats, weapon damage and new gear checked against Wowhead
+  Forever on Nov 15: placeholder and removed items dropped, new Blackmaw Hold and dungeon drops,
+  stat fixes) and `QuestData.lua` from 1.1.1 (QuestieDB commit 4dbb824).
+
+Our changes for this port (marked "WL Helper change (1.3.0)"):
+
+35. **Mental Quickness** (talent read in game, change 4) now follows the enhancement spell
+    power value, which fades with the level: its full value is 30% of that spell power.
+    As in 1.1.1, up to level 50 a leveling override (`lvl`) replaces the weight it sets, so
+    the "talents you really have" adjustment of that weight (for example Retribution
+    Intellect and Champion of the Light) only fades in from 50.
+36. **Live items on non-English clients**: the "name differs" test above only runs on English
+    clients. `Data.lua`'s names are English, so on a French client every item would differ and
+    be read live instead of from the checked list. Items with no stats in the list are still
+    read live on every client. Once the client has their data, such items are kept in the
+    live cache like any other (upstream caches every live read), so an effect-only trinket is
+    read once, not on every compare. While the client is still loading an item read live,
+    it is "unknown" for a moment (change 10), where 1.2.0 showed the list's copy.
+37. **API**: `WLHelperGear.VERSION` is "1.3.0" and `UPSTREAM` "Geared Forever 1.1.1";
+    `Weights()` returns `statsOnly` (`{ Thrown = true }` for hunters) and `prefer` holds only
+    the damage multipliers.
+
 With no talent data, no hit on the character and no enchant, and with
-`SetOptions({ neutral = true })`, the scores are the same as Geared Forever 1.1's.
+`SetOptions({ neutral = true })`, the scores are the same as Geared Forever 1.1.1's.

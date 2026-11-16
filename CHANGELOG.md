@@ -6,6 +6,42 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.79] — 2026-11-16
+
+### Ajouté / Added
+- **Trouver un groupe** (T-78) : la fenêtre Groupes a un onglet de recherche de groupe pensé pour ton guide (donjons de ta route, de tes quêtes, de ton niveau), avec la guilde en premier : membres qui cherchent le même donjon, qui ont les mêmes quêtes, événement prévu. Filtres (rôle, classe, niveau, langue), notes des joueurs, messages groupés par personne, joueurs récents. `/wlh lfg`.
+  *Group finder in the Groups window, built around your guide and your guild: filters, player ratings, whispers by person, recent players.*
+- **Bienvenue et visite guidée** (T-62) : une page Bienvenue avec les réglages à faire pas à pas, et une visite qui montre chaque fonction à l'écran. `/wlh bienvenue`, `/wlh visite`.
+  *Welcome page with step-by-step setup and a replayable guided tour.*
+- **Quêtes du guide automatiques** : accepter, rendre et partager les quêtes du guide tout seul (Réglages › Quêtes du guide).
+  *Auto accept, turn in and share the guide's quests.*
+- **Les PNJ qui patrouillent** : leur chemin est tracé sur la carte et la carte du guide dit « Il se déplace le long d'un chemin ».
+  *Patrolling NPCs: their path is drawn on the map.*
+- **Budget des writs** (T-70) : indique le maximum à dépenser, le plan choisit les writs les plus rentables et les plus proches dans ce budget.
+  *Writs budget: set a max spend, the plan picks the best and nearest writs within it.*
+- **Accueil des commandes** façon Mastercraft (T-60) : fiche artisan, recherche, tuiles par métier, top de la semaine.
+  *Orders home: crafter card, search, profession tiles, weekly top.*
+- **Marques BiS de Naowh** (T-79) : si NaowhForever est installé, ses listes BiS servent pour les marques ; ses poids de stats ne servent que pour une spé dont tu as changé les poids dans Naowh (mention « poids Naowh »). Sinon le % reste celui de notre outil (caps de toucher et défense, montée de niveau).
+  *Naowh BiS lists used when installed; Naowh stat weights only for specs you customized there.*
+
+### Modifié / Changed
+- **Portraits** : le bouton Cibler montre le visage du PNJ (ou une caisse pour un objet) au lieu d'une tête de mort.
+  *Target button shows the NPC portrait instead of a skull.*
+- **Menu Actions** réduit à 4 entrées : étape faite, recalculer, flèche, boss du donjon.
+  *Actions menu down to 4 entries.*
+- **Chaîne de quêtes en frise** dans l'Overview : numéros, trait, état, une ligne d'infos, détails au clic.
+  *Overview chain as a timeline.*
+- **Choisir un guide** en 3 ou 4 colonnes selon l'écran ; **modules du Hub** en deux colonnes ; **textes** mieux structurés (titres, puces) partout.
+  *Guide picker in 3-4 columns, hub modules in two columns, better text structure.*
+- **Points du chemin** plus visibles et réglables (taille carte, minimap, couleur) ; **étiquette dans le monde** plus soignée (tige, anneau, grande distance).
+  *Bigger, configurable path dots; polished world label.*
+- **Équipement** : WL Helper Gear suit Geared Forever 1.1.1. Le réglage « baguette » est fusionné en un seul, et le choix « Méthode » des améliorations disparaît (automatique).
+  *Gear synced to Geared Forever 1.1.1; wand settings merged; upgrade method is automatic.*
+
+### Corrigé / Fixed
+- Les messages des commandes ne peuvent plus boucler quand beaucoup partent d'un coup.
+  *Orders messages can no longer loop when many are sent at once.*
+
 ## [1.0.0-beta.78] — 2026-11-16
 
 ### Corrigé / Fixed

@@ -1543,3 +1543,72 @@ function ns.FDJNote(qid)
   end
   return note
 end
+
+-- =====================================================================
+--  NPCs that walk a path: s.sp / f.sp = { {x, y}, ... } in path order, on the point's map (a third
+--  value is another map, for a path that crosses a zone border). The point's own x, y is the spot
+--  nearest the middle of the path; the GPS (Writs/Route.lua) goes to the spot nearest to you, then on
+--  to the next one each time you reach a spot, round the path again after the last one.
+-- =====================================================================
+-- The spots of a quest's giver (which = "s", the default) or turn-in ("f") as { {m, x, y}, ... },
+-- and the NPC's name; nil when that NPC stands still. q: a quest id or a quest table.
+function ns.PatrolSpots(q, which)
+  if type(q) == "number" then q = ns.Q and ns.Q[q] end
+  local p = type(q) == "table" and q[which or "s"]
+  if type(p) ~= "table" or type(p.sp) ~= "table" or not p.sp[1] or not p.m then return nil end
+  local out = {}
+  for i, s in ipairs(p.sp) do out[i] = { s[3] or p.m, s[1], s[2] } end
+  return out, p.n
+end
+
+-- The spots of the patrolling NPC whose marker is (m, x, y), or nil: what the GPS asks for a point.
+local patrolAt
+function ns.PatrolAt(m, x, y)
+  if not (m and x and y) then return nil end
+  if not patrolAt then
+    patrolAt = {}
+    for _, q in pairs(ns.Q or {}) do
+      for _, w in ipairs({ "s", "f" }) do
+        local p = q[w]
+        if type(p) == "table" and p.sp and p.m and p.x and p.y then
+          local k = p.m .. ":" .. p.x .. ":" .. p.y
+          if not patrolAt[k] then patrolAt[k] = { ns.PatrolSpots(q, w) } end
+        end
+      end
+    end
+  end
+  local e = patrolAt[m .. ":" .. x .. ":" .. y]
+  if e then return e[1], e[2] end
+  return nil
+end
+
+-- The spot nearest to a world position ({cont, x, y}, as ns.World gives); 1 when it is not known.
+function ns.PatrolNearest(spots, here)
+  if not (spots and spots[1]) then return nil end
+  if not here then return 1 end
+  local best, bd
+  for i, s in ipairs(spots) do
+    local w = ns.World(s[1], s[2], s[3])
+    if w then
+      local d = Dist(here, w)
+      if not bd or d < bd then best, bd = i, d end
+    end
+  end
+  return best or 1
+end
+
+-- The spot after idx along the path, back to the first after the last.
+function ns.PatrolNext(spots, idx)
+  local n = spots and #spots or 0
+  if n == 0 then return nil end
+  return ((idx or 0) % n) + 1
+end
+
+-- True when a world position stands within `within` yards (15 by default) of spot idx.
+function ns.PatrolReached(spots, idx, here, within)
+  local s = spots and idx and spots[idx]
+  if not (s and here) then return false end
+  local w = ns.World(s[1], s[2], s[3])
+  if not w or w[1] ~= here[1] then return false end
+  return Dist(here, w) <= (within or 15)
+end

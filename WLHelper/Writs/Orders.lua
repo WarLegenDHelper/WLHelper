@@ -23,6 +23,10 @@ local L = ns.L
 local O = {}
 WP.Orders = O
 local S = ns.S
+-- the crafters' home (T-60): profile, presence, favourites, watched recipes, deliveries, search.
+-- One table, filled further down, so the file keeps few top-level locals.
+local K = {}
+O._K = K   -- for the offline tests
 
 ns.AddEnglish({
     ["Commandes"] = "Orders",
@@ -63,6 +67,27 @@ ns.AddEnglish({
     ["Contre-remboursement impossible sans objet joint : joins l'objet, ou demande %s à %s en échange."] =
         "Cash on delivery needs an attached item: attach it, or ask %s from %s by trade.",
     ["métier inconnu"] = "profession unknown",
+    -- the crafters' home (T-60): alerts
+    ["%s sait maintenant faire %s."] = "%s can now make %s.",
+    ["%s est en ligne."] = "%s is online.",
+    ["%s est hors ligne : ta commande l'attendra."] = "%s is offline: your order will wait for them.",
+    ["%s sait maintenant faire %s. Tape /wlh orders pour le commander."] = "%s can now make %s. Type /wlh orders to order it.",
+    ["%s est en ligne (%s)."] = "%s is online (%s).",
+    ["Voir sa fiche"] = "Open profile",
+    ["%s, ton artisan favori, est en ligne. Tape /wlh orders pour voir sa fiche."] =
+        "%s, one of your favourite crafters, is online. Type /wlh orders to open their profile.",
+    ["1 favori en ligne : %s."] = "1 favourite online: %s.",
+    ["%d favoris en ligne : %s."] = "%d favourites online: %s.",
+    ["%s est en ligne et sait faire %s."] = "%s is online and can make %s.",
+    ["%s est en ligne et sait faire %s. Tape /wlh orders pour le commander."] = "%s is online and can make %s. Type /wlh orders to order it.",
+    ["Et 1 autre alerte dans les Commandes."] = "And 1 more alert in Orders.",
+    ["Et %d autres alertes dans les Commandes."] = "And %d more alerts in Orders.",
+    ["Ouvrir"] = "Open",
+    ["1 commande t'a attendu pendant le donjon."] = "1 order waited for you during the dungeon.",
+    ["%d commandes t'ont attendu pendant le donjon."] = "%d orders waited for you during the dungeon.",
+    ["Les voir"] = "See them",
+    ["%s est en donjon : ta commande attend, tu es %s dans sa file."] = "%s is in a dungeon: your order is waiting, you are %s in line.",
+    ["Utilise : "] = "Uses: ",
 })
 
 local PREFIX = "WLHord"
@@ -98,7 +123,7 @@ O.DB = DB
 local outbox = {}
 local pumping = false
 local tokens, tokensAt = 10, 0
-local function Pump()
+local function PumpOnce(Pump)
     local m = outbox[1]
     if not m then pumping = false; return end
     local now = GetTime()
@@ -116,6 +141,20 @@ local function Pump()
     table.remove(outbox, 1)
     tokens = tokens - 1
     C_Timer.After(0.1, Pump)
+end
+-- A timer that fires at once (some stubs, some clients at 0 s) must not recurse: re-entry is
+-- turned into a bounded loop, and past the bound the queue waits for the next Send.
+local pumpDepth, pumpAgain = 0, false
+local function Pump()
+    if pumpDepth > 0 then pumpAgain = true; return end
+    pumpDepth = 1
+    local n = 0
+    repeat
+        pumpAgain = false; n = n + 1
+        if not pcall(PumpOnce, Pump) then pumpAgain = false; pumping = false end
+    until not pumpAgain or n >= 100
+    if pumpAgain then pumping = false end
+    pumpDepth = 0
 end
 local function Send(msg, channel, target)
     if not channel then return end
@@ -165,7 +204,17 @@ local function ReadModern(recipes)
     local base = T.GetBaseProfessionInfo and T.GetBaseProfessionInfo()
     local prof = base and base.professionName
     if not prof or prof == "" then return end
-    for _, id in ipairs(T.GetAllRecipeIDs() or {}) do
+    local ids = T.GetAllRecipeIDs() or {}
+    -- right after switching professions the window can still hold the previous one's list: the
+    -- first recipe must belong to the open profession, or the read waits (ReadProfession retries)
+    if T.GetProfessionInfoByRecipeID and ids[1] and type(base.professionID) == "number" then
+        local ok, pi = pcall(T.GetProfessionInfoByRecipeID, ids[1])
+        if ok and type(pi) == "table" then
+            local a, b = pi.professionID, pi.parentProfessionID
+            if type(a) == "number" and a ~= base.professionID and b ~= base.professionID then return "stale" end
+        end
+    end
+    for _, id in ipairs(ids) do
         local info = T.GetRecipeInfo(id)
         if info and info.learned then
             local sch = T.GetRecipeSchematic and T.GetRecipeSchematic(id, false)
@@ -187,6 +236,13 @@ local function ReadProfession()
     local recipes = {}
     if C_TradeSkillUI and C_TradeSkillUI.GetAllRecipeIDs then
         local ok, p, r, m = pcall(ReadModern, recipes)
+        if ok and p == "stale" then
+            -- another profession's list still in the window: read again shortly (3 times at most)
+            K.staleTries = (K.staleTries or 0) + 1
+            if K.staleTries <= 3 and C_Timer and C_Timer.After then C_Timer.After(0.6, ReadProfession) else K.staleTries = 0 end
+            return
+        end
+        K.staleTries = 0
         if ok then prof, rank, max = p, r, m end
     end
     if prof then
@@ -314,9 +370,11 @@ end
 -- My professions' hashes to the guild: those with an older copy will ask for the list.
 local announcedAt = 0
 function O.Announce(throttled)
-    if WLWritsDB.ordersShare == false then return end
     if throttled and GetTime() - announcedAt < 30 then return end
     announcedAt = GetTime()
+    -- my crafter profile (status, note, counts) goes with it, recipes shared or not
+    if K.SendA then pcall(K.SendA) end
+    if WLWritsDB.ordersShare == false then return end
     for prof, p in pairs(DB().mine) do
         Guild("H|" .. prof .. "|" .. (p.rank or 0) .. "|" .. (p.max or 0) .. "|" .. p.hash)
     end
@@ -492,7 +550,7 @@ local function LogStep(o, status, by)
 end
 O.LogStep = LogStep
 
-local function Merge(o)
+local function MergeRaw(o)
     local d = DB()
     local cur = d.list[o.id]
     if not cur then d.list[o.id] = o; return o, true end
@@ -515,6 +573,12 @@ local function Merge(o)
         local count = (C_Item and C_Item.GetItemCount) or GetItemCount
         cur.custBase = count and (count(cur.item) or 0) or nil
     end
+    return cur, changed
+end
+-- every merge also feeds my recent orders and the weekly delivery counts (K.AfterMerge, below)
+local function Merge(o)
+    local cur, changed = MergeRaw(o)
+    if K.AfterMerge and cur then pcall(K.AfterMerge, cur) end
     return cur, changed
 end
 
@@ -818,19 +882,39 @@ function O.Catalog()
 end
 
 -- Who of the guild is online, and each member's class (file name, "WARRIOR"...), read together
+-- Each member also gets { level, class, zone, online, afk, lastOnline (seconds) } (O.Member).
 local onlineCache, classCache, onlineAt = {}, {}, 0
-function O.OnlineGuild()
-    if GetTime() - onlineAt < 30 then return onlineCache end
+function O.OnlineGuild(force)
+    if not force and GetTime() - onlineAt < 30 then return onlineCache end
     onlineCache, classCache, onlineAt = {}, {}, GetTime()
+    K.members = {}
     if not (IsInGuild and IsInGuild() and GetNumGuildMembers and GetGuildRosterInfo) then return onlineCache end
     for i = 1, (GetNumGuildMembers() or 0) do
-        local name, _, _, _, _, _, _, _, online, _, cls = GetGuildRosterInfo(i)
+        local name, _, _, level, _, zone, _, _, online, status, cls = GetGuildRosterInfo(i)
         if name then
-            onlineCache[Short(name)] = online and true or false
-            if cls then classCache[Short(name)] = cls end
+            local n = Short(name)
+            onlineCache[n] = online and true or false
+            if cls then classCache[n] = cls end
+            -- status: 1/2 (or "<AFK>"/"<DND>") = away or busy
+            local afk = (status == 1 or status == 2) or (type(status) == "string" and status ~= "")
+            local m = { level = type(level) == "number" and level or nil, class = cls, zone = type(zone) == "string" and zone or nil,
+                online = online and true or false, afk = afk and true or nil }
+            if not online and GetGuildRosterLastOnline then
+                local ok, y, mo, dd, hh = pcall(GetGuildRosterLastOnline, i)
+                if ok and type(y) == "number" then
+                    m.lastOnline = (((y * 365 + (mo or 0) * 30 + (dd or 0)) * 24) + (hh or 0)) * 3600
+                end
+            end
+            K.members[n] = m
         end
     end
     return onlineCache
+end
+function O.Member(name)
+    if name == Me() then return { level = UnitLevel and UnitLevel("player"), class = select(2, UnitClass("player")), online = true,
+        zone = GetRealZoneText and GetRealZoneText() or nil } end
+    O.OnlineGuild()
+    return K.members and K.members[name] or nil
 end
 function O.ClassOf(name)
     if name == Me() then return select(2, UnitClass("player")) end
@@ -985,6 +1069,883 @@ function O.FillMail(o, kind)
     return missing, attached
 end
 
+-- ---------------------------------------------------------------- the crafters' home (T-60)
+-- My crafter profile (status, a note for buyers, what I hide) goes to the guild in one "A"
+-- message; the others' come back into d.profiles. Around it: favourites, watched recipes, my
+-- recent orders, the week's deliveries, alerts with their limits, a search that folds accents,
+-- and one counted set of crafters (O.CrafterSet) that every number of the home reads.
+do
+    local DAY = 86400
+    local function Day(t) return math.floor((t or time()) / DAY) end
+    K.Day = Day
+    local function Now() return GetTime and GetTime() or 0 end
+    local function InCombat() return (InCombatLockdown and InCombatLockdown()) and true or false end
+    K.InCombat = InCombat
+    local function En() return ns.English and ns.English() or false end
+    -- a yes/no from the game that may be a secret value: false unless plainly true
+    local function Yes(f, ...)
+        if not f then return false end
+        local ok, v = pcall(f, ...)
+        if not ok or (root.IsSecret and root.IsSecret(v)) then return false end
+        return v == true or (v ~= nil and v ~= false and v ~= 0)
+    end
+    local function Bit(f, b) return math.floor((tonumber(f) or 0) / b) % 2 == 1 end
+    K.Bit = Bit
+
+    -- ---- my profile (account-wide), my status (per character)
+    function O.Profile()
+        local d = DB()
+        local p = d.profile
+        if type(p) ~= "table" then p = {}; d.profile = p end
+        if type(p.note) ~= "string" then p.note = "" end
+        if p.hideAlts == nil then p.hideAlts = false end
+        if p.showZone == nil then p.showZone = true end
+        if p.quiet == nil then p.quiet = true end
+        if p.autoBusy == nil then p.autoBusy = true end
+        if type(p.alts) ~= "table" then p.alts = {} end
+        return p
+    end
+    local function CharDB()
+        if type(WLWritsCharDB) ~= "table" then WLWritsCharDB = {} end
+        return WLWritsCharDB
+    end
+    -- the words of a status, in the player's language (never through L: "Absent" is taken)
+    local WORDS = { a = { "Disponible", "Available" }, b = { "Occupé", "Busy" }, o = { "Absent", "Away" }, d = { "En donjon", "In a dungeon" } }
+    function O.StatusWord(s)
+        local w = WORDS[s]
+        if not w then return nil end
+        return En() and w[2] or w[1]
+    end
+    -- the status picked by hand: a (available), b (busy), o (away)
+    function O.BaseStatus()
+        local s = CharDB().crafterStatus
+        return (s == "a" or s == "b" or s == "o") and s or "a"
+    end
+    function O.SetCrafterStatus(s)
+        if s ~= "a" and s ~= "b" and s ~= "o" then return end
+        CharDB().crafterStatus = s
+        K.Reeval()
+    end
+    function O.CycleStatus() O.SetCrafterStatus(({ a = "b", b = "o", o = "a" })[O.BaseStatus()]) end
+
+    -- queued for a battleground or the dungeon finder (read only)
+    local function Queued()
+        if GetMaxBattlefieldID and GetBattlefieldStatus then
+            local n = GetMaxBattlefieldID()
+            for i = 1, (type(n) == "number" and n or 0) do
+                if GetBattlefieldStatus(i) == "queued" then return true end
+            end
+        end
+        if GetLFGQueueStats and LE_LFG_CATEGORY_LFD then
+            if GetLFGQueueStats(LE_LFG_CATEGORY_LFD) then return true end
+        end
+        return false
+    end
+    local function InInstance()
+        if not IsInInstance then return false end
+        local ok, inside, kind = pcall(IsInInstance)
+        if not ok or (root.IsSecret and (root.IsSecret(inside) or root.IsSecret(kind))) then return false end
+        return (inside and (kind == "party" or kind == "raid" or kind == "pvp" or kind == "arena")) and true or false
+    end
+    K.InInstance = InInstance
+    -- what the guild sees, worked out each time (never stored): Away wins; then Busy on its own
+    -- (AFK, queued); then In a dungeon (quiet mode); then the status picked by hand.
+    -- Second value: why it is automatic ("afk", "queue", "inst").
+    function O.MyStatus()
+        local base = O.BaseStatus()
+        if base == "o" then return "o" end
+        local p = O.Profile()
+        if p.autoBusy then
+            if Yes(UnitIsAFK, "player") then return "b", "afk" end
+            if Yes(Queued) then return "b", "queue" end
+        end
+        if p.quiet and InInstance() then return "d", "inst" end
+        return base
+    end
+    function O.MyMain()
+        local p = O.Profile()
+        if type(p.main) == "string" and p.main ~= "" and p.alts[p.main] then return p.main end
+    end
+
+    -- ---- the buyer's note: one line, no link, colour or texture, 50 characters (150 bytes) at most
+    local function CutChars(t, n)
+        local count, i = 0, 1
+        while i <= #t do
+            local c = t:byte(i)
+            local len = c >= 0xF0 and 4 or c >= 0xE0 and 3 or c >= 0xC0 and 2 or 1
+            count = count + 1
+            if count > n then return t:sub(1, i - 1) end
+            i = i + len
+        end
+        return t
+    end
+    function O.NoteLength(t) local _, n = tostring(t or ""):gsub("[^\128-\191]", ""); return n end
+    function O.CleanNote(t)
+        t = tostring(t or "")
+        t = t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h", ""):gsub("|h", ""):gsub("|T.-|t", ""):gsub("|A.-|a", "")
+        t = t:gsub("[|%c]", " "):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")
+        return (Utf8Cut(CutChars(t, 50), 150))
+    end
+
+    -- ---- the "A" message: A|v=1,s=a,f=0,w=3,t=40,m=Main|note
+    -- f: 1 = zone hidden, 2 = alts hidden, 4 = recipes not shared. Unknown keys are ignored (a v2
+    -- adds keys, never reorders). H and the other kinds are unchanged on the wire.
+    function O.BuildA()
+        local p = O.Profile()
+        local f = (p.showZone == false and 1 or 0) + (p.hideAlts and 2 or 0) + (WLWritsDB.ordersShare == false and 4 or 0)
+        local kv = { "v=1", "s=" .. O.MyStatus(), "f=" .. f, "w=" .. math.min(999, O.MyWeek()), "t=" .. math.min(99999, DB().myDelivTotal or 0) }
+        local main = O.MyMain()
+        if main and not p.hideAlts and main ~= Me() then
+            local m = Utf8Cut((main:gsub("[,|=%c%s]", "")), 36)
+            if m ~= "" then kv[#kv + 1] = "m=" .. m end
+        end
+        return "A|" .. table.concat(kv, ",") .. "|" .. O.CleanNote(p.note)
+    end
+    -- what a received "A" says, clamped (rest: everything after "A|")
+    function O.ParseA(rest)
+        local kvs, note = tostring(rest or ""):match("^([^|]*)|?(.*)$")
+        local t = {}
+        for item in ((kvs or "") .. ","):gmatch("([^,]*),") do
+            local k, v = item:match("^(%a)=(.+)$")
+            if k then t[k] = v end
+        end
+        local function Num(v, max)
+            v = tonumber(v)
+            if not v or v ~= v or v < 0 then return 0 end
+            return math.min(max, math.floor(v))
+        end
+        local a = { v = Num(t.v, 999), s = ({ a = "a", b = "b", o = "o", d = "d" })[t.s], f = Num(t.f, 255), w = Num(t.w, 999), tot = Num(t.t, 99999) }
+        if t.m and not Bit(a.f, 2) then
+            local m = Utf8Cut((t.m:gsub("[,|=%c%s]", "")), 36)
+            if m ~= "" then a.m = m end
+        end
+        a.note = O.CleanNote(note or "")
+        return a
+    end
+    function K.OnProfile(sender, rest)
+        local a = O.ParseA(rest)
+        -- the main must be a member of the guild, and someone else
+        if a.m and (a.m == sender or not O.Member(a.m)) then a.m = nil end
+        local d = DB()
+        d.profiles = d.profiles or {}
+        d.profiles[sender] = { s = a.s, f = a.f, w = a.w, tot = a.tot, m = a.m, note = a.note, at = time(), v = a.v }
+        -- one per sender per 5 s redraws the window; later ones are kept, quietly
+        K.aSeen = K.aSeen or {}
+        local now = Now()
+        if K.aSeen[sender] and now - K.aSeen[sender] < 5 then return end
+        K.aSeen[sender] = now
+        K.RefreshSoon()
+    end
+    function K.RefreshSoon()
+        if K.refreshPending then return end
+        K.refreshPending = true
+        C_Timer.After(0.5, function() K.refreshPending = false; if WP.RefreshOrders then WP.RefreshOrders() end end)
+    end
+
+    -- ---- sending my "A": at login (O.Announce), in answer to Q (same 30 s limit), and on a change
+    -- of status, note or flags: 3 s later (changes merged, the latest wins), at most once per 30 s,
+    -- never in combat. Busy or in a dungeon: said again after 15 min for whoever logged in since.
+    local A = { lastAt = -1e9, dirty = false, timer = false }
+    K.A = A
+    function K.Sig()
+        local p = O.Profile()
+        return table.concat({ O.MyStatus(), p.note, tostring(p.hideAlts), tostring(p.showZone), tostring(WLWritsDB.ordersShare ~= false),
+            tostring((O.MyMain())) }, "|")
+    end
+    function K.SendA()
+        if not (IsInGuild and IsInGuild()) then return end
+        if InCombat() then A.dirty = true; A.waitCombat = true; return end
+        A.dirty, A.waitCombat = false, false
+        A.lastAt = Now()
+        A.sig = K.Sig()
+        Guild(O.BuildA())
+        A.resendToken = (A.resendToken or 0) + 1
+        local token = A.resendToken
+        C_Timer.After(900, function()
+            if A.resendToken ~= token then return end
+            -- Away too: a status older than 20 min reads as Available on the other side
+            if O.MyStatus() ~= "a" then K.SendA() end
+        end)
+    end
+    function K.QueueA()
+        A.dirty = true
+        if A.timer then return end
+        A.timer = true
+        C_Timer.After(math.max(3, 30 - (Now() - A.lastAt)), function()
+            A.timer = false
+            if A.dirty then K.SendA() end
+        end)
+    end
+    -- something that may change what the guild sees: status, note, flags (and the way out of a
+    -- dungeon: the orders that waited, the alerts held)
+    -- fromEvent: a game event (AFK flag, queue, zone) only redraws the window when what it shows
+    -- changed (LFG_UPDATE and UPDATE_BATTLEFIELD_STATUS come often while queued)
+    function K.Reeval(fromEvent)
+        local s, why = O.MyStatus()
+        local was, wasWhy = K.lastStatus, K.lastWhy
+        K.lastStatus, K.lastWhy = s, why
+        if was == "d" and s ~= "d" then pcall(K.QuietReturn); pcall(K.FlushAlerts) end
+        local sig = K.Sig()
+        local changed = s ~= was or why ~= wasWhy
+        if A.sig == nil and A.lastAt < 0 then A.sig = sig      -- not sent yet: the login announce says it
+        elseif sig ~= A.sig then A.sig = sig; K.QueueA(); changed = true end
+        if (changed or not fromEvent) and WP.RefreshOrders then WP.RefreshOrders() end
+    end
+    function O.SetNote(t)
+        local link = tostring(t or ""):find("|", 1, true) ~= nil
+        local n = O.CleanNote(t)
+        O.Profile().note = n
+        K.Reeval()
+        return n, link
+    end
+    function O.SetProfileFlag(k, v)
+        if k ~= "hideAlts" and k ~= "showZone" and k ~= "quiet" and k ~= "autoBusy" and k ~= "main" then return end
+        O.Profile()[k] = v
+        K.Reeval()
+    end
+    function O.ShareChanged() K.Reeval() end
+
+    -- ---- alerts: never in combat (queued, the latest per key), held in a dungeon, chat only when
+    -- Away, 3 toasts per 5 min (the rest merged into one), chat lines through Say (30 s de-duplication)
+    local AL = { q = {}, order = {}, shown = {}, extra = 0 }
+    K.AL = AL
+    -- toast = { text, sub, linkLabel, onLink }
+    function K.ShowAlert(toast, chat)
+        if chat and K.Say then K.Say(chat, nil, "find") end
+        if not toast or O.MyStatus() == "o" then return "chat" end
+        local now = Now()
+        for i = #AL.shown, 1, -1 do if now - AL.shown[i] >= 300 then table.remove(AL.shown, i) end end
+        if #AL.shown >= 3 then
+            AL.extra = AL.extra + 1
+            if not AL.extraTimer then
+                AL.extraTimer = true
+                C_Timer.After(math.max(1, 300 - (now - AL.shown[1])), function()
+                    AL.extraTimer = false
+                    local n = AL.extra
+                    AL.extra = 0
+                    if n > 0 then
+                        K.ShowAlert({ n == 1 and L("Et 1 autre alerte dans les Commandes.") or string.format(L("Et %d autres alertes dans les Commandes."), n),
+                            nil, L("Ouvrir"), function() if WP.ShowOrdersTab then WP.ShowOrdersTab("find") end end })
+                    end
+                end)
+            end
+            return "merged"
+        end
+        AL.shown[#AL.shown + 1] = now
+        if S and S.Toast then pcall(S.Toast, toast[1], toast[2], "info", toast[3], toast[4]) end
+        return "toast"
+    end
+    function O.Alert(key, toast, chat)
+        if WP.ModuleOn and not WP.ModuleOn("orders") then return "off" end
+        if InCombat() or O.MyStatus() == "d" then
+            if not AL.q[key] then AL.order[#AL.order + 1] = key end
+            AL.q[key] = { toast, chat }
+            return "queued"
+        end
+        return K.ShowAlert(toast, chat)
+    end
+    function K.FlushAlerts()
+        if InCombat() or O.MyStatus() == "d" then return end
+        local order, q = AL.order, AL.q
+        AL.order, AL.q = {}, {}
+        for _, k in ipairs(order) do local a = q[k]; if a then K.ShowAlert(a[1], a[2]) end end
+    end
+
+    -- ---- quiet in a dungeon (crafter side): new orders for me wait without a sound
+    K.held = {}
+    function K.HoldQuiet(o)
+        if O.MyStatus() ~= "d" then return false end
+        K.held[o.id] = true
+        return true
+    end
+    function K.QuietReturn()
+        local n, d = 0, DB()
+        for id in pairs(K.held) do local o = d.list[id]; if o and o.status == "open" then n = n + 1 end end
+        K.held = {}
+        if n == 0 then return end
+        K.ShowAlert({ n == 1 and L("1 commande t'a attendu pendant le donjon.") or string.format(L("%d commandes t'ont attendu pendant le donjon."), n),
+            nil, L("Les voir"), function() if WP.ShowOrdersTab then WP.ShowOrdersTab("recv") end end })
+    end
+
+    -- ---- favourites (50 at most), watched recipes (30 at most)
+    function O.IsFav(name) local f = DB().favs; return (f and name and f[name] ~= nil) and true or false end
+    function O.ToggleFav(name)
+        local d = DB()
+        d.favs = d.favs or {}
+        if not name then return false end
+        if d.favs[name] then d.favs[name] = nil; return true, false end
+        local n = 0
+        for _ in pairs(d.favs) do n = n + 1 end
+        if n >= 50 then return false, "cap" end
+        d.favs[name] = time()
+        return true, true
+    end
+    function O.IsWatched(id) local w = DB().watch; return (w and id and w[id] ~= nil) and true or false end
+    function O.WatchCount() local n = 0; for _ in pairs(DB().watch or {}) do n = n + 1 end; return n end
+    O.WATCH_MAX = 30
+    function O.ToggleWatch(id)
+        local d = DB()
+        d.watch = d.watch or {}
+        if not id then return false end
+        if d.watch[id] then d.watch[id] = nil; return true, false end
+        if O.WatchCount() >= O.WATCH_MAX then return false, "cap" end
+        -- whoever already makes it never alerts
+        local seen = {}
+        for _, c in ipairs(O.Crafters(id)) do if not c.me then seen[c.name] = true end end
+        d.watch[id] = { t = time(), seen = seen }
+        return true, true
+    end
+    -- a member's recipe list arrived (only when its hash changed): watched recipes they now make.
+    -- hadList false: no earlier list for this member and profession, so seen quietly (no alert)
+    function K.OnRecipes(sender, prof, recipes, hadList)
+        K.index = nil
+        local d = DB()
+        for id, w in pairs(d.watch or {}) do
+            if recipes[id] and type(w) == "table" then
+                w.seen = w.seen or {}
+                if not w.seen[sender] then
+                    w.seen[sender] = true
+                    if hadList ~= false and WLWritsDB.ordersAlertWatch ~= false then
+                        local on = O.OnlineGuild()[sender]
+                        local item = O.Name(id)
+                        O.Alert("w:" .. id .. ":" .. sender, { string.format(L("%s sait maintenant faire %s."), sender, item),
+                            on and string.format(L("%s est en ligne."), sender) or string.format(L("%s est hors ligne : ta commande l'attendra."), sender),
+                            L("Commander"), function() if WP.NewOrder then WP.NewOrder(id, sender) end end },
+                            string.format(L("%s sait maintenant faire %s. Tape /wlh orders pour le commander."), sender, item))
+                    end
+                end
+            end
+        end
+    end
+    -- the first watched recipe a member makes, or nil
+    function K.WatchedBy(name)
+        for id in pairs(DB().watch or {}) do if O.CanCraft(name, id) then return id end end
+    end
+
+    -- ---- presence: a favourite (or a crafter of a watched recipe) comes online. Signals: their
+    -- "S" when they log in, else the roster going from offline to online. Once per 30 min per name;
+    -- the first 90 s after my login, one summary instead.
+    K.presAt = {}
+    function K.ProfLine(name)
+        local t = {}
+        for pname, p in pairs(DB().crafters[name] or {}) do
+            if type(p) == "table" then t[#t + 1] = { O.ProfName(O.ProfKeyOf(pname) or pname), p.rank or 0 } end
+        end
+        table.sort(t, function(a, b) return a[2] > b[2] end)
+        local out = {}
+        for i = 1, math.min(3, #t) do out[i] = t[i][1] .. " " .. t[i][2] end
+        local pf = (DB().profiles or {})[name]
+        local s = table.concat(out, " · ")
+        if pf and pf.note and pf.note ~= "" then s = s .. (s ~= "" and " · " or "") .. "« " .. pf.note .. " »" end
+        return s ~= "" and s or nil
+    end
+    function K.GraceSummary()
+        K.graceTimer = false
+        local names = K.grace or {}
+        K.grace = {}
+        if #names == 0 then return end
+        table.sort(names)
+        local list = table.concat(names, ", ", 1, math.min(6, #names)) .. (#names > 6 and (", +" .. (#names - 6)) or "")
+        O.Alert("grace", { #names == 1 and string.format(L("1 favori en ligne : %s."), list) or string.format(L("%d favoris en ligne : %s."), #names, list),
+            nil, L("Ouvrir"), function() if WP.ShowOrdersTab then WP.ShowOrdersTab("find") end end })
+    end
+    function K.Presence(name)
+        if not name or name == Me() then return end
+        local now = Now()
+        if K.presAt[name] and now - K.presAt[name] < 1800 then return end
+        local fav = O.IsFav(name)
+        local watched = (not fav) and K.WatchedBy(name) or nil
+        if not fav and not watched then return end
+        K.presAt[name] = now
+        local grace = K.loginAt and now - K.loginAt < 90
+        if fav then
+            if WLWritsDB.ordersAlertFav == false then return end
+            if grace then
+                K.grace = K.grace or {}
+                K.grace[#K.grace + 1] = name
+                if not K.graceTimer then
+                    K.graceTimer = true
+                    C_Timer.After(math.max(0.1, 90 - (now - K.loginAt)), K.GraceSummary)
+                end
+                return "grace"
+            end
+            local word = O.StatusWord(O.StatusOf(name))
+            return O.Alert("f:" .. name, { word and string.format(L("%s est en ligne (%s)."), name, word) or string.format(L("%s est en ligne."), name),
+                K.ProfLine(name), L("Voir sa fiche"), function() if WP.OpenCrafterPage then WP.OpenCrafterPage(name) end end },
+                string.format(L("%s, ton artisan favori, est en ligne. Tape /wlh orders pour voir sa fiche."), name))
+        end
+        if grace or WLWritsDB.ordersAlertWatch == false then return end
+        local item = O.Name(watched)
+        return O.Alert("f:" .. name, { string.format(L("%s est en ligne et sait faire %s."), name, item), K.ProfLine(name),
+            L("Commander"), function() if WP.NewOrder then WP.NewOrder(watched, name) end end },
+            string.format(L("%s est en ligne et sait faire %s. Tape /wlh orders pour le commander."), name, item))
+    end
+    function K.RosterDiff()
+        local prev = K.prevOnline
+        local cur = {}
+        for n, v in pairs(O.OnlineGuild(true)) do cur[n] = v end
+        K.prevOnline = cur
+        if not prev then
+            -- the first read: who is online counts as arriving only during the login grace
+            if K.loginAt and Now() - K.loginAt < 90 then for n, v in pairs(cur) do if v then K.Presence(n) end end end
+            return
+        end
+        for n, v in pairs(cur) do if v and not prev[n] then K.Presence(n) end end
+        K.RefreshSoon()
+    end
+
+    -- ---- my recent orders (30, both sides) and the deliveries of the week
+    local function IdTime(id) return tonumber(tostring(id or ""):match("%-(%d+)%-%d+$")) end
+    K.IdTime = IdTime
+    -- two names of the same player (one is the other's main, or they share one)
+    function K.SameOwner(a, b)
+        if not a or not b then return false end
+        if a == b then return true end
+        local P = DB().profiles or {}
+        local ma, mb = P[a] and P[a].m, P[b] and P[b].m
+        return ma == b or mb == a or (ma ~= nil and ma == mb)
+    end
+    -- a delivered order counts once: for me (one per customer per day, never myself or my alts),
+    -- or seen for its crafter (kept 14 days, apart from the orders list)
+    function K.CountDelivery(o)
+        local d = DB()
+        d.seenDelivIDs = d.seenDelivIDs or {}
+        if not (o.id and o.by and o.from) or d.seenDelivIDs[o.id] then return end
+        local day = Day()
+        d.seenDelivIDs[o.id] = day
+        local me = Me()
+        if o.by == me then
+            if o.from == me or O.Profile().alts[o.from] then return end
+            d.myDeliv = d.myDeliv or {}
+            local e = d.myDeliv[day]
+            if type(e) ~= "table" then e = { n = 0, who = {} }; d.myDeliv[day] = e end
+            e.who = e.who or {}
+            if e.who[o.from] then return end
+            e.who[o.from] = true
+            e.n = (e.n or 0) + 1
+            d.myDelivTotal = (d.myDelivTotal or 0) + 1
+            K.QueueA()
+        elseif not K.SameOwner(o.by, o.from) then
+            d.seenDeliv = d.seenDeliv or {}
+            d.seenDeliv[o.by] = d.seenDeliv[o.by] or {}
+            d.seenDeliv[o.by][day] = (d.seenDeliv[o.by][day] or 0) + 1
+        end
+    end
+    function K.AfterMerge(o)
+        local d, me = DB(), Me()
+        if o.from == me or o.by == me then
+            d.recent = d.recent or {}
+            local side = (o.from == me) and "out" or "in"
+            local e
+            for _, x in ipairs(d.recent) do if x.id == o.id then e = x; break end end
+            if not e then
+                e = { id = o.id, t = IdTime(o.id) or time() }
+                table.insert(d.recent, 1, e)
+                table.sort(d.recent, function(a, b) return (a.t or 0) > (b.t or 0) end)
+                while #d.recent > 30 do table.remove(d.recent) end
+            end
+            e.item, e.title, e.qty, e.side, e.st = o.item, o.title, o.qty, side, o.status
+            e.who = side == "out" and (o.by or o.to) or o.from
+        end
+        if o.status == "delivered" then K.CountDelivery(o) end
+    end
+    -- delivered in the last 7 days (today and the 6 before)
+    function O.MyWeek()
+        local today, n = Day(), 0
+        for day, e in pairs(DB().myDeliv or {}) do
+            if type(day) == "number" and day > today - 7 and day <= today and type(e) == "table" then n = n + (e.n or 0) end
+        end
+        return n
+    end
+    function O.SeenWeek(name)
+        local today, n = Day(), 0
+        for day, k in pairs((DB().seenDeliv or {})[name] or {}) do
+            if type(day) == "number" and day > today - 7 and day <= today then n = n + (tonumber(k) or 0) end
+        end
+        return n
+    end
+    -- forgets what is outside its window; favourites and watched recipes stay
+    function K.Prune()
+        local d, today, now = DB(), Day(), time()
+        for day, e in pairs(d.myDeliv or {}) do
+            if type(day) ~= "number" or day <= today - 14 then d.myDeliv[day] = nil
+            elseif day < today and type(e) == "table" then e.who = nil end
+        end
+        for name, days in pairs(d.seenDeliv or {}) do
+            if type(days) == "table" then
+                for day in pairs(days) do if type(day) ~= "number" or day <= today - 14 then days[day] = nil end end
+            end
+            if type(days) ~= "table" or next(days) == nil then d.seenDeliv[name] = nil end
+        end
+        for id, day in pairs(d.seenDelivIDs or {}) do if type(day) ~= "number" or day <= today - 14 then d.seenDelivIDs[id] = nil end end
+        for name, p in pairs(d.profiles or {}) do if type(p) ~= "table" or (p.at or 0) < now - 30 * DAY then d.profiles[name] = nil end end
+        if type(d.recent) == "table" then
+            for i = #d.recent, 1, -1 do if type(d.recent[i]) ~= "table" or (d.recent[i].t or 0) < now - 14 * DAY then table.remove(d.recent, i) end end
+        end
+        K.index = nil
+    end
+    -- the searches typed (8, newest first, the same words once)
+    function O.AddSearch(q)
+        q = tostring(q or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        if #q < 2 or q:find("|", 1, true) then return end
+        local d = DB()
+        d.searches = d.searches or {}
+        local f = O.Fold(q)
+        for i = #d.searches, 1, -1 do if O.Fold(d.searches[i]) == f then table.remove(d.searches, i) end end
+        table.insert(d.searches, 1, q)
+        while #d.searches > 8 do table.remove(d.searches) end
+    end
+
+    -- ---- place in line: an order to a crafter waits behind their earlier open or running orders
+    function O.PlaceInLine(o)
+        local x = o and (o.by or o.to)
+        if not x then return nil end
+        local mine, now = IdTime(o.id) or 0, time()
+        local n = 1
+        for _, y in pairs(DB().list) do
+            if y.id ~= o.id then
+                local q = (y.to == x and y.status == "open" and (y.expires or now) >= now) or (y.by == x and (y.status == "accepted" or y.status == "crafted"))
+                if q and (IdTime(y.id) or 0) < mine then n = n + 1 end
+            end
+        end
+        return n
+    end
+    function O.Ordinal(n)
+        if En() then
+            local t, s = n % 100, "th"
+            if t < 11 or t > 13 then s = ({ "st", "nd", "rd" })[n % 10] or "th" end
+            return n .. s
+        end
+        return n == 1 and "1er" or (n .. "e")
+    end
+    -- another member's status: their last "A" (20 min at most) while online, else away in the roster
+    function O.StatusOf(name)
+        if name == Me() then return (O.MyStatus()) end
+        if not O.OnlineGuild()[name] then return nil end
+        local pf = (DB().profiles or {})[name]
+        if pf and pf.s and time() - (pf.at or 0) < 1200 then return pf.s end
+        local m = O.Member(name)
+        if m and m.afk then return "b" end
+        return nil
+    end
+
+    -- ---- folding for the search: lower case, accents off (the game's lower() only does A-Z)
+    local FOLD = {}
+    for base, chars in pairs({
+        a = "ÀÁÂÃÄÅàáâãäåĀāĂăĄą", ae = "Ææ", c = "ÇçĆćĈĉĊċČč", d = "ĎďĐđÐð", e = "ÈÉÊËèéêëĒēĔĕĖėĘęĚě",
+        g = "ĜĝĞğĠġĢģ", h = "ĤĥĦħ", i = "ÌÍÎÏìíîïĨĩĪīĬĭĮįİı", ij = "Ĳĳ", j = "Ĵĵ", k = "Ķķĸ", l = "ĹĺĻļĽľĿŀŁł",
+        n = "ÑñŃńŅņŇňŉŊŋ", o = "ÒÓÔÕÖØòóôõöøŌōŎŏŐő", oe = "Œœ", r = "ŔŕŖŗŘř", s = "ŚśŜŝŞşŠšſ", ss = "ß",
+        t = "ŢţŤťŦŧ", th = "Þþ", u = "ÙÚÛÜùúûüŨũŪūŬŭŮůŰűŲų", w = "Ŵŵ", y = "ÝýÿŶŷŸ", z = "ŹźŻżŽž", ["'"] = "’‘ʼ´`",
+    }) do
+        for ch in chars:gmatch("[%z\1-\127\192-\244][\128-\191]*") do FOLD[ch] = base end
+    end
+    function O.Fold(s)
+        -- accents first, then A-Z only (a locale-aware lower() could change the bytes of UTF-8 letters)
+        s = tostring(s or ""):gsub("[\192-\244][\128-\191]*", FOLD)
+        return (s:gsub("[A-Z]", string.lower):gsub("`", "'"))
+    end
+
+    -- ---- the set of crafters every number of the home reads
+    function K.Ignored(name)
+        return Yes(C_FriendList and C_FriendList.IsIgnored, name)
+    end
+    -- { list = groups, byName, online, avail, zone, known, prof = { [key] = { total, online } }, top }
+    -- A group is one player: characters with the same main are shown as one, under the online one
+    -- (else the main), "+N alts". Each: name, chars, class, level, online, status, zone, note,
+    -- week, tot, profs = { { key, rank, n, char } } (best per profession), favourite, stars, seen.
+    function O.CrafterSet()
+        local d, me = DB(), Me()
+        local p = O.Profile()
+        local on = O.OnlineGuild()
+        local P = d.profiles or {}
+        local names = {}
+        for name, profs in pairs(d.crafters) do
+            if type(profs) == "table" then
+                for _, pr in pairs(profs) do
+                    if type(pr) == "table" and ((pr.rank or 0) > 1 or next(pr.recipes or {}) ~= nil) then names[name] = true; break end
+                end
+            end
+        end
+        for name in pairs(P) do names[name] = true end
+        local chars = {}
+        for name in pairs(names) do
+            if name ~= me and not p.alts[name] and not K.Ignored(name) then
+                local pf, m = P[name], O.Member(name)
+                local online = on[name] and true or false
+                local st
+                if online then
+                    if pf and pf.s and time() - (pf.at or 0) < 1200 then st = pf.s
+                    elseif m and m.afk then st = "b" end
+                end
+                local profs = {}
+                for pname, pr in pairs(d.crafters[name] or {}) do
+                    if type(pr) == "table" then
+                        local n = 0
+                        for _ in pairs(pr.recipes or {}) do n = n + 1 end
+                        profs[#profs + 1] = { key = O.ProfKeyOf(pname) or pname, raw = pname, rank = pr.rank or 0, max = pr.max, n = n, char = name }
+                    end
+                end
+                chars[#chars + 1] = { name = name, main = pf and pf.m or nil, class = m and m.class or nil, level = m and m.level or nil,
+                    online = online, status = st, zone = (online and m and not (pf and Bit(pf.f, 1))) and m.zone or nil,
+                    lastOnline = m and m.lastOnline or nil, note = (pf and pf.note ~= "") and pf.note or nil,
+                    week = pf and pf.w or 0, tot = pf and pf.tot or 0, profs = profs, fav = O.IsFav(name) }
+            end
+        end
+        local groups, byKey = {}, {}
+        for _, c in ipairs(chars) do
+            local key = c.main or c.name
+            local g = byKey[key]
+            if not g then g = { key = key, chars = {} }; byKey[key] = g; groups[#groups + 1] = g end
+            g.chars[#g.chars + 1] = c
+        end
+        local myZone = GetRealZoneText and GetRealZoneText() or nil
+        local set = { list = groups, byName = {}, online = 0, avail = 0, zone = 0, known = #groups, prof = {}, top = {} }
+        for _, g in ipairs(groups) do
+            table.sort(g.chars, function(a, b)
+                if a.online ~= b.online then return a.online end
+                if (a.status == "a") ~= (b.status == "a") then return a.status == "a" end
+                if (a.name == g.key) ~= (b.name == g.key) then return a.name == g.key end
+                return a.name < b.name
+            end)
+            local rep = g.chars[1]
+            g.name, g.class, g.level, g.online, g.status, g.zone = rep.name, rep.class, rep.level, rep.online, rep.status, rep.zone
+            g.alts = #g.chars - 1
+            g.week, g.tot, g.stars, g.seen, g.fav = 0, 0, 0, 0, false
+            local best = {}
+            for _, c in ipairs(g.chars) do
+                set.byName[c.name] = g
+                g.week, g.tot = math.max(g.week, c.week), math.max(g.tot, c.tot)
+                g.stars = g.stars + O.Stars(c.name)
+                g.seen = g.seen + O.SeenWeek(c.name)
+                g.fav = g.fav or c.fav
+                if not g.note and c.note then g.note = c.note end
+                if c.lastOnline and (not g.lastOnline or c.lastOnline < g.lastOnline) then g.lastOnline = c.lastOnline end
+                for _, pr in ipairs(c.profs) do
+                    if not best[pr.key] or pr.rank > best[pr.key].rank then best[pr.key] = pr end
+                end
+            end
+            if rep.note then g.note = rep.note end
+            g.profs = {}
+            for _, pr in pairs(best) do g.profs[#g.profs + 1] = pr end
+            table.sort(g.profs, function(a, b) if a.rank ~= b.rank then return a.rank > b.rank end return tostring(a.key) < tostring(b.key) end)
+            g.available = g.online and (g.status == "a" or g.status == nil)
+            if g.online then
+                set.online = set.online + 1
+                if g.available then set.avail = set.avail + 1 end
+                if myZone and g.zone == myZone then set.zone = set.zone + 1 end
+            end
+            for key in pairs(best) do
+                local e = set.prof[key]
+                if not e then e = { total = 0, online = 0 }; set.prof[key] = e end
+                e.total = e.total + 1
+                if g.online then e.online = e.online + 1 end
+            end
+            if g.week > 0 then set.top[#set.top + 1] = g end
+        end
+        table.sort(set.top, function(a, b)
+            if a.week ~= b.week then return a.week > b.week end
+            if a.seen ~= b.seen then return a.seen > b.seen end
+            if a.stars ~= b.stars then return a.stars > b.stars end
+            return a.name < b.name
+        end)
+        return set
+    end
+
+    -- ---- search: players, items, materials (a lazy index, rebuilt when lists change)
+    function K.Index()
+        if K.index then return K.index end
+        local idx = { names = {}, raw = {}, mats = {}, matNames = {}, who = {}, pending = {} }
+        local me = Me()
+        local function Walk(name, recipes)
+            for id, re in pairs(recipes or {}) do
+                if type(id) == "number" then
+                    if not idx.raw[id] then
+                        local n = O.Name(id)
+                        idx.raw[id], idx.names[id] = n, O.Fold(n)
+                        if id > 0 and n:match("^item:?%s?%d+$") then
+                            idx.pending[id] = true
+                            if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
+                        end
+                    end
+                    if name ~= me then
+                        local w = idx.who[id]
+                        if not w then w = {}; idx.who[id] = w end
+                        w[#w + 1] = name
+                    end
+                    for rid in tostring(re):gmatch("(%d+):%d+") do
+                        rid = tonumber(rid)
+                        local t = idx.mats[rid]
+                        if not t then t = {}; idx.mats[rid] = t end
+                        t[id] = true
+                    end
+                end
+            end
+        end
+        for name, profs in pairs(DB().crafters) do
+            if type(profs) == "table" then for _, p in pairs(profs) do if type(p) == "table" then Walk(name, p.recipes) end end end
+        end
+        for _, p in pairs(DB().mine) do if type(p) == "table" then Walk(me, p.recipes) end end
+        K.index = idx
+        return idx
+    end
+    function K.MatName(idx, rid)
+        local n = idx.matNames[rid]
+        if not n then
+            local raw = O.Name(rid)
+            n = O.Fold(raw)
+            if raw:match("^item:?%s?%d+$") then idx.pending[rid] = true else idx.matNames[rid] = n end
+        end
+        return n
+    end
+    -- 1 = starts with the words, 2 = a word starts with them, 3 = anywhere
+    local function Rank(fname, fq)
+        if fname:sub(1, #fq) == fq then return 1 end
+        local at = fname:find(fq, 1, true)
+        if not at then return nil end
+        if fname:sub(at - 1, at - 1):match("[%s%-'%(]") then return 2 end
+        return 3
+    end
+    K.Rank = Rank
+    O.SEARCH_CAPS = { players = 5, items = 20, mats = 5 }
+    -- O.Search(q, caps, set) -> { players, items, mats = { list, total }, use = reagent id or false }
+    function O.Search(q, caps, set)
+        caps = caps or {}
+        local fq = O.Fold((tostring(q or ""):gsub("^%s+", ""):gsub("%s+$", "")))
+        local res = { players = { list = {}, total = 0 }, items = { list = {}, total = 0 }, mats = { list = {}, total = 0 }, q = fq }
+        if #fq < 2 then return res end
+        local idx = K.Index()
+        local on = O.OnlineGuild()
+        local function Cap(g, list, cap)
+            g.total = #list
+            for i = 1, math.min(#list, cap) do g.list[i] = list[i] end
+        end
+        -- "Uses: <material>": the items made with it, and nothing else
+        local useP = O.Fold(L("Utilise : "))
+        local useOnly
+        if fq:sub(1, #useP) == useP then
+            local want = (fq:sub(#useP + 1):gsub("^%s+", ""))
+            for rid in pairs(idx.mats) do if K.MatName(idx, rid) == want then useOnly = rid; break end end
+            res.use = useOnly or false
+        end
+        -- items
+        local items = {}
+        if res.use ~= nil then
+            for id in pairs(useOnly and idx.mats[useOnly] or {}) do items[#items + 1] = { id = id, rank = 1 } end
+        else
+            for id, fname in pairs(idx.names) do
+                local r = Rank(fname, fq)
+                if r then items[#items + 1] = { id = id, rank = r } end
+            end
+        end
+        for _, it in ipairs(items) do
+            it.name = idx.raw[it.id] or O.Name(it.id)
+            local who = idx.who[it.id] or {}
+            it.n = #who
+            for _, n in ipairs(who) do
+                if on[n] and not it.online then it.online = n end
+                if O.IsFav(n) then it.fav = true end
+            end
+        end
+        table.sort(items, function(a, b)
+            if a.rank ~= b.rank then return a.rank < b.rank end
+            if (a.online ~= nil) ~= (b.online ~= nil) then return a.online ~= nil end
+            if (a.fav or false) ~= (b.fav or false) then return a.fav or false end
+            if a.name ~= b.name then return a.name < b.name end
+            return a.id < b.id
+        end)
+        Cap(res.items, items, caps.items or O.SEARCH_CAPS.items)
+        if res.use ~= nil then return res end
+        -- players: name, main, or a profession (either language)
+        set = set or O.CrafterSet()
+        local players = {}
+        for _, g in ipairs(set.list) do
+            local r
+            for _, c in ipairs(g.chars) do
+                local x = Rank(O.Fold(c.name), fq) or (c.main and Rank(O.Fold(c.main), fq))
+                if x and (not r or x < r) then r = x end
+            end
+            if not r then
+                for _, pr in ipairs(g.profs) do
+                    for _, n in ipairs(PROF_NAMES[pr.key] or { pr.raw or pr.key }) do
+                        local x = Rank(O.Fold(n), fq)
+                        if x then r = math.max(2, x) end
+                    end
+                end
+            end
+            if r then players[#players + 1] = { g = g, rank = r } end
+        end
+        table.sort(players, function(a, b)
+            if a.rank ~= b.rank then return a.rank < b.rank end
+            if a.g.online ~= b.g.online then return a.g.online end
+            if a.g.fav ~= b.g.fav then return a.g.fav end
+            return a.g.name < b.g.name
+        end)
+        for i, x in ipairs(players) do players[i] = x.g end
+        Cap(res.players, players, caps.players or O.SEARCH_CAPS.players)
+        -- materials
+        local mats = {}
+        for rid, ids in pairs(idx.mats) do
+            local fname = K.MatName(idx, rid)
+            local r = Rank(fname, fq)
+            if r then
+                local n = 0
+                for _ in pairs(ids) do n = n + 1 end
+                mats[#mats + 1] = { id = rid, rank = r, name = O.Name(rid), n = n }
+            end
+        end
+        table.sort(mats, function(a, b)
+            if a.rank ~= b.rank then return a.rank < b.rank end
+            if a.name ~= b.name then return a.name < b.name end
+            return a.id < b.id
+        end)
+        Cap(res.mats, mats, caps.mats or O.SEARCH_CAPS.mats)
+        return res
+    end
+
+    -- ---- events: status changes, combat, the roster, item names arriving
+    local ev = CreateFrame("Frame")
+    for _, e in ipairs({ "PLAYER_LOGIN", "PLAYER_REGEN_ENABLED", "GUILD_ROSTER_UPDATE", "PLAYER_FLAGS_CHANGED", "UPDATE_BATTLEFIELD_STATUS",
+        "LFG_UPDATE", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "GET_ITEM_INFO_RECEIVED" }) do pcall(ev.RegisterEvent, ev, e) end
+    local function AddAlt() if IsInGuild and IsInGuild() then O.Profile().alts[Me()] = true end end
+    ev:SetScript("OnEvent", function(_, e, a1)
+        if not WLWritsDB then return end
+        if e == "PLAYER_LOGIN" then
+            K.loginAt = Now()
+            pcall(AddAlt)
+            C_Timer.After(20, function() pcall(AddAlt) end)
+        elseif e == "PLAYER_REGEN_ENABLED" then
+            if A.waitCombat or A.dirty then
+                if Now() - A.lastAt >= 30 then pcall(K.SendA) else K.QueueA() end
+            end
+            pcall(K.FlushAlerts)
+        elseif e == "GUILD_ROSTER_UPDATE" then
+            if K.rosterPending then return end
+            K.rosterPending = true
+            C_Timer.After(math.max(2, 10 - (Now() - (K.rosterAt or -1e9))), function()
+                K.rosterPending = false
+                K.rosterAt = Now()
+                pcall(K.RosterDiff)
+            end)
+        elseif e == "GET_ITEM_INFO_RECEIVED" then
+            -- a name the search was waiting for: rebuild the index (0.3 s after the last one), and
+            -- the results again while they show
+            if K.index and a1 and K.index.pending[a1] and not K.itemTimer then
+                K.itemTimer = true
+                C_Timer.After(0.3, function()
+                    K.itemTimer = false
+                    K.index = nil
+                    local f = WP.OrdersUI and WP.OrdersUI.find
+                    if f and f.box and f.box:IsVisible() and #((f.box:GetText() or ""):gsub("%s", "")) >= 2 then K.RefreshSoon() end
+                end)
+            end
+        elseif e == "PLAYER_FLAGS_CHANGED" and type(a1) == "string" and not (root.IsSecret and root.IsSecret(a1)) and a1 ~= "player" then
+            return   -- a party member's flags
+        else
+            pcall(K.Reeval, true)
+        end
+    end)
+end
+
 -- ---------------------------------------------------------------- receiving
 local parts = {}
 local function OnPayload(sender, key, payload)
@@ -995,8 +1956,13 @@ local function OnPayload(sender, key, payload)
         local d = DB()
         d.crafters[sender] = d.crafters[sender] or {}
         local c = d.crafters[sender][prof] or {}
+        -- a first list for this member and profession (first sync, after the 30-day prune, a fresh
+        -- install) says nothing new: it only marks the watched recipes as seen
+        local hadList = type(c.recipes) == "table"
         c.recipes, c.hash, c.t = recipes, hash, time()
         d.crafters[sender][prof] = c
+        -- a watched recipe learned by this member, and the search index to rebuild
+        if K.OnRecipes then pcall(K.OnRecipes, sender, prof, recipes, hadList) end
         if WP.RefreshOrders then WP.RefreshOrders() end
     end
 end
@@ -1087,10 +2053,14 @@ local function OnMessage(msg, channel, sender)
         O.Announce(true)
     elseif kind == "S" and channel == "GUILD" then
         -- someone just logged in: resend the running orders I published or I am crafting
+        if K.Presence then pcall(K.Presence, sender) end
         local me = Me()
         for _, o in pairs(d.list) do
             if (o.from == me and o.status == "open") or ((o.from == me or o.by == me) and Running(o)) then Broadcast(o) end
         end
+    elseif kind == "A" and channel == "GUILD" then
+        -- a member's crafter profile (T-60); older copies have no "A" branch and ignore it
+        if K.OnProfile then pcall(K.OnProfile, sender, rest) end
     end
 end
 
@@ -1107,6 +2077,7 @@ local function Prune()
         for _, p in pairs(profs) do if (p.t or 0) > now - 30 * 86400 then recent = true end end
         if not recent then d.crafters[name] = nil end
     end
+    if K.Prune then pcall(K.Prune) end
 end
 
 -- Asks the guild for its crafters (at login and when the Orders window opens, once a minute at most):
@@ -1130,6 +2101,7 @@ local function Say(msg, o, tab)
     WP.Print(msg)
     return true
 end
+K.Say = Say
 
 -- One chat line when an order concerns you.
 function O.Notify(o)
@@ -1138,6 +2110,8 @@ function O.Notify(o)
     local name = O.Name(o)
     -- a request (o.prof set) alerts everyone who declared its profession, or any profession when unknown
     if o.status == "open" and o.from ~= me and (o.to == me or (not o.to and O.CanServe(me, o))) then
+        -- quiet in a dungeon: no line, no sound; counted, and told on the way out
+        if K.HoldQuiet and K.HoldQuiet(o) then return end
         local money = (o.fee or 0) + (o.tip or 0)
         local fee = money > 0 and string.format(L("%s de commission"), S.Money(money)) or L("sans commission")
         local msg = o.prof and string.format(L("Nouvelle demande de %s : %s ×%d (%s), %s. Tape /wlh orders, onglet Pour moi, pour l'accepter."), o.from, name, o.qty or 1, O.ProfName(o.prof), fee)

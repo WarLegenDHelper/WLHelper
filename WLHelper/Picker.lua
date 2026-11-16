@@ -7,10 +7,38 @@ local Text, Tex, Hex = ns.Text, ns.Tex, ns.Hex
 
 local p, qp
 -- two columns of picture cards inside a 640 window (inset 16, 12 between cards)
-local PW, PAD, GAP = 640, 16, 12
-local COLS = 2
-local CW = math.floor((PW - 2 * PAD - (COLS - 1) * GAP) / COLS)
-local CH = 124   -- room for a 2-line name on top and a 2-line level line at the bottom
+-- 3 or 4 columns of cards as the screen allows (2 on a very small one): less scrolling. The width
+-- follows the screen (80 % of it, 640 to 1000 px), the cards keep at least MIN_CW of width.
+-- UIParent's width is in UI units: a small UI scale makes it larger, so the columns are also held
+-- to MIN_PX real screen pixels per card (at UI scale 0.64 on 1920 px: 3 columns, not 4 of 146 px).
+local PAD, GAP, MIN_CW, MIN_PX = 16, 12, 220, 200
+local PW, COLS, CW = 640, 2, 298
+local SMALL = false     -- UI scale under 0.8: the small muted lines of a card go up to 12
+local function EffScale()
+  local ok, e = pcall(function() return UIParent:GetEffectiveScale() end)
+  if not ok or type(e) ~= "number" or (issecretvalue and issecretvalue(e)) or e <= 0 then return 1 end
+  return e
+end
+local function Dims()
+  local sw = (UIParent and UIParent.GetWidth and tonumber(UIParent:GetWidth())) or 1024
+  if issecretvalue and issecretvalue(sw) then sw = 1024 end
+  local eff = EffScale()
+  local w = math.max(640, math.min(1000, math.floor(sw * 0.80)))
+  local cols = math.max(2, math.min(4, math.floor((w - 2 * PAD + GAP) / (MIN_CW + GAP))))
+  local function cwOf(n) return math.floor((w - 2 * PAD - (n - 1) * GAP) / n) end
+  while cols > 2 and cwOf(cols) * eff < MIN_PX do cols = cols - 1 end
+  PW, COLS = w, cols
+  CW = cwOf(COLS)
+  SMALL = eff < 0.8
+end
+Dims()
+-- Card height: at least CH_MIN; every render takes the tallest card's need (2-line name on top,
+-- the level line, the quests stat and its prerequisite line at the bottom), so a row stays even
+-- and nothing is cut, in French as in English, down to MIN_CW.
+local CH_MIN = 124
+local CH = CH_MIN
+local BAND_PAD = 10     -- top and bottom padding of the bottom band
+local ART_GAP = 20      -- the picture stays visible between the two bands (32 with a class icon)
 local HEADER = 44
 
 -- The design system (Writs/Style.lua) is required: a clear error rather than a nil index later.
@@ -247,9 +275,11 @@ ns.SetClassIcon = SetClassIcon
 
 local Render
 
--- A card: the dungeon's picture, a dark band behind each line of text (the picture stays bright),
--- the name alone on top (full width, up to 2 lines), the quests and the level in the bottom band,
--- a 1 px accent border and a "Picked" pill when it is in the route, a thin bar of the quests done.
+-- A card: the dungeon's picture, a dark band behind each block of text (the picture stays bright),
+-- the name on top (up to 2 lines, beside the Overview button or under it when it needs the room),
+-- the bottom band built from the text-structure pieces (DESIGN 3.21): the level line (body), then
+-- the quests stat ("Quêtes rendues 5/6" and its thin bar) and, only when some wait on a prerequisite, a muted
+-- line saying how many. Picked: accent border, accent tint and a filled check badge.
 local function MakeCard(parent)
   local S = SW()
   local c = CreateFrame("Button", nil, parent)
@@ -261,17 +291,35 @@ local function MakeCard(parent)
   c.shade:SetColorTexture(0, 0, 0, 0.15)
   c.topBand = c:CreateTexture(nil, "ARTWORK", nil, 3); c.topBand:SetPoint("TOPLEFT", 1, -1); c.topBand:SetPoint("TOPRIGHT", -1, -1); c.topBand:SetHeight(36)
   c.topBand:SetColorTexture(0, 0, 0, 0.55)
-  c.botBand = c:CreateTexture(nil, "ARTWORK", nil, 3); c.botBand:SetPoint("BOTTOMLEFT", 1, 1); c.botBand:SetPoint("BOTTOMRIGHT", -1, 1); c.botBand:SetHeight(30)
-  c.botBand:SetColorTexture(0, 0, 0, 0.55)
+  -- the bottom band: a frame (no mouse: the card stays the one click target) holding the text
+  -- stack, so its pieces are placed from the band's top whatever the card's height
+  c.body = CreateFrame("Frame", nil, c)
+  c.body:SetPoint("BOTTOMLEFT", 1, 1); c.body:SetPoint("BOTTOMRIGHT", -1, 1); c.body:SetHeight(30)
+  c.body.wlWorld = true   -- text over the picture keeps a shadow
+  -- darker than the top band: it carries the small muted words
+  c.botBand = c:CreateTexture(nil, "ARTWORK", nil, 3); c.botBand:SetPoint("TOPLEFT", c.body, "TOPLEFT", 0, 0); c.botBand:SetPoint("BOTTOMRIGHT", c.body, "BOTTOMRIGHT", 0, 0)
+  c.botBand:SetColorTexture(0, 0, 0, 0.80)   -- the muted words keep 4.5:1 over a bright picture
+  c.stk = ns.TextStack(c.body)
+  -- picked: the selected tint over the whole card (above the picture and the bands)
+  c.selFill = c:CreateTexture(nil, "ARTWORK", nil, 5); c.selFill:SetPoint("TOPLEFT", 1, -1); c.selFill:SetPoint("BOTTOMRIGHT", -1, 1)
+  c.selFill:SetColorTexture(T.selFill[1], T.selFill[2], T.selFill[3], T.selFill[4]); c.selFill:Hide()
   c.hl = Tex(c, "HIGHLIGHT", T.hoverFill); c.hl:SetAllPoints()
   c.press = Tex(c, "OVERLAY", T.pressFill); c.press:SetAllPoints(); c.press:Hide()
   c.selEdge = ns.Outline(c, T.accent, 0, "OVERLAY")
+  -- picked: a filled accent check badge on the bottom band's top edge, right side. Filled and
+  -- white, unlike the bare green check of a finished dungeon (top right, beside Overview)
+  c.selBox = c.body:CreateTexture(nil, "OVERLAY", nil, 1); c.selBox:SetSize(18, 18)
+  c.selBox:SetPoint("CENTER", c.body, "TOPRIGHT", -20, 0)
+  c.selBox:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1); c.selBox:Hide()
+  c.selTick = c.body:CreateTexture(nil, "OVERLAY", nil, 2); c.selTick:SetSize(12, 12)
+  ns.SetHDIcon(c.selTick, "check", T.fg); c.selTick:SetPoint("CENTER", c.selBox, "CENTER", 0, 0); c.selTick:Hide()
   -- text drawn over a picture keeps a shadow
   c.wlWorld = true
   -- the summary button at the card's top-right corner; the check of a finished dungeon left of
   -- it. A word, not the info icon: "info" only means neutral information (icon audit G1), and the
-  -- check beside an info icon read as one cluster
-  c.ov = S.Button(c, L.OV_T, 0, 24, "secondary", function() if ns.ShowOverview then ns.ShowOverview(c.dkey) end end,
+  -- check beside an info icon read as one cluster. A short word ("Résumé"): every name keeps its
+  -- place beside it, so the names of one row line up
+  c.ov = S.Button(c, L.OV_BTN, 0, 24, "secondary", function() if ns.ShowOverview then ns.ShowOverview(c.dkey) end end,
     function() return { L.OV_T, L.OV_CLICK } end)
   c.ov:SetPoint("TOPRIGHT", -6, -6)
   c.ov:SetFrameLevel((c:GetFrameLevel() or 1) + 3)
@@ -279,11 +327,6 @@ local function MakeCard(parent)
   c.name = Text(c, ns.F.heading, T.fg, false, "SHADOW"); c.name:SetPoint("TOPLEFT", 12, -10)
   c.name:SetJustifyH("LEFT")
   c.cicon = c:CreateTexture(nil, "OVERLAY"); c.cicon:SetSize(20, 20); c.cicon:SetPoint("TOPLEFT", 12, -42)
-  -- bottom band: the level line (bottom left), the "Picked" pill (bottom right), the quests above them
-  c.picked = S.Pill(c); c.picked:SetPoint("BOTTOMRIGHT", -8, 6)
-  c.lvl = Text(c, ns.F.meta, T.text, false, "SHADOW"); c.lvl:SetPoint("BOTTOMLEFT", 12, 10); c.lvl:SetJustifyH("LEFT")
-  c.info = Text(c, ns.F.label, T.fg, false, "SHADOW"); c.info:SetPoint("BOTTOMLEFT", c.lvl, "TOPLEFT", 0, 3); c.info:SetJustifyH("LEFT")
-  c.bar = Tex(c, "OVERLAY", T.ok); c.bar:SetPoint("BOTTOMLEFT", 1, 1); c.bar:SetHeight(2)
   c.bigIcon = c:CreateTexture(nil, "ARTWORK", nil, 1); c.bigIcon:SetSize(40, 40); c.bigIcon:SetPoint("CENTER", 0, -2); c.bigIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.bigIcon:Hide()
   c.dicon = c:CreateTexture(nil, "OVERLAY"); c.dicon:Hide()
   c:SetScript("OnClick", function(self, btn)
@@ -313,8 +356,12 @@ local function MakeCard(parent)
   c:SetScript("OnEnter", function(self)
     local d = ns.D[self.dkey]
     local n, done = Counts(self.dkey)
-    local lines = { ns.DName(self.dkey), (GetLocale and GetLocale() == "frFR" and d.locf) or ns.T(d.loc) or "",
-      ns.Plural(n, "PICK_QUESTS1", "PICK_QUESTS", n) .. "  ·  " .. ns.Plural(done, "PICK_DONE1", "PICK_DONE", done) }
+    local lines = { ns.DName(self.dkey) }
+    if Selected()[self.dkey] then table.insert(lines, { L.PICK_PICKED, T.accentSoft[1], T.accentSoft[2], T.accentSoft[3] }) end
+    for _, v in ipairs({ (GetLocale and GetLocale() == "frFR" and d.locf) or ns.T(d.loc) or "",
+      ns.Plural(n, "PICK_QUESTS1", "PICK_QUESTS", n) .. "  ·  " .. ns.Plural(done, "PICK_DONE1", "PICK_DONE", done) }) do
+      table.insert(lines, v)
+    end
     if d.cq and d.home then table.insert(lines, L.CQ_IN:format(ns.DName(d.home))) end
     if d.ed then table.insert(lines, ns.T(d.ed)) end
     for _, k in ipairs(ns.KeyLines and ns.KeyLines(self.dkey) or {}) do table.insert(lines, k[1]) end
@@ -349,6 +396,7 @@ local function Build()
   local S = SW()
   p = CreateFrame("Frame", "WLDTPicker", UIParent)
   p.wlOwned = true
+  Dims()
   p:SetSize(PW, 400); p:SetPoint("CENTER"); p:SetFrameStrata("HIGH")
   p:SetMovable(true); p:EnableMouse(true); p:SetClampedToScreen(true); p:SetToplevel(true)
   ns.Flat(p, T.bg, T.cardEdge)
@@ -432,6 +480,67 @@ local function Build()
   p:Hide()
 end
 
+-- Fills one card for dungeon `k` in section `sec` and returns the card height it needs.
+local function FillCard(c, k, sec)
+  local d = ns.D[k]
+  c.section, c.dkey = sec, k
+  Art(c.art, d, c)
+  c.dicon:Hide()
+  if d.cq then SetClassIcon(c.cicon, (d.cq:match("^[^,]+"))) else c.cicon:Hide() end
+  local soon = d.up and time() < d.up
+  local n, done = Counts(k)
+  local finished = n > 0 and done >= n
+  c.doneMark:SetShown(finished)
+  -- the name: 2 lines beside the Overview button (and the finished check); when it needs more
+  -- there, it goes under the button at the card's full width, still 2 lines at most
+  c.name:SetText(ns.DName(k))
+  local line = ns.F.heading
+  local ovW = num(c.ov:GetWidth()) or 64
+  local besideW = CW - 12 - 6 - ovW - 8 - (finished and 16 or 0)
+  local nameY, nameW = 10, besideW
+  local needH = ns.FitText(c.name, 0, besideW, c)
+  if besideW < 64 or needH > 2 * line + 4 then nameY, nameW = 6 + 24 + 6, CW - 24 end
+  c.name:ClearAllPoints(); c.name:SetPoint("TOPLEFT", 12, -nameY)
+  local nameH = ns.FitText(c.name, 2, nameW, c)
+  if nameH < line then nameH = line + 3 end
+  local topH = math.max(36, math.ceil(nameY + nameH + 8))
+  c.topBand:SetHeight(topH)
+  c.cicon:ClearAllPoints(); c.cicon:SetPoint("TOPLEFT", 12, -(topH + 6))
+  -- the bottom band: level (and raid size / opening date), then the quests stat
+  local later = sec == "later" or sec == "below"
+  local dateTop = soon and n == 0   -- a coming raid without quests: its date takes the quests' place
+  local parts = {}
+  if d.lvl and d.lvl[1] then
+    local lo, hi2 = d.lvl[1], d.lvl[2] or d.lvl[1]
+    parts[#parts + 1] = lo == hi2 and L.PICK_LV1:format(lo) or L.PICK_LV:format(lo, hi2)
+  end
+  if d.raid then parts[#parts + 1] = L.RAID .. (d.size and (" · " .. L.PICK_SIZE:format(d.size)) or "") end
+  if soon and not dateTop then parts[#parts + 1] = L.PICK_OPENS:format(date(L.PICK_DATE, d.up)) end
+  local st = c.stk
+  st:Begin(11, BAND_PAD, CW - 24)
+  -- the level line is body (13): it is the first thing read, above the 12 px stat row
+  st:Body(table.concat(parts, "  ·  "), later and T.muted or T.text)
+  if n > 0 then
+    local npre = (n > done) and PreCount(k) or 0
+    st:Stat(L.PICK_STAT, done, n, { sub = npre > 0 and ns.Plural(npre, "OV_CARD_PRE1", "OV_CARD_PRE", npre) or nil,
+      subSize = SMALL and ns.F.label or nil })
+  else
+    st:Body(dateTop and (L.PICK_SOON .. " · " .. date(L.PICK_DATE, d.up)) or L.PICK_NOQ, later and T.muted or T.text)
+  end
+  local bandH = BAND_PAD + st:End() + BAND_PAD
+  c.body:SetHeight(bandH)
+  c.bandH, c.topH = bandH, topH
+  -- picked: accent border, tint and the filled check badge
+  local sel = Selected()[k] and true or false
+  c.sel = sel
+  c.selEdge(T.accent, sel and 1 or 0)
+  c.selFill:SetShown(sel); c.selBox:SetShown(sel); c.selTick:SetShown(sel)
+  -- later, below, no quest, coming soon: greyed; to do and done: the picture as it is
+  c.art:SetDesaturated(later or sec == "noq" or sec == "upcoming")
+  c.shade:SetColorTexture(0, 0, 0, (sec == "todo" or sec == "done" or sel) and 0.12 or 0.45)
+  return 1 + topH + (d.cq and 32 or ART_GAP) + bandH + 1
+end
+
 Render = function()
   if not p then return end
   ns.EnsureClassCards()
@@ -462,6 +571,10 @@ Render = function()
   end
   p.tabBar:Update()
   p.filter:Update()
+  -- the screen may have changed since last time: width, columns and card size follow it
+  Dims()
+  if p.GetWidth and p:GetWidth() ~= PW then p:SetWidth(PW) end
+  for _, c in ipairs(p.cards or {}) do c:SetWidth(CW) end
   local contentW = PW - 2 * PAD
   if searching then p.hint:SetText(L.PICK_HINT_SEARCH:format(p.query))
   else p.hint:SetText(tab == "cls" and L.PICK_HINT_CLS or tab == "raid" and L.PICK_HINT_RAID or L.PICK_HINT) end
@@ -472,79 +585,43 @@ Render = function()
     if la ~= lb then return la < lb end
     return a < b
   end
+  -- first pass: fill every card and take the tallest one's need as the card height
+  local SECS = { { "todo", L.SEC_TODO }, { "later", L.SEC_LATER }, { "below", L.SEC_BELOW }, { "done", L.SEC_DONE }, { "upcoming", L.SEC_UP }, { "noq", L.SEC_NOQ } }
+  local i, need = 0, CH_MIN
+  for _, s in ipairs(SECS) do
+    local keys = secs[s[1]]
+    table.sort(keys, byLevel)
+    for _, k in ipairs(keys) do
+      i = i + 1
+      local c = p.cards[i] or MakeCard(p.grid); p.cards[i] = c
+      need = math.max(need, FillCard(c, k, s[1]))
+    end
+  end
+  CH = math.ceil(need)
+  -- second pass: section headers (DESIGN 3.10, as in every other window: 13 fg, the count 11
+  -- muted, a 1 px rule) and the cards under them
   p.heads = p.heads or {}
   for _, hd in ipairs(p.heads) do hd:Hide() end
-  local i, y, hi = 0, 0, 0
-  for _, s in ipairs({ { "todo", L.SEC_TODO }, { "later", L.SEC_LATER }, { "below", L.SEC_BELOW }, { "done", L.SEC_DONE }, { "upcoming", L.SEC_UP }, { "noq", L.SEC_NOQ } }) do
+  local y, hi = 0, 0
+  i = 0
+  for _, s in ipairs(SECS) do
     local keys = secs[s[1]]
     if #keys > 0 then
-      table.sort(keys, byLevel)
       hi = hi + 1
       local hd = p.heads[hi] or S.SectionHeader(p.grid, s[2], #keys); p.heads[hi] = hd
       hd:Set(s[2], #keys)
+      hd.secText, hd.n = s[2], #keys
       -- 16 above a section header (8 left by the cards above + 8), 0 above the first one
       if hi > 1 then y = y + 8 end
+      hd.top = y
       hd:ClearAllPoints(); hd:SetPoint("TOPLEFT", p.grid, "TOPLEFT", 0, -y); hd:SetWidth(contentW); hd:Show()
       y = y + 32 + 8
-      for j, k in ipairs(keys) do
+      for j in ipairs(keys) do
         i = i + 1
-        local c = p.cards[i] or MakeCard(p.grid); p.cards[i] = c
+        local c = p.cards[i]
         local col, row = (j - 1) % COLS, math.floor((j - 1) / COLS)
+        c:SetSize(CW, CH)
         c:ClearAllPoints(); c:SetPoint("TOPLEFT", p.grid, "TOPLEFT", col * (CW + GAP), -(y + row * (CH + GAP)))
-        c.section = s[1]
-        local d = ns.D[k]
-        c.dkey = k
-        Art(c.art, d, c)
-        c.dicon:Hide()
-        if d.cq then SetClassIcon(c.cicon, (d.cq:match("^[^,]+"))) else c.cicon:Hide() end
-        c.name:SetText(ns.DName(k))
-        local soon = d.up and time() < d.up
-        local n, done = Counts(k)
-        local finished = n > 0 and done >= n
-        -- the name wraps to 2 lines over the whole width (less the summary button and the check);
-        -- the band follows it
-        local ovW = (num(c.ov:GetWidth()) or 64) + 12
-        local nameH = ns.FitText(c.name, 2, CW - 12 - ovW - (finished and 16 or 0), c)
-        if nameH < 14 then nameH = 17 end
-        local topH = 10 + nameH + 8
-        c.topBand:SetHeight(topH)
-        c.cicon:ClearAllPoints(); c.cicon:SetPoint("TOPLEFT", 12, -(topH + 6))
-        -- a coming raid without quests shows its opening date on the quests line, so the level line stays short
-        local dateTop = soon and n == 0
-        local parts = {}
-        if d.raid then table.insert(parts, L.RAID .. (d.size and (" · " .. L.PICK_SIZE:format(d.size)) or "")) end
-        if d.lvl and d.lvl[1] then
-          local lo, hi2 = d.lvl[1], d.lvl[2] or d.lvl[1]
-          table.insert(parts, lo == hi2 and L.PICK_LV1:format(lo) or L.PICK_LV:format(lo, hi2))
-        end
-        if soon and not dateTop then table.insert(parts, L.PICK_OPENS:format(date(L.PICK_DATE, d.up))) end
-        c.lvl:SetText(table.concat(parts, "  ·  "))
-        -- "1 quête rendue sur 3" agrees with the quests turned in; "1 of 3 quests turned in" with the total
-        local qline = n > 0 and ns.Plural(ns.lang == "fr" and done or n, "PICK_QN1", "PICK_QN", done, n)
-        -- how many of the quests left need earlier quests ("5 quests · 2 with prerequisites")
-        local npre = (n > done) and PreCount(k) or 0
-        if qline and npre > 0 then qline = qline .. " · " .. ns.Plural(npre, "OV_CARD_PRE1", "OV_CARD_PRE", npre) end
-        c.info:SetText(qline or (dateTop and (L.PICK_SOON .. " · " .. date(L.PICK_DATE, d.up))) or L.PICK_NOQ)
-        c.bar:SetWidth(math.max(1, (CW - 2) * (n > 0 and done / n or 0)))
-        c.bar:SetShown(n > 0 and done > 0)
-        c.doneMark:SetShown(finished)
-        local lc = (c.section == "later" or c.section == "below") and T.muted or T.text
-        c.lvl:SetTextColor(lc[1], lc[2], lc[3])
-        local sel = Selected()[k] and true or false
-        -- a word, no check: the check means "done" (the finished dungeon's mark), not "picked"
-        if sel then c.picked:Set(L.PICK_PICKED, T.accentSoft); c.picked:Show() else c.picked:Hide() end
-        -- the level line leaves room for the pill only while it shows; it wraps to 2 lines
-        local pillW = sel and ((num(c.picked:GetWidth()) or 80) + 8) or 0
-        local lvlH = ns.FitText(c.lvl, 2, CW - 24 - pillW, c)
-        if lvlH < 11 then lvlH = 13 end
-        -- "3 of 7 quests turned in · 2 waiting on a prerequisite" may need a second line
-        local infoH = ns.FitText(c.info, 2, CW - 24, c)
-        if infoH < 12 then infoH = 15 end
-        c.botBand:SetHeight(math.max(30, 10 + lvlH + 3 + infoH + 6))
-        c.selEdge(T.accent, sel and 1 or 0)
-        -- later, below, no quest, coming soon: greyed; to do and done: the picture as it is
-        c.art:SetDesaturated(c.section == "later" or c.section == "below" or c.section == "noq" or c.section == "upcoming")
-        c.shade:SetColorTexture(0, 0, 0, (c.section == "todo" or c.section == "done" or sel) and 0.12 or 0.45)
         c:Show()
       end
       y = y + math.ceil(#keys / COLS) * (CH + GAP) - GAP + 8

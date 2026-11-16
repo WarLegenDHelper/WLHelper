@@ -387,16 +387,37 @@ function Sh.Dungeons()
 end
 
 -- ---------------------------------------------------------------- actions
-local function InGroupWith(name) return (UnitInParty and UnitInParty(name)) or (UnitInRaid and UnitInRaid(name)) end
+-- a yes/no the game may hide (secret in instances): nil when it cannot be read
+local function Flag(v)
+    if root.Readable and not root.Readable(v) then return nil end
+    if Secret(v) then return nil end
+    return v and true or false
+end
+local function InGroupWith(name)
+    return Flag(UnitInParty and UnitInParty(name)) or Flag(UnitInRaid and UnitInRaid(name)) or false
+end
+-- leader or assistant; an answer the game hides lets the invite through (the game still decides)
+local function MayInvite(raid)
+    local lead = Flag(UnitIsGroupLeader and UnitIsGroupLeader("player"))
+    if lead == nil then return true end
+    if lead then return true end
+    if raid then
+        local assist = Flag(UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
+        return assist == nil or assist
+    end
+    return false
+end
+Sh.MayInvite = MayInvite
 
 -- Invites the online members given (with their realm when they have one); says why when the game
--- would refuse.
+-- would refuse. A name the game hides (secret) is never passed on.
 function Sh.Invite(names)
     local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
     if type(invite) ~= "function" or type(names) ~= "table" then return 0 end
     local todo = {}
     for _, n in ipairs(names) do
-        if type(n) == "string" and Short(n) ~= Me() then
+        n = Str(n)
+        if n and Short(n) ~= Me() then
             if InGroupWith(n) or InGroupWith(Short(n)) then WP.Print(string.format(L("%s est déjà dans ton groupe."), Short(n)), true)
             else todo[#todo + 1] = n end
         end
@@ -404,10 +425,10 @@ function Sh.Invite(names)
     if #todo == 0 then return 0 end
     -- a party has no assistants: only its leader invites; in a raid, assistants can too
     if IsInRaid and IsInRaid() then
-        if not (UnitIsGroupLeader("player") or (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))) then
+        if not MayInvite(true) then
             WP.Print(L("Seul le chef du raid ou un assistant peut inviter : demande au chef de te passer assistant."), true); return 0
         end
-    elseif IsInGroup and IsInGroup() and not UnitIsGroupLeader("player") then
+    elseif IsInGroup and IsInGroup() and not MayInvite(false) then
         local shown = {}
         for i, n in ipairs(todo) do shown[i] = Short(n) end
         WP.Print(string.format(L("Seul le chef du groupe peut inviter : demande-lui d'inviter %s ou de te passer chef."), table.concat(shown, ", ")), true)

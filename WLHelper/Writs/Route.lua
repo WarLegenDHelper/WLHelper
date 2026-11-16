@@ -1458,3 +1458,60 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3)
         ReplanSoon(1)
     end
 end)
+
+-- ---------------------------------------------------------------- NPCs that walk a path
+-- A guide point whose NPC patrols (s.sp / f.sp in Data.lua, root.PatrolAt in Engine.lua): the GPS goes
+-- to the spot of his path nearest to you rather than to the marker, and each time you reach a spot
+-- (NEAR yards) it moves on to the next spot along the path, round again after the last one. The
+-- guide keeps the step until the quest is taken or handed in, so meeting him ends it the usual way.
+-- The guide may call GPS.GoPoint with the marker as often as it likes: the walk along the path goes on.
+local patrol         -- { map, x, y (the marker), source, label, spots, idx, dest (the spot guided to) }
+local patrolTicker
+local plainGoPoint = GPS.GoPoint
+
+local function HereWorld()
+    local cont, wx, wy = Here()
+    if cont then return { cont, wx, wy } end
+end
+
+local function PatrolStop()
+    patrol = nil
+    if patrolTicker then patrolTicker:Cancel(); patrolTicker = nil end
+end
+
+local function PatrolGo()
+    local s = patrol.spots[patrol.idx]
+    plainGoPoint(s[1], s[2], s[3], patrol.label, patrol.source)
+    patrol.dest = state.dest
+end
+
+local function PatrolTick()
+    if not patrol then return end
+    -- a Comptoir detour: the spot comes back when it ends
+    if state.source == "writs" and state.suspended and state.suspended == patrol.dest then return end
+    -- the GPS stopped or guides somewhere else
+    if not state.dest or state.dest ~= patrol.dest then PatrolStop(); return end
+    local here = HereWorld()
+    if here and root.PatrolReached and root.PatrolReached(patrol.spots, patrol.idx, here, NEAR) then
+        patrol.idx = root.PatrolNext(patrol.spots, patrol.idx)
+        PatrolGo()
+    end
+end
+GPS.PatrolTick = PatrolTick
+
+function GPS.GoPoint(map, x, y, label, source)
+    local spots = root.PatrolAt and root.PatrolAt(map, x, y)
+    if not spots then return plainGoPoint(map, x, y, label, source) end
+    if state.source == "writs" and state.dest and source ~= "writs" then return end
+    if patrol and patrol.map == map and patrol.x == x and patrol.y == y and patrol.source == source
+        and state.dest and state.dest == patrol.dest then return end
+    patrol = { map = map, x = x, y = y, source = source, label = label, spots = spots }
+    patrol.idx = root.PatrolNearest(spots, HereWorld()) or 1
+    PatrolGo()
+    if not patrolTicker and C_Timer and C_Timer.NewTicker then
+        patrolTicker = C_Timer.NewTicker(1, function() pcall(PatrolTick) end)
+    end
+end
+
+-- The patrol the GPS follows now ({ spots, idx, label, ... }), or nil: read it, do not change it.
+function GPS.Patrol() return patrol end

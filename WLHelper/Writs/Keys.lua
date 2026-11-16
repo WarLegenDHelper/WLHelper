@@ -555,9 +555,14 @@ function K.StateText(k, st)
 end
 
 -- ---------------------------------------------------------------- the passport window
--- 420 wide (a single list), sized to its content (DESIGN 3.2).
-local W, PAD = 420, 16
+-- 640 wide, sized to its content (DESIGN 3.2). The keys are a grid (T-55, T-56): two tiles of 296
+-- a row, 16 apart (x = 0 and 312 in the content), 8 between two rows; the two tiles of a row take
+-- the height of the taller one. Each section ("Pour entrer", "Raccourcis et portes") starts its
+-- own rows.
+local W, PAD = 640, 16
 local CW = W - 2 * PAD
+local GAP, VGAP = 16, 8
+local TILE_W = math.floor((CW - GAP) / 2)
 local win, sa, rows, heads, measure = nil, nil, {}, {}, nil
 
 local function GuideTip(k)
@@ -587,10 +592,12 @@ local function RowTip(r)
     return t
 end
 
+-- A key tile, TILE_W wide: icon 30 at (8, 8), the name 13, what it is for 11 muted, the status 11;
+-- "Guide-moi" under the text, at the text's left edge. The whole tile is the click target.
 local function KeyRow(parent)
     local r = CreateFrame("Button", nil, parent)
     r.wlOwned = true
-    r:SetWidth(CW)
+    r:SetWidth(TILE_W)
     r.bg = S.Solid(r, "BACKGROUND", C.cardFill); r.bg:SetAllPoints()
     r.hl = S.Solid(r, "BORDER", C.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
     S.Border(r, C.cardEdge)
@@ -626,15 +633,10 @@ local function KeyRow(parent)
         self.btn:SetShown(not have and K.GuideMode(k) ~= nil)
         if self.icon.SetDesaturated then pcall(self.icon.SetDesaturated, self.icon, not have and st.state ~= "prog") end
     end
+    -- measures the tile (its own height); the grid then gives the row's height with SetHeight
     function r:Fit()
         local x = 8 + 30 + 8
-        local right = 12
-        if self.btn:IsShown() then
-            local bw = Num(self.btn:GetWidth()) or 90
-            self.btn:ClearAllPoints(); self.btn:SetPoint("RIGHT", -12, 0)
-            right = right + bw + 8
-        end
-        local tw = CW - x - right
+        local tw = TILE_W - x - 12
         local y = 8
         self.name:ClearAllPoints(); self.name:SetPoint("TOPLEFT", x, -y)
         y = y + S.FitText(self.name, 2, tw, self)
@@ -644,6 +646,11 @@ local function KeyRow(parent)
         y = y + 3
         self.state:ClearAllPoints(); self.state:SetPoint("TOPLEFT", x, -y)
         y = y + S.FitText(self.state, 2, tw, self)
+        if self.btn:IsShown() then
+            y = y + 8
+            self.btn:ClearAllPoints(); self.btn:SetPoint("TOPLEFT", x, -y)
+            y = y + 24
+        end
         local h = math.max(8 + 30 + 8, math.ceil(y + 8))
         self:SetHeight(h)
         return h
@@ -667,6 +674,13 @@ local function Render()
         local h = heads[s]
         h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -y); h:SetPoint("TOPRIGHT", sa.child, "TOPRIGHT", 0, -y)
         y = y + (Num(h:GetHeight()) or 32) + 8
+        -- the keys of this section, two a row: left, right, left...
+        local col, pair, rowH, any = 0, {}, 0, false
+        local function EndRow()
+            for _, t in ipairs(pair) do t:SetHeight(rowH) end
+            y = y + rowH + VGAP
+            col, pair, rowH, any = 0, {}, 0, true
+        end
         for _, key in ipairs(SHOW) do
             local k = BY[key]
             if k.need == sec[1] then
@@ -674,11 +688,17 @@ local function Render()
                 local r = rows[i]
                 if not r then r = KeyRow(sa.child); rows[i] = r end
                 r:Set(k); r:Show()
-                r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
-                y = y + r:Fit() + 2
+                r:ClearAllPoints(); r:SetPoint("TOPLEFT", col * (TILE_W + GAP), -y)
+                rowH = math.max(rowH, r:Fit())
+                pair[#pair + 1] = r
+                col = col + 1
+                if col == 2 then EndRow() end
             end
         end
-        if s == 1 then y = y + 16 - 2 end
+        if col > 0 then EndRow() end
+        -- the last row's gap goes; a section without keys keeps the 8 under its header
+        if any then y = y - VGAP end
+        if s == 1 then y = y + 16 end
     end
     for j = i + 1, #rows do rows[j]:Hide() end
     sa.child:SetWidth(CW)

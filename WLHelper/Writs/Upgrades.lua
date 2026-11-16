@@ -1,8 +1,13 @@
 -- Writs/Upgrades.lua: a green arrow on the bag items that are an upgrade for you, and a line in
 -- every item tooltip ("WL Helper · Givre    +24 %", then "Remplace [icon] Old item").
 --
--- The judge is WL Helper's own stat weights (Writs/Weights.lua): your class, your spec (the talent
--- tree with the most points, or the one picked in Settings > Upgrades) and what you wear.
+-- The judge, first that can: Naowh Forever's stat weights for a spec whose weights you changed
+-- yourself in Naowh (Writs/NaowhBiS.lua; Naowh's defaults are level 60 sims without caps or
+-- leveling, so they never judge on their own), then WL Helper Gear / Geared Forever (hit and
+-- defense caps, leveling), then WL Helper's own stat weights (Writs/Weights.lua): your class,
+-- your spec (the talent tree with the most points, or the one picked in Settings > Upgrades) and
+-- what you wear. When your Naowh weights judge a spec and Naowh writes its own upgrade line for
+-- it, ours steps aside (no line twice).
 -- Bags: the game's own and Baganator (corner widgets and its "upgrade" search).
 -- Several specs (Settings > Upgrades > Specs to compare): one tooltip line per spec ticked, the main
 -- spec first; the bag arrow follows the main spec, or any of them when the setting says so.
@@ -27,6 +32,7 @@ ns.AddEnglish({
     ["Équipable au niveau %d"] = "Equippable at level %d",
     ["Remplace"] = "Replaces",
     ["Flèche verte pour : %s"] = "Green arrow for: %s",
+    ["(poids Naowh)"] = "(Naowh weights)",
 })
 
 local GREEN = T.ok        -- a gain
@@ -53,7 +59,9 @@ local NO = { up = false }
 -- Its ranking is finer than our weights (per level range, per spec): when it is installed, its own
 -- verdict is read live from the item's tooltip (nothing of it is copied: it writes its lines in a
 -- hidden tooltip as on any tooltip, and the line of your spec carries its green "up" arrow).
--- Settings > Upgrades > Calculation: "auto" (Geared Forever when installed) or WL Helper's weights.
+-- No setting picks the judge: WL Helper Gear ships with WL Helper and is used whenever it is loaded
+-- and knows your spec; WL Helper's weights judge otherwise (Gear disabled, a spec it has no ranking
+-- for), with nothing to choose.
 local GF_ARROW = "GearedForever\\Media\\ArrowUp"
 local function Loaded(name)
     local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
@@ -61,7 +69,36 @@ local function Loaded(name)
 end
 -- WL Helper Gear (our sub-addon, Geared Forever's engine, GPLv3) is asked first through its API
 local function Gear() return Loaded("WLHelper_Gear") and WLHelperGear and WLHelperGear.Compare and WLHelperGear or nil end
-local function UseGF() return WLWritsDB.upgradeSource ~= "wl" and (Gear() ~= nil or Loaded("GearedForever")) end
+-- WL Helper Gear is told the spec WL Helper sees (talent tabs read the way that works on this
+-- client, or your choice in Settings > Upgrades): its own talent scan can miss on Forever and
+-- would then fall back to the class's first spec (a frost mage judged as arcane).
+-- false when Gear has no ranking for that spec: WL Helper's weights judge it instead.
+local GEAR_KEY = { aff = "affli" }
+local function SyncGearSpec(G)
+    local Wt = WP.Weights
+    local s = Wt and Wt.Spec and Wt.Spec()
+    if not (s and G.SetSpec) then return true end
+    local key = GEAR_KEY[s[1]] or s[1]
+    if key == G._wlSpec then return true end
+    if key == G._wlNoSpec then return false end
+    local ok, done = pcall(G.SetSpec, key)
+    if ok and done ~= false then
+        G._wlSpec, G._wlNoSpec = key, nil
+        return true
+    end
+    G._wlSpec, G._wlNoSpec = nil, key
+    return false
+end
+-- kept until Refresh (talents, spec settings, login): asked for every bag slot and tooltip
+local gfMemo
+local function UseGF()
+    if gfMemo == nil then
+        local G = Gear()
+        if G then gfMemo = SyncGearSpec(G)
+        else gfMemo = Loaded("GearedForever") end
+    end
+    return gfMemo
+end
 -- Hides Geared Forever's block in item tooltips while our line shows the same % (an option, on by
 -- default); puts it back when the option or our line is off.
 function WP.ApplyGFTip()
@@ -77,20 +114,6 @@ function WP.ApplyGFTip()
 end
 WP.UpgradeUsesGF = UseGF
 local gfTip
--- WL Helper Gear is told the spec WL Helper sees (talent tabs read the way that works on this
--- client, or your choice in Settings > Upgrades): its own talent scan can miss on Forever and
--- would then fall back to the class's first spec (a frost mage judged as arcane).
-local GEAR_KEY = { aff = "affli" }
-local function SyncGearSpec(G)
-    local Wt = WP.Weights
-    local s = Wt and Wt.Spec and Wt.Spec()
-    if not (s and G.SetSpec) then return end
-    local key = GEAR_KEY[s[1]] or s[1]
-    if key ~= G._wlSpec then
-        local ok, done = pcall(G.SetSpec, key)
-        G._wlSpec = (ok and done ~= false) and key or nil
-    end
-end
 local function GFSpec()
     local G = Gear()
     if G then
@@ -192,11 +215,74 @@ local function Retry(key)
     return false
 end
 
+local function Worn(link)
+    local equipLoc = select(9, ((C_Item and C_Item.GetItemInfo) or GetItemInfo)(link))
+    for _, s in ipairs(W.SLOTS[equipLoc or ""] or {}) do
+        if GetInventoryItemLink("player", s) == link then return true end
+    end
+    return false
+end
+
+-- ---------------------------------------------------------------- Naowh Forever's weights, when yours
+-- Asked first for a spec whose weights the player changed in Naowh (WP.NaowhBiS.JudgeKey, loaded
+-- after this file: read when called); Naowh's tooltip and marks switches do not decide. Who may wear it, worn and empty slots stay ours; the percent is Naowh's.
+local NOJUDGE = {}             -- Naowh does not judge this spec: the next judge does
+local nbMemo = {}              -- [our spec key] = Naowh key or false, until Refresh
+local function NaowhKey(spec)
+    local NB = WP.NaowhBiS
+    if not (NB and spec) then return false end
+    local k = nbMemo[spec[1]]
+    if k == nil then k = NB.JudgeKey(spec) or false; nbMemo[spec[1]] = k end
+    return k
+end
+local function NaowhMain()
+    local s = W.Spec()
+    return s and NaowhKey(s) or false
+end
+-- Naowh's own tooltip line already gives this spec's percent
+local function NaowhTipShown(spec)
+    local k = NaowhKey(spec)
+    return k and WP.NaowhBiS.TipShows(k) or false
+end
+-- a percent, 1000 (empty slot), "equipped", false, nil (not loaded yet) or NOJUDGE
+local function NaowhVerdict(link, spec)
+    local key = NaowhKey(spec)
+    if not key then return NOJUDGE end
+    local can = W.CanWear(link)
+    if can == nil then return nil end
+    if not can then return false end
+    if Worn(link) then return "equipped" end
+    if W.Gain(link, spec) == "empty" then return 1000 end
+    local g, why = WP.NaowhBiS.Gain(link, key)
+    if type(g) == "number" then return math.max(-999, math.min(999, g)) end
+    if why == "loading" then return nil end
+    -- Naowh cannot judge now (gone, no weights, cannot read your stats, an error): the next judge
+    if why == "absent" or why == "nospec" or why == "nopower" or why == "error" then return NOJUDGE end
+    return false
+end
+WP.UpgradeNaowhVerdict = NaowhVerdict
+
 -- { up = true/false, text = "+24%", n = gain } for the main spec
 local function CheckMain(link)
     if type(link) ~= "string" or not Active() then return NO end
     local c = cache[link]
     if c then return c end
+    local main = W.Spec()
+    local nv = main and NaowhVerdict(link, main) or NOJUDGE
+    if nv ~= NOJUDGE then
+        if nv == nil then
+            Pending(link)
+            if Retry(link) then cache[link] = NO end
+            return NO
+        end
+        local r
+        if nv == 1000 then r = { up = true, text = L("vide"), n = 1000 }
+        elseif type(nv) == "number" and nv >= (WLWritsDB.upgradeMin or 1) then
+            r = { up = true, text = nv >= 999 and "+999%" or ("+" .. math.floor(nv + 0.5) .. "%"), n = nv }
+        else r = NO end
+        cache[link] = r
+        return r
+    end
     if UseGF() then
         -- not gear (potion, reagent): Geared Forever writes nothing on it, no need to wait for it
         local Instant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
@@ -230,13 +316,7 @@ end
 -- say: not for you, blocked) or nil (not loaded yet: asked again later). Cached per item link and
 -- spec; Refresh empties the cache (equipment, level and talent changes, settings).
 local specCache = {}
-local function Worn(link)
-    local equipLoc = select(9, ((C_Item and C_Item.GetItemInfo) or GetItemInfo)(link))
-    for _, s in ipairs(W.SLOTS[equipLoc or ""] or {}) do
-        if GetInventoryItemLink("player", s) == link then return true end
-    end
-    return false
-end
+local specByNaowh = {}         -- [link|spec] = true when Naowh's weights gave that verdict
 -- WL Helper's weights for one spec
 local function WeightsVerdict(link, spec)
     local can = W.CanWear(link)
@@ -266,21 +346,25 @@ local function GearFor(G, link, spec)
     if not G._wlSpec then pcall(G.SetSpec, nil) end
     return v
 end
+-- the verdict, and true when Naowh's weights gave it
 local function SpecVerdict(link, spec, isMain)
     local ck = link .. "|" .. spec[1]
     local c = specCache[ck]
-    if c ~= nil then return c end
-    local v
-    if UseGF() then
-        local G = Gear()
-        if isMain then v = GFVerdict(link)
-        elseif G then v = GearFor(G, link, spec)
-        else v = WeightsVerdict(link, spec) end         -- Geared Forever alone judges the main spec only
-    else
-        v = WeightsVerdict(link, spec)
+    if c ~= nil then return c, specByNaowh[ck] or false end
+    local v = NaowhVerdict(link, spec)
+    local byNaowh = v ~= NOJUDGE
+    if v == NOJUDGE then
+        if UseGF() then
+            local G = Gear()
+            if isMain then v = GFVerdict(link)
+            elseif G then v = GearFor(G, link, spec)
+            else v = WeightsVerdict(link, spec) end     -- Geared Forever alone judges the main spec only
+        else
+            v = WeightsVerdict(link, spec)
+        end
     end
-    if v ~= nil then specCache[ck] = v end
-    return v
+    if v ~= nil then specCache[ck] = v; specByNaowh[ck] = byNaowh or nil end
+    return v, byNaowh
 end
 WP.UpgradeSpecVerdict = SpecVerdict
 local function IsGear(link)
@@ -297,7 +381,7 @@ local specsMemo, judgedMemo, judgedGF
 local function Judged()
     if not specsMemo then specsMemo = W.CompareSpecs and W.CompareSpecs() or {}; judgedMemo = nil end
     local gfKey = false
-    if UseGF() and not Gear() and W.SpecKeyFor then gfKey = W.SpecKeyFor(GFSpec()) or false end
+    if UseGF() and not Gear() and not NaowhMain() and W.SpecKeyFor then gfKey = W.SpecKeyFor(GFSpec()) or false end
     if judgedMemo and judgedGF == gfKey then return judgedMemo end
     local out = {}
     for i, spec in ipairs(specsMemo) do
@@ -377,10 +461,12 @@ local function InsteadOf(tip, link)
     end
 end
 
--- the left half of the line: the addon's tag, then the spec judged
-local function Tag(spec, extra)
+-- the left half of the line: the addon's tag, then the spec judged ("(poids Naowh)" when Naowh's
+-- weights judged it)
+local function Tag(spec, extra, naowh)
     local guess = not extra and W.SpecGuessed and W.SpecGuessed()
     return ns.S.Hex(T.accent) .. "WL Helper|r · " .. (spec or "") .. (guess and (" " .. ns.S.Hex(T.warn) .. L("(spé à choisir)") .. "|r") or "")
+        .. (naowh and (" " .. ns.S.Hex(T.muted) .. L("(poids Naowh)") .. "|r") or "")
 end
 
 -- the right half of a spec's line: text, colour, true for a percent
@@ -395,24 +481,26 @@ end
 -- one line per spec judged ("WL Helper · Protection  +6 %", "WL Helper · Fureur  -3 %"), main first
 local function MultiLines(tip, link)
     if not IsGear(link) then return end
-    if not UseGF() then
+    local nMain = NaowhMain()
+    if not UseGF() or nMain then
         -- only your level stops you (the same for every spec): the one line saying from which level
         local can, why, lvl = W.CanWear(link)
         if not can then
             if why == "level" and lvl then
-                tip:AddDoubleLine(Tag(W.SpecName()), string.format(L("Équipable au niveau %d"), lvl), T.fg[1], T.fg[2], T.fg[3], T.warn[1], T.warn[2], T.warn[3])
+                tip:AddDoubleLine(Tag(W.SpecName(), nil, nMain and true), string.format(L("Équipable au niveau %d"), lvl), T.fg[1], T.fg[2], T.fg[3], T.warn[1], T.warn[2], T.warn[3])
             end
             return
         end
     end
     local pct, shown = false, false
     for i, spec in ipairs(Judged()) do
-        local v = SpecVerdict(link, spec, i == 1)
+        local v, byNaowh = SpecVerdict(link, spec, i == 1)
         local name = W.SpecName(spec)
-        if i == 1 and UseGF() then name = W.SpecNameFor(GFSpec()) end
+        if i == 1 and UseGF() and not byNaowh then name = W.SpecNameFor(GFSpec()) end
         local text, col, isPct = VerdictText(v)
-        if text then
-            tip:AddDoubleLine(Tag(name, i > 1), text, T.fg[1], T.fg[2], T.fg[3], col[1], col[2], col[3])
+        -- Naowh writes this spec's percent itself: ours steps aside (worn: Naowh says nothing)
+        if text and not (byNaowh and type(v) == "number" and NaowhTipShown(spec)) then
+            tip:AddDoubleLine(Tag(name, i > 1, byNaowh), text, T.fg[1], T.fg[2], T.fg[3], col[1], col[2], col[3])
             shown = true
             pct = pct or isPct
         end
@@ -431,6 +519,28 @@ end
 local function TooltipLine(tip, link)
     if not (Active() and link) or WLWritsDB.upgradeTip == false then return end
     if MultiSpec() then return MultiLines(tip, link) end
+    local main = W.Spec()
+    if main and NaowhKey(main) then
+        -- Naowh's weights judge (cached per link): ours with "(poids Naowh)"; Naowh's own tooltip line
+        -- gives the percent already (ours steps aside), not the worn or level lines
+        local v, byNaowh = SpecVerdict(link, main, true)
+        if byNaowh then
+            if type(v) == "number" and NaowhTipShown(main) then return end
+            if v == nil then return end
+            if v == false then
+                local can, why, lvl = W.CanWear(link)
+                if not can and why == "level" and lvl then
+                    tip:AddDoubleLine(Tag(W.SpecName(main), nil, true), string.format(L("Équipable au niveau %d"), lvl), T.fg[1], T.fg[2], T.fg[3], T.warn[1], T.warn[2], T.warn[3])
+                end
+                return
+            end
+            local text, col, isPct = VerdictText(v)
+            if not text then return end
+            tip:AddDoubleLine(Tag(W.SpecName(main), nil, true), text, T.fg[1], T.fg[2], T.fg[3], col[1], col[2], col[3])
+            if isPct then InsteadOf(tip, link) end
+            return
+        end
+    end
     if UseGF() then
         local v = GFVerdict(link)
         local text, col
@@ -678,7 +788,10 @@ local queued = false
 local function Refresh()
     cache = {}
     wipe(specCache)
+    wipe(specByNaowh)
     specsMemo, judgedMemo = nil, nil
+    gfMemo = nil
+    wipe(nbMemo)
     W.Reset()
     if baganator and Baganator.API.RequestItemButtonsRefresh then pcall(Baganator.API.RequestItemButtonsRefresh) end
     walked = 0
@@ -711,8 +824,15 @@ ev:SetScript("OnEvent", function(_, e, ...)
                 WP.Print(string.format(L("Améliorations : ta spé n'a pas pu être lue dans tes talents, %s est supposée. Choisis-la dans WL Helper, Améliorations, Spé jugée."), W.SpecName()))
             end
         end)
-        specsMemo, judgedMemo = nil, nil
+        specsMemo, judgedMemo, gfMemo = nil, nil, nil
+        -- the old "Method" setting (Automatic / WL Helper weights) is gone: nobody stays on weights only
+        WLWritsDB.upgradeSource = nil
         WP.ApplyGFTip()
+        -- Naowh's lists, weights or their settings changed: judged again
+        if WP.NaowhBiS and WP.NaowhBiS.OnChange and not WP._upgradesNaowhHooked then
+            WP._upgradesNaowhHooked = true
+            WP.NaowhBiS.OnChange(function() if Active() then Soon() end end)
+        end
         HookBaganator()
         if EUI_Bags and EUI_Bags.RefreshInventory then
             hooksecurefunc(EUI_Bags, "RefreshInventory", function() walked = 0; PaintSoon() end)

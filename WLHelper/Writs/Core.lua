@@ -358,9 +358,293 @@ function WP.IsSkipped(kind, id)
     return s and s[kind] and s[kind][id] and true or false
 end
 
+-- ---------------------------------------------------------------- budget plan (T-70)
+-- With a budget (WLWritsDB.budget, copper; 0 = no limit), the plan is the set of writs that brings
+-- the most reputation for the trip it asks, without spending more than the budget:
+--   maximise  reputation (up to the goal) - lambda x seconds of travel,  with  gold spent <= budget.
+-- The trip is a tree over the turn-in spots: from where you stand to a spot (the GPS's own search:
+-- flights, ships, teleports, the Hearthstone), or from a spot already on the tour to the next one
+-- (a ride or a flight); writs handed in at one spot share its trip. Lambda comes from the
+-- "Prefer" choice (WLWritsDB.budgetPref): reputation, or the least travel.
+-- Greedy (the best reputation per gold among single writs and whole groups at a new spot), then a
+-- local improvement (drop a spot, fill again, keep it when the result is better).
+WP.BUDGET_LAMBDA = { rep = 0.1, trip = 1 }   -- reputation points one second of travel is worth
+WP.BUDGET_STEPS = { 10000, 30000, 100000 }   -- the budget's quick choices: 1, 3 and 10 gold
+
+local FROM_YOU_FRESH = 20                     -- seconds the GPS's times from you stay valid
+local UNREACHABLE = 600                       -- a spot the GPS cannot price: ten minutes
+local fromYou = { at = -1000, sig = nil, out = {} }
+
+local function SpotKey(w)
+    return w.map .. ":" .. math.floor((w.x or 0) + 0.5) .. ":" .. math.floor((w.y or 0) + 0.5)
+end
+
+-- Seconds from where you stand to each spot, in one GPS search (cached a few seconds).
+local function SecondsFromYou(spots)
+    local G = WP.GPS
+    if not (G and G.CostsTo) then return {} end
+    local keys = {}
+    for i, s in ipairs(spots) do keys[i] = s.key end
+    local sig = table.concat(keys, ",")
+    local now = (GetTime and GetTime()) or 0
+    if fromYou.sig == sig and now - fromYou.at < FROM_YOU_FRESH then return fromYou.out end
+    -- no router in combat: the last times stay (whatever their age), or every spot waits unpriced
+    -- until the fight ends (PLAYER_REGEN_ENABLED refreshes the window)
+    if InCombatLockdown and InCombatLockdown() then
+        return fromYou.sig == sig and fromYou.out or {}
+    end
+    local dests, idx, out = {}, {}, {}
+    for i, s in ipairs(spots) do
+        if s.p then dests[#dests + 1] = { cont = s.p.cont, wx = s.p.wx, wy = s.p.wy, map = s.map, kind = "dest" }; idx[#dests] = i end
+    end
+    if #dests > 0 then
+        local ok, costs = pcall(G.CostsTo, dests)
+        if ok and type(costs) == "table" then
+            for j, t in pairs(costs) do if idx[j] and type(t) == "number" then out[idx[j]] = t end end
+        end
+    end
+    -- no position (an instance, a loading screen): keep the last good times for these spots
+    if not next(out) and fromYou.sig == sig and next(fromYou.out) then return fromYou.out end
+    fromYou.at, fromYou.sig, fromYou.out = now, sig, out
+    return out
+end
+function WP._BudgetResetCache() fromYou.at, fromYou.sig, fromYou.out = -1000, nil, {} end
+
+-- Seconds from spot a to spot b once a is on the tour: a ride or a flight on one continent,
+-- else the way from where you stand (a ship or a teleport).
+local function Hop(a, b, speed)
+    local pa, pb = a.p, b.p
+    if pa and pb and pa.cont == pb.cont then
+        local dx, dy = pa.wx - pb.wx, pa.wy - pb.wy
+        local d = math.sqrt(dx * dx + dy * dy)
+        local ride = d * 1.3 / speed
+        local fly = d * 1.25 / 30 + 20 + 40     -- the flight, its stop, and the rides to and from the masters
+        return math.min(ride, fly, b.t0)
+    end
+    if not (pa and pb) and a.map == b.map then return 30 end
+    return b.t0
+end
+
+-- Seconds of a tour through these spots: the tree that joins them to you at the least cost.
+local function TreeSeconds(list, speed)
+    local n = #list
+    if n == 0 then return 0 end
+    local inTree, best, total = {}, {}, 0
+    for i = 1, n do best[i] = list[i].t0 end
+    for _ = 1, n do
+        local u, bu = nil, math.huge
+        for i = 1, n do if not inTree[i] and best[i] < bu then u, bu = i, best[i] end end
+        if not u then break end
+        inTree[u] = true
+        total = total + bu
+        for i = 1, n do
+            if not inTree[i] then
+                local h = Hop(list[u], list[i], speed)
+                if h < best[i] then best[i] = h end
+            end
+        end
+    end
+    return total
+end
+
+-- cands: rows the plan may buy (each with .w, .writPrice, .itemPrice, .ownItem, .haveItems, .cost);
+-- o = { budget = copper, lambda, left = reputation still wanted, fixed = rows to hand in anyway,
+--       taken = { [itemID] = units already bought for them } }.
+-- Returns the chosen rows (in tour order), and { cost, rep, seconds, spots }.
+function WP.BudgetPick(cands, o)
+    local lambda, left0 = o.lambda or WP.BUDGET_LAMBDA.rep, o.left or math.huge
+    local speed = ((UnitLevel and UnitLevel("player")) or 1) >= 40 and 11.2 or 7
+    local G = WP.GPS
+    -- the spots: every turn-in place, the fixed ones (writs you hand in anyway) and the candidates'
+    local spots, byKey = {}, {}
+    local function spotOf(w)
+        local k = SpotKey(w)
+        local s = byKey[k]
+        if not s then
+            local p
+            if G and G.Point and w.x and w.y then
+                local ok, v = pcall(G.Point, w.map, w.x, w.y)
+                if ok and type(v) == "table" then p = v end
+            end
+            s = { key = k, map = w.map, p = p, writs = {} }
+            byKey[k] = s
+            spots[#spots + 1] = s
+        end
+        return s
+    end
+    for _, r in ipairs(o.fixed or {}) do spotOf(r.w).fixed = true end
+    for _, r in ipairs(cands) do local s = spotOf(r.w); s.writs[#s.writs + 1] = r end
+    table.sort(spots, function(a, b) return a.key < b.key end)
+    local t0 = SecondsFromYou(spots)
+    for i, s in ipairs(spots) do s.t0 = t0[i] or UNREACHABLE end
+    -- inside a spot, the most reputation per gold first
+    for _, s in ipairs(spots) do
+        table.sort(s.writs, function(a, b)
+            local ra, rb = a.w.rep / math.max(1, a.cost or 1), b.w.rep / math.max(1, b.cost or 1)
+            if ra ~= rb then return ra > rb end
+            return a.w.writ < b.w.writ
+        end)
+    end
+
+    -- What k more units of an item cost after `have` (the price ladder when the auction house
+    -- gave one: the sixth crate costs more than the first). Asked once per item, not per trial.
+    local ladder, inBank = {}, {}
+    local CostFor = WP.CostFor
+    for _, r in ipairs(cands) do
+        local w = r.w
+        for _, x in ipairs({ w.writ, w.item }) do
+            if ladder[x] == nil then ladder[x] = (CostFor and WP.Ladder and WP.Ladder(x)) and true or false end
+        end
+        if inBank[w.writ] == nil then inBank[w.writ] = (WP.InBank and WP.InBank(w.writ) > 0) or false end
+    end
+    local function Units(id, price, have, k)
+        if k <= 0 then return 0 end
+        if ladder[id] then
+            local a = CostFor(id, have + k)
+            -- a fresh ladder with nothing for sale: this item cannot be bought now
+            if a == nil then return nil end
+            local b = CostFor(id, have)
+            if b then return a - b end
+        end
+        return price and price * k or nil
+    end
+    -- What a writ costs to buy now, given the units already taken; adds its units to `taken`.
+    local function WritCost(r, taken)
+        local w = r.w
+        local env = 0
+        if not inBank[w.writ] then
+            env = Units(w.writ, r.writPrice, taken[w.writ] or 0, 1)
+        end
+        local n = r.ownItem and 0 or ((w.count or 1) - (r.haveItems or 0))
+        local item = Units(w.item, r.itemPrice, taken[w.item] or 0, n)
+        if not env or not item then return nil end
+        taken[w.writ] = (taken[w.writ] or 0) + 1
+        taken[w.item] = (taken[w.item] or 0) + n
+        return env + item
+    end
+    local function Copy(t) local c = {}; for k, v in pairs(t) do c[k] = v end; return c end
+
+    -- One run of the greedy from a starting choice; `banned` spots are not used.
+    local function Run(start, banned)
+        local st = { chosen = {}, order = {}, taken = Copy(o.taken or {}), spent = 0, rep = 0, onTour = {}, hop = {} }
+        local tour = {}
+        local layer = { __index = st.taken }   -- a trial's units sit over the plan's, without a copy
+        st.joinHop = {}
+        local function join(s)
+            if st.onTour[s] then return end
+            st.joinHop[s] = st.hop[s] or s.t0
+            st.onTour[s] = true
+            tour[#tour + 1] = s
+            for _, x in ipairs(spots) do
+                if not st.onTour[x] then
+                    local h = Hop(s, x, speed)
+                    if h < (st.hop[x] or x.t0) then st.hop[x] = h end
+                end
+            end
+        end
+        for _, s in ipairs(spots) do if s.fixed then join(s) end end
+        local function take(r, c)
+            st.chosen[r] = true
+            st.order[#st.order + 1] = r
+            st.spent = st.spent + c
+            st.rep = st.rep + r.w.rep
+        end
+        for _, r in ipairs(start or {}) do
+            local c = WritCost(r, st.taken)
+            if c and st.spent + c <= o.budget then take(r, c); join(spotOf(r.w)) end
+        end
+        while st.rep < left0 do
+            local best
+            for _, s in ipairs(spots) do
+                if not (banned and banned[s]) then
+                    local travel = st.onTour[s] and 0 or (st.hop[s] or s.t0)
+                    local overlay = setmetatable({}, layer)
+                    local cost, rep = 0, 0
+                    local picks = {}
+                    for _, r in ipairs(s.writs) do
+                        if not st.chosen[r] then
+                            -- a writ too dear for what is left is skipped, not the end of the spot:
+                            -- a cheaper one after it may still fit (its units are tried apart)
+                            local trial = setmetatable({}, { __index = overlay })
+                            local c = WritCost(r, trial)
+                            if c and st.spent + cost + c <= o.budget then
+                                for k, v in pairs(trial) do overlay[k] = v end
+                                cost, rep = cost + c, rep + r.w.rep
+                                picks[#picks + 1] = r
+                                local gain = math.min(rep, left0 - st.rep) - lambda * travel
+                                if gain > 0 then
+                                    local ratio = gain / math.max(cost, 1)
+                                    if not best or ratio > best.ratio then
+                                        local list = {}; for j = 1, #picks do list[j] = picks[j] end
+                                        best = { s = s, picks = list, ratio = ratio }
+                                    end
+                                end
+                                if st.rep + rep >= left0 then break end
+                            end
+                        end
+                    end
+                end
+            end
+            if not best then break end
+            for _, r in ipairs(best.picks) do
+                if not st.chosen[r] then take(r, WritCost(r, st.taken)) end
+            end
+            join(best.s)
+        end
+        st.tour = tour
+        st.seconds = TreeSeconds(tour, speed)
+        st.score = math.min(st.rep, left0) - lambda * st.seconds
+        return st
+    end
+
+    local best = Run(nil, nil)
+    -- local improvement: leave out one spot of the plan and fill again, the weakest spots first
+    -- (reputation for its trip and gold); two rounds of six tries at most, so it stays quick
+    local rounds, improved = 0, true
+    while improved and rounds < 2 do
+        improved, rounds = false, rounds + 1
+        local worth, list = {}, {}
+        for _, r in ipairs(best.order) do
+            local s = spotOf(r.w)
+            local x = worth[s] or { rep = 0, cost = 0 }
+            worth[s] = x
+            x.rep, x.cost = x.rep + r.w.rep, x.cost + (r.cost or 0)
+        end
+        for s, x in pairs(worth) do
+            if not s.fixed then
+                x.v = (x.rep - lambda * (best.joinHop[s] or s.t0)) / math.max(1, x.cost)
+                list[#list + 1] = s
+            end
+        end
+        table.sort(list, function(a, b)
+            if worth[a].v ~= worth[b].v then return worth[a].v < worth[b].v end
+            return a.key < b.key
+        end)
+        for i, s in ipairs(list) do
+            if i > 6 then break end
+            do
+                local keep = {}
+                for _, r in ipairs(best.order) do if spotOf(r.w) ~= s then keep[#keep + 1] = r end end
+                local alt = Run(keep, { [s] = true })
+                if alt.score > best.score + 0.01 or (math.abs(alt.score - best.score) <= 0.01 and alt.spent < best.spent) then
+                    best, improved = alt, true
+                    break
+                end
+            end
+        end
+    end
+    -- the chosen writs, spot by spot in the order the tour reached them
+    local out = {}
+    for _, s in ipairs(best.tour) do
+        for _, r in ipairs(best.order) do if spotOf(r.w) == s then out[#out + 1] = r end end
+    end
+    return out, { cost = best.spent, rep = best.rep, seconds = best.seconds, spots = #best.tour }
+end
+
 function WP.Plan(rows)
     local need = WP.RepNeeded()
     local plan, pending, readyRep, zones = {}, 0, 0, {}
+    WP.budgetInfo = nil
     if not need then return plan, nil, 0, 0, zones end
     -- Zones on the route, in the order given: those with writs ready first (most reputation
     -- first), then the ones the plan adds, in the order it adds them.
@@ -391,7 +675,6 @@ function WP.Plan(rows)
     -- Candidates by zone, cheapest first inside each zone.
     local cap = (WLWritsDB.maxPer100 or 0) > 0 and WLWritsDB.maxPer100 or nil
     local byZone
-    -- Candidates by zone, cheapest first inside each zone.
     local function build()
         byZone = {}
         for _, r in ipairs(rows) do
@@ -418,29 +701,62 @@ function WP.Plan(rows)
         visit(map)
     end
     local function fill()
-    -- Zones you already have to visit come first: their writs cost no extra trip.
-    for _, map in ipairs(startZones) do if byZone[map] then take(map) end end
-    -- Then the fewest extra zones: the zone that covers the most of what is left, cheapest on ties.
-    while left > 0 do
-        local best, bestRep, bestCost
-        for map, z in pairs(byZone) do
-            local rep, cost = 0, 0
-            for _, r in ipairs(z) do
-                if rep >= left then break end
-                rep = rep + r.w.rep
-                cost = cost + r.net
+        -- Zones you already have to visit come first: their writs cost no extra trip.
+        for _, map in ipairs(startZones) do if byZone[map] then take(map) end end
+        -- Then the fewest extra zones: the zone that covers the most of what is left, cheapest on ties.
+        while left > 0 do
+            local best, bestRep, bestCost
+            for map, z in pairs(byZone) do
+                local rep, cost = 0, 0
+                for _, r in ipairs(z) do
+                    if rep >= left then break end
+                    rep = rep + r.w.rep
+                    cost = cost + r.net
+                end
+                local covered = math.min(rep, left)
+                if not best or covered > bestRep or (covered == bestRep and (cost < bestCost
+                    or (cost == bestCost and map < best))) then
+                    best, bestRep, bestCost = map, covered, cost
+                end
             end
-            local covered = math.min(rep, left)
-            if not best or covered > bestRep or (covered == bestRep and (cost < bestCost
-                or (cost == bestCost and map < best))) then
-                best, bestRep, bestCost = map, covered, cost
-            end
+            if not best then break end
+            take(best)
         end
-        if not best then break end
-        take(best)
-    end
     end
     build()
+    local budget = tonumber(WLWritsDB.budget) or 0
+    if budget > 0 then
+        -- the writs you hand in anyway: their trip is paid, and the items still missing for those in
+        -- your quest log come out of the budget first (the Shopping tab buys them too)
+        local fixed, taken, committed = {}, {}, 0
+        for _, r in ipairs(rows) do
+            if (r.state == "ready" or r.state == "log" or r.state == "bag") and r.w.map and not r.tooHigh then
+                fixed[#fixed + 1] = r
+                if r.state ~= "ready" and not r.ownItem then
+                    local n = (r.w.count or 1) - (r.haveItems or 0)
+                    if n > 0 then
+                        committed = committed + (r.itemPrice or 0) * n
+                        taken[r.w.item] = (taken[r.w.item] or 0) + n
+                    end
+                end
+            end
+        end
+        local cands = {}
+        for _, z in pairs(byZone) do for _, r in ipairs(z) do cands[#cands + 1] = r end end
+        local lambda = WP.BUDGET_LAMBDA[WLWritsDB.budgetPref or "rep"] or WP.BUDGET_LAMBDA.rep
+        local picked, info = WP.BudgetPick(cands, { budget = budget - committed, lambda = lambda, left = left, fixed = fixed, taken = taken })
+        for _, r in ipairs(picked) do
+            r.inPlan = true
+            plan[#plan + 1] = r
+            visit(r.w.map)
+        end
+        info.budget, info.committed, info.cost = budget, committed, info.cost + committed
+        info.n = #plan
+        info.cands = #cands
+        info.over = committed > budget
+        WP.budgetInfo = info
+        return plan, need, pending, readyRep, WP.ZoneList(route)
+    end
     fill()
     return plan, need, pending, readyRep, WP.ZoneList(route)
 end
@@ -476,6 +792,7 @@ function WP.Plan(rows)
     local plan, need, pending, readyRep, zones = AutoPlan(rows)
     local picked = WLWritsCharDB.picked
     if not picked or not next(picked) then return plan, need, pending, readyRep, zones end
+    WP.budgetInfo = nil   -- your ticks are the plan: the budget does not choose them
     for _, r in ipairs(plan) do r.inPlan = nil end
     plan = {}
     for _, r in ipairs(rows) do

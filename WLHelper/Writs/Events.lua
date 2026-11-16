@@ -8,12 +8,17 @@
 --            before, those signed up get a reminder; the organizer gets a banner to invite everyone
 --            in one click, and the organizer's invite is accepted by itself (can be turned off).
 --            A cancelled event is announced to those signed up.
---  Now       "I'm looking for a group": your role (from your spec by default) and what for; the list
---            of members looking right now, with Whisper and Invite buttons. Your search is renewed
---            while you stay on and withdrawn when your group is full or you log out; other entries
---            fade after 30 minutes. A new search in the guild gets one line in the chat.
+--  Looking   "I'm looking for a group" (WP.SetLooking): your role (from your spec by default), what
+--            for and the guide's dungeon keys (K message, T-78). Your search is renewed while you
+--            stay on and withdrawn when your group is full or you log out; other entries fade after
+--            30 minutes. A new search in the guild gets one line in the chat. Shown and switched in
+--            the "Trouver un groupe" tab (Writs/Finder.lua), which replaced the "Groupe maintenant" tab.
 -- Everything goes on the guild's addon channel; every copy keeps what it saw. Only members who have
--- WL Helper see it. Only names, roles, class, level, times and the texts typed travel.
+-- WL Helper see it. Only names, roles, class, level, times, dungeon keys and the texts typed travel.
+--
+-- The window is the Groups window ("Groupes" / "Groups"): other files add their tabs before Agenda
+-- and Créer through WP.RegisterGroupTab (Writs/Finder.lua: Trouver un groupe; Writs/FinderPeople.lua:
+-- Messages, Joueurs récents).
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -26,6 +31,7 @@ ns.AddEnglish({
     -- the window, its header and its tabs
     ["Seuls les membres qui ont WL Helper voient les événements et les recherches de groupe."] = "Only members who have WL Helper see the events and the group searches.",
     ["WL Helper n'envoie jamais de message privé : tout passe par le canal de la guilde."] = "WL Helper never whispers anyone: everything goes through the guild channel.",
+    ["Trouver un groupe n'envoie un message privé que quand tu cliques sur Demander à rejoindre ou Inviter, avec le texte montré dans la bulle."] = "Find a group only whispers when you click Ask to join or Invite, with the text shown in the tooltip.",
     ["Agenda"] = "Upcoming",
     ["Créer"] = "Create",
     ["Groupe maintenant"] = "Group now",
@@ -55,6 +61,9 @@ ns.AddEnglish({
     ["complet"] = "full",
     ["+%d en réserve"] = "+%d in reserve",
     ["Accepter l'invitation de l'organisateur"] = "Accept the organizer's invite",
+    -- Agenda in two columns: the list on the left, the chosen event on the right
+    ["Choisis un événement à gauche."] = "Pick an event on the left.",
+    ["Clic : voir cet événement"] = "Click: show this event",
     ["Quand tu es inscrit, son invitation est acceptée pour toi, de 30 min avant le début à 30 min après."] = "When you are signed up, their invite is accepted for you, from 30 min before the start to 30 min after.",
     -- dates and times
     ["Aujourd'hui"] = "Today", ["Demain"] = "Tomorrow",
@@ -302,7 +311,11 @@ end
 function WP.LFGList()
     Prune()
     local out = {}
-    for name, l in pairs(DB().lfg) do out[#out + 1] = { name = name, role = l.role, cls = l.cls, lvl = l.lvl, what = l.what, t = l.t } end
+    for name, l in pairs(DB().lfg) do
+        local keys = {}
+        if type(l.keys) == "table" then for _, k in ipairs(l.keys) do if type(k) == "string" then keys[#keys + 1] = k end end end
+        out[#out + 1] = { name = name, role = l.role, cls = l.cls, lvl = l.lvl, what = l.what, t = l.t or 0, keys = keys }
+    end
     table.sort(out, function(a, b) return a.t > b.t end)
     return out
 end
@@ -340,7 +353,11 @@ function WP.SignUp(e, role)
 end
 function WP.MySignup(e) return e.signups and e.signups[Me()] end
 
+-- One invite: WP.Shared.Invite checks leader or assistant, members already grouped and free slots
+-- (T-78: the bare InviteUnit invited from a party where we were not the leader).
 local function InviteName(name)
+    if type(name) ~= "string" or (root.Readable and not root.Readable(name)) then return end
+    if WP.Shared and WP.Shared.Invite then WP.Shared.Invite({ name }); return end
     local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
     if invite then pcall(invite, name) end
 end
@@ -474,19 +491,49 @@ local function MyRole()
     return "dps"
 end
 
-function WP.SetLooking(role, what)
+WP.LFGRole = MyRole
+
+-- The guide's dungeon keys of a search (K message): 4 at most, plain ASCII words only.
+local function CleanKeys(keys)
+    local out, seen = {}, {}
+    if type(keys) ~= "table" then return out end
+    for _, k in ipairs(keys) do
+        if type(k) == "string" and k:match("^[%w_]+$") and #k <= 40 and not seen[k] then
+            seen[k] = true; out[#out + 1] = k
+            if #out >= 4 then break end
+        end
+    end
+    return out
+end
+WP.LFGCleanKeys = CleanKeys
+-- N (every version reads it) first, then K with the dungeon keys (new versions; older ones skip a
+-- kind letter they do not know). Sent in that order, one a second: K always lands after N.
+local function LookingMsgs(l)
+    local n = table.concat({ "N", l.role, l.cls or "", l.lvl or 0, l.what or "" }, "|")
+    local k = table.concat({ "K", l.role, l.cls or "", l.lvl or 0, table.concat(CleanKeys(l.keys), ","), l.what or "" }, "|")
+    return n, k
+end
+
+-- keys: the guide's dungeon keys; nil = the "Trouver un groupe" tab's current dungeons
+function WP.SetLooking(role, what, keys)
     local d = DB()
     local _, cls = UnitClass("player")
     if role then
-        d.lfg[Me()] = { role = role, cls = cls, lvl = UnitLevel("player"), what = Clean(what, 80), t = time() }
-        Send(table.concat({ "N", role, cls or "", UnitLevel("player") or 0, Clean(what, 80) }, "|"))
+        if keys == nil and WP.Finder and WP.Finder.SourceKeys then
+            local ok, k = pcall(WP.Finder.SourceKeys)
+            keys = ok and k or nil
+        end
+        local l = { role = role, cls = cls, lvl = UnitLevel("player"), what = Clean(what, 80), t = time(), keys = CleanKeys(keys) }
+        d.lfg[Me()] = l
+        local n, k = LookingMsgs(l)
+        Send(n); Send(k)
     else
         d.lfg[Me()] = nil
         Send("N|x|||")
     end
     Refresh()
 end
-function WP.IsLooking() local l = DB().lfg[Me()]; return l and l.role, l and l.what end
+function WP.IsLooking() local l = DB().lfg[Me()]; return l and l.role, l and l.what, l and l.keys end
 
 -- ---------------------------------------------------------------- receiving
 local function ClassHex(cls)
@@ -548,7 +595,8 @@ local function OnMessage(msg, sender)
         local was = d.lfg[sender]
         if role == "x" then d.lfg[sender] = nil
         else
-            d.lfg[sender] = { role = role, cls = cls, lvl = tonumber(lvl), what = what, t = time() }
+            -- the keys a K message gave stay (N is sent again at each renewal, its K follows)
+            d.lfg[sender] = { role = role, cls = cls, lvl = tonumber(lvl), what = what, t = time(), keys = was and was.keys or nil }
             -- a new search: one line in the chat (not the answers to my own question at login)
             if not was and On() and GetTime() - askedAt > 20 then
                 local who, rl, lv = ClassHex(cls) .. sender .. "|r", L(ROLE_LABEL[role] or "DPS"), lvl ~= "" and lvl or "?"
@@ -560,6 +608,20 @@ local function OnMessage(msg, sender)
             end
         end
         Refresh()
+    elseif kind == "K" then
+        -- "K|role|cls|lvl|key1,key2|what": the same search with the guide's dungeon keys; the N sent
+        -- with it already said the news in the chat
+        local role, cls, lvl, keys, what = msg:match("^K|(%a+)|(%u*)|(%d*)|([%w_,]*)|(.*)$")
+        if not role then return end
+        if role == "x" then d.lfg[sender] = nil; Refresh(); return end
+        local list = {}
+        for k in keys:gmatch("[%w_]+") do list[#list + 1] = k end
+        local l = d.lfg[sender] or { t = time() }
+        l.role, l.cls, l.lvl, l.what = role, cls, tonumber(lvl), what
+        l.keys = CleanKeys(list)
+        l.t = time()
+        d.lfg[sender] = l
+        Refresh()
     elseif kind == "Q" then
         -- someone logged in: what I organize, what I signed up for, whether I'm looking
         for _, e in pairs(d.list) do
@@ -570,7 +632,7 @@ local function OnMessage(msg, sender)
             end
         end
         local l = d.lfg[Me()]
-        if l then Send(table.concat({ "N", l.role, l.cls or "", l.lvl or 0, l.what or "" }, "|")) end
+        if l then local n, k = LookingMsgs(l); Send(n); Send(k) end
     end
 end
 
@@ -579,7 +641,7 @@ local function Remind()
     if not (WLWritsDB and On()) then return end
     -- my search for a group stays fresh for the others while it is on (their copies drop it after 30 min)
     local l = DB().lfg[Me()]
-    if l and time() - (l.t or 0) > 1200 then WP.SetLooking(l.role, l.what) end
+    if l and time() - (l.t or 0) > 1200 then WP.SetLooking(l.role, l.what, l.keys or {}) end
     local d, now = DB(), time()
     for id, e in pairs(d.list) do
         local mine = e.by == Me() or (e.signups and e.signups[Me()])
@@ -628,13 +690,23 @@ local function LoginRecap()
 end
 
 -- ---------------------------------------------------------------- the window
--- "Groupes" / "LFG": 520 wide (one column), sized to its content (f:FitHeight); lists scroll inside
--- the window only once it reached 80 % of the screen. Three tabs: Agenda, Create, Group now.
-local W, PAD = 520, 16
+-- "Groupes" / "LFG": 640 wide, sized to its content (f:FitHeight); lists scroll inside the window
+-- only once it reached 80 % of the screen. Three tabs: Agenda, Create, Group now.
+-- Agenda (T-55 V4): the events on the left (240), a 1 px rule at x = 272, the chosen event on the
+-- right (336): 16 + 240 + 16 + 1 + 15 + 336 + 16 = 640. Create and Group now stay one column, their
+-- fields and sentences 480 wide at most (DESIGN 4.2).
+local W, PAD = 640, 16
 local CW = W - 2 * PAD          -- content width
+local FW = 480                  -- form width (Create, Group now)
+local LIST_W, DW = 240, 336     -- Agenda: the list, the detail
+local RULE_X = PAD + LIST_W + 16
+local DET_X = RULE_X + 1 + 15
+local ROW_H = 52                -- an event line of the list
+local PW = 520                  -- the dungeon picker keeps its width
+local PCWW = PW - 2 * PAD       -- the picker's content width
 local LBL = S.F.meta + 2 + 4    -- a field label (11 px) and its 4 px gap
 local F = S.F
-local win, tabs, current = nil, nil, "upcoming"
+local win, tabs, current = nil, nil, nil
 local pages, ui = {}, {}
 local draft = { day = 0, tank = 1, heal = 1, dps = 3 }
 
@@ -657,14 +729,6 @@ local function List(parent, make)
     function l.HideFrom(i) for j = i, #l.items do l.items[j]:Hide() end end
     return l
 end
--- Anchors a list under the fixed part of a page (y from the page top) down to the page bottom.
-local function PlaceList(l, page, y)
-    l.sa:ClearAllPoints()
-    l.sa:SetPoint("TOPLEFT", page, "TOPLEFT", PAD, -y)
-    l.sa:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -PAD, 12)
-    l.sa.child:SetWidth(CW)
-end
-
 -- A settings row: label 13 on the left, switch on the right, a description on a second line.
 -- The whole row is the click target.
 local function SettingRow(parent, label, desc, get, set, noRule)
@@ -729,10 +793,11 @@ local function EventIcon(title)
 end
 
 -- ---------------------------------------------------------------- the event card
-local function EventCard(parent)
+local function EventCard(parent, width)
     local c = CreateFrame("Frame", nil, parent)
     c.wlOwned = true
-    c:SetWidth(CW)
+    c.w = width or DW
+    c:SetWidth(c.w)
     S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
     S.Border(c, C.cardEdge)
     c.iconFrame = CreateFrame("Frame", nil, c)
@@ -769,7 +834,7 @@ local function EventCard(parent)
     c.cancel:SetIcon("trash")
     c.cancel:SetConfirm(L("Confirmer l'annulation"))
     function c:Fit()
-        local pad, w = 12, CW
+        local pad, w = 12, self.w
         local x = pad + 32 + 8
         local textW = w - x - pad
         local pillW = self.pill:IsShown() and ((Num(self.pill:GetWidth()) or 0) + 8) or 0
@@ -794,16 +859,24 @@ local function EventCard(parent)
             y = y + 4; Place(self.keyWarn, pad, y)
             y = y + S.FitText(self.keyWarn, 0, w - 2 * pad, self)
         end
+        -- two controls side by side when they fit the card, else the second one goes under the first
+        local function Pair(a, b, top)
+            Place(a, pad, top)
+            if not b:IsShown() then return top + 24 end
+            local aw, bw = Num(a:GetWidth()) or 0, Num(b:GetWidth()) or 0
+            if aw + 8 + bw <= w - 2 * pad then
+                b:ClearAllPoints(); b:SetPoint("LEFT", a, "RIGHT", 8, 0)
+                return top + 24
+            end
+            Place(b, pad, top + 24 + 8)
+            return top + 24 + 8 + 24
+        end
         if self.seg:IsShown() then
             y = y + 12; Place(self.segLabel, pad, y); y = y + LBL
-            Place(self.seg, pad, y)
-            self.out:ClearAllPoints(); self.out:SetPoint("LEFT", self.seg, "RIGHT", 8, 0)
-            y = y + 24
+            y = Pair(self.seg, self.out, y)
         end
         if self.invite:IsShown() then
-            y = y + 8; Place(self.invite, pad, y)
-            self.cancel:ClearAllPoints(); self.cancel:SetPoint("LEFT", self.invite, "RIGHT", 8, 0)
-            y = y + 24
+            y = Pair(self.invite, self.cancel, y + 8)
         end
         local h = math.ceil(y + pad)
         self:SetHeight(h)
@@ -895,164 +968,155 @@ local function PaintEvent(c, e)
     return c:Fit()
 end
 
-local function Whisper(name)
-    if ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. name .. " ")
-    elseif ChatFrameUtil and ChatFrameUtil.OpenChat then ChatFrameUtil.OpenChat("/w " .. name .. " ") end
-end
-
 local function AgoText(t)
     local mins = math.max(0, math.floor((time() - (t or time())) / 60))
     if mins < 1 then return L("à l'instant") end
     return string.format(L("il y a %d min"), mins)
 end
+-- read by the Trouver un groupe tab (Writs/Finder.lua): the same words, the same instance lists
+WP.GroupsAgo = AgoText
+WP.GroupsRoleText = RoleText
+WP.GroupInstances = Instances
+-- the guide's keys of an event title "Zul'Farrak + Maraudon" (the names EventIcon matches)
+function WP.EventKeys(title)
+    local out = {}
+    for part in (tostring(title or "") .. " + "):gmatch("(.-)%s+%+%s+") do
+        for _, kind in ipairs({ "dg", "raid" }) do
+            for _, e in ipairs(Instances(kind)) do
+                local d = root.D and root.D[e[1]]
+                if e[2] == part or (d and (d.n == part or d.nf == part)) then out[#out + 1] = e[1] end
+            end
+        end
+    end
+    return out
+end
 
--- A member looking for a group: class icon, name; what for (wraps, the row grows); role, level and
--- since when on the last line. Whisper and Invite on the right.
-local function LookRow(parent)
+-- ---------------------------------------------------------------- an event line of the Agenda list
+-- 240 x 52: the title 13 fg, when 11 muted, the number of sign-ups in a pill at the right (or
+-- "Annulé"). The chosen line is in selFill, no side band. The whole line is the click target.
+local selId                     -- the chosen event, kept for the session
+local RenderUpcoming
+local function EventRow(parent)
     local r = CreateFrame("Button", nil, parent)
     r.wlOwned = true
-    r:SetWidth(CW)
-    r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    r:SetSize(LIST_W, ROW_H)
     r.bg = S.Solid(r, "BACKGROUND", C.cardFill); r.bg:SetAllPoints()
-    r.hl = S.Solid(r, "BORDER", C.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
-    r.press = S.Solid(r, "BORDER", C.pressFill); r.press:SetAllPoints(); r.press:Hide()
-    r.cls = r:CreateTexture(nil, "ARTWORK"); r.cls:SetSize(20, 20); r.cls:SetPoint("TOPLEFT", 8, -8)
-    r.name = S.Text(r, F.label, C.fg)
-    r.what = S.Text(r, F.label, C.text)
-    r.detail = S.Text(r, F.meta, C.muted)
-    r.inv = S.Button(r, L("Inviter"), 0, 24, "secondary", function(self)
-        if r.who then InviteName(r.who); self:Flash(L("Invité")) end
-    end)
-    r.whisper = S.Button(r, L("Chuchoter"), 0, 24, "secondary", function() if r.who then Whisper(r.who) end end)
+    r.sel = S.Solid(r, "BORDER", C.selFill); r.sel:SetAllPoints(); r.sel:Hide()
+    r.hl = S.Solid(r, "ARTWORK", C.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
+    r.press = S.Solid(r, "ARTWORK", C.pressFill); r.press:SetAllPoints(); r.press:Hide()
+    r.title = S.Text(r, F.body, C.fg); r.title:SetWordWrap(false); r.title:SetJustifyH("LEFT")
+    r.when = S.Text(r, F.meta, C.muted); r.when:SetWordWrap(false); r.when:SetJustifyH("LEFT")
+    r.pill = S.Pill(r)
+    r.pill:SetPoint("RIGHT", -12, 0)
     local function Hover(on)
         root.Tween(r, r.hov or 0, on and 1 or 0, 0.10, function(v) r.hov = v; r.hl:SetAlpha(v) end)
     end
-    r:SetScript("OnClick", function(self, button)
-        local who = self.who
-        if not who or who == Me() then return end
-        if button == "RightButton" or IsAltKeyDown() then InviteName(who); r.inv:Flash(L("Invité")) else Whisper(who) end
+    r:SetScript("OnClick", function(self)
+        if not self.e then return end
+        -- another event: its card opens at the top, not where the last one was scrolled
+        if selId ~= self.e.id and ui.detail and ui.detail.sa then ui.detail.sa:ScrollTo(0, true) end
+        selId = self.e.id
+        if RenderUpcoming then RenderUpcoming() end
     end)
     r:SetScript("OnEnter", function(self)
         Hover(true)
-        if not self.l then return end
-        local l = self.l
-        local c = RAID_CLASS_COLORS and l.cls and RAID_CLASS_COLORS[l.cls]
-        local lines = { c and { l.name, c.r, c.g, c.b } or l.name }
-        lines[#lines + 1] = string.format(L("%s, niv. %s"), L(ROLE_LABEL[l.role] or "DPS"), l.lvl or "?")
-        lines[#lines + 1] = (l.what and l.what ~= "") and string.format(L("Pour : %s"), l.what) or L("Pour n'importe quel groupe")
-        if l.name ~= Me() then
-            lines[#lines + 1] = L("Clic : chuchoter")
-            lines[#lines + 1] = L("Clic droit : inviter dans ton groupe")
-        end
+        local e = self.e
+        if not e then return end
+        local lines = { e.title or "?", When(e.when) .. "  ·  " .. string.format(L("par %s"), e.by or "?"),
+            SignupsText(CountSignups(e)) }
+        if e.status ~= "open" then lines[#lines + 1] = { L("Annulé"), C.bad[1], C.bad[2], C.bad[3] } end
+        if selId ~= e.id then lines[#lines + 1] = L("Clic : voir cet événement") end
         S.Tip(self, lines)
     end)
     r:SetScript("OnLeave", function() Hover(false); S.HideTip() end)
     r:SetScript("OnMouseDown", function(self) self.press:Show() end)
     r:SetScript("OnMouseUp", function(self) self.press:Hide() end)
-    local function Out() if not r:IsMouseOver() then Hover(false) end end
-    r.inv:HookScript("OnEnter", function() Hover(true) end)
-    r.whisper:HookScript("OnEnter", function() Hover(true) end)
-    r.inv:HookScript("OnLeave", Out)
-    r.whisper:HookScript("OnLeave", Out)
-    function r:Fit()
-        local right = 12
-        if self.inv:IsShown() then
-            self.inv:ClearAllPoints(); self.inv:SetPoint("RIGHT", -12, 0)
-            self.whisper:ClearAllPoints(); self.whisper:SetPoint("RIGHT", self.inv, "LEFT", -8, 0)
-            right = 12 + (Num(self.inv:GetWidth()) or 72) + 8 + (Num(self.whisper:GetWidth()) or 84) + 12
-        end
-        local textW = math.max(60, CW - 36 - right)
-        Place(self.name, 36, 6)
-        local nh = math.max(F.label, S.FitText(self.name, 1, textW, self))
-        local y = 6 + nh + 3
-        Place(self.what, 36, y)
-        y = y + S.FitText(self.what, 0, textW, self) + 3
-        Place(self.detail, 36, y)
-        y = y + S.FitText(self.detail, 0, textW, self)
-        local h = math.max(36, math.ceil(y + 8))
-        self:SetHeight(h)
-        return h
+    function r:Paint(e, on)
+        self.e = e
+        local cancelled = e.status ~= "open"
+        if cancelled then self.pill:Set(L("Annulé"), C.bad)
+        else self.pill:Set(tostring(CountSignups(e)), nil, "group") end
+        local right = 12 + (Num(self.pill:GetWidth()) or 24) + 8
+        local tw = LIST_W - 12 - right
+        local tc = cancelled and C.muted or C.fg
+        self.title:SetTextColor(tc[1], tc[2], tc[3])
+        self.title:ClearAllPoints(); self.title:SetPoint("TOPLEFT", 12, -11); self.title:SetWidth(tw)
+        self.title:SetText(e.title or "?")
+        S.ClampLabel(self.title, e.title, self)
+        self.when:ClearAllPoints(); self.when:SetPoint("TOPLEFT", 12, -(11 + F.body + 3)); self.when:SetWidth(tw)
+        self.when:SetText(When(e.when))
+        S.ClampLabel(self.when, nil, self)
+        self.sel:SetShown(on and true or false)
+        self.on = on and true or false
     end
     return r
 end
 
 -- ---------------------------------------------------------------- Agenda
-local function RenderUpcoming()
+-- One column of the Agenda: a scroll area at x, `w` wide, from y = 12 down to the page bottom.
+local function PlaceCol(l, page, x, w)
+    l.sa:ClearAllPoints()
+    l.sa:SetPoint("TOPLEFT", page, "TOPLEFT", x, -12)
+    l.sa:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", x, 12)
+    l.sa:SetWidth(w)
+    l.sa.child:SetWidth(w)
+end
+-- the chosen event: the one picked this session while it is listed, else the next open one
+local function Chosen(list)
+    for _, e in ipairs(list) do if e.id == selId then return e end end
+    for _, e in ipairs(list) do if e.status == "open" then selId = e.id; return e end end
+    selId = nil
+    return nil
+end
+function RenderUpcoming()
+    if not (win and win:IsShown() and current == "upcoming") then return end
     local p = pages.upcoming
     local list = WP.EventList()
     if #list == 0 then
-        ui.events.sa:Hide()
+        ui.events.sa:Hide(); ui.detail.sa:Hide(); ui.split:Hide()
         ui.noEvents:Show()
         ui.noEvents:ClearAllPoints(); ui.noEvents:SetPoint("TOP", p, "TOPLEFT", W / 2, -24)
         win:FitHeight(12 + ui.noEvents:Fit())
         return
     end
-    ui.noEvents:Hide(); ui.events.sa:Show()
-    local y = 0
+    ui.noEvents:Hide(); ui.events.sa:Show(); ui.detail.sa:Show(); ui.split:Show()
+    local chosen = Chosen(list)
+    -- the list: one line per event, 2 px apart
+    local listH = 0
     for i, e in ipairs(list) do
-        local c = ui.events.Get(i)
-        local h = PaintEvent(c, e)
-        Place(c, 0, y)
-        y = y + h + 12
+        local r = ui.events.Get(i)
+        r:Paint(e, chosen and e.id == chosen.id)
+        Place(r, 0, listH)
+        listH = listH + ROW_H + 2
     end
+    listH = listH - 2
     ui.events.HideFrom(#list + 1)
-    -- the organizer's invite, accepted by itself: a setting that belongs right under the list
+    -- the detail: the chosen event's card, or one sentence when none is chosen
+    local y = 0
+    if chosen then
+        ui.noPick:Hide()
+        ui.card:Show()
+        local h = PaintEvent(ui.card, chosen)
+        Place(ui.card, 0, 0)
+        y = h + 12
+    else
+        ui.card:Hide()
+        ui.noPick:Show()
+        Place(ui.noPick, 0, 24)
+        y = 24 + S.FitText(ui.noPick, 0, DW, ui.detail.content) + 24
+    end
+    -- the organizer's invite, accepted by itself: a setting that belongs right under the event
     ui.autoRow.switch:Update()
     Place(ui.autoRow, 0, y)
-    y = y + ui.autoRow:Fit(CW)
-    PlaceList(ui.events, p, 12)
-    ui.events.sa:SetContentHeight(y)
-    win:FitHeight(y)
+    y = y + ui.autoRow:Fit(DW)
+    PlaceCol(ui.events, p, PAD, LIST_W)
+    PlaceCol(ui.detail, p, DET_X, DW)
+    ui.events.sa:SetContentHeight(listH)
+    ui.detail.sa:SetContentHeight(y)
+    win:FitHeight(math.max(listH, y))
 end
-
--- ---------------------------------------------------------------- Group now
-local function RenderNow()
-    local p = pages.now
-    ui.lookRow.switch:Update()
-    ui.lookSeg:Update()
-    local y = 12
-    Place(ui.lookRow, PAD, y)
-    y = y + ui.lookRow:Fit(CW) + 12
-    Place(ui.roleLabel, PAD, y); y = y + LBL
-    Place(ui.lookSeg, PAD, y); y = y + 28 + 12
-    y = y + LBL
-    Place(ui.what, PAD, y); y = y + 28 + 16
-    local list = WP.LFGList()
-    -- the header names the list; with nobody in it, the empty state alone says so
-    ui.lookHead:SetShown(#list > 0)
-    if #list > 0 then
-        ui.lookHead:SetWidth(CW)
-        ui.lookHead:Set(L("Membres qui cherchent un groupe"), #list)
-        Place(ui.lookHead, PAD, y); y = y + 32 + 8
-    end
-    local listH = 0
-    for i, l in ipairs(list) do
-        local r = ui.looking.Get(i)
-        r.who, r.l = l.name, l
-        if not S.ClassIcon(r.cls, l.cls) then r.cls:Hide() else r.cls:Show() end
-        r.name:SetText(ClassHex(l.cls) .. l.name .. "|r" .. (l.name == Me() and (" " .. S.Hex(C.muted) .. L("(toi)") .. "|r") or ""))
-        r.what:SetText((l.what and l.what ~= "") and string.format(L("Pour : %s"), l.what) or L("Pour n'importe quel groupe"))
-        r.detail:SetText(RoleText(l.role, 12) .. "  ·  " .. string.format(L("niv. %s"), l.lvl or "?") .. "  ·  " .. AgoText(l.t))
-        local other = l.name ~= Me()
-        r.whisper:SetShown(other); r.inv:SetShown(other)
-        local h = r:Fit()
-        Place(r, 0, listH)
-        listH = listH + h + 2
-    end
-    ui.looking.HideFrom(#list + 1)
-    if #list > 0 then listH = listH - 2 end
-    ui.noLooking:SetShown(#list == 0)
-    if #list == 0 then
-        ui.noLooking:ClearAllPoints(); ui.noLooking:SetPoint("TOP", p, "TOPLEFT", W / 2, -(y + 4))
-        PlaceList(ui.looking, p, y)
-        ui.looking.sa:SetContentHeight(0)
-        win:FitHeight(y - 12 + 4 + ui.noLooking:Fit())
-        return
-    end
-    PlaceList(ui.looking, p, y)
-    ui.looking.sa:SetContentHeight(listH)
-    win:FitHeight(y - 12 + listH)
-end
+-- the event shown on the right of the Agenda (read by the tests)
+function WP.EventsSelected() return selId end
 
 -- Today, Tomorrow, then "sam. 21" (the day of the month avoids doubts); short: the day name alone
 local function DayChoices(short)
@@ -1115,7 +1179,7 @@ end
 -- Cards with the loading-screen art of the guide's picker, two columns, several can be ticked.
 -- The choice is kept aside (sel) until the main button: closing the window changes nothing.
 local PGAP = 8
-local PCW = math.floor((CW - PGAP) / 2)   -- two cards across the content width
+local PCW = math.floor((PCWW - PGAP) / 2)   -- two cards across the picker's content width
 local PCH = 88
 local picker
 local sel = {}
@@ -1174,7 +1238,7 @@ local function PickCard(parent)
 end
 
 local function BuildPicker()
-    local f = S.Window("WLHelperEventsPicker", W, 420, L("Choisir les donjons"), nil, nil, nil,
+    local f = S.Window("WLHelperEventsPicker", PW, 420, L("Choisir les donjons"), nil, nil, nil,
         { header = S.HEADER_H, minH = 240, strata = "DIALOG", noHome = true })
     f:EnableMouse(true)
     f.hint = S.Text(f, F.label, C.muted)
@@ -1262,7 +1326,7 @@ function WP.OpenEventPicker()
             hi = hi + 1
             local h = picker.heads[hi]
             if not h then h = S.SectionHeader(picker.content, "", nil, nil, nil, true); picker.heads[hi] = h end
-            h:SetWidth(CW)
+            h:SetWidth(PCWW)
             if pi > 1 then y = y + 8 end
             Place(h, 0, y)
             h:Set(part[1], #part[2]); h:Show()
@@ -1293,13 +1357,13 @@ function WP.OpenEventPicker()
     -- the window: hint, the grid (scrolls past the height cap), the bar
     local top = S.HEADER_H + 1 + 12
     Place(picker.hint, PAD, top)
-    local hh = S.FitText(picker.hint, 2, CW, picker)
+    local hh = S.FitText(picker.hint, 2, PCWW, picker)
     local gridTop = top + hh + 12
     local barH = 12 + 1 + 12 + 28
     picker.sa:ClearAllPoints()
     picker.sa:SetPoint("TOPLEFT", picker, "TOPLEFT", PAD, -gridTop)
     picker.sa:SetPoint("BOTTOMRIGHT", picker, "BOTTOMRIGHT", -PAD, barH + 12)
-    picker.content:SetWidth(CW)
+    picker.content:SetWidth(PCWW)
     picker.sa:SetContentHeight(y)
     picker.UpdateOk()
     if win then picker:ClearAllPoints(); picker:SetPoint("TOP", win, "TOP", 0, -24) end
@@ -1355,7 +1419,7 @@ local function BuildCreate(p)
     -- the kind
     ui.kindLabel = FieldLabel(p, L("Type"))
     -- dungeon or raid: one button opens the picker with the pictures
-    ui.pick = S.Button(p, "", CW, 32, "secondary", function() WP.OpenEventPicker() end, function()
+    ui.pick = S.Button(p, "", FW, 32, "secondary", function() WP.OpenEventPicker() end, function()
         local names = PickedNames()
         local lines = { draft.kind == "raid" and L("Choisir les raids") or L("Choisir les donjons") }
         for _, n in ipairs(names) do lines[#lines + 1] = n end
@@ -1379,11 +1443,11 @@ local function BuildCreate(p)
         local names = PickedNames()
         local lb = ui.pick.label
         if #names == 0 then
-            lb:SetWidth(CW - 36 - 34); lb:SetWordWrap(false)
+            lb:SetWidth(FW - 36 - 34); lb:SetWordWrap(false)
             lb:SetText(draft.kind == "raid" and L("Choisir les raids") or L("Choisir les donjons"))
             S.Painted(ui.pick.thing, draft.kind == "raid" and "Interface\\Icons\\INV_Misc_Head_Dragon_01" or "Interface\\Icons\\INV_Misc_Map_01")
         else
-            FitNames(lb, names, CW - 36 - 34)
+            FitNames(lb, names, FW - 36 - 34)
             local first
             for _, e in ipairs(Instances(draft.kind)) do if picked[e[1]] then first = e[1]; break end end
             local d = first and root.D and root.D[first]
@@ -1419,7 +1483,7 @@ local function BuildCreate(p)
             Relayout()
         end, 28)
     -- the name
-    ui.title = S.Input(p, CW, { label = L("Nom de l'événement"), placeholder = L(PLACEHOLDER[draft.kind]),
+    ui.title = S.Input(p, FW, { label = L("Nom de l'événement"), placeholder = L(PLACEHOLDER[draft.kind]),
         onChange = function() ui.title:SetError(nil); Recap(); Relayout() end })
     ui.title:SetMaxLetters(60)
     -- the day
@@ -1434,12 +1498,13 @@ local function BuildCreate(p)
         ui.dayBuiltFor = today
         if ui.day then ui.day:Hide() end
         ui.day = S.Segmented(p, DayChoices(), function() return draft.day end, DaySet, 28)
-        if (Num(ui.day:GetWidth()) or 0) > CW then
+        -- as wide as the form's other fields at most (FW), its right edge in line with theirs
+        if (Num(ui.day:GetWidth()) or 0) > FW then
             -- the day numbers do not fit seven times: the day names alone
             ui.day:Hide()
             ui.day = S.Segmented(p, DayChoices(true), function() return draft.day end, DaySet, 28)
         end
-        ui.day:SetMaxWidth(CW)
+        ui.day:SetMaxWidth(FW)
         ui.day:Update()
     end
     ui.MakeDay()
@@ -1467,7 +1532,7 @@ local function BuildCreate(p)
         ui["n_" .. role] = b
     end
     -- the note
-    ui.note = S.Input(p, CW, { label = L("Note (facultatif)"), placeholder = L("Ex. niveau 45 minimum, rendez-vous à Gadgetzan") })
+    ui.note = S.Input(p, FW, { label = L("Note (facultatif)"), placeholder = L("Ex. niveau 45 minimum, rendez-vous à Gadgetzan") })
     ui.note:SetMaxLetters(120)
     ui.recap = S.Text(p, F.label, C.text)
     ui.go = S.Button(p, L("Publier l'événement"), 0, 32, "primary", function()
@@ -1483,7 +1548,12 @@ local function BuildCreate(p)
         end
         if bad then Relayout(); return end
         local function N(role) return tonumber(ui["n_" .. role]:GetText()) or 0 end
-        WP.CreateEvent(title, when, N("tank"), N("heal"), N("dps"), ui.note:GetText())
+        local made = WP.CreateEvent(title, when, N("tank"), N("heal"), N("dps"), ui.note:GetText())
+        -- the Agenda opens on the event just published, at the top of its card
+        if made then
+            selId = made.id
+            if ui.detail and ui.detail.sa then ui.detail.sa:ScrollTo(0, true) end
+        end
         ui.title:SetText(""); ui.note:SetText(""); wipe(picked); lastBuilt = ""; PickUpdate()
         ui.title:SetError(nil); ui.hour:SetError(nil)
         placesTouched = false
@@ -1493,7 +1563,7 @@ local function BuildCreate(p)
     -- an error sentence under a narrow field spans the whole form
     local function ErrH(box)
         if not box.err:IsShown() then return 0 end
-        return 4 + S.FitText(box.err, 0, CW, box)
+        return 4 + S.FitText(box.err, 0, FW, box)
     end
     function ui.LayoutCreate()
         local y = 12
@@ -1515,7 +1585,7 @@ local function BuildCreate(p)
         if recap and recap ~= "" then
             ui.recap:Show()
             Place(ui.recap, PAD, y)
-            y = y + S.FitText(ui.recap, 2, CW, p) + 8
+            y = y + S.FitText(ui.recap, 2, FW, p) + 8
         else
             ui.recap:Hide()
         end
@@ -1527,66 +1597,84 @@ local function BuildCreate(p)
     Recap()
 end
 
--- ---------------------------------------------------------------- Group now
-local function BuildNow(p)
-    ui.lookRow = SettingRow(p, L("Je cherche un groupe"),
-        L("Les membres qui ont WL Helper te voient dans leur liste. Ta recherche s'arrête seule quand ton groupe est complet."),
-        function() return WP.IsLooking() ~= nil end,
-        function(v) if v then WP.SetLooking(MyRole(), ui.what:GetText()) else WP.SetLooking(nil) end end, true)
-    ui.roleLabel = FieldLabel(p, L("Mon rôle"))
-    ui.lookSeg = S.Segmented(p, { { "tank", RoleText("tank", 14) }, { "heal", RoleText("heal", 14) }, { "dps", RoleText("dps", 14) } },
-        function() return MyRole() end, function(v)
-            WLWritsCharDB.lfgRole = v
-            if WP.IsLooking() then WP.SetLooking(v, ui.what:GetText()) end
-        end, 28)
-    ui.what = S.Input(p, CW, { label = L("Pour quoi ?"), placeholder = L("Ex. Zul'Farrak, quêtes des Maleterres"),
-        onEnter = function(text) if WP.IsLooking() then WP.SetLooking(MyRole(), text) end end })
-    ui.what:SetMaxLetters(80)
-    -- the text counts without Enter too (only sent when it changed)
-    ui.what:HookScript("OnEditFocusLost", function(self)
-        if WP.IsLooking() then
-            local _, w = WP.IsLooking()
-            if (w or "") ~= Clean(self:GetText(), 80) then WP.SetLooking(MyRole(), self:GetText()) end
-        end
-    end)
-    ui.lookHead = S.SectionHeader(p, L("Membres qui cherchent un groupe"))
-    ui.looking = List(p, LookRow)
-    ui.noLooking = S.EmptyState(p, "group", L("Personne ne cherche de groupe"),
-        L("Quand un membre allume « Je cherche un groupe », il apparaît ici avec son rôle."))
-    ui.noLooking:Hide()
+local function InfoTip()
+    return { L("Groupes"), L("Seuls les membres qui ont WL Helper voient les événements et les recherches de groupe."),
+        L("Trouver un groupe n'envoie un message privé que quand tu cliques sur Demander à rejoindre ou Inviter, avec le texte montré dans la bulle.") }
 end
 
-local function InfoTip()
-    return { L("LFG"), L("Seuls les membres qui ont WL Helper voient les événements et les recherches de groupe."),
-        L("WL Helper n'envoie jamais de message privé : tout passe par le canal de la guilde.") }
+-- Tabs other files add before Agenda and Créer (WP.RegisterGroupTab, before the window is built):
+-- def = { key, label (a French L() key), order, build(page, win), render(), badge() -> n, urgent }.
+-- render() draws the tab and fits the window (win:FitHeight). Agenda is 40, Créer 50.
+local extraTabs = {}
+function WP.RegisterGroupTab(def)
+    if type(def) ~= "table" or type(def.key) ~= "string" then return end
+    for i, d in ipairs(extraTabs) do if d.key == def.key then extraTabs[i] = def; return end end
+    extraTabs[#extraTabs + 1] = def
+end
+local function TabDef(k) for _, d in ipairs(extraTabs) do if d.key == k then return d end end end
+-- old names: "now" (Groupe maintenant) became Trouver un groupe
+local ALIAS = { now = "find" }
+local function Resolve(k)
+    k = ALIAS[k] or k
+    if k == "upcoming" or k == "create" then return k end
+    if k and TabDef(k) then return k end
+    return TabDef("find") and "find" or "upcoming"
 end
 
 local function Build()
-    win = S.Window("WLHelperEvents", W, 480, L("LFG"), GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "eventsPos",
+    win = S.Window("WLHelperEvents", W, 480, L("Groupes"), GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "eventsPos",
         { header = S.HEADER_H, minH = 240 })
     win:AddHeaderButton(S.IconButton(win.header, "info", 28, InfoTip))
-    tabs = S.Tabs(win, { { "upcoming", L("Agenda") }, { "create", L("Créer") }, { "now", L("Groupe maintenant") } },
+    local defs = {}
+    for _, d in ipairs(extraTabs) do defs[#defs + 1] = d end
+    defs[#defs + 1] = { key = "upcoming", label = "Agenda", order = 40 }
+    defs[#defs + 1] = { key = "create", label = "Créer", order = 50 }
+    table.sort(defs, function(a, b) return (a.order or 0) < (b.order or 0) end)
+    local list = {}
+    for _, d in ipairs(defs) do list[#list + 1] = { d.key, L(d.label) } end
+    tabs = S.Tabs(win, list,
         function() return current end, function(k) WP.ShowEventsTab(k) end, function(k)
             if k == "upcoming" then local n = #WP.EventList(); return n > 0 and n or nil end
-            if k == "now" then local n = WP.LFGCount(true); return n > 0 and n or nil end
+            local d = TabDef(k)
+            if d and d.badge then
+                local ok, n, urgent = pcall(d.badge)
+                if ok and type(n) == "number" and n > 0 then return n, urgent end
+            end
         end)
     tabs:SetPoint("TOPLEFT", 0, -(S.HEADER_H + 1)); tabs:SetPoint("TOPRIGHT", 0, -(S.HEADER_H + 1))
-    for _, k in ipairs({ "upcoming", "create", "now" }) do
+    for _, d in ipairs(defs) do
         local p = CreateFrame("Frame", nil, win)
         p:SetPoint("TOPLEFT", 0, -win:ContentTop()); p:SetPoint("BOTTOMRIGHT")
-        p:Hide(); pages[k] = p
+        p:Hide(); pages[d.key] = p
     end
-    -- Agenda
-    ui.events = List(pages.upcoming, EventCard)
+    -- Agenda: the list on the left, a 1 px rule, the chosen event on the right
+    ui.events = List(pages.upcoming, EventRow)
+    ui.detail = List(pages.upcoming, function(parent) return EventCard(parent, DW) end)
+    ui.card = ui.detail.Get(1)
+    ui.split = S.Solid(pages.upcoming, "BORDER", C.divider)
+    ui.split:SetPoint("TOPLEFT", RULE_X, -12); ui.split:SetPoint("BOTTOMLEFT", RULE_X, 12); ui.split:SetWidth(1)
+    if root.PixelLine then root.PixelLine(pages.upcoming, ui.split, false) end
+    ui.noPick = S.Text(ui.detail.content, F.label, C.muted)
+    ui.noPick:SetWordWrap(true); ui.noPick:SetJustifyH("CENTER")
+    ui.noPick:SetText(L("Choisis un événement à gauche."))
+    ui.noPick:Hide()
     ui.noEvents = S.EmptyState(pages.upcoming, "calendar", L("Aucun événement prévu"),
         L("Les donjons et raids prévus par la guilde apparaîtront ici."), L("Créer un événement"),
         function() WP.ShowEventsTab("create") end, "primary")
     ui.noEvents:Hide()
-    ui.autoRow = SettingRow(ui.events.content, L("Accepter l'invitation de l'organisateur"),
+    ui.autoRow = SettingRow(ui.detail.content, L("Accepter l'invitation de l'organisateur"),
         L("Quand tu es inscrit, son invitation est acceptée pour toi, de 30 min avant le début à 30 min après."),
         function() return WLWritsDB.eventsAutoAccept ~= false end, function(v) WLWritsDB.eventsAutoAccept = v end)
     BuildCreate(pages.create)
-    BuildNow(pages.now)
+    for _, d in ipairs(extraTabs) do
+        if d.build then
+            local ok, err = pcall(d.build, pages[d.key], win)
+            if not ok then
+                -- a tab that failed to build is left out, the rest of the window works
+                if WP.Print then WP.Print("Groupes: " .. tostring(err), true) end
+            end
+        end
+    end
     -- the picker belongs to the Create tab: it goes when the tab or the window goes
     pages.create:HookScript("OnHide", function() if picker then picker:Hide() end end)
     win:HookScript("OnHide", function() if picker then picker:Hide() end end)
@@ -1595,28 +1683,44 @@ end
 
 function WP.ShowEventsTab(k)
     if not win then Build() end
-    current = k
-    for key, pg in pairs(pages) do pg:SetShown(key == k) end
+    current = Resolve(k or current)
+    for key, pg in pairs(pages) do pg:SetShown(key == current) end
     win.subtitle:SetText(GetGuildInfo and GetGuildInfo("player") or "")
     win:Show(); win:Raise()
     WP.RefreshEvents()
     -- wrapped text measures right only once its width is applied: once more on the next frame
     if C_Timer and C_Timer.After then C_Timer.After(0, function() WP.RefreshEvents() end) end
 end
+-- the tab shown (or shown last), the window; read by the other tabs and the tests
+function WP.EventsTab() return current end
+function WP.GroupsWindow() return win end
 function WP.RefreshEvents()
     if not (win and win:IsShown()) then return end
     tabs:Update()
+    local d = TabDef(current)
     if current == "upcoming" then RenderUpcoming()
-    elseif current == "now" then RenderNow()
+    elseif d then
+        if d.render then d.render() end
     elseif ui.LayoutCreate then
         if ui.MakeDay and ui.dayBuiltFor ~= DayStart(time()) then ui.MakeDay(); if ui.recapNow then ui.recapNow() end end
         win:FitHeight(ui.LayoutCreate())
     end
 end
-function WP.ToggleEvents()
-    if win and win:IsShown() then win:Hide(); return end
+-- k: the tab to open (/wlh lfg -> "find", /wlh agenda -> "upcoming"); nil: the last one shown.
+-- Open on another tab: that tab; open on the same tab (or no tab given): closes.
+function WP.ToggleEvents(k)
+    if win and win:IsShown() and (k == nil or Resolve(k) == current) then win:Hide(); return end
     if WP.ModuleOff and WP.ModuleOff("events") then return end
-    WP.ShowEventsTab(current)
+    WP.ShowEventsTab(k or current)
+end
+-- the Agenda on one event (Home's "Voir l'événement"): always opens, never toggles closed
+function WP.ShowEvent(id)
+    if WP.ModuleOff and WP.ModuleOff("events") then return end
+    if id and id ~= selId then
+        selId = id
+        if ui.detail and ui.detail.sa then ui.detail.sa:ScrollTo(0, true) end
+    end
+    WP.ShowEventsTab("upcoming")
 end
 function WP.HideEvents() if win then win:Hide() end end
 -- the title typed or built from the picker (read by the tests)

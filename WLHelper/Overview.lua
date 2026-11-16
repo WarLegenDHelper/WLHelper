@@ -1,8 +1,8 @@
 -- Résumé d'un ou plusieurs donjons : le premier écran quand tu lances une route depuis le choix des
 -- donjons, et la vue d'ensemble d'un donjon (bouton de la carte, clic droit, bouton du guide).
 -- Pour chaque donjon, trois questions dans l'ordre : où est-ce, puis-je y aller, qu'est-ce que j'y
--- gagne. L'image du donjon (nom, « Conseillé niv. 38 à 48 · Groupe de 5 · tu es niv. 41 »), puis une
--- liste de faits sans icône, libellé à gauche et valeur à droite : Entrée (avec son GPS), Clé, Avant
+-- gagne. L'image du donjon (nom, « Conseillé niv. 38 à 48 · Groupe de 5 · tu es niv. 41 »), puis des
+-- blocs titrés (titre doré au-dessus, texte dessous, DESIGN 3.21) : Entrée (avec son GPS), Clé, Avant
 -- d'entrer (les quêtes à prendre dehors, chacune avec son GPS) et Tu gagnes (quêtes cochées, XP et
 -- part d'un niveau, argent, objets). Puis « Quêtes à faire » : une carte par quête, toujours dans le
 -- même ordre. Le nom (blanc) et, à droite, l'XP que tu recevras vraiment à ton niveau (grisée quand
@@ -106,6 +106,7 @@ local STR = {
     SUM_RDY_AFTER = "après « %s »", SUM_RDY_MORE1 = "et %d autre", SUM_RDY_MORE = "et %d autres",
     SUM_ST_TAKE = "À prendre", SUM_ST_TAKE_TT = "Elle se prend dehors : prends-la avant d'entrer dans le donjon.",
     SUM_ST_IN = "À prendre dedans", SUM_ST_IN_TT = "Elle se prend dans le donjon : rien à faire avant d'entrer.",
+    SUM_LINK_UNFOLD = "Clic : afficher la description", SUM_LINK_FOLD = "Clic : replier la description",
   },
   en = {
     SUM_T = "Overview", SUM_ROUTE_T = "Route overview", SUM_DG1 = "%d dungeon", SUM_DG = "%d dungeons",
@@ -187,6 +188,7 @@ local STR = {
     SUM_RDY_AFTER = "after \"%s\"", SUM_RDY_MORE1 = "and %d more", SUM_RDY_MORE = "and %d more",
     SUM_ST_TAKE = "To pick up", SUM_ST_TAKE_TT = "Given outside: pick it up before you go into the dungeon.",
     SUM_ST_IN = "To pick up inside", SUM_ST_IN_TT = "You get it inside the dungeon: nothing to do before you go in.",
+    SUM_LINK_UNFOLD = "Click: show the description", SUM_LINK_FOLD = "Click: fold the description",
   },
 }
 do
@@ -213,7 +215,6 @@ local RW_SIZE, RW_STEP = 32, 48   -- a reward icon, and icon + gap (the "+12 %" 
 local RW_LABEL = 17               -- the line under an icon: arrow and gain
 local HIGH_GAP = 5              -- a chain more than 5 levels above the player is unticked by default
 local XPCOL = 88                -- the XP and money column at the right of a quest card
-local FX = 112                  -- the value column of the facts list (labels at 0, 100 wide)
 
 local function SW()
   local S = ns.Writs and ns.Writs.S
@@ -1161,26 +1162,44 @@ local function FillCell(c, m, qid, dkey)
   c.tip = tip
 end
 
--- One link of an unfolded chain: name, level, XP and its state in words; where it happens.
-local LINK_X = 8
+-- One link of an unfolded chain, as a timeline (T-69): a numbered dot on a line that joins the
+-- links (the current one in the accent), the quest's name and its state on one line, one muted line
+-- "NPC · zone · lvl N · X XP"; its description (objective, note, places with their GPS) folds
+-- behind a click.
+local LINK_X = 26          -- text column, after the dot
+local DOT = 16             -- the numbered dot
+local LINK_GAP = 6         -- between two links
+local DISC = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local function MakeLink(parent)
   local b = CreateFrame("Button", nil, parent)
   b.wlOwned = true
   b.hl = ns.Tex(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:Hide()
   b.press = ns.Tex(b, "BORDER", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
-  b.name = ns.Text(b, ns.F.meta, T.text); b.name:SetPoint("TOPLEFT", LINK_X, -3)
+  -- the line behind the dots (2 px), then the dot and its number
+  b.rail = b:CreateTexture(nil, "BORDER", nil, 1); b.rail:SetWidth(2)
+  b.dot = b:CreateTexture(nil, "ARTWORK"); b.dot:SetTexture(DISC); b.dot:SetSize(DOT, DOT); b.dot:SetPoint("TOPLEFT", 0, -1)
+  b.num = ns.Text(b, ns.F.foot, T.fg, false); b.num:SetPoint("CENTER", b.dot, "CENTER", 0, 0); b.num:SetJustifyH("CENTER")
+  b.chev = ns.Icon(b, "chevron_right", 12, "ARTWORK", T.muted); b.chev:SetPoint("TOPRIGHT", -2, -3)
+  b.name = ns.Text(b, ns.F.meta, T.text); b.name:SetPoint("TOPLEFT", LINK_X, -2)
+  b.facts = ns.Text(b, ns.F.meta, T.muted)
   b.where = ns.Text(b, ns.F.meta, T.muted)
   b.ne = ns.Text(b, ns.F.meta, T.text)
   b.note = ns.Text(b, ns.F.meta, T.muted)
   b.objs = {}
   b:SetScript("OnEnter", function(self)
-    if self.point then self.hl:Show() end
+    if self.more then self.hl:Show() end
     if self.tip then ns.ShowTip(self, self.tip) end
   end)
   b:SetScript("OnLeave", function(self) self.hl:Hide(); self.press:Hide(); ns.HideTip() end)
-  b:SetScript("OnMouseDown", function(self) if self.point then self.press:Show() end end)
+  b:SetScript("OnMouseDown", function(self) if self.more then self.press:Show() end end)
   b:SetScript("OnMouseUp", function(self) self.press:Hide() end)
-  b:SetScript("OnClick", function(self) if self.point then GoPoint(self.point) end end)
+  b:SetScript("OnClick", function(self)
+    if not (self.more and self.qid and f) then return end
+    f.linkOpen = f.linkOpen or {}
+    f.linkOpen[self.qid] = not f.linkOpen[self.qid] or nil
+    ns.HideTip()
+    Render()
+  end)
   return b
 end
 
@@ -1617,84 +1636,132 @@ local function FillRow(r, qid, dkey, inf, ctx)
     y = y + 6 + th + 2
   else r.chain:Hide() end
 
-  -- the unfolded chain, right under its line: one line per link (and the quest itself)
+  -- the unfolded chain, right under its line: a timeline, one link per quest (and the quest itself)
   local li = 0
   if hasChain and f.open[qid] then
-    y = y + 4
+    y = y + 8
     local ids = {}
-    for _, pid in ipairs(pre.chain) do ids[#ids + 1] = pid end
-    ids[#ids + 1] = qid
-    local lw = wide - LINK_X
-    for _, id in ipairs(ids) do
+    for _, pid in ipairs(pre.chain) do if ns.Q[pid] then ids[#ids + 1] = pid end end
+    if ns.Q[qid] then ids[#ids + 1] = qid end
+    local lw = wide - LINK_X - 16
+    -- the current link: the first one not turned in
+    local curId
+    for _, id in ipairs(ids) do if QState(log, id) ~= "done" then curId = id break end end
+    f.linkOpen = f.linkOpen or {}
+    for k, id in ipairs(ids) do
       local lq = ns.Q[id]
-      if lq then
-        li = li + 1
-        local b = r.links[li] or MakeLink(r); r.links[li] = b
-        local ls = QState(log, id)
-        local parts = { ns.QName(id) .. (id == qid and (" (" .. L.OV_THIS .. ")") or "") }
-        if lq.l then parts[#parts + 1] = L.SUM_LINK_LV:format(lq.l) end
-        local xp = XPFor(id, ctx.lvl)
-        if xp > 0 then parts[#parts + 1] = L.SUM_XP:format(Big(xp)) end
-        local wc = (ls == "none" and not off) and T.warn or T[LINK_COLOR[ls] or "muted"] or T.muted
-        parts[#parts + 1] = ns.Hex(wc) .. L[LINK_WORD[ls] or LINK_WORD.none] .. "|r"
-        b.name:SetText(table.concat(parts, " · "))
-        local tc = ls == "done" and T.muted or T.text
-        b.name:SetTextColor(tc[1], tc[2], tc[3])
-        local bh = 3 + LineH(b.name, ns.F.meta, lw, b)
-        -- where and what, for a link not turned in yet: giver / objective, and the FDJ note
-        local where, note = nil, nil
-        if ls ~= "done" then
-          local w = {}
-          local g = GiverText(lq, ls); if g then w[#w + 1] = g end
-          local o = ObjText(lq); if o then w[#w + 1] = o end
-          where = #w > 0 and table.concat(w, " · ") or nil
-          local fn = FDJNote(id)
-          if fn then note = L.SUM_FDJ .. L.COLON .. fn end
-        end
-        if where then
-          b.where:SetText(where); b.where:ClearAllPoints(); b.where:SetPoint("TOPLEFT", LINK_X, -(bh + 3)); b.where:Show()
-          bh = bh + 3 + LineH(b.where, ns.F.meta, lw, b, 3)
-        else b.where:Hide() end
-        -- the data's note says how and where (3 lines; all of it in the tooltip)
-        local ne = ls ~= "done" and lq.ne and ns.T(lq.ne) or nil
-        if ne then
-          b.ne:SetText(ne); b.ne:ClearAllPoints(); b.ne:SetPoint("TOPLEFT", LINK_X, -(bh + 3)); b.ne:Show()
-          bh = bh + 3 + LineH(b.ne, ns.F.meta, lw, b, 3)
-        else b.ne:Hide() end
-        -- each place of an objective outside, with its GPS
-        local oi = 0
-        if ls == "on" or ls == "none" then
-          for _, pl in ipairs(OutsidePlaces(log, id, lq)) do
-            oi = oi + 1
-            local ol = b.objs[oi] or MakeObjLine(b); b.objs[oi] = ol
-            ol.text:SetText(pl.text)
-            ol.point = pl.point
-            local oh = LineH(ol.text, ns.F.meta, lw - 16, ol)
-            ol:SetSize(lw, oh + 2)
-            ol:ClearAllPoints(); ol:SetPoint("TOPLEFT", b, "TOPLEFT", LINK_X, -(bh + 3))
-            ol:Show()
-            bh = bh + 3 + oh + 2
-          end
-        end
-        for k = oi + 1, #b.objs do b.objs[k]:Hide() end
-        if note then
-          b.note:SetText(note); b.note:ClearAllPoints(); b.note:SetPoint("TOPLEFT", LINK_X, -(bh + 3)); b.note:Show()
-          bh = bh + 3 + LineH(b.note, ns.F.meta, lw, b, 3)
-        else b.note:Hide() end
-        bh = bh + 4
-        b.point = (ls ~= "done") and (PointOf(log, id, lq, ls) or FDJPoint(id, ns.QName(id))) or nil
-        local tip = { ns.QName(id) }
-        local o = ObjText(lq); if o then tip[#tip + 1] = o end
-        local steps = LibSteps(id)
-        if steps then tip[#tip + 1] = { L.SUM_LFD, T.fg[1], T.fg[2], T.fg[3] }; for _, s in ipairs(steps) do tip[#tip + 1] = "- " .. s end end
-        if lq.ne then tip[#tip + 1] = ns.T(lq.ne) end
-        if b.point then tip[#tip + 1] = L.OV_ROW_CLICK:format(b.point[4] or "") end
-        b.tip = tip
-        b:SetSize(wide, bh)
-        b:ClearAllPoints(); b:SetPoint("TOPLEFT", r, "TOPLEFT", TX, -y)
-        b:Show()
-        y = y + bh
+      li = li + 1
+      local b = r.links[li] or MakeLink(r); r.links[li] = b
+      b.qid = id
+      local ls = QState(log, id)
+      local cur = (id == curId)
+      -- the dot: done = faint, current = accent, to come = the line's grey; its number
+      local dc = cur and T.accent or (ls == "done" and T.faint) or T.trackOff
+      b.dot:SetVertexColor(dc[1], dc[2], dc[3], 1)
+      b.num:SetText(tostring(k))
+      -- dark figure on the faint (done) dot: muted on faint was ~1.7:1, unreadable
+      local nc = (ls == "done" and not cur) and T.bg or T.fg
+      b.num:SetTextColor(nc[1], nc[2], nc[3])
+      -- line 1: the name and its state
+      local wc = (ls == "none" and not off) and T.warn or T[LINK_COLOR[ls] or "muted"] or T.muted
+      b.name:SetText(ns.QName(id) .. (id == qid and (" (" .. L.OV_THIS .. ")") or "") .. " · "
+        .. ns.Hex(wc) .. L[LINK_WORD[ls] or LINK_WORD.none] .. "|r")
+      local tc = cur and T.fg or (ls == "done" and T.muted) or T.text
+      b.name:SetTextColor(tc[1], tc[2], tc[3])
+      b.name:SetWidth(lw)
+      local bh = 2 + LineH(b.name, ns.F.meta, lw, b)
+      -- line 2, muted: NPC · zone · lvl N · X XP
+      local fl = {}
+      local gs = (ls == "ready" and lq.f) or lq.s
+      if type(gs) == "table" then
+        if gs.n then fl[#fl + 1] = ns.T(gs.n) end
+        if gs.i then fl[#fl + 1] = L.OV_IN_DG
+        elseif gs.m then local z = ZoneName(gs.m); if z ~= "" then fl[#fl + 1] = z end end
       end
+      if lq.l then fl[#fl + 1] = L.SUM_LINK_LV:format(lq.l) end
+      local xp = XPFor(id, ctx.lvl)
+      if xp > 0 then fl[#fl + 1] = L.SUM_XP:format(Big(xp)) end
+      if #fl > 0 then
+        b.facts:SetText(table.concat(fl, " · ")); b.facts:ClearAllPoints(); b.facts:SetPoint("TOPLEFT", LINK_X, -(bh + 2)); b.facts:Show()
+        bh = bh + 2 + LineH(b.facts, ns.F.meta, lw, b, 2)
+      else b.facts:Hide() end
+      -- the description, folded: giver or objective, the data's note, each place outside with its
+      -- GPS, the FDJ note
+      local where, note, ne, places = nil, nil, nil, {}
+      if ls ~= "done" then
+        local w = {}
+        local g = GiverText(lq, ls); if g then w[#w + 1] = g end
+        local o = ObjText(lq); if o then w[#w + 1] = o end
+        where = #w > 0 and table.concat(w, " · ") or nil
+        local fn = FDJNote(id)
+        if fn then note = L.SUM_FDJ .. L.COLON .. fn end
+        ne = lq.ne and ns.T(lq.ne) or nil
+        if ls == "on" or ls == "none" then places = OutsidePlaces(log, id, lq) end
+      end
+      local point = (ls ~= "done") and (PointOf(log, id, lq, ls) or FDJPoint(id, ns.QName(id))) or nil
+      b.point = point
+      b.more = (where or ne or note or point or #places > 0) and true or false
+      local open = b.more and f.linkOpen[id] and true or false
+      b.chev:SetShown(b.more)
+      if b.more then ns.SetHDIcon(b.chev, open and "chevron_down" or "chevron_right", T.muted) end
+      if open and where then
+        b.where:SetText(where); b.where:ClearAllPoints(); b.where:SetPoint("TOPLEFT", LINK_X, -(bh + 4)); b.where:Show()
+        bh = bh + 4 + LineH(b.where, ns.F.meta, lw, b, 3)
+      else b.where:Hide() end
+      if open and ne then
+        b.ne:SetText(ne); b.ne:ClearAllPoints(); b.ne:SetPoint("TOPLEFT", LINK_X, -(bh + 4)); b.ne:Show()
+        bh = bh + 4 + LineH(b.ne, ns.F.meta, lw, b, 6)
+      else b.ne:Hide() end
+      local oi = 0
+      if open then
+        for _, pl in ipairs(places) do
+          oi = oi + 1
+          local ol = b.objs[oi] or MakeObjLine(b); b.objs[oi] = ol
+          ol.text:SetText(pl.text)
+          ol.point = pl.point
+          local oh = LineH(ol.text, ns.F.meta, lw - 16, ol)
+          ol:SetSize(lw, oh + 2)
+          ol:ClearAllPoints(); ol:SetPoint("TOPLEFT", b, "TOPLEFT", LINK_X, -(bh + 4))
+          ol:Show()
+          bh = bh + 4 + oh + 2
+        end
+      end
+      for j = oi + 1, #b.objs do b.objs[j]:Hide() end
+      -- the giver (or where to turn it in), with its GPS
+      if open and point then
+        local gl = b.gpsLine or MakeObjLine(b); b.gpsLine = gl
+        gl.text:SetText(L.OV_GPS_T:format(point[4] or ""))
+        gl.point = point
+        local gh = LineH(gl.text, ns.F.meta, lw - 16, gl)
+        gl:SetSize(lw, gh + 2)
+        gl:ClearAllPoints(); gl:SetPoint("TOPLEFT", b, "TOPLEFT", LINK_X, -(bh + 4))
+        gl:Show()
+        bh = bh + 4 + gh + 2
+      elseif b.gpsLine then b.gpsLine:Hide() end
+      if open and note then
+        b.note:SetText(note); b.note:ClearAllPoints(); b.note:SetPoint("TOPLEFT", LINK_X, -(bh + 4)); b.note:Show()
+        bh = bh + 4 + LineH(b.note, ns.F.meta, lw, b, 3)
+      else b.note:Hide() end
+      bh = bh + 2
+      -- the line joins this dot to the next one (through the gap); none above the first, none
+      -- below the last
+      local last = (k == #ids)
+      b.rail:ClearAllPoints()
+      b.rail:SetPoint("TOP", b.dot, "CENTER", 0, 0)
+      if last then b.rail:SetHeight(0.001); b.rail:Hide()
+      else b.rail:SetPoint("BOTTOM", b, "BOTTOMLEFT", DOT / 2, -LINK_GAP - 1); b.rail:Show() end
+      local rc = (ls == "done") and T.faint or T.trackOff
+      b.rail:SetColorTexture(rc[1], rc[2], rc[3], 1)
+      -- the tooltip: what a click does
+      local tip = { ns.QName(id) }
+      local steps = LibSteps(id)
+      if steps then tip[#tip + 1] = { L.SUM_LFD, T.fg[1], T.fg[2], T.fg[3] }; for _, st in ipairs(steps) do tip[#tip + 1] = "- " .. st end end
+      if b.more then tip[#tip + 1] = open and L.SUM_LINK_FOLD or L.SUM_LINK_UNFOLD end
+      b.tip = tip
+      b:SetSize(wide, bh)
+      b:ClearAllPoints(); b:SetPoint("TOPLEFT", r, "TOPLEFT", TX, -y)
+      b:Show()
+      y = y + bh + (last and 0 or LINK_GAP)
     end
   end
   for i = li + 1, #r.links do r.links[i]:Hide() end
@@ -1784,8 +1851,10 @@ local function Build()
   local c = f.child
   f.heroes, f.gpsBtns, f.notes, f.rows, f.heads, f.folds = {}, {}, {}, {}, {}, {}
   f.rdyLines, f.rdySubs = {}, {}
-  -- the facts list of each dungeon: labels (11 muted) and values (13)
-  f.factLabels, f.factValues = {}, {}
+  -- the facts of each dungeon: the short ones (entrance, key) as label-value rows (ns.TyFact),
+  -- the long ones (before you go in, you get) as a block heading (ns.TyHeading, gold) over their
+  -- values (13). factLabels: every fact's label in order, row or heading
+  f.factHeads, f.factLabels, f.factValues, f.factRows = {}, {}, {}, {}
   -- several dungeons: the whole route's gains at the end
   f.routeHead = MakeHead(c); f.routeHead.cols:Hide(); f.routeHead:Hide()
   f.routeLine = ns.Text(c, ns.F.body, T.fg); f.routeLine:Hide()
@@ -2030,7 +2099,7 @@ Render = function()
 
   local y = 0
   local hi, gi, ni, ri, hdi, fi = 0, 0, 0, 0, 0, 0
-  local rli, rsi, fli, fvi = 0, 0, 0, 0
+  local rli, rsi, fli, fvi, fri, fla = 0, 0, 0, 0, 0, 0
   local noHelperShown, allDoneShown, extraShown, routeShown = false, false, false, false
   local noHelperText, extraText
 
@@ -2042,14 +2111,26 @@ Render = function()
     y = y + 12 + (num(eh) or 80) + 12
   end
 
-  -- The facts list: a label (11 muted, 100 wide) at the left, its value (13) at FX; no icons.
-  local function FactLabel(text)
+  -- The facts: a block heading (DESIGN 3.21: gold, 14 above unless first, 4 below) over its
+  -- value lines, which start at the left edge and take the whole width.
+  local function FactLabel(text, first)
     fli = fli + 1
-    local fs = f.factLabels[fli] or ns.Text(c, ns.F.meta, T.muted); f.factLabels[fli] = fs
-    fs:SetText(text)
-    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 2))
-    fs:Show()
-    return y + 2 + LineH(fs, ns.F.meta, FX - 12, c)
+    local h = f.factHeads[fli] or ns.TyHeading(c); f.factHeads[fli] = h
+    fla = fla + 1; f.factLabels[fla] = h.fs
+    y = y + h:Place(text, 0, y, CW, { first = first })
+    return h.fs
+  end
+  -- a short fact on one row: label 12 muted in a column shared by the entrance and the key, the
+  -- value 12 beside it (under the label when narrow). 4 above unless first; y moves under it
+  local function FactRow(label, value, color, w, first)
+    fri = fri + 1
+    local fc = f.factRows[fri] or ns.TyFact(c); f.factRows[fri] = fc
+    fla = fla + 1; f.factLabels[fla] = fc.label
+    local lw = math.ceil(math.max(ns.TextWidth(fc.label, L.SUM_F_ENTRY) or 0, ns.TextWidth(fc.label, L.SUM_F_KEY) or 0))
+    if not first then y = y + ns.TY.gap end
+    local top = y
+    y = y + fc:Place(label, value, 0, y, w or CW, { labelW = lw, valueColor = color })
+    return fc, top
   end
   -- one value line at y (y moves under it)
   local function FactValue(text, color, w, maxLines)
@@ -2058,9 +2139,9 @@ Render = function()
     fs:SetText(text)
     local col = color or T.text
     fs:SetTextColor(col[1], col[2], col[3])
-    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", FX, -y)
+    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
     fs:Show()
-    y = y + LineH(fs, ns.F.body, w or (CW - FX), c, maxLines)
+    y = y + LineH(fs, ns.F.body, w or CW, c, maxLines)
     return fs
   end
   -- a detail under a value (11 muted)
@@ -2069,9 +2150,9 @@ Render = function()
     local fs = f.rdySubs[rsi] or ns.Text(c, ns.F.meta, T.muted); f.rdySubs[rsi] = fs
     fs:SetText(text)
     fs:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
-    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", FX, -(y + 3))
+    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 3))
     fs:Show()
-    y = y + 3 + LineH(fs, ns.F.meta, CW - FX, c)
+    y = y + 3 + LineH(fs, ns.F.meta, CW, c)
     return fs
   end
 
@@ -2110,7 +2191,7 @@ Render = function()
       return a < b
     end)
     y = y + 4
-    local lw = CW - FX
+    local lw = CW
     for i, id in ipairs(miss) do
       if i > MAX_MISS then break end
       local q = ns.Q[id]
@@ -2136,7 +2217,7 @@ Render = function()
       o.tip = tip
       local th = LineH(o.text, ns.F.meta, lw - 16, o)
       o:SetSize(lw, th + 3)
-      o:ClearAllPoints(); o:SetPoint("TOPLEFT", c, "TOPLEFT", FX, -y)
+      o:ClearAllPoints(); o:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
       o:Show()
       info.lines[#info.lines + 1] = o
       y = y + th + 3 + 2
@@ -2149,12 +2230,13 @@ Render = function()
       info.sub = SubLine(ns.Plural(inside, "SUM_RDY_IN1", "SUM_RDY_IN", inside))
     end
   end
-  -- one fact: its label, then its value(s); 6 under the taller of the two
+  -- one fact: its heading, then its value(s) under it; the next heading brings its own space
+  local nFact = 0
   local function Fact(label, fill)
     local top = y
-    local lb = FactLabel(label)
+    FactLabel(label, nFact == 0)
+    nFact = nFact + 1
     fill()
-    y = math.max(y, lb) + 6
     return top
   end
 
@@ -2198,13 +2280,16 @@ Render = function()
     if not multi and dgDone then AllDoneBlock(L.SUM_ALLDONE_T:format(ns.DName(dkey))) end
 
     -- where is it, can I go, what do I get: only while something is left to do
+    nFact = 0
     if not dgDone then
       local point = d.e and d.e.m and { d.e.m, d.e.x, d.e.y, ns.DName(dkey) } or nil
       local loc = (GetLocale and GetLocale() == "frFR" and d.locf) or ns.T(d.loc) or ""
       if d.cq and d.home then loc = L.CQ_IN:format(ns.DName(d.home)) end
       local entry = ns.T(d.ed) or loc
       if entry and entry ~= "" then
-        Fact(L.SUM_F_ENTRY, function()
+        nFact = nFact + 1
+        local _, top = FactRow(L.SUM_F_ENTRY, entry, T.fg, CW - (point and 32 or 0), true)
+        do
           if point then
             gi = gi + 1
             local g = f.gpsBtns[gi]
@@ -2214,23 +2299,21 @@ Render = function()
               f.gpsBtns[gi] = g
             end
             g.point = point
-            g:ClearAllPoints(); g:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -(y - 5))
+            -- the pin on the row's middle; the next row clears it
+            g:ClearAllPoints(); g:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -(top - 6))
             g:Show()
             if gi == 1 then f.entryGps = g; f.entryPoint = point end
-          end
-          FactValue(entry, T.text, CW - FX - (point and 32 or 0))
-        end)
-      end
-      Fact(L.SUM_F_KEY, function()
-        local kl = ns.KeyLines and ns.KeyLines(dkey, true) or {}
-        if #kl == 0 then FactValue(L.OV_KEY_NONE, T.muted)
-        else
-          for i, k in ipairs(kl) do
-            if i > 1 then y = y + 4 end
-            FactValue(k[1], T.text, nil, 3)
+            y = math.max(y, top + 18)
           end
         end
-      end)
+      end
+      do
+        local kl = ns.KeyLines and ns.KeyLines(dkey, true) or {}
+        local kv = {}
+        for _, k in ipairs(kl) do kv[#kv + 1] = k[1] end
+        FactRow(L.SUM_F_KEY, #kv == 0 and L.OV_KEY_NONE or table.concat(kv, "\n"), #kv == 0 and T.muted or T.fg, nil, nFact == 0)
+        nFact = nFact + 1
+      end
       Fact(L.SUM_F_READY, function() ReadyBlock(dkey) end)
       if #todo > 0 then
         Fact(L.SUM_F_GAIN, function()
@@ -2239,7 +2322,7 @@ Render = function()
           else f.gainFs[dkey] = FactValue(L.SUM_GAIN0, T.muted) end
         end)
       end
-      y = y + 6
+      y = y + 16
     end
 
     if #todo == 0 and #done == 0 then
@@ -2384,7 +2467,9 @@ Render = function()
   if not routeShown then f.routeHead:Hide(); f.routeLine:SetText(""); f.routeLine:Hide() end
 
   for j = hi + 1, #f.heroes do f.heroes[j]:Hide() end
-  for j = fli + 1, #f.factLabels do f.factLabels[j]:Hide() end
+  for j = fli + 1, #f.factHeads do f.factHeads[j]:Hide() end
+  for j = fri + 1, #f.factRows do f.factRows[j]:Hide() end
+  for j = fla + 1, #f.factLabels do f.factLabels[j] = nil end
   for j = fvi + 1, #f.factValues do f.factValues[j]:Hide() end
   for j = gi + 1, #f.gpsBtns do f.gpsBtns[j]:Hide() end
   if gi == 0 then f.entryGps, f.entryPoint = nil, nil end

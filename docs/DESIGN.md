@@ -55,6 +55,7 @@ Semantic (text colour, icon tint, or 14-16 % fill behind a pill; never a stripe,
 | `bad` | `#F87171` | error, destructive action (always with the trash or warning icon so it is not read as the accent) |
 | `gold` | `#E6CC80` | money, top 3 rank, legendary quality |
 | `info` | `#7AB8F5` | neutral information icon only |
+| `head` | `#E6CC80` (= `gold`) | block headings inside cards and panels (3.21), and their 12 px icon. Contrast on `cardFill` 11.7:1. Not `accentSoft`: that colour means a link. The one accepted second use of gold: a heading is always 14 px words above a block, never a number or an item name, so it does not read as money, a rank or a legendary item; What's new's group words take `head` and the kind colour stays on its items' dots |
 
 Rule: at most 2 semantic colours in one row. Class colours only on player names. Item quality colours only on item names.
 
@@ -409,6 +410,27 @@ The one WL Helper window (`WLHelperHub`, Writs/Options.lua; `WLHelperHome` and `
 - Home is built with the Hub; a settings page is built the first time it shows, or all of them the first time the settings search is used (its index needs every row). A screen change rebuilds once, 0.25 s after the last event, and only when the Hub opens if it is hidden.
 - A Home line's right-click opens its settings even when it is switched off.
 
+
+### 3.21 Text structure inside cards and panels
+
+A card that explains something (the guide's boss step, a dungeon card, a summary) is built from these pieces, in Theme.lua, never from hand-placed FontStrings. Each piece is placed at TOPLEFT (x, -y) of its parent, returns the height it uses, takes no mouse and wraps without a line limit.
+
+| Piece | Helper | Look | Height returned |
+|---|---|---|---|
+| Block heading ("Tactique", "Conseil", "En chemin, ramasse aussi", "Récompenses") | `ns.TyHeading(parent):Place(text, x, y, w, {first, icon})` | 14 (`F.heading`, one step above the 13 body under it), `head` (gold), sentence case; optional 12 px HD icon in `head` on the line's middle, text 4 px after it | 14 above (0 when first) + text + 4 below |
+| Body under a heading | `ns.TyBody(parent):Place(text, x, y, w [, color])` | 13 `text` | text |
+| Secondary line | `ns.TyBody(parent, "muted"):Place(...)` | 11 `muted` | text |
+| Bullet list | `ns.TyBullets(parent):Place(items, x, y, w, {size, color, colors, marks})` | 5 px `dot` (`muted`) at x, centred on the first line on whole pixels; text 13 at x + 12, width w - 12, so wrapped lines align under the first word. `marks[i]`: a 12 px HD icon in `ok` in place of that item's dot (a done objective's check): one marker per item | items + 4 between items |
+| Fact ("Niveau conseillé  37-46") | `ns.TyFact(parent):Place(label, value, x, y, w, {labelW, valueColor})` | label 12 `muted`, value 12 `fg` 8 px after the label (or after a shared `labelW` column); under the label (2 px) when the value would get less than 64 px | max(label, value), or label + 2 + value |
+| Stat ("Quêtes rendues  5/6" + bar) | `ns.TyStat(parent):Place(label, done, total, x, y, w, {count, sub, subSize, fill})` | label 12 `muted`, count 12 `fg` right-aligned at x + w, never wrapped (2 px of slack against pixel snapping); 4 px under, a 2 px bar: track white 0.08, fill `ok` (none at 0); optional 11 `muted` line 4 px under the bar (`subSize` 12 under UI scale 0.8) | row + 4 + 2 (+ 4 + sub) |
+
+- Stacking: `ns.TextStack(parent)`, built once; each render `Begin(x, y, w)`, then `Heading`, `Body`, `Muted`, `Bullets`, `Fact`, `Stat`, `Gap`, and `End()` returns the total height and hides what this render did not use. A piece after another piece gets 4 px above, except right under a heading (its 4 below is the gap). Empty text adds nothing.
+- A heading is set apart by size, colour and space: one step above the text under it (14 over 13), gold, 14 px above. Never smaller than its text: a 12 px gold heading over 13 px text read as one more line (the gold and the `text` grey have the same brightness). The client has one face (1.2), so no bold, no small caps or letter spacing, and no ALL CAPS. No rule under a block heading (the rule belongs to section headers, 3.10, which a window's lists keep: the Pick a guide sections are 3.10 like every other window's); an icon only when it says what the block is (skull for tactics, info for a tip, bag for loot).
+- Short facts of one value ("Entrée", "Clé" in a dungeon summary) are `TyFact` rows sharing a label column; a heading block is for a fact of several lines ("Avant d'entrer", "Tu gagnes").
+- Pick a guide card (Picker.lua): bottom band black 0.80 over the picture; the level line body 13, then the stat "Quêtes rendues 5/6" (`PICK_STAT`), then the prerequisite line. The summary button says "Résumé" / "Overview" (`OV_BTN`, the full name in its tooltip) so every name stays beside it. Columns: 2 to 4 by the window width, and no more than keep each card 200 real screen pixels wide (UI units x `UIParent:GetEffectiveScale()`): at UI scale 0.64 on a 1920 px screen, 3 columns.
+- Numbers: every spacing and size above lives in `ns.TY`; change it there, not in a view.
+- The 2 px stat bar is a fill, not a border: it is the one other thing thicker than 1 px besides the active tab's underline (1.4).
+
 ---
 
 ## 4. Text rules
@@ -470,6 +492,7 @@ The one WL Helper window (`WLHelperHub`, Writs/Options.lua; `WLHelperHome` and `
 - Never a bare slash command at the end of a line.
 - Errors say what went wrong and how to fix it.
 - Repeats are rate-limited (same message at most once per 30 s). The addon never whispers.
+- Exception (T-78): Trouver un groupe sends a whisper only on the player's own click on a row's Ask or Invite button, with the exact text shown in that button's tooltip. Never automatically, never on an event, never in bulk.
 
 ### 5.5 Status words
 
@@ -503,6 +526,10 @@ One word per concept, everywhere: tab names, card titles, buttons, tooltips, cha
 | Épingler / Désépingler | Pin / Unpin | uses the pin icon |
 | Événement | Event | any planned guild outing; not "sortie", "raid night", "outing" in UI labels |
 | Groupe | Group | a party formed for an event or LFG; an event creates a group |
+| Groupes | Groups | the group module's window (was titled "LFG"): tabs Trouver un groupe, Messages, Joueurs récents, Agenda, Créer |
+| Trouver un groupe | Find a group | the game's group finder search, seen through WL Helper (the first tab of Groupes); `/wlh lfg` |
+| Demander à rejoindre | Ask to join | a whisper to a listed group's leader, from a click; the group is then marked "Demandé" / "Asked" |
+| Joueurs récents | Recent players | the players of your last parties, with your rating 1-3: À éviter / Correct / Super (Avoid / Okay / Great) |
 | Agenda | Upcoming | the list of events |
 | Créer un événement | Create an event | |
 | S'inscrire / Inscrit / Inscrits | Sign up / Signed up / Sign-ups | |

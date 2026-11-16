@@ -104,6 +104,8 @@ ns.AddEnglish({
     ["Clic : ouvrir Comment faire... ?"] = "Click: open How do I...?",
     ["Clic : ouvrir l'Accueil"] = "Click: open Home",
     ["Pour tout retrouver"] = "To find it all again",
+    ["Quelques bulles sur les vraies fenêtres te montrent où est chaque chose, en deux minutes."] = "A few bubbles on the real windows show you where everything is, in two minutes.",
+    ["Tape /wlh bienvenue pour tout régler pas à pas, ou refaire la visite."] = "Type /wlh welcome to set everything up step by step, or take the tour again.",
     ["Les réglages sont dans la fenêtre WL Helper, à gauche sous chaque activité. /wlh setup rouvre cet écran."] =
         "Settings are in the WL Helper window, on the left under each activity. /wlh setup opens this screen again.",
     ["Le bouton WL de la minimap ouvre l'Accueil."] = "The WL button on the minimap opens Home.",
@@ -693,14 +695,19 @@ STEPS.comfort = {
                 function() return d.shoot end,
                 function(v)
                     d.shoot = v
-                    -- mages, priests and warlocks: the wand line below switches on with it, once
+                    -- mages, priests and warlocks: the key goes to "None" with it, once (right-click
+                    -- alone shoots the wand)
                     if v and WP.OfferWand then WP.OfferWand() end
-                    apply(); if win and win.Relayout then win.Relayout() end
+                    apply()
+                    -- the key row shows the key OfferWand may just have set
+                    if f.key and f.key.control and f.key.control.Update then f.key.control:Update() end
+                    if win and win.Relayout then win.Relayout() end
                 end, shootTaken)
             rows[#rows + 1] = f.shoot
             if not shootTaken and WP.ShootKeys then
                 f.key = Row(f, L("Touche à maintenir"), L("Avec « Aucune », le clic droit seul tire."), function(row)
                     local seg = S.Segmented(row, WP.ShootKeys(), function() return d.shootMod end, function(v)
+                        if WP.OfferWand then WP.OfferWand() end   -- your own choice wins from now on
                         d.shootMod = v; apply()
                         if win and win.Relayout then win.Relayout() end
                     end, 28)
@@ -708,17 +715,6 @@ STEPS.comfort = {
                     return seg
                 end)
                 rows[#rows + 1] = f.key
-                -- wand classes (and anyone with a wand): right-click alone shoots the wand
-                if WP.WandOption then
-                    f.wand = SwitchRow(f, L("Clic droit simple = baguette"),
-                        L("Avec une baguette, un clic droit seul sur un ennemi lance Tir au lieu de ton attaque au corps-à-corps. Maintenu sur un ennemi, il ne tourne plus la caméra."),
-                        function() return d.wandRight end,
-                        function(v)
-                            if WP.OfferWand then WP.OfferWand() end   -- your own choice wins from now on
-                            d.wandRight = v and true or false; apply()
-                        end)
-                    rows[#rows + 1] = f.wand
-                end
             end
             f.group = Group(f, rows)
             f.banner = S.Banner(f, "info", "")
@@ -736,7 +732,7 @@ STEPS.comfort = {
         f.mmGroup = Group(f, { f.mmRow })
     end,
     Enter = function(f)
-        for _, r in ipairs({ f.invite, f.shoot, f.wand, f.mmRow }) do if r and r.sw then r.sw:Update() end end
+        for _, r in ipairs({ f.invite, f.shoot, f.mmRow }) do if r and r.sw then r.sw:Update() end end
         if f.key and f.key.control.Update then f.key.control:Update() end
     end,
     Layout = function(f)
@@ -751,9 +747,6 @@ STEPS.comfort = {
         if d then
             local shootOn = d.shoot and not f.shootTaken
             if f.key then f.key.wlHidden = not shootOn end
-            -- the wand line: shooting on, a key held (with "None" right-click already shoots), and a
-            -- wand class or a wand in the ranged slot
-            if f.wand then f.wand.wlHidden = not (shootOn and d.shootMod ~= "NONE" and WP.WandOption()) end
             if f.allTaken then
                 f.group:Hide()
                 f.taken:SetText(L("Ces raccourcis sont déjà gérés par un autre de tes addons."))
@@ -808,9 +801,11 @@ STEPS.ready = {
         end)
         f.writs = Card(function() Finish("card"); if WP.Open then WP.Open("writs") end end)
         f.help = Card(function() Finish("card"); if WP.Help and WP.Help.Toggle then WP.Help.Toggle() end end)
+        -- the guided tour (Writs/Tour.lua): the quick start's last offer, the bubbles take it from here
+        f.tour = Card(function() Finish("card"); if WP.Tour and WP.Tour.Start then WP.Tour.Start() end end)
         f.head = S.SectionHeader(f, L("Pour tout retrouver"), nil, nil, nil, true)
         f.finds = {}
-        for i, icon in ipairs({ "home", "search", "gear" }) do
+        for i, icon in ipairs({ "home", "search", "gear", "flag" }) do
             f.finds[i] = { icon = root.Icon(f, icon, 14, "ARTWORK", C.muted), text = Txt(f, F.body, C.text) }
         end
     end,
@@ -850,6 +845,13 @@ STEPS.ready = {
             tip = { L("Comment faire... ?"), L("Clic : ouvrir Comment faire... ?") } })
         f.help:Show()
         cards[#cards + 1] = f.help
+        f.tour:SetShown(WP.Tour ~= nil)
+        if WP.Tour then
+            f.tour:SetContent({ icon = Icon("INV_Misc_Spyglass_03"), title = L("Faire la visite"),
+                line2 = L("Quelques bulles sur les vraies fenêtres te montrent où est chaque chose, en deux minutes."),
+                tip = { L("Faire la visite"), L("Clic : lancer la visite guidée") } })
+            cards[#cards + 1] = f.tour
+        end
         f.shownCards = cards
         for i, c in ipairs(cards) do
             local h = math.max(64, c:Fit(CW))
@@ -865,6 +867,7 @@ STEPS.ready = {
                 or L("Le bouton de la minimap est caché : Réglages, Général pour le remettre."),
             L("Tape /wlh dans le chat pour ouvrir l'Accueil."),
             L("Les réglages sont dans la fenêtre WL Helper, à gauche sous chaque activité. /wlh setup rouvre cet écran."),
+            L("Tape /wlh bienvenue pour tout régler pas à pas, ou refaire la visite."),
         }
         for i, ln in ipairs(f.finds) do
             ln.text:SetText(words[i])
@@ -1007,6 +1010,8 @@ local function Ended()
     if not WLWritsDB then return end
     WLWritsDB.welcomed = 2
     WLWritsDB.welcomeEnd = how
+    -- gone through once: the Welcome page's "modules" line stays ticked (Writs/Hub.lua)
+    if how == "finish" or how == "card" then WLWritsDB.welcomeDone = true end
     if not win.fromCommand and (how == "skip" or how == "close") then
         WP.Print(L("Écran de bienvenue fermé : tes choix sont gardés. Tape /wlh setup pour le rouvrir."))
     end

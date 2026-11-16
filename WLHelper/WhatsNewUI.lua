@@ -2,7 +2,8 @@
 -- changed since the version you last saw, once. /wlh nouveautes (or news) opens it again.
 -- Layout: one block per version (the version on the left, its date muted on the right; a 1 px rule
 -- with 16 px of air between versions), then its changes grouped by kind (Nouveautés in green,
--- Changements in blue, Corrections in gold: a small label in the kind's colour), each change a 5 px
+-- Changements in blue, Corrections in gold: a block heading, DESIGN 3.21, in the kind's colour:
+-- 12, 14 px above it, 4 under it), each change a 5 px
 -- dot of that colour, its title (fg 13) and one muted sentence (12) under it, 8 px between changes.
 -- English items without an English text fall back to the French one. The window fits its content
 -- (DESIGN 3.2) and scrolls past 80 % of the screen; the footer says how to open it again.
@@ -81,6 +82,7 @@ local function Fill(sinceKey)
   local fr = Fr()
   local F = ns.F or { heading = 14, body = 13, label = 12, meta = 11 }
   local C = St.C or {}
+  local TYH = (ns.TY and ns.TY.head) or { size = 12, top = 14, bottom = 4 }
   local y, nt, nd, nr, nv = 0, 0, 0, 0, 0
   local gap = 0                -- the space the last line asked for under it
   -- a line of text at (x, y), `w` wide (the rest of the column by default); returns its top
@@ -186,10 +188,12 @@ local function Fill(sinceKey)
             local title, text = ItemText(it)
             if title or text then
               if not any then
-                -- a new group: 12 px under the last change of the one before
-                if groups > 0 then y = y - gap + 12 end
+                -- a new group: a block heading (ns.TY.head) 14 px under the last change before it
+                if groups > 0 then y = y - gap + TYH.top end
                 groups = groups + 1
-                Text(fr and kind[2] or kind[3], F.meta, col, 0, 6)
+                -- the group's words in the heading colour like every block heading; the kind's
+                -- colour stays on its items' dots (green new, blue changed, gold fixed)
+                Text(fr and kind[2] or kind[3], TYH.size, C.head or (ns.T_ and ns.T_.head) or col, 0, TYH.bottom)
                 any = true
               end
               local at2 = Text(title or text, F.body, C.fg, INDENT, (title and text) and 3 or ITEM_GAP)
