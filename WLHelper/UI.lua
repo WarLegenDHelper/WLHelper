@@ -213,6 +213,62 @@ function ns.BossTacticText(st)
   return #lines > 0 and table.concat(lines, "\n") or nil
 end
 local ARROW_UP = "|TInterface\\AddOns\\WLHelper\\Media\\Icons\\arrow_up:14:14:0:-1:128:128:0:128:0:128:76:208:122|t"
+-- Naowh Forever's BiS list (WP.NaowhBiS) for an item and the player's current spec: rank 1 (BiS)
+-- or 2 (second choice), its short badge ("BiS" + star / "2e choix") and colour. nil when Naowh is
+-- absent or switched off, the item unranked or ranked lower, or the item a secret value.
+local BIS_STAR = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:%d:%d:0:0|t"
+function ns.BisBadge(item, size)
+  if item == nil or (issecretvalue and issecretvalue(item)) then return nil end
+  local WP = ns.Writs and ns.Writs.WP
+  local NB = WP and WP.NaowhBiS
+  if not (NB and NB.Available and NB.Rank) then return nil end
+  local okA, on = pcall(NB.Available)
+  if not (okA and on) then return nil end
+  -- our spec (talents or the settings' choice); a guessed default asks Naowh's own active list
+  local W, spec = WP.Weights, nil
+  if W and W.Spec then
+    local okS, s = pcall(W.Spec)
+    local okG, guessed = pcall(function() return W.SpecGuessed and W.SpecGuessed() end)
+    if okS and s and not (okG and guessed) then spec = s end
+  end
+  local ok, rank = pcall(NB.Rank, item, spec)
+  if not ok or (rank ~= 1 and rank ~= 2) then return nil end
+  local r, g, b = 1, 0.5, 0
+  if NB.Color then
+    local okC, cr, cg, cb = pcall(NB.Color, rank)
+    if okC and cr then r, g, b = cr, cg, cb end
+  end
+  local text = rank == 1 and L.BIS_1 or L.BIS_2
+  -- an empty Naowh list falls back on Naowh's gear for a level: "BiS niv. 40"
+  if rank == 1 and NB.Source and NB.Label then
+    local okB, _, bracket = pcall(NB.Source, item, spec)
+    if okB and bracket then
+      local okL, lab = pcall(NB.Label, 1, bracket)
+      if okL and type(lab) == "string" and lab ~= "" then text = lab end
+    end
+  end
+  if rank == 1 then size = size or 12; text = text .. " " .. BIS_STAR:format(size, size) end
+  return rank, text, r, g, b
+end
+-- true when Naowh's own item tooltip line (its active list) already says this rank
+function ns.BisNaowhTip(item, rank)
+  if item == nil or rank == nil or (issecretvalue and issecretvalue(item)) then return false end
+  local WP = ns.Writs and ns.Writs.WP
+  local NB = WP and WP.NaowhBiS
+  if not (NB and NB.RankTipOn and NB.Rank) then return false end
+  local okT, on = pcall(NB.RankTipOn)
+  if not (okT and on) then return false end
+  local ok, r = pcall(NB.Rank, item)
+  return ok and r == rank
+end
+-- the badge as coloured chat text ("|cffff8000BiS|r [star]"), or nil
+function ns.BisBadgeText(item, size)
+  local rank, text, r, g, b = ns.BisBadge(item, size)
+  if not rank then return nil end
+  -- the word coloured, the star after it (a texture keeps its own colours)
+  local word, star = text:match("^(.-)( |T.*)$")
+  return Hex({ r, g, b }) .. (word or text) .. "|r" .. (star or "")
+end
 -- the loot that matters: an upgrade (green arrow and its gain) or a quest item, 3 lines at most
 function ns.BossLootText(st)
   local ok, list = pcall(ns.BossStepLoot, st)
@@ -222,6 +278,8 @@ function ns.BossLootText(st)
     if k > 3 then break end
     local ic = it.icon and ("|T" .. tostring(it.icon) .. ":14:14:0:-1:64:64:5:59:5:59|t ") or ""
     local name = it.link or it.name or "?"
+    local bis = ns.BisBadgeText(it.link or it.id, 12)
+    if bis then name = name .. "  " .. bis end
     if it.up then
       lines[#lines + 1] = ic .. name .. "  " .. ARROW_UP .. Hex(T.ok) .. (it.text or "") .. "|r"
     else

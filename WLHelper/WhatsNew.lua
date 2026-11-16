@@ -2,6 +2,13 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.80", date = "2026-11-16", items = {
+    { s = "add", fr = { "Badges BiS sur le butin", "Les récompenses de quête de l'Overview et le butin des boss affichent « BiS ★ » ou « 2e choix » quand Naowh classe l'objet pour ta spé." }, en = { "BiS / 2nd choice badges on quest rewards and boss loot, from Naowh.", "" } },
+    { s = "add", fr = { "BiS même sans liste remplie", "Si tu n'as jamais rempli ta liste BiS dans Naowh, WL Helper prend l'équipement que Naowh conseille pour ton niveau (« BiS niv. 40 » avant 60, son classement au 60). Ta propre liste passe toujours en premier." }, en = { "No Naowh list filled? Naowh's gear for your level is used (\"BiS lvl 40\"), its ranking at 60.", "" } },
+    { s = "add", fr = { "Statut d'artisan dans la minimap", "« Artisan : Disponible » dans le menu, un clic passe à Occupé ou Absent." }, en = { "Crafter status in the minimap menu, click to change it.", "" } },
+    { s = "add", fr = { "« Me prévenir quand quelqu'un sait le faire »", "Sur la page Demander : un message (et un son) quand un membre de la guilde apprend la recette." }, en = { "Get told when a guild member learns the recipe you asked for.", "" } },
+    { s = "add", fr = { "Alertes des commandes", "Dans Réglages › Général › Commandes : favori qui se connecte, recette surveillée apprise, son." }, en = { "Orders alerts in Settings.", "" } },
+  } },
   { v = "1.0.0-beta.79", date = "2026-11-16", items = {
     { s = "add", fr = { "Trouver un groupe", "La fenêtre Groupes a un onglet de recherche de groupe pensé pour ton guide (donjons de ta route, de tes quêtes, de ton niveau), avec la guilde en premier : membres qui cherchent le même donjon, qui ont les mêmes quêtes, événement prévu. Filtres (rôle, classe, niveau, langue), notes des joueurs, messages groupés par personne, joueurs récents. /wlh lfg." }, en = { "Group finder in the Groups window, built around your guide and your guild: filters, player ratings, whispers by person, recent players.", "" } },
     { s = "add", fr = { "Bienvenue et visite guidée", "Une page Bienvenue avec les réglages à faire pas à pas, et une visite qui montre chaque fonction à l'écran. /wlh bienvenue, /wlh visite." }, en = { "Welcome page with step-by-step setup and a replayable guided tour.", "" } },
@@ -16,6 +23,7 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "Choisir un guide", "En 3 ou 4 colonnes selon l'écran ; **modules du Hub** en deux colonnes ; **textes** mieux structurés (titres, puces) partout." }, en = { "Guide picker in 3-4 columns, hub modules in two columns, better text structure.", "" } },
     { s = "chg", fr = { "Points du chemin", "Plus visibles et réglables (taille carte, minimap, couleur) ; **étiquette dans le monde** plus soignée (tige, anneau, grande distance)." }, en = { "Bigger, configurable path dots; polished world label.", "" } },
     { s = "chg", fr = { "Équipement", "WL Helper Gear suit Geared Forever 1.1.1. Le réglage « baguette » est fusionné en un seul, et le choix « Méthode » des améliorations disparaît (automatique)." }, en = { "Gear synced to Geared Forever 1.1.1; wand settings merged; upgrade method is automatic.", "" } },
+    { s = "fix", fr = { "Budget des writs", "Un writ trop cher pour ce qui restait ne fait plus sauter les writs moins chers de la même zone." }, en = { "Writs budget no longer skips cheaper writs behind a too-dear one.", "" } },
     { s = "fix", fr = { "", "Les messages des commandes ne peuvent plus boucler quand beaucoup partent d'un coup." }, en = { "Orders messages can no longer loop when many are sent at once.", "" } },
   } },
   { v = "1.0.0-beta.78", date = "2026-11-16", items = {
@@ -95,8 +103,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.66", date = "2026-11-15", items = {
     { s = "fix", fr = { "Fenêtre des boss", "Les portraits sont rognés et découpés en rond pour que leur bord gris ne dépasse plus ; plus d'icône décorative à côté du nom du donjon." }, en = { "Boss panel", "Portraits cropped round, no decorative header icon." } },
-  } },
-  { v = "1.0.0-beta.65", date = "2026-11-15", items = {
-    { s = "fix", fr = { "Fenêtre des boss", "Plus de croissant gris à droite des portraits (l'anneau n'est gardé que pour les rares, en argent) ; le survol éclaircit doucement au lieu de blanchir le portrait ; la fenêtre se place par défaut en haut à droite de l'écran (comme le minuteur Mythique+), l'épingle la colle au guide si tu préfères." }, en = { "Boss panel", "No grey crescents, softer hover, top-right by default." } },
   } },
 }

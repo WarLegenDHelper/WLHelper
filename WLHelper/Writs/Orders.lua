@@ -88,6 +88,8 @@ ns.AddEnglish({
     ["Les voir"] = "See them",
     ["%s est en donjon : ta commande attend, tu es %s dans sa file."] = "%s is in a dungeon: your order is waiting, you are %s in line.",
     ["Utilise : "] = "Uses: ",
+    -- T-80: "tell me when someone can make it" (the Request page)
+    ["%s sait faire %s : tu peux le lui commander. Tape /wlh orders."] = "%s can make %s: you can order it from them. Type /wlh orders.",
 })
 
 local PREFIX = "WLHord"
@@ -1395,10 +1397,53 @@ do
         d.watch[id] = { t = time(), seen = seen }
         return true, true
     end
+    -- ---- "tell me when someone can make it" (T-80, the Request page): an item nobody makes yet.
+    -- The first guild member whose recipe list arrives with it: one chat line, a sound when the
+    -- setting allows it, then forgotten (once). Whoever already makes it does not count.
+    O.KNOWN_MAX = 30
+    function O.IsKnownWatch(id) local w = DB().knownWatch; return (w and id and w[id] ~= nil) and true or false end
+    function O.ToggleKnownWatch(id)
+        local d = DB()
+        d.knownWatch = d.knownWatch or {}
+        if type(id) ~= "number" or id == 0 then return false end
+        if d.knownWatch[id] then d.knownWatch[id] = nil; return true, false end
+        local n = 0
+        for _ in pairs(d.knownWatch) do n = n + 1 end
+        if n >= O.KNOWN_MAX then return false, "cap" end
+        local seen = {}
+        for _, c in ipairs(O.Crafters(id)) do if not c.me then seen[c.name] = true end end
+        d.knownWatch[id] = { t = time(), seen = seen }
+        return true, true
+    end
+    function K.OnKnown(sender, recipes, hadList)
+        local d = DB()
+        if type(d.knownWatch) ~= "table" or sender == Me() or O.Profile().alts[sender] then return end
+        local on = not (WP.ModuleOn and not WP.ModuleOn("orders"))
+        local said = false
+        for id, w in pairs(d.knownWatch) do
+            if recipes[id] and not (type(w) == "table" and type(w.seen) == "table" and w.seen[sender]) then
+                d.knownWatch[id] = nil
+                -- a watched recipe gives the same news with its own alert: not twice
+                local ww = type(d.watch) == "table" and d.watch[id]
+                local watchSays = type(ww) == "table" and not (type(ww.seen) == "table" and ww.seen[sender])
+                    and hadList ~= false and WLWritsDB.ordersAlertWatch ~= false
+                if on and not watchSays and K.Say
+                    and K.Say(string.format(L("%s sait faire %s : tu peux le lui commander. Tape /wlh orders."), sender, O.Name(id)), nil, "find") then
+                    said = true
+                end
+            end
+        end
+        -- one sound for the list, never in combat or in a dungeon (the other Orders alerts wait there too)
+        if said and WLWritsDB.ordersKnownSound ~= false and not K.InCombat() and O.MyStatus() ~= "d"
+            and PlaySound and SOUNDKIT and SOUNDKIT.READY_CHECK then
+            pcall(PlaySound, SOUNDKIT.READY_CHECK, "Master")
+        end
+    end
     -- a member's recipe list arrived (only when its hash changed): watched recipes they now make.
     -- hadList false: no earlier list for this member and profession, so seen quietly (no alert)
     function K.OnRecipes(sender, prof, recipes, hadList)
         K.index = nil
+        pcall(K.OnKnown, sender, recipes, hadList)
         local d = DB()
         for id, w in pairs(d.watch or {}) do
             if recipes[id] and type(w) == "table" then
@@ -1579,6 +1624,7 @@ do
         end
         for id, day in pairs(d.seenDelivIDs or {}) do if type(day) ~= "number" or day <= today - 14 then d.seenDelivIDs[id] = nil end end
         for name, p in pairs(d.profiles or {}) do if type(p) ~= "table" or (p.at or 0) < now - 30 * DAY then d.profiles[name] = nil end end
+        for id, w in pairs(d.knownWatch or {}) do if type(w) ~= "table" or (w.t or 0) < now - 30 * DAY then d.knownWatch[id] = nil end end
         if type(d.recent) == "table" then
             for i = #d.recent, 1, -1 do if type(d.recent[i]) ~= "table" or (d.recent[i].t or 0) < now - 14 * DAY then table.remove(d.recent, i) end end
         end

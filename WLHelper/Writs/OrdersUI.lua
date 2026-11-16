@@ -193,6 +193,15 @@ ns.AddEnglish({
     ["Publier la demande"] = "Publish request",
     ["Écris ce que tu veux, par exemple Sac en étoffe runique."] = "Type what you want, for example Runecloth Bag.",
     ["Demande publiée : %s ×%d (%s). Tu la suis dans Mes commandes."] = "Request published: %s ×%d (%s). Follow it in My orders.",
+    -- T-80: tell me when someone can make it
+    ["Me prévenir quand quelqu'un sait le faire"] = "Tell me when someone can make it",
+    ["Une ligne dans le chat dès qu'un membre de la guilde l'apprend, une seule fois."] =
+        "A chat line as soon as a guild member learns it, once.",
+    ["Déjà connu dans la guilde : tu seras prévenu si un autre membre l'apprend."] =
+        "Already known in the guild: you will be told if another member learns it.",
+    ["Pour un objet du jeu seulement : écris son nom exact ou fais Maj-clic dessus."] =
+        "For an item the game knows only: type its exact name or shift-click it.",
+    ["%d objets attendus au plus : retires-en un avant d'en ajouter."] = "%d items at most: remove one before adding another.",
     -- order cards
     ["Ouverte"] = "Open", ["Prise"] = "Taken", ["Fabriquée"] = "Crafted", ["Livrée"] = "Delivered",
     ["Refusée"] = "Declined", ["Annulée"] = "Cancelled", ["Expirée"] = "Expired",
@@ -3656,6 +3665,30 @@ local function BuildAsk(p)
     a.note:SetMaxLetters(60)
     -- who will be told (online first)
     a.summary = S.Text(c, F.meta, C.muted); a.summary:SetJustifyH("LEFT"); a.summary:SetJustifyV("TOP")
+    -- T-80: tell me when someone can make it (an item the game knows; one chat line, once)
+    local kn = CreateFrame("Button", nil, c)
+    kn.wlOwned = true
+    S.Solid(kn, "BACKGROUND", C.cardFill):SetAllPoints(); S.Border(kn, C.cardEdge)
+    kn.label = S.Text(kn, F.body, C.fg); kn.label:SetPoint("TOPLEFT", 12, -10); kn.label:SetJustifyH("LEFT")
+    kn.label:SetText(L("Me prévenir quand quelqu'un sait le faire")); S.ClampLabel(kn.label, nil, kn)
+    kn.desc = S.Text(kn, F.meta, C.muted); kn.desc:SetJustifyH("LEFT"); kn.desc:SetJustifyV("TOP")
+    kn.desc:SetPoint("TOPLEFT", kn.label, "BOTTOMLEFT", 0, -3)
+    local function KnownID() return Resolve(a.box:GetText() or "") end
+    kn.switch = S.Switch(kn, function()
+        local id = KnownID()
+        return (id and O.IsKnownWatch and O.IsKnownWatch(id)) or false
+    end, function(v)
+        local id = KnownID()
+        if not id or not O.ToggleKnownWatch then return end
+        if O.IsKnownWatch(id) ~= (v and true or false) then
+            local ok, why = O.ToggleKnownWatch(id)
+            if not ok and why == "cap" then WP.Print(string.format(L("%d objets attendus au plus : retires-en un avant d'en ajouter."), O.KNOWN_MAX or 30)) end
+        end
+        WP.RefreshOrders()
+    end)
+    kn.switch:SetPoint("RIGHT", -12, 0)
+    kn.switch:AttachRow(kn)
+    a.known = kn
     a.go = S.Button(c, L("Publier la demande"), 0, 32, "primary", function()
         local text = a.box:GetText() or ""
         local id = Resolve(text)
@@ -3765,7 +3798,27 @@ local function RenderAsk()
         else a.summary:SetText(string.format(L("%d artisans prévenus, dont %d en ligne : %s"), n, online, list)) end
     end
     a.summary:ClearAllPoints(); a.summary:SetPoint("TOPLEFT", 0, -y)
-    y = y + S.FitText(a.summary, 2, CW, c) + 16
+    y = y + S.FitText(a.summary, 2, CW, c) + 12
+    -- tell me when someone can make it: an item the game knows only
+    local kn = a.known
+    if id then
+        local others = 0
+        for _, cr in ipairs(O.Crafters(id)) do if not cr.me and cr.name ~= me then others = others + 1 end end
+        kn.desc:SetText(others > 0 and L("Déjà connu dans la guilde : tu seras prévenu si un autre membre l'apprend.")
+            or L("Une ligne dans le chat dès qu'un membre de la guilde l'apprend, une seule fois."))
+    else
+        kn.desc:SetText(L("Pour un objet du jeu seulement : écris son nom exact ou fais Maj-clic dessus."))
+    end
+    kn.switch:ApplyState(id and "normal" or "disabled")
+    kn.switch:Update()
+    kn:SetWidth(CW)
+    local ktw = math.max(40, CW - 12 - 40 - 24)
+    kn.label:SetWidth(ktw)
+    local kdh = S.FitText(kn.desc, 2, ktw, kn)
+    local kh = math.max(44, math.ceil(10 + F.body + 3 + kdh + 10))
+    kn:SetHeight(kh)
+    kn:ClearAllPoints(); kn:SetPoint("TOPLEFT", 0, -y)
+    y = y + kh + 16
     a.go:ClearAllPoints(); a.go:SetPoint("TOPLEFT", 0, -y)
     local gw = num(a.go:GetWidth()) or 160
     a.hint:ClearAllPoints(); a.hint:SetPoint("LEFT", a.go, "RIGHT", 12, 0)

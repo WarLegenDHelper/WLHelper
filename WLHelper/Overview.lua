@@ -1089,6 +1089,15 @@ local function MakeReward(parent)
   if b.upArrow.SetDrawLayer then b.upArrow:SetDrawLayer("OVERLAY", 2) end
   b.upArrow:Hide()
   if b.pct.SetWordWrap then b.pct:SetWordWrap(false) end
+  -- Naowh's BiS list ranks the item for your spec: a star (BiS) or "2" (second choice) on a dark
+  -- chip in the icon's top-left corner, its colour from NaowhBiS; the words under the icon when
+  -- no gain sits there, and in the tooltip
+  b.bisChip = b:CreateTexture(nil, "OVERLAY", nil, 1); b.bisChip:SetSize(14, 14); b.bisChip:SetPoint("TOPLEFT", -3, 3)
+  b.bisChip:SetColorTexture(0.04, 0.05, 0.06, 0.92); b.bisChip:Hide()
+  b.bisStar = b:CreateTexture(nil, "OVERLAY", nil, 2); b.bisStar:SetSize(12, 12); b.bisStar:SetPoint("CENTER", b.bisChip, "CENTER", 0, 0)
+  b.bisStar:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1"); b.bisStar:Hide()
+  b.bisTwo = ns.Text(b, ns.F.foot, T.fg, true); b.bisTwo:SetPoint("CENTER", b.bisChip, "CENTER", 0, 0); b.bisTwo:SetText("2"); b.bisTwo:Hide()
+  if b.bisTwo.SetDrawLayer then b.bisTwo:SetDrawLayer("OVERLAY", 3) end
   b:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:ClearLines()
@@ -1098,6 +1107,7 @@ local function MakeReward(parent)
     if not shown then GameTooltip:AddLine(self.name or "?", T.fg[1], T.fg[2], T.fg[3], true) end
     if self.choice then GameTooltip:AddLine(L.OV_CHOICE, T.muted[1], T.muted[2], T.muted[3], true) end
     if self.best then GameTooltip:AddLine(L.SUM_BEST, T.gold[1], T.gold[2], T.gold[3], true) end
+    if self.bisText and not (shown and ns.BisNaowhTip and ns.BisNaowhTip(self.id or self.link, self.bisRank)) then GameTooltip:AddLine(L.BIS_TT:format(self.bisText), self.bisR or 1, self.bisG or 0.5, self.bisB or 0, true) end
     if self.upText then GameTooltip:AddLine(L.OV_UPGRADE .. (self.upText ~= "" and (" " .. self.upText) or ""), T.ok[1], T.ok[2], T.ok[3], true) end
     if self.upEmpty then GameTooltip:AddLine(L.SUM_UP_EMPTY_TT, T.muted[1], T.muted[2], T.muted[3], true) end
     if self.link then GameTooltip:AddLine(L.TT_SHIFT_LINK, (T.hint or T.muted)[1], (T.hint or T.muted)[2], (T.hint or T.muted)[3], true) end
@@ -1121,11 +1131,23 @@ local function FillReward(b, rw, best, lvl)
   b.edge(QualityColor(quality) or T.cardEdge)
   b.ring:SetShown(best == true)
   b.upText, b.upEmpty = u.up and (u.text or "") or nil, u.empty == true
+  local rank, bisText, br, bg, bb
+  if ns.BisBadge then rank, bisText, br, bg, bb = ns.BisBadge(link or rw.id, 11) end
+  b.bisRank, b.bisText, b.bisR, b.bisG, b.bisB = rank, bisText, br, bg, bb
+  b.bisChip:SetShown(rank ~= nil)
+  b.bisStar:SetShown(rank == 1)
+  b.bisTwo:SetShown(rank == 2)
+  if rank == 2 then b.bisTwo:SetTextColor(br, bg, bb) end
   if u.up then
+    b.pct:SetTextColor(T.ok[1], T.ok[2], T.ok[3])
     b.pct:SetText(u.short or u.text or ""); b.pct:Show()
+  elseif rank then
+    -- no gain to show: the badge's words under the icon ("BiS" / "2e choix"), the star on the chip
+    b.pct:SetTextColor(br, bg, bb)
+    b.pct:SetText((bisText and bisText:match("^(.-) |T")) or bisText or (rank == 1 and L.BIS_1 or L.BIS_2)); b.pct:Show()
   else b.pct:Hide() end
   b.upChip:SetShown(u.up == true); b.upArrow:SetShown(u.up == true)
-  return u.up == true
+  return u.up == true or rank ~= nil
 end
 
 -- A group cell: one HD icon (two checks when ready); the member, the state and the detail in the tooltip.
@@ -1612,6 +1634,8 @@ local function FillRow(r, qid, dkey, inf, ctx)
       local u = UpInfo(rw, rwLvl)
       local line = "- " .. (nm or "?")
       if bestI == i then line = line .. " (" .. L.SUM_BEST .. ")" end
+      local bis = ns.BisBadgeText and ns.BisBadgeText(rw.id, 11)
+      if bis then line = line .. "  " .. bis end
       if u.up then line = { line .. " " .. (u.text or ""), T.ok[1], T.ok[2], T.ok[3] } end
       names[#names + 1] = line
     end

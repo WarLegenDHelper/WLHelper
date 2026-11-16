@@ -6,6 +6,20 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.80] — 2026-11-16
+
+### Ajouté / Added
+- **Badges BiS sur le butin** : les récompenses de quête de l'Overview et le butin des boss affichent « BiS ★ » ou « 2e choix » quand Naowh classe l'objet pour ta spé.
+  *BiS / 2nd choice badges on quest rewards and boss loot, from Naowh.*
+- **BiS même sans liste remplie** : si tu n'as jamais rempli ta liste BiS dans Naowh, WL Helper prend l'équipement que Naowh conseille pour ton niveau (« BiS niv. 40 » avant 60, son classement au 60). Ta propre liste passe toujours en premier.
+  *No Naowh list filled? Naowh's gear for your level is used ("BiS lvl 40"), its ranking at 60.*
+- **Statut d'artisan dans la minimap** : « Artisan : Disponible » dans le menu, un clic passe à Occupé ou Absent.
+  *Crafter status in the minimap menu, click to change it.*
+- **« Me prévenir quand quelqu'un sait le faire »** sur la page Demander : un message (et un son) quand un membre de la guilde apprend la recette.
+  *Get told when a guild member learns the recipe you asked for.*
+- **Alertes des commandes** dans Réglages › Général › Commandes : favori qui se connecte, recette surveillée apprise, son.
+  *Orders alerts in Settings.*
+
 ## [1.0.0-beta.79] — 2026-11-16
 
 ### Ajouté / Added
@@ -39,6 +53,8 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *Gear synced to Geared Forever 1.1.1; wand settings merged; upgrade method is automatic.*
 
 ### Corrigé / Fixed
+- **Budget des writs** : un writ trop cher pour ce qui restait ne fait plus sauter les writs moins chers de la même zone.
+  *Writs budget no longer skips cheaper writs behind a too-dear one.*
 - Les messages des commandes ne peuvent plus boucler quand beaucoup partent d'un coup.
   *Orders messages can no longer loop when many are sent at once.*
 

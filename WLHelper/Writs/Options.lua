@@ -217,6 +217,16 @@ ns.AddEnglish({
     ["Dis-nous ce qui manque ou ce qui coince. Chaque bouton t'affiche un lien à ouvrir dans ton navigateur."] =
         "Tell us what's missing or broken. Each button gives you a link to open in your browser.",
     ["Commandes du chat"] = "Chat commands",
+    -- T-80: the Orders alerts (General, section Commandes)
+    ["Un favori se connecte"] = "A favourite logs in",
+    ["Une alerte quand un artisan de tes favoris arrive en ligne, au plus toutes les 30 min pour chacun."] =
+        "An alert when one of your favourite crafters comes online, at most every 30 min for each.",
+    ["Une recette surveillée est apprise"] = "A watched recipe is learned",
+    ["Une alerte quand un membre de la guilde apprend une recette que tu surveilles, une fois par membre et par recette."] =
+        "An alert when a guild member learns a recipe you watch, once per member and per recipe.",
+    ["Son quand quelqu'un sait le faire"] = "Sound when someone can make it",
+    ["Avec « Me prévenir quand quelqu'un sait le faire » sur la page Demande : un son avec la ligne du chat."] =
+        "With \"Tell me when someone can make it\" on the Request page: a sound with the chat line.",
     -- game settings and EllesmereUI
     ["Le guide de quêtes, les Writs, le GPS et les outils de la guilde WaR LegenD."] =
         "The quest guide, the Writs window, the GPS and the WaR LegenD guild tools.",
@@ -783,6 +793,20 @@ function BUILD.general(p)
             SwitchRow(p, L("Partager mes quêtes de donjon"), function() return Sh.GetShare() end, function(v) Sh.SetShare(v) end,
                 L("Les membres de la guilde qui ont WL Helper voient quelles quêtes de donjon tu as, pour grouper. Rien d'autre n'est envoyé."))
         end
+    end
+
+    -- the Orders alerts (T-80): the same switches as on my crafter profile
+    if ns.WP.Orders then
+        Section(p, L("Commandes"))
+        SwitchRow(p, L("Un favori se connecte"), function() return Writs().ordersAlertFav ~= false end,
+            function(v) Writs().ordersAlertFav = v and true or false end,
+            L("Une alerte quand un artisan de tes favoris arrive en ligne, au plus toutes les 30 min pour chacun."))
+        SwitchRow(p, L("Une recette surveillée est apprise"), function() return Writs().ordersAlertWatch ~= false end,
+            function(v) Writs().ordersAlertWatch = v and true or false end,
+            L("Une alerte quand un membre de la guilde apprend une recette que tu surveilles, une fois par membre et par recette."))
+        SwitchRow(p, L("Son quand quelqu'un sait le faire"), function() return Writs().ordersKnownSound ~= false end,
+            function(v) Writs().ordersKnownSound = v and true or false end,
+            L("Avec « Me prévenir quand quelqu'un sait le faire » sur la page Demande : un son avec la ligne du chat."))
     end
 
     Section(p, L("Langue"))

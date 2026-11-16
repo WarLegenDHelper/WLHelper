@@ -157,6 +157,15 @@ ns.AddEnglish({
     ["Nous écrire"] = "Write to us",
     ["Clic : ouvrir le guide de quêtes"] = "Click: open the quest guide",
     ["Clic : arrêter le GPS"] = "Click: stop the GPS",
+    -- T-80: my crafter status in the minimap menu
+    ["Artisan : %s"] = "Crafter: %s",
+    ["Artisan"] = "Crafter",
+    ["Clic : passer à %s"] = "Click: switch to %s",
+    ["Ce que la guilde voit dans les Commandes."] = "What the guild sees in Orders.",
+    ["Automatique pour l'instant : %s."] = "Automatic for now: %s.",
+    ["absent (AFK)"] = "away (AFK)",
+    ["en file d'attente"] = "queued",
+    ["en donjon"] = "in a dungeon",
 })
 
 local GAP = 12             -- between blocks (search, now, the activities)
@@ -989,6 +998,20 @@ end
 
 -- ---------------------------------------------------------------- minimap button
 
+-- My crafter status (Orders, T-60): what the guild sees, and the status a click picks next
+-- (Available, Busy, Away, round). nil when the Orders module is off or not loaded.
+local NEXT_STATUS = { a = "b", b = "o", o = "a" }
+local WHY_AUTO = { afk = "absent (AFK)", queue = "en file d'attente", inst = "en donjon" }
+local function CrafterStatus()
+    local O = WP.Orders
+    if not (O and O.MyStatus and O.StatusWord and O.BaseStatus and O.CycleStatus) or not WP.ModuleOn("orders") then return nil end
+    local ok, s, why = pcall(O.MyStatus)
+    if not ok then return nil end
+    local base = O.BaseStatus()
+    return O.StatusWord(s) or O.StatusWord(base) or "?", O.StatusWord(NEXT_STATUS[base] or "a"), why and L(WHY_AUTO[why] or "") or nil, s
+end
+local STATUS_COLOR = { a = "ok", b = "warn", d = "info", o = "faint" }
+
 -- Tooltip: where you stand first, then what the mouse does.
 function WP.MinimapTooltip(owner)
     local tt = GameTooltip
@@ -1012,6 +1035,8 @@ function WP.MinimapTooltip(owner)
     end
     local open = WP.ModuleOn("orders") and OrdersOpen() or 0
     if open > 0 then Row(L("Commandes"), string.format(L("%d à accepter"), open), C.ok) end
+    local word, _, _, st = CrafterStatus()
+    if word then Row(L("Artisan"), word, C[STATUS_COLOR[st] or "fg"] or C.fg) end
     local lfg = WP.ModuleOn("events") and WP.LFGList and #WP.LFGList() or 0
     if lfg > 0 then Row(L("LFG"), N(lfg, "1 cherche un groupe", "%d cherchent un groupe")) end
     local newer = WP.UpdateAvailable and WP.UpdateAvailable()
@@ -1074,6 +1099,7 @@ local function MenuRow(parent, y, icon, text, onClick, disabledReason, hint)
     b:SetScript("OnMouseUp", function(self) self.press:Hide() end)
     b:SetScript("OnEnable", Paint); b:SetScript("OnDisable", Paint)
     b:SetScript("OnClick", function(self)
+        if self.keep then onClick(self); return end
         menu:Hide()
         if self.off then
             if self.entry then WP.HubTurnOn(self.entry) elseif self.module then WP.SetModule(self.module, true) end
@@ -1104,6 +1130,16 @@ function WP.MinimapMenu(owner)
         -- hint, hub entry }: the Hub's windows by activity (WP.HUB, the order of Home), a rule
         -- between activities, then the GPS, help, settings and contact
         local items = {}
+        -- my crafter status: a click picks the next one, the menu stays open
+        if WP.Orders and WP.Orders.CycleStatus then
+            items[#items + 1] = { { hd = "hammer" }, string.format(L("Artisan : %s"), "?"), function(self)
+                -- turned on from the menu (module off): the module only, no status change
+                if not self then return end
+                pcall(WP.Orders.CycleStatus)
+                if self.Sync then self:Sync(); if self.tipLines then S.Tip(self, self.tipLines) end end
+            end, nil, "crafter" }
+            items[#items + 1] = false
+        end
         for _, g in ipairs(WP.HUB_GROUPS or {}) do
             local list = WP.HubEntries and WP.HubEntries(g.key) or {}
             if #list > 0 and #items > 0 then items[#items + 1] = false end
@@ -1134,6 +1170,23 @@ function WP.MinimapMenu(owner)
         end
         menu:SetSize(208, -y + 4)
         menu.lang = L("Réglages")
+        local cb = menu.buttons.crafter
+        if cb then
+            cb.keep = true
+            function cb:Sync()
+                local word, nxt, why = CrafterStatus()
+                local text = string.format(L("Artisan : %s"), word or L("Éteint"))
+                self.label:SetText(text)
+                self.label.wlFull = text
+                self.tipLines = { text, L("Ce que la guilde voit dans les Commandes.") }
+                if why then self.tipLines[#self.tipLines + 1] = string.format(L("Automatique pour l'instant : %s."), why) end
+                if word and nxt then self.tipLines[#self.tipLines + 1] = string.format(L("Clic : passer à %s"), nxt) end
+            end
+            -- its tooltip follows the status (the row's own one has no hint)
+            cb:HookScript("OnEnter", function(self)
+                if not self.off and self:IsEnabled() ~= false and self.tipLines then S.Tip(self, self.tipLines) end
+            end)
+        end
         -- closes when the mouse has left it for a moment
         menu:SetScript("OnUpdate", function(self, dt)
             if self:IsMouseOver() or (self.owner and self.owner:IsMouseOver()) then self.away = 0; return end
@@ -1144,6 +1197,13 @@ function WP.MinimapMenu(owner)
     if menu:IsShown() then menu:Hide(); return end
     menu.owner = owner; menu.away = 0
     menu.buttons.gps:SetEnabled(WP.GPS.Active() and true or false)
+    if menu.buttons.crafter then
+        local on = WP.ModuleOn("orders")
+        menu.buttons.crafter:SetOff(not on)
+        menu.buttons.crafter.keep = on and true or nil
+        menu.buttons.crafter.module = (not on) and "orders" or nil
+        menu.buttons.crafter:Sync()
+    end
     for _, b in ipairs(menu.rows) do
         if b.entry then b:SetOff(not WP.HubEntryOn(b.entry))
         elseif b.module then b:SetOff(not WP.ModuleOn(b.module)) end
