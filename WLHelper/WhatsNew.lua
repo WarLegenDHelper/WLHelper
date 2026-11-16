@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.81", date = "2026-11-16", items = {
+    { s = "chg", fr = { "Liste des addons", "WL Helper Gear et les trois WL Helper Nav ont maintenant le logo WL Helper et un nom aligné (« WaR LegenD Helper - Gear », « - Nav »…), regroupés sous WL Helper quand le jeu le permet." }, en = { "Gear and Nav sub-addons now show the WL Helper logo and matching names in the addon list.", "" } },
+  } },
   { v = "1.0.0-beta.80", date = "2026-11-16", items = {
     { s = "add", fr = { "Badges BiS sur le butin", "Les récompenses de quête de l'Overview et le butin des boss affichent « BiS ★ » ou « 2e choix » quand Naowh classe l'objet pour ta spé." }, en = { "BiS / 2nd choice badges on quest rewards and boss loot, from Naowh.", "" } },
     { s = "add", fr = { "BiS même sans liste remplie", "Si tu n'as jamais rempli ta liste BiS dans Naowh, WL Helper prend l'équipement que Naowh conseille pour ton niveau (« BiS niv. 40 » avant 60, son classement au 60). Ta propre liste passe toujours en premier." }, en = { "No Naowh list filled? Naowh's gear for your level is used (\"BiS lvl 40\"), its ranking at 60.", "" } },
@@ -100,8 +103,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.67", date = "2026-11-15", items = {
     { s = "fix", fr = { "Clic sur un portrait de boss sans effet", "Le portrait réagit maintenant à l'appui comme au relâchement, comme les boutons de téléportation et du guide qui marchent sur ce client. Si le boss n'est pas ciblé après le clic, un message le dit dans le chat avec le nom cherché." }, en = { "Boss portraits", "Click now registered like the working buttons; a chat line says when the boss was not targeted." } },
-  } },
-  { v = "1.0.0-beta.66", date = "2026-11-15", items = {
-    { s = "fix", fr = { "Fenêtre des boss", "Les portraits sont rognés et découpés en rond pour que leur bord gris ne dépasse plus ; plus d'icône décorative à côté du nom du donjon." }, en = { "Boss panel", "Portraits cropped round, no decorative header icon." } },
   } },
 }

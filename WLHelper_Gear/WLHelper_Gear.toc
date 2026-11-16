@@ -1,5 +1,7 @@
 ## Interface: 16001
-## Title: WL Helper Gear
+## Title: WaR |cffce1918LegenD|r Helper - Gear
+## IconTexture: Interface\AddOns\WLHelper\Media\Logo64
+## Group: WLHelper
 ## Notes: WL Helper's gear scoring engine (no window of its own), based on Geared Forever by Nathan.
 ## Notes-frFR: Moteur de notation d'équipement de WL Helper (sans fenêtre), basé sur Geared Forever de Nathan.
 ## Author: WaR LegenD (based on Geared Forever by Nathan)

@@ -1,5 +1,6 @@
 ## Interface: 16001
-## Title: WL Helper Nav - Eastern Kingdoms
+## Title: WaR |cffce1918LegenD|r Helper - Nav (Royaumes de l'Est)
+## IconTexture: Interface\AddOns\WLHelper\Media\Logo64
 ## Notes: Walking maps of the Eastern Kingdoms for WL Helper's GPS. Loaded on demand on that continent.
 ## Notes-frFR: Cartes de marche des Royaumes de l'Est pour le GPS de WL Helper. Chargé à la demande sur ce continent.
 ## Author: WaR LegenD (router and maps from Polestar and Shortest Path Forever)

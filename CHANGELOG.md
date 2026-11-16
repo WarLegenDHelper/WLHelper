@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.81] — 2026-11-16
+
+### Modifié / Changed
+- **Liste des addons** : WL Helper Gear et les trois WL Helper Nav ont maintenant le logo WL Helper et un nom aligné (« WaR LegenD Helper - Gear », « - Nav »…), regroupés sous WL Helper quand le jeu le permet.
+  *Gear and Nav sub-addons now show the WL Helper logo and matching names in the addon list.*
+
 ## [1.0.0-beta.80] — 2026-11-16
 
 ### Ajouté / Added

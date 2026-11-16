@@ -1,5 +1,6 @@
 ## Interface: 16001
-## Title: WL Helper Nav
+## Title: WaR |cffce1918LegenD|r Helper - Nav
+## IconTexture: Interface\AddOns\WLHelper\Media\Logo64
 ## Notes: WL Helper's walking router for the GPS: real paths round mountains and through gates (Polestar's router and maps, without Polestar). Loaded on demand.
 ## Notes-frFR: Routeur à pied du GPS de WL Helper : vrais chemins autour des montagnes et par les portes (routeur et cartes de Polestar, sans Polestar). Chargé à la demande.
 ## Author: WaR LegenD (router and maps from Polestar and Shortest Path Forever)
