@@ -1,17 +1,23 @@
 -- Résumé d'un ou plusieurs donjons : le premier écran quand tu lances une route depuis le choix des
 -- donjons, et la vue d'ensemble d'un donjon (bouton de la carte, clic droit, bouton du guide).
--- En haut : l'image du donjon (nom, niveaux, taille du groupe), l'entrée (GPS) et la clé sur deux
--- lignes courtes, puis le total de ta sélection, qui suit tes coches. Puis « Quêtes à faire » : une
--- ligne par quête (case à cocher, nom dans la couleur de difficulté, « Niv. 45 · 7 800 XP · 65 pa »,
--- des pastilles seulement quand elles disent quelque chose, la chaîne qui se déplie, jusqu'à 4
--- objets en récompense : icône 30 px bordée de sa qualité, flèche verte et « +12 % » sous l'icône
--- quand WL Helper Gear y voit une amélioration, le meilleur des choix cerclé d'or). Les quêtes
--- déjà rendues sont repliées en bas (« Déjà rendues (10) »). En groupe : une colonne d'icônes par
--- membre dont l'état est connu (WL Helper, ou la réponse du jeu à un partage) ; les autres sur une
--- seule ligne. En bas : « Lancer la route » (premier écran), « Mettre à jour la route » (la route
--- tourne et tes coches ont changé) ou « Retour à la route » (rien n'a changé), et « Fermer » (« Retour
--- au choix » quand le résumé vient du choix des donjons). Ouvert ailleurs pendant qu'une route tourne
--- sur d'autres donjons : « Lancer la route ici », confirmé par un deuxième clic.
+-- Pour chaque donjon, trois questions dans l'ordre : où est-ce, puis-je y aller, qu'est-ce que j'y
+-- gagne. L'image du donjon (nom, « Conseillé niv. 38 à 48 · Groupe de 5 · tu es niv. 41 »), puis une
+-- liste de faits sans icône, libellé à gauche et valeur à droite : Entrée (avec son GPS), Clé, Avant
+-- d'entrer (les quêtes à prendre dehors, chacune avec son GPS) et Tu gagnes (quêtes cochées, XP et
+-- part d'un niveau, argent, objets). Puis « Quêtes à faire » : une carte par quête, toujours dans le
+-- même ordre. Le nom (blanc) et, à droite, l'XP que tu recevras vraiment à ton niveau (grisée quand
+-- elle est réduite) et l'argent. Une ligne de faits en mots : « Quête niv. 36 · facile · se prend dès
+-- le niv. 30 », ou le niveau qu'il te manque. Une pastille d'état (À prendre, À prendre dedans, Dans
+-- ton journal, Prête à rendre) puis Élite ou Autre donjon, avec à droite « Partager » (seulement
+-- quand un membre n'a pas encore la quête) et le GPS. Jusqu'à 4 objets en récompense (icône bordée de
+-- sa qualité, « +12 % » sous l'icône quand WL Helper Gear y voit une amélioration, le meilleur des
+-- choix cerclé d'or). Enfin la chaîne, qui se déplie juste en dessous. Les quêtes déjà rendues sont
+-- repliées en bas (« Déjà rendues (10) »). En groupe : une colonne d'icônes par membre dont l'état
+-- est connu, les autres nommés sous le titre « Quêtes à faire ». Avec plusieurs donjons, le total de
+-- toute la route vient à la fin. En bas : « Lancer la route » (premier écran), « Mettre à jour la
+-- route » (la route tourne et tes coches ont changé) ou « Retour à la route » (rien n'a changé), et
+-- « Fermer » (« Retour au choix » quand le résumé vient du choix des donjons). Ouvert ailleurs pendant
+-- qu'une route tourne sur d'autres donjons : « Lancer la route ici », confirmé par un deuxième clic.
 -- Design system: docs/DESIGN.md (640 px window sized to its content, scroll past 80 % of the screen).
 local ADDON, ns = ...
 local L, T = ns.L, ns.T_
@@ -22,13 +28,31 @@ local L, T = ns.L, ns.T_
 local STR = {
   fr = {
     SUM_T = "Résumé", SUM_ROUTE_T = "Résumé de la route", SUM_DG1 = "%d donjon", SUM_DG = "%d donjons",
-    SUM_SEL = "Ta sélection : %s", SUM_SEL0 = "Aucune quête cochée pour l'instant.",
-    SUM_Q1 = "%d quête", SUM_Q = "%d quêtes", SUM_XP = "%s XP",
-    SUM_LV1 = "Niv. %d", SUM_LV = "Niv. %d-%d", SUM_SIZE = "Groupe de %d",
-    SUM_CHAIN_LINE = "Chaîne : %d quêtes · %s XP au total",
+    SUM_XP = "%s XP", SUM_XP_UNIT = "XP", SUM_SIZE = "Groupe de %d",
+    SUM_CHAIN_LINE = "Chaîne de %d quêtes · %s XP en tout", SUM_CHAIN_HIGH = "monte au niv. %d",
+    SUM_FACT_LV = "Quête niv. %d",
+    SUM_BAND_RED = "très dure", SUM_BAND_ORANGE = "dure", SUM_BAND_YELLOW = "à ton niveau", SUM_BAND_GREEN = "facile",
+    SUM_BAND_GREY = "grise, peu d'XP",
+    SUM_BAND_RED_TT = "Très dure : 5 niveaux ou plus au-dessus de toi.",
+    SUM_BAND_ORANGE_TT = "Dure : 3 ou 4 niveaux au-dessus de toi.",
+    SUM_BAND_YELLOW_TT = "À ton niveau : de 2 niveaux sous toi à 2 au-dessus.",
+    SUM_BAND_GREEN_TT = "Facile : sous ton niveau, elle donne encore de l'XP.",
+    SUM_BAND_GREY_TT = "Grise : trop basse pour toi, elle donne très peu d'XP.",
+    SUM_FROM = "se prend dès le niv. %d", SUM_NEED = "se prend au niv. %d, tu es niv. %d",
+    SUM_NEED_PRE = "étape suivante au niv. %d, tu es niv. %d",
+    SUM_XP_LESS_TT = "XP réduite : %s au lieu de %s, car tu as %d niveaux de plus que la quête.",
+    SUM_XP_CAP_TT = "Tu es au niveau maximum : plus d'XP.",
+    SUM_F_ENTRY = "Entrée", SUM_F_KEY = "Clé", SUM_F_READY = "Avant d'entrer", SUM_F_GAIN = "Tu gagnes",
+    SUM_RDY_NOTHING = "Aucune quête à prendre dehors.", SUM_XP_LESS = "XP réduite", SUM_LINK_LV = "niv. %d",
+    SUM_GQ1 = "%d quête cochée", SUM_GQ = "%d quêtes cochées", SUM_GAIN0 = "Aucune quête cochée.",
+    SUM_LVPCT = "(environ %d\194\160%% d'un niveau)", SUM_LVN1 = "(environ %s niveau)", SUM_LVN = "(environ %s niveaux)",
+    SUM_HERO_LV1 = "Conseillé niv. %d", SUM_HERO_LV = "Conseillé niv. %d à %d", SUM_HERO_YOU = "tu es niv. %d",
+    SUM_ROUTE_H = "Toute la route", SUM_AND = " et ",
+    SUM_SHARE_WHO = "Pas encore chez : %s",
+    SUM_ST_ON_TT = "Tu l'as déjà : rien à prendre.", SUM_ST_READY_TT = "Objectifs faits : va la rendre.",
     SUM_ELITE = "Élite", SUM_ELITE_TT = "Un objectif vise un monstre élite : viens en groupe.",
     SUM_OTHER = "Autre donjon : %s", SUM_OTHER_TT = "Un maillon de la chaîne se fait dans %s.",
-    SUM_HIGH = "Niveau trop haut", SUM_HIGH_TT = "La chaîne monte jusqu'au niveau %d, plus de 5 niveaux au-dessus de toi : décochée par défaut.",
+    SUM_HIGH_TT = "La chaîne monte jusqu'au niveau %d, plus de 5 niveaux au-dessus de toi : décochée par défaut.",
     SUM_ST_ON = "Dans ton journal", SUM_ST_READY = "Prête à rendre", SUM_ST_DONE = "Rendue",
     SUM_TICK_OFF = "Clic : retirer cette quête de la route", SUM_TICK_ON = "Clic : remettre cette quête dans la route",
     SUM_TICK_OFF_CH = "Clic : retirer cette quête et ses %d prérequis de la route",
@@ -47,8 +71,8 @@ local STR = {
     SUM_BACK_PICK = "Retour au choix", SUM_BACK_PICK_TT = "Clic : revenir au choix des donjons sans lancer la route",
     SUM_GO_HERE = "Lancer la route ici", SUM_GO_CONFIRM = "Remplacer la route ?",
     SUM_GO_HERE_TT = "Clic : remplacer la route en cours par ce donjon seul, avec les quêtes cochées (les étapes cochées à la main sont perdues ; un 2e clic confirme)",
-    SUM_EXTRA1 = "Aussi dans le groupe : %s (son état est dans la bulle de chaque quête)",
-    SUM_EXTRA = "Aussi dans le groupe : %s (leur état est dans la bulle de chaque quête)",
+    SUM_EXTRA1 = "Aussi dans le groupe : %s. Son état est dans la bulle de chaque quête.",
+    SUM_EXTRA = "Aussi dans le groupe : %s. Leur état est dans la bulle de chaque quête.",
     SUM_COL_TT = "Une icône par quête : survole-la pour le détail",
     SUM_GO = "Lancer la route", SUM_GO_TT = "Clic : fermer le résumé et ouvrir le guide sur la première étape, avec les quêtes cochées",
     SUM_GO_TT1 = "Clic : lancer la route sur ce donjon seul, avec les quêtes cochées (remplace tes donjons choisis)",
@@ -59,8 +83,8 @@ local STR = {
     SUM_SHARE_ALL = "Tout partager", SUM_SHARE_ALL_TT = "Clic : partager avec le groupe les quêtes cochées de ton journal, une toutes les 1,5 s",
     SUM_SHARE_WHY = "Aucune quête cochée de ton journal ne se partage.", SUM_SHARING = "Partage en cours",
     SUM_NOQ = "Aucune quête pour toi dans ce donjon.",
-    SUM_NOHELPER1 = "Sans WL Helper : %s (son état apparaît quand tu partages)",
-    SUM_NOHELPER = "Sans WL Helper : %s (leur état apparaît quand tu partages)",
+    SUM_NOHELPER1 = "%s n'a pas WL Helper : son état s'affiche quand tu partages une quête.",
+    SUM_NOHELPER = "%s n'ont pas WL Helper : leur état s'affiche quand tu partages une quête.",
     SUM_G_ON = "L'a dans son journal", SUM_G_READY = "Prête à rendre", SUM_G_DONE = "Déjà rendue", SUM_G_TAKE = "À prendre",
     SUM_G_PRE = "Prérequis manquant", SUM_G_LOW = "Niveau trop bas", SUM_G_NA = "Pas pour ce personnage", SUM_G_INVALID = "Pas éligible",
     SUM_G_DECLINED = "Refusée", SUM_G_FULL = "Journal plein", SUM_G_BUSY = "Indisponible", SUM_G_FAR = "Trop loin",
@@ -76,23 +100,40 @@ local STR = {
     SUM_UP_PCT = "+%d\194\160%%", SUM_UP_EMPTY = "vide", SUM_UP_EMPTY_TT = "Tu n'as rien à cet emplacement.",
     SUM_BEST = "Ton meilleur choix", SUM_BEST_TT = "Le meilleur choix pour ta spécialisation parmi les récompenses au choix.",
     SUM_RDY_OK1 = "Prêt : tu as la quête à prendre dehors", SUM_RDY_OK = "Prêt : tu as les %d quêtes à prendre dehors",
-    SUM_RDY_NONE = "Prêt : aucune quête à prendre dehors",
     SUM_RDY_IN1 = "%d autre se prend dans le donjon", SUM_RDY_IN = "%d autres se prennent dans le donjon",
     SUM_RDY_INALL1 = "Ta quête se prend dans le donjon", SUM_RDY_INALL = "Tes quêtes se prennent toutes dans le donjon",
-    SUM_RDY_MISS1 = "Il te manque %d quête à prendre avant d'entrer", SUM_RDY_MISS = "Il te manque %d quêtes à prendre avant d'entrer",
+    SUM_RDY_MISS1 = "Il te manque %d quête à prendre dehors", SUM_RDY_MISS = "Il te manque %d quêtes à prendre dehors",
     SUM_RDY_AFTER = "après « %s »", SUM_RDY_MORE1 = "et %d autre", SUM_RDY_MORE = "et %d autres",
     SUM_ST_TAKE = "À prendre", SUM_ST_TAKE_TT = "Elle se prend dehors : prends-la avant d'entrer dans le donjon.",
-    SUM_ST_IN = "Dans le donjon", SUM_ST_IN_TT = "Elle se prend dans le donjon : rien à faire avant d'entrer.",
+    SUM_ST_IN = "À prendre dedans", SUM_ST_IN_TT = "Elle se prend dans le donjon : rien à faire avant d'entrer.",
   },
   en = {
     SUM_T = "Summary", SUM_ROUTE_T = "Route summary", SUM_DG1 = "%d dungeon", SUM_DG = "%d dungeons",
-    SUM_SEL = "Your selection: %s", SUM_SEL0 = "No quest ticked yet.",
-    SUM_Q1 = "%d quest", SUM_Q = "%d quests", SUM_XP = "%s XP",
-    SUM_LV1 = "Lvl %d", SUM_LV = "Lvl %d-%d", SUM_SIZE = "Group of %d",
-    SUM_CHAIN_LINE = "Chain: %d quests · %s XP in all",
+    SUM_XP = "%s XP", SUM_XP_UNIT = "XP", SUM_SIZE = "Group of %d",
+    SUM_CHAIN_LINE = "Chain of %d quests · %s XP in all", SUM_CHAIN_HIGH = "goes up to level %d",
+    SUM_FACT_LV = "Level %d quest",
+    SUM_BAND_RED = "very hard", SUM_BAND_ORANGE = "hard", SUM_BAND_YELLOW = "at your level", SUM_BAND_GREEN = "easy",
+    SUM_BAND_GREY = "grey, little XP",
+    SUM_BAND_RED_TT = "Very hard: 5 or more levels above you.",
+    SUM_BAND_ORANGE_TT = "Hard: 3 or 4 levels above you.",
+    SUM_BAND_YELLOW_TT = "At your level: from 2 levels below you to 2 above.",
+    SUM_BAND_GREEN_TT = "Easy: below your level, it still gives XP.",
+    SUM_BAND_GREY_TT = "Grey: too low for you, it gives very little XP.",
+    SUM_FROM = "available from level %d", SUM_NEED = "available at level %d, you are level %d",
+    SUM_NEED_PRE = "next step at level %d, you are level %d",
+    SUM_XP_LESS_TT = "Reduced XP: %s instead of %s, because you are %d levels above the quest.",
+    SUM_XP_CAP_TT = "You are at the level cap: no more XP.",
+    SUM_F_ENTRY = "Entrance", SUM_F_KEY = "Key", SUM_F_READY = "Before you go in", SUM_F_GAIN = "You get",
+    SUM_RDY_NOTHING = "No quest to pick up outside.", SUM_XP_LESS = "reduced XP", SUM_LINK_LV = "level %d",
+    SUM_GQ1 = "%d ticked quest", SUM_GQ = "%d ticked quests", SUM_GAIN0 = "No quest ticked.",
+    SUM_LVPCT = "(about %d%% of a level)", SUM_LVN1 = "(about %s level)", SUM_LVN = "(about %s levels)",
+    SUM_HERO_LV1 = "Suggested level %d", SUM_HERO_LV = "Suggested level %d-%d", SUM_HERO_YOU = "you are level %d",
+    SUM_ROUTE_H = "The whole route", SUM_AND = " and ",
+    SUM_SHARE_WHO = "Not yet with: %s",
+    SUM_ST_ON_TT = "You already have it: nothing to pick up.", SUM_ST_READY_TT = "Objectives done: go and turn it in.",
     SUM_ELITE = "Elite", SUM_ELITE_TT = "An objective targets an elite: bring a group.",
     SUM_OTHER = "Other dungeon: %s", SUM_OTHER_TT = "One link of the chain happens in %s.",
-    SUM_HIGH = "Level too high", SUM_HIGH_TT = "The chain goes up to level %d, more than 5 levels above you: unticked by default.",
+    SUM_HIGH_TT = "The chain goes up to level %d, more than 5 levels above you: unticked by default.",
     SUM_ST_ON = "In your log", SUM_ST_READY = "Ready to turn in", SUM_ST_DONE = "Turned in",
     SUM_TICK_OFF = "Click: leave this quest out of the route", SUM_TICK_ON = "Click: put this quest back in the route",
     SUM_TICK_OFF_CH = "Click: leave this quest and its %d prerequisites out of the route",
@@ -111,8 +152,8 @@ local STR = {
     SUM_BACK_PICK = "Back to the picker", SUM_BACK_PICK_TT = "Click: go back to the dungeon picker without starting the route",
     SUM_GO_HERE = "Start the route here", SUM_GO_CONFIRM = "Replace the route?",
     SUM_GO_HERE_TT = "Click: replace the running route with this dungeon only and the ticked quests (steps marked done by hand are lost; a 2nd click confirms)",
-    SUM_EXTRA1 = "Also in the group: %s (their state is in each quest's tooltip)",
-    SUM_EXTRA = "Also in the group: %s (their state is in each quest's tooltip)",
+    SUM_EXTRA1 = "Also in the group: %s. Their state is in each quest's tooltip.",
+    SUM_EXTRA = "Also in the group: %s. Their state is in each quest's tooltip.",
     SUM_COL_TT = "One icon per quest: hover it for the detail",
     SUM_GO = "Start the route", SUM_GO_TT = "Click: close the summary and open the guide on the first step, with the ticked quests",
     SUM_GO_TT1 = "Click: start the route with this dungeon only and the ticked quests (replaces your picked dungeons)",
@@ -123,8 +164,8 @@ local STR = {
     SUM_SHARE_ALL = "Share all", SUM_SHARE_ALL_TT = "Click: share the ticked quests of your log with the group, one every 1.5 s",
     SUM_SHARE_WHY = "No ticked quest in your log can be shared.", SUM_SHARING = "Sharing",
     SUM_NOQ = "No quest for you in this dungeon.",
-    SUM_NOHELPER1 = "Without WL Helper: %s (their state shows when you share)",
-    SUM_NOHELPER = "Without WL Helper: %s (their state shows when you share)",
+    SUM_NOHELPER1 = "%s doesn't have WL Helper: their state shows once you share a quest.",
+    SUM_NOHELPER = "%s don't have WL Helper: their state shows once you share a quest.",
     SUM_G_ON = "Has it in their log", SUM_G_READY = "Ready to turn in", SUM_G_DONE = "Already turned in", SUM_G_TAKE = "To pick up",
     SUM_G_PRE = "Missing prerequisite", SUM_G_LOW = "Level too low", SUM_G_NA = "Not for this character", SUM_G_INVALID = "Not eligible",
     SUM_G_DECLINED = "Declined", SUM_G_FULL = "Log full", SUM_G_BUSY = "Busy", SUM_G_FAR = "Too far",
@@ -140,13 +181,12 @@ local STR = {
     SUM_UP_PCT = "+%d%%", SUM_UP_EMPTY = "empty", SUM_UP_EMPTY_TT = "You wear nothing in this slot.",
     SUM_BEST = "Your best pick", SUM_BEST_TT = "The best of the rewards to choose from for your spec.",
     SUM_RDY_OK1 = "Ready: you have the quest to pick up outside", SUM_RDY_OK = "Ready: you have all %d quests to pick up outside",
-    SUM_RDY_NONE = "Ready: no quest to pick up outside",
     SUM_RDY_IN1 = "%d more is picked up inside the dungeon", SUM_RDY_IN = "%d more are picked up inside the dungeon",
     SUM_RDY_INALL1 = "Your quest is picked up inside the dungeon", SUM_RDY_INALL = "Your quests are all picked up inside the dungeon",
-    SUM_RDY_MISS1 = "%d quest still to pick up before you go in", SUM_RDY_MISS = "%d quests still to pick up before you go in",
+    SUM_RDY_MISS1 = "%d quest still to pick up outside", SUM_RDY_MISS = "%d quests still to pick up outside",
     SUM_RDY_AFTER = "after \"%s\"", SUM_RDY_MORE1 = "and %d more", SUM_RDY_MORE = "and %d more",
     SUM_ST_TAKE = "To pick up", SUM_ST_TAKE_TT = "Given outside: pick it up before you go into the dungeon.",
-    SUM_ST_IN = "Inside the dungeon", SUM_ST_IN_TT = "Given inside the dungeon: nothing to do before you go in.",
+    SUM_ST_IN = "To pick up inside", SUM_ST_IN_TT = "You get it inside the dungeon: nothing to do before you go in.",
   },
 }
 do
@@ -172,6 +212,8 @@ local MAX_REWARDS = 4            -- reward icons per row (the last one is "+N" w
 local RW_SIZE, RW_STEP = 30, 40   -- a reward icon, and icon + gap (the "+12 %" under it fits the gap)
 local RW_LABEL = 14               -- the line under an icon: arrow and gain
 local HIGH_GAP = 5              -- a chain more than 5 levels above the player is unticked by default
+local XPCOL = 88                -- the XP and money column at the right of a quest card
+local FX = 112                  -- the value column of the facts list (labels at 0, 100 wide)
 
 local function SW()
   local S = ns.Writs and ns.Writs.S
@@ -182,7 +224,6 @@ local function secret(v) return issecretvalue ~= nil and issecretvalue(v) end
 local function num(v) return type(v) == "number" and not secret(v) and v or nil end
 local function Cls() local _, c = UnitClass("player"); return c end
 local function Level() return num(UnitLevel("player")) or 1 end
-local function Mark(name, color, size) return SW().IconMarkup(name, size or 12, color) end
 local function ZoneName(m)
   if not (m and C_Map and C_Map.GetMapInfo) then return "" end
   local ok, info = pcall(C_Map.GetMapInfo, m)
@@ -474,6 +515,18 @@ local function ItemInfo(rw)
       end
     else pendingName = true end
   end
+  -- an id this server does not know (QuestieDB's), the name still known: LibForeverData's id for it
+  if not icon and rw.name and (not rw.id or failedItems[rw.id]) then
+    local alt = LibItemId(rw.name)
+    if alt and alt ~= rw.id then
+      local ok, ic = pcall(function() return (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(alt)) or (GetItemIcon and GetItemIcon(alt)) end)
+      if ok and ic then icon = ic end
+      if not quality and C_Item and C_Item.GetItemQualityByID then
+        local okQ, qu = pcall(C_Item.GetItemQualityByID, alt)
+        if okQ then quality = num(qu) end
+      end
+    end
+  end
   icon = icon or "Interface\\Icons\\INV_Misc_QuestionMark"
   if key then infoCache[key] = { icon, link, quality } end
   return icon, link, quality
@@ -624,10 +677,90 @@ local function QuestMoney(qid)
 end
 ns.QuestMoney, ns.QuestXP = QuestMoney, QuestXP
 
+-- No more XP: the level cap, or XP turned off (the rule of Bosses.lua).
+local function AtCap()
+  if IsXPUserDisabled then
+    local ok, v = pcall(IsXPUserDisabled)
+    if ok and v == true then return true end
+  end
+  local maxL = 60
+  if GetMaxPlayerLevel then
+    local ok, mx = pcall(GetMaxPlayerLevel)
+    maxL = ok and num(mx) or maxL
+  end
+  return Level() >= maxL
+end
+-- XP the player really gets for a quest at level plvl (vanilla rule): full up to 5 levels above
+-- the quest, then 80/60/40/20 %, then 10 %; rounded like the server. 0 at the level cap.
+-- If the Forever server differs on a grey quest, only XP_CUT and RoundXP change.
+local XP_CUT = { [6] = 0.8, [7] = 0.6, [8] = 0.4, [9] = 0.2 }
+local function RoundXP(x)
+  local step = x <= 100 and 5 or x <= 500 and 10 or x <= 1000 and 25 or 50
+  return math.floor(x / step + 0.5) * step
+end
+-- returns got, base, diff (player level minus quest level)
+local function XPFor(qid, plvl)
+  local base = QuestXP(qid)
+  if base <= 0 or AtCap() then return 0, base, 0 end
+  local q = ns.Q[qid]
+  local ql = q and num(q.l)
+  if not ql then return base, base, 0 end
+  local d = (plvl or Level()) - ql
+  if d <= 5 then return base, base, d end
+  return RoundXP(base * (XP_CUT[d] or 0.1)), base, d
+end
+ns.QuestXPFor = XPFor
+
+-- Difficulty band of a quest level for the player: "red", "orange", "yellow", "green", "grey".
+-- The game's own colour table first (GetQuestDifficultyColor returns one of its entries), else
+-- the same thresholds.
+local BAND_OF = { impossible = "red", verydifficult = "orange", difficult = "yellow", standard = "green", trivial = "grey" }
+local function Band(ql, plvl)
+  ql = num(ql)
+  if not ql then return nil end
+  if GetQuestDifficultyColor and type(QuestDifficultyColors) == "table" then
+    local ok, c = pcall(GetQuestDifficultyColor, ql)
+    if ok and c then
+      for k, v in pairs(QuestDifficultyColors) do if v == c and BAND_OF[k] then return BAND_OF[k] end end
+    end
+  end
+  local d = ql - plvl
+  if d >= 5 then return "red" elseif d >= 3 then return "orange" elseif d >= -2 then return "yellow" end
+  local g
+  if GetQuestGreenRange then
+    local ok, v = pcall(GetQuestGreenRange)
+    g = ok and num(v) or nil
+  end
+  g = g or (plvl <= 5 and 5 or plvl < 40 and 5 + math.floor(plvl / 10) or 1 + math.floor(plvl / 5))
+  return (-d <= g) and "green" or "grey"
+end
+
 local function Money(c)
   local S = SW()
   if S.Money then return S.Money(c) end
   return tostring(c)
+end
+
+-- "(environ 80 % d'un niveau)", "(environ 1,3 niveau)", "(about 2.4 levels)": the share of the
+-- XP bar; nil when the bar is not readable or at the level cap.
+local function LevelShare(xp)
+  if not (xp and xp > 0) or AtCap() or not UnitXPMax then return nil end
+  local ok, mx = pcall(UnitXPMax, "player")
+  mx = ok and num(mx) or nil
+  if not mx or mx <= 0 then return nil end
+  local r = xp / mx
+  if r < 1 then return L.SUM_LVPCT:format(math.max(1, math.floor(r * 100 + 0.5))) end
+  local s = ("%.1f"):format(r):gsub("%.0$", "")
+  if ns.lang == "fr" then s = s:gsub("%.", ",") end
+  local one
+  if ns.lang == "fr" then one = r < 2 else one = s == "1" end
+  return (one and L.SUM_LVN1 or L.SUM_LVN):format(s)
+end
+
+-- "Bob, Cara et Dino"
+local function JoinNames(list)
+  if #list <= 1 then return list[1] or "" end
+  return table.concat(list, ", ", 1, #list - 1) .. L.SUM_AND .. list[#list]
 end
 
 -- Elite: an objective's target is elite (rank 1 or 2), read live from LibForeverData; else the
@@ -731,12 +864,13 @@ local function Info(qid, dkey, ctx)
   local pre = ns.QuestPreInfo(qid, log, ctx.cls)
   local low = LowLevel(log, q, st, pre, ctx.lvl)
   local maxL = q.l or q.r or 0
-  local chainXP = QuestXP(qid)
+  local xpGot, xpBase, xpDiff = XPFor(qid, ctx.lvl)
+  local chainXP = xpGot
   local other
   for _, pid in ipairs(pre.chain) do
     local pq = ns.Q[pid]
     if pq and (pq.l or 0) > maxL then maxL = pq.l end
-    chainXP = chainXP + QuestXP(pid)
+    chainXP = chainXP + (XPFor(pid, ctx.lvl))
     if not other then
       for _, k in ipairs(DungeonsOf(pid) or {}) do
         local dk = ns.D[dkey]
@@ -747,7 +881,8 @@ local function Info(qid, dkey, ctx)
   local high = (st == "none") and (low ~= nil or maxL > ctx.lvl + HIGH_GAP) or false
   return {
     q = q, st = st, pre = pre, low = low, maxL = maxL, high = high, other = other,
-    xp = QuestXP(qid), money = QuestMoney(qid), chainN = pre.total + 1, chainXP = chainXP,
+    xp = xpGot, xpBase = xpBase, xpDiff = xpDiff, band = Band(q.l, ctx.lvl),
+    money = QuestMoney(qid), chainN = pre.total + 1, chainXP = chainXP,
     elite = IsElite(qid, q),
   }
 end
@@ -850,6 +985,23 @@ local function ShareTarget(qid, pre, log)
   for _, pid in ipairs(pre and pre.chain or {}) do if ok(pid) then return pid end end
 end
 
+-- Does sharing a row's quest still help someone? Members without WL Helper (their state shows
+-- only once shared), and members who have not got it yet (to take, no answer, declined, log
+-- full, busy, too far; or a missing prerequisite when the share is that prerequisite). Returns
+-- the yes and the names.
+local NEED_SHARE = { take = true, unknown = true, declined = true, full = true, busy = true, far = true }
+local function NeedsShare(qid, shareId, dkey, ctx)
+  local who = {}
+  for _, m in ipairs(ctx.others or {}) do who[#who + 1] = m.name end
+  for _, list in ipairs({ ctx.cols or {}, ctx.extra or {} }) do
+    for _, m in ipairs(list) do
+      local s = ns.MemberQuest and ns.MemberQuest(m.name, qid, dkey) or "unknown"
+      if NEED_SHARE[s] or (s == "pre" and shareId ~= qid) then who[#who + 1] = m.name end
+    end
+  end
+  return #who > 0, who
+end
+
 -- =====================================================================
 --  Group: one column per member whose state is known, the others on one line
 -- =====================================================================
@@ -900,14 +1052,12 @@ local function MakeReward(parent)
   b.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   -- 1 px border in the item's quality colour (card edge for common items)
   b.edge = ns.Outline(b, T.cardEdge)
-  -- the best of the rewards to choose from: a gold ring 2 px outside the icon and a star
+  -- the best of the rewards to choose from: a gold ring 2 px outside the icon
   b.ring = CreateFrame("Frame", nil, b); b.ring:SetPoint("TOPLEFT", -2, 2); b.ring:SetPoint("BOTTOMRIGHT", 2, -2)
   ns.Outline(b.ring, T.gold); b.ring:Hide()
-  b.star = ns.Icon(b, "star", 12, "OVERLAY", T.gold); b.star:SetPoint("TOPLEFT", -4, 4); b.star:Hide()
-  -- an upgrade: the green arrow and the gain under the icon ("+12 %")
-  b.pct = ns.Text(b, ns.F.foot, T.ok); b.pct:SetPoint("TOP", b, "BOTTOM", 6, -2); b.pct:Hide()
+  -- an upgrade: the green gain under the icon ("+12 %")
+  b.pct = ns.Text(b, ns.F.foot, T.ok); b.pct:SetPoint("TOP", b, "BOTTOM", 0, -2); b.pct:Hide()
   if b.pct.SetWordWrap then b.pct:SetWordWrap(false) end
-  b.up = ns.Icon(b, "arrow_up", 10, "OVERLAY", T.ok); b.up:SetPoint("RIGHT", b.pct, "LEFT", -1, 0); b.up:Hide()
   b:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:ClearLines()
@@ -929,7 +1079,7 @@ local function MakeReward(parent)
   return b
 end
 
--- One reward icon: the item, its quality border, the upgrade (arrow and gain), the best choice.
+-- One reward icon: the item, its quality border, the upgrade (the gain), the best choice.
 -- Returns true when it shows a line under the icon.
 local function FillReward(b, rw, best, lvl)
   local icon, link, quality = ItemInfo(rw)
@@ -938,11 +1088,11 @@ local function FillReward(b, rw, best, lvl)
   b.tex:SetTexture(icon)
   b.quality = quality
   b.edge(QualityColor(quality) or T.cardEdge)
-  b.ring:SetShown(best == true); b.star:SetShown(best == true)
+  b.ring:SetShown(best == true)
   b.upText, b.upEmpty = u.up and (u.text or "") or nil, u.empty == true
   if u.up then
-    b.pct:SetText(u.short or u.text or ""); b.pct:Show(); b.up:Show()
-  else b.pct:Hide(); b.up:Hide() end
+    b.pct:SetText(u.short or u.text or ""); b.pct:Show()
+  else b.pct:Hide() end
   return u.up == true
 end
 
@@ -980,14 +1130,14 @@ local function FillCell(c, m, qid, dkey)
   c.tip = tip
 end
 
--- One link of an unfolded chain: state icon, name, level, XP and state; where it happens.
+-- One link of an unfolded chain: name, level, XP and its state in words; where it happens.
+local LINK_X = 8
 local function MakeLink(parent)
   local b = CreateFrame("Button", nil, parent)
   b.wlOwned = true
   b.hl = ns.Tex(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:Hide()
   b.press = ns.Tex(b, "BORDER", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
-  b.icon = ns.Icon(b, "dot", 14, "ARTWORK", T.muted); b.icon:SetPoint("TOPLEFT", 4, -3)
-  b.name = ns.Text(b, ns.F.meta, T.text); b.name:SetPoint("TOPLEFT", 24, -3)
+  b.name = ns.Text(b, ns.F.meta, T.text); b.name:SetPoint("TOPLEFT", LINK_X, -3)
   b.where = ns.Text(b, ns.F.meta, T.muted)
   b.ne = ns.Text(b, ns.F.meta, T.text)
   b.note = ns.Text(b, ns.F.meta, T.muted)
@@ -1022,8 +1172,8 @@ local function MakeObjLine(parent)
   return o
 end
 
--- One quest still to pick up before going in: pin (or clock while it cannot be taken yet), its name
--- and what it waits on; hover for the giver and where, a click guides to the giver.
+-- One quest still to pick up before going in: its name and what it waits on, after a pin when a
+-- click guides to the giver (none while it cannot be taken yet); hover for the giver and where.
 local function MakeReadyLine(parent)
   local o = CreateFrame("Button", nil, parent)
   o.wlOwned = true
@@ -1070,7 +1220,8 @@ local function OutsidePlaces(log, qid, q)
 end
 
 -- the state words of the unfolded links
-local LINK_WORD = { none = "SUM_G_TAKE", on = "SUM_ST_ON", ready = "SUM_ST_READY", done = "SUM_ST_DONE" }
+local LINK_WORD = { none = "SUM_ST_TAKE", on = "SUM_ST_ON", ready = "SUM_ST_READY", done = "SUM_ST_DONE" }
+local LINK_COLOR = { none = "muted", on = "info", ready = "ok", done = "muted" }
 
 local function RowTip(r)
   local qid = r.qid
@@ -1096,7 +1247,15 @@ local function RowTip(r)
   if q.ne then table.insert(lines, ns.T(q.ne)) end
   local rw = q.rw and q.rw ~= "" and q.rw or nil
   if rw then table.insert(lines, { L.TT_REWARD:format(rw), T.gold[1], T.gold[2], T.gold[3] }) end
-  if r.low then table.insert(lines, { L.ST_LOW:format(r.low), T.warn[1], T.warn[2], T.warn[3] }) end
+  local inf = r.inf
+  if inf and r.st ~= "done" then
+    -- what the level word means, and why the XP is lower than the quest's
+    if inf.band then table.insert(lines, L["SUM_BAND_" .. inf.band:upper() .. "_TT"]) end
+    if AtCap() and (inf.xpBase or 0) > 0 then table.insert(lines, L.SUM_XP_CAP_TT)
+    elseif inf.xpBase and inf.xp < inf.xpBase then
+      table.insert(lines, { L.SUM_XP_LESS_TT:format(Big(inf.xp), Big(inf.xpBase), inf.xpDiff or 0), T.warn[1], T.warn[2], T.warn[3] })
+    end
+  end
   if r.st ~= "done" then
     local n = r.pre and r.pre.total or 0
     -- the members past the 4 columns: their state here
@@ -1112,7 +1271,8 @@ local function RowTip(r)
   ns.ShowTip(r, lines)
 end
 
-local ROW_TOP = 8   -- the name's top inset; the check box and the group icons sit on its first line
+local ROW_TOP = 8   -- the name's top inset; the check box, the XP and the group icons sit on its first line
+local PILL_LINE = 24 -- a line of pills (18 tall, centred) and the row's actions (24)
 
 local function MakeRow(parent)
   local S = SW()
@@ -1131,14 +1291,23 @@ local function MakeRow(parent)
   r.doneIcon = ns.Icon(r, "check", 16, "ARTWORK", T.faint); r.doneIcon:SetPoint("TOPLEFT", 8, -ROW_TOP); r.doneIcon:Hide()
   r.name = ns.Text(r, ns.F.body, T.fg)
   r.detail = ns.Text(r, ns.F.meta, T.muted)
-  -- the chain line: chevron + "Chain: 10 quests · 31,500 XP in all"; a click unfolds it
+  -- the number column at the right: the XP you will get ("3 500" 13 + "XP" 11), the money under it
+  r.xpUnit = ns.Text(r, ns.F.meta, T.muted); r.xpUnit:SetWordWrap(false)
+  r.xpNum = ns.Text(r, ns.F.body, T.fg); r.xpNum:SetWordWrap(false)
+  r.xpNum:SetPoint("BOTTOMRIGHT", r.xpUnit, "BOTTOMLEFT", -3, 0)
+  r.money = ns.Text(r, ns.F.meta, T.muted); r.money:SetWordWrap(false)
+  -- the chain line: chevron + "Chain of 10 quests · 31,500 XP in all"; a click unfolds it below
   r.chain = CreateFrame("Button", nil, r)
   r.chain.hl = ns.Tex(r.chain, "BACKGROUND", T.hoverFill); r.chain.hl:SetAllPoints(); r.chain.hl:Hide()
   r.chain.chev = ns.Icon(r.chain, "chevron_right", 12, "ARTWORK", T.accentSoft); r.chain.chev:SetPoint("TOPLEFT", 0, -1)
   r.chain.text = ns.Text(r.chain, ns.F.meta, T.text); r.chain.text:SetPoint("TOPLEFT", 16, 0)
   r.chain:SetScript("OnEnter", function(self)
     self.hl:Show(); self.chev:SetVertexColor(T.fg[1], T.fg[2], T.fg[3])
-    ns.ShowTip(self, { L.OV_CHAIN_TT, f.open[r.qid] and L.SUM_COLLAPSE or L.SUM_EXPAND })
+    local tip = { L.OV_CHAIN_TT }
+    local inf = r.inf
+    if inf and inf.high and not inf.low then tip[#tip + 1] = { L.SUM_HIGH_TT:format(inf.maxL), T.warn[1], T.warn[2], T.warn[3] } end
+    tip[#tip + 1] = f.open[r.qid] and L.SUM_COLLAPSE or L.SUM_EXPAND
+    ns.ShowTip(self, tip)
   end)
   r.chain:SetScript("OnLeave", function(self)
     self.hl:Hide(); self.chev:SetVertexColor(T.accentSoft[1], T.accentSoft[2], T.accentSoft[3]); ns.HideTip()
@@ -1150,13 +1319,27 @@ local function MakeRow(parent)
     Render()
   end)
   r.pills, r.rewards, r.cells, r.links = {}, {}, {}, {}
-  r.share = S.Button(r, L.SUM_SHARE, 0, 24, "secondary", function(self)
+  -- share: a quiet text action, shown only while a member still lacks the quest; it brightens
+  -- when the card is under the mouse
+  r.share = S.Button(r, L.SUM_SHARE, 0, 24, "ghost", function(self)
     if r.shareId and ns.PushQuest and ns.PushQuest(r.shareId) then self:Flash(L.SUM_SHARED) end
-  end, function() return { L.SUM_SHARE, L.SUM_SHARE_TT:format(r.shareId and ns.QName(r.shareId) or "") } end)
+  end, function()
+    local tip = { L.SUM_SHARE }
+    if r.shareWho and #r.shareWho > 0 then tip[#tip + 1] = L.SUM_SHARE_WHO:format(JoinNames(r.shareWho)) end
+    tip[#tip + 1] = L.SUM_SHARE_TT:format(r.shareId and ns.QName(r.shareId) or "")
+    return tip
+  end)
+  local function shareLit(on) if r.share.content then r.share.content:SetAlpha(on and 1 or 0.6) end end
+  r.shareLit = shareLit
+  shareLit(false)
+  if r.share.HookScript then
+    r.share:HookScript("OnEnter", function() shareLit(true) end)
+    r.share:HookScript("OnLeave", function() shareLit(r.IsMouseOver and r:IsMouseOver() or false) end)
+  end
   r.gps = S.IconButton(r, "pin", 24, function()
     return { L.OV_GPS_T:format(r.point and r.point[4] or ""), L.OV_GPS_CLICK }
   end, function() GoPoint(r.point) end)
-  -- "+N": the rewards that do not fit beside the actions, listed in its tooltip
+  -- "+N": the rewards past the 4 slots, listed in its tooltip
   r.more = CreateFrame("Frame", nil, r)
   r.more:SetSize(RW_SIZE, RW_SIZE); r.more:EnableMouse(true); r.more:Hide()
   r.more.hl = ns.Tex(r.more, "BACKGROUND", T.hoverFill); r.more.hl:SetAllPoints(); r.more.hl:Hide()
@@ -1175,14 +1358,15 @@ local function MakeRow(parent)
   end
   r:SetScript("OnMouseDown", function(self) if self.st ~= "done" then self.press:Show(); nudge(self, 1) end end)
   r:SetScript("OnMouseUp", function(self) self.press:Hide(); nudge(self, 0) end)
-  r:SetScript("OnEnter", function(self) if self.st ~= "done" then self.hl:Show() end RowTip(self) end)
-  r:SetScript("OnLeave", function(self) self.hl:Hide(); self.press:Hide(); nudge(self, 0); ns.HideTip() end)
+  r:SetScript("OnEnter", function(self) if self.st ~= "done" then self.hl:Show() end shareLit(true); RowTip(self) end)
+  r:SetScript("OnLeave", function(self) self.hl:Hide(); self.press:Hide(); nudge(self, 0); shareLit(false); ns.HideTip() end)
   return r
 end
 
--- Pills in a flowing line inside `width`; returns the height used.
+-- Pills in flowing lines of 24 (each 18 tall, centred) from (x0, y) inside `width`; returns the
+-- bottom of the last line.
 local function PlacePills(r, list, x0, y, width)
-  local x, rowH, n = 0, 0, 0
+  local x, n = 0, 0
   for i, p in ipairs(list) do
     local pill = r.pills[i] or SW().Pill(r); r.pills[i] = pill
     pill:Set(p[1], p[2], p[3])
@@ -1196,34 +1380,58 @@ local function PlacePills(r, list, x0, y, width)
     local pw = num(pill:GetWidth()) or 60
     -- wider than the whole line: its short label (the full text stays in its tooltip)
     if pw > width and p[5] then pill:Set(p[5], p[2], p[3]); pw = num(pill:GetWidth()) or 60 end
-    if x > 0 and x + pw > width then x = 0; y = y + 18 + 4 end
-    pill:ClearAllPoints(); pill:SetPoint("TOPLEFT", r, "TOPLEFT", x0 + x, -y)
+    if x > 0 and x + pw > width then x = 0; y = y + PILL_LINE end
+    pill:ClearAllPoints(); pill:SetPoint("TOPLEFT", r, "TOPLEFT", x0 + x, -(y + (PILL_LINE - 18) / 2))
     pill:Show()
     x = x + pw + 4
-    rowH = 18
     n = i
   end
   for i = n + 1, #r.pills do r.pills[i]:Hide() end
-  return y + rowH
+  return n > 0 and (y + PILL_LINE) or y
 end
 
 -- Hides what a row turned in does not show.
 local function HideExtras(r)
   r.chain:Hide(); r.share:Hide(); r.gps:Hide(); r.more:Hide()
+  r.xpNum:Hide(); r.xpUnit:Hide(); r.money:Hide()
   for _, p in ipairs(r.pills) do p:Hide() end
   for _, b in ipairs(r.rewards) do b:Hide() end
   for _, l in ipairs(r.links) do l:Hide() end
   for _, c in ipairs(r.cells) do c:Hide() end
 end
 
--- Fills one quest row; returns its height.
+-- The fact line of a card, in words: "Quête niv. 36 · facile · se prend dès le niv. 30" (the level
+-- part in the game's quest colour), or the level you still need, in the warning colour.
+local function FactText(q, inf, lvl)
+  local seg = {}
+  local lowSelf = inf.low and not inf.pre.nextPid
+  if q.l then
+    local band = (not lowSelf) and inf.band and L["SUM_BAND_" .. inf.band:upper()] or nil
+    seg[#seg + 1] = ns.Hex(SW().LevelColor(q.l)) .. L.SUM_FACT_LV:format(q.l) .. (band and (" · " .. band) or "") .. "|r"
+  end
+  if inf.low then
+    local fmt = lowSelf and L.SUM_NEED or L.SUM_NEED_PRE
+    seg[#seg + 1] = ns.Hex(T.warn) .. fmt:format(inf.low, lvl) .. "|r"
+  elseif inf.st == "none" and q.r and q.r > lvl then
+    seg[#seg + 1] = ns.Hex(T.warn) .. L.SUM_NEED:format(q.r, lvl) .. "|r"
+  elseif inf.st == "none" and q.r and q.r < (q.l or 0) then
+    seg[#seg + 1] = L.SUM_FROM:format(q.r)
+  end
+  if (inf.xpBase or 0) > 0 and (inf.xp or 0) > 0 and inf.xp < inf.xpBase and inf.band ~= "grey" then
+    seg[#seg + 1] = L.SUM_XP_LESS
+  end
+  return #seg > 0 and table.concat(seg, " · ") or nil
+end
+
+-- Fills one quest card; returns its height. Always the same order: name (XP and money at the
+-- right), facts, state and actions, rewards, chain (its links unfold right under it).
 local function FillRow(r, qid, dkey, inf, ctx)
   local q = inf.q
   local log = ctx.log
   local st, pre = inf.st, inf.pre
   local done = st == "done"
   local off = IsOff(qid)
-  r.qid, r.dkey, r.st, r.pre, r.low = qid, dkey, st, pre, inf.low
+  r.qid, r.dkey, r.st, r.pre, r.low, r.inf = qid, dkey, st, pre, inf.low, inf
   r.point = (not done) and PointFor(log, qid, q, st, pre) or nil
 
   -- check box (a quest turned in shows a grey check instead)
@@ -1231,31 +1439,34 @@ local function FillRow(r, qid, dkey, inf, ctx)
   r.tick:SetShown(not off)
   r.boxEdge(off and T.btnEdge or T.accent)
 
-  -- the group's columns take the right side of a quest still to do
+  -- the group's columns take the top right of a quest still to do; the XP column sits left of them
   local cols = done and {} or ctx.cols
   local ncol = #cols
-  local right = 12 + (ncol > 0 and (ncol * CELLW + 8) or 0)
-  local wide = CW - TX - right
-  r.wide = wide
+  local groupW = ncol > 0 and (ncol * CELLW + 8) or 0
+  local colR = CW - 12 - groupW
+  local nameW = colR - XPCOL - 12 - TX
+  local wide = colR - TX
+  r.wide, r.nameW, r.colR = wide, nameW, colR
 
-  -- the name in the game's quest colour against your level; muted when left out or turned in
+  -- line 1: the name, always white (muted when left out or turned in)
   r.name:SetText(ns.QName(qid))
-  local nc = (off or done) and T.muted or SW().LevelColor(q.l or q.r)
+  local nc = (off or done) and T.muted or T.fg
   r.name:SetTextColor(nc[1], nc[2], nc[3])
   r.name:ClearAllPoints(); r.name:SetPoint("TOPLEFT", TX, -ROW_TOP)
-  local y = ROW_TOP + LineH(r.name, ns.F.body, wide, r)
+  local y = ROW_TOP + LineH(r.name, ns.F.body, nameW, r)
+  local line2 = y + 3
 
-  -- one muted line: level · XP · money
-  local d = {}
-  if q.l then d[#d + 1] = L.SUM_LV1:format(q.l) end
-  if inf.xp > 0 then d[#d + 1] = L.SUM_XP:format(Big(inf.xp)) end
-  if inf.money > 0 then d[#d + 1] = Money(inf.money) end
-  if #d > 0 then
-    r.detail:SetText(table.concat(d, " · "))
-    r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", TX, -(y + 3))
+  -- line 2: the facts in words
+  local detail
+  if done then detail = q.l and L.SUM_FACT_LV:format(q.l) or nil
+  else detail = FactText(q, inf, ctx.lvl) end
+  if detail then
+    r.detail:SetText(detail)
+    r.detail:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
+    r.detail:ClearAllPoints(); r.detail:SetPoint("TOPLEFT", TX, -line2)
     r.detail:Show()
-    y = y + 3 + LineH(r.detail, ns.F.meta, wide, r)
-  else r.detail:Hide() end
+    y = line2 + LineH(r.detail, ns.F.meta, nameW, r)
+  else r.detail:SetText(""); r.detail:Hide() end
 
   if done then
     HideExtras(r)
@@ -1264,61 +1475,69 @@ local function FillRow(r, qid, dkey, inf, ctx)
     return h
   end
 
-  -- pills only when they say something: in your log / ready, elite, another dungeon, too high
+  -- the number column: the XP you will get (muted when reduced or left out), the money under it
+  if inf.xp > 0 then
+    r.xpUnit:SetText(L.SUM_XP_UNIT)
+    r.xpUnit:ClearAllPoints(); r.xpUnit:SetPoint("TOPRIGHT", r, "TOPLEFT", colR, -(ROW_TOP + 2))
+    r.xpNum:SetText(Big(inf.xp))
+    local xc = (off or (inf.xpBase and inf.xp < inf.xpBase)) and T.muted or T.fg
+    r.xpNum:SetTextColor(xc[1], xc[2], xc[3])
+    r.xpUnit:Show(); r.xpNum:Show()
+  else r.xpUnit:Hide(); r.xpNum:Hide() end
+  if inf.money > 0 then
+    r.money:SetText(Money(inf.money))
+    r.money:ClearAllPoints(); r.money:SetPoint("TOPRIGHT", r, "TOPLEFT", colR, -line2)
+    r.money:Show()
+  else r.money:Hide() end
+
+  -- line 3: one state pill, then what is special; the actions (share, GPS) at the right
   local pills = {}
-  if st == "on" then pills[#pills + 1] = { L.SUM_ST_ON, T.info, nil, { L.SUM_ST_ON } }
-  elseif st == "ready" then pills[#pills + 1] = { L.SUM_ST_READY, T.ok, "check", { L.SUM_ST_READY } }
-  elseif st == "none" and ctx.peBefore and ctx.peBefore[qid] then
-    -- on the guide's "before entering" list: given outside, to pick up before going in
-    local tip = { L.SUM_ST_TAKE, L.SUM_ST_TAKE_TT }
-    local g = GiverText(q, st)
-    if g then tip[#tip + 1] = g end
-    local why = TakeWhy(log, qid, q, ctx.lvl, ctx.cls)
-    if why then tip[#tip + 1] = { why, T.warn[1], T.warn[2], T.warn[3] } end
-    pills[#pills + 1] = { L.SUM_ST_TAKE, T.warn, nil, tip }
-  elseif st == "none" and ctx.peInside and ctx.peInside[qid] then
-    pills[#pills + 1] = { L.SUM_ST_IN, T.muted, "portal", { L.SUM_ST_IN, L.SUM_ST_IN_TT } }
+  if st == "on" then pills[#pills + 1] = { L.SUM_ST_ON, T.info, nil, { L.SUM_ST_ON, L.SUM_ST_ON_TT } }
+  elseif st == "ready" then pills[#pills + 1] = { L.SUM_ST_READY, T.ok, nil, { L.SUM_ST_READY, L.SUM_ST_READY_TT } }
+  else
+    local before = ctx.peBefore and ctx.peBefore[qid]
+    local inside = not before and ((ctx.peInside and ctx.peInside[qid])
+      or (q.s and q.s.i) or (q.si and not (q.s and q.s.m))) and true or false
+    if inside then
+      pills[#pills + 1] = { L.SUM_ST_IN, T.fg, nil, { L.SUM_ST_IN, L.SUM_ST_IN_TT } }
+    else
+      local tip = { L.SUM_ST_TAKE, L.SUM_ST_TAKE_TT }
+      local g = GiverText(q, st)
+      if g then tip[#tip + 1] = g end
+      local why = TakeWhy(log, qid, q, ctx.lvl, ctx.cls)
+      if why then tip[#tip + 1] = { why, T.warn[1], T.warn[2], T.warn[3] } end
+      pills[#pills + 1] = { L.SUM_ST_TAKE, off and T.fg or T.warn, nil, tip }
+    end
   end
-  if inf.elite then pills[#pills + 1] = { L.SUM_ELITE, T.warn, "skull", { L.SUM_ELITE, L.SUM_ELITE_TT } } end
+  if inf.elite then pills[#pills + 1] = { L.SUM_ELITE, T.warn, nil, { L.SUM_ELITE, L.SUM_ELITE_TT } } end
   if inf.other then
     local dn = ns.DName(inf.other)
-    pills[#pills + 1] = { L.SUM_OTHER:format(dn), T.info, "portal", { L.SUM_OTHER:format(dn), L.SUM_OTHER_TT:format(dn) }, L.SUM_OTHER_SHORT }
+    pills[#pills + 1] = { L.SUM_OTHER:format(dn), T.info, nil, { L.SUM_OTHER:format(dn), L.SUM_OTHER_TT:format(dn) }, L.SUM_OTHER_SHORT }
   end
-  if inf.high then
-    local lv = inf.low or inf.maxL
-    pills[#pills + 1] = { L.SUM_HIGH, T.warn, "warning", { L.SUM_HIGH, inf.low and L.ST_LOW:format(inf.low) or L.SUM_HIGH_TT:format(lv) } }
-  end
-  if #pills > 0 then y = PlacePills(r, pills, TX, y + 6, wide) else PlacePills(r, {}, TX, y, wide) end
-
-  -- the chain block, unfoldable: "Chain: 10 quests · 31,500 XP in all"
-  local hasChain = pre.total > 0
-  if hasChain then
-    r.chain.text:SetText(L.SUM_CHAIN_LINE:format(inf.chainN, Big(inf.chainXP)))
-    ns.SetHDIcon(r.chain.chev, f.open[qid] and "chevron_down" or "chevron_right", T.accentSoft)
-    local th = LineH(r.chain.text, ns.F.meta, wide - 16, r.chain)
-    r.chain:SetSize(wide, th + 2)
-    r.chain:ClearAllPoints(); r.chain:SetPoint("TOPLEFT", TX, -(y + 6))
-    r.chain:Show()
-    y = y + 6 + th + 2
-  else r.chain:Hide() end
-
-  -- the actions at the right (GPS, share), then up to 4 reward icons (30 px) as the room left
-  -- holds; the others behind a "+N" marker
+  local lineY = y + 6
   r.shareId = ctx.grouped and ShareTarget(qid, pre, log) or nil
-  r.share:SetShown(r.shareId ~= nil)
-  r.gps:SetShown(r.point ~= nil)
-  local actY = y + 6
-  local rightX = TX + wide
+  local need, who = false, nil
+  if r.shareId then need, who = NeedsShare(qid, r.shareId, dkey, ctx) end
+  r.shareWho = who
+  local ax = colR
   if r.point then
-    r.gps:ClearAllPoints(); r.gps:SetPoint("TOPRIGHT", r, "TOPLEFT", rightX, -actY); rightX = rightX - 24 - 4
-  end
-  if r.shareId then
+    r.gps:ClearAllPoints(); r.gps:SetPoint("TOPRIGHT", r, "TOPLEFT", ax, -lineY); r.gps:Show()
+    ax = ax - 24 - 4
+  else r.gps:Hide() end
+  if r.shareId and need then
     local sw = num(r.share:GetWidth()) or 0
-    if sw < 40 then sw = 80 end
-    r.share:ClearAllPoints(); r.share:SetPoint("TOPRIGHT", r, "TOPLEFT", rightX, -actY); rightX = rightX - sw - 4
-  end
+    if sw < 40 then sw = 70 end
+    r.share:ClearAllPoints(); r.share:SetPoint("TOPRIGHT", r, "TOPLEFT", ax, -lineY); r.share:Show()
+    if r.shareLit then r.shareLit(r.hl:IsShown()) end
+    ax = ax - sw - 4
+  else r.share:Hide() end
+  y = PlacePills(r, pills, TX, lineY, math.max(60, math.min(nameW, ax - 8 - TX)))
+  if y < lineY + PILL_LINE and (r.point or r.share:IsShown()) then y = lineY + PILL_LINE end
+
+  -- line 4: up to 4 reward icons (30 px) over the card's width; the others behind a "+N" marker
   local list = Rewards(qid, q)
-  local slots = math.max(1, math.min(MAX_REWARDS, math.floor((rightX - TX + RW_STEP - RW_SIZE) / RW_STEP)))
+  local rwY = y + 6
+  local slots = math.max(1, math.min(MAX_REWARDS, math.floor((wide + RW_STEP - RW_SIZE) / RW_STEP)))
   local showN = #list
   if showN > slots then showN = slots - 1 end
   local rwLvl = RewardLevel(q)
@@ -1328,7 +1547,7 @@ local function FillRow(r, qid, dkey, inf, ctx)
     n = n + 1
     local b = r.rewards[n] or MakeReward(r); r.rewards[n] = b
     if FillReward(b, list[i], bestI == i, rwLvl) then labels = true end
-    b:ClearAllPoints(); b:SetPoint("TOPLEFT", TX + (n - 1) * RW_STEP, -actY)
+    b:ClearAllPoints(); b:SetPoint("TOPLEFT", TX + (n - 1) * RW_STEP, -rwY)
     b:Show()
   end
   for i = n + 1, #r.rewards do r.rewards[i]:Hide() end
@@ -1347,39 +1566,49 @@ local function FillRow(r, qid, dkey, inf, ctx)
       names[#names + 1] = line
     end
     r.more.tip = names
-    r.more:ClearAllPoints(); r.more:SetPoint("TOPLEFT", TX + showN * RW_STEP, -actY)
+    r.more:ClearAllPoints(); r.more:SetPoint("TOPLEFT", TX + showN * RW_STEP, -rwY)
     r.more:Show()
   else r.more:Hide() end
   r.rwLabels = labels
-  if #list > 0 then y = y + 6 + math.max(24, RW_SIZE + (labels and RW_LABEL or 0))
-  elseif r.point or r.shareId then y = y + 6 + 24 end
+  if #list > 0 then y = rwY + RW_SIZE + (labels and RW_LABEL or 0) end
 
-  -- the unfolded chain: one line per link (and the quest itself), where it happens
+  -- line 5: the chain, unfoldable: "Chain of 10 quests · 31,500 XP in all · goes up to level 44"
+  local hasChain = pre.total > 0
+  if hasChain then
+    local t = L.SUM_CHAIN_LINE:format(inf.chainN, Big(inf.chainXP))
+    if inf.high and not inf.low then t = t .. " · " .. ns.Hex(T.warn) .. L.SUM_CHAIN_HIGH:format(inf.maxL) .. "|r" end
+    r.chain.text:SetText(t)
+    ns.SetHDIcon(r.chain.chev, f.open[qid] and "chevron_down" or "chevron_right", T.accentSoft)
+    local th = LineH(r.chain.text, ns.F.meta, wide - 16, r.chain)
+    r.chain:SetSize(wide, th + 2)
+    r.chain:ClearAllPoints(); r.chain:SetPoint("TOPLEFT", TX, -(y + 6))
+    r.chain:Show()
+    y = y + 6 + th + 2
+  else r.chain:Hide() end
+
+  -- the unfolded chain, right under its line: one line per link (and the quest itself)
   local li = 0
   if hasChain and f.open[qid] then
     y = y + 4
     local ids = {}
     for _, pid in ipairs(pre.chain) do ids[#ids + 1] = pid end
     ids[#ids + 1] = qid
+    local lw = wide - LINK_X
     for _, id in ipairs(ids) do
       local lq = ns.Q[id]
       if lq then
         li = li + 1
         local b = r.links[li] or MakeLink(r); r.links[li] = b
         local ls = QState(log, id)
-        local word = L[LINK_WORD[ls] or LINK_WORD.none]
-        local icon, col = "dot", T.faint
-        if ls == "done" then icon, col = "check", T.faint elseif ls == "ready" then icon, col = "check", T.ok elseif ls == "on" then icon, col = "clock", T.info end
-        ns.SetHDIcon(b.icon, icon, col)
         local parts = { ns.QName(id) .. (id == qid and (" (" .. L.OV_THIS .. ")") or "") }
-        if lq.l then parts[#parts + 1] = L.SUM_LV1:format(lq.l) end
-        local xp = QuestXP(id)
+        if lq.l then parts[#parts + 1] = L.SUM_LINK_LV:format(lq.l) end
+        local xp = XPFor(id, ctx.lvl)
         if xp > 0 then parts[#parts + 1] = L.SUM_XP:format(Big(xp)) end
-        parts[#parts + 1] = word
+        local wc = (ls == "none" and not off) and T.warn or T[LINK_COLOR[ls] or "muted"] or T.muted
+        parts[#parts + 1] = ns.Hex(wc) .. L[LINK_WORD[ls] or LINK_WORD.none] .. "|r"
         b.name:SetText(table.concat(parts, " · "))
         local tc = ls == "done" and T.muted or T.text
         b.name:SetTextColor(tc[1], tc[2], tc[3])
-        local lw = wide - 24 - 4
         local bh = 3 + LineH(b.name, ns.F.meta, lw, b)
         -- where and what, for a link not turned in yet: giver / objective, and the FDJ note
         local where, note = nil, nil
@@ -1392,13 +1621,13 @@ local function FillRow(r, qid, dkey, inf, ctx)
           if fn then note = L.SUM_FDJ .. L.COLON .. fn end
         end
         if where then
-          b.where:SetText(where); b.where:ClearAllPoints(); b.where:SetPoint("TOPLEFT", 24, -(bh + 3)); b.where:Show()
+          b.where:SetText(where); b.where:ClearAllPoints(); b.where:SetPoint("TOPLEFT", LINK_X, -(bh + 3)); b.where:Show()
           bh = bh + 3 + LineH(b.where, ns.F.meta, lw, b, 3)
         else b.where:Hide() end
         -- the data's note says how and where (3 lines; all of it in the tooltip)
         local ne = ls ~= "done" and lq.ne and ns.T(lq.ne) or nil
         if ne then
-          b.ne:SetText(ne); b.ne:ClearAllPoints(); b.ne:SetPoint("TOPLEFT", 24, -(bh + 3)); b.ne:Show()
+          b.ne:SetText(ne); b.ne:ClearAllPoints(); b.ne:SetPoint("TOPLEFT", LINK_X, -(bh + 3)); b.ne:Show()
           bh = bh + 3 + LineH(b.ne, ns.F.meta, lw, b, 3)
         else b.ne:Hide() end
         -- each place of an objective outside, with its GPS
@@ -1411,14 +1640,14 @@ local function FillRow(r, qid, dkey, inf, ctx)
             ol.point = pl.point
             local oh = LineH(ol.text, ns.F.meta, lw - 16, ol)
             ol:SetSize(lw, oh + 2)
-            ol:ClearAllPoints(); ol:SetPoint("TOPLEFT", b, "TOPLEFT", 24, -(bh + 3))
+            ol:ClearAllPoints(); ol:SetPoint("TOPLEFT", b, "TOPLEFT", LINK_X, -(bh + 3))
             ol:Show()
             bh = bh + 3 + oh + 2
           end
         end
         for k = oi + 1, #b.objs do b.objs[k]:Hide() end
         if note then
-          b.note:SetText(note); b.note:ClearAllPoints(); b.note:SetPoint("TOPLEFT", 24, -(bh + 3)); b.note:Show()
+          b.note:SetText(note); b.note:ClearAllPoints(); b.note:SetPoint("TOPLEFT", LINK_X, -(bh + 3)); b.note:Show()
           bh = bh + 3 + LineH(b.note, ns.F.meta, lw, b, 3)
         else b.note:Hide() end
         bh = bh + 4
@@ -1522,10 +1751,14 @@ local function Build()
   f.child = f.sa.child
   f.child:SetWidth(CW)
   local c = f.child
-  f.heroes, f.info, f.gpsBtns, f.notes, f.rows, f.heads, f.folds = {}, {}, {}, {}, {}, {}, {}
+  f.heroes, f.gpsBtns, f.notes, f.rows, f.heads, f.folds = {}, {}, {}, {}, {}, {}
   f.rdyLines, f.rdySubs = {}, {}
-  -- your selection's totals (they follow your ticks), and the members without WL Helper, once
-  f.totals = ns.Text(c, ns.F.body, T.fg)
+  -- the facts list of each dungeon: labels (11 muted) and values (13)
+  f.factLabels, f.factValues = {}, {}
+  -- several dungeons: the whole route's gains at the end
+  f.routeHead = MakeHead(c); f.routeHead.cols:Hide(); f.routeHead:Hide()
+  f.routeLine = ns.Text(c, ns.F.body, T.fg); f.routeLine:Hide()
+  -- the members without WL Helper, and the known ones past the 4 columns, under "Quests to do"
   f.noHelper = ns.Text(c, ns.F.meta, T.muted)
   f.extra = ns.Text(c, ns.F.meta, T.muted)
   f.empty = S.EmptyState(c, "portal", L.OV_EMPTY_T, L.OV_EMPTY)
@@ -1620,20 +1853,28 @@ local function Build()
   end)
 end
 
--- A line of facts: HD icon 14 at the left edge, body text at 22.
-local function InfoLine(i, icon, color, text, textColor)
-  local c = f.child
-  local it = f.info[i]
-  if not it then
-    it = { icon = ns.Icon(c, "dot", 14, "ARTWORK", T.muted), fs = ns.Text(c, ns.F.body, T.text) }
-    f.info[i] = it
+-- "8 quêtes cochées · 42 300 XP (environ 80 % d'un niveau) · 1 po 15 pa · 3 objets dont 1
+-- amélioration": what a dungeon (or the whole route) gives for the ticked quests.
+local function GainsText(a)
+  local parts = { ns.Plural(a.ticked, "SUM_GQ1", "SUM_GQ", a.ticked) }
+  if a.xp > 0 then
+    local x = L.SUM_XP:format(Big(a.xp))
+    local share = LevelShare(a.xp)
+    if share then x = x .. " " .. share end
+    parts[#parts + 1] = x
   end
-  ns.SetHDIcon(it.icon, icon, color)
-  it.fs:SetText(text)
-  local tc = textColor or T.text
-  it.fs:SetTextColor(tc[1], tc[2], tc[3])
-  it.icon:Show(); it.fs:Show()
-  return it
+  if a.money > 0 then parts[#parts + 1] = Money(a.money) end
+  -- "4 objets dont 2 améliorations" (one per quest at most for rewards to choose from)
+  if a.items > 0 then
+    local it = ns.Plural(a.items, "SUM_IT1", "SUM_IT", a.items)
+    if a.up > 0 then
+      local single = a.up == 1 or (ns.lang == "fr" and a.up == 0)
+      local fmt = (single and L.SUM_IT_UP1 or L.SUM_IT_UP):gsub("%%d", ns.Hex(T.ok) .. "%%d|r", 1)
+      it = fmt:format(it, a.up)
+    end
+    parts[#parts + 1] = it
+  end
+  return table.concat(parts, " · ")
 end
 
 -- =====================================================================
@@ -1652,35 +1893,36 @@ Render = function()
   local members = Members()
   local cols, others, extra = SplitMembers(members)
   f.extraCols = extra
-  local ctx = { log = log, cls = cls, lvl = lvl, cols = cols, grouped = #members > 0 }
+  local ctx = { log = log, cls = cls, lvl = lvl, cols = cols, others = others, extra = extra, grouped = #members > 0 }
   local multi = #keys > 1
-  if multi then
-    f.title:SetText(L.SUM_ROUTE_T)
-    f.subtitle:SetText(ns.Plural(#keys, "SUM_DG1", "SUM_DG", #keys))
-  else
-    -- the picture below names the dungeon
-    f.title:SetText(L.SUM_T)
-    f.subtitle:SetText("")
-  end
+  f.title:SetText(multi and L.SUM_ROUTE_T or L.SUM_T)
   local c = f.child
 
-  -- every quest's facts first: the defaults, then the totals over the ticked ones
+  -- every quest's facts first: the defaults, then the gains of the ticked ones, per dungeon and
+  -- for the whole route (a quest shared by two dungeons counts once in the route)
   local per, sel, seen = {}, {}, {}
   local routeChanged = false
-  local tq, txp, tmoney, titems, tup = 0, 0, 0, 0, 0
+  local function Acc() return { ticked = 0, q = 0, xp = 0, money = 0, items = 0, up = 0 } end
+  local route, acc, seenD, facts = Acc(), {}, {}, {}
   local nQuests, nTodo = 0, 0
-  local shareList, shareSeen = {}, {}
-  local function count(id)
-    if seen[id] then return end
-    seen[id] = true
-    local q = ns.Q[id]
-    tq = tq + 1
-    txp = txp + QuestXP(id)
-    tmoney = tmoney + QuestMoney(id)
-    if q then titems = titems + ItemCount(id, q); tup = tup + UpCount(id, q) end
+  local shareList, shareSeen, seenTick = {}, {}, {}
+  local function add(a, id)
+    local fc = facts[id]
+    if not fc then
+      local q = ns.Q[id]
+      fc = { xp = (XPFor(id, lvl)), money = QuestMoney(id), items = q and ItemCount(id, q) or 0, up = q and UpCount(id, q) or 0 }
+      facts[id] = fc
+    end
+    a.q = a.q + 1; a.xp = a.xp + fc.xp; a.money = a.money + fc.money
+    a.items = a.items + fc.items; a.up = a.up + fc.up
+  end
+  local function count(id, dkey)
+    if not seen[id] then seen[id] = true; add(route, id) end
+    if not seenD[dkey][id] then seenD[dkey][id] = true; add(acc[dkey], id) end
   end
   for _, dkey in ipairs(keys) do
     local todo, done = {}, {}
+    acc[dkey], seenD[dkey] = Acc(), {}
     for _, qid in ipairs(ns.DungeonQuests(dkey, cls)) do
       local inf = Info(qid, dkey, ctx)
       if ApplyDefault(qid, inf) and WLDTDB.sel and WLDTDB.sel[dkey] then routeChanged = true end
@@ -1692,8 +1934,10 @@ Render = function()
       end
       if not IsOff(qid) and inf.st ~= "done" then
         sel[#sel + 1] = { qid = qid, dkey = dkey, st = inf.st }
-        for k, pid in ipairs(inf.pre.chain) do if inf.pre.states[k] ~= "done" then count(pid) end end
-        count(qid)
+        acc[dkey].ticked = acc[dkey].ticked + 1
+        if not seenTick[qid] then seenTick[qid] = true; route.ticked = route.ticked + 1 end
+        for k, pid in ipairs(inf.pre.chain) do if inf.pre.states[k] ~= "done" then count(pid, dkey) end end
+        count(qid, dkey)
         local function addShare(id)
           local q = ns.Q[id]
           if not shareSeen[id] and log[id] and q and q.sh ~= false and (not ns.Pushable or ns.Pushable(id, log[id])) then
@@ -1714,6 +1958,18 @@ Render = function()
     per[dkey] = { todo = todo, done = done }
   end
   f.shareList = shareList
+  f.gains, f.routeGains = acc, route
+  f.totalsInfo = { quests = route.q, xp = route.xp, money = route.money, items = route.items, upgrades = route.up }
+  -- the subtitle: "2 donjons · 23 quêtes cochées · 131 970 XP" (the picture names one dungeon)
+  do
+    local parts = {}
+    if multi then parts[#parts + 1] = ns.Plural(#keys, "SUM_DG1", "SUM_DG", #keys) end
+    if multi and route.ticked > 0 then
+      parts[#parts + 1] = ns.Plural(route.ticked, "SUM_GQ1", "SUM_GQ", route.ticked)
+      if route.xp > 0 then parts[#parts + 1] = L.SUM_XP:format(Big(route.xp)) end
+    end
+    f.subtitle:SetText(table.concat(parts, " · "))
+  end
   -- the guide's "before entering" list (Engine PreEntry) over the ticks: what to pick up outside
   local pe, peB, peI = {}, {}, {}
   if ns.PreEntryQuests then
@@ -1728,7 +1984,7 @@ Render = function()
   end
   ctx.peBefore, ctx.peInside = peB, peI
   f.ready = {}
-  f.totalsInfo = { quests = tq, xp = txp, money = tmoney, items = titems, upgrades = tup }
+  f.gainFs = {}
   local allDone = nQuests > 0 and nTodo == 0
   f.allDoneNow = allDone
   -- nothing left to do but a dungeon to walk through (a class-quest card is no place to run)
@@ -1742,52 +1998,11 @@ Render = function()
   end
 
   local y = 0
-  local hi, ii, gi, ni, ri, hdi, fi = 0, 0, 0, 0, 0, 0, 0
-  local rli, rsi = 0, 0
-  local totalsShown, noHelperShown, allDoneShown, extraShown = false, false, false, false
+  local hi, gi, ni, ri, hdi, fi = 0, 0, 0, 0, 0, 0
+  local rli, rsi, fli, fvi = 0, 0, 0, 0
+  local noHelperShown, allDoneShown, extraShown, routeShown = false, false, false, false
   local noHelperText, extraText
 
-  -- "Your selection: 7 quests · 38,900 XP · 3g 20s · 4 items including 2 upgrades", then the members without WL Helper, once
-  local function TotalsBlock()
-    if tq > 0 then
-      local parts = { ns.Plural(tq, "SUM_Q1", "SUM_Q", tq) }
-      if txp > 0 then parts[#parts + 1] = L.SUM_XP:format(Big(txp)) end
-      if tmoney > 0 then parts[#parts + 1] = Money(tmoney) end
-      -- "4 objets dont 2 améliorations" (one per quest at most for rewards to choose from)
-      if titems > 0 then
-        local it = ns.Plural(titems, "SUM_IT1", "SUM_IT", titems)
-        if tup > 0 then it = ns.Plural(tup, "SUM_IT_UP1", "SUM_IT_UP", it, tup) end
-        parts[#parts + 1] = it
-      end
-      f.totals:SetText(L.SUM_SEL:format(table.concat(parts, " · ")))
-      f.totals:SetTextColor(T.fg[1], T.fg[2], T.fg[3])
-    else
-      f.totals:SetText(L.SUM_SEL0)
-      f.totals:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
-    end
-    f.totals:ClearAllPoints(); f.totals:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
-    f.totals:Show(); totalsShown = true
-    y = y + LineH(f.totals, ns.F.body, CW, c)
-    if #others > 0 then
-      local names = {}
-      for _, m in ipairs(others) do names[#names + 1] = m.name end
-      noHelperText = ns.Plural(#others, "SUM_NOHELPER1", "SUM_NOHELPER", table.concat(names, ", "))
-      f.noHelper:SetText(noHelperText)
-      f.noHelper:ClearAllPoints(); f.noHelper:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 4))
-      f.noHelper:Show(); noHelperShown = true
-      y = y + 4 + LineH(f.noHelper, ns.F.meta, CW, c, 3)
-    end
-    if #extra > 0 then
-      local names = {}
-      for _, m in ipairs(extra) do names[#names + 1] = m.name end
-      extraText = ns.Plural(#extra, "SUM_EXTRA1", "SUM_EXTRA", table.concat(names, ", "))
-      f.extra:SetText(extraText)
-      f.extra:ClearAllPoints(); f.extra:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 4))
-      f.extra:Show(); extraShown = true
-      y = y + 4 + LineH(f.extra, ns.F.meta, CW, c, 3)
-    end
-    y = y + 8
-  end
   local function AllDoneBlock(title)
     f.allDone:ClearAllPoints(); f.allDone:SetPoint("TOP", c, "TOP", 0, -(y + 12))
     f.allDone:SetWrapWidth(CW)
@@ -1796,56 +2011,75 @@ Render = function()
     y = y + 12 + (num(eh) or 80) + 12
   end
 
-  -- "Can I go in now?": the ticked quests given outside (the guide's "before entering" list), in
-  -- your log or not; the ones still to pick up by name, each with what it waits on
+  -- The facts list: a label (11 muted, 100 wide) at the left, its value (13) at FX; no icons.
+  local function FactLabel(text)
+    fli = fli + 1
+    local fs = f.factLabels[fli] or ns.Text(c, ns.F.meta, T.muted); f.factLabels[fli] = fs
+    fs:SetText(text)
+    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 2))
+    fs:Show()
+    return y + 2 + LineH(fs, ns.F.meta, FX - 12, c)
+  end
+  -- one value line at y (y moves under it)
+  local function FactValue(text, color, w, maxLines)
+    fvi = fvi + 1
+    local fs = f.factValues[fvi] or ns.Text(c, ns.F.body, T.text); f.factValues[fvi] = fs
+    fs:SetText(text)
+    local col = color or T.text
+    fs:SetTextColor(col[1], col[2], col[3])
+    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", FX, -y)
+    fs:Show()
+    y = y + LineH(fs, ns.F.body, w or (CW - FX), c, maxLines)
+    return fs
+  end
+  -- a detail under a value (11 muted)
   local function SubLine(text)
     rsi = rsi + 1
     local fs = f.rdySubs[rsi] or ns.Text(c, ns.F.meta, T.muted); f.rdySubs[rsi] = fs
     fs:SetText(text)
     fs:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
-    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 22, -(y - 2))
+    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", FX, -(y + 3))
     fs:Show()
-    y = y - 2 + LineH(fs, ns.F.meta, CW - 22, c) + 6
+    y = y + 3 + LineH(fs, ns.F.meta, CW - FX, c)
     return fs
   end
+
+  -- "Before you go in": the ticked quests given outside (the guide's "before entering" list), in
+  -- your log or not; the ones still to pick up by name, each with what it waits on
   local MAX_MISS = 5
-  local function ReadyBlock(dkey, place)
+  local function ReadyBlock(dkey)
     local rd = pe[dkey]
-    if not rd then return end
     local have, miss, inside = 0, {}, 0
-    for id in pairs(rd.before) do
-      local s = QState(log, id)
-      if s == "on" or s == "ready" then have = have + 1 elseif s == "none" then miss[#miss + 1] = id end
-    end
-    for id in pairs(rd.inside) do
-      if not rd.before[id] and QState(log, id) == "none" then inside = inside + 1 end
+    if rd then
+      for id in pairs(rd.before) do
+        local s = QState(log, id)
+        if s == "on" or s == "ready" then have = have + 1 elseif s == "none" then miss[#miss + 1] = id end
+      end
+      for id in pairs(rd.inside) do
+        if not rd.before[id] and QState(log, id) == "none" then inside = inside + 1 end
+      end
     end
     local nOut = have + #miss
-    if nOut + inside == 0 then return end
+    if nOut + inside == 0 then FactValue(L.SUM_RDY_NOTHING, T.text); return end
     local info = { have = have, missing = miss, inside = inside, lines = {} }
     f.ready[dkey] = info
     if #miss == 0 then
-      ii = ii + 1
-      local txt = nOut == 0 and L.SUM_RDY_NONE or ns.Plural(nOut, "SUM_RDY_OK1", "SUM_RDY_OK", nOut)
-      local it = InfoLine(ii, "check", T.ok, txt, T.ok)
-      place(it, CW - 22)
-      info.head = it.fs
+      if nOut == 0 then info.head = FactValue(L.SUM_RDY_NOTHING, T.text)
+      else info.head = FactValue(ns.Plural(nOut, "SUM_RDY_OK1", "SUM_RDY_OK", nOut), T.ok) end
       if inside > 0 then
         info.sub = SubLine(nOut == 0 and ns.Plural(inside, "SUM_RDY_INALL1", "SUM_RDY_INALL")
           or ns.Plural(inside, "SUM_RDY_IN1", "SUM_RDY_IN", inside))
       end
       return
     end
-    ii = ii + 1
-    local it = InfoLine(ii, "warning", T.warn, ns.Plural(#miss, "SUM_RDY_MISS1", "SUM_RDY_MISS", #miss), T.warn)
-    place(it, CW - 22)
-    info.head = it.fs
+    info.head = FactValue(ns.Plural(#miss, "SUM_RDY_MISS1", "SUM_RDY_MISS", #miss), T.warn)
     table.sort(miss, function(a, b)
       local la, lb = ns.Q[a].l or 0, ns.Q[b].l or 0
       if la ~= lb then return la < lb end
       return a < b
     end)
-    y = y - 2
+    y = y + 4
+    local lw = CW - FX
     for i, id in ipairs(miss) do
       if i > MAX_MISS then break end
       local q = ns.Q[id]
@@ -1858,7 +2092,8 @@ Render = function()
       o.text:SetText(why and (name .. " · " .. why) or name)
       local tc = why and T.muted or T.text
       o.text:SetTextColor(tc[1], tc[2], tc[3])
-      ns.SetHDIcon(o.icon, why and "clock" or (o.point and "pin" or "dot"), why and T.muted or T.accentSoft)
+      -- the pin only where a click guides somewhere (not while it waits)
+      o.icon:SetShown(o.point ~= nil and not why)
       local tip = { name }
       local g = GiverText(q, "none")
       if g then tip[#tip + 1] = g end
@@ -1868,14 +2103,14 @@ Render = function()
         tip[#tip + 1] = L.OV_GPS_CLICK
       end
       o.tip = tip
-      local th = LineH(o.text, ns.F.meta, CW - 22 - 16, o)
-      o:SetSize(CW - 22, th + 3)
-      o:ClearAllPoints(); o:SetPoint("TOPLEFT", c, "TOPLEFT", 22, -y)
+      local th = LineH(o.text, ns.F.meta, lw - 16, o)
+      o:SetSize(lw, th + 3)
+      o:ClearAllPoints(); o:SetPoint("TOPLEFT", c, "TOPLEFT", FX, -y)
       o:Show()
       info.lines[#info.lines + 1] = o
       y = y + th + 3 + 2
     end
-    y = y + 4
+    y = y - 2
     if #miss > MAX_MISS then
       info.more = SubLine(ns.Plural(#miss - MAX_MISS, "SUM_RDY_MORE1", "SUM_RDY_MORE", #miss - MAX_MISS))
     end
@@ -1883,17 +2118,24 @@ Render = function()
       info.sub = SubLine(ns.Plural(inside, "SUM_RDY_IN1", "SUM_RDY_IN", inside))
     end
   end
-
-  -- the route of several dungeons: its totals (or "all turned in") first
-  if multi then
-    if allDone then AllDoneBlock(L.SUM_ALLDONE_TN) elseif nTodo > 0 then TotalsBlock() end
+  -- one fact: its label, then its value(s); 6 under the taller of the two
+  local function Fact(label, fill)
+    local top = y
+    local lb = FactLabel(label)
+    fill()
+    y = math.max(y, lb) + 6
+    return top
   end
 
-  -- the dungeons, one after the other: picture, entrance and key, quests to do, quests turned in
+  -- several dungeons, every quest turned in: the fact first
+  if multi and allDone then AllDoneBlock(L.SUM_ALLDONE_TN) end
+
+  -- the dungeons, one after the other: picture, facts (entrance, key, before you go in, gains),
+  -- quests to do, quests turned in
   for di, dkey in ipairs(keys) do
     local d = ns.D[dkey]
     local todo, done = per[dkey].todo, per[dkey].done
-    if di > 1 or (multi and y > 0) then y = y + 8 end
+    if di > 1 then y = y + 24 elseif y > 0 then y = y + 8 end
     hi = hi + 1
     local hero = f.heroes[hi] or MakeHero(c); f.heroes[hi] = hero
     if hi == 1 then f.hero = hero end
@@ -1901,12 +2143,17 @@ Render = function()
     hero:SetSize(CW, hh)
     hero:ClearAllPoints(); hero:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
     if ns.DungeonArt then ns.DungeonArt(hero.art, dkey, hero.big) end
+    -- "Conseillé niv. 38 à 48 · Groupe de 5 · tu es niv. 41" (your level in orange when below)
     local parts = {}
-    if d.lvl and d.lvl[1] then
-      local lo, hi2 = d.lvl[1], d.lvl[2] or d.lvl[1]
-      table.insert(parts, lo == hi2 and L.SUM_LV1:format(lo) or L.SUM_LV:format(lo, hi2))
+    local lo = d.lvl and d.lvl[1]
+    if lo then
+      local hi2 = d.lvl[2] or lo
+      table.insert(parts, lo == hi2 and L.SUM_HERO_LV1:format(lo) or L.SUM_HERO_LV:format(lo, hi2))
     end
     table.insert(parts, L.SUM_SIZE:format(d.size or 5))
+    local you = L.SUM_HERO_YOU:format(lvl)
+    if lo and lvl < lo then you = ns.Hex(T.warn) .. you .. "|r" end
+    table.insert(parts, you)
     hero.lvl:SetText(table.concat(parts, " · "))
     hero.name:SetText(ns.DName(dkey))
     local lvlH = LineH(hero.lvl, ns.F.meta, CW - 24, hero, 1)
@@ -1919,54 +2166,50 @@ Render = function()
     -- one dungeon, every quest turned in: say it at the top, offer another dungeon
     if not multi and dgDone then AllDoneBlock(L.SUM_ALLDONE_T:format(ns.DName(dkey))) end
 
-    -- entrance (with its GPS) and key: two short lines, only while something is left to do
+    -- where is it, can I go, what do I get: only while something is left to do
     if not dgDone then
-      local function place(it, w, extra)
-        it.icon:ClearAllPoints(); it.icon:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 1))
-        it.fs:ClearAllPoints(); it.fs:SetPoint("TOPLEFT", c, "TOPLEFT", 22, -y)
-        local h = LineH(it.fs, ns.F.body, w, c)
-        y = y + math.max(h, extra or 0) + 6
-      end
       local point = d.e and d.e.m and { d.e.m, d.e.x, d.e.y, ns.DName(dkey) } or nil
       local loc = (GetLocale and GetLocale() == "frFR" and d.locf) or ns.T(d.loc) or ""
       if d.cq and d.home then loc = L.CQ_IN:format(ns.DName(d.home)) end
       local entry = ns.T(d.ed) or loc
       if entry and entry ~= "" then
-        ii = ii + 1
-        local it = InfoLine(ii, "portal", T.muted, L.OV_ENTRANCE:format(entry), T.text)
-        if point then
-          gi = gi + 1
-          local g = f.gpsBtns[gi]
-          if not g then
-            g = S.IconButton(c, "pin", 24, function(self) return { L.OV_GPS_T:format(L.OV_ENTRY_T), L.OV_GPS_CLICK } end,
-              function(self) GoPoint(self.point) end)
-            f.gpsBtns[gi] = g
+        Fact(L.SUM_F_ENTRY, function()
+          if point then
+            gi = gi + 1
+            local g = f.gpsBtns[gi]
+            if not g then
+              g = S.IconButton(c, "pin", 24, function(self) return { L.OV_GPS_T:format(L.OV_ENTRY_T), L.OV_GPS_CLICK } end,
+                function(self) GoPoint(self.point) end)
+              f.gpsBtns[gi] = g
+            end
+            g.point = point
+            g:ClearAllPoints(); g:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -(y - 5))
+            g:Show()
+            if gi == 1 then f.entryGps = g; f.entryPoint = point end
           end
-          g.point = point
-          g:ClearAllPoints(); g:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -(y - 5))
-          g:Show()
-          if gi == 1 then f.entryGps = g; f.entryPoint = point end
-        end
-        place(it, CW - 22 - (point and 32 or 0), point and 14 or 0)
+          FactValue(entry, T.text, CW - FX - (point and 32 or 0))
+        end)
       end
-      local kl = ns.KeyLines and ns.KeyLines(dkey) or {}
-      if #kl == 0 then
-        ii = ii + 1
-        place(InfoLine(ii, "check", T.muted, L.OV_KEY_NONE, T.muted), CW - 22)
-      else
-        for _, k in ipairs(kl) do
-          ii = ii + 1
-          local icon, col = "check", T.ok
-          if not k[2] then if k[3] then icon, col = "warning", T.warn else icon, col = "info", T.muted end end
-          place(InfoLine(ii, icon, col, k[1], T.text), CW - 22)
+      Fact(L.SUM_F_KEY, function()
+        local kl = ns.KeyLines and ns.KeyLines(dkey, true) or {}
+        if #kl == 0 then FactValue(L.OV_KEY_NONE, T.muted)
+        else
+          for i, k in ipairs(kl) do
+            if i > 1 then y = y + 4 end
+            FactValue(k[1], T.text, nil, 3)
+          end
         end
+      end)
+      Fact(L.SUM_F_READY, function() ReadyBlock(dkey) end)
+      if #todo > 0 then
+        Fact(L.SUM_F_GAIN, function()
+          local a = acc[dkey]
+          if a.ticked > 0 then f.gainFs[dkey] = FactValue(GainsText(a), T.fg, nil, 3)
+          else f.gainFs[dkey] = FactValue(L.SUM_GAIN0, T.muted) end
+        end)
       end
-      ReadyBlock(dkey, place)
       y = y + 6
     end
-
-    -- one dungeon: its totals under its facts
-    if not multi and #todo > 0 then TotalsBlock() end
 
     if #todo == 0 and #done == 0 then
       if multi then
@@ -2033,6 +2276,24 @@ Render = function()
         hd:ClearAllPoints(); hd:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
         hd:Show()
         y = y + 24 + 8
+        -- under the first header: who in the group has no column (no WL Helper; past the 4 columns)
+        if hdi == 1 then
+          local any = false
+          local function groupLine(fs, list, one, many)
+            local names = {}
+            for _, m in ipairs(list) do names[#names + 1] = m.name end
+            local text = ns.Plural(#list, one, many, JoinNames(names))
+            fs:SetText(text)
+            fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+            fs:Show()
+            y = y + LineH(fs, ns.F.meta, CW, c, 3) + 4
+            any = true
+            return text
+          end
+          if #others > 0 then noHelperText = groupLine(f.noHelper, others, "SUM_NOHELPER1", "SUM_NOHELPER"); noHelperShown = true end
+          if #extra > 0 then extraText = groupLine(f.extra, extra, "SUM_EXTRA1", "SUM_EXTRA"); extraShown = true end
+          if any then y = y - 4 + 8 end
+        end
         for _, e in ipairs(todo) do
           ri = ri + 1
           local r = f.rows[ri] or MakeRow(c); f.rows[ri] = r
@@ -2070,8 +2331,30 @@ Render = function()
       end
     end
   end
+
+  -- several dungeons with ticked quests: what the whole route gives, at the end
+  if multi then
+    local nWith = 0
+    for _, k in ipairs(keys) do if acc[k].ticked > 0 then nWith = nWith + 1 end end
+    if nWith >= 2 then
+      y = y + 16
+      local hd = f.routeHead
+      hd.label:SetText(L.SUM_ROUTE_H); hd.count:SetText(""); hd.cols:Hide()
+      hd:ClearAllPoints(); hd:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+      hd:Show()
+      y = y + 24 + 8
+      f.routeLine:SetText(GainsText(route))
+      f.routeLine:ClearAllPoints(); f.routeLine:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+      f.routeLine:Show()
+      y = y + LineH(f.routeLine, ns.F.body, CW, c, 3)
+      routeShown = true
+    end
+  end
+  if not routeShown then f.routeHead:Hide(); f.routeLine:SetText(""); f.routeLine:Hide() end
+
   for j = hi + 1, #f.heroes do f.heroes[j]:Hide() end
-  for j = ii + 1, #f.info do f.info[j].icon:Hide(); f.info[j].fs:Hide() end
+  for j = fli + 1, #f.factLabels do f.factLabels[j]:Hide() end
+  for j = fvi + 1, #f.factValues do f.factValues[j]:Hide() end
   for j = gi + 1, #f.gpsBtns do f.gpsBtns[j]:Hide() end
   if gi == 0 then f.entryGps, f.entryPoint = nil, nil end
   for j = ni + 1, #f.notes do f.notes[j]:Hide() end
@@ -2081,7 +2364,6 @@ Render = function()
   for j = hdi + 1, #f.heads do f.heads[j]:Hide() end
   for j = fi + 1, #f.folds do f.folds[j]:Hide() end
   if hdi == 0 and f.heads[1] then f.gHead = f.heads[1].cols; f.gHead:Hide() end
-  if not totalsShown then f.totals:SetText(""); f.totals:Hide() end
   if not noHelperShown then f.noHelper:SetText(""); f.noHelper:Hide() end
   f.noHelperText = noHelperText
   if not extraShown then f.extra:SetText(""); f.extra:Hide() end
@@ -2108,7 +2390,7 @@ Render = function()
   f.backPick = f.fromPicker and nTodo > 0 or nil
   f.closeBtn:SetText(f.backPick and L.SUM_BACK_PICK or L.SUM_CLOSE)
   if f.closeBtn.SetIcon then f.closeBtn:SetIcon(f.backPick and "chevron_left" or nil) end
-  if f.goBtn.SetIcon then f.goBtn:SetIcon(mode == "update" and "refresh" or mode == "back" and "chevron_left" or "pin") end
+  if f.goBtn.SetIcon then f.goBtn:SetIcon(mode == "update" and "refresh" or mode == "back" and "chevron_left" or nil) end
   SetOn(f.goBtn, mode ~= "start" or #sel > 0)
   f.goBtn:SetShown(nTodo > 0)
   -- nothing to do: "Guide me through the dungeon" (or back to that route when it runs)
@@ -2127,7 +2409,7 @@ Render = function()
     if not f.runBtn.armed then
       f.runBtn:SetText(runMode ~= "start" and L.SUM_BACK or (f.runReplaces and L.SUM_GO_HERE) or f.runLabel)
     end
-    if f.runBtn.SetIcon then f.runBtn:SetIcon(runMode ~= "start" and "chevron_left" or "pin") end
+    if f.runBtn.SetIcon then f.runBtn:SetIcon(runMode ~= "start" and "chevron_left" or nil) end
   end
   f.closeBtn:ClearAllPoints()
   if nTodo > 0 then f.closeBtn:SetPoint("RIGHT", f.goBtn, "LEFT", -8, 0)

@@ -22,8 +22,13 @@ local function Hex(c) return ns.Hex and ns.Hex(c) or "|cffffffff" end
 -- =====================================================================
 --  Actions: one line per thing to do (take, turn in, kill, loot, use, talk, go, enter...)
 -- =====================================================================
-local AICON = { take = "mail", turn = "check", kill = "sword", loot = "bag", use = "hammer", talk = "user", go = "pin",
-  fly = "external", enter = "portal", boss = "skull", item = "bag", have = "flag", ["do"] = "sword" }
+-- take and turn in use the game's own quest marks (SetActIcon); "have" ("keep this quest in your
+-- log") gets no icon: the bag already means loot, and one icon keeps one meaning (icon audit G1).
+-- No letter for a quest to take, no link icon for a trip, no flag for a quest you keep
+local AICON = { turn = "check", kill = "sword", loot = "bag", use = "hammer", talk = "user", go = "pin",
+  enter = "portal", boss = "skull", item = "bag", ["do"] = "sword" }
+-- the game's quest marks, used when the guide's icon helper is not there
+local QUEST_MARK = { take = "Interface\\GossipFrame\\AvailableQuestIcon", turn = "Interface\\GossipFrame\\ActiveQuestIcon" }
 local ACOL = { take = T.gold, turn = T.ok, enter = T.fg, boss = T.fg }
 local OBJ_KIND = { kill = "kill", item = "loot", object = "use", talk = "talk", event = "go" }
 local OBJ_TEXT = { kill = "TR_KILL", loot = "TR_LOOT", use = "TR_USE", talk = "TR_TALK", go = "TR_GO" }
@@ -284,9 +289,16 @@ local function RowClick(self)
 end
 
 local function SetActIcon(tex, kind, dim)
+  -- an empty slot keeps the text aligned with the other rows
+  if kind == "have" then tex:SetAlpha(0) return end
   if (kind == "take" or kind == "turn") and ns.GuideIcon then
     local ok = pcall(ns.GuideIcon, tex, kind)
     if ok then tex:SetAlpha(dim and 0.6 or 1) return end
+  end
+  if QUEST_MARK[kind] then
+    tex:SetTexture(QUEST_MARK[kind]); tex:SetTexCoord(0, 1, 0, 1); tex:SetVertexColor(1, 1, 1)
+    tex:SetAlpha(dim and 0.6 or 1)
+    return
   end
   ns.SetHDIcon(tex, AICON[kind] or "dot", dim and T.muted or (ACOL[kind] or T.fg))
   tex:SetAlpha(1)
@@ -371,7 +383,7 @@ local function Build()
   f.travel = ns.Text(f, F.meta, T.muted)
   f.travel:SetWidth(TEXT_W)
   f.travelIcon = f:CreateTexture(nil, "ARTWORK"); f.travelIcon:SetSize(NEXT_ICON, NEXT_ICON)
-  ns.SetHDIcon(f.travelIcon, AICON.fly, T.muted)
+  ns.SetHDIcon(f.travelIcon, ns.ARROW, T.muted)
   f.bars = {}
   for k = 1, MAX_BARS do
     local b = CreateFrame("Frame", nil, f)

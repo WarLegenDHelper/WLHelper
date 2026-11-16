@@ -14,6 +14,26 @@ local F = S.F
 
 ns.AddEnglish({
     ["%s, niveau %d"] = "%s, level %d",
+    -- tools (the smaller helpers under the module cards)
+    ["Outils"] = "Tools",
+    ["Aucune clé pour l'instant (%d en tout)"] = "No keys yet (%d in all)",
+    ["Faire de la place dans le journal"] = "Make room in the log",
+    ["Banque, HV, donjon, PNJ : la flèche t'y emmène"] = "Bank, AH, dungeon, NPC: the arrow takes you there",
+    ["Clic : choisir où aller"] = "Click: choose where to go",
+    ["Ce qu'il y a à faire en arrivant dans une capitale"] = "What there is to do when you arrive in a capital",
+    ["1 chose à faire dans cette ville"] = "1 thing to do in this city",
+    ["%d choses à faire dans cette ville"] = "%d things to do in this city",
+    ["Clic : ouvrir la tournée en ville"] = "Click: open the city tour",
+    ["Les membres qui font les mêmes donjons que toi"] = "Members doing the same dungeons as you",
+    ["Clic : voir les quêtes en commun"] = "Click: see the shared quests",
+    ["Journal : %d quêtes sur %d"] = "Log: %d of %d quests",
+    ["1 quête peut partir"] = "1 quest can go",
+    ["%d quêtes peuvent partir"] = "%d quests can go",
+    ["Clic : voir les quêtes à abandonner"] = "Click: see the quests you can abandon",
+    ["1 chose à faire dans cette ville."] = "1 thing to do in this city.",
+    ["%d choses à faire dans cette ville."] = "%d things to do in this city.",
+    ["Voir la tournée"] = "See the tour",
+    ["Ton journal de quêtes est presque plein."] = "Your quest log is nearly full.",
     ["Réglages"] = "Settings",
     ["Clic : ouvrir les réglages"] = "Click: open settings",
     ["Une idée, un bug ?"] = "An idea, a bug?",
@@ -201,14 +221,62 @@ end
 local win
 local cards = {}
 local ORDER = { "writs", "favor", "bags", "orders", "guild", "events", "upgrades", "help" }
+-- The smaller tools, under the module cards: one list row each (name, one state line), no icon.
+-- They are not places a player thinks of as modules, so they stay quieter than the cards.
+local tools = {}
+local TOOL_ORDER = { "goto", "city", "keys", "shared", "triage" }
 
 local function Close() if win then win:Hide() end end
+
+-- One icon per module, the same on the Home cards, the minimap menu, Settings and the welcome
+-- window, so a player learns it once (icon audit G5). Modules are things: painted game icons
+-- (design system 2.2). LFG is a group (the battle shout read as a war cry). Upgrades is the one HD
+-- glyph: the green arrow the module puts on better items, so its card teaches that very mark.
+local ICONS = "Interface\\Icons\\"
+WP.MODULE_ICON = {
+    dungeons = ICONS .. "INV_Misc_Map_01", writs = ICONS .. "INV_Letter_15", favor = ICONS .. "INV_Crate_04",
+    bags = ICONS .. "INV_Misc_Bag_08", orders = ICONS .. "Trade_BlackSmithing", guild = ICONS .. "INV_BannerPVP_01",
+    events = ICONS .. "INV_Misc_GroupNeedMore", upgrades = { hd = "arrow_up", color = C.ok },
+    help = ICONS .. "INV_Misc_Book_09",
+}
+-- INV_Misc_GroupNeedMore may be missing on this client: an empty square would then show on Home,
+-- the minimap menu, Settings and the welcome window. Probe it once (the TrySet test of Picker.lua)
+-- and fall back to the earlier battle shout, but only when the fallback itself is known: a client
+-- that cannot tell (no file ids) keeps the group icon
+do
+    local function Known(path)
+        local f = CreateFrame and CreateFrame("Frame")
+        local tex = f and f.CreateTexture and f:CreateTexture()
+        if not (tex and tex.GetTextureFileID) then return nil end
+        local ok = pcall(tex.SetTexture, tex, path)
+        local okI, id = pcall(tex.GetTextureFileID, tex)
+        return ok and okI and type(id) == "number" and id ~= 0
+    end
+    local okP, has = pcall(Known, WP.MODULE_ICON.events)
+    if okP and has == false then
+        local alt = ICONS .. "Ability_Warrior_BattleShout"
+        local okA, altHas = pcall(Known, alt)
+        if okA and altHas then WP.MODULE_ICON.events = alt end
+    end
+end
+-- WP.PaintModuleIcon(tex, icon): a painted path (white, cropped) or { hd, color } (an HD glyph in
+-- its colour). -> true when it drew an HD glyph (the caller insets it in its box)
+function WP.PaintModuleIcon(tex, icon)
+    if type(icon) == "table" then
+        root.SetHDIcon(tex, icon.hd, icon.color or C.fg)
+        return true
+    end
+    S.Painted(tex, icon); tex:SetVertexColor(1, 1, 1)
+    return false
+end
+-- what S.Card can take as its painted icon (it is redrawn as a glyph right after)
+local function CardIcon(icon) return type(icon) == "table" and root.IconPath(icon.hd) or icon end
 
 -- A home card: the design system's card (icon, title, state line, next-step line, chevron), a
 -- counter on the icon's corner, and the switched-off look (a click turns the module back on).
 local function Card(key, icon, onClick)
     local c
-    c = S.Card(win.inner, { icon = icon, title = "", line1 = "", line2 = "", onClick = function()
+    c = S.Card(win.inner, { icon = CardIcon(icon), title = "", line1 = "", line2 = "", onClick = function()
         if c.off then
             WP.SetModule(c.module or key, true)
             WP.RefreshHome()
@@ -217,6 +285,12 @@ local function Card(key, icon, onClick)
         Close(); onClick()
     end })
     c.key, c.module = key, key
+    -- an HD glyph sits 6 px inside the box, like a tile; a painted icon fills it
+    if type(icon) == "table" then
+        c.icon:ClearAllPoints()
+        c.icon:SetPoint("TOPLEFT", c.iconFrame, "TOPLEFT", 6, -6); c.icon:SetPoint("BOTTOMRIGHT", c.iconFrame, "BOTTOMRIGHT", -6, 6)
+        WP.PaintModuleIcon(c.icon, icon)
+    end
     c.counter = S.Counter(c)
     c.counter:SetPoint("CENTER", c.iconFrame, "TOPRIGHT", -2, -2)
     pcall(c.counter.SetFrameLevel, c.counter, (c.iconFrame:GetFrameLevel() or 1) + 3)
@@ -233,7 +307,8 @@ local function Card(key, icon, onClick)
     -- o: title, line1, line2, lineColor (line1's colour), pill, pillColor, count, urgent, hint
     function c:Show2(o)
         self.off = false
-        self:SetContent({ icon = icon, title = o.title, line1 = o.line1, line2 = o.line2, pill = o.pill, pillColor = o.pillColor })
+        self:SetContent({ icon = CardIcon(icon), title = o.title, line1 = o.line1, line2 = o.line2, pill = o.pill, pillColor = o.pillColor })
+        if type(icon) == "table" then WP.PaintModuleIcon(self.icon, icon) end
         local lc = o.lineColor or C.text
         self.line1:SetTextColor(lc[1], lc[2], lc[3])
         self.clickHint = o.hint
@@ -246,7 +321,8 @@ local function Card(key, icon, onClick)
         local _, desc = WP.ModuleCopy(self.module)
         self.off = true
         -- what the module does goes in the tooltip: a tile is too narrow for it
-        self:SetContent({ icon = icon, title = title, line1 = L("Module éteint") })
+        self:SetContent({ icon = CardIcon(icon), title = title, line1 = L("Module éteint") })
+        if type(icon) == "table" then WP.PaintModuleIcon(self.icon, icon) end
         self.line1:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
         self.offDesc = desc
         self.clickHint = L("Clic : allumer le module")
@@ -257,28 +333,20 @@ local function Card(key, icon, onClick)
     return c
 end
 
--- "Now": a painted (or HD) icon, one sentence that may wrap, and the view's one primary button.
+-- "Now": one sentence that may wrap, and the view's one primary button. No icon: it only repeated
+-- the icon of the module card right below (icon audit, Home).
 local function BuildNow()
     local t = CreateFrame("Frame", nil, win.inner)
     t.wlOwned = true
     S.Solid(t, "BACKGROUND", C.cardFill):SetAllPoints()
     S.Border(t, C.cardEdge)
-    t.iconFrame = CreateFrame("Frame", nil, t)
-    t.iconFrame:SetSize(28, 28); t.iconFrame:SetPoint("LEFT", 12, 0)
-    t.icon = t.iconFrame:CreateTexture(nil, "ARTWORK"); t.icon:SetAllPoints()
-    t.edge = S.Border(t.iconFrame, C.cardEdge)
     t.text = S.Text(t, F.body, C.fg)
     t.text:SetJustifyH("LEFT"); t.text:SetJustifyV("MIDDLE")
-    t.text:SetPoint("LEFT", t.iconFrame, "RIGHT", 8, 0)
+    t.text:SetPoint("LEFT", t, "LEFT", 12, 0)
     t.go = S.Button(t, "", 0, 28, "primary", function() if t.fn then t.fn() end end)
     t.go:SetPoint("RIGHT", -12, 0)
-    -- icon: a painted path, or { hd = name or path }
-    function t:Set(icon, text, label, fn, kind)
-        if type(icon) == "table" then
-            root.SetHDIcon(self.icon, icon.hd, C.fg); self.edge(C.cardEdge, 0)
-        else
-            S.Painted(self.icon, icon); self.icon:SetVertexColor(1, 1, 1); self.edge(C.cardEdge)
-        end
+    -- t:Set(text, label, fn, kind)
+    function t:Set(text, label, fn, kind)
         self.text:SetText(text)
         self.go:SetText(label)
         self.go:SetKind(kind or "primary")
@@ -287,7 +355,7 @@ local function BuildNow()
     function t:Fit(width)
         local okW, bw = pcall(self.go.GetWidth, self.go)
         bw = (okW and type(bw) == "number") and bw or 100
-        local th = S.FitText(self.text, 2, math.max(80, width - 12 - 28 - 8 - 12 - bw - 12), self)
+        local th = S.FitText(self.text, 2, math.max(80, width - 12 - 12 - bw - 12), self)
         local h = math.ceil(math.max(28, th) + 24)
         self:SetHeight(h)
         return h
@@ -320,6 +388,21 @@ local function Layout()
         Place(a, h, 0, TILE_W)
         if b then Place(b, h, TILE_W + GAP, TILE_W) end
         y = y + h + (i + 2 <= #ORDER and GAP or 0)
+    end
+    -- the tools, two per line like the cards
+    local shownTools = {}
+    for _, k in ipairs(TOOL_ORDER) do if tools[k] and tools[k]:IsShown() then shownTools[#shownTools + 1] = tools[k] end end
+    win.toolsHead:SetShown(#shownTools > 0)
+    if #shownTools > 0 then
+        y = y + GAP
+        Place(win.toolsHead, 24); y = y + 24 + 8
+        for i = 1, #shownTools, 2 do
+            local a, b = shownTools[i], shownTools[i + 1]
+            local h = math.max(a:Fit(TILE_W), b and b:Fit(TILE_W) or 0)
+            Place(a, h, 0, TILE_W)
+            if b then Place(b, h, TILE_W + GAP, TILE_W) end
+            y = y + h + (i + 2 <= #shownTools and 8 or 0)
+        end
     end
     y = math.ceil(y)
     win.scroll:SetContentHeight(y + 24)
@@ -357,17 +440,37 @@ local function Build()
     win.upd = S.Banner(win.inner, "info", "")
     win.upd:Hide()
 
-    cards.dungeons = Card("dungeons", "Interface\\Icons\\INV_Misc_Map_01", OpenGuide)
-    cards.writs = Card("writs", "Interface\\Icons\\INV_Letter_15", function() WP.Open("writs") end)
-    cards.favor = Card("favor", "Interface\\Icons\\INV_Crate_04", function() WP.Open("favor") end)
+    local MI = WP.MODULE_ICON
+    cards.dungeons = Card("dungeons", MI.dungeons, OpenGuide)
+    cards.writs = Card("writs", MI.writs, function() WP.Open("writs") end)
+    cards.favor = Card("favor", MI.favor, function() WP.Open("favor") end)
     cards.favor.module = "writs"
-    cards.bags = Card("bags", "Interface\\Icons\\INV_Misc_Bag_08", function() if WP.Cleaner then WP.Cleaner.Toggle() end end)
-    cards.orders = Card("orders", "Interface\\Icons\\Trade_BlackSmithing", function() if WP.ToggleOrders then WP.ToggleOrders() end end)
-    cards.guild = Card("guild", "Interface\\Icons\\INV_BannerPVP_01", function() if WP.ToggleGuild then WP.ToggleGuild() end end)
-    cards.events = Card("events", "Interface\\Icons\\Ability_Warrior_BattleShout", function() if WP.ToggleEvents then WP.ToggleEvents() end end)
-    cards.upgrades = Card("upgrades", "Interface\\Icons\\INV_Chest_Cloth_17", function() if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end end)
-    cards.help = Card("help", "Interface\\Icons\\INV_Misc_Book_09", function() if WP.Help then WP.Help.Toggle() end end)
+    cards.bags = Card("bags", MI.bags, function() if WP.Cleaner then WP.Cleaner.Toggle() end end)
+    cards.orders = Card("orders", MI.orders, function() if WP.ToggleOrders then WP.ToggleOrders() end end)
+    cards.guild = Card("guild", MI.guild, function() if WP.ToggleGuild then WP.ToggleGuild() end end)
+    cards.events = Card("events", MI.events, function() if WP.ToggleEvents then WP.ToggleEvents() end end)
+    cards.upgrades = Card("upgrades", MI.upgrades, function() if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end end)
+    cards.help = Card("help", MI.help, function() if WP.Help then WP.Help.Toggle() end end)
     cards.help.module = nil
+
+    win.toolsHead = S.SectionHeader(win.inner, L("Outils"), nil, nil, nil, true)
+    local function Tool(key, onClick)
+        local r = S.ListRow(win.inner, { density = "reading", onClick = function() Close(); onClick() end })
+        r.tip = function(self)
+            local lines = { self.name:GetText() or "" }
+            local d = self.detail:IsShown() and self.detail:GetText()
+            if d and d ~= "" then lines[#lines + 1] = d end
+            if self.clickHint then lines[#lines + 1] = self.clickHint end
+            return lines
+        end
+        r:Hide()
+        tools[key] = r
+    end
+    Tool("goto", function() if WP.GoTo then WP.GoTo.Show() end end)
+    Tool("city", function() if WP.CityTour then WP.CityTour.Show() end end)
+    Tool("keys", function() if WP.ToggleKeys then WP.ToggleKeys() end end)
+    Tool("shared", function() if WP.Shared then WP.Shared.Show() end end)
+    Tool("triage", function() if WP.Triage then WP.Triage.Show() end end)
 
     win:SetScript("OnShow", function() bagsDirty = true; WP.RefreshHome() end)
     local ev = CreateFrame("Frame", nil, win)
@@ -505,33 +608,101 @@ local function Refresh()
         if card.module and not On(card.module) then card:ShowOff(card.title:GetText()) end
     end
 
+    -- tools: a row only when its tool is loaded and its module is on; every call is guarded, a
+    -- broken tool only loses its state line
+    local cityOpen, triageN, logN, logMax = 0, 0, 0, 0
+    local function Tool(key, show, name, detail, hint)
+        local r = tools[key]
+        if not r then return end
+        if show then r:Set({ name = name, detail = detail }); r.clickHint = hint end
+        r:SetShown(show and true or false)
+    end
+    Tool("goto", WP.GoTo ~= nil, L("Aller à"), L("Banque, HV, donjon, PNJ : la flèche t'y emmène"), L("Clic : choisir où aller"))
+    local CT = WP.CityTour
+    if CT and CT.CurrentCity and CT.Tasks then
+        local ok, city = pcall(CT.CurrentCity)
+        if ok and city and CT.IsOn and CT.IsOn() then
+            local okT, _, n = pcall(CT.Tasks)
+            cityOpen = (okT and type(n) == "number") and n or 0
+        end
+    end
+    -- switched off in Settings: no row, like the other tools
+    local cityOn = false
+    if CT and CT.IsOn then local okO, v = pcall(CT.IsOn); cityOn = okO and v and true or false end
+    Tool("city", cityOn, L("Tournée en ville"),
+        cityOpen > 0 and N(cityOpen, "1 chose à faire dans cette ville", "%d choses à faire dans cette ville")
+            or L("Ce qu'il y a à faire en arrivant dans une capitale"), L("Clic : ouvrir la tournée en ville"))
+    local K = WP.Keys
+    local keyLine
+    if K and K.Summary then
+        -- the passport's own line: one count, said the same way in both places
+        local ok, s = pcall(K.Summary)
+        if ok and type(s) == "string" then keyLine = s end
+    elseif K and K.LIST and K.Status then
+        local ok, have = pcall(function()
+            local n = 0
+            for _, k in ipairs(K.LIST) do if K.Status(k).state == "have" then n = n + 1 end end
+            return n
+        end)
+        if ok then
+            keyLine = have == 0 and string.format(L("Aucune clé pour l'instant (%d en tout)"), #K.LIST)
+                or have == 1 and string.format(L("1 clé sur %d"), #K.LIST) or string.format(L("%d clés sur %d"), have, #K.LIST)
+        end
+    end
+    Tool("keys", K ~= nil and On("keys"), L("Passeport des clés"), keyLine, L("Clic : ouvrir le passeport des clés"))
+    local Sh = WP.Shared
+    local nShared = 0
+    if Sh and Sh.Dungeons then
+        local ok, list = pcall(Sh.Dungeons)
+        nShared = (ok and type(list) == "table") and #list or 0
+    end
+    Tool("shared", Sh ~= nil and On("guild"), L("Quêtes en commun"),
+        nShared > 0 and (nShared == 1 and L("1 donjon en commun") or string.format(L("%d donjons en commun"), nShared))
+            or L("Les membres qui font les mêmes donjons que toi"), L("Clic : voir les quêtes en commun"))
+    local Tr = WP.Triage
+    if Tr and On("triage") then
+        local ok, n, max = pcall(Tr.LogCount)
+        if ok then logN, logMax = tonumber(n) or 0, tonumber(max) or 0 end
+        local okC, c = pcall(Tr.Count)
+        triageN = (okC and type(c) == "number") and c or 0
+    end
+    local triLine = string.format(L("Journal : %d quêtes sur %d"), logN, logMax)
+    if triageN > 0 then triLine = N(triageN, "1 quête peut partir", "%d quêtes peuvent partir") .. " · " .. triLine end
+    Tool("triage", Tr ~= nil and On("triage"), L("Tri du journal"), triLine, L("Clic : voir les quêtes à abandonner"))
+
     -- "now": the first thing that waits, from the most urgent down; nothing waits: no strip
     local t = win.now
     local shown = true
     if On("orders") and open > 0 then
-        t:Set("Interface\\Icons\\Trade_BlackSmithing", N(open, "1 commande attend ta réponse.", "%d commandes attendent ta réponse."), L("Voir les commandes"),
+        t:Set(N(open, "1 commande attend ta réponse.", "%d commandes attendent ta réponse."), L("Voir les commandes"),
             function() Close(); if WP.ToggleOrders then WP.ToggleOrders() end end)
     elseif On("writs") and ready > 0 then
-        t:Set("Interface\\Icons\\INV_Letter_15", N(ready, "1 Writ est prêt à rendre.", "%d Writs sont prêts à rendre."), L("Y aller"), function()
+        t:Set(N(ready, "1 Writ est prêt à rendre.", "%d Writs sont prêts à rendre."), L("Y aller"), function()
             Close()
             -- the tour already runs: on to the next stop; otherwise start it
             if WLWritsCharDB and WLWritsCharDB.gps then WP.GoNext() else WP.ToggleGPS() end
         end)
     elseif On("writs") and bag > 0 then
-        t:Set("Interface\\Icons\\INV_Letter_15", N(bag, "1 enveloppe à ouvrir dans tes sacs.", "%d enveloppes à ouvrir dans tes sacs."), L("Voir les Writs"),
+        t:Set(N(bag, "1 enveloppe à ouvrir dans tes sacs.", "%d enveloppes à ouvrir dans tes sacs."), L("Voir les Writs"),
             function() Close(); WP.Open("writs") end)
     elseif On("events") and nextE and nextE.when - time() < 3600 then
         local mins = math.ceil((nextE.when - time()) / 60)
-        t:Set("Interface\\Icons\\Ability_Warrior_BattleShout",
-            mins > 0 and string.format(L("%s commence dans %d min."), nextE.title, mins) or string.format(L("%s a commencé."), nextE.title),
+        t:Set(mins > 0 and string.format(L("%s commence dans %d min."), nextE.title, mins) or string.format(L("%s a commencé."), nextE.title),
             L("Voir l'événement"), function() Close(); if WP.ToggleEvents then WP.ToggleEvents() end end)
     -- (the quest guide has its own card right below: no "next step" here, it would say it twice)
     elseif On("bags") and nBag > 0 then
-        t:Set("Interface\\Icons\\INV_Misc_Bag_08", N(nBag, "1 objet de quête ne sert plus.", "%d objets de quête ne servent plus."), L("Nettoyer les sacs"),
+        t:Set(N(nBag, "1 objet de quête ne sert plus.", "%d objets de quête ne servent plus."), L("Nettoyer les sacs"),
             function() Close(); if WP.Cleaner then WP.Cleaner.Toggle() end end)
+    elseif cityOpen > 0 and not (WP.CityTour.TourOn and WP.CityTour.TourOn()) then
+        -- in a capital with something to do: the tour card says what
+        t:Set(N(cityOpen, "1 chose à faire dans cette ville.", "%d choses à faire dans cette ville."), L("Voir la tournée"),
+            function() Close(); WP.CityTour.Show() end)
+    elseif triageN > 0 and logMax > 0 and logMax - logN <= 2 then
+        t:Set(L("Ton journal de quêtes est presque plein."), L("Faire de la place dans le journal"),
+            function() Close(); WP.Triage.Show() end)
     elseif WP.GPS and WP.GPS.Active() then
         -- only a running GPS: a quiet line, its stop is not the main thing to do
-        t:Set({ hd = root.ARROW }, string.format(L("Le GPS te guide vers %s."), WP.GPS.DestName() or "?"), L("Arrêter le GPS"),
+        t:Set(string.format(L("Le GPS te guide vers %s."), WP.GPS.DestName() or "?"), L("Arrêter le GPS"),
             function() WP.StopGPS(); WP.RefreshHome() end, "secondary")
     else
         shown = false
@@ -615,7 +786,9 @@ local function MenuRow(parent, y, icon, text, onClick, disabledReason, hint)
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetSize(16, 16); b.icon:SetPoint("LEFT", 8, 0)
     b.hd = type(icon) == "table"
-    if b.hd then root.SetHDIcon(b.icon, icon.hd, C.muted) else S.Painted(b.icon, icon) end
+    -- a glyph with its own colour (the upgrades arrow) keeps it; the others are muted, fg on hover
+    b.hdColor = b.hd and icon.color or nil
+    if b.hd then root.SetHDIcon(b.icon, icon.hd, b.hdColor or C.muted) else S.Painted(b.icon, icon) end
     b.label = S.Text(b, F.label, C.fg)
     b.label:SetPoint("LEFT", b.icon, "RIGHT", 8, 0); b.label:SetPoint("RIGHT", -8, 0)
     b.label:SetJustifyH("LEFT")
@@ -625,7 +798,7 @@ local function MenuRow(parent, y, icon, text, onClick, disabledReason, hint)
     local function Paint()
         local on = b:IsEnabled() ~= false
         b:SetAlpha(on and (b.off and 0.45 or 1) or C.disabledAlpha)
-        if b.hd then local c = (b.hov and on) and C.fg or C.muted; b.icon:SetVertexColor(c[1], c[2], c[3]) end
+        if b.hd and not b.hdColor then local c = (b.hov and on) and C.fg or C.muted; b.icon:SetVertexColor(c[1], c[2], c[3]) end
     end
     b:SetScript("OnEnter", function(self)
         self.hov = true
@@ -667,18 +840,19 @@ function WP.MinimapMenu(owner)
         S.Border(menu, C.cardEdge)
         tinsert(UISpecialFrames, "WLHelperMinimapMenu")
         -- { icon, label, onClick, module (dimmed when off), key in menu.buttons, why disabled, click hint }
+        local MI = WP.MODULE_ICON
         local items = {
-            { "Interface\\Icons\\INV_Misc_Map_01", L("Guide de quêtes"), OpenGuide, "dungeons", nil, nil, L("Clic : ouvrir le guide de quêtes") },
-            { "Interface\\Icons\\INV_Letter_15", L("Writs"), function() WP.Open("writs") end, "writs", nil, nil, L("Clic : ouvrir les Writs") },
-            { "Interface\\Icons\\INV_Crate_04", L("Faveur du marchand"), function() WP.Open("favor") end, "writs", "favor", nil, L("Clic : voir les caisses") },
-            { "Interface\\Icons\\INV_Misc_Bag_08", L("Sacs"), function() if WP.Cleaner then WP.Cleaner.Toggle() end end, "bags", nil, nil, L("Clic : voir les objets à jeter") },
-            { "Interface\\Icons\\Trade_BlackSmithing", L("Commandes"), function() if WP.ToggleOrders then WP.ToggleOrders() end end, "orders", nil, nil, L("Clic : ouvrir les commandes") },
-            { "Interface\\Icons\\INV_BannerPVP_01", L("Guilde"), function() if WP.ToggleGuild then WP.ToggleGuild() end end, "guild", nil, nil, L("Clic : ouvrir la guilde") },
-            { "Interface\\Icons\\Ability_Warrior_BattleShout", L("LFG"), function() if WP.ToggleEvents then WP.ToggleEvents() end end, "events", nil, nil, L("Clic : ouvrir le LFG") },
-            { "Interface\\Icons\\INV_Chest_Cloth_17", L("Améliorations"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end end, "upgrades", nil, nil, L("Clic : choisir ta spé et voir tes améliorations") },
+            { MI.dungeons, L("Guide de quêtes"), OpenGuide, "dungeons", nil, nil, L("Clic : ouvrir le guide de quêtes") },
+            { MI.writs, L("Writs"), function() WP.Open("writs") end, "writs", nil, nil, L("Clic : ouvrir les Writs") },
+            { MI.favor, L("Faveur du marchand"), function() WP.Open("favor") end, "writs", "favor", nil, L("Clic : voir les caisses") },
+            { MI.bags, L("Sacs"), function() if WP.Cleaner then WP.Cleaner.Toggle() end end, "bags", nil, nil, L("Clic : voir les objets à jeter") },
+            { MI.orders, L("Commandes"), function() if WP.ToggleOrders then WP.ToggleOrders() end end, "orders", nil, nil, L("Clic : ouvrir les commandes") },
+            { MI.guild, L("Guilde"), function() if WP.ToggleGuild then WP.ToggleGuild() end end, "guild", nil, nil, L("Clic : ouvrir la guilde") },
+            { MI.events, L("LFG"), function() if WP.ToggleEvents then WP.ToggleEvents() end end, "events", nil, nil, L("Clic : ouvrir le LFG") },
+            { MI.upgrades, L("Améliorations"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage("upgrades") end end, "upgrades", nil, nil, L("Clic : choisir ta spé et voir tes améliorations") },
             false,
             { { hd = root.ARROW }, L("Arrêter le GPS"), function() WP.StopGPS() end, nil, "gps", L("Aucun trajet GPS en cours."), L("Clic : arrêter le GPS") },
-            { { hd = "info" }, L("Comment faire... ?"), function() if WP.Help then WP.Help.Toggle() end end, nil, nil, nil, L("Clic : ouvrir Comment faire... ?") },
+            { MI.help, L("Comment faire... ?"), function() if WP.Help then WP.Help.Toggle() end end, nil, nil, nil, L("Clic : ouvrir Comment faire... ?") },
             { { hd = "gear" }, L("Réglages"), function() if WP.ShowOptionsPage then WP.ShowOptionsPage() end end, nil, nil, nil, L("Clic : ouvrir les réglages") },
             { { hd = "mail" }, L("Nous écrire"), function() if WP.Feedback then WP.Feedback("idea") end end, nil, nil, nil, L("Clic : ouvrir le formulaire pour nous écrire") },
         }

@@ -82,6 +82,7 @@ ns.AddEnglish({
     ["Clic : commander à la guilde"] = "Click: order from the guild",
     ["Maj-clic : demander à toute la guilde"] = "Shift-click: ask the whole guild",
     ["Artisans :"] = "Crafters:",
+    ["Artisan :"] = "Crafter:",
     ["1 autre artisan"] = "1 more crafter",
     ["%d autres artisans"] = "%d more crafters",
     ["Clic : voir tous les artisans"] = "Click: show every crafter",
@@ -487,11 +488,6 @@ local function ProfKey(name)
 end
 local function ProfLabel(key, raw) local p = PROFS[key]; return p and ((root.lang == "en") and p[2] or p[1]) or raw or "?" end
 local function ProfIcon(key) local p = PROFS[key]; return p and p[3] or "Interface\\Icons\\INV_Misc_Note_01" end
--- a profession's icon inside a text, its edges cropped like the icons
-local function ProfMarkup(key, size)
-    size = size or 14
-    return "|T" .. ProfIcon(key) .. ":" .. size .. ":" .. size .. ":0:-1:64:64:5:59:5:59|t"
-end
 
 -- shift-click an item while one of our item boxes (search, request) has the focus: its link goes in it
 local function InsertLink(link)
@@ -1339,7 +1335,8 @@ local function RenderCatalog(f, g)
         local lvl = (it.lvl or 0) > 1 and (S.Hex(C.text) .. string.format(L("Niv. %d"), it.lvl) .. "|r") or ""
         if mixed and it.kind then lvl = lvl .. (lvl ~= "" and " · " or "") .. it.kind end
         if lvl ~= "" then lvl = lvl .. "  " end
-        r.detail:SetText(lvl .. S.IconMarkup("user", 12, C.muted) .. " " .. WhoText(it.who, 3)); r.detail:Show()
+        -- the crafters in words ("Crafters: ..."), not behind a person icon (icon audit, Orders)
+        r.detail:SetText(lvl .. L(#it.who == 1 and "Artisan :" or "Artisans :") .. " " .. WhoText(it.who, 3)); r.detail:Show()
         r.btn:SetText(L("Commander")); r.btn:Show()
         -- one crafter only: shift-click would do the same as a click, so it is not offered
         local others = 0
@@ -1515,7 +1512,8 @@ local function RenderFind()
             cr.name:SetText(c.name .. Stars(c.name))
             SetClass(cr, c.name)
             local key = ProfKey(c.prof)
-            cr.detail:SetText(ProfMarkup(key) .. " " .. string.format(L("%s %d"), ProfLabel(key, c.prof), c.rank or 0)
+            -- the profession by its name only: an icon before "Forge 300" repeated it (icon audit, Orders)
+            cr.detail:SetText(string.format(L("%s %d"), ProfLabel(key, c.prof), c.rank or 0)
                 .. " · " .. Where(c.online) .. " · " .. (c.exact and L("recette connue") or L("métier compatible"))); cr.detail:Show()
             local tip = { c.name, cr.detail:GetText() }
             local sl = StarLine(c.name); if sl then tip[#tip + 1] = sl end
@@ -2106,7 +2104,6 @@ local function OrderCard(parent)
     c.b2 = S.Button(c, "", 0, 28, "secondary", function(self) if c.a2 then c.a2(self) end end, function() return c.t2 or { c.b2:GetText() } end)
     c.b3 = S.Button(c, "", 0, 28, "secondary", function() if c.o then WP.AskMessage(c.o) end end,
         function() return { c.b3:GetText(), L("Seuls le client et l'artisan voient ce message.") } end)
-    c.b3:SetIcon("mail")
     function c:Fit(width)
         self:SetWidth(width)
         local pad = 12
@@ -2174,7 +2171,9 @@ local function SetButton(b, label, icon, kind)
     b.armToken = nil
     b:SetKind(kind or "secondary")
     b:SetConfirm(nil); b.armed = nil
-    b:SetIcon(icon)
+    -- labelled buttons keep an icon only for danger (the trash on "Cancel the order"): a check, a
+    -- coin or a star beside a verb only repeated it (design system 3.4, icon audit G3)
+    b:SetIcon(icon == "trash" and icon or nil)
     b:SetText(label)
 end
 
@@ -2467,7 +2466,6 @@ function WP.AskMessage(o)
             if msgBox.order then O.Say(msgBox.order, msgBox.eb:GetText()) end
             msgBox.eb:SetText(""); msgBox:Hide()
         end)
-        msgBox.send:SetIcon("mail")
         msgBox.send:SetPoint("TOPLEFT", PAD, -(top + LBL + 28 + 16))
         msgBox.eb:SetScript("OnEnterPressed", function() msgBox.send:Click() end)
     end
@@ -2679,7 +2677,6 @@ function WP.RefreshMailPanel()
                 panel.pendingTo = (r.act.kind == "give" and (r.act.o.by or r.act.o.to) or r.act.o.from)
                 r.btn:Flash(L("Prêt, clique sur Envoyer"), 4)
             end)
-            r.btn:SetIcon("mail")
             panel.rows[i] = r
         end
         r.act = a

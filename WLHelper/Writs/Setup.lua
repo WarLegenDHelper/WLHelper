@@ -125,7 +125,13 @@ local win
 local switches = {}
 local texts = {}        -- every FontString of the window (the tests check none is cut)
 
-local function Icon(name) return "Interface\\Icons\\" .. name end
+-- a game icon by name; a full path or an { hd } glyph (the module icons of Home) passes through
+local function Icon(name)
+    if type(name) ~= "string" or name:find("\\", 1, true) then return name end
+    return "Interface\\Icons\\" .. name
+end
+-- the modules' own icons, the same as on Home (Writs/Home.lua WP.MODULE_ICON, icon audit G5)
+local function ModIcon(key, fallback) return (WP.MODULE_ICON and WP.MODULE_ICON[key]) or fallback end
 local function PlayerClass() local _, c = UnitClass("player"); return c end
 local function MinimapShown() return not (WLDTDB and WLDTDB.hideMinimap) end
 
@@ -143,7 +149,12 @@ local function PaintedIcon(parent, size, path)
     local fr = CreateFrame("Frame", nil, parent)
     fr:SetSize(size, size)
     fr.tex = fr:CreateTexture(nil, "ARTWORK"); fr.tex:SetAllPoints()
-    if path then S.Painted(fr.tex, path) end
+    if type(path) == "table" then
+        -- an HD glyph (the upgrades arrow) sits inside the box like a tile, in its own colour
+        local inset = math.floor(size / 5)
+        fr.tex:ClearAllPoints(); fr.tex:SetPoint("TOPLEFT", inset, -inset); fr.tex:SetPoint("BOTTOMRIGHT", -inset, inset)
+        root.SetHDIcon(fr.tex, path.hd, path.color or C.fg)
+    elseif path then S.Painted(fr.tex, path) end
     S.Border(fr, C.cardEdge)
     return fr
 end
@@ -459,7 +470,7 @@ STEPS.hello = {
         f.head = Txt(f, F.title, C.fg, "CENTER")
         f.value = Txt(f, F.body, C.text, "CENTER")
         f.lines = {}
-        for i, icon in ipairs({ "INV_Misc_Map_01", "INV_Letter_15", "Ability_Warrior_BattleShout" }) do
+        for i, icon in ipairs({ ModIcon("dungeons", "INV_Misc_Map_01"), ModIcon("writs", "INV_Letter_15"), ModIcon("events", "INV_Misc_GroupNeedMore") }) do
             local ln = { icon = PaintedIcon(f, 28, Icon(icon)), text = Txt(f, F.body, C.fg) }
             f.lines[i] = ln
         end
@@ -515,9 +526,9 @@ local function ModuleDefs()
           desc = function() return L("Une place libre en un clic, et les objets gris vendus chez le marchand.") end },
         { keys = { "orders" }, icon = "Trade_BlackSmithing", title = function() return L("Commandes") end,
           desc = function() return L("Demande un objet aux artisans de la guilde, ou fabrique pour eux.") end },
-        { keys = { "guild", "events" }, icon = "Ability_Warrior_BattleShout", title = function() return L("Guilde et événements") end,
+        { keys = { "guild", "events" }, icon = ModIcon("events", "INV_Misc_GroupNeedMore"), title = function() return L("Guilde et événements") end,
           desc = function() return L("Les membres, le classement PvP, les événements prévus et qui cherche un groupe.") end },
-        { keys = { "upgrades" }, icon = "INV_Chest_Cloth_17", title = function() return L("Améliorations") end,
+        { keys = { "upgrades" }, icon = ModIcon("upgrades", { hd = "arrow_up", color = C.ok }), title = function() return L("Améliorations") end,
           desc = function() return L("Une flèche verte sur les objets meilleurs que les tiens.") end },
     }
     for _, d in ipairs(defs) do

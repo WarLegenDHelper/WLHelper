@@ -924,6 +924,8 @@ WP.MODULES = {
     { key = "guild", label = "Guilde", hint = "Voir toute la guilde et le classement PvP" },
     { key = "events", label = "Groupes", hint = "Donjons et raids de la guilde, groupes du moment" },
     { key = "upgrades", label = "Améliorations", hint = "Flèche verte sur les objets meilleurs que les tiens" },
+    { key = "keys", label = "Clés", hint = "Clés et accès des donjons et raids, et qui les a dans la guilde" },
+    { key = "triage", label = "Tri du journal", hint = "Les quêtes à abandonner quand le journal est presque plein" },
 }
 function WP.ModuleOn(key)
     local m = WLWritsDB and WLWritsDB.modules
@@ -967,10 +969,19 @@ function WP.SetModule(key, on)
         if not on and WP.Cleaner and WP.Cleaner.Hide then WP.Cleaner.Hide() end
     elseif key == "guild" then
         if not on and WP.HideGuild then WP.HideGuild() end
+        -- the shared dungeon quests follow the guild switch (SharedQuests.lua): their window goes too
+        if not on and WP.Shared and WP.Shared.Hide then WP.Shared.Hide() end
     elseif key == "events" then
         if not on and WP.HideEvents then WP.HideEvents() end
     elseif key == "upgrades" then
         if WP.RefreshUpgrades then WP.RefreshUpgrades() end
+    elseif key == "keys" then
+        if not on and WP.Keys and WP.Keys.Hide then WP.Keys.Hide() end
+        -- an open guild window must not stay on a keys board that no longer updates
+        local gw = _G.WLHelperGuild
+        if not on and gw and gw.IsShown and gw:IsShown() and WP.ShowGuildTab then WP.ShowGuildTab("members") end
+    elseif key == "triage" then
+        if not on and WP.Triage and WP.Triage.Hide then WP.Triage.Hide() end
     end
     if WP.RefreshHome then WP.RefreshHome() end
     if WP.SyncOptions then WP.SyncOptions() end

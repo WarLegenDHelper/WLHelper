@@ -634,7 +634,9 @@ end
 ns.ObjectiveBlock = ObjectiveBlock
 
 -- the game's own icon for each kind of line (quest marks), HD icons for the rest
-local KICON = { a = "take", t = "turn", c = "boss", o = "map", h = "take" }
+-- "outside" (o) has no icon: its word ("Dehors") already says it, and a flag there meant nothing
+-- more (icon audit, guide)
+local KICON = { a = "take", t = "turn", c = "boss", h = "take" }
 local function SetKindIcon(tex, nd)
   if nd.kind == "i" then
     local id = nd.items and nd.items[1]
@@ -982,7 +984,15 @@ function ns.RowTip(row)
   end
   -- XP and money, reward items
   local money = q.rw and q.rw ~= "" and q.rw or nil
+  -- the XP this player really gets (less on a grey quest, none at the cap), as the summary shows it
   local xp = q.xp and q.xp > 0 and q.xp or nil
+  if xp and ns.QuestXPFor then
+    local okL, lv = pcall(function() return tonumber(UnitLevel("player")) end)
+    lv = okL and lv or 1
+    local ok, got = pcall(ns.QuestXPFor, n.q, lv)
+    if ok and type(got) == "number" then xp = got > 0 and got or nil end
+  end
+  if xp and ns.BigNumber then xp = ns.BigNumber(xp) end
   if xp or money or (q.ri and q.ri[1]) then
     gap()
     if xp and money then add(L.TT_XPMONEY:format(xp, money))
@@ -1190,7 +1200,8 @@ local function RenderFocus(card, st, log, y, dkey)
   fo.hl:SetShown(nd.loc ~= nil)
   fo.icon:SetVertexColor(1, 1, 1)
   if ok then ns.SetHDIcon(fo.icon, "check", T.ok)
-  elseif not SetKindIcon(fo.icon, nd) then ns.SetHDIcon(fo.icon, "dot", T.muted) end
+  -- no kind icon: an empty slot (alpha 0) rather than a dot that says nothing
+  elseif not SetKindIcon(fo.icon, nd) then ns.SetHDIcon(fo.icon, "dot", T.muted, 0) end
   local key = FOCUS_KEY[nd.kind]
   fo.head:SetText(key and L[key]:format(NodeName(nd)) or NodeName(nd))
   local hc = ok and T.muted or T.fg
@@ -1260,7 +1271,7 @@ local function RenderFocus(card, st, log, y, dkey)
       ln.node = a
       ln.hl:SetShown(a.loc ~= nil)
       ln.icon:SetVertexColor(1, 1, 1)
-      if not SetKindIcon(ln.icon, a) then ns.SetHDIcon(ln.icon, "dot", T.muted) end
+      if not SetKindIcon(ln.icon, a) then ns.SetHDIcon(ln.icon, "dot", T.muted, 0) end
       local lk = LINE_KEY[a.kind]
       local t = lk and L[lk]:format(NodeName(a)) or NodeName(a)
       local an = NpcShort(a)
@@ -1338,18 +1349,18 @@ local function Build()
     if WP and WP.OpenOptions then WP.OpenOptions("dungeons") end
   end)
   f.gearBtn:SetPoint("RIGHT", f.miniBtn, "LEFT", -4, 0)
-  -- "Dungeons": a labelled button (an icon alone was not understood), small map + the word
+  -- "Dungeons": a labelled button (an icon alone was not understood); the word alone, since a
+  -- map beside it only repeated it (icon audit, guide header)
   f.pickBtn = LabelBtn(h, L.DUNGEONS_BTN, 24, "secondary", function() ns.TogglePicker() end, { L.TT_HPICK, L.TT_PICKBTN })
-  if f.pickBtn.SetPaintedIcon then f.pickBtn:SetPaintedIcon("Interface\\Icons\\INV_Misc_Map_01")
-  elseif f.pickBtn.SetIcon then f.pickBtn:SetIcon("portal") end
   f.pickBtn:SetPoint("RIGHT", f.gearBtn, "LEFT", -6, 0)
   local leftmost = f.pickBtn
-  -- the overview of the guide's dungeon (Overview.lua): its quests, prerequisites and rewards
+  -- the summary of the guide's dungeon (Overview.lua): its quests, prerequisites and rewards. A
+  -- word, not the info icon: "info" only means neutral information (icon audit G1)
   if ns.ShowOverview then
-    f.ovBtn = IconBtn(h, "info", function()
+    f.ovBtn = LabelBtn(h, L.OV_T, 24, "secondary", function() ns.ShowOverview(GuideDungeon()) end, function()
       local dn = ns.DName(GuideDungeon())
       return { dn and L.OV_HDR_T:format(dn) or L.OV_T, L.OV_CLICK }
-    end, function() ns.ShowOverview(GuideDungeon()) end)
+    end)
     f.ovBtn:SetPoint("RIGHT", f.pickBtn, "LEFT", -4, 0)
     leftmost = f.ovBtn
   end
@@ -1480,6 +1491,7 @@ local function Build()
   -- empty, finished: one centred block (icon 32, title, sentence)
   card.bigIcon = ns.Icon(card, "portal", 32, "ARTWORK", T.muted); card.bigIcon:Hide()
   card.title = Text(card, ns.F.title, T.fg)
+  -- never shown now (the travel line is text only); kept so the code that hides it stays valid
   card.travelIcon = ns.Icon(card, "info", 14, "ARTWORK", T.info); card.travelIcon:Hide()
   card.travel = Text(card, ns.F.label, T.text)
   -- check-list status: a banner (tint of its colour, 1 px edge, HD icon) with state, why, what next
@@ -1495,8 +1507,8 @@ local function Build()
   card.rows = {}
   for r = 1, MAXROWS do card.rows[r] = MakeRow(card) end
   MakeFocus(card)
+  -- labelled buttons carry no icon that repeats their verb (design system 3.4, icon audit G3)
   card.shareBtn = LabelBtn(card, L.SHARE_SHORT, 28, "secondary", DoShare, function() return { L.M_SHARE, L.TT_FSHARE } end)
-  if card.shareBtn.SetIcon then card.shareBtn:SetIcon("group") end
   card.shareBtn:Hide()
 
   -- footer, under the card: the one main action, then previous / next / check-list / actions
@@ -1506,14 +1518,13 @@ local function Build()
   f.go = LabelBtn(foot, L.GO, 32, "primary", function(self) if self.action then self.action() end end)
   -- in a group: "Share 3 quests" beside the big button, greyed when none can be shared
   f.shareFoot = LabelBtn(foot, L.SHARE_SHORT, 32, "secondary", DoShare, function() return { L.M_SHARE, L.TT_FSHARE } end)
-  if f.shareFoot.SetIcon then f.shareFoot:SetIcon("group") end
   f.shareFoot:Hide()
   f.prev = IconBtn(foot, "chevron_left", { L.B_PREV, L.TT_PREV_CLICK }, function() ns.GoTo(f.view - 1) end)
   f.prev.edge = ns.Outline(f.prev, T.btnEdge)
   f.prev:SetPoint("BOTTOMLEFT")
   f.moreBtn = LabelBtn(foot, L.MORE_BTN, 28, "secondary", function() f.menu:SetShown(not f.menu:IsShown()) end,
     function() return { L.MORE, L.TT_MORE } end)
-  if f.moreBtn.SetIcon then f.moreBtn:SetIcon("chevron_up") end
+  -- a menu takes the gear icon or none (design system 3.13): the word "Actions" says it
   f.moreBtn:SetPoint("BOTTOMRIGHT")
   f.next = LabelBtn(foot, L.NEXT2, 28, "secondary", function() ns.GoTo(f.view + 1) end, function() return { L.NEXT2, L.TT_NEXT, L.TT_NEXT_CLICK } end)
   if f.next.SetIcon then f.next:SetIcon("chevron_right") end
@@ -1962,13 +1973,14 @@ Render = function()
     f.miniRow:Hide(); f.holder:Show(); f.foot:Show()
     HideStepParts(card)
     local title, text = L.NOROUTE_T2, L.NOROUTE_TXT
-    f.go:SetText(L.PICK_FIRST); if f.go.SetIcon then f.go:SetIcon("portal") end
+    -- labelled: no icon ("portal" is kept for a dungeon entrance or a teleport, icon audit G1)
+    f.go:SetText(L.PICK_FIRST); if f.go.SetIcon then f.go:SetIcon(nil) end
     f.go.action = ns.ShowPicker; f.go:SetEnabled(true)
     if offerKey and ns.InstLeft then
       -- no route, but you stand in a dungeon with quests: start its guide in one click
       local name, nLeft = ns.DName(offerKey), ns.InstLeft(offerKey)
       title, text = L.INST_T:format(name), ns.Plural(nLeft, "INST_TXT1", "INST_TXT", nLeft)
-      f.go:SetText(L.INST_GO); if f.go.SetIcon then f.go:SetIcon("plus") end
+      f.go:SetText(L.INST_GO); if f.go.SetIcon then f.go:SetIcon(nil) end
       f.go.action = function()
         local kk = ns.instOffer; if not kk then return end
         for k2 in pairs(WLDTDB.sel) do WLDTDB.sel[k2] = nil end; WLDTDB.sel[kk] = true; ns.instOffer = nil; ns.instIn = kk; ns.StartGuide()
@@ -2026,7 +2038,7 @@ Render = function()
     f.menu:Hide()
     f.prev:SetEnabled(true); f.next:SetEnabled(false); f.moreBtn:SetEnabled(true)
     ns.RenderReadyBtn(log)
-    f.go:SetText(L.PICK_MORE); if f.go.SetIcon then f.go:SetIcon("portal") end
+    f.go:SetText(L.PICK_MORE); if f.go.SetIcon then f.go:SetIcon(nil) end
     f.go.action = ns.ShowPicker; f.go:SetEnabled(true)
     FitGuide(TOP, ch, LayoutFoot(true, false))
     WLDTDB.view = i
@@ -2158,19 +2170,18 @@ Render = function()
   else card.ready:Hide(); card.readyIcon:Hide(); card.readyBox:Hide() end
 
   card.travelIcon:Hide()
+  -- the travel sentence is plain text: an info or check icon before it said nothing more
+  -- (icon audit: "info" is for neutral info icons only, "check" for done)
   if done and f.auto and i ~= f.auto then
     -- a finished step looked at again: say so (the big button goes back to the current one)
     card.travel:SetText(L.DONE_VIEW); card.travel:SetTextColor(T.text[1], T.text[2], T.text[3])
-    ns.SetHDIcon(card.travelIcon, "check", T.ok)
   elseif st.travel then
     card.travel:SetText(L[st.travel]); card.travel:SetTextColor(T.text[1], T.text[2], T.text[3])
-    ns.SetHDIcon(card.travelIcon, "info", T.info)
   else card.travel:SetText("") end
   if card.travel:GetText() and card.travel:GetText() ~= "" then
     y = y + 8
-    card.travelIcon:ClearAllPoints(); card.travelIcon:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -(y + 1)); card.travelIcon:Show()
-    card.travel:ClearAllPoints(); card.travel:SetPoint("TOPLEFT", card, "TOPLEFT", CI + 20, -y); card.travel:Show()
-    y = y + ns.FitText(card.travel, 0, TW - 20, card)
+    card.travel:ClearAllPoints(); card.travel:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.travel:Show()
+    y = y + ns.FitText(card.travel, 0, TW, card)
   else card.travel:Hide() end
   if card.ready:IsShown() then
     y = y + GAP
@@ -2269,8 +2280,9 @@ Render = function()
       local npcW = math.min(ns.TextWidth(row.npc) + 2, 140)
       row.npc:SetWidth(npcW)
       row.gb:Hide(); row.wpOn:Hide(); row.icon:Hide()
-      if nd.bossIdx > 0 then Icon(row.kicon, "boss") else ns.SetHDIcon(row.kicon, "flag", T.muted) end
-      row.kicon:SetAlpha(nd.allOk and 0.5 or 1); row.kicon:Show()
+      -- the whole-dungeon header has its word only ("Tout le donjon"): no flag
+      if nd.bossIdx > 0 then Icon(row.kicon, "boss"); row.kicon:SetAlpha(nd.allOk and 0.5 or 1); row.kicon:Show()
+      else row.kicon:Hide() end
       local nameH = ns.FitText(row.name, 2, math.max(80, rowW - ROW_NAME_X - 12 - npcW - 8), row)
       local sub = (not nd.allOk and nd.tip) and nd.tip or ""
       row.sub:SetText(sub); row.sub:SetShown(sub ~= "")
@@ -2451,7 +2463,8 @@ Render = function()
     f.go:SetText(label); if f.go.SetIcon then f.go:SetIcon("pin") end
     f.go.action = GoPoints; f.go:SetEnabled(true)
   else
-    f.go:SetText(L.NOPOINT_S); if f.go.SetIcon then f.go:SetIcon("info") end
+    -- disabled and labelled: its tooltip says why, an info icon added nothing
+    f.go:SetText(L.NOPOINT_S); if f.go.SetIcon then f.go:SetIcon(nil) end
     f.go.action = nil; f.go:SetEnabled(false)
     f.go.disabledReason = L.NOPOINT
   end

@@ -6,6 +6,42 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.72] — 2026-11-16
+
+### Ajouté / Added
+- **Tournée en ville** (T-02) : en arrivant dans une capitale, une fiche liste ce qu'il y a à y faire (maître de classe, courrier, réparations, quêtes à rendre, composants à sortir de la banque pour une commande, achats des Writs, munitions) dans l'ordre de marche ; chaque tâche se coche toute seule et la flèche va de l'une à l'autre.
+  *City tour: what to do in a capital, in walking order, ticked automatically.*
+- **Passeport des clés** (T-03) : chaque clé ou accès (Scholomance, UBRS, Onyxia...) possédé, en cours (étape N sur M) ou pas commencé, avec « Guide-moi » ; onglet « Qui a la clé ? » dans la Guilde ; alerte sur un groupe si personne n'a la clé.
+  *Key passport, who has the key in the guild, LFG warning.*
+- **Quêtes en commun** (T-04) : les membres de la guilde qui ont les mêmes quêtes de donjon que toi, avec Grouper et Chuchoter.
+  *Shared dungeon quests with guild members.*
+- **Tri du journal** (T-05) : quand le journal est presque plein, des conseils d'abandon avec la raison ; les quêtes de tes donjons, de clés et de classe sont protégées.
+  *Quest log triage when the log is nearly full.*
+- **/way** (T-06) : « /wlway Tanaris 52,4 31,2 » envoie la flèche de WL Helper au point (et /way quand aucun autre addon ne l'a).
+  *A /way point straight into WL Helper's arrow.*
+- **Alt + clic dans les sacs** (T-07) : désenchanter (enchanteurs) et crocheter (voleurs) en un clic.
+  *Alt-click to disenchant or pick a lock.*
+- **Carte du donjon** (T-08) : un bouton dans la fenêtre des boss ouvre la meilleure carte installée (OpenMap, Naowh, FDJ, sinon la carte du monde).
+  *Dungeon map button in the boss panel.*
+- **Aller à…** (T-09) : cherche une destination (banque, HV, maître de classe, PNJ, zone, entrée de donjon) ; la flèche suit un vrai chemin à pied grâce à WLHelper_Nav, livré à côté (addon GPL séparé, tiré de Polestar Nav et de Shortest Path Forever, crédités).
+  *Go to: search a destination, walking trail from WLHelper_Nav (shipped alongside, GPL).*
+- **Classement PvP de la guilde** (T-11) : d'où viennent les victoires honorables (zones, champs de bataille) et un K/D/A en champ de bataille ; morts face aux joueurs en monde ouvert.
+  *Guild PvP: where HKs come from, battleground K/D/A.*
+
+### Modifié / Changed
+- **Résumé du donjon refait** (T-01) : bannière « Conseillé niv. 38 à 48 · tu es niv. 41 », puis Entrée, Clé, Avant d'entrer et Tu gagnes ; sur chaque quête, la difficulté en mots, le niveau où elle se prend, l'XP que tu gagnes vraiment (réduite pour une quête grise) et une seule façon de dire son état.
+  *Summary redesign: suggested level, real XP, plain difficulty words, one state vocabulary.*
+- **Icônes** (T-10) : une icône a désormais un seul sens dans toutes les fenêtres ; les icônes décoratives sur les boutons sont retirées.
+  *Icons: one meaning each, decorative ones removed.*
+- **Bouton « Choisir les donjons »** (T-12) dans le guide.
+  *"Pick dungeons" button in the guide.*
+
+### Corrigé / Fixed
+- **Images des raids** (T-13) : Onyxia, Hyjal et Barrow Deeps ont une image tirée du jeu.
+  *Raid cards get a picture from the game.*
+- **Icône de récompense** (T-14) quand le serveur ne connaît pas le numéro donné par la base de quêtes.
+  *Reward icon fallback through LibForeverData.*
+
 ## [1.0.0-beta.71] — 2026-11-15
 
 ### Ajouté / Added

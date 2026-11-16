@@ -43,6 +43,43 @@ local MAYBE_ART = {
   ScarletMonasteryCathedral = "LoadScreenScarletMonastery",
 }
 local missing = {}   -- paths the client does not have, tried once per session
+-- Raids (no picture in ForeverDungeonJournal or Naowh): the game's own art, first one this client
+-- has wins (journal art of the modern client, then loading screens; Kalimdor's as the last resort).
+local EJ = "Interface\\EncounterJournal\\"
+local RAID_ART = {
+  OnyxiasLair = { EJ .. "UI-EJ-LOREBG-OnyxiasLair", EJ .. "UI-EJ-BACKGROUND-OnyxiasLair", LS .. "LoadScreenOnyxiasLair",
+    LS .. "LoadScreenOnyxia", LS .. "LoadScreenDustwallowMarsh", LS .. "LoadScreenKalimdor" },
+  HyjalSummit = { EJ .. "UI-EJ-LOREBG-TheBattleforMountHyjal", EJ .. "UI-EJ-BACKGROUND-TheBattleforMountHyjal",
+    EJ .. "UI-EJ-LOREBG-HyjalSummit", LS .. "LoadScreenHyjal", LS .. "LoadScreenCavernsTimeHyjal", EJ .. "UI-EJ-LOREBG-Firelands",
+    LS .. "LoadScreenKalimdor2", LS .. "LoadScreenKalimdor" },
+  BarrowDeeps = { EJ .. "UI-EJ-LOREBG-TheEmeraldNightmare", EJ .. "UI-EJ-BACKGROUND-TheEmeraldNightmare", LS .. "LoadScreenMoonglade",
+    LS .. "LoadScreenHyjal", LS .. "LoadScreenKalimdor2", LS .. "LoadScreenKalimdor" },
+}
+-- the game's journal, when this client has its functions: the instance's own lore picture
+local function JournalArt(d)
+  if not (EJ_GetNumTiers and EJ_SelectTier and EJ_GetInstanceByIndex) then return nil end
+  local want = { [d.n or ""] = true, [d.nf or ""] = true }
+  local okN, nt = pcall(EJ_GetNumTiers)
+  if not okN or type(nt) ~= "number" then return nil end
+  -- selecting a tier moves the game's own Adventure Guide: put the player's tier back after
+  local okC, before = false, nil
+  if EJ_GetCurrentTier then okC, before = pcall(EJ_GetCurrentTier) end
+  local found
+  for tier = 1, nt do
+    pcall(EJ_SelectTier, tier)
+    for _, raid in ipairs({ true, false }) do
+      for i = 1, 60 do
+        local ok, id, name, _, bg, _, lore = pcall(EJ_GetInstanceByIndex, i, raid)
+        if not ok or not id then break end
+        if type(name) == "string" and want[name] then found = lore or bg; break end
+      end
+      if found then break end
+    end
+    if found then break end
+  end
+  if okC and type(before) == "number" then pcall(EJ_SelectTier, before) end
+  return found
+end
 local function TrySet(tex, path)
   if missing[path] then return false end
   local ok = tex:SetTexture(path)
@@ -76,6 +113,16 @@ local function Art(tex, d, c)
   if GAME_ART[key] then tex:SetTexture(GAME_ART[key]); tex:SetTexCoord(0.02, 0.98, 0.26, 0.74); return true end
   if MAYBE_ART[key] and TrySet(tex, LS .. MAYBE_ART[key]) then tex:SetTexCoord(0.02, 0.98, 0.26, 0.74); return true end
   if d.nart then tex:SetTexture(d.nart); tex:SetTexCoord(0, 1, 0.3, 0.7); return true end
+  if RAID_ART[key] or d.raid then
+    if d.jart == nil then d.jart = JournalArt(d) or false end
+    if d.jart and TrySet(tex, d.jart) then tex:SetTexCoord(0, 1, 0.1, 0.9); return true end
+    for _, path in ipairs(RAID_ART[key] or {}) do
+      if TrySet(tex, path) then
+        if path:find("EncounterJournal", 1, true) then tex:SetTexCoord(0, 1, 0.1, 0.9) else tex:SetTexCoord(0.02, 0.98, 0.26, 0.74) end
+        return true
+      end
+    end
+  end
   -- no picture: a dark card with the dungeon's painted icon (not a stretched icon)
   tex:SetColorTexture(T.panel[1], T.panel[2], T.panel[3], 1)
   if c then ns.SetPainted(c.bigIcon, d.icon or "Interface\\Icons\\INV_Misc_Map_01", 40); c.bigIcon:Show() end
@@ -221,9 +268,11 @@ local function MakeCard(parent)
   c.selEdge = ns.Outline(c, T.accent, 0, "OVERLAY")
   -- text drawn over a picture keeps a shadow
   c.wlWorld = true
-  -- the overview button at the card's top-right corner; the check of a finished dungeon left of it
-  c.ov = S.IconButton(c, "info", 24, function() return { L.OV_T, L.OV_CLICK } end,
-    function() if ns.ShowOverview then ns.ShowOverview(c.dkey) end end)
+  -- the summary button at the card's top-right corner; the check of a finished dungeon left of
+  -- it. A word, not the info icon: "info" only means neutral information (icon audit G1), and the
+  -- check beside an info icon read as one cluster
+  c.ov = S.Button(c, L.OV_T, 0, 24, "secondary", function() if ns.ShowOverview then ns.ShowOverview(c.dkey) end end,
+    function() return { L.OV_T, L.OV_CLICK } end)
   c.ov:SetPoint("TOPRIGHT", -6, -6)
   c.ov:SetFrameLevel((c:GetFrameLevel() or 1) + 3)
   c.doneMark = ns.Icon(c, "check", 14, "OVERLAY", T.ok); c.doneMark:SetPoint("RIGHT", c.ov, "LEFT", -2, 0)
@@ -452,8 +501,10 @@ Render = function()
         local soon = d.up and time() < d.up
         local n, done = Counts(k)
         local finished = n > 0 and done >= n
-        -- the name wraps to 2 lines over the whole width (less the check); the band follows it
-        local nameH = ns.FitText(c.name, 2, CW - 12 - 36 - (finished and 16 or 0), c)
+        -- the name wraps to 2 lines over the whole width (less the summary button and the check);
+        -- the band follows it
+        local ovW = (num(c.ov:GetWidth()) or 64) + 12
+        local nameH = ns.FitText(c.name, 2, CW - 12 - ovW - (finished and 16 or 0), c)
         if nameH < 14 then nameH = 17 end
         local topH = 10 + nameH + 8
         c.topBand:SetHeight(topH)
@@ -521,8 +572,8 @@ Render = function()
 
   local nSel = SelCount()
   p.selText:SetText(nSel == 0 and L.PICK_SEL0 or ns.Plural(nSel, "PICK_SEL1", "PICK_SEL", nSel))
+  -- no pin: this button opens the summary, it starts no GPS (the pin means GPS, icon audit G1)
   p.go:SetText(nSel == 0 and L.PICK_GO or ns.Plural(nSel, "PICK_GO1", "PICK_GON", nSel))
-  if p.go.SetIcon then p.go:SetIcon("pin") end
   p.go:SetEnabled(nSel > 0)
   p.none:SetEnabled(nSel > 0)
 end
@@ -606,16 +657,18 @@ local function BuildQuests()
       local lines = { ns.QName(self.qid) }
       local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
       if obj then table.insert(lines, obj) end
-      -- the chain in order, one line per quest: done (check), in the log (dot), to do (faint dot)
+      -- the chain in order, one line per quest with its state in words, the same four words as
+      -- everywhere (To take / In your log / Ready to turn in / Turned in): no dots to decode
       local pre = ns.QuestPreInfo and ns.QuestPreInfo(self.qid)
       if pre and pre.total > 0 then
-        local S = SW()
         table.insert(lines, { L.OV_CHAIN_TT, T.fg[1], T.fg[2], T.fg[3] })
         for i, pid in ipairs(pre.chain) do
           local s = pre.states[i]
-          local mark = s == "done" and S.IconMarkup("check", 12, T.ok) or S.IconMarkup("dot", 12, s ~= "none" and T.info or T.faint)
+          local word = (s == "done" and L.S_DONE) or (s == "ready" and L.S_READY) or (s == "on" and L.CL_HAVE) or L.S_NONE
+          -- "to take" is a normal state, not an alert: gold, like the tracker's take line
+          local wc = (s == "done" and T.muted) or (s == "ready" and T.ok) or (s == "on" and T.fg) or T.gold
           local pq = ns.Q[pid] or {}
-          local txt = mark .. " " .. ns.QName(pid) .. (pq.l and (" · " .. L.PICK_LV1:format(pq.l)) or "")
+          local txt = ns.QName(pid) .. " · " .. Hex(wc) .. word .. "|r" .. (pq.l and (" · " .. L.PICK_LV1:format(pq.l)) or "")
           if i == 1 and pq.s and pq.s.m and C_Map and C_Map.GetMapInfo then
             local ok, mi = pcall(C_Map.GetMapInfo, pq.s.m)
             if ok and type(mi) == "table" and mi.name then txt = txt .. " · " .. mi.name end

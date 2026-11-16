@@ -1,4 +1,5 @@
-# Copies the addons (WLHelper and WLHelper_Gear) from this repo into the game's AddOns folder,
+# Copies the addons (WLHelper, WLHelper_Gear and the GPS's walking router WLHelper_Nav,
+# WLHelper_Nav_EK, WLHelper_Nav_Kalimdor) from this repo into the game's AddOns folder,
 # to try them in game (/reload).
 # The repo is the source: work here, never in AddOns (WowUp may overwrite that folder).
 #   .\tools\install.ps1
@@ -7,7 +8,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
-foreach ($name in @("WLHelper", "WLHelper_Gear")) {
+foreach ($name in @("WLHelper", "WLHelper_Gear", "WLHelper_Nav", "WLHelper_Nav_EK", "WLHelper_Nav_Kalimdor")) {
     $src = Join-Path $repo $name
     $dst = Join-Path $AddOns $name
     if (-not (Test-Path (Join-Path $src "$name.toc"))) { throw "Not found: $src" }

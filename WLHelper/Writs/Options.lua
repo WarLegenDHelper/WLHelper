@@ -227,6 +227,11 @@ ns.AddEnglish({
     ["Donjons · Raids · Classe"] = "Dungeons · Raids · Class",
     ["Version"] = "Version", ["Voir"] = "Show",
     ["Writs & Favor"] = "Writs & Favor",
+    -- the tools' rows (their own strings live in their files)
+    ["Prendre /way"] = "Take /way",
+    ["Allumé, /way envoie le point au GPS de WL Helper. Éteint, /way reste à l'addon qui l'avait (TomTom par exemple) et /wlway fait la même chose."] =
+        "When on, /way sends the point to WL Helper's GPS. When off, /way stays with the addon that had it (TomTom, for example) and /wlway does the same.",
+    ["/way est à %s."] = "/way belongs to %s.",
 })
 
 -- ---------------------------------------------------------------- settings access
@@ -601,15 +606,30 @@ end
 
 -- ---------------------------------------------------------------- pages
 
+-- Page icons (icon audit G5): the modules' own icons (Writs/Home.lua WP.MODULE_ICON, the same as
+-- on the Home cards); General is the HD settings gear, as everywhere else Settings opens; GPS is the addon's GPS arrow, as on the HUD
+-- and in the minimap menu; About is the neutral "info" glyph (the question mark read as Help).
+-- An icon is a painted path or { hd = glyph name or path }.
+local MI = ns.WP.MODULE_ICON or {}
 local PAGES = {
-    { key = "general",  label = "Général",       icon = "Interface\\Icons\\Trade_Engineering",     desc = "Modules, clics, langue et fenêtres." },
-    { key = "dungeons", label = "Donjons",       icon = "Interface\\Icons\\INV_Misc_Map_01",       desc = "La flèche, les alertes et les quêtes que montre le guide." },
-    { key = "comptoir", label = "Writs",      icon = "Interface\\Icons\\INV_Letter_15",         desc = "Remise des Writs, rappels, objectif et zones." },
-    { key = "gps",      label = "GPS",           icon = "Interface\\Icons\\Ability_Tracking",      desc = "Itinéraire, vols, téléportations et flèche." },
-    { key = "bags",     label = "Sacs",          icon = "Interface\\Icons\\INV_Misc_Bag_08",       desc = "Place dans les sacs et vente des objets gris." },
-    { key = "upgrades", label = "Améliorations", icon = "Interface\\Icons\\INV_Chest_Cloth_17",    desc = "Calcul, spé et affichage des améliorations." },
-    { key = "about",    label = "À propos",      icon = "Interface\\Icons\\INV_Misc_QuestionMark", desc = "Version, crédits, contact et commandes du chat." },
+    { key = "general",  label = "Général",       icon = { hd = "gear" },                            desc = "Modules, clics, langue et fenêtres." },
+    { key = "dungeons", label = "Donjons",       icon = MI.dungeons or "Interface\\Icons\\INV_Misc_Map_01", desc = "La flèche, les alertes et les quêtes que montre le guide." },
+    { key = "comptoir", label = "Writs",      icon = MI.writs or "Interface\\Icons\\INV_Letter_15", desc = "Remise des Writs, rappels, objectif et zones." },
+    { key = "gps",      label = "GPS",           icon = { hd = root.ARROW },                          desc = "Itinéraire, vols, téléportations et flèche." },
+    { key = "bags",     label = "Sacs",          icon = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", desc = "Place dans les sacs et vente des objets gris." },
+    { key = "upgrades", label = "Améliorations", icon = MI.upgrades or { hd = "arrow_up", color = T.ok }, desc = "Calcul, spé et affichage des améliorations." },
+    { key = "about",    label = "À propos",      icon = { hd = "info" },                              desc = "Version, crédits, contact et commandes du chat." },
 }
+-- Draws a page or module icon: a painted path, or an HD glyph (its own colour, else `rest`).
+-- -> true for a glyph
+local function PaintIcon(tex, icon, rest)
+    if type(icon) == "table" then
+        root.SetHDIcon(tex, icon.hd, icon.color or rest or T.muted)
+        return true
+    end
+    S.Painted(tex, icon); tex:SetVertexColor(1, 1, 1)
+    return false
+end
 
 -- What each module does, written for the Settings rows and the module card of its page.
 local MODULE_DESC = {
@@ -622,8 +642,8 @@ local MODULE_DESC = {
     upgrades = "Une flèche verte sur les objets meilleurs que ceux que tu portes.",
 }
 local MODULE_ICON = {
-    dungeons = "Interface\\Icons\\INV_Misc_Map_01", writs = "Interface\\Icons\\INV_Letter_15",
-    bags = "Interface\\Icons\\INV_Misc_Bag_08", upgrades = "Interface\\Icons\\INV_Chest_Cloth_17",
+    dungeons = MI.dungeons or "Interface\\Icons\\INV_Misc_Map_01", writs = MI.writs or "Interface\\Icons\\INV_Letter_15",
+    bags = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", upgrades = MI.upgrades or { hd = "arrow_up", color = T.ok },
 }
 
 -- A module's name: "Groupes" has two English texts (Events.lua says "LFG"), and WP.MODULES says
@@ -673,6 +693,40 @@ function BUILD.general(p)
                 if ns.WP.OfferWand then ns.WP.OfferWand() end
                 setClick("wandRight")(v)
             end, L("Sans touche, un clic droit sur un ennemi lance ta baguette au lieu du corps-à-corps. La touche choisie tire toujours. Maintenu sur un ennemi, il ne tourne plus la caméra."))
+        end
+        local AC = ns.WP.AltClick
+        if AC and AC.On and AC.SetOn then
+            SwitchRow(p, L("Alt-clic pour désenchanter / crocheter"), function() return AC.On() end, function(v) AC.SetOn(v) end,
+                L("Alt + clic gauche sur un objet de tes sacs : désenchanter (enchanteur), crocheter un coffret (voleur), déchiffrer un parchemin (mage)."))
+        end
+    end
+
+    -- the smaller tools (Home, "Outils"): each row only when its file is loaded
+    local CT, Tr = ns.WP.CityTour, ns.WP.Triage
+    if (CT and CT.IsOn) or Tr then
+        Section(p, L("Outils"))
+        if CT and CT.IsOn and CT.SetOn then
+            SwitchRow(p, L("Tournée en ville"), function() return CT.IsOn() end, function(v) CT.SetOn(v) end,
+                L("En arrivant dans une capitale, une petite fiche liste ce qu'il y a à faire : courrier, réparations, maître de classe, quêtes à rendre."))
+        end
+        if Tr then
+            SwitchRow(p, L("Proposer le tri du journal"), function() return WLWritsDB.triageNotice ~= false end,
+                function(v) WLWritsDB.triageNotice = v and true or false end,
+                L("Quand ton journal de quêtes est presque plein, une ligne dans le chat propose de voir les quêtes à abandonner."))
+        end
+    end
+
+    -- what this copy tells the guild's copies: each one can be kept private
+    local K, Sh = ns.WP.Keys, ns.WP.Shared
+    if (K and K.ShareOn) or (Sh and Sh.GetShare) then
+        Section(p, L("Guilde"))
+        if K and K.ShareOn and K.SetShare then
+            SwitchRow(p, L("Partager mes clés avec la guilde"), function() return K.ShareOn() end, function(v) K.SetShare(v) end,
+                L("Les membres qui ont WL Helper voient quelles clés tu as, dans l'onglet Qui a la clé ? de la guilde."))
+        end
+        if Sh and Sh.GetShare and Sh.SetShare then
+            SwitchRow(p, L("Partager mes quêtes de donjon"), function() return Sh.GetShare() end, function(v) Sh.SetShare(v) end,
+                L("Les membres de la guilde qui ont WL Helper voient quelles quêtes de donjon tu as, pour grouper. Rien d'autre n'est envoyé."))
         end
     end
 
@@ -812,6 +866,22 @@ function BUILD.gps(p)
     known:Sync()
     Place(p, row, known)
     SwitchRow(p, L("Distances en yards"), function() return Gps().yards end, SetGps("yards"), L("Sinon en mètres et en kilomètres."))
+    local GT, Way = ns.WP.GoTo, ns.WP.Way
+    if GT and GT.WalkOn and GT.SetWalk then
+        SwitchRow(p, L("Chemins à pied"), function() return GT.WalkOn() end, function(v) GT.SetWalk(v) end,
+            L("Pour « Aller à », la flèche suit un vrai chemin autour des collines et par les portes (WL Helper Nav). Sans lui, elle va tout droit."))
+    end
+    if Way and Way.SetTake then
+        -- the setting itself, not who owns /way right now: /way is decided a few seconds after login
+        local function wants()
+            if Way.WantsWay then local ok, v = pcall(Way.WantsWay); if ok then return v and true or false end end
+            return Way.Takes and Way.Takes() or false
+        end
+        local desc = L("Allumé, /way envoie le point au GPS de WL Helper. Éteint, /way reste à l'addon qui l'avait (TomTom par exemple) et /wlway fait la même chose.")
+        local okO, other = pcall(function() return Way.OtherOwnerName and Way.OtherOwnerName() end)
+        if okO and type(other) == "string" and other ~= "" then desc = desc .. " " .. string.format(L("/way est à %s."), other) end
+        SwitchRow(p, L("Prendre /way"), wants, function(v) Way.SetTake(v) end, desc)
+    end
 
     Section(p, L("Flèche"))
     PercentSlider(p, L("Taille de la flèche"), 70, 150, function() return Gps().scale end, SetGps("scale"))
@@ -822,7 +892,7 @@ function BUILD.gps(p)
         local G = ns.WP and ns.WP.GPS
         if G and G.UnlockArrow then G.UnlockArrow() end
     end)
-    move:SetIcon("arrow_up")
+    -- no arrow_up here: it read as "move up" (icon audit G3)
     function move:Sync()
         local G = ns.WP and ns.WP.GPS
         self:SetEnabled(G and G.UnlockArrow and true or false)
@@ -1026,10 +1096,9 @@ function BUILD.about(p)
     local say = S.Text(fb, F.body, T.text)
     say:SetJustifyH("LEFT"); say:SetJustifyV("TOP")
     say:SetText(L("Dis-nous ce qui manque ou ce qui coince. Chaque bouton t'affiche un lien à ouvrir dans ton navigateur."))
+    -- labelled: no star or warning beside the words (icon audit G3)
     local bIdea = S.Button(fb, L("Proposer une idée"), 0, 28, "secondary", function() if ns.WP.Feedback then ns.WP.Feedback("idea") end end)
-    bIdea:SetIcon("star")
     local bBug = S.Button(fb, L("Signaler un bug"), 0, 28, "secondary", function() if ns.WP.Feedback then ns.WP.Feedback("bug") end end)
-    bBug:SetIcon("warning")
     Add(p, fb, function(width)
         say:ClearAllPoints(); say:SetPoint("TOPLEFT", 0, 0)
         local h = math.max(15, root.FitText(say, 0, width, fb))
@@ -1068,7 +1137,10 @@ local function ModuleCard(p, pageKey, mod)
     c.iconFrame = CreateFrame("Frame", nil, c)
     c.iconFrame:SetSize(32, 32); c.iconFrame:SetPoint("TOPLEFT", 12, -12)
     c.icon = c.iconFrame:CreateTexture(nil, "ARTWORK"); c.icon:SetAllPoints()
-    S.Painted(c.icon, MODULE_ICON[mod] or "Interface\\Icons\\INV_Misc_QuestionMark", 32)
+    -- an HD glyph sits 6 px inside the box (as on the Home card); a painted icon fills it
+    if PaintIcon(c.icon, MODULE_ICON[mod] or "Interface\\Icons\\INV_Misc_Map_01", T.fg) then
+        c.icon:ClearAllPoints(); c.icon:SetPoint("TOPLEFT", 6, -6); c.icon:SetPoint("BOTTOMRIGHT", -6, 6)
+    end
     S.Border(c.iconFrame, T.cardEdge)
     c.title = S.Text(c, F.heading, T.fg)
     c.title:SetJustifyH("LEFT"); c.title:SetJustifyV("TOP")
@@ -1142,9 +1214,16 @@ local function BuildBody()
         b.press = S.Solid(b, "BORDER", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
         b.iconFrame = CreateFrame("Frame", nil, b)
         b.iconFrame:SetSize(20, 20); b.iconFrame:SetPoint("LEFT", 8, 0)
-        b.icon = b.iconFrame:CreateTexture(nil, "ARTWORK"); b.icon:SetAllPoints()
-        S.Painted(b.icon, def.icon, 20)
-        S.Border(b.iconFrame, T.cardEdge)
+        b.icon = b.iconFrame:CreateTexture(nil, "ARTWORK")
+        -- painted: 20 px in a 1 px edge; an HD glyph: 16 px, no edge, tinted like the label
+        b.hdIcon = PaintIcon(b.icon, def.icon)
+        b.hdColor = b.hdIcon and def.icon.color or nil
+        if b.hdIcon then
+            b.icon:SetSize(16, 16); b.icon:SetPoint("CENTER")
+        else
+            b.icon:SetAllPoints()
+            S.Border(b.iconFrame, T.cardEdge)
+        end
         b.count = S.Counter(b)
         b.count:SetPoint("RIGHT", -8, 0)
         b.label = S.Text(b, F.label, T.muted)
@@ -1185,6 +1264,7 @@ local function BuildBody()
             b.sel:SetShown(on)
             local c = (on or b.hover) and T.fg or T.muted
             b.label:SetTextColor(c[1], c[2], c[3])
+            if b.hdIcon and not b.hdColor then b.icon:SetVertexColor(c[1], c[2], c[3]) end
             b.iconFrame:SetAlpha((on or b.hover) and 1 or 0.8)
         end
     end
@@ -1453,8 +1533,8 @@ BuildSearch = function(nav, content)
                 page = e.page
                 hi = hi + 1
                 local head = Head(hi)
-                local icon = e.pageIcon and ("|T" .. e.pageIcon .. ":14:14:0:-1:64:64:5:59:5:59|t ") or ""
-                head:Set(icon .. (e.pageLabel or ""), counts[page] or 0)
+                -- the page's name only: an icon there was decoration (icon audit, Settings)
+                head:Set(e.pageLabel or "", counts[page] or 0)
                 layoutPlan[#layoutPlan + 1] = { head = head }
             end
             ri = ri + 1
@@ -1601,7 +1681,6 @@ local function RegisterGameSettings()
     desc:SetWidth(480); desc:SetJustifyH("LEFT")
     desc:SetText(L("Le guide de quêtes, les Writs, le GPS et les outils de la guilde WaR LegenD."))
     local open = S.Button(panel, L("Ouvrir les réglages"), 0, 32, "primary", OpenFromOutside)
-    open:SetIcon("gear")
     open:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -12)
 
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
@@ -1655,7 +1734,6 @@ local function RegisterEllesmere()
                     local prebuild = EllesmereUI.IsSearchPrebuild and EllesmereUI.IsSearchPrebuild()
                     if not prebuild then
                         local b = S.Button(parent, L("Ouvrir les réglages"), 0, 32, "primary", OpenFromOutside)
-                        b:SetIcon("gear")
                         b:SetPoint("TOPLEFT", parent, "TOPLEFT", 20, y)
                     end
                     y = y - 32 - 16

@@ -3,7 +3,7 @@
 -- sit on the dungeon's instance map (ns.D[k].inst = the client Map id LibForeverData stores for
 -- instance spawns), ranked boss (3) or rare (2 rare elite, 4 rare), plus the bosses of the walk
 -- order (ns.WALK / ns.BossOrder: most 5-player bosses are only "elite" in the data).
--- The panel: a header (the dungeon's name, a "new run" button, close), the current run's numbers
+-- The panel: a header (the dungeon's name, the dungeon's map, a "new run" button, close), the current run's numbers
 -- (time since entering, XP and gold gained inside), then a grid of ROUND creature portraits, five per
 -- row in dungeon order, and the rares under a "Rares" label. Every creature gets a face: its display
 -- id (the dungeon journal's model, the game's encounter journal, or a one-time hidden model lookup
@@ -27,6 +27,7 @@
 --      ns.ShowBosses(dkey), ns.HideBosses(), ns.ToggleBosses(dkey), ns.AttachBosses(parentFrame),
 --      ns.RefreshBosses(), ns.BossesShown(), ns.RareSeen(npcId), ns.RareAlert(unit),
 --      ns.NewBossRun(), ns.BossCommand(), ns.BossRunStats(dkey)
+--      ns.OpenDungeonMap(dkey), ns.DungeonMapSource(dkey) -> kind, label (OpenMap, Naowh, FDJ, world map)
 local ADDON, ns = ...
 local L = ns.L
 local T = ns.Tok
@@ -1438,6 +1439,255 @@ local function ResetClick()
   if C_Timer and C_Timer.After then C_Timer.After(4, function() if P and P.armed == token then Disarm() end end) end
 end
 
+-- ---------------------------------------------------------------- the dungeon's map
+-- The header's map button opens the best map of the dungeon another addon already has, read live
+-- (nothing copied), in this order:
+--   OpenMap: standing in the dungeon, its world map opens on the dungeon's own map by itself (it
+--     has no public call to open one from outside, so only inside);
+--   Naowh Forever's Dungeon Journal: its map window (J.OpenDungeonMap);
+--   Forever Dungeon Journal: its map page (FDJ.OpenDungeonMap, once its window is up);
+--   else the game's world map, when the client has a map of the place you stand in.
+-- In combat nothing opens: the world map opened from addon code in combat can be blocked by the game
+-- ("Interface action failed because of an AddOn"), and the journals' windows wait too. The M key still
+-- works then (OpenMap answers it). The button is hidden when nothing has a map of this dungeon.
+-- Strings: added to Locale.lua's tables from here (both languages), so /wlh lang still switches them.
+do
+  local LT = ns.LOCALE_TABLES
+  local add = {
+    fr = {
+      BOSS_MAP = "Carte du donjon", BOSS_MAP_CLICK = "Clic : ouvrir la carte du donjon",
+      BOSS_MAP_FROM = "Source : %s", BOSS_MAP_WORLD = "la carte du monde du jeu",
+      BOSS_MAP_COMBAT = "En combat, seule la carte du monde s'ouvre.",
+      BOSS_MAP_LATER = "La carte du donjon s'ouvre hors combat.",
+      BOSS_MAP_NONE = "Pas de carte pour ce donjon. OpenMap ou un journal de donjon en donne une.",
+      BOSS_MAP_NOWHERE = "Entre dans un donjon, ou ouvre son panneau de boss, pour voir sa carte.",
+    },
+    en = {
+      BOSS_MAP = "Dungeon map", BOSS_MAP_CLICK = "Click: open the dungeon's map",
+      BOSS_MAP_FROM = "From: %s", BOSS_MAP_WORLD = "the game's world map",
+      BOSS_MAP_COMBAT = "In combat, only the world map opens.",
+      BOSS_MAP_LATER = "The dungeon map opens out of combat.",
+      BOSS_MAP_NONE = "No map for this dungeon. OpenMap or a dungeon journal provides one.",
+      BOSS_MAP_NOWHERE = "Enter a dungeon, or open its boss panel, to see its map.",
+    },
+  }
+  for lang, t in pairs(add) do
+    local into = type(LT) == "table" and LT[lang]
+    if type(into) == "table" then for k, v in pairs(t) do if into[k] == nil then into[k] = v end end end
+  end
+end
+
+-- (in one block: the file's main chunk is near Lua's 200 locals; only these two leave it)
+local MapIcon, MapTip
+do
+  -- "The Hall of Thanes" / "HallofThanes" / "Dire Maul: East" -> "hallofthanes" / "diremauleast"
+  local function Simple(s) return (tostring(s or ""):lower():gsub("^the ", ""):gsub("[^%w]", "")) end
+  -- 2: the same name, 1: one starts like the other (a wing of a dungeon mapped whole), 0: no
+  local function Likeness(a, b)
+    if a == "" or b == "" then return 0 end
+    if a == b then return 2 end
+    if #a >= 5 and #b >= 5 and (a:find(b, 1, true) == 1 or b:find(a, 1, true) == 1) then return 1 end
+    return 0
+  end
+  local function Wanted(dkey)
+    local d = ns.D and ns.D[dkey]
+    return { Simple(d and d.n), Simple(dkey) }
+  end
+  local function Score(wants, ...)
+    local best = 0
+    for i = 1, select("#", ...) do
+      local v = select(i, ...)
+      if type(v) == "string" then
+        local s = Simple(v)
+        for _, w in ipairs(wants) do best = math.max(best, Likeness(w, s)) end
+      end
+    end
+    return best
+  end
+
+  local function InsideOf(d) return d ~= nil and d.inst ~= nil and CurrentInstance() == d.inst end
+
+  -- the client's own map of where you stand, when it is a dungeon's (or a part of one)
+  local function ClientMapHere()
+    if not (C_Map and type(C_Map.GetBestMapForUnit) == "function" and type(C_Map.GetMapInfo) == "function") then return nil end
+    local ok, id = pcall(C_Map.GetBestMapForUnit, "player")
+    id = ok and num(id) or nil
+    if not id then return nil end
+    local okI, info = pcall(C_Map.GetMapInfo, id)
+    local kind = okI and type(info) == "table" and num(info.mapType) or nil
+    local E = Enum and Enum.UIMapType
+    if kind and E and (kind == E.Dungeon or kind == E.Micro) then return id end
+    return nil
+  end
+
+  local function OpenMapOn(d)
+    local OM = rawget(_G, "OpenMap")
+    if type(OM) ~= "table" or not InsideOf(d) then return false end
+    if type(OM.GetModule) == "function" then
+      local ok, mod = pcall(OM.GetModule, OM, "worldmap")
+      if ok and type(mod) == "table" then
+        if mod.enabled == false then return false end
+        if type(mod.db) == "table" and mod.db.dungeonMaps == false then return false end   -- its option "Dungeon maps"
+      end
+    end
+    -- Blizzard's map, one drawn for Forever's own dungeons (by instance, or by name when the game's
+    -- tables have no instance ID for it yet), or one built from the minimap pictures
+    for _, k in ipairs({ "MapDungeonMaps", "MapDungeonDrawn", "MapDungeonMinimap" }) do
+      local maps = rawget(OM, k)
+      if type(maps) == "table" and maps[d.inst] ~= nil then return true end
+    end
+    local drawn = rawget(OM, "MapDungeonDrawn")
+    if type(drawn) == "table" and type(GetInstanceInfo) == "function" then
+      local okN, name = pcall(GetInstanceInfo)
+      if okN and type(name) == "string" and not (issecretvalue and issecretvalue(name)) and drawn[name] ~= nil then return true end
+    end
+    return ClientMapHere() ~= nil
+  end
+
+  local function NaowhMap(dkey)
+    local N = rawget(_G, "NaowhForever")
+    local J = type(N) == "table" and N.Journal
+    if not (type(J) == "table" and type(J.OpenDungeonMap) == "function" and type(J.Dungeons) == "function"
+      and type(J.Maps) == "table") then return nil end
+    local ok, list = pcall(J.Dungeons)
+    if not ok or type(list) ~= "table" then return nil end
+    local wants = Wanted(dkey)
+    local best, bestScore = nil, 0
+    for _, dg in ipairs(list) do
+      if type(dg) == "table" and dg.key and J.Maps[dg.key] then
+        local s = Score(wants, dg.english, dg.name, dg.key)
+        if s > bestScore then best, bestScore = dg, s end
+        if s == 2 then break end
+      end
+    end
+    return best and { J = J, dg = best } or nil
+  end
+
+  local function FDJMap(dkey)
+    local FDJ = rawget(_G, "ForeverDungeonJournal_NS")
+    if not (type(FDJ) == "table" and type(FDJ.OpenDungeonMap) == "function" and type(FDJ.DUNGEON_MAPS) == "table") then return nil end
+    local wants = Wanted(dkey)
+    local names = {}
+    for name in pairs(FDJ.DUNGEON_MAPS) do if type(name) == "string" then names[#names + 1] = name end end
+    table.sort(names)   -- the same pick every time when two only start alike
+    local best, bestScore = nil, 0
+    for _, name in ipairs(names) do
+      -- (its map opens only for a dungeon its journal has)
+      if not (type(FDJ.DB) == "table" and FDJ.DB[name] == nil) then
+        local s = Score(wants, name)
+        if s > bestScore then best, bestScore = name, s end
+        if s == 2 then break end
+      end
+    end
+    if not best then return nil end
+    -- its role-play mode can keep a map locked until it is earned: then it has none for us either
+    if type(FDJ.IsDungeonMapLocked) == "function" then
+      local okL, locked = pcall(FDJ.IsDungeonMapLocked, best)
+      if okL and locked then return nil end
+    end
+    return { FDJ = FDJ, name = best }
+  end
+
+  local function WorldMapShown() return WorldMapFrame ~= nil and WorldMapFrame:IsShown() == true end
+  -- the world map, on `mapID` when given; a second click closes it (as the map key does)
+  local function OpenWorld(mapID)
+    if WorldMapShown() then
+      local cur = WorldMapFrame.GetMapID and WorldMapFrame:GetMapID()
+      if mapID and cur ~= mapID and WorldMapFrame.SetMapID then return (pcall(WorldMapFrame.SetMapID, WorldMapFrame, mapID)) end
+      if type(ToggleWorldMap) == "function" then return (pcall(ToggleWorldMap)) end
+      return (pcall(HideUIPanel or WorldMapFrame.Hide, WorldMapFrame))
+    end
+    if mapID and type(OpenWorldMap) == "function" and pcall(OpenWorldMap, mapID) then return true end
+    if type(ToggleWorldMap) == "function" then return (pcall(ToggleWorldMap)) end
+    if WorldMapFrame then return (pcall(ShowUIPanel or WorldMapFrame.Show, WorldMapFrame)) end
+    return false
+  end
+
+  -- The sources for a dungeon, best first: { kind, label, combat (opens in combat), open = fn }
+  local function MapSources(dkey)
+    local out = {}
+    local d = ns.D and ns.D[dkey]
+    if not d then return out end
+    if OpenMapOn(d) then
+      out[#out + 1] = { kind = "openmap", label = "OpenMap", combat = false, open = function() return OpenWorld(nil) end }
+    end
+    local nm = NaowhMap(dkey)
+    if nm then
+      out[#out + 1] = { kind = "naowh", label = "Naowh Forever", open = function()
+        return (pcall(nm.J.OpenDungeonMap, nm.dg))
+      end }
+    end
+    local fm = FDJMap(dkey)
+    if fm then
+      out[#out + 1] = { kind = "fdj", label = "Forever Dungeon Journal", open = function()
+        -- its map page lives in its window: up first, then the dungeon's map in it
+        local frame, toggle = rawget(_G, "ForeverDungeonJournalFrame"), rawget(_G, "ForeverDungeonJournal_Toggle")
+        if not (frame and frame.IsShown and frame:IsShown()) and type(toggle) == "function" then pcall(toggle) end
+        return (pcall(fm.FDJ.OpenDungeonMap, fm.name))
+      end }
+    end
+    local here = InsideOf(d) and ClientMapHere()
+    if here then
+      out[#out + 1] = { kind = "world", label = L.BOSS_MAP_WORLD, combat = false, open = function() return OpenWorld(here) end }
+    end
+    return out
+  end
+
+  -- The source the button would use now (in combat: the first that opens in combat), or nil.
+  local function MapSource(dkey, inCombat)
+    for _, src in ipairs(MapSources(dkey)) do
+      if not inCombat or src.combat then return src end
+    end
+    return nil
+  end
+  ns.DungeonMapSources = MapSources
+
+  -- Has this dungeon a map anywhere? -> kind ("openmap", "naowh", "fdj", "world"), label; or nil
+  function ns.DungeonMapSource(dkey)
+    dkey = dkey or (P and P.dkey)
+    local src = dkey and MapSource(dkey, false)
+    if src then return src.kind, src.label end
+    return nil
+  end
+
+  -- Opens the best map of the dungeon (dkey: the panel's dungeon when nil). Returns the source's kind
+  -- when a map opened, nil (with one chat line saying why) when none could.
+  function ns.OpenDungeonMap(dkey)
+    dkey = dkey or (P and P.dkey)
+    -- (/wlh carte outside a dungeon, no boss panel opened yet: one line rather than silence)
+    if not dkey then
+      if ns.Print then ns.Print(L.BOSS_MAP_NOWHERE) end
+      return nil
+    end
+    local fight = InCombat()
+    local list = MapSources(dkey)
+    for _, src in ipairs(list) do
+      if (not fight or src.combat) and src.open() then return src.kind end
+    end
+    if ns.Print then ns.Print((fight and #list > 0) and L.BOSS_MAP_LATER or L.BOSS_MAP_NONE) end
+    return nil
+  end
+
+  -- the button's icon: the HD "map" glyph once Media/Icons has it, else the game's painted map
+  function MapIcon()
+    if ns.HD_NAMES and ns.HD_NAMES.map then return "map" end
+    return "Interface\\Icons\\INV_Misc_Map_01"
+  end
+
+  function MapTip()
+    local dkey = P and P.dkey
+    local src = dkey and MapSource(dkey, false)
+    local lines = { L.BOSS_MAP }
+    if src then lines[#lines + 1] = L.BOSS_MAP_FROM:format(src.label) end
+    if InCombat() and src and not src.combat then
+      local alt = MapSource(dkey, true)
+      lines[#lines + 1] = { alt and L.BOSS_MAP_COMBAT or L.BOSS_MAP_LATER, T.warn[1], T.warn[2], T.warn[3] }
+    end
+    lines[#lines + 1] = { L.BOSS_MAP_CLICK, T.hint[1], T.hint[2], T.hint[3] }
+    return lines
+  end
+end
+
 local function Build()
   if P then return P end
   if InCombat() then return nil end
@@ -1487,6 +1737,10 @@ local function Build()
     if P.armed then return { L.RUN_RESET, { L.RUN_RESET_CONFIRM, T.warn[1], T.warn[2], T.warn[3] } } end
     return { L.RUN_RESET, L.RUN_RESET_TIP, { L.RUN_RESET_CLICK, T.hint[1], T.hint[2], T.hint[3] } }
   end, ResetClick)
+  -- the dungeon's map (shown only when some addon or the game has one of it)
+  P.map = S.IconButton(P, MapIcon(), 24, MapTip, function() ns.OpenDungeonMap(P.dkey) end)
+  if not P.map.hd and P.map.icon.SetTexCoord then P.map.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
+  P.map:Hide()
   -- the run's numbers: small label over the value, three columns (two at the level cap)
   P.stats = {}
   for i, key in ipairs({ "RUN_TIME", "RUN_XP", "RUN_GOLD" }) do
@@ -1603,8 +1857,12 @@ local function RenderNow()
   if not live and P.armed then P.armed = nil; if P.reset.SetIcon then P.reset:SetIcon("refresh") end end
   P.attach:SetShown(showAttach)
   P.reset:SetShown(live)
+  -- (a source that fails to be read just hides the button: the panel draws anyway)
+  local okMap, mapKind = pcall(ns.DungeonMapSource, dkey)
+  local showMap = dkey ~= nil and okMap and mapKind ~= nil
+  P.map:SetShown(showMap)
   local prev, right = P.close, 4 + 24
-  for _, btn in ipairs({ showAttach and P.attach or false, live and P.reset or false }) do
+  for _, btn in ipairs({ showAttach and P.attach or false, live and P.reset or false, showMap and P.map or false }) do
     if btn then
       btn:ClearAllPoints(); btn:SetPoint("RIGHT", prev, "LEFT", -2, 0)
       prev, right = btn, right + 2 + 24

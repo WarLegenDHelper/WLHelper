@@ -112,4 +112,13 @@ Exception: the [`WLHelper_Gear`](WLHelper_Gear) folder (gear scoring) is a modif
 **Geared Forever** by Nathan, licensed under the **GNU GPL v3** ([`LICENSE.txt`](WLHelper_Gear/LICENSE.txt),
 [`NOTICE.md`](WLHelper_Gear/NOTICE.md)). It is a separate addon shipped in the same zip; WL Helper
 contains none of its code and only calls its API.
+
+Exception: the [`WLHelper_Nav`](WLHelper_Nav), [`WLHelper_Nav_EK`](WLHelper_Nav_EK) and
+[`WLHelper_Nav_Kalimdor`](WLHelper_Nav_Kalimdor) folders (the GPS's walking router and its maps) are a
+modified copy of **Polestar Nav** by the Polestar authors, whose router started from **Shortest Path
+Forever** by Cillian Berragan (used with his permission), licensed under the **GNU GPL v3 or later**
+(`WLHelper_Nav/Danger.lua`, adapted from the Polestar addon: GPL v3 only); see
+[`LICENSE`](WLHelper_Nav/LICENSE), [`NOTICE.md`](WLHelper_Nav/NOTICE.md) and
+[`CREDITS.md`](WLHelper_Nav/CREDITS.md). They are separate addons shipped in the same zip (mere
+aggregation); WL Helper contains none of their code and only calls their API.
 Author: Alandir (WarLegend).

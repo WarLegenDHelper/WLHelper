@@ -13,9 +13,9 @@
 --   Writ / Writ (capital W)          Faveur du marchand / Merchant's Favor
 --   Événement / Event                Groupe / Group          HV / AH
 --   Actions / Actions                the guide's footer menu    Cibler et objets / Target and items   the bar above the guide
---   Guider sur N donjons / Guide me through N dungeons   the picker's main button
+--   Voir le résumé (N donjons) / See the summary (N dungeons)   the picker's main button (it opens the summary)
 --   Suivi du guide / Guide tracker   the small window with the current action ("le suivi" / "the tracker")
---   Vue d'ensemble / Overview        one dungeon's page: picture, entrance, quests
+--   Résumé / Summary                 one dungeon's page (or the route's): entrance, quests, rewards
 --   Boss et rares / Bosses and rares the panel of a dungeon's bosses and rare mobs
 --   Actif / On                       a step row's GPS button while the GPS leads there (never "Suivi")
 -- Status words: À prendre / To take, En cours / In progress, Prête à rendre / Ready to turn in,
@@ -124,17 +124,17 @@ local S = {
     PICK_SEARCH = "Donjon, quête, PNJ", PICK_HINT_SEARCH = "Résultats pour « %s » dans tous les onglets et à tous les niveaux.",
     PICK_EMPTY_SEARCH_T = "Rien pour « %s »", PICK_EMPTY_SEARCH = "Cherche un nom de donjon (ou ZF, BRD, SM), une quête ou la personne qui la donne.",
     PICK_T = "Choisir les donjons", PICK_HINT = "Coche un ou plusieurs donjons : le guide les enchaîne en une seule route depuis ta position.",
-    PICK_GO = "Lancer la route", PICK_GO1 = "Guider sur 1 donjon", PICK_GON = "Guider sur %d donjons", PICK_GO_WHY = "Coche au moins un donjon.", PICK_NONE = "Tout décocher", PICK_MINE = "Mon niveau", PICK_ALL = "Tous",
+    PICK_GO = "Voir le résumé", PICK_GO1 = "Voir le résumé (1 donjon)", PICK_GON = "Voir le résumé (%d donjons)", PICK_GO_WHY = "Coche au moins un donjon.", PICK_NONE = "Tout décocher", PICK_MINE = "Mon niveau", PICK_ALL = "Tous",
     PICK_QUESTS = "%d quêtes", PICK_QUESTS1 = "%d quête", PICK_DONE = "%d faites", PICK_DONE1 = "%d faite", PICK_NOQ = "Aucune quête", PICK_CUSTOM = "Quêtes",
     PICK_SEL = "%d donjons choisis", PICK_SEL1 = "1 donjon choisi", PICK_SEL0 = "Aucun donjon choisi",
-    PICK_CUSTOM_T = "Quêtes de %s", PICK_CUSTOM_H = "Décoche les quêtes que tu ne veux pas faire : la route les laisse de côté.", PICK_RCLICK = "Clic droit : choisir les quêtes", PICK_CLICK = "Clic : cocher ou décocher", PICK_DCLICK = "Double-clic : lancer la route sur ce donjon seul",
+    PICK_CUSTOM_T = "Quêtes de %s", PICK_CUSTOM_H = "Décoche les quêtes que tu ne veux pas faire : la route les laisse de côté.", PICK_RCLICK = "Clic droit : choisir les quêtes", PICK_CLICK = "Clic : cocher ou décocher", PICK_DCLICK = "Double-clic : voir le résumé de ce donjon seul",
     PICK_QCLICK = "Clic : garder ou retirer cette quête", PICK_QOFF = "Retirée de la route",
     ROUTE_BUILT = "Route calculée : %d étapes pour %s.", RECALC = "Recalculer", RECALC_TT = "Recalcule la route depuis l'endroit où tu es.",
     ARROW_FAR = "Autre continent", ARROW_IN = "Dans le donjon", YARDS = "%d m",
     LANG = "Langue : français.", BONUS = "Bonus", UNKNOWN_LOC = "lieu à confirmer",
     PRE = "Prérequis", MAIN = "Quête de donjon", DETAILS = "Détails", HIDE = "Masquer",
     MM_TT1 = "Clic : ouvrir ou fermer le guide", MM_TT2 = "Clic droit : choisir les donjons", MM_TT3 = "Glisser : déplacer le bouton",
-    HELP = "/wlh : ouvrir l'accueil\n/wlh dungeons : ouvrir le guide de quêtes\n/wlh pick : choisir les donjons\n/wlh trade : ouvrir les Writs (Writs et Faveur)\n/wlh bags : nettoyer les sacs\n/wlh orders : ouvrir les commandes d'artisanat\n/wlh guild : voir la guilde et le classement PvP\n/wlh events : voir l'agenda des événements de la guilde\n/wlh gps : arrêter ou relancer le GPS\n/wlh options : ouvrir les réglages\n/wlh setup : revoir l'écran de bienvenue\n/wlh idea : envoyer une idée ou un bug\n/wlh tracker : afficher ou cacher le suivi du guide\n/wlh boss : afficher ou cacher les boss du donjon\n/wlh help : afficher cette liste",
+    HELP = "/wlh : ouvrir l'accueil\n/wlh dungeons : ouvrir le guide de quêtes\n/wlh pick : choisir les donjons\n/wlh trade : ouvrir les Writs (Writs et Faveur)\n/wlh bags : nettoyer les sacs\n/wlh orders : ouvrir les commandes d'artisanat\n/wlh guild : voir la guilde et le classement PvP\n/wlh events : voir l'agenda des événements de la guilde\n/wlh gps : arrêter ou relancer le GPS\n/wlh aller [lieu] : la flèche t'emmène à un lieu, un service ou un PNJ\n/wlway Tanaris 52,4 31,2 : la flèche de WL Helper va à ce point (aussi /way si aucun autre addon ne l'a)\n/wlh ville : ce qu'il y a à faire dans cette capitale\n/wlh cles : le passeport des clés\n/wlh commun : les quêtes de donjon en commun avec la guilde\n/wlh tri : les quêtes à abandonner quand le journal est plein\n/wlh options : ouvrir les réglages\n/wlh setup : revoir l'écran de bienvenue\n/wlh idea : envoyer une idée ou un bug\n/wlh tracker : afficher ou cacher le suivi du guide\n/wlh boss : afficher ou cacher les boss du donjon\n/wlh help : afficher cette liste",
     UNKNOWN_CMD = "Commande inconnue « %s ». Tape /wlh help pour voir la liste.",
     RESET = "Étapes validées à la main et route remises à zéro.", SKIP = "Passer",
     B_READY_T = "Check-list avant d'entrer",
@@ -199,12 +199,12 @@ local S = {
     ST_PICKUP = "À prendre", ST_ACTIVE = "En cours", ST_READY = "Prête à rendre", ST_DONE = "Rendue",
     -- guide window: chapter headers in the step list, overview, bosses and tracker entries
     TT_CHAPTER_CLICK = "Clic : aller à la première étape à faire de cette partie", CH_PROGRESS = "Étapes faites : %d / %d",
-    OV_HDR_T = "Vue d'ensemble : %s",
+    OV_HDR_T = "Résumé : %s",
     BOSS_MENU_CLICK = "Clic : afficher les boss et les rares du donjon", BOSS_MENU_NONE = "Aucun donjon dans la route pour l'instant.",
     TR_MENU_TT = "Une petite fenêtre avec l'action en cours et les deux suivantes, même guide fermé.",
     TR_MENU_CLICK = "Clic : afficher ou cacher le suivi",
     -- dungeon overview (Overview.lua)
-    OV_T = "Vue d'ensemble", OV_CLICK = "Clic : ouvrir la vue d'ensemble du donjon", OV_RCLICK = "Clic droit : vue d'ensemble du donjon",
+    OV_T = "Résumé", OV_CLICK = "Clic : ouvrir le résumé du donjon", OV_RCLICK = "Clic droit : résumé du donjon",
     OV_ENTRANCE = "Entrée : %s", OV_GROUP = "Groupe de %d joueurs", OV_SUM_Q1 = "%d quête", OV_SUM_Q = "%d quêtes", OV_SUM_LOG1 = "%d dans ton journal",
     OV_SUM_LOG = "%d dans ton journal", OV_SUM_PRE1 = "%d prérequis manquant", OV_SUM_PRE = "%d prérequis manquants",
     OV_SUM_PRE0 = "aucun prérequis manquant", OV_SUM_OFF1 = "%d retirée de la route", OV_SUM_OFF = "%d retirées de la route",
@@ -254,7 +254,7 @@ local S = {
     ARROW_GAME = "La flèche suit la zone de quête du jeu", ARROW_LOG = "Lieu exact inconnu : suis ton journal de quêtes",
     FDJ_NOTE = "Note de ForeverDungeonJournal", GAME_TEXT = "Texte de la quête", TT_OBJ_H = "Objectif",
     TT_OUT_L = "hors du donjon", TT_IN_L = "dans le donjon", TT_XPMONEY = "XP : %s  ·  %s",
-    DUNGEONS_BTN = "Donjons", TT_LINE_CLICK = "Clic : guider vers ce point",
+    DUNGEONS_BTN = "Choisir les donjons", TT_LINE_CLICK = "Clic : guider vers ce point",
   },
   en = {
     COLON = ": ", WRITS = "Writs and Favor", TT_HWRITS = "Writs and Merchant's Favor: the cheapest Writs, the shopping list and the GPS to the NPCs.", MM_TT4 = "Shift-click: open the Writs window",
@@ -350,17 +350,17 @@ local S = {
     PICK_SEARCH = "Dungeon, quest, NPC", PICK_HINT_SEARCH = "Results for \"%s\" across every tab and level.",
     PICK_EMPTY_SEARCH_T = "Nothing for \"%s\"", PICK_EMPTY_SEARCH = "Search a dungeon name (or ZF, BRD, SM), a quest or who gives it.",
     PICK_T = "Pick dungeons", PICK_HINT = "Tick one or more dungeons: the guide chains them into one route from where you stand.",
-    PICK_GO = "Start the route", PICK_GO1 = "Guide me through 1 dungeon", PICK_GON = "Guide me through %d dungeons", PICK_GO_WHY = "Tick at least one dungeon.", PICK_NONE = "Clear all", PICK_MINE = "My level", PICK_ALL = "All",
+    PICK_GO = "See the summary", PICK_GO1 = "See the summary (1 dungeon)", PICK_GON = "See the summary (%d dungeons)", PICK_GO_WHY = "Tick at least one dungeon.", PICK_NONE = "Clear all", PICK_MINE = "My level", PICK_ALL = "All",
     PICK_QUESTS = "%d quests", PICK_QUESTS1 = "%d quest", PICK_DONE = "%d done", PICK_DONE1 = "%d done", PICK_NOQ = "No quest", PICK_CUSTOM = "Quests",
     PICK_SEL = "%d dungeons picked", PICK_SEL1 = "1 dungeon picked", PICK_SEL0 = "No dungeon picked",
-    PICK_CUSTOM_T = "%s quests", PICK_CUSTOM_H = "Untick the quests you do not want: the route leaves them out.", PICK_RCLICK = "Right-click: choose the quests", PICK_CLICK = "Click: tick or untick", PICK_DCLICK = "Double-click: start the route with this dungeon only",
+    PICK_CUSTOM_T = "%s quests", PICK_CUSTOM_H = "Untick the quests you do not want: the route leaves them out.", PICK_RCLICK = "Right-click: choose the quests", PICK_CLICK = "Click: tick or untick", PICK_DCLICK = "Double-click: see the summary of this dungeon only",
     PICK_QCLICK = "Click: keep or remove this quest", PICK_QOFF = "Left out of the route",
     ROUTE_BUILT = "Route built: %d steps for %s.", RECALC = "Rebuild", RECALC_TT = "Rebuilds the route from where you stand.",
     ARROW_FAR = "Other continent", ARROW_IN = "In the dungeon", YARDS = "%d m",
     LANG = "Language: English.", BONUS = "Bonus", UNKNOWN_LOC = "place to confirm",
     PRE = "Prerequisite", MAIN = "Dungeon quest", DETAILS = "Details", HIDE = "Hide",
     MM_TT1 = "Click: open or close the guide", MM_TT2 = "Right-click: pick dungeons", MM_TT3 = "Drag: move the button",
-    HELP = "/wlh: open Home\n/wlh dungeons: open the quest guide\n/wlh pick: pick dungeons\n/wlh trade: open the Writs window (Writs and Favor)\n/wlh bags: clean your bags\n/wlh orders: open crafting orders\n/wlh guild: see the guild and the PvP ranking\n/wlh events: see the guild's upcoming events\n/wlh gps: stop or restart the GPS\n/wlh options: open the settings\n/wlh setup: see the welcome screen again\n/wlh idea: send an idea or a bug\n/wlh tracker: show or hide the guide tracker\n/wlh boss: show or hide the dungeon's bosses\n/wlh help: show this list",
+    HELP = "/wlh: open Home\n/wlh dungeons: open the quest guide\n/wlh pick: pick dungeons\n/wlh trade: open the Writs window (Writs and Favor)\n/wlh bags: clean your bags\n/wlh orders: open crafting orders\n/wlh guild: see the guild and the PvP ranking\n/wlh events: see the guild's upcoming events\n/wlh gps: stop or restart the GPS\n/wlh goto [place]: the arrow takes you to a place, a service or an NPC\n/wlway Tanaris 52.4 31.2: WL Helper's arrow goes to that point (also /way when no other addon has it)\n/wlh city: what there is to do in this capital\n/wlh keys: the key passport\n/wlh quests: dungeon quests shared with the guild\n/wlh triage: quests to abandon when the log is full\n/wlh options: open the settings\n/wlh setup: see the welcome screen again\n/wlh idea: send an idea or a bug\n/wlh tracker: show or hide the guide tracker\n/wlh boss: show or hide the dungeon's bosses\n/wlh help: show this list",
     UNKNOWN_CMD = "Unknown command \"%s\". Type /wlh help to see the list.",
     RESET = "Steps completed by hand and the route are reset.", SKIP = "Skip",
     B_READY_T = "Checklist before entering",
@@ -425,12 +425,12 @@ local S = {
     ST_PICKUP = "To take", ST_ACTIVE = "In progress", ST_READY = "Ready to turn in", ST_DONE = "Turned in",
     -- guide window: chapter headers in the step list, overview, bosses and tracker entries
     TT_CHAPTER_CLICK = "Click: go to the first open step of this part", CH_PROGRESS = "Steps done: %d / %d",
-    OV_HDR_T = "Overview: %s",
+    OV_HDR_T = "Summary: %s",
     BOSS_MENU_CLICK = "Click: show the dungeon's bosses and rares", BOSS_MENU_NONE = "No dungeon in the route yet.",
     TR_MENU_TT = "A small window with the current action and the next two, even with the guide closed.",
     TR_MENU_CLICK = "Click: show or hide the tracker",
     -- dungeon overview (Overview.lua)
-    OV_T = "Overview", OV_CLICK = "Click: open the dungeon overview", OV_RCLICK = "Right-click: dungeon overview", OV_ENTRANCE = "Entrance: %s",
+    OV_T = "Summary", OV_CLICK = "Click: open the dungeon summary", OV_RCLICK = "Right-click: dungeon summary", OV_ENTRANCE = "Entrance: %s",
     OV_GROUP = "Group of %d players", OV_SUM_Q1 = "%d quest", OV_SUM_Q = "%d quests", OV_SUM_LOG1 = "%d in your log",
     OV_SUM_LOG = "%d in your log", OV_SUM_PRE1 = "%d missing prerequisite", OV_SUM_PRE = "%d missing prerequisites",
     OV_SUM_PRE0 = "no missing prerequisite", OV_SUM_OFF1 = "%d left out of the route", OV_SUM_OFF = "%d left out of the route",
@@ -478,7 +478,7 @@ local S = {
     ARROW_GAME = "The arrow follows the game's quest area", ARROW_LOG = "Exact place unknown: follow your quest log",
     FDJ_NOTE = "ForeverDungeonJournal note", GAME_TEXT = "Quest text", TT_OBJ_H = "Objective",
     TT_OUT_L = "outside the dungeon", TT_IN_L = "inside the dungeon", TT_XPMONEY = "XP: %s  ·  %s",
-    DUNGEONS_BTN = "Dungeons", TT_LINE_CLICK = "Click: guide me to this point",
+    DUNGEONS_BTN = "Pick dungeons", TT_LINE_CLICK = "Click: guide me to this point",
   },
 }
 

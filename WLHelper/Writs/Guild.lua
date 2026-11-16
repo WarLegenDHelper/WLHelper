@@ -9,13 +9,19 @@
 --            the professions the member shares (Orders) and the addon's version.
 --            Drawn with the design system (docs/DESIGN.md): 640 wide, sized to its content; the
 --            list scrolls inside the window only past 80 % of the screen.
+--  Keys     "Qui a la clé ?": for each dungeon key, the members who have it (drawn by Writs/Keys.lua,
+--            which also does its sharing; the tab only shows when that file is loaded).
 --  PvP      A ranking of honorable kills, as the game counts them (battlegrounds included): this
 --            week, this season (one season = one calendar month) and all time. The game keeps the
 --            all-time total, so it shows from day one; week and season follow from it. Each copy of
 --            WL Helper tells the guild its own numbers on the addon channel; the season's podium is
 --            kept when a new season starts. Kills made in the open world are counted apart.
--- The combat log is closed to addons on this client: nothing here reads it.
--- Only counts, levels and the version travel; nothing else about the character.
+--            Each kill is put on a place (the battleground, or the zone): the top 6 per period.
+--            K/D/A: battlegrounds from the player's own scoreboard row (once per match, assists =
+--            HK - KB, an estimate); open world: deaths while an enemy player was around. A row
+--            shows the top places and the K/D/A in a muted line, its tooltip the whole breakdown.
+-- The combat log is closed to addons on this client: nothing here reads it (no open-world KB).
+-- Only counts, places, levels and the version travel; nothing else about the character.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -112,6 +118,29 @@ ns.AddEnglish({
     ["Aucune victoire cette semaine"] = "No kills this week",
     ["Aucune victoire cette saison"] = "No kills this season",
     ["Aucune victoire pour l'instant"] = "No kills yet",
+    -- PvP ranking: where the kills come from, K/D/A
+    ["Autres"] = "Other",
+    ["1 mort"] = "1 death",
+    ["%s morts"] = "%s deaths",
+    ["Champs de bataille : %s / %s / %s (KB / morts / assist.)"] = "Battlegrounds: %s / %s / %s (KB / deaths / assists)",
+    ["Monde ouvert : %s VH, %s"] = "Open world: %s HK, %s",
+    ["D'où viennent les victoires :"] = "Where the kills come from:",
+    ["Lieux suivis depuis la mise à jour : %s victoires sur %s."] = "Places tracked since the update: %s of %s kills.",
+    ["Champs de bataille, 1 partie"] = "Battlegrounds, 1 match",
+    ["Champs de bataille, %s parties"] = "Battlegrounds, %s matches",
+    ["Coups fatals (KB)"] = "Killing blows (KB)",
+    ["Morts"] = "Deaths",
+    ["Assistances (estimation)"] = "Assists (estimate)",
+    ["Ratio KB / morts"] = "KB / deaths ratio",
+    ["Honneur gagné"] = "Honor gained",
+    ["Assistances : victoires honorables moins coups fatals, lues au tableau des scores. Une estimation."] = "Assists: honorable kills minus killing blows, read from the scoreboard. An estimate.",
+    ["Monde ouvert"] = "Open world",
+    ["Victoires honorables"] = "Honorable kills",
+    ["Morts face à un joueur"] = "Deaths to a player",
+    ["Les coups fatals en monde ouvert restent invisibles aux addons."] = "Open-world killing blows stay hidden from addons.",
+    ["Lieux et K/D/A : visibles quand ce membre aura la dernière version de WL Helper."] = "Places and K/D/A: shown once this member has the latest WL Helper.",
+    ["Ton K/D en champ de bataille : %s / %s (%s)."] = "Your battleground K/D: %s / %s (%s).",
+    ["Ton K/D en champ de bataille : %s / %s."] = "Your battleground K/D: %s / %s.",
     ["Les victoires honorables des membres qui ont WL Helper apparaîtront ici."] = "Honorable kills of the members who have WL Helper will show up here.",
     -- chat
     ["Victoire honorable en monde ouvert : la 1re de la semaine."] = "Open-world honorable kill: your first this week.",
@@ -120,6 +149,8 @@ ns.AddEnglish({
     ["Pas de guilde."] = "No guild.",
     ["%d en ligne"] = "%d online",
     ["Tous"] = "All",
+    -- the keys tab (drawn by Writs/Keys.lua)
+    ["Qui a la clé ?"] = "Who has the key?",
 })
 
 local MONTHS = {
@@ -237,10 +268,238 @@ local function Seasons()
     return sl, known
 end
 
+-- ---------------------------------------------------------------- places and K/D/A
+-- Where each honorable kill came from (the battleground, or the open-world zone), and the K/D/A:
+-- battlegrounds from the player's own row of the scoreboard (once per match), open world deaths
+-- when an enemy player was around. Kept per period: a = all time, w = this week, s = this season.
+-- Killing blows in the open world would need the combat log, closed to addons here: not counted.
+local OTHER = "~"             -- the places beyond the top ones, shown as "Autres"
+local KEEP_PLACES = 6
+local KD_M, KD_KB, KD_HK, KD_D, KD_AS, KD_HON, KD_OD = 1, 2, 3, 4, 5, 6, 7   -- e.kd.a / w / s
+local function Secret(v) return issecretvalue ~= nil and issecretvalue(v) == true end
+local function Clean(v) if type(v) == "string" and not Secret(v) and v ~= "" then return v end end
+local function N(v) if type(v) == "number" and not Secret(v) then return v end end
+local function Call(f, ...)
+    if type(f) ~= "function" then return end
+    local r = { pcall(f, ...) }
+    if r[1] then return unpack(r, 2) end
+end
+-- "Goulet des Chanteguerres": no separator of the sync messages, not too long
+local function SafeName(s)
+    s = Clean(s)
+    if not s then return nil end
+    s = s:gsub("[|:;~%c]", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if s == "" or #s > 60 then return nil end
+    return s
+end
+-- a number from another member: whole, not negative, not absurd
+local function Cap(v, max)
+    v = tonumber(v) or 0
+    if v ~= v or v < 0 then return 0 end
+    return math.min(math.floor(v), max or 1000000)
+end
+local function InstanceKind()
+    local inside, kind = Call(IsInInstance)
+    if Secret(inside) or Secret(kind) then return false, nil end
+    return inside, kind
+end
+local function InPvP() local _, kind = InstanceKind(); return kind == "pvp" end
+-- the battleground's name inside one, the zone outside
+local function PlaceName()
+    local _, kind = InstanceKind()
+    if kind == "pvp" or kind == "arena" then
+        local n = SafeName((Call(GetInstanceInfo)))
+        if n then return n end
+    end
+    local n = SafeName((Call(GetRealZoneText))) or SafeName((Call(GetZoneText)))
+    if n then return n end
+    if C_Map and C_Map.GetBestMapForUnit and C_Map.GetMapInfo then
+        local id = N(Call(C_Map.GetBestMapForUnit, "player"))
+        local info = id and Call(C_Map.GetMapInfo, id)
+        n = type(info) == "table" and SafeName(info.name)
+        if n then return n end
+    end
+    return OTHER
+end
+
+local function NewPeriod(k) return { k = k, pl = {}, bg = {}, od = 0, ow = 0 } end
+local function FixPeriod(P)
+    P.pl = type(P.pl) == "table" and P.pl or {}
+    P.bg = type(P.bg) == "table" and P.bg or {}
+    for _, f in ipairs({ "m", "kb", "hk", "d", "as", "hon" }) do P.bg[f] = tonumber(P.bg[f]) or 0 end
+    P.od, P.ow = tonumber(P.od) or 0, tonumber(P.ow) or 0
+    return P
+end
+-- p.st = { a, w, s }: saved before this existed, it starts empty; a new week or season starts over
+local function Stats(p)
+    p.st = type(p.st) == "table" and p.st or {}
+    local st = p.st
+    if type(st.a) ~= "table" then st.a = NewPeriod() end
+    if type(st.w) ~= "table" or st.w.k ~= Week() then st.w = NewPeriod(Week()) end
+    if type(st.s) ~= "table" or st.s.k ~= Season() then st.s = NewPeriod(Season()) end
+    FixPeriod(st.a); FixPeriod(st.w); FixPeriod(st.s)
+    return st
+end
+local function EachPeriod(p, fn) local st = Stats(p); fn(st.a); fn(st.w); fn(st.s) end
+
+-- adds n kills to a place; past the top 6, the smallest ones go to "Autres"
+local function AddPlace(pl, name, n)
+    pl[name] = (pl[name] or 0) + n
+    local names = {}
+    for k in pairs(pl) do if k ~= OTHER then names[#names + 1] = k end end
+    if #names <= KEEP_PLACES then return end
+    table.sort(names, function(a, b) if pl[a] ~= pl[b] then return pl[a] > pl[b] end return a < b end)
+    for i = KEEP_PLACES + 1, #names do pl[OTHER] = (pl[OTHER] or 0) + pl[names[i]]; pl[names[i]] = nil end
+end
+-- { { name, n }, ... } most first, "Autres" last
+local function SortedPlaces(pl)
+    local out, other = {}, 0
+    for k, v in pairs(pl or {}) do
+        v = tonumber(v) or 0
+        if k == OTHER then other = other + v elseif v > 0 then out[#out + 1] = { k, v } end
+    end
+    table.sort(out, function(a, b) if a[2] ~= b[2] then return a[2] > b[2] end return a[1] < b[1] end)
+    if other > 0 then out[#out + 1] = { OTHER, other } end
+    return out
+end
+local function KdOf(P)
+    local b = P.bg
+    return { b.m, b.kb, b.hk, b.d, b.as, b.hon, P.od }
+end
+
+-- the scoreboard's row of the player: { kb, hk, d, hon } (nil when there is no scoreboard)
+local function MyScore()
+    local n = N(Call(GetNumBattlefieldScores)) or 0
+    if n <= 0 then return nil end
+    local me, guid = Me(), Clean(UnitGUID and Call(UnitGUID, "player"))
+    for i = 1, math.min(n, 120) do
+        local name, kb, hk, d, hon, g
+        if C_PvP and C_PvP.GetScoreInfo then
+            local t = Call(C_PvP.GetScoreInfo, i)
+            if type(t) == "table" then name, kb, hk, d, hon, g = t.name, t.killingBlows, t.honorableKills, t.deaths, t.honorGained, t.guid end
+        end
+        if name == nil and GetBattlefieldScore then name, kb, hk, d, hon = Call(GetBattlefieldScore, i) end
+        name, g = Clean(name), Clean(g)
+        if (name and Short(name) == me) or (g and guid and g == guid) then
+            return { kb = N(kb) or 0, hk = N(hk) or 0, d = N(d) or 0, hon = math.floor(N(hon) or 0) }
+        end
+    end
+end
+
+-- The match under way: p.cur = { inst, snap = latest numbers, applied = numbers already counted,
+-- counted = the match is in the count, done = the match is over }. Only the difference between
+-- the latest numbers and what was already counted is added: repeated scoreboard updates count once.
+local function ApplyMatch(p)
+    local c = p.cur
+    if not (c and c.snap) then return end
+    local s, a = c.snap, c.applied or { kb = 0, hk = 0, d = 0, hon = 0, as = 0 }
+    s.as = math.max(0, (s.hk or 0) - (s.kb or 0))   -- assists: honorable kills without the killing blow, an estimate
+    EachPeriod(p, function(P)
+        if not c.counted then P.bg.m = P.bg.m + 1 end
+        for _, f in ipairs({ "kb", "hk", "d", "hon", "as" }) do P.bg[f] = math.max(0, P.bg[f] + (s[f] or 0) - (a[f] or 0)) end
+    end)
+    c.counted = true
+    c.applied = { kb = s.kb, hk = s.hk, d = s.d, hon = s.hon, as = s.as }
+end
+local function TrackScore(p)
+    if not InPvP() then return end
+    local s = MyScore()
+    if not s then return end
+    local inst = PlaceName()
+    -- numbers left from another match (a crash, a log out inside): counted, then a new match
+    if p.cur and (p.cur.inst ~= inst or time() - (p.cur.t0 or 0) > 3 * 3600) then ApplyMatch(p); p.cur = nil end
+    p.cur = p.cur or { inst = inst, t0 = time() }
+    local old = p.cur.snap or {}
+    -- the scoreboard only goes up during a match: lower numbers are the next match on the same
+    -- battleground (its exit was missed), so the last one is counted and a new one starts
+    if s.kb + s.hk + s.d > 0 and (s.kb < (old.kb or 0) or s.hk < (old.hk or 0) or s.d < (old.d or 0)) then
+        ApplyMatch(p); p.cur = { inst = inst, t0 = time() }; old = {}
+    end
+    p.cur.snap = { kb = math.max(s.kb, old.kb or 0), hk = math.max(s.hk, old.hk or 0), d = math.max(s.d, old.d or 0), hon = math.max(s.hon, old.hon or 0) }
+    if p.cur.done then ApplyMatch(p) end
+end
+local function EndMatch(p)
+    TrackScore(p)
+    if p.cur then p.cur.done = true; ApplyMatch(p) end
+end
+local function LeaveMatch(p)
+    if p.cur and not InPvP() then ApplyMatch(p); p.cur = nil end
+end
+
+-- an enemy player was around a moment ago (target, mouseover, focus)
+local lastHostile = nil
+local HOSTILE_FOR = 15
+local function Hostile(u)
+    if not (UnitExists and UnitIsPlayer and UnitCanAttack) then return false end
+    local ex = Call(UnitExists, u)
+    if Secret(ex) or not ex then return false end
+    local pl, atk = Call(UnitIsPlayer, u), Call(UnitCanAttack, "player", u)
+    if Secret(pl) or Secret(atk) then return false end
+    return pl and atk and true or false
+end
+local function SeeHostile(...)
+    for i = 1, select("#", ...) do
+        if Hostile((select(i, ...))) then lastHostile = GetTime(); return true end
+    end
+    return false
+end
+local function RecentHostile()
+    if SeeHostile("target", "mouseover", "focus") then return true end
+    return lastHostile ~= nil and GetTime() - lastHostile <= HOSTILE_FOR
+end
+
 -- ---------------------------------------------------------------- sharing
+-- my own places and K/D/A in the shape the guild's messages give them (e.q, e.kd)
+local function OwnExtra(e)
+    local st = Stats(Mine())
+    e.q = { a = { l = SortedPlaces(st.a.pl) }, w = { k = st.w.k, l = SortedPlaces(st.w.pl) }, s = { k = st.s.k, l = SortedPlaces(st.s.pl) } }
+    e.kd = { wk = st.w.k, sk = st.s.k, a = KdOf(st.a), w = KdOf(st.w), s = KdOf(st.s), sow = st.s.ow }
+    return e
+end
+local function OwnEntry()
+    local p = Mine()
+    local hk, week, season = Numbers()
+    local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    local ver = meta and meta(ADDON, "Version") or "?"
+    local lvl = UnitLevel("player") or 0
+    local spec = WP.Weights and WP.Weights.Spec and WP.Weights.Spec()
+    local specKey = spec and spec[1] or ""
+    local e = OwnExtra({ wk = Week(), w = week, sk = Season(), s = season, hk = hk, kb = p.kb, week = p.week, lvl = lvl, ver = ver, spec = specKey, t = time() })
+    Board()[Me()] = e
+    return e
+end
+-- Messages stay under 255 bytes: "Q" carries the places of one period (the ones that do not fit go
+-- to "Autres"), "K" the K/D/A of the three periods. Older copies ignore both.
+local MAX_MSG = 240
+local function PlacesMsg(per, key, list)
+    local head = "Q|" .. per .. "|" .. (key or "") .. "|"
+    local parts, len, other = {}, #head, 0
+    for _, x in ipairs(list or {}) do
+        local item = x[1] ~= OTHER and (x[1] .. ":" .. x[2]) or nil
+        if item and len + #item + 1 + 12 <= MAX_MSG then parts[#parts + 1] = item; len = len + #item + 1
+        else other = other + x[2] end
+    end
+    if other > 0 then parts[#parts + 1] = OTHER .. ":" .. other end
+    return head .. table.concat(parts, ";")
+end
+local function KdMsg(kd)
+    local t = { "K", kd.wk, kd.sk }
+    for _, per in ipairs({ "a", "w", "s" }) do
+        for i = 1, 7 do t[#t + 1] = math.floor(tonumber(kd[per][i]) or 0) end
+    end
+    t[#t + 1] = math.floor(tonumber(kd.sow) or 0)
+    return table.concat(t, "|")
+end
+-- the messages this copy would send about its places and K/D/A (tests, /wlh debug)
+function WP.GuildPvPMessages()
+    local e = OwnExtra({})
+    return { PlacesMsg("a", "", e.q.a.l), PlacesMsg("w", e.q.w.k, e.q.w.l), PlacesMsg("s", e.q.s.k, e.q.s.l), KdMsg(e.kd) }
+end
+
 local lastSent, shareQueued = 0, false
 local function Share(force)
     if not (On() and IsInGuild and IsInGuild() and SendRaw) then return end
+    OwnEntry()   -- my line is always up to date, even between two messages
     if not force and GetTime() - lastSent < 30 then
         if not shareQueued then
             shareQueued = true
@@ -249,17 +508,17 @@ local function Share(force)
         return
     end
     lastSent = GetTime()
-    local p = Mine()
-    local hk, week, season = Numbers()
-    local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
-    local ver = meta and meta(ADDON, "Version") or "?"
-    local lvl = UnitLevel("player") or 0
+    local e = OwnEntry()
     -- "P" for the copies before 1.0.0-beta.25, "S" with the week and the season
-    pcall(SendRaw, PREFIX, table.concat({ "P", p.kb, p.week, p.wk, hk, lvl, ver }, "|"), "GUILD")
-    local spec = WP.Weights and WP.Weights.Spec and WP.Weights.Spec()
-    local specKey = spec and spec[1] or ""
-    pcall(SendRaw, PREFIX, table.concat({ "S", Week(), week, Season(), season, hk, p.kb, p.week, lvl, ver, specKey }, "|"), "GUILD")
-    Board()[Me()] = { wk = Week(), w = week, sk = Season(), s = season, hk = hk, kb = p.kb, week = p.week, lvl = lvl, ver = ver, spec = specKey, t = time() }
+    pcall(SendRaw, PREFIX, table.concat({ "P", e.kb, e.week, Mine().wk, e.hk, e.lvl, e.ver }, "|"), "GUILD")
+    pcall(SendRaw, PREFIX, table.concat({ "S", e.wk, e.w, e.sk, e.s, e.hk, e.kb, e.week, e.lvl, e.ver, e.spec }, "|"), "GUILD")
+    -- places and K/D/A: only once there is something to tell
+    for _, per in ipairs({ "a", "w", "s" }) do
+        local q = e.q[per]
+        if #q.l > 0 then pcall(SendRaw, PREFIX, PlacesMsg(per, q.k, q.l), "GUILD") end
+    end
+    -- K always goes out (about 50 bytes): it also tells the others this copy knows places and K/D/A
+    pcall(SendRaw, PREFIX, KdMsg(e.kd), "GUILD")
 end
 
 local askedAt = 0
@@ -269,6 +528,13 @@ local function Ask()
     pcall(SendRaw, PREFIX, "R", "GUILD")
 end
 
+-- a new "S" or "P" line keeps the places and K/D/A already known for that member
+local function Put(sender, e)
+    local b = Board()
+    local old = b[sender]
+    if old then e.q, e.kd = old.q, old.kd end
+    b[sender] = e
+end
 local function OnMessage(msg, sender)
     local kind = msg:match("^(%u)")
     if kind == "R" then Share()
@@ -276,8 +542,8 @@ local function OnMessage(msg, sender)
         local wk, w, sk, s, hk, kb, owk, lvl, ver = msg:match("^S|([%d%-]+)|(%d+)|([%d%-]+)|(%d+)|(%d+)|(%d+)|(%d+)|(%d+)|([^|]*)")
         if wk then
             local spec = msg:match("^S|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|(%a*)")
-            Board()[sender] = { wk = wk, w = tonumber(w), sk = sk, s = tonumber(s), hk = tonumber(hk), kb = tonumber(kb),
-                week = tonumber(owk), lvl = tonumber(lvl), ver = ver, spec = spec ~= "" and spec or nil, t = time() }
+            Put(sender, { wk = wk, w = tonumber(w), sk = sk, s = tonumber(s), hk = tonumber(hk), kb = tonumber(kb),
+                week = tonumber(owk), lvl = tonumber(lvl), ver = ver, spec = spec ~= "" and spec or nil, t = time() })
             if WP.RefreshGuild then WP.RefreshGuild() end
         end
     elseif kind == "P" then
@@ -285,8 +551,45 @@ local function OnMessage(msg, sender)
         local kb, week, wk, hk, lvl, ver = msg:match("^P|(%d+)|(%d+)|([%d%-]+)|(%d+)|(%d+)|([^|]*)$")
         local cur = Board()[sender]
         if kb and not (cur and cur.sk) then
-            Board()[sender] = { kb = tonumber(kb), week = tonumber(week), wk = wk, hk = tonumber(hk), lvl = tonumber(lvl), ver = ver, t = time() }
+            Put(sender, { kb = tonumber(kb), week = tonumber(week), wk = wk, hk = tonumber(hk), lvl = tonumber(lvl), ver = ver, t = time() })
             if WP.RefreshGuild then WP.RefreshGuild() end
+        end
+    elseif kind == "Q" then
+        -- the places of one period: "Q|w|2026-11-10|Goulet des Chanteguerres:12;Hautebrande:3;~:2"
+        local per, key, body = msg:match("^Q|(%a)|([%d%-]*)|(.*)$")
+        if per == "a" or per == "w" or per == "s" then
+            local l = {}
+            for item in body:gmatch("[^;]+") do
+                local name, n = item:match("^([^:]+):(%d+)$")
+                -- no colours, textures or links from someone else's message
+                if name ~= OTHER then name = SafeName(name) end
+                if name and #l < KEEP_PLACES + 2 then l[#l + 1] = { name, Cap(n) } end
+            end
+            local e = Board()[sender] or { t = time() }
+            Board()[sender] = e
+            e.q = type(e.q) == "table" and e.q or {}
+            e.q[per] = { k = key ~= "" and key or nil, l = l }
+            if WP.RefreshGuild then WP.RefreshGuild() end
+        end
+    elseif kind == "K" then
+        -- K|week|season| then for all time, the week, the season: matches, KB, HK, deaths, assists,
+        -- honor, open-world deaths; then the season's open-world kills. Fields added later are ignored.
+        local wk, sk, rest = msg:match("^K|([%d%-]+)|([%d%-]+)|(.*)$")
+        if wk then
+            local v = {}
+            for x in (rest .. "|"):gmatch("([^|]*)|") do v[#v + 1] = Cap(x) end
+            if #v >= 21 then
+                local function seg(i)
+                    local t = {}; for j = 1, 7 do t[j] = v[i + j] end
+                    t[KD_M] = math.min(t[KD_M], 100000)
+                    t[KD_AS] = math.min(t[KD_AS], t[KD_HK])
+                    return t
+                end
+                local e = Board()[sender] or { t = time() }
+                Board()[sender] = e
+                e.kd = { wk = wk, sk = sk, a = seg(0), w = seg(7), s = seg(14), sow = v[22] or 0 }
+                if WP.RefreshGuild then WP.RefreshGuild() end
+            end
         end
     end
 end
@@ -294,7 +597,7 @@ end
 -- ---------------------------------------------------------------- open-world kills
 -- When the game's total goes up outside a battleground or an arena, the difference is open world.
 local function InWorld()
-    local _, kind = IsInInstance()
+    local _, kind = InstanceKind()
     return kind ~= "pvp" and kind ~= "arena"
 end
 -- 12500 -> "12 500" in French, "12,500" in English (DESIGN 4.3)
@@ -306,7 +609,14 @@ local function Thousands(n)
     if out:sub(1, 1) == sep then out = out:sub(2) end
     return (n < 0 and "-" or "") .. out
 end
-local function CheckHonor()
+-- the place at the moment of the kill (the count is read a second later, maybe after a teleport)
+local pendingPlace, pendingWorld = nil, nil
+local function NoteKillPlace()
+    if pendingPlace == nil then pendingPlace, pendingWorld = PlaceName(), InWorld() end
+end
+local function CheckHonor(atLogin)
+    local place, world = pendingPlace, pendingWorld
+    pendingPlace, pendingWorld = nil, nil
     local hk = LifetimeHK()
     if hk <= 0 then return end
     local p = Mine()
@@ -314,7 +624,17 @@ local function CheckHonor()
     local gained = hk - p.lastHK
     p.lastHK = hk
     if gained <= 0 then return end
-    if InWorld() then
+    -- where they came from: the battleground or the zone, for all time, the week and the season;
+    -- kills from before this login have no known place
+    if place == nil then
+        world = InWorld()
+        place = atLogin == true and OTHER or PlaceName()
+    end
+    EachPeriod(p, function(P)
+        AddPlace(P.pl, place, gained)
+        if world then P.ow = P.ow + gained end
+    end)
+    if world then
         p.kb, p.week = (p.kb or 0) + gained, (p.week or 0) + gained
         if WLWritsDB.guildToast ~= false then
             WP.Print(p.week == 1 and L("Victoire honorable en monde ouvert : la 1re de la semaine.")
@@ -324,9 +644,40 @@ local function CheckHonor()
     Share()
     if WP.RefreshGuild then WP.RefreshGuild() end
 end
+-- in a battleground: ask the game for the scoreboard (UPDATE_BATTLEFIELD_SCORE answers)
+local askedScore = 0
+local function AskScore()
+    if not (RequestBattlefieldScoreData and InPvP()) or GetTime() - askedScore < 5 then return end
+    askedScore = GetTime()
+    Call(RequestBattlefieldScoreData)
+end
+-- a death outside any instance while an enemy player was around: an open-world PvP death
+local function PvPDeath()
+    local inside = InstanceKind()
+    if inside then AskScore(); return end
+    if not RecentHostile() then return end
+    EachPeriod(Mine(), function(P) P.od = P.od + 1 end)
+    lastHostile = nil
+    Share()
+    if WP.RefreshGuild then WP.RefreshGuild() end
+end
 
 -- ---------------------------------------------------------------- seasons
 -- When a new month starts, the podium of the one that ended is kept.
+local PER = { week = "w", season = "s", all = "a" }
+-- a member's places ({ { name, n } }) and K/D/A ({ m, kb, hk, d, as, hon, od }) for a period, when known
+local function PeriodData(e, mode, key)
+    local per = PER[mode] or "a"
+    local q = type(e.q) == "table" and type(e.q[per]) == "table" and e.q[per] or nil
+    local places = q and (per == "a" or q.k == key) and q.l or nil
+    local kd, k = type(e.kd) == "table" and e.kd or nil, nil
+    if kd then
+        if per == "a" then k = kd.a
+        elseif per == "w" and kd.wk == key then k = kd.w
+        elseif per == "s" and kd.sk == key then k = kd.s end
+    end
+    return places, type(k) == "table" and k or nil, kd and kd.sk == key and tonumber(kd.sow) or nil
+end
 local function Ranking(mode, key)
     local out = {}
     key = key or (mode == "week" and Week() or Season())
@@ -335,9 +686,11 @@ local function Ranking(mode, key)
         if mode == "week" then n = (e.wk == key) and e.w or 0
         elseif mode == "season" then n = (e.sk == key) and e.s or 0
         else n = e.hk or 0 end
-        -- open world: the total for "all", this week's for "week"; no season counter exists, so none for "season"
-        local ow = (mode == "all") and (e.kb or 0) or (mode == "week" and e.wk == Week() and e.week) or 0
-        if (n or 0) > 0 then out[#out + 1] = { name = name, n = n, ow = ow, lvl = e.lvl } end
+        local places, kd, sow = PeriodData(e, mode, mode ~= "all" and key or nil)
+        -- open world: the total for "all", this week's for "week"; the season's from the copies that count it
+        local ow = (mode == "all") and (e.kb or 0) or (mode == "week" and e.wk == Week() and e.week)
+            or (mode == "season" and sow) or 0
+        if (n or 0) > 0 then out[#out + 1] = { name = name, n = n, ow = ow, lvl = e.lvl, places = places, kd = kd, known = e.q ~= nil or e.kd ~= nil } end
     end
     table.sort(out, function(a, b) if a.n ~= b.n then return a.n > b.n end return a.name < b.name end)
     return out
@@ -523,7 +876,7 @@ local function MemberRow(parent)
             self:Flash(L("Invité"))
         end
     end)
-    r.inv:SetIcon("plus")
+    -- labelled: no plus beside "Inviter" (icon audit G3)
     r.inv:SetPoint("RIGHT", -8, 0); r.inv:Hide()
     local function Hover(on)
         root.Tween(r, r.hov or 0, on and 1 or 0, 0.10, function(v) r.hov = v; r.hl:SetAlpha(v) end)
@@ -787,17 +1140,109 @@ local function RankRow(parent)
     return r
 end
 
+-- ---------------------------------------------------------------- places and K/D/A, in words
+local SEP = " \194\183 "   -- " · "
+local function PlaceLabel(name) return name == OTHER and L("Autres") or name end
+local function Ratio(kb, d)
+    local s = string.format("%.1f", (kb or 0) / d)
+    return root.lang == "en" and s or (s:gsub("%.", ","))
+end
+local function Deaths(n) return n == 1 and L("1 mort") or string.format(L("%s morts"), Thousands(n)) end
+-- as many parts as fit on one line of `width`; a part too wide is left to the tooltip.
+-- `inOrder`: stop at the first one that does not fit (places, most first)
+local function FitParts(parts, width, inOrder)
+    local out = {}
+    for _, t in ipairs(parts) do
+        local try = #out == 0 and t or (table.concat(out, SEP) .. SEP .. t)
+        ui.measure:SetText(try)
+        if TextW(ui.measure) <= width then out[#out + 1] = t
+        elseif inOrder then break end
+    end
+    ui.measure:SetText("")
+    return #out > 0 and table.concat(out, SEP) or nil
+end
+local function BgLine(kd)
+    if not (kd and (kd[KD_M] or 0) > 0) then return nil end
+    return string.format(L("Champs de bataille : %s / %s / %s (KB / morts / assist.)"),
+        Thousands(kd[KD_KB]), Thousands(kd[KD_D]), Thousands(kd[KD_AS]))
+end
+local function WorldLine(ow, kd)
+    local od = kd and kd[KD_OD] or 0
+    if od > 0 then return string.format(L("Monde ouvert : %s VH, %s"), Thousands(ow or 0), Deaths(od)) end
+    if (ow or 0) > 0 then return string.format(L("dont %s en monde ouvert"), Thousands(ow)) end
+end
+-- the row's muted lines: where the kills come from, then the K/D/A (what does not fit is in the tooltip)
+local function RowDetail(e, width)
+    local first, second = nil, {}
+    local places = {}
+    for _, x in ipairs(e.places or {}) do places[#places + 1] = PlaceLabel(x[1]) .. " " .. Thousands(x[2]) end
+    local world = WorldLine(e.ow, e.kd)
+    if #places > 0 then first = FitParts(places, width, true) elseif world then first = FitParts({ world }, width); world = nil end
+    second[#second + 1] = BgLine(e.kd)
+    second[#second + 1] = world
+    local line2 = #second > 0 and FitParts(second, width) or nil
+    if first and line2 then return first .. "\n" .. line2 end
+    return first or line2
+end
+local function RowTip(e)
+    local fg, mu = C.fg, C.muted
+    local t = { e.name, e.n == 1 and L("1 victoire honorable") or string.format(L("%s victoires honorables"), Thousands(e.n)) }
+    local places, kd = e.places or {}, e.kd
+    if #places > 0 then
+        t[#t + 1] = { gap = true }
+        t[#t + 1] = { L("D'où viennent les victoires :"), fg[1], fg[2], fg[3] }
+        local sum = 0
+        for _, x in ipairs(places) do t[#t + 1] = { PlaceLabel(x[1]), mu[1], mu[2], mu[3], right = Thousands(x[2]) }; sum = sum + x[2] end
+        if sum < e.n then
+            t[#t + 1] = string.format(L("Lieux suivis depuis la mise à jour : %s victoires sur %s."), Thousands(sum), Thousands(e.n))
+        end
+    end
+    if kd and (kd[KD_M] or 0) > 0 then
+        local m = kd[KD_M]
+        t[#t + 1] = { gap = true }
+        t[#t + 1] = { m == 1 and L("Champs de bataille, 1 partie") or string.format(L("Champs de bataille, %s parties"), Thousands(m)), fg[1], fg[2], fg[3] }
+        t[#t + 1] = { L("Coups fatals (KB)"), mu[1], mu[2], mu[3], right = Thousands(kd[KD_KB]) }
+        t[#t + 1] = { L("Morts"), mu[1], mu[2], mu[3], right = Thousands(kd[KD_D]) }
+        t[#t + 1] = { L("Assistances (estimation)"), mu[1], mu[2], mu[3], right = Thousands(kd[KD_AS]) }
+        if (kd[KD_D] or 0) > 0 then t[#t + 1] = { L("Ratio KB / morts"), mu[1], mu[2], mu[3], right = Ratio(kd[KD_KB], kd[KD_D]) } end
+        if (kd[KD_HON] or 0) > 0 then t[#t + 1] = { L("Honneur gagné"), mu[1], mu[2], mu[3], right = Thousands(kd[KD_HON]) } end
+        t[#t + 1] = L("Assistances : victoires honorables moins coups fatals, lues au tableau des scores. Une estimation.")
+    end
+    local od = kd and kd[KD_OD] or 0
+    if (e.ow or 0) > 0 or od > 0 then
+        t[#t + 1] = { gap = true }
+        t[#t + 1] = { L("Monde ouvert"), fg[1], fg[2], fg[3] }
+        t[#t + 1] = { L("Victoires honorables"), mu[1], mu[2], mu[3], right = Thousands(e.ow or 0) }
+        if kd then t[#t + 1] = { L("Morts face à un joueur"), mu[1], mu[2], mu[3], right = Thousands(od) } end
+        t[#t + 1] = L("Les coups fatals en monde ouvert restent invisibles aux addons.")
+    end
+    if not e.known then
+        t[#t + 1] = { gap = true }
+        t[#t + 1] = L("Lieux et K/D/A : visibles quand ce membre aura la dernière version de WL Helper.")
+    end
+    return t
+end
+
 local function RenderPvP()
     ArchiveSeason()
     local p = pages.pvp
     local mode = WLWritsDB.guildRankMode or "week"
-    local list = Ranking(mode)
     Share()
+    local list = Ranking(mode)
     local w, s, hk = WP.GuildMine()
     ui.seasonPill:Set(string.format(L("Saison %s"), SeasonName(Season())), nil, "calendar")
     local y = 12 + 28 + 12
     Place(ui.mine, PAD, y)
-    ui.mine:SetText(string.format(L("Toi : %s cette semaine, %s cette saison, %s au total."), Thousands(w), Thousands(s), Thousands(hk)))
+    local mineText = string.format(L("Toi : %s cette semaine, %s cette saison, %s au total."), Thousands(w), Thousands(s), Thousands(hk))
+    -- my K/D in battlegrounds over the selected period
+    local mine = Board()[Me()]
+    local _, myKd = PeriodData(mine or {}, mode, mode == "week" and Week() or mode == "season" and Season() or nil)
+    if myKd and (myKd[KD_M] or 0) > 0 then
+        mineText = mineText .. " " .. ((myKd[KD_D] or 0) > 0
+            and string.format(L("Ton K/D en champ de bataille : %s / %s (%s)."), Thousands(myKd[KD_KB]), Thousands(myKd[KD_D]), Ratio(myKd[KD_KB], myKd[KD_D]))
+            or string.format(L("Ton K/D en champ de bataille : %s / %s."), Thousands(myKd[KD_KB]), Thousands(myKd[KD_D] or 0)))
+    end
+    ui.mine:SetText(mineText)
     y = y + S.FitText(ui.mine, 2, CW, p)
     -- the last season's podium
     local past, pastKey = Seasons().list, nil
@@ -805,7 +1250,8 @@ local function RenderPvP()
     if pastKey and #past[pastKey] > 0 then
         local t = {}
         for i, e in ipairs(past[pastKey]) do t[#t + 1] = i .. ". " .. e[1] .. " (" .. e[2] .. ")" end
-        ui.past:SetText(S.IconMarkup("star", 12, C.gold) .. " " .. string.format(L("Saison précédente (%s) : %s"), SeasonName(pastKey), table.concat(t, ", ")))
+        -- no star before it: it was decoration (icon audit, Guild)
+        ui.past:SetText(string.format(L("Saison précédente (%s) : %s"), SeasonName(pastKey), table.concat(t, ", ")))
         y = y + 4
         Place(ui.past, PAD, y)
         y = y + S.FitText(ui.past, 2, CW, p)
@@ -820,12 +1266,12 @@ local function RenderPvP()
     for i, e in ipairs(list) do
         local r = ui.rank.Get(i)
         Zebra(r.bg, i)
-        local detail
-        if (e.ow or 0) > 0 then detail = string.format(L("dont %s en monde ouvert"), Thousands(e.ow)) end
+        -- the text column of the row (S.ListRow: rank 8 + 24 + 4 on the left; value 56, unit and gaps on the right)
+        ui.measure:SetText(L("VH"))
+        local textW = CW - 36 - (12 + TextW(ui.measure) + 4 + 56 + 8)
+        local detail = RowDetail(e, textW)
         r:Set({ rank = i, name = e.name == me and string.format(L("%s (toi)"), e.name) or e.name, detail = detail,
-            value = Thousands(e.n), unit = L("VH"),
-            tip = { e.name, e.n == 1 and L("1 victoire honorable") or string.format(L("%s victoires honorables"), Thousands(e.n)),
-                detail or nil } })
+            value = Thousands(e.n), unit = L("VH"), tip = RowTip(e) })
         r:SetSelected(e.name == me)
         local h = r:Fit(CW)
         Place(r, 0, listH)
@@ -850,6 +1296,7 @@ end
 
 -- the header's info icon: what the current tab shows, in words
 local function InfoTip()
+    if current == "keys" and WP.Keys and WP.Keys.GuildTip then return WP.Keys.GuildTip() end
     if current == "pvp" then
         return { L("Classement PvP"), L("Les victoires honorables comptées par le jeu, champs de bataille compris."),
             L("Une saison dure un mois : le podium de la saison passée reste affiché."),
@@ -863,10 +1310,13 @@ local function Build()
     win = S.Window("WLHelperGuild", W, 520, L("Guilde"), GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "guildPos",
         { header = S.HEADER_H, minH = 240 })
     win:AddHeaderButton(S.IconButton(win.header, "info", 28, InfoTip))
-    tabs = S.Tabs(win, { { "members", L("Membres") }, { "pvp", L("Classement PvP") } },
-        function() return current end, function(k) WP.ShowGuildTab(k) end)
+    local tabList = { { "members", L("Membres") }, { "pvp", L("Classement PvP") } }
+    -- the keys tab exists only when Writs/Keys.lua is loaded (it draws the tab and shares the keys)
+    if WP.Keys and WP.Keys.RenderGuildTab then tabList[#tabList + 1] = { "keys", L("Qui a la clé ?") } end
+    tabs = S.Tabs(win, tabList, function() return current end, function(k) WP.ShowGuildTab(k) end)
     tabs:SetPoint("TOPLEFT", 0, -(S.HEADER_H + 1)); tabs:SetPoint("TOPRIGHT", 0, -(S.HEADER_H + 1))
-    for _, k in ipairs({ "members", "pvp" }) do
+    for _, t in ipairs(tabList) do
+        local k = t[1]
         local p = CreateFrame("Frame", nil, win)
         p:SetPoint("TOPLEFT", 0, -win:ContentTop()); p:SetPoint("BOTTOMRIGHT")
         p:Hide(); pages[k] = p
@@ -939,7 +1389,9 @@ local function Build()
         ui.classBtns[i] = b
         x = x + 28 + 4
     end
-    ui.role = Keep(S.Segmented(m, { { "all", L("Tous les rôles") }, { "tank", S.RoleMarkup("tank", 16) }, { "heal", S.RoleMarkup("heal", 16) }, { "dps", S.RoleMarkup("dps", 16) } },
+    -- "Tous" beside three role icons (the tooltip still says "Tous les rôles"): a long word next to
+    -- icons read as a different kind of control (icon audit, Guild)
+    ui.role = Keep(S.Segmented(m, { { "all", L("Tous") }, { "tank", S.RoleMarkup("tank", 16) }, { "heal", S.RoleMarkup("heal", 16) }, { "dps", S.RoleMarkup("dps", 16) } },
         function() return WLWritsDB.guildRole or "all" end,
         function(v) WLWritsDB.guildRole = v ~= "all" and v or nil; WP.RefreshGuild() end, 28))
     ui.role:SetPoint("TOPRIGHT", -PAD, -92)
@@ -982,18 +1434,28 @@ local function Build()
     ui.seasonPill:SetPoint("RIGHT", p, "TOPRIGHT", -PAD, -26)
     ui.mine = S.Text(p, F.body, C.text)
     ui.past = S.Text(p, F.meta, C.muted)
+    ui.measure = S.Text(p, F.meta, C.muted); ui.measure:SetWordWrap(false); ui.measure:Hide()
     ui.rank = List(p, RankRow)
     ui.none = S.EmptyState(p, "sword", L("Aucune victoire cette semaine"))
     ui.none:Hide()
     win:SetScript("OnShow", function()
         if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster) elseif GuildRoster then pcall(GuildRoster) end
         Ask()
+        if WP.Keys and WP.Keys.Ask then WP.Keys.Ask() end
         WP.RefreshGuild()
     end)
 end
 
+local function RenderKeys()
+    if not (WP.Keys and WP.Keys.RenderGuildTab) then return end
+    win:FitHeight(WP.Keys.RenderGuildTab(pages.keys, W, PAD))
+end
+
+-- the keys tab follows the "keys" module: off, it hides and the window opens on the members
+local function KeysOn() return WP.Keys and WP.Keys.RenderGuildTab and (not WP.ModuleOn or WP.ModuleOn("keys")) end
 function WP.ShowGuildTab(k)
     if not win then Build() end
+    if not pages[k] or (k == "keys" and not KeysOn()) then k = "members" end
     current = k
     for key, pg in pairs(pages) do pg:SetShown(key == k) end
     win.subtitle:SetText(GetGuildInfo and GetGuildInfo("player") or "")
@@ -1006,8 +1468,11 @@ local refreshing = false
 function WP.RefreshGuild()
     if not (win and win:IsShown()) or refreshing then return end
     refreshing = true
+    if current == "keys" and not KeysOn() then current = "members"; for key, pg in pairs(pages) do pg:SetShown(key == current) end end
     tabs:Update()
-    local ok, err = pcall(current == "members" and RenderMembers or RenderPvP)
+    -- the keys tab is the last one: hiding it leaves no gap in the bar
+    for _, b in ipairs(tabs.tabs or {}) do if b.key == "keys" then b:SetShown(KeysOn() and true or false) end end
+    local ok, err = pcall(current == "members" and RenderMembers or current == "keys" and RenderKeys or RenderPvP)
     refreshing = false
     if not ok then error(err, 0) end
 end
@@ -1026,13 +1491,37 @@ pcall(ev.RegisterEvent, ev, "GUILD_ROSTER_UPDATE")
 ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
     if not WLWritsDB then return end
     if e == "PLAYER_LOGIN" then
-        for _, h in ipairs({ "PLAYER_PVP_KILLS_CHANGED", "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA" }) do
+        for _, h in ipairs({ "PLAYER_PVP_KILLS_CHANGED", "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA", "PLAYER_ENTERING_WORLD",
+            "UPDATE_BATTLEFIELD_SCORE", "UPDATE_BATTLEFIELD_STATUS", "PVP_MATCH_COMPLETE", "PLAYER_DEAD",
+            "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT", "PLAYER_FOCUS_CHANGED", "PLAYER_REGEN_DISABLED" }) do
             pcall(self.RegisterEvent, self, h)
         end
-        C_Timer.After(5, function() pcall(ArchiveSeason); CheckHonor() end)
+        C_Timer.After(5, function() pcall(ArchiveSeason); CheckHonor(true) end)
         C_Timer.After(25, function() Share(true) end)
-    elseif e == "PLAYER_PVP_KILLS_CHANGED" or e == "PLAYER_REGEN_ENABLED" or e == "ZONE_CHANGED_NEW_AREA" then
-        if On() then C_Timer.After(1, CheckHonor) end
+    elseif e == "PLAYER_PVP_KILLS_CHANGED" or e == "PLAYER_REGEN_ENABLED" or e == "ZONE_CHANGED_NEW_AREA" or e == "PLAYER_ENTERING_WORLD" then
+        if On() then
+            -- out of a battleground: its last numbers are counted; in one: ask for the scoreboard
+            if e == "ZONE_CHANGED_NEW_AREA" or e == "PLAYER_ENTERING_WORLD" then LeaveMatch(Mine()) end
+            if e == "PLAYER_PVP_KILLS_CHANGED" then NoteKillPlace() end
+            AskScore()
+            C_Timer.After(1, function() CheckHonor() end)
+        end
+    elseif e == "UPDATE_BATTLEFIELD_SCORE" then
+        if On() then TrackScore(Mine()) end
+    elseif e == "UPDATE_BATTLEFIELD_STATUS" or e == "PVP_MATCH_COMPLETE" then
+        -- the match is over: its numbers count now (later updates only add what changed)
+        if On() and InPvP() then
+            local w = Call(GetBattlefieldWinner)
+            if e == "PVP_MATCH_COMPLETE" or (w ~= nil and not Secret(w)) then EndMatch(Mine()); Share() end
+        end
+    elseif e == "PLAYER_DEAD" then
+        if On() then PvPDeath() end
+    elseif e == "PLAYER_TARGET_CHANGED" or e == "PLAYER_REGEN_DISABLED" then
+        SeeHostile("target")
+    elseif e == "UPDATE_MOUSEOVER_UNIT" then
+        SeeHostile("mouseover")
+    elseif e == "PLAYER_FOCUS_CHANGED" then
+        SeeHostile("focus")
     elseif e == "GUILD_ROSTER_UPDATE" then
         WP.RefreshGuild()
     elseif prefix == PREFIX and channel == "GUILD" and type(msg) == "string" and sender then

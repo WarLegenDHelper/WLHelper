@@ -414,7 +414,7 @@ local function ShowInviteToast(e, mins)
             if toast.e then WP.InviteSignups(toast.e) end
             HideToast()
         end)
-        toast.go:SetIcon("group")
+        -- no group icon on the button: the toast's own icon already shows it (icon audit, LFG)
         toast.later = S.Button(toast, L("Plus tard"), 0, 28, "secondary", HideToast)
         toast.later:SetPoint("LEFT", toast.go, "RIGHT", 8, 0)
     end
@@ -738,6 +738,9 @@ local function EventCard(parent)
     c.meta = S.Text(c, F.meta, C.muted)
     c.roles = S.Text(c, F.label, C.text)
     c.who = S.Text(c, F.meta, C.muted)
+    -- a dungeon that needs a key nobody signed up has (Keys.lua, from what members' copies shared)
+    c.keyWarn = S.Text(c, F.meta, C.warn)
+    c.keyWarn:Hide()
     c.note = S.Text(c, F.label, C.text)
     -- signing up is one segmented choice: no role yet, or the role you came with (a click changes it)
     local opts = {}
@@ -752,7 +755,7 @@ local function EventCard(parent)
         WP.InviteSignups(c.e)
         self:Flash(L("Invitations envoyées"))
     end)
-    c.invite:SetIcon("group")
+    -- labelled: no icon (icon audit G3); the trash stays on the cancel, a destructive action
     -- cancel in two clicks: the first asks (the label becomes the confirmation), the second cancels
     c.cancel = S.Button(c, L("Annuler l'événement"), 0, 24, "danger", function() if c.e then WP.CancelEvent(c.e) end end)
     c.cancel:SetIcon("trash")
@@ -773,6 +776,10 @@ local function EventCard(parent)
         if self.who:IsShown() then
             y = y + 4; Place(self.who, pad, y)
             y = y + S.FitText(self.who, 0, w - 2 * pad, self)
+        end
+        if self.keyWarn:IsShown() then
+            y = y + 4; Place(self.keyWarn, pad, y)
+            y = y + S.FitText(self.keyWarn, 0, w - 2 * pad, self)
         end
         if self.note:IsShown() then
             y = y + 6; Place(self.note, pad, y)
@@ -842,6 +849,16 @@ local function PaintEvent(c, e)
     local t = {}
     for _, p in ipairs(names) do t[#t + 1] = S.RoleMarkup(p[2].role, 12) .. " " .. ClassHex(p[2].cls) .. p[1] .. "|r" end
     c.who:SetText(table.concat(t, "   ")); c.who:SetShown(#t > 0)
+    -- the organizer and those signed up: does one of them have the key to get in?
+    local warn
+    if not cancelled and WP.Keys and WP.Keys.EventWarning then
+        local who = { e.by }
+        for name in pairs(e.signups or {}) do if name ~= e.by then who[#who + 1] = name end end
+        local ok, w = pcall(WP.Keys.EventWarning, e.title, who)
+        if ok and type(w) == "string" and w ~= "" then warn = w end
+    end
+    c.keyWarn:SetText(warn and (S.IconMarkup("warning", 12, C.warn) .. " " .. warn) or "")
+    c.keyWarn:SetShown(warn ~= nil)
     c.note:SetText(e.note or ""); c.note:SetShown((e.note or "") ~= "")
     -- sign up / change role / step out; the organizer invites or cancels
     c.seg:SetShown(not cancelled); c.seg:Update()
@@ -889,7 +906,6 @@ local function LookRow(parent)
     r.inv = S.Button(r, L("Inviter"), 0, 24, "secondary", function(self)
         if r.who then InviteName(r.who); self:Flash(L("Invité")) end
     end)
-    r.inv:SetIcon("plus")
     r.whisper = S.Button(r, L("Chuchoter"), 0, 24, "secondary", function() if r.who then Whisper(r.who) end end)
     local function Hover(on)
         root.Tween(r, r.hov or 0, on and 1 or 0, 0.10, function(v) r.hov = v; r.hl:SetAlpha(v) end)

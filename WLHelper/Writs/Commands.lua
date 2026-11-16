@@ -1,0 +1,85 @@
+-- Writs/Commands.lua: the /wlh words of the smaller tools, in one place.
+-- Main.lua owns /wlh. Like Diag.lua and WhatsNewUI.lua, this file wraps its handler once the addon
+-- is loaded: the words below are answered here, every other word goes on to Main.lua untouched.
+--   aller / goto [lieu]      Writs/GoTo.lua      "Aller à" (search box, or straight to the place)
+--   way <zone> x y [nom]     Writs/Way.lua       the same as /way, for players who know /wlh only
+--   cles / keys              Writs/Keys.lua      the key passport
+--   ville / city / tournee   Writs/CityTour.lua  the city tour card
+--   commun / quetes / quests Writs/SharedQuests  the dungeon quests shared with the guild
+--   tri / triage             Writs/LogTriage     the quests that can leave a full log
+--   altclick                 Writs/AltClick.lua  what Alt + click does for this character
+--   carte / map              Bosses.lua          the map of the dungeon you are in
+-- Each tool checks its own module switch: nothing is decided twice here.
+local ADDON, root = ...
+local ns = root.Writs
+local WP = ns.WP
+
+-- "clés", "tournée", "quêtes" typed with accents: accents out before lower(), which may touch
+-- UTF-8 bytes on some clients (the same care as Main.lua)
+local function Word(w)
+    w = w or ""
+    for _, a in ipairs({ "é", "è", "ê", "É", "È", "Ê" }) do w = w:gsub(a, "e") end
+    return w:lower()
+end
+
+local function Run(fn, ...)
+    if type(fn) ~= "function" then return false end
+    local ok, err = pcall(fn, ...)
+    if not ok and geterrorhandler then geterrorhandler()(err) end
+    return true
+end
+
+-- word -> function(rest): true when the word was ours (even if its tool is missing: the word is
+-- then simply ignored rather than read as an unknown command by Main.lua)
+local ROUTES = {}
+local function Route(words, fn) for _, w in ipairs(words) do ROUTES[w] = fn end end
+
+Route({ "aller", "goto" }, function(rest)
+    local G = WP.GoTo
+    if not G then return end
+    if G.Slash then Run(G.Slash, rest) else Run(G.Show, rest ~= "" and rest or nil) end
+end)
+Route({ "way" }, function(rest)
+    if WP.Way then Run(WP.Way.Command, rest) end
+end)
+Route({ "cles", "cle", "keys" }, function()
+    Run(WP.ToggleKeys or (WP.Keys and WP.Keys.Toggle))
+end)
+Route({ "ville", "city", "tournee" }, function()
+    if WP.CityTour then Run(WP.CityTour.Toggle) end
+end)
+-- no "shared": one letter from Main.lua's "share" (share quests with the party), too easy to mix up
+Route({ "commun", "quetes", "quests", "partage" }, function()
+    if WP.Shared then Run(WP.Shared.Toggle) end
+end)
+Route({ "tri", "triage" }, function()
+    if WP.Triage then Run(WP.Triage.Toggle) end
+end)
+Route({ "altclick" }, function()
+    if WP.AltClick then Run(WP.AltClick.Status) end
+end)
+Route({ "carte", "map" }, function()
+    if not root.OpenDungeonMap then return end
+    local inside = type(root.InsideKey) == "function" and select(2, pcall(root.InsideKey)) or nil
+    Run(root.OpenDungeonMap, type(inside) == "string" and inside or nil)
+end)
+
+-- exposed for the tests and for Help.lua's clickable commands
+WP.ToolCommand = function(msg)
+    local w, rest = (msg or ""):match("^%s*(%S*)%s*(.-)%s*$")
+    local fn = ROUTES[Word(w)]
+    if not fn then return false end
+    fn(rest or "")
+    return true
+end
+
+local hook = CreateFrame("Frame")
+pcall(hook.RegisterEvent, hook, "PLAYER_LOGIN")
+hook:SetScript("OnEvent", function()
+    local orig = SlashCmdList and SlashCmdList.WLDUNGEONTOOL
+    if not orig then return end
+    SlashCmdList.WLDUNGEONTOOL = function(msg, ...)
+        if WP.ToolCommand(msg) then return end
+        return orig(msg, ...)
+    end
+end)

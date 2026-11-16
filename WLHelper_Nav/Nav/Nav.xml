@@ -1,0 +1,10 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<!-- Modified copy for WL Helper (2026-11-15): same files, globals renamed (NOTICE.md). -->
+	<!-- Written by forge nav pack: Polestar's walking maps (PACK.json), then the chokepoints. -->
+	<Script file="Nav0.lua"/>
+	<Script file="Nav1.lua"/>
+	<Script file="Nav2991.lua"/>
+	<Script file="Nav2991_1.lua"/>
+	<Script file="Nav2991_2.lua"/>
+	<Script file="Chokepoints.lua"/>
+</Ui>

@@ -23,3 +23,11 @@ Exception: the WLHelper_Gear folder is a modified version of Geared Forever by N
 is licensed under the GNU GPL v3 (WLHelper_Gear/LICENSE.txt, NOTICE.md); it is a separate
 program shipped alongside WL Helper (mere aggregation). This CC BY-NC-SA licence does not
 apply to it.
+
+Exception: the WLHelper_Nav, WLHelper_Nav_EK and WLHelper_Nav_Kalimdor folders (the GPS's walking
+router and its maps) are a modified copy of Polestar Nav by the Polestar authors, whose router
+started from Shortest Path Forever by Cillian Berragan (used with his permission), and are
+licensed under the GNU GPL, version 3 or (at your option) any later version (WLHelper_Nav/
+Danger.lua, adapted from the Polestar addon, under version 3 only). See WLHelper_Nav/LICENSE,
+NOTICE.md and CREDITS.md, and each part folder's LICENSE and NOTICE.md. They are separate programs
+shipped alongside WL Helper (mere aggregation). This CC BY-NC-SA licence does not apply to them.

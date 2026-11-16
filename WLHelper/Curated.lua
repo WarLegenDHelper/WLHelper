@@ -149,7 +149,9 @@ local function BossName(npc, fallback)
 end
 
 -- lignes « clé » pour un donjon : { texte, ok }
-function ns.KeyLines(dkey)
+-- bare: without the "Key needed: " prefix (the summary row is already labelled "Key"); the
+-- doors / shortcut labels stay, they say what the key is for.
+function ns.KeyLines(dkey, bare)
   local out = {}
   for _, k in ipairs(KEYS[dkey] or {}) do
     local name = (GetItemInfo and GetItemInfo(k.item)) or k.name
@@ -159,7 +161,7 @@ function ns.KeyLines(dkey)
     elseif k.boss then how = ns.L.KEY_BOSS:format(BossName(k.boss, k.bossn), k.src and ns.DName(k.src) or "") end
     local label = k.opt == "doors" and ns.L.KEY_DOORS or k.opt == "shortcut" and ns.L.KEY_SHORT or ns.L.KEY_REQ
     local Tk = ns.T_
-    local txt = label .. ns.L.COLON .. name .. " · " .. (have and (ns.Hex(Tk.ok) .. ns.L.KEY_HAVE .. "|r") or (ns.Hex(Tk.warn) .. ns.L.KEY_MISSING .. "|r"))
+    local txt = ((bare and not k.opt) and "" or (label .. ns.L.COLON)) .. name .. " · " .. (have and (ns.Hex(Tk.ok) .. ns.L.KEY_HAVE .. "|r") or (ns.Hex(Tk.warn) .. ns.L.KEY_MISSING .. "|r"))
     -- the key's own icon from the game, to spot it in the bags
     local ic = GetItemIcon and GetItemIcon(k.item)
     if ic then txt = ("|T%s:14:14:0:0:64:64:5:59:5:59|t "):format(tostring(ic)) .. txt end

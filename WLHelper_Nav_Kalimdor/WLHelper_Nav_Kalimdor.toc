@@ -1,0 +1,63 @@
+## Interface: 16001
+## Title: WL Helper Nav - Kalimdor
+## Notes: Walking maps of Kalimdor for WL Helper's GPS. Loaded on demand on that continent.
+## Notes-frFR: Cartes de marche de Kalimdor pour le GPS de WL Helper. Chargé à la demande sur ce continent.
+## Author: WaR LegenD (router and maps from Polestar and Shortest Path Forever)
+## Version: 1.0.0
+## Group: WLHelper
+## LoadOnDemand: 1
+## Dependencies: WLHelper_Nav
+## X-License: GPL-3.0-or-later
+## X-Credits: Polestar Nav 0.3.7.2 by the Polestar authors (GPL-3.0-or-later), router started from Shortest Path Forever v1.16.0 by Cillian Berragan (GPL-3.0-or-later, used with his permission), walking maps from Leffe's navigation maps. See NOTICE.md
+
+Nav1_1.lua
+Nav1_2.lua
+Nav1_3.lua
+Nav1_4.lua
+Nav1_5.lua
+Nav1_6.lua
+Nav1_7.lua
+Nav1_8.lua
+Nav1_9.lua
+Nav1_10.lua
+Nav1_11.lua
+Nav1_12.lua
+Nav1_13.lua
+Nav1_14.lua
+Nav1_15.lua
+Nav1_16.lua
+Nav1_17.lua
+Nav1_18.lua
+Nav1_19.lua
+Nav1_20.lua
+Nav1_21.lua
+Nav1_22.lua
+Nav1_23.lua
+Nav1_24.lua
+Nav1_25.lua
+Nav1_26.lua
+Nav1_27.lua
+Nav1_28.lua
+Nav1_29.lua
+Nav1_30.lua
+Nav1_31.lua
+Nav1_32.lua
+Nav1_33.lua
+Nav1_34.lua
+Nav1_35.lua
+Nav1_36.lua
+Nav1_37.lua
+Nav1_38.lua
+Nav1_39.lua
+Nav1_40.lua
+Nav1_41.lua
+Nav1_42.lua
+Nav1_43.lua
+Nav1_44.lua
+Nav1_45.lua
+Nav1_46.lua
+Nav1_47.lua
+Nav1_48.lua
+Nav1_49.lua
+Nav1_50.lua
+Nav1_51.lua
