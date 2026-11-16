@@ -496,12 +496,20 @@ local function ClassColor(class)
 end
 
 -- ---------------------------------------------------------------- the window
--- 420 wide (a single list). The height follows the content; past 80 % of the screen the list
--- scrolls inside the window.
-local W, PAD = 420, 16
+-- A panel window (DESIGN 3.1: ~45 % of the screen wide, 560 to 860, width resizable and saved).
+-- The height follows the content; past 80 % of the screen the list scrolls inside the window.
+-- The dungeon blocks sit 2 per line once the list is wide enough (GRID_BLOCKS).
+local W, PAD = 576, 16
 local CW = W - 2 * PAD
 local ROW_GAP = 2
+local GRID_BLOCKS = { minW = 360, gap = 16, rowGap = 16, maxCols = 2, minPx = 200 }
 local win, ui = nil, {}
+local function Dims()
+    local w = win and Num(win:GetWidth())
+    if not (w and w > 0) then w = (ns.WinSize and ns.WinSize("panel")) or 576 end
+    W = math.floor(w)
+    CW = W - 2 * PAD
+end
 local RefreshSoon   -- the throttled redraw, set with the events below
 
 local function Place(obj, x, y) obj:ClearAllPoints(); obj:SetPoint("TOPLEFT", x, -y) end
@@ -534,7 +542,9 @@ local function MemberRow(parent)
         S.Tip(self, lines)
     end)
     r:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); S.HideTip() end)
-    function r:Set(m)
+    function r:Set(m, width)
+        width = width or CW
+        self:SetWidth(width)
         self.m = m
         local c = ClassColor(m.class)
         self.dot:SetVertexColor((m.online and C.ok or C.faint)[1], (m.online and C.ok or C.faint)[2], (m.online and C.ok or C.faint)[3])
@@ -543,7 +553,7 @@ local function MemberRow(parent)
         if m.online then self.whisper:Enable(); self.whisper:SetDisabledReason(nil)
         else self.whisper:Disable(); self.whisper:SetDisabledReason(L("Hors ligne : ton message ne partirait pas.")) end
         local right = (Num(self.whisper:GetWidth()) or 80) + 12 + 12
-        local textW = math.max(80, CW - 24 - right)
+        local textW = math.max(80, width - 24 - right)
         Place(self.dot, 8, 7)
         Place(self.name, 24, 6)
         self.name:SetWidth(textW)
@@ -580,7 +590,9 @@ local function Block(parent)
     b.rule = S.Rule(b)
     b.sentence = S.Text(b, F.body, C.text)
     b.rows = {}
-    function b:Set(d)
+    function b:Set(d, width)
+        width = width or CW
+        self:SetWidth(width)
         self.members = d.members
         local dd = root.D and root.D[d.key]
         local y = 0
@@ -595,7 +607,7 @@ local function Block(parent)
         else self.group:Disable(); self.group:SetDisabledReason(L("Personne de ce donjon n'est en ligne.")) end
         local gw = Num(self.group:GetWidth()) or 80
         self.title:SetText(d.name)
-        self.title:SetWidth(math.max(80, CW - titleX - gw - 12))
+        self.title:SetWidth(math.max(80, width - titleX - gw - 12))
         S.ClampLabel(self.title, d.name, self)
         Place(self.title, titleX, 7)
         y = 28 + 4
@@ -604,12 +616,12 @@ local function Block(parent)
         y = y + 1 + 8
         self.sentence:SetText(Sentence(d.members))
         Place(self.sentence, 0, y)
-        y = y + S.FitText(self.sentence, 0, CW, self) + 8
+        y = y + S.FitText(self.sentence, 0, width, self) + 8
         for i, m in ipairs(d.members) do
             local r = self.rows[i]
             if not r then r = MemberRow(self); self.rows[i] = r end
             r:Show()
-            local h = r:Set(m)
+            local h = r:Set(m, width)
             Place(r, 0, y)
             y = y + h + ROW_GAP
         end
@@ -623,7 +635,8 @@ end
 
 local function Build()
     win = S.Window("WLHelperShared", W, 240, L("Quêtes en commun"), nil, WLWritsDB, "sharedPos",
-        { header = S.HEADER_H, footer = true, minH = 200 })
+        { header = S.HEADER_H, footer = true, minH = 200, size = "panel" })
+    Dims()
     local page = CreateFrame("Frame", nil, win)
     page:SetPoint("TOPLEFT", 0, -win:ContentTop()); page:SetPoint("BOTTOMRIGHT", 0, S.FOOTER_H)
     ui.page = page
@@ -634,7 +647,10 @@ local function Build()
     ui.blocks = {}
     ui.empty = S.EmptyState(page, "group", "")
     ui.empty:Hide()
+    -- a new width: the same dungeons laid out again (no new reading of the lists)
+    win.OnResize = function() Dims(); if ui.list and ui.sa:IsShown() then ui.Layout(ui.list) end end
     win:SetScript("OnShow", function()
+        Dims()
         if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster) elseif GuildRoster then pcall(GuildRoster) end
         Sh.Refresh()
     end)
@@ -648,7 +664,7 @@ local function Render()
         for _, b in ipairs(ui.blocks) do b:Hide() end
         win.subtitle:SetText("")
         ui.empty:Show()
-        ui.empty:ClearAllPoints(); ui.empty:SetPoint("TOP", ui.page, "TOPLEFT", W / 2, -24)
+        ui.empty:ClearAllPoints(); ui.empty:SetPoint("TOP", ui.page, "TOP", 0, -24)   -- stays centred when the width changes
         win:FitHeight(12 + ui.empty:Set(icon, title, text))
     end
     if not InGuild() then
@@ -663,15 +679,23 @@ local function Render()
     end
     ui.empty:Hide(); ui.sa:Show()
     win.subtitle:SetText(#list == 1 and L("1 donjon en commun") or string.format(L("%d donjons en commun"), #list))
-    local y = 0
+    ui.list = list
+    ui.Layout(list)
+end
+
+-- The dungeon blocks in a grid (1 or 2 per line by the width), in the list's order.
+function ui.Layout(list)
+    ui.sa.child:SetWidth(CW)
+    ui.grid = ui.grid or ns.Grid()
+    local g = ui.grid
+    g:Begin(ui.sa.child, 0, 0, CW, GRID_BLOCKS)
     for i, d in ipairs(list) do
         local b = ui.blocks[i]
         if not b then b = Block(ui.sa.child); ui.blocks[i] = b end
         b:Show()
-        if i > 1 then y = y + 16 end
-        Place(b, 0, y)
-        y = y + b:Set(d)
+        g:Add(b, function(f, w) return f:Set(d, w) end)
     end
+    local y = g:End()
     for i = #list + 1, #ui.blocks do ui.blocks[i]:Hide() end
     ui.sa:SetContentHeight(y)
     win:FitHeight(y)
@@ -694,6 +718,7 @@ function Sh.Show()
     if C_Timer and C_Timer.After then C_Timer.After(0, function() Sh.Refresh() end) end
 end
 function Sh.Hide() if win then win:Hide() end end
+function Sh._UI() return win, ui, CW end   -- test access
 function Sh.Toggle()
     if win and win:IsShown() then win:Hide() else Sh.Show() end
 end

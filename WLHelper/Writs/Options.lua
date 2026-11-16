@@ -1,11 +1,13 @@
 -- Writs/Options.lua: the WL Helper window, "the Hub" (T-55, DESIGN 3.20): one window for Home and
--- every settings page. 860 px wide (90 % of a narrow screen), a fixed height (80 % of the screen,
--- 520 to 680), each page scrolls inside it. At the left a nav: the settings search, Home, then the
--- activities (Writs/Hub.lua WP.HUB_GROUPS) with their settings pages; at the bottom Settings
--- (General, About), "How do I...?", "What's new", "Write to us" and the version. At the right the
--- page: a fixed header (title, one sentence) over its scrolled content. Home is built by
--- Writs/Home.lua (WP.HomePage) into its page; the settings pages are cards of rows (label and
--- description on the left, control on the right). Built the first time it opens.
+-- every settings page. The workspace size (70 % x 78 % of the screen, 900 x 620 to 1400 x 900),
+-- resizable from its bottom-right grip (size saved), each page scrolls inside it. At the left a nav:
+-- the settings search, Home, then the activities (Writs/Hub.lua WP.HUB_GROUPS) with their settings
+-- pages; at the bottom Settings (General, About), "How do I...?", "What's new", "Write to us" and
+-- the version. At the right the page: a fixed header (title, one sentence) over its scrolled
+-- content. Home is built by Writs/Home.lua (WP.HomePage) into its page; the settings pages are
+-- cards of rows (S.SettingRow: label and one line of description on the left, control on the
+-- right) in 2 columns, 3 on a wide window (S.SettingsCard). Built the first time it opens; a new
+-- size only lays the page out again.
 -- WLHelperHome and WLHelperOptions (the two windows it replaced) are aliases of WLHelperHub.
 -- No secure frame lives here: the Hub may open, close and change in combat.
 -- Also registers WL Helper in the game's own settings (Esc > Options > AddOns) and, when present,
@@ -170,7 +172,7 @@ ns.AddEnglish({
     ["Choisir le vol automatiquement"] = "Pick the flight automatically",
     ["Chez le maître de vol, le bon trajet est choisi pour toi."] = "At the flight master, the right route is picked for you.",
     ["Points de vol connus"] = "Known flight paths",
-    ["Ceux que ce personnage a déjà découverts."] = "The ones this character has already discovered.",
+    ["Ceux que ce personnage a déjà découverts."] = "Already discovered by this character.",
     ["Distances en yards"] = "Distances in yards",
     ["Sinon en mètres et en kilomètres."] = "Otherwise in meters and kilometers.",
     ["Flèche"] = "Arrow",
@@ -274,6 +276,74 @@ ns.AddEnglish({
     ["Allumé, /way envoie le point au GPS de WL Helper. Éteint, /way reste à l'addon qui l'avait (TomTom par exemple) et /wlway fait la même chose."] =
         "When on, /way sends the point to WL Helper's GPS. When off, /way stays with the addon that had it (TomTom, for example) and /wlway does the same.",
     ["/way est à %s."] = "/way belongs to %s.",
+    -- one-line descriptions of the settings rows (UI width rework: the full text is in the tooltip)
+    ["Déjà fait par un autre addon."] = "Another addon already does it.",
+    ["Dans le monde ou depuis son portrait."] = "In the world or from their portrait.",
+    ["Sur les messages « inv » du chat."] = "On \"inv\" messages in chat.",
+    ["Sur un ennemi : ton tir à distance."] = "On an enemy: your ranged shot.",
+    ["Sur un objet de tes sacs."] = "On an item in your bags.",
+    ["À garder enfoncée avant le clic droit."] = "Hold it down, then right-click.",
+    ["Automatique suit la langue du jeu."] = "Automatic follows the game's language.",
+    ["Même fermé avant de te déconnecter."] = "Even if closed when you logged out.",
+    ["Une alerte quand un de tes favoris arrive."] = "An alert when a favorite logs in.",
+    ["Une alerte quand un membre l'apprend."] = "An alert when a member learns it.",
+    ["Un son avec la ligne du chat."] = "A sound with the chat line.",
+    ["Visibles dans « Qui a la clé ? »."] = "Shown in \"Who has the key?\".",
+    ["Pour grouper. Rien d'autre n'est envoyé."] = "To group up. Nothing else is sent.",
+    ["Un message et un son, dans un donjon."] = "A message and a sound, in a dungeon.",
+    ["Posés tout seuls à chaque nouvelle étape."] = "Set on their own at each new step.",
+    ["Une petite fenêtre, guide fermé."] = "A small window when the guide is closed.",
+    ["Seulement les quêtes de ta route."] = "Only the quests on your route.",
+    ["Quand il n'y a pas de récompense à choisir."] = "When there's no reward to pick.",
+    ["Une fois, hors combat."] = "Once, out of combat.",
+    ["La meilleure amélioration pour ta spé."] = "The best upgrade for your spec.",
+    ["Masquées, elles sortent de la route."] = "Hidden, they leave the route.",
+    ["Quand ton journal est presque plein."] = "When your quest log is almost full.",
+    ["En parlant au PNJ. Maj : à la main."] = "When talking to the NPC. Shift: by hand.",
+    ["Fenêtre Writs ouverte, prix de plus d'1 h."] = "Writs window open, prices over 1 h old.",
+    ["Ex. « 3 Writs prêts à rendre »."] = "E.g. \"3 Writs ready to hand in\".",
+    ["Réputation, coût, à qui la rendre."] = "Reputation, cost, who to hand it to.",
+    ["Une ligne dans le chat, pour chaque perso."] = "A chat line, for each character.",
+    ["Moyenne sur 60 jours, dans l'infobulle."] = "60-day average, in the tooltip.",
+    ["Le plan achète de quoi l'atteindre."] = "The plan buys what it takes to get there.",
+    ["Au-dessus de ton niveau : hors du plan."] = "Above your level: left out of the plan.",
+    ["Automatique laisse Zygor tranquille."] = "Automatic leaves Zygor alone.",
+    ["Mage, druide : quand elles sont prêtes."] = "Mage, druid: when they're ready.",
+    ["Chez le maître de vol."] = "At the flight master.",
+    ["La flèche contourne collines et murs."] = "The arrow goes around hills and walls.",
+    ["Des points sur la carte du monde."] = "Dots on the world map.",
+    ["Les mêmes points, autour de toi."] = "The same dots, around you.",
+    ["Lieu, distance et temps, dans le monde."] = "Place, distance and time, in the world.",
+    ["/way envoie le point au GPS de WL Helper."] = "/way sends the point to WL Helper's GPS.",
+    ["Une fiche en arrivant dans une capitale."] = "A card when you arrive in a capital.",
+    ["Sacs pleins : jeter l'objet le moins cher."] = "Bags full: drop the cheapest item.",
+    ["Un autre addon les vend déjà."] = "Another addon already sells them.",
+    ["Auto : l'arbre où tu as le plus de points."] = "Auto: the tree with the most points.",
+    ["Toujours sur la première ligne."] = "Always on the first line.",
+    ["Une ligne de plus dans les infobulles."] = "One more line in item tooltips.",
+    ["L'infobulle dit quelle spé gagne."] = "The tooltip says which spec wins.",
+    ["Le gain minimum pour la flèche."] = "The minimum gain for the arrow.",
+    ["Le gain ou la perte pour ta spé."] = "The gain or loss for your spec.",
+    ["Si ton addon d'équipement l'affiche déjà."] = "If your gear addon already shows it.",
+    ["Le GPS te mène à l'étape suivante."] = "The GPS takes you to the next step.",
+    ["Aussi fait par %s."] = "Also done by %s.",
+    ["Fait par %s."] = "Done by %s.",
+    -- key bindings (Settings > Quest guide > Raccourcis, T-83)
+    ["Raccourcis"] = "Key bindings",
+    ["Aucun"] = "None",
+    ["Effacer"] = "Clear",
+    ["Ouvrir"] = "Open",
+    ["Appuie sur une touche... (Échap : annuler)"] = "Press a key... (Esc: cancel)",
+    ["%s sert à « %s » : clique encore pour remplacer"] = "%s is used by “%s”: click again to replace",
+    ["Indisponible en combat"] = "Not available in combat",
+    ["Touches : %s"] = "Keys: %s",
+    ["Aussi : %s"] = "Also: %s",
+    ["Clic : choisir une touche."] = "Click: choose a key.",
+    ["Clic : changer la touche."] = "Click: change the key.",
+    ["Enlève les touches de cette action."] = "Removes this action's keys.",
+    ["Tout régler dans le jeu"] = "Set everything in the game",
+    ["La fenêtre des raccourcis du jeu."] = "The game's key bindings window.",
+    ["Ouvre les raccourcis du jeu (section AddOns)."] = "Opens the game's key bindings (AddOns section).",
 })
 
 -- ---------------------------------------------------------------- settings access
@@ -323,39 +393,47 @@ end
 
 -- ---------------------------------------------------------------- layout constants
 
--- DESIGN 3.1 / 3.20: W = min(860, 90 % of the screen) (never under 640), H = 80 % of the screen
--- between 520 and 680, the same on every page (the nav would jump otherwise). Recomputed when the
--- screen or the UI scale changes.
+-- DESIGN 3.1 / 3.20: the workspace size rule (ns.WinSize "workspace": 70 % x 78 % of the screen,
+-- 900 x 620 at least, 1400 x 900 at most), the same on every page (the nav would jump otherwise).
+-- The grip at the bottom right resizes it (size saved in WLWritsDB.hubPosSize, double-click: back
+-- to the default); a new screen size or UI scale re-applies the rule (Writs/Style.lua). The pages
+-- lay out again at the new width (OnResize), nothing is rebuilt.
 local NAV_W = 199                          -- the nav, then its 1 px rule
 local INSET = 16                           -- one left edge, one right edge
 local NAV_ITEM_H, NAV_GAP, NAV_TOP = 32, 2, 12 + 28 + 12
 local HEADER_H = 44
 local PAGE_HEAD_H = 60                     -- a page's fixed header (title, sentence), its rule under it
+local NOTE_W = 480                         -- a running sentence never runs wider (4.2)
 local WIN_W, WIN_H, CONTENT_W, CARD_W
+local win, body, current                   -- the window, its nav and pages, the page shown
 
-local function HubW()
-    local uw = num(UIParent:GetWidth()) or 1366
-    return math.max(640, math.min(860, math.floor(uw * 0.90)))
-end
-local function HubH()
-    local uh = num(UIParent:GetHeight()) or 768
-    return math.max(520, math.min(680, math.floor(uh * 0.80)))
-end
+-- The window's size: what it has once built (dragged or saved), else the rule's default. A size the
+-- client cannot give (secret, or under the rule's minimum) reads as the default.
 local function Dims()
-    WIN_W, WIN_H = HubW(), HubH()
+    local defW, defH, minW, minH = root.WinSize("workspace")
+    local w, h = defW, defH
+    if win then
+        local cw, ch = num(win:GetWidth()), num(win:GetHeight())
+        if cw and cw >= minW - 0.5 then w = math.floor(cw + 0.5) end
+        if ch and ch >= minH - 0.5 then h = math.floor(ch + 0.5) end
+    end
+    WIN_W, WIN_H = w, h
     CONTENT_W = WIN_W - NAV_W - 1          -- the content column, right of the nav and its rule
-    CARD_W = CONTENT_W - 2 * INSET         -- a settings card, a Home row of two columns
+    CARD_W = CONTENT_W - 2 * INSET         -- a settings card, Home's activity lines
 end
+local function HubW() Dims(); return WIN_W end
+local function HubH() Dims(); return WIN_H end
 Dims()
 ns.WP = ns.WP or {}
 ns.WP.HubW, ns.WP.HubH = HubW, HubH
+-- -> the content column and the card width the pages use now (the offline tests)
+ns.WP.HubDims = function() return CONTENT_W, CARD_W, WIN_W, WIN_H end
 
 -- ---------------------------------------------------------------- search index
 -- Every row registers its page, section, label and description while the pages are built. Text is
 -- matched lower-cased and without accents, in both languages (the French key and its English text),
 -- plus a few keywords, so "arrow", "fleche" and "flèche" all find the arrow settings.
 local INDEX = {}
-local needsRebuild = false   -- the width changed while the Hub was hidden: rebuilt when it opens
 local BuildSearch   -- defined after ShowPage; builds the search box into the nav
 
 local FOLD = { ["à"] = "a", ["â"] = "a", ["ä"] = "a", ["é"] = "e", ["è"] = "e", ["ê"] = "e", ["ë"] = "e",
@@ -382,6 +460,7 @@ end
 local KEYWORDS = {
     arrow = "fleche pointeur", fleche = "arrow pointeur", flight = "vol taxi", vol = "flight taxi",
     teleport = "teleportation portail mage", zygor = "guide pointeur", tooltip = "infobulle",
+    raccourci = "touche keybind binding bind", touche = "raccourci keybind binding", keybind = "raccourci touche binding",
     infobulle = "tooltip", writ = "enveloppe comptoir", minimap = "carte bouton", langue = "language english francais",
     language = "langue", sac = "bags clean nettoyeur", bags = "sacs nettoyeur", reglage = "settings options",
     commande = "orders artisan metier", orders = "commandes", guilde = "guild classement pvp",
@@ -392,9 +471,11 @@ local KEYWORDS = {
     invite = "inviter inv clic", inviter = "invite inv", tir = "shoot tirer", shoot = "tirer tir",
 }
 
-local function Register(p, row, label, hint)
+-- hint: the row's one line (shown under the result); long: its tooltip text, searched too
+local function Register(p, row, label, hint, long)
     local section = p.section or ""
     local text = table.concat({ label or "", OtherLanguage(label), hint or "", OtherLanguage(hint),
+        long or "", OtherLanguage(long),
         section, OtherLanguage(section), p.pageLabel or "", OtherLanguage(p.pageLabel) }, " ")
     INDEX[#INDEX + 1] = { page = p.key, pageLabel = p.pageLabel, pageIcon = p.pageIcon, section = section,
         label = label, hint = hint, row = row,
@@ -491,7 +572,8 @@ local function Note(p, text, size, color)
     fs:SetText(text)
     holder.text = fs
     Add(p, holder, function(width)
-        local h = root.FitText(fs, 0, width, holder)
+        -- a running sentence stays readable on a wide page (4.2): 480 at most
+        local h = root.FitText(fs, 0, math.min(width, NOTE_W), holder)
         h = math.max(h, size and size + 2 or 13)
         holder:SetHeight(h)
         return h
@@ -499,82 +581,40 @@ local function Note(p, text, size, color)
     return fs
 end
 
--- The current settings card of the page (a new one after a section header or a note).
-local function Card(p)
-    if p.card then return p.card end
-    local card = CreateFrame("Frame", nil, p)
-    card.bg = S.Solid(card, "BACKGROUND", T.cardFill); card.bg:SetAllPoints()
-    S.Border(card, T.cardEdge)
-    card.rows = {}
+-- The current settings card of the page (a new one after a section header or a note): an
+-- S.SettingsCard, its rows in 2 columns from 652 px of card, 3 from 984 (ns.GRID.settings).
+-- grid: another standard grid (the Writs zones: ns.GRID.toggles).
+local function Card(p, grid)
+    if p.card and p.card.wlGridName == grid then return p.card end
+    local card = S.SettingsCard(p, grid and { grid = root.GRID[grid] } or nil)
+    card.wlGridName = grid
     p.card = card
     Add(p, card, function(width, top)
-        local y = 0
-        for i, row in ipairs(card.rows) do
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", card, "TOPLEFT", 0, -y)
-            row:SetWidth(width)
-            local h = row:Layout(width)
-            row:SetHeight(h)
-            row.pageY = top + y
-            row.divider:SetShown(i < #card.rows)
-            y = y + h
-        end
-        card:SetHeight(math.max(1, y))
-        return y
+        local h = card:Fit(width)
+        -- where each row sits on the page: the search scrolls to it, the anchors light it
+        for _, c in ipairs(card.grid.cells) do c.frame.pageY = top + c.y end
+        return h
     end, "card", 0)
     return card
 end
 
--- A settings row (3.18): label 13 fg at the left, an optional description 11 muted on a second
--- line, the control at the right. The row grows with its wrapped texts.
-local function Row(p, label, desc)
-    local card = Card(p)
-    local row = CreateFrame("Frame", nil, card)
-    row.label = S.Text(row, F.body, T.fg)
-    row.label:SetJustifyH("LEFT"); row.label:SetJustifyV("TOP")
-    row.label:SetText(label)
-    row.desc = S.Text(row, F.meta, T.muted)
-    row.desc:SetJustifyH("LEFT"); row.desc:SetJustifyV("TOP")
-    row.desc:SetWordWrap(true)
-    row.hl = S.Solid(row, "BACKGROUND", T.hoverFill); row.hl:SetAllPoints(); row.hl:SetAlpha(0)
-    row.divider = S.Rule(row)
-    row.divider:SetPoint("BOTTOMLEFT", INSET, 0); row.divider:SetPoint("BOTTOMRIGHT", -INSET, 0)
-    function row:SetDesc(t)
-        self.desc:SetText(t or "")
-        self.desc:SetShown(t ~= nil and t ~= "")
-    end
-    row:SetDesc(desc)
-    function row:Layout(width)
-        local c = self.control
-        local cw = c and (num(c:GetWidth()) or 0) or 0
-        local textW = math.max(80, width - 2 * INSET - (cw > 0 and (cw + 12) or 0))
-        local lh = math.max(15, root.FitText(self.label, 2, textW, self))
-        local h
-        self.label:ClearAllPoints()
-        if self.desc:IsShown() then
-            local dh = math.max(13, root.FitText(self.desc, 0, textW, self))
-            self.label:SetPoint("TOPLEFT", INSET, -8)
-            self.desc:ClearAllPoints()
-            self.desc:SetPoint("TOPLEFT", self.label, "BOTTOMLEFT", 0, -3)
-            h = 8 + lh + 3 + dh + 8
-        else
-            h = math.max(36, lh + 16)
-            self.label:SetPoint("TOPLEFT", INSET, -math.floor((h - lh) / 2))
-        end
-        h = math.ceil(h)
-        if c then c:ClearAllPoints(); c:SetPoint("RIGHT", self, "RIGHT", -INSET, 0) end
-        return h
-    end
-    card.rows[#card.rows + 1] = row
-    Register(p, row, label, desc)
+-- A settings row (3.18, S.SettingRow): label 13 fg, one line of description 11 muted (cut, its
+-- full text in the tooltip), the control at the right; long: more text for the tooltip only.
+-- opts.wide: the row takes a whole line of the card (a wide control goes under the texts).
+-- opts.grid: the card's grid (Card).
+local function Row(p, label, desc, long, opts)
+    opts = opts or {}
+    local card = Card(p, opts.grid)
+    local row = card:AddRow({ label = label, desc = desc, long = long, wide = opts.wide })
+    Register(p, row, label, (desc and desc ~= "") and desc or long, (desc and desc ~= "") and long or nil)
     return row
 end
 
--- Puts the control at the row's right edge; it is re-synced each time the page shows.
+-- Gives the row its control (S.SettingRow places it at the right); it is re-synced each time the
+-- page shows.
 local function Place(p, row, control)
     row.control = control
-    control:ClearAllPoints()
-    control:SetPoint("RIGHT", row, "RIGHT", -INSET, 0)
+    if control.GetParent and control:GetParent() ~= row and control.SetParent then control:SetParent(row) end
     p.controls[#p.controls + 1] = control
     return control
 end
@@ -605,54 +645,42 @@ local function LiftList(d, sa)
     if sa then sa.wlListHook[#sa.wlListHook + 1] = d end
 end
 
--- A segmented control that turns into a dropdown when its labels would leave the row's texts less
--- than 200 px. The dropdown is as wide as its longest choice.
-local function Choice(p, row, options, get, set)
-    local CHOICE_MAX = CARD_W - 2 * INSET - 12 - 200
+-- A segmented control; S.SettingRow turns it into a dropdown when its labels would leave the
+-- row's texts less than 120 px (a paired row) or the row's width (a wide row). The dropdown is as
+-- wide as its longest choice and its list opens above the page (LiftList).
+-- wide: the row takes a whole line (3 or more long choices).
+local function Choice(p, row, options, get, set, wide)
     local seg = S.Segmented(row, options, get, set)
-    seg:SetMaxWidth(CHOICE_MAX)
-    local d = seg.dropdown
-    if d and d:IsShown() then
-        local longest = 0
-        for _, b in ipairs(seg.buttons or {}) do
-            longest = math.max(longest, root.TextWidth(b.label))
+    if wide then row.wide = true end
+    local setMax = seg.SetMaxWidth
+    seg.SetMaxWidth = function(self, w)
+        setMax(self, w)
+        local d = self.dropdown
+        if d and d:IsShown() then
+            local longest = 0
+            for _, b in ipairs(self.buttons or {}) do
+                longest = math.max(longest, root.TextWidth(b.label))
+            end
+            -- the button's own measure (label + 24, chevron and its gap + 12): the longest choice fits
+            local cap = math.max(120, w or 200)
+            d:SetWidth(math.max(120, math.min(cap, math.ceil(longest) + 24 + 12)))
+            self:SetWidth(num(d:GetWidth()) or 120)
+            if not d.wlLifted then d.wlLifted = true; LiftList(d, p.sa) end
         end
-        -- the button's own measure (label + 24, chevron and its gap + 12): the longest choice fits
-        d:SetWidth(math.max(120, math.min(CHOICE_MAX, math.ceil(longest) + 24 + 12)))
-        seg:SetWidth(num(d:GetWidth()) or CHOICE_MAX)
-        LiftList(d, p.sa)
     end
     return Place(p, row, seg)
 end
 
--- A switch row: the whole row is the click target and shows what the click does.
-local function SwitchRow(p, label, get, set, desc)
-    local row = Row(p, label, desc)
-    local sw = S.Switch(row, get, set)
-    sw:AttachRow(row)
-    row:EnableMouse(true)
-    local function Over(f) local ok, v = pcall(f.IsMouseOver, f); return ok and v end
-    local function Tip() S.Tip(row, { row.label:GetText() or "", get() and L("Clic : désactiver") or L("Clic : activer") }) end
-    local function Enter()
-        root.Tween(row.hl, num(row.hl:GetAlpha()) or 0, 1, 0.10, function(v) row.hl:SetAlpha(v) end)
-        Tip()
-    end
-    local function Leave()
-        root.Tween(row.hl, num(row.hl:GetAlpha()) or 0, 0, 0.10, function(v) row.hl:SetAlpha(v) end)
-        S.HideTip()
-    end
-    -- the switch is a button over the row: moving onto it keeps the row lit and its tooltip
-    row:HookScript("OnEnter", Enter)
-    row:HookScript("OnLeave", function() if not Over(sw) then Leave() end end)
-    sw:HookScript("OnEnter", Enter)
-    sw:HookScript("OnLeave", function() if not Over(row) then Leave() end end)
-    -- after a click the tooltip tells the next click
-    sw:HookScript("OnClick", function()
-        local ok, owner = pcall(function() return GameTooltip:IsShown() and GameTooltip:GetOwner() end)
-        if ok and owner == row then Tip() end
-    end)
-    row.switch = sw
-    Place(p, row, sw)
+-- A switch row: the whole row is the click target; its tooltip says what the click does.
+-- opts: as Row (grid, wide).
+local function SwitchRow(p, label, get, set, desc, long, opts)
+    opts = opts or {}
+    local card = Card(p, opts.grid)
+    local row = card:AddRow({ label = label, desc = desc, long = long, control = "switch", get = get, set = set,
+        wide = opts.wide })
+    Register(p, row, label, (desc and desc ~= "") and desc or long, (desc and desc ~= "") and long or nil)
+    local sw = row.switch
+    p.controls[#p.controls + 1] = sw
     return sw, row
 end
 
@@ -672,7 +700,7 @@ end
 
 -- A slider shown in percent for a value stored as a fraction (1 = 100 %), its value at its right.
 local function PercentSlider(p, label, min, max, getFrac, setFrac)
-    local row = Row(p, label)
+    local row = Row(p, label, nil, nil, { wide = true })
     local holder = CreateFrame("Frame", nil, row)
     holder:SetSize(160 + 12 + 48, 20)
     local s = S.Slider(holder, min, max, 5,
@@ -745,25 +773,109 @@ end
 local Rebuild   -- defined with the window: rebuilds every page after a language change
 local RebuildPage   -- defined with the window: rebuilds one settings page (a new spec, a new bracket)
 local Relayout  -- defined with the window: re-measures the page shown and fits the window
+local Resized   -- defined with the window: the window got a new size
 
 local BUILD = {}
+local CommandTable   -- defined with the About page
 
 -- the Groups page: Writs/FinderPeople.lua draws it (templates and switches of Trouver un groupe)
+-- A page drawn by another file gets the content width at Build; p.hubWidth is the width now
+-- (set before each p:Layout). A page that follows p.hubWidth itself sets p.wlResizes; any other is
+-- built again at the new width once the size stops changing (ApplyWidths).
 function BUILD.groups(p)
     if ns.WP.GroupsPage then ns.WP.GroupsPage.Build(p, CONTENT_W) end
+    p.builtW = CONTENT_W
 end
 
 -- the Welcome page: Writs/Tour.lua draws it (the checklist of Writs/Hub.lua and the guided tour)
 function BUILD.welcome(p)
     if ns.WP.WelcomePage then ns.WP.WelcomePage.Build(p, CONTENT_W) end
+    p.builtW = CONTENT_W
+end
+
+-- The modules: one tile each (painted icon 28, name, switch; what it does in the tooltip) in the
+-- module tiles grid (ns.GRID.moduleTiles: 3 a line at 668-724 px, 4 from 860). The whole tile is
+-- the click target.
+local TILE_H = 52
+local function ModuleTiles(p)
+    p.card = nil
+    local holder = CreateFrame("Frame", nil, p)
+    holder.tiles = {}
+    holder.grid = root.Grid()
+    p.moduleTiles = holder
+    for _, m in ipairs(ns.WP.MODULES) do
+        local t = CreateFrame("Frame", nil, holder)
+        t.wlOwned = true
+        t.key = m.key
+        t.bg = S.Solid(t, "BACKGROUND", T.cardFill); t.bg:SetAllPoints()
+        S.Border(t, T.cardEdge)
+        t.hl = S.Solid(t, "BACKGROUND", T.hoverFill); t.hl:SetAllPoints(); t.hl:SetAlpha(0)
+        t.iconFrame = CreateFrame("Frame", nil, t)
+        t.iconFrame:SetSize(28, 28)
+        t.icon = t.iconFrame:CreateTexture(nil, "ARTWORK"); t.icon:SetAllPoints()
+        local icon = MODULE_ICON[m.key] or (ns.WP.MODULE_ICON or {})[m.key] or { hd = "gear" }
+        if PaintIcon(t.icon, icon, T.fg) then
+            t.icon:ClearAllPoints(); t.icon:SetPoint("TOPLEFT", 5, -5); t.icon:SetPoint("BOTTOMRIGHT", -5, 5)
+        end
+        S.Border(t.iconFrame, T.cardEdge)
+        t.label = S.Text(t, F.body, T.fg)
+        t.label:SetJustifyH("LEFT"); t.label:SetJustifyV("MIDDLE")
+        t.label:SetText(ModLabel(m))
+        local get = function() return ns.WP.ModuleOn(m.key) end
+        t.switch = S.Switch(t, get, function(v) ns.WP.SetModule(m.key, v) end)
+        t.switch:AttachRow(t)
+        t:EnableMouse(true)
+        local function Tip()
+            S.Tip(t, { ModLabel(m), ModDesc(m), get() and L("Clic : désactiver") or L("Clic : activer") })
+        end
+        local function Over(f) local ok, v = pcall(f.IsMouseOver, f); return ok and v end
+        local function Enter() root.Tween(t.hl, num(t.hl:GetAlpha()) or 0, 1, 0.10, function(v) t.hl:SetAlpha(v) end); Tip() end
+        local function Leave() root.Tween(t.hl, num(t.hl:GetAlpha()) or 0, 0, 0.10, function(v) t.hl:SetAlpha(v) end); S.HideTip() end
+        t:HookScript("OnEnter", Enter)
+        t:HookScript("OnLeave", function() if not Over(t.switch) then Leave() end end)
+        t.switch:HookScript("OnEnter", Enter)
+        t.switch:HookScript("OnLeave", function() if not Over(t) then Leave() end end)
+        t.switch:HookScript("OnClick", function()
+            local ok, owner = pcall(function() return GameTooltip:IsShown() and GameTooltip:GetOwner() end)
+            if ok and owner == t then Tip() end
+        end)
+        function t:Update()
+            self.switch:Update()
+            self.iconFrame:SetAlpha(get() and 1 or 0.5)
+        end
+        -- name between the icon and the switch: two lines when it does not fit (never cut)
+        function t:Fit(width)
+            self.iconFrame:ClearAllPoints(); self.iconFrame:SetPoint("LEFT", self, "LEFT", 12, 0)
+            self.switch:ClearAllPoints(); self.switch:SetPoint("RIGHT", self, "RIGHT", -12, 0)
+            local textW = math.max(40, width - 12 - 28 - 10 - 12 - 40 - 12)
+            self.label:ClearAllPoints(); self.label:SetPoint("LEFT", self, "LEFT", 12 + 28 + 10, 0)
+            local lh = math.max(15, root.FitText(self.label, 2, textW, self))
+            self.textW = textW
+            local h = math.max(TILE_H, math.ceil(12 + lh + 12))
+            self:SetHeight(h)
+            return h
+        end
+        holder.tiles[#holder.tiles + 1] = t
+        p.controls[#p.controls + 1] = t
+        Register(p, t, ModLabel(m), ModDesc(m))
+    end
+    Add(p, holder, function(width, top)
+        local g = holder.grid
+        local go = root.GRID.moduleTiles
+        g:Begin(holder, 0, 0, width, { minW = go.minW, gap = go.gap, rowGap = go.rowGap, maxCols = go.maxCols,
+            minPx = go.minPx, equal = true })
+        for _, t in ipairs(holder.tiles) do g:Add(t, function(f, w) return f:Fit(w) end) end
+        local h = math.max(1, (g:End()))
+        for _, c in ipairs(g.cells) do c.frame.pageY = top + c.y end
+        holder:SetHeight(h)
+        return h
+    end, "tiles", 0)
+    return holder
 end
 
 function BUILD.general(p)
     Section(p, L("Modules"))
-    for _, m in ipairs(ns.WP.MODULES) do
-        SwitchRow(p, ModLabel(m), function() return ns.WP.ModuleOn(m.key) end,
-            function(v) ns.WP.SetModule(m.key, v) end, ModDesc(m))
-    end
+    ModuleTiles(p)
     Note(p, L("Le GPS reste toujours allumé : les autres modules s'en servent. Un module rallumé revient tout de suite, sans /reload."))
 
     if ns.WP.ClicksDB then
@@ -771,31 +883,36 @@ function BUILD.general(p)
         local function Clicks() return ns.WP.ClicksDB() end
         local function setClick(k) return function(v) Clicks()[k] = v; if ns.WP.ApplyClicks then ns.WP.ApplyClicks() end end end
         local taken = L("Un autre addon le fait déjà : ce réglage reste sans effet.")
+        local takenShort = L("Déjà fait par un autre addon.")
         local inviteBy = ns.WP.ClickOwner and ns.WP.ClickOwner("invite")
         local shootBy = ns.WP.ClickOwner and ns.WP.ClickOwner("shoot")
+        local function Two(by, short, long) if by then return takenShort, taken end return L(short), long and L(long) or nil end
         SwitchRow(p, L("Alt-clic sur un nom dans le chat"), function() return Clicks().chat end, setClick("chat"),
-            inviteBy and taken or L("Invite ce joueur dans ton groupe."))
+            Two(inviteBy, "Invite ce joueur dans ton groupe."))
         SwitchRow(p, L("Alt-clic sur un joueur ou un portrait"), function() return Clicks().world end, setClick("world"),
-            inviteBy and taken or L("Invite le joueur, dans le monde ou depuis son portrait."))
+            Two(inviteBy, "Dans le monde ou depuis son portrait.", "Invite le joueur, dans le monde ou depuis son portrait."))
         SwitchRow(p, L("Lien [Inviter] dans le chat"), function() return Clicks().link end, setClick("link"),
-            inviteBy and taken or L("Ajouté aux messages qui demandent une invitation, comme « inv »."))
+            Two(inviteBy, "Sur les messages « inv » du chat.", "Ajouté aux messages qui demandent une invitation, comme « inv »."))
         SwitchRow(p, L("Clic droit pour tirer"), function() return Clicks().shoot end, setClick("shoot"),
-            shootBy and taken or L("Sur un ennemi, lance ton tir à distance : arc, fusil, arbalète, arme de jet ou baguette."))
-        local mrow = Row(p, L("Touche pour tirer"), L("Garde-la enfoncée, puis fais un clic droit sur l'ennemi. Avec « Aucune », le clic droit seul tire : pratique avec une baguette."))
+            Two(shootBy, "Sur un ennemi : ton tir à distance.", "Sur un ennemi, lance ton tir à distance : arc, fusil, arbalète, arme de jet ou baguette."))
+        local mrow = Row(p, L("Touche pour tirer"), L("À garder enfoncée avant le clic droit."),
+            L("Garde-la enfoncée, puis fais un clic droit sur l'ennemi. Avec « Aucune », le clic droit seul tire : pratique avec une baguette."))
         -- OfferWand first, so the welcome step never overrides the key chosen here
         Choice(p, mrow, ns.WP.ShootKeys(), function() return Clicks().shootMod end, function(v)
             if ns.WP.OfferWand then ns.WP.OfferWand() end
             setClick("shootMod")(v)
-        end)
+        end, true)
         local AC = ns.WP.AltClick
         if AC and AC.On and AC.SetOn then
             SwitchRow(p, L("Alt-clic pour désenchanter / crocheter"), function() return AC.On() end, function(v) AC.SetOn(v) end,
+                L("Sur un objet de tes sacs."),
                 L("Alt + clic gauche sur un objet de tes sacs : désenchanter (enchanteur), crocheter un coffret (voleur), déchiffrer un parchemin (mage)."))
         end
     end
 
     Section(p, L("Langue"))
-    local row = Row(p, L("Langue de l'addon"), L("Automatique suit la langue du jeu. Les fenêtres déjà ouvertes changent après un /reload."))
+    local row = Row(p, L("Langue de l'addon"), L("Automatique suit la langue du jeu."),
+        L("Automatique suit la langue du jeu. Les fenêtres déjà ouvertes changent après un /reload."))
     Choice(p, row, {
         { "auto", L("Automatique") }, { "fr", L("Français") }, { "en", L("English") },
     }, function() return Guide().lang or "auto" end, function(v)
@@ -811,22 +928,23 @@ function BUILD.general(p)
         RefreshWrits()
         -- Rebuild once the click has finished: this very control belongs to the old pages.
         C_Timer.After(0, function() if Rebuild then Rebuild() end end)
-    end)
+    end, true)
 
     -- the font: the game's own (sure to show everywhere) or EllesmereUI's when it is installed
     if root.IsLoaded and root.IsLoaded("EllesmereUI") then
         Section(p, L("Police"))
-        local frow = Row(p, L("Police des textes"), L("Si des textes restent vides, reviens à celle du jeu."))
+        local frow = Row(p, L("Police des textes"), nil, L("Si des textes restent vides, reviens à celle du jeu."))
         Choice(p, frow, { { "game", L("Police du jeu") }, { "eui", "EllesmereUI" } },
             function() return WLWritsDB.font == "eui" and "eui" or "game" end,
-            function(v) WLWritsDB.font = v; if root.ApplyLooks then root.ApplyLooks() end end)
+            function(v) WLWritsDB.font = v; if root.ApplyLooks then root.ApplyLooks() end end, true)
     end
 
     Section(p, L("Fenêtres"))
     SwitchRow(p, L("Bouton de la minimap"), function() return not Guide().hideMinimap end, SetMinimap,
         L("Ouvre l'Accueil de WL Helper d'un clic."))
     SwitchRow(p, L("Rouvrir le guide à la connexion"), function() return Guide().reopenGuide == true end,
-        function(v) Guide().reopenGuide = v end, L("Même si tu l'avais fermé avant de te déconnecter."))
+        function(v) Guide().reopenGuide = v end, L("Même fermé avant de te déconnecter."),
+        L("Même si tu l'avais fermé avant de te déconnecter."))
 end
 
 -- the Orders page (T-80 alerts): the first two are also on my crafter profile
@@ -835,12 +953,15 @@ function BUILD.orders(p)
     Section(p, L("Alertes"))
     SwitchRow(p, L("Un favori se connecte"), function() return Writs().ordersAlertFav ~= false end,
         function(v) Writs().ordersAlertFav = v and true or false end,
+        L("Une alerte quand un de tes favoris arrive."),
         L("Une alerte quand un artisan de tes favoris arrive en ligne, au plus toutes les 30 min pour chacun."))
     SwitchRow(p, L("Une recette surveillée est apprise"), function() return Writs().ordersAlertWatch ~= false end,
         function(v) Writs().ordersAlertWatch = v and true or false end,
+        L("Une alerte quand un membre l'apprend."),
         L("Une alerte quand un membre de la guilde apprend une recette que tu surveilles, une fois par membre et par recette."))
     SwitchRow(p, L("Son quand quelqu'un sait le faire"), function() return Writs().ordersKnownSound ~= false end,
         function(v) Writs().ordersKnownSound = v and true or false end,
+        L("Un son avec la ligne du chat."),
         L("Avec « Me prévenir quand quelqu'un sait le faire » sur la page Demande : un son avec la ligne du chat."))
     Note(p, L("Les deux alertes se règlent aussi sur ta fiche d'artisan, dans la fenêtre Commandes."))
 end
@@ -852,23 +973,373 @@ function BUILD.guild(p)
     Section(p, L("Partage"))
     if K and K.ShareOn and K.SetShare then
         SwitchRow(p, L("Partager mes clés avec la guilde"), function() return K.ShareOn() end, function(v) K.SetShare(v) end,
+            L("Visibles dans « Qui a la clé ? »."),
             L("Les membres qui ont WL Helper voient quelles clés tu as, dans l'onglet Qui a la clé ? de la guilde."))
     end
     if Sh and Sh.GetShare and Sh.SetShare then
         SwitchRow(p, L("Partager mes quêtes de donjon"), function() return Sh.GetShare() end, function(v) Sh.SetShare(v) end,
+            L("Pour grouper. Rien d'autre n'est envoyé."),
             L("Les membres de la guilde qui ont WL Helper voient quelles quêtes de donjon tu as, pour grouper. Rien d'autre n'est envoyé."))
     end
+end
+
+-- ---------------------------------------------------------------- key bindings (T-83)
+-- The guide's keys (Bindings.xml), set from here rather than the game's menu. One row per binding:
+-- its name, a button with its key ("Aucun" without one) and "Effacer". A click on the key waits for
+-- the next key (with Alt-, Ctrl-, Maj-; mouse buttons 4 and 5 too; Échap cancels); a key another
+-- action uses is offered on the row's line first, a second click within 5 s takes it. A new key
+-- replaces the action's old ones. Bindings are protected: out of combat only (the buttons are
+-- disabled in combat). The rows re-read the keys on UPDATE_BINDINGS while the page shows.
+local BINDINGS = { "WLDT_TOGGLE", "WLDT_PICK", "WLDT_NEXT", "WLDT_PREV", "WLDT_POINTS", "WLDT_ARROW", "WLDT_TARGET", "WLDT_ITEM" }
+ns.KEY_BINDINGS = BINDINGS
+local MODKEYS = { LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true, LALT = true, RALT = true,
+    LMETA = true, RMETA = true, SHIFT = true, CTRL = true, ALT = true, META = true }
+local CONFIRM_S = 5
+local keyCombat = false          -- PLAYER_REGEN_DISABLED comes before InCombatLockdown() turns true
+local keyCapture                 -- the one frame that listens for the key
+
+local function KeysLocked() return keyCombat or ((InCombatLockdown and InCombatLockdown()) and true or false) end
+
+-- the keys of a binding (strings, in the game's order)
+local function BindingKeys(name)
+    local out = {}
+    if type(GetBindingKey) ~= "function" then return out end
+    local t = { pcall(GetBindingKey, name) }
+    if not t[1] then return out end
+    for i = 2, 3 do
+        local k = t[i]
+        if type(k) == "string" and k ~= "" and not secret(k) then out[#out + 1] = k end
+    end
+    return out
+end
+
+-- what a key reads like ("Maj-F" on a French client), the key itself when the game says nothing
+local function KeyLabel(key)
+    if type(GetBindingText) == "function" then
+        local ok, t = pcall(GetBindingText, key)
+        if ok and type(t) == "string" and t ~= "" and not secret(t) then return t end
+    end
+    return key
+end
+
+-- the name of a binding command, from its BINDING_NAME_ global
+local function ActionLabel(action)
+    local t = rawget(_G, "BINDING_NAME_" .. tostring(action))
+    if type(t) == "string" and t ~= "" then return t end
+    return tostring(action)
+end
+
+local function KeyOwner(key)
+    if type(GetBindingAction) ~= "function" then return nil end
+    local ok, a = pcall(GetBindingAction, key)
+    if ok and type(a) == "string" and a ~= "" and not secret(a) then return a end
+    return nil
+end
+
+local function SaveKeys()
+    if type(SaveBindings) ~= "function" then return end
+    local set = 1
+    if type(GetCurrentBindingSet) == "function" then
+        local ok, s = pcall(GetCurrentBindingSet)
+        if ok and num(s) then set = s end
+    end
+    pcall(SaveBindings, set)
+end
+
+-- the key pressed with its modifiers, in the game's order (ALT-CTRL-SHIFT-F)
+local function WithModifiers(key)
+    local p = ""
+    if IsAltKeyDown and IsAltKeyDown() then p = p .. "ALT-" end
+    if IsControlKeyDown and IsControlKeyDown() then p = p .. "CTRL-" end
+    if IsShiftKeyDown and IsShiftKeyDown() then p = p .. "SHIFT-" end
+    return p .. key
+end
+
+-- A screen-wide frame that takes the next key or mouse button for one row (its target).
+local function KeyCapture()
+    if keyCapture then return keyCapture end
+    local c = CreateFrame("Frame", nil, UIParent)
+    c:SetAllPoints(UIParent)
+    c:SetFrameStrata("FULLSCREEN_DIALOG")
+    c:EnableMouse(true)
+    c:Hide()
+    c:SetScript("OnKeyDown", function(self, key)
+        local t = self.target
+        if t then t:OnKey(key) end
+    end)
+    c:SetScript("OnMouseDown", function(self, button)
+        local t = self.target
+        if not t then return end
+        if button == "Button4" or button == "Button5" then t:OnKey(string.upper(button))
+        else t:Cancel() end
+    end)
+    function c:Stop()
+        self.target = nil
+        pcall(self.EnableKeyboard, self, false)
+        self.wlKeys = false
+        self:Hide()
+    end
+    -- hidden any other way (the UI reloaded, a parent hidden): it never keeps the keyboard
+    c:SetScript("OnHide", function(self)
+        local t = self.target
+        self.target = nil
+        pcall(self.EnableKeyboard, self, false)
+        self.wlKeys = false
+        if t and t.Cancel then t:Cancel() end
+    end)
+    keyCapture = c; ns.keyCapture = c   -- the tests drive it
+    return c
+end
+
+-- One binding's control: [key] [Effacer], right-aligned in its row.
+local function BindingControl(p, row, name)
+    local holder = CreateFrame("Frame", nil, row)
+    holder:SetHeight(24)
+    holder.name = name
+    local st = {}            -- state: nil, "capture" or "conflict" (key, action, t, token)
+    holder.st = st
+    local keyB, clr
+
+    local function Sync() holder:Sync() end
+    local function Reset() st.state, st.key, st.action, st.t, st.token = nil, nil, nil, nil, nil end
+
+    -- binds key to this action (its old keys freed), saved in the current binding set
+    local function Apply(key)
+        Reset()
+        if KeysLocked() or type(SetBinding) ~= "function" then Sync() return end
+        for _, old in ipairs(BindingKeys(name)) do
+            if old ~= key then pcall(SetBinding, old) end
+        end
+        pcall(SetBinding, key, name)
+        SaveKeys()
+        Sync()
+    end
+
+    function holder:Cancel()
+        local c = keyCapture
+        if c and c.target == self then c:Stop() end
+        Reset()
+        Sync()
+    end
+
+    function holder:OnKey(key)
+        if type(key) ~= "string" or key == "" then return end
+        if key == "ESCAPE" then self:Cancel() return end
+        if MODKEYS[key] then return end            -- a lone modifier: wait for the key
+        local c = keyCapture
+        if c and c.target == self then c:Stop() end
+        if KeysLocked() then Reset(); Sync() return end
+        local full = WithModifiers(key)
+        local owner = KeyOwner(full)
+        if owner == name then Reset(); Sync() return end   -- already this action's key
+        if owner then
+            local token = {}
+            st.state, st.key, st.action, st.t, st.token = "conflict", full, owner, GetTime(), token
+            C_Timer.After(CONFIRM_S, function()
+                if st.token == token then Reset(); Sync() end
+            end)
+            Sync()
+            return
+        end
+        Apply(full)
+    end
+
+    local function Start()
+        local c = KeyCapture()
+        if c.target and c.target ~= holder then c.target:Cancel() end
+        Reset()
+        st.state = "capture"
+        -- a focused edit box (the Hub's search) would take the key before the capture does
+        if type(GetCurrentKeyBoardFocus) == "function" then
+            local okF, f = pcall(GetCurrentKeyBoardFocus)
+            if okF and type(f) == "table" and f.ClearFocus then pcall(f.ClearFocus, f) end
+        end
+        c.target = holder
+        c:Show()
+        if c.Raise then pcall(c.Raise, c) end
+        -- above the Hub (FULLSCREEN_DIALOG) and not passed on: Échap cancels here, the game's
+        -- Escape (UISpecialFrames) never sees it and the Hub stays open
+        if c.SetPropagateKeyboardInput then pcall(c.SetPropagateKeyboardInput, c, false) end
+        pcall(c.EnableKeyboard, c, true)
+        c.wlKeys = true
+        Sync()
+    end
+
+    local function KeyClick()
+        if KeysLocked() then return end
+        if st.state == "conflict" then
+            if GetTime() - (st.t or 0) <= CONFIRM_S then Apply(st.key) else Reset(); Sync() end
+            return
+        end
+        if st.state == "capture" then holder:Cancel() return end
+        Start()
+    end
+
+    local function Clear()
+        if KeysLocked() or type(SetBinding) ~= "function" then return end
+        holder:Cancel()
+        local keys = BindingKeys(name)
+        if #keys == 0 then return end
+        for _, k in ipairs(keys) do pcall(SetBinding, k) end
+        SaveKeys()
+        Sync()
+    end
+
+    local function KeyTip()
+        if KeysLocked() then return { L("Indisponible en combat") } end
+        local keys = BindingKeys(name)
+        local t = { ActionLabel(name) }
+        if #keys > 0 then
+            local names = {}
+            for i, k in ipairs(keys) do names[i] = KeyLabel(k) end
+            t[#t + 1] = string.format(L("Touches : %s"), table.concat(names, ", "))
+        end
+        t[#t + 1] = L("Clic : choisir une touche.")
+        return t
+    end
+    local function ClearTip()
+        if KeysLocked() then return { L("Indisponible en combat") } end
+        return { L("Effacer"), L("Enlève les touches de cette action.") }
+    end
+
+    keyB = S.Button(holder, L("Aucun"), 84, 24, "secondary", KeyClick, KeyTip)
+    clr = S.Button(holder, L("Effacer"), 0, 24, "ghost", Clear, ClearTip)
+    keyB:SetDisabledReason(L("Indisponible en combat"))
+    clr:SetDisabledReason(L("Indisponible en combat"))
+    clr:SetPoint("RIGHT", holder, "RIGHT", 0, 0)
+    keyB:SetPoint("RIGHT", clr, "LEFT", -8, 0)
+    holder.keyB, holder.clr = keyB, clr
+
+    -- the button's text, the row's line, what can be clicked; a new width lays the page out again
+    function holder:Sync()
+        local locked = KeysLocked()
+        if locked and st.state then
+            local c = keyCapture
+            if c and c.target == self then c:Stop() end
+            Reset()
+        end
+        local keys = BindingKeys(name)
+        local text, desc
+        if st.state == "capture" then
+            text, desc = "...", L("Appuie sur une touche... (Échap : annuler)")
+        elseif st.state == "conflict" then
+            text = KeyLabel(st.key) .. " ?"
+            desc = string.format(L("%s sert à « %s » : clique encore pour remplacer"), KeyLabel(st.key), ActionLabel(st.action))
+        else
+            text = (#keys > 0) and KeyLabel(keys[1]) or L("Aucun")
+            if #keys > 1 then text = text .. " +" .. (#keys - 1) end
+            if locked then desc = L("Indisponible en combat")
+            elseif #keys > 1 then
+                local more = {}
+                for i = 2, #keys do more[#more + 1] = KeyLabel(keys[i]) end
+                desc = string.format(L("Aussi : %s"), table.concat(more, ", "))
+            elseif #keys == 1 then desc = L("Clic : changer la touche.")
+            else desc = L("Clic : choisir une touche.") end
+        end
+        keyB:SetText(text)
+        row:SetDesc(desc)
+        if locked then keyB:Disable(); clr:Disable() else keyB:Enable(); clr:Enable() end
+        if not locked and #keys == 0 and st.state == nil then clr:Disable() end
+        if keyB.Paint then keyB.Paint() end
+        if clr.Paint then clr.Paint() end
+        local w = math.ceil((num(keyB:GetWidth()) or 84) + 8 + (num(clr:GetWidth()) or 60))
+        local old = num(self:GetWidth()) or 0
+        self:SetWidth(w)
+        if old > 0 and old ~= w and p.holder and p.holder:IsShown() and p.contentH then p:Layout() end
+    end
+    holder:Sync()
+    return holder
+end
+
+-- Settings > Quest guide > "Raccourcis": the rows, the game's own window, the events while shown.
+local function KeyBindingsSection(p)
+    Section(p, L("Raccourcis"))
+    p.keyRows = {}
+    for _, name in ipairs(BINDINGS) do
+        local row = Row(p, ActionLabel(name), L("Clic : choisir une touche."))
+        local ctl = BindingControl(p, row, name)
+        Place(p, row, ctl)
+        p.keyRows[#p.keyRows + 1] = ctl
+    end
+    local row = Row(p, L("Tout régler dans le jeu"), L("La fenêtre des raccourcis du jeu."))
+    local open = S.Button(row, L("Ouvrir"), 0, 28, "secondary", function()
+        if KeysLocked() then return end
+        local opened
+        if root.OpenKeyBindings then
+            opened = root.OpenKeyBindings()
+        else
+            local St = rawget(_G, "Settings")
+            if type(St) == "table" and type(St.OpenToCategory) == "function" and St.KEYBINDINGS_CATEGORY_ID ~= nil then
+                opened = pcall(St.OpenToCategory, St.KEYBINDINGS_CATEGORY_ID)
+            end
+            if not opened then
+                if not rawget(_G, "KeyBindingFrame") and type(rawget(_G, "KeyBindingFrame_LoadUI")) == "function" then
+                    pcall(KeyBindingFrame_LoadUI)
+                end
+                local K = rawget(_G, "KeyBindingFrame")
+                if K and type(ShowUIPanel) == "function" then opened = pcall(ShowUIPanel, K) end
+            end
+        end
+        -- a button of the Hub that opens another window closes the Hub (3.20)
+        if opened and win then win:Hide() end
+    end, function()
+        if KeysLocked() then return { L("Indisponible en combat") } end
+        return { L("Tout régler dans le jeu"), L("Ouvre les raccourcis du jeu (section AddOns).") }
+    end)
+    open:SetDisabledReason(L("Indisponible en combat"))
+    function open:Sync() if KeysLocked() then self:Disable() else self:Enable() end end
+    Place(p, row, open)
+    p.keyOpen = open
+
+    local function SyncAll()
+        for _, c in ipairs(p.keyRows) do c:Sync() end
+        open:Sync()
+    end
+    p.SyncKeys = SyncAll
+    local ev = CreateFrame("Frame")
+    p.keyEvents = ev
+    local EVENTS = { "UPDATE_BINDINGS", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED" }
+    local function Arm(on)
+        for _, e in ipairs(EVENTS) do
+            pcall(on and ev.RegisterEvent or ev.UnregisterEvent, ev, e)
+        end
+    end
+    ev:SetScript("OnEvent", function(_, e)
+        -- shown: the page, and the Hub (a hidden page has no event, 3.20)
+        if not (p.holder:IsShown() and win and win:IsShown()) then Arm(false) return end
+        if e == "PLAYER_REGEN_DISABLED" then keyCombat = true
+        elseif e == "PLAYER_REGEN_ENABLED" then keyCombat = false end
+        SyncAll()
+    end)
+    p.holder:HookScript("OnShow", function()
+        keyCombat = (InCombatLockdown and InCombatLockdown()) and true or false
+        Arm(true)
+        SyncAll()
+    end)
+    local function StopCapture()
+        local c = keyCapture
+        if c and c.target then c.target:Cancel() end
+    end
+    p.holder:HookScript("OnHide", function()
+        Arm(false)
+        StopCapture()
+    end)
+    -- the Hub closed mid-capture: the screen-wide frame (a child of UIParent) goes with it
+    if win and win.HookScript then win:HookScript("OnHide", StopCapture) end
+    if p.holder:IsShown() and win and win:IsShown() then Arm(true) end
 end
 
 function BUILD.dungeons(p)
     -- the module card above names the guide: the sections say what their rows are about
     Section(p, L("GPS et alertes"))
     SwitchRow(p, L("Flèche du guide"), function() return Guide().arrow ~= false end, SetGuideArrow,
-        L("Le GPS te mène à la prochaine étape du guide."))
+        L("Le GPS te mène à l'étape suivante."), L("Le GPS te mène à la prochaine étape du guide."))
     SwitchRow(p, L("Alerte des monstres rares"), function() return Guide().rareAlert ~= false end, function(v) Guide().rareAlert = v end,
+        L("Un message et un son, dans un donjon."),
         L("Dans un donjon, un message et un son quand un monstre rare apparaît."))
     SwitchRow(p, L("Points GPS à chaque étape"), function() return Guide().autoWay and true or false end,
         function(v) Guide().autoWay = v; RefreshGuide() end,
+        L("Posés tout seuls à chaque nouvelle étape."),
         L("Les points de l'étape en cours sont posés tout seuls quand une nouvelle étape commence."))
     -- the guide tracker (Tracker.lua): its switch left the guide's Actions menu (T-74), it lives here
     SwitchRow(p, L("Suivi du guide"), function() return Guide().tracker == true end,
@@ -876,6 +1347,7 @@ function BUILD.dungeons(p)
             local TR = _G.WLHelperTracker
             if TR and TR.SetShown then TR.SetShown(v) else Guide().tracker = v and true or false end
         end,
+        L("Une petite fenêtre, guide fermé."),
         L("Une petite fenêtre avec l'action à faire, quand la fenêtre du guide est fermée."))
     -- the route's quests taken, handed in and shared by themselves (Writs/GuideQuests.lua)
     local GQ = ns.WP and ns.WP.GuideQuests
@@ -884,22 +1356,32 @@ function BUILD.dungeons(p)
             local ok, note = pcall(GQ.OwnerNote, kind)
             return (ok and note) and (text .. " " .. note) or text
         end
-        local function Sw(label, key, desc)
-            SwitchRow(p, L(label), function() return GQ.On(key) end, function(v) GQ.Set(key, v) end, desc)
+        -- another addon that does it too is named on the row's one line (its full note in the tooltip)
+        local function Short(text, kind)
+            local okW, who = pcall(GQ.Owners, kind)
+            if okW and type(who) == "table" and #who > 0 then
+                return string.format(kind == "share" and L("Fait par %s.") or L("Aussi fait par %s."), table.concat(who, ", "))
+            end
+            return text
+        end
+        local function Sw(label, key, desc, long)
+            SwitchRow(p, L(label), function() return GQ.On(key) end, function(v) GQ.Set(key, v) end, desc, long)
         end
         Section(p, L("Quêtes du guide"))
-        Sw("Prendre les quêtes du guide tout seul", "questAutoAccept",
+        Sw("Prendre les quêtes du guide tout seul", "questAutoAccept", Short(L("Seulement les quêtes de ta route."), "accept"),
             Desc(L("En parlant au PNJ, seulement les quêtes de ta route. Garde Maj enfoncée pour le faire à la main."), "accept"))
-        Sw("Rendre les quêtes du guide tout seul", "questAutoTurnIn",
+        Sw("Rendre les quêtes du guide tout seul", "questAutoTurnIn", Short(L("Quand il n'y a pas de récompense à choisir."), "turnin"),
             Desc(L("La récompense est prise toute seule quand il n'y a pas de choix. Garde Maj enfoncée pour le faire à la main."), "turnin"))
-        Sw("Partager les quêtes du guide avec le groupe", "questAutoShare",
+        Sw("Partager les quêtes du guide avec le groupe", "questAutoShare", Short(L("Une fois, hors combat."), "share"),
             Desc(L("Une quête de ta route que tu prends en groupe est partagée une fois, hors combat."), "share"))
         Sw("Choisir la récompense tout seul (la meilleure amélioration)", "questAutoReward",
+            L("La meilleure amélioration pour ta spé."),
             L("Quand une quête du guide offre un choix, la meilleure amélioration pour ta spé est prise. Éteint, un message te dit laquelle choisir."))
     end
     -- "useful" hides the repeatable reputation quests and the quests of professions you don't have
     Section(p, L("Quêtes montrées"))
-    local row = Row(p, L("Quêtes répétables ou d'un autre métier"), L("Masquées, elles sortent de la route et du compte de quêtes de chaque donjon."))
+    local row = Row(p, L("Quêtes répétables ou d'un autre métier"), L("Masquées, elles sortent de la route."),
+        L("Masquées, elles sortent de la route et du compte de quêtes de chaque donjon."))
     Choice(p, row, { { true, L("Masquer") }, { false, L("Afficher") } },
         function() return Guide().useful ~= false end,
         function(v)
@@ -913,32 +1395,36 @@ function BUILD.dungeons(p)
         Section(p, L("Journal de quêtes"))
         SwitchRow(p, L("Proposer le tri du journal"), function() return WLWritsDB.triageNotice ~= false end,
             function(v) WLWritsDB.triageNotice = v and true or false end,
+            L("Quand ton journal est presque plein."),
             L("Quand ton journal de quêtes est presque plein, une ligne dans le chat propose de voir les quêtes à abandonner."))
     end
+    -- the guide's keys, set here (T-83)
+    KeyBindingsSection(p)
 end
 
 function BUILD.comptoir(p)
     Section(p, L("Automatismes"))
     SwitchRow(p, L("Rendre les Writs automatiquement"), function() return Comfort().autoTurnIn end, SetComfort("autoTurnIn"),
-        L("En parlant au PNJ. Garde Maj enfoncée pour le faire à la main."))
+        L("En parlant au PNJ. Maj : à la main."), L("En parlant au PNJ. Garde Maj enfoncée pour le faire à la main."))
     SwitchRow(p, L("Rendre les caisses automatiquement"), function() return Comfort().autoCrates ~= false end, SetComfort("autoCrates"),
         L("En parlant à Dokimi ou à Marcy Baker."))
     SwitchRow(p, L("Accepter la quête en ouvrant l'enveloppe"), function() return Comfort().autoAccept end, SetComfort("autoAccept"))
     SwitchRow(p, L("Scanner l'HV à son ouverture"), function() return Writs().autoRescan end,
         function(v) Writs().autoRescan = v; RefreshWrits() end,
+        L("Fenêtre Writs ouverte, prix de plus d'1 h."),
         L("Seulement si la fenêtre Writs est ouverte et que les prix ont plus d'une heure."))
 
     Section(p, L("Rappels et infobulles"))
     SwitchRow(p, L("Rappel à la connexion"), function() return Comfort().reminder end, SetComfort("reminder"),
-        L("Par exemple : « 3 Writs prêts à rendre, 1 enveloppe à ouvrir »."))
+        L("Ex. « 3 Writs prêts à rendre »."), L("Par exemple : « 3 Writs prêts à rendre, 1 enveloppe à ouvrir »."))
     SwitchRow(p, L("Détails dans l'infobulle des enveloppes"), function() return Comfort().tooltip end, SetComfort("tooltip"),
-        L("Réputation, coût, à qui la rendre, et si tu l'as déjà rendue."))
-
-    -- profession cooldowns (Writs/Cooldowns.lua): the chat line when one is ready
-    Section(p, L("Recharges de métier"))
+        L("Réputation, coût, à qui la rendre."), L("Réputation, coût, à qui la rendre, et si tu l'as déjà rendue."))
+    -- profession cooldowns (Writs/Cooldowns.lua): the chat line when one is ready (a reminder too:
+    -- its own section header cost a line on a wide page)
     SwitchRow(p, L("Prévenir quand une recharge est prête"),
         function() local CDm = ns.WP.Cooldowns; return not CDm or CDm.AlertOn() end,
         function(v) local CDm = ns.WP.Cooldowns; if CDm then CDm.SetAlert(v) end end,
+        L("Une ligne dans le chat, pour chaque perso."),
         L("Transmutations, Étoffe lunaire, Salière : une ligne dans le chat, pour tous tes personnages. Leur temps restant est sur l'Accueil."))
 
     -- cost price at the AH (Writs/CostPrice.lua)
@@ -947,17 +1433,21 @@ function BUILD.comptoir(p)
         function() local C = ns.WP.CostPrice; return not C or C.On() end,
         -- on = nil (the default), off = false ("v and nil or false" was always false)
         function(v) if v then WLWritsDB.costPrice = nil else WLWritsDB.costPrice = false end end,
+        L("Moyenne sur 60 jours, dans l'infobulle."),
         L("Retient ce que tu paies à l'HV (moyenne sur 60 jours), l'affiche dans l'infobulle et prévient si tu vends en dessous."))
 
     Section(p, L("Plan d'achat"))
-    local row = Row(p, L("Objectif de réputation"), L("Le plan achète les Writs qu'il faut pour l'atteindre."))
+    local row = Row(p, L("Objectif de réputation"), L("Le plan achète de quoi l'atteindre."),
+        L("Le plan achète les Writs qu'il faut pour l'atteindre."))
     Choice(p, row, {
         { 0, L("Rang suivant") }, { 6, L("Honoré") }, { 7, L("Révéré") },
     }, function() return Writs().goal or 0 end, function(v) Writs().goal = v; RefreshWrits() end)
     SwitchRow(p, L("Masquer les zones trop hautes"), function() return Writs().hideHigh end,
-        function(v) Writs().hideHigh = v; RefreshWrits() end, L("Les zones au-dessus de ton niveau sortent du plan."))
+        function(v) Writs().hideHigh = v; RefreshWrits() end, L("Au-dessus de ton niveau : hors du plan."),
+        L("Les zones au-dessus de ton niveau sortent du plan."))
 
-    -- zones: the plan only buys writs of the zones left on (a single writ: right-click in "All writs")
+    -- zones: the plan only buys writs of the zones left on (a single writ: right-click in "All writs");
+    -- one compact toggle per zone (name, "from level N"), 3 or 4 a line (ns.GRID.toggles)
     Section(p, L("Zones du plan"))
     local maps, seen = {}, {}
     for _, w in ipairs(ns.WRITS or {}) do
@@ -969,20 +1459,23 @@ function BUILD.comptoir(p)
         if la ~= lb then return la < lb end
         return WP.ZoneName(a) < WP.ZoneName(b)
     end)
-    local muted = S.Hex(T.muted)
+    -- how to leave out a single writ: in each zone's tooltip (a note under 24 toggles was one more
+    -- line to scroll past)
+    local one = string.format(L("Pour écarter un seul Writ : clic droit dessus dans l'onglet « %s » de la fenêtre Writs."), L("Tous les Writs"))
     for _, map in ipairs(maps) do
         local lo = WP.ZoneMin(map)
-        local label = WP.ZoneName(map)
-        if lo then label = label .. "  " .. muted .. string.format(L("dès le niv. %d"), lo) .. "|r" end
-        SwitchRow(p, label, function() return not WP.IsSkipped("zones", map) end,
-            function(v) WP.SetSkipped("zones", map, not v) end)
+        local _, zr = SwitchRow(p, WP.ZoneName(map), function() return not WP.IsSkipped("zones", map) end,
+            function(v) WP.SetSkipped("zones", map, not v) end,
+            lo and string.format(L("dès le niv. %d"), lo) or nil, nil, { grid = "toggles" })
+        zr:SetLong(one)   -- tooltip only: not searched (24 hits for "writ" otherwise)
     end
-    Note(p, string.format(L("Pour écarter un seul Writ : clic droit dessus dans l'onglet « %s » de la fenêtre Writs."), L("Tous les Writs")))
 end
 
 function BUILD.gps(p)
     Section(p, L("Itinéraire"))
-    local row = Row(p, L("Calcul de l'itinéraire"), L("Automatique garde le GPS de WL Helper et laisse ton guide Zygor tranquille. Choisis Zygor pour passer par son système de trajet."))
+    local row = Row(p, L("Calcul de l'itinéraire"), L("Automatique laisse Zygor tranquille."),
+        L("Automatique garde le GPS de WL Helper et laisse ton guide Zygor tranquille. Choisis Zygor pour passer par son système de trajet."),
+        { wide = true })
     local seg = Choice(p, row, {
         { "auto", L("Automatique") },
         { "wl", L("WL Helper") },
@@ -1001,9 +1494,9 @@ function BUILD.gps(p)
 
     Section(p, L("Trajet"))
     SwitchRow(p, L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"),
-        L("Tes sorts de téléportation (mage, druide), quand ils sont prêts."))
+        L("Mage, druide : quand elles sont prêtes."), L("Tes sorts de téléportation (mage, druide), quand ils sont prêts."))
     SwitchRow(p, L("Choisir le vol automatiquement"), function() return Gps().autoFlight end, SetGps("autoFlight"),
-        L("Chez le maître de vol, le bon trajet est choisi pour toi."))
+        L("Chez le maître de vol."), L("Chez le maître de vol, le bon trajet est choisi pour toi."))
     row = Row(p, L("Points de vol connus"), L("Ceux que ce personnage a déjà découverts."))
     local known = ValueText(row, 80)
     function known:Sync()
@@ -1017,14 +1510,16 @@ function BUILD.gps(p)
     local GT, Way = ns.WP.GoTo, ns.WP.Way
     if GT and GT.WalkOn and GT.SetWalk then
         SwitchRow(p, L("Chemins à pied"), function() return GT.WalkOn() end, function(v) GT.SetWalk(v) end,
+            L("La flèche contourne collines et murs."),
             L("La flèche suit un vrai chemin autour des collines et par les portes, pour tous les guides (WL Helper Nav). Sans lui, elle va tout droit."))
     end
     local TR = ns.WP.Trail
     if TR and TR.MapOn and TR.SetMap then
         SwitchRow(p, L("Chemin à pied sur la carte"), function() return TR.MapOn() end, function(v) TR.SetMap(v) end,
+            L("Des points sur la carte du monde."),
             L("Des points sur la carte du monde montrent le chemin à pied jusqu'au point du GPS, avec une épingle sur l'endroit exact (WL Helper Nav)."))
         SwitchRow(p, L("Sur la minimap"), function() return TR.MinimapOn() end, function(v) TR.SetMinimap(v) end,
-            L("Les mêmes points sur la minimap, autour de toi."))
+            L("Les mêmes points, autour de toi."), L("Les mêmes points sur la minimap, autour de toi."))
         if TR.SetMapSize and TR.SetMinimapSize and TR.SetColor then
             local function Sizes()
                 return { { "small", L("Petits") }, { "medium", L("Moyens") }, { "large", L("Grands") } }
@@ -1044,7 +1539,7 @@ function BUILD.gps(p)
             .. " " .. L("Si tu as déjà posé un repère sur la carte, il est gardé et l'étiquette ne s'affiche pas.")
         local okO, who = pcall(WPn.Owner)
         if okO and type(who) == "string" then desc = desc .. " " .. string.format(L("Déjà fait par %s."), who) end
-        local pinRow = Row(p, L("Repère dans le monde"), desc)
+        local pinRow = Row(p, L("Repère dans le monde"), L("Lieu, distance et temps, dans le monde."), desc)
         Choice(p, pinRow, {
             { "auto", L("Automatique") },
             { "always", L("Toujours") },
@@ -1060,7 +1555,8 @@ function BUILD.gps(p)
         local desc = L("Allumé, /way envoie le point au GPS de WL Helper. Éteint, /way reste à l'addon qui l'avait (TomTom par exemple) et /wlway fait la même chose.")
         local okO, other = pcall(function() return Way.OtherOwnerName and Way.OtherOwnerName() end)
         if okO and type(other) == "string" and other ~= "" then desc = desc .. " " .. string.format(L("/way est à %s."), other) end
-        SwitchRow(p, L("Prendre /way"), wants, function(v) Way.SetTake(v) end, desc)
+        SwitchRow(p, L("Prendre /way"), wants, function(v) Way.SetTake(v) end,
+            L("/way envoie le point au GPS de WL Helper."), desc)
     end
 
     -- the city tour (Writs/CityTour.lua): its card when you arrive in a capital
@@ -1068,6 +1564,7 @@ function BUILD.gps(p)
     if CT and CT.IsOn and CT.SetOn then
         Section(p, L("En ville"))
         SwitchRow(p, L("Tournée en ville"), function() return CT.IsOn() end, function(v) CT.SetOn(v) end,
+            L("Une fiche en arrivant dans une capitale."),
             L("En arrivant dans une capitale, une petite fiche liste ce qu'il y a à faire : courrier, réparations, maître de classe, quêtes à rendre."))
     end
 
@@ -1092,11 +1589,13 @@ function BUILD.bags(p)
     Section(p, L("Place dans les sacs"))
     SwitchRow(p, L("Proposer de libérer une place"),
         function() return WLWritsDB.freeSlotPrompt ~= false end, function(v) WLWritsDB.freeSlotPrompt = v end,
+        L("Sacs pleins : jeter l'objet le moins cher."),
         L("Quand tes sacs sont pleins, WL Helper propose de jeter l'objet le moins cher : un gris, ou une arme ou une armure blanche."))
     local other = ns.WP.Junk and ns.WP.Junk.OtherSeller and ns.WP.Junk.OtherSeller()
     SwitchRow(p, L("Vendre les gris chez les marchands"),
         function() return WLWritsDB.sellGreys ~= false end, function(v) WLWritsDB.sellGreys = v end,
-        other and L("Un autre de tes addons les vend déjà : WL Helper le laisse faire.") or L("Dès que tu ouvres la fenêtre d'un marchand."))
+        other and L("Un autre addon les vend déjà.") or L("Dès que tu ouvres la fenêtre d'un marchand."),
+        other and L("Un autre de tes addons les vend déjà : WL Helper le laisse faire.") or nil)
     Note(p, L("Le nettoyeur ne propose jamais un objet qui lance une quête. Pour libérer une place à la main, tape /wlh place."))
 end
 
@@ -1121,15 +1620,17 @@ function BUILD.upgrades(p)
     -- the judge is not a setting: WL Helper Gear when loaded, else WL Helper's weights (Upgrades.lua)
     -- the spec rated, then for dual or triple spec the other specs of the class ticked here
     Section(p, L("Spés à comparer"))
-    local srow = Row(p, L("Spé évaluée"), L("Auto : l'arbre de talents où tu as le plus de points."))
+    local srow = Row(p, L("Spé évaluée"), L("Auto : l'arbre où tu as le plus de points."),
+        L("Auto : l'arbre de talents où tu as le plus de points."))
     Choice(p, srow, Wt.SpecChoices(),
         function() local db, c = SpecDB(); return db[c] or "auto" end,
         function(v)
             local db, c = SpecDB(); db[c] = v; Refresh()
             -- this page only, once the click has finished (this very control belongs to the old page)
             if RebuildPage then C_Timer.After(0, function() RebuildPage("upgrades") end) end
-        end)
-    local mrow = Row(p, L("Spé principale"), L("Celle de tes talents, ou celle choisie plus haut. Toujours sur la première ligne."))
+        end, true)
+    local mrow = Row(p, L("Spé principale"), L("Toujours sur la première ligne."),
+        L("Celle de tes talents, ou celle choisie plus haut. Toujours sur la première ligne."))
     local mainName = ValueText(mrow, 200)
     function mainName:Sync() self:SetText(Wt.SpecName()) end
     mainName:Sync()
@@ -1138,22 +1639,26 @@ function BUILD.upgrades(p)
         local key = spec[1]
         SwitchRow(p, string.format(L("Comparer aussi : %s"), Wt.SpecName(spec)),
             function() return Wt.ExtraOn(key) end, function(v) Wt.SetExtra(key, v); Refresh() end,
-            L("Une ligne de plus dans les infobulles d'objet pour cette spé."))
+            L("Une ligne de plus dans les infobulles."), L("Une ligne de plus dans les infobulles d'objet pour cette spé."))
     end
-    local arow = Row(p, L("Flèche pour"), L("Avec plusieurs spés, l'infobulle dit laquelle gagne."))
+    local arow = Row(p, L("Flèche pour"), L("L'infobulle dit quelle spé gagne."),
+        L("Avec plusieurs spés, l'infobulle dit laquelle gagne."))
     Choice(p, arow, { { "main", L("Ma spé principale") }, { "any", L("N'importe laquelle de mes spés") } },
         function() return WLWritsDB.upgradeArrowFor == "any" and "any" or "main" end,
-        function(v) WLWritsDB.upgradeArrowFor = (v == "any") and "any" or nil; Refresh() end)
+        function(v) WLWritsDB.upgradeArrowFor = (v == "any") and "any" or nil; Refresh() end, true)
 
     Section(p, L("Affichage"))
-    local trow = Row(p, L("Flèche à partir de"), L("Le gain minimum pour mettre la flèche sur un objet."))
+    local trow = Row(p, L("Flèche à partir de"), L("Le gain minimum pour la flèche."),
+        L("Le gain minimum pour mettre la flèche sur un objet."))
     local function pct(n) return string.format(L("%d %%"), n) end
     Choice(p, trow, { { 1, pct(1) }, { 3, pct(3) }, { 5, pct(5) }, { 10, pct(10) } },
         function() return WLWritsDB.upgradeMin or 1 end, function(v) WLWritsDB.upgradeMin = v; Refresh() end)
     SwitchRow(p, L("Ligne dans les infobulles d'objet"), function() return WLWritsDB.upgradeTip ~= false end,
-        function(v) WLWritsDB.upgradeTip = v; ApplyTip() end, L("Le gain ou la perte pour ta spé, et l'objet qu'il remplacerait."))
+        function(v) WLWritsDB.upgradeTip = v; ApplyTip() end, L("Le gain ou la perte pour ta spé."),
+        L("Le gain ou la perte pour ta spé, et l'objet qu'il remplacerait."))
     SwitchRow(p, L("Masquer le bloc en double des infobulles"), function() return WLWritsDB.hideGFTip ~= false end,
-        function(v) WLWritsDB.hideGFTip = v; ApplyTip() end, L("Quand ton addon d'équipement affiche déjà le même pourcentage."))
+        function(v) WLWritsDB.hideGFTip = v; ApplyTip() end, L("Si ton addon d'équipement l'affiche déjà."),
+        L("Quand ton addon d'équipement affiche déjà le même pourcentage."))
 
     local _, label = Wt.Bracket()
     -- built once: a level-up across a bracket or a respec on Auto rebuilds this page when shown
@@ -1166,13 +1671,13 @@ function BUILD.upgrades(p)
         end
     end }
     Section(p, string.format(L("Poids utilisés : %s, niveaux %s"), Wt.SpecName(), label))
-    -- a zebra list: stat name at the left, weight in a number column at the right
+    -- the weights: one cell per stat (name at the left, weight at the right) in the compact grid
+    -- (ns.GRID.toggles, 3 or 4 a line), a zebra per line
     local list = CreateFrame("Frame", nil, p)
     local lines = {}
     for i, e in ipairs(Wt.Table()) do
         local line = CreateFrame("Frame", nil, list)
-        local z = (i % 2 == 0) and T.zebraB or T.zebraA
-        S.Solid(line, "BACKGROUND", z):SetAllPoints()
+        line.zebra = S.Solid(line, "BACKGROUND", T.zebraA); line.zebra:SetAllPoints()
         line.name = S.Text(line, F.label, T.text)
         line.name:SetJustifyH("LEFT")
         line.name:SetText(L(STAT_NAMES[e[1]] or e[1]))
@@ -1182,20 +1687,28 @@ function BUILD.upgrades(p)
         line.value:SetText(Decimal(e[2]))
         lines[i] = line
     end
+    list.lines = lines
+    list.grid = root.Grid()
+    p.weights = list
     Add(p, list, function(width)
-        local y = 0
+        local g = list.grid
+        local go = root.GRID.toggles
+        g:Begin(list, 0, 0, width, { minW = go.minW, gap = go.gap, rowGap = 0, maxCols = go.maxCols, minPx = go.minPx, equal = true })
         for _, line in ipairs(lines) do
-            line:ClearAllPoints()
-            line:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
-            line:SetWidth(width)
-            line.value:ClearAllPoints(); line.value:SetPoint("TOPRIGHT", -12, -7); line.value:SetWidth(56)
-            line.name:ClearAllPoints(); line.name:SetPoint("TOPLEFT", 8, -7)
-            local h = math.max(28, 7 + math.max(15, root.FitText(line.name, 2, width - 8 - 12 - 56 - 8, line)) + 6)
-            line:SetHeight(h)
-            y = y + h
+            g:Add(line, function(f, w)
+                f.value:ClearAllPoints(); f.value:SetPoint("TOPRIGHT", -12, -7); f.value:SetWidth(56)
+                f.name:ClearAllPoints(); f.name:SetPoint("TOPLEFT", 8, -7)
+                return math.max(28, 7 + math.max(15, root.FitText(f.name, 2, w - 8 - 12 - 56 - 8, f)) + 6)
+            end)
         end
-        list:SetHeight(math.max(1, y))
-        return y
+        local h = g:End()
+        for _, c in ipairs(g.cells) do
+            local z = (c.line % 2 == 0) and T.zebraB or T.zebraA
+            c.frame.zebra:SetColorTexture(z[1], z[2], z[3], z[4] or 1)
+            c.frame.zebraLine = c.line
+        end
+        list:SetHeight(math.max(1, h))
+        return h
     end, "list", 4)
     Note(p, L("Ces poids sont ceux de WL Helper, par classe et par spé, ajustés à ta tranche de niveaux (1-20, 21-40, 41-59, 60). Les dégâts d'une école de magie comptent selon ta spé. Un objet que ta classe ne peut pas porter n'a pas de flèche."))
 end
@@ -1227,6 +1740,50 @@ local function CopyBox(parent, text, width)
     return eb
 end
 
+-- The chat commands as a table: "/wlh x : what it does" (FR) or "/wlh x: what it does" (EN), one
+-- per line of the text; a line without a colon is a command alone.
+local CMD_W = 132
+local function SplitCommand(line)
+    local cmd, what = line:match("^(.-)%s*:%s+(.+)$")
+    if not cmd or cmd == "" then return line, "" end
+    return cmd, what
+end
+CommandTable = function(p, text)
+    p.card = nil
+    local holder = CreateFrame("Frame", nil, p)
+    holder.cells = {}
+    holder.grid = root.Grid()
+    p.commands = holder
+    for line in (text or ""):gmatch("[^\n]+") do
+        local cmd, what = SplitCommand(line)
+        local c = CreateFrame("Frame", nil, holder)
+        c.cmd = S.Text(c, F.label, T.fg)
+        c.cmd:SetJustifyH("LEFT"); c.cmd:SetJustifyV("TOP")
+        c.cmd:SetText(cmd)
+        c.what = S.Text(c, F.label, T.muted)
+        c.what:SetJustifyH("LEFT"); c.what:SetJustifyV("TOP")
+        c.what:SetText(what)
+        holder.cells[#holder.cells + 1] = c
+    end
+    Add(p, holder, function(width)
+        local g = holder.grid
+        g:Begin(holder, 0, 0, width, { minW = 380, gap = 16, rowGap = 6, maxCols = 2, minPx = 200 })
+        for _, c in ipairs(holder.cells) do
+            g:Add(c, function(f, w)
+                f.cmd:ClearAllPoints(); f.cmd:SetPoint("TOPLEFT", 0, 0)
+                local ch = root.FitText(f.cmd, 0, CMD_W, f)
+                f.what:ClearAllPoints(); f.what:SetPoint("TOPLEFT", CMD_W + 12, 0)
+                local wh = root.FitText(f.what, 0, math.max(40, w - CMD_W - 12), f)
+                return math.max(14, ch, wh)
+            end)
+        end
+        local h = math.max(1, (g:End()))
+        holder:SetHeight(h)
+        return h
+    end, "commands", 8)
+    return holder
+end
+
 function BUILD.about(p)
     -- the addon: logo, name, version, who it is for
     local head = CreateFrame("Frame", nil, p)
@@ -1256,27 +1813,24 @@ function BUILD.about(p)
 
     local function info(label, value)
         local row = Row(p, label)
-        local v = ValueText(row, CARD_W - 2 * INSET - 120)
+        local v = ValueText(row, 200)
         v:SetText(value)
         Place(p, row, v)
     end
     Section(p, L("Crédits"))
     info(L("Auteur"), "Alandir (WaR LegenD)")
     info(L("Logo"), L("WaR LegenD (War Legend Raid Tool)"))
-    -- the link under its label, across the whole row: never cut
-    local row = Row(p, L("Code source"), L("Clique sur le lien, puis Ctrl+C pour le copier."))
-    local link = CopyBox(row, GITHUB, CARD_W - 2 * INSET)
-    function row:Layout(width)
-        local textW = width - 2 * INSET
-        self.label:ClearAllPoints(); self.label:SetPoint("TOPLEFT", INSET, -8)
-        local lh = math.max(15, root.FitText(self.label, 2, textW, self))
-        self.desc:ClearAllPoints(); self.desc:SetPoint("TOPLEFT", self.label, "BOTTOMLEFT", 0, -3)
-        local dh = math.max(13, root.FitText(self.desc, 0, textW, self))
-        link:ClearAllPoints(); link:SetPoint("TOPLEFT", self.desc, "BOTTOMLEFT", 0, -8)
-        link:SetWidth(textW)
-        local bh = num(link:GetHeight()) or 28
-        if bh <= 0 then bh = 28 end
-        return math.ceil(8 + lh + 3 + dh + 8 + bh + 12)
+    -- the link under its label, across a whole line of the card: never cut
+    local row = Row(p, L("Code source"), L("Clique sur le lien, puis Ctrl+C pour le copier."), nil, { wide = true })
+    local link = CopyBox(row, GITHUB, 320)
+    Place(p, row, link)
+    local fit = row.Fit
+    function row:Fit(width)
+        width = math.floor(width or 0)
+        link:SetWidth(math.max(120, math.min(NOTE_W, width - 2 * 12)))
+        if (num(link:GetHeight()) or 0) <= 0 then link:SetHeight(28) end
+        -- wider than half the row: S.SettingRow puts it under the texts, else beside them
+        return fit(self, width)
     end
     Note(p, L("Sources et remerciements : le fichier CREDITS.txt dans le dossier de l'addon."))
 
@@ -1291,7 +1845,7 @@ function BUILD.about(p)
     local bBug = S.Button(fb, L("Signaler un bug"), 0, 28, "secondary", function() if ns.WP.Feedback then ns.WP.Feedback("bug") end end)
     Add(p, fb, function(width)
         say:ClearAllPoints(); say:SetPoint("TOPLEFT", 0, 0)
-        local h = math.max(15, root.FitText(say, 0, width, fb))
+        local h = math.max(15, root.FitText(say, 0, math.min(width, NOTE_W), fb))
         bIdea:ClearAllPoints(); bIdea:SetPoint("TOPLEFT", 0, -(h + 12))
         bBug:ClearAllPoints(); bBug:SetPoint("LEFT", bIdea, "RIGHT", 8, 0)
         h = math.ceil(h + 12 + 28)
@@ -1301,13 +1855,12 @@ function BUILD.about(p)
     Register(p, fb, L("Une idée, un bug ?"), L("Proposer une idée") .. " " .. L("Signaler un bug"))
 
     Section(p, L("Commandes du chat"))
-    -- the same list as /wlh help, in the guide's language
-    Note(p, root.L and root.L.HELP or "/wlh", F.label, T.text)
+    -- the same list as /wlh help, in the guide's language: one cell per command (the command 12 fg
+    -- in a column of 132, what it does 12 muted beside it), 2 a line from 784 px (minW 380)
+    CommandTable(p, root.L and root.L.HELP or "/wlh")
 end
 
 -- ---------------------------------------------------------------- the window
-
-local win, body, current
 
 -- A module page's first card: the module's painted icon, its name, what it does and a button to
 -- open it; when it is switched off, a sentence that says so and the button that turns it back on.
@@ -1580,6 +2133,56 @@ Relayout = function(later)
     end
 end
 
+-- Every page (and the search results) at the content width of now. Home and Welcome follow it
+-- (their SetWidth); a page drawn elsewhere that does not (p.wlResizes) is built again at the new
+-- width, once the size has stopped changing.
+local rebuildTimer
+local function ApplyWidths()
+    if not body then return end
+    local function Stale(k, pg)
+        return k ~= "home" and k ~= "welcome" and pg.built and pg.builtW and pg.builtW ~= CONTENT_W
+            and not pg.wlResizes
+    end
+    local stale = false
+    for key, p in pairs(body.pages) do
+        p:SetWidth(CONTENT_W)
+        p.hubWidth = CONTENT_W
+        if key == "home" then
+            if ns.WP.HomePage and ns.WP.HomePage.SetWidth then ns.WP.HomePage.SetWidth(CONTENT_W) end
+        elseif key == "welcome" then
+            if ns.WP.WelcomePage and ns.WP.WelcomePage.SetWidth then ns.WP.WelcomePage.SetWidth(CONTENT_W) end
+        elseif Stale(key, p) then
+            stale = true
+        end
+    end
+    -- one timer for every stale page, each checked again when it fires
+    if stale then
+        if rebuildTimer and rebuildTimer.Cancel then rebuildTimer:Cancel() end
+        local function go()
+            rebuildTimer = nil
+            if not (body and RebuildPage) then return end
+            local keys = {}
+            for k, pg in pairs(body.pages) do if Stale(k, pg) then keys[#keys + 1] = k end end
+            for _, k in ipairs(keys) do RebuildPage(k) end
+        end
+        if C_Timer and C_Timer.NewTimer then rebuildTimer = C_Timer.NewTimer(0.25, go) else go() end
+    end
+    if body.results and body.results.child then body.results.child:SetWidth(CONTENT_W) end
+end
+
+-- The window got a new size (dragged, saved, a new screen): new widths, then the page shown laid
+-- out again (layout only, nothing rebuilt). widthsOnly: no layout (ShowPage lays out after).
+Resized = function(later, widthsOnly)
+    local oldW, oldH = WIN_W, WIN_H
+    Dims()
+    if WIN_W ~= oldW or not body or body.appliedW ~= CONTENT_W then
+        ApplyWidths()
+        if body then body.appliedW = CONTENT_W end
+    end
+    if widthsOnly then return end
+    if win and win:IsShown() and (WIN_W ~= oldW or WIN_H ~= oldH or later ~= nil) then Relayout(later) end
+end
+
 local function PlayerLine()
     local okN, n = pcall(UnitName, "player")
     local okL, lv = pcall(UnitLevel, "player")
@@ -1599,8 +2202,11 @@ end
 local function BuildWindow()
     Migrate()
     Dims()
+    -- the workspace tier (Writs/Style.lua S.MakeResizable): the rule's size or the saved one, the
+    -- grip, the bounds; OnResize lays the page shown out again at the new width (once a frame)
     win = S.Window("WLHelperHub", WIN_W, WIN_H, "WL Helper", PlayerLine(), WLWritsDB, "hubPos",
-        { header = HEADER_H, logo = true, minH = 520 })
+        { header = HEADER_H, logo = true, size = "workspace" })
+    win.OnResize = function() if Resized then Resized(false) end end
     -- "?": how do I...? (DESIGN 2.1: the info glyph), one click from every page
     if ns.WP.Help then
         -- the tip is read on hover: it follows a language change
@@ -1619,7 +2225,6 @@ end
 
 Rebuild = function()
     if not win then return end
-    needsRebuild = false
     local keep = current
     body:Hide()
     body:SetParent(nil)   -- the old frames stay orphaned; a language change is rare
@@ -1672,6 +2277,7 @@ ShowPage = function(key)
         if body.ClearSearch then body.ClearSearch() end
     end
     current = key
+    if Resized then Resized(nil, true) end   -- the size may have changed while hidden: widths only
     local p = body.pages[key]
     if not p.built and p.Build then p:Build() end
     for k, pg in pairs(body.pages) do pg:SetShown(k == key) end
@@ -2009,12 +2615,7 @@ end
 -- "bags", "upgrades", "orders", "guild", "groups", "general", "about"; Home by default, or the page it was on), built the first
 -- time. anchor: a section or a row label of that page (French key): scrolled to and flashed.
 function ns.WP.OpenHub(page, anchor)
-    if not win then BuildWindow()
-    elseif needsRebuild then
-        needsRebuild = false
-        local keep = current
-        body:Hide(); body:SetParent(nil); BuildBody(); current = keep
-    end
+    if not win then BuildWindow() end
     win.subtitle:SetText(PlayerLine())
     win:Show()
     ShowPage(page or current or "home")
@@ -2055,20 +2656,13 @@ function ns.WP.OpenOptions(pageKey)
     ns.WP.ShowOptionsPage(pageKey)
 end
 
--- A new screen size or UI scale: the Hub takes its new size (and its pages the new width).
+-- A new screen size or UI scale: Writs/Style.lua re-applies the size rule to every tiered window
+-- (0.25 s after the last event) and the window's OnResize lays the page out at the new width.
+-- Called directly too (the offline tests, a client that sends no OnSizeChanged).
 local function OnScreenChanged()
     if not win then return end
-    local w, h = HubW(), HubH()
-    if w == WIN_W and h == WIN_H then return end
-    local widthChanged = (w ~= WIN_W)
-    Dims()
-    win:SetSize(WIN_W, WIN_H)
-    if widthChanged then
-        -- hidden: rebuilt the next time it opens (a windowed client being resized sends many events)
-        if win:IsShown() then Rebuild() else needsRebuild = true end
-    else
-        Relayout()
-    end
+    if win.ApplySize then win:ApplySize() end
+    Resized()
 end
 ns.WP.HubScreenChanged = OnScreenChanged
 
@@ -2176,20 +2770,9 @@ end
 -- ---------------------------------------------------------------- login
 
 local ev = CreateFrame("Frame")
-local screenTimer
 pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
-pcall(ev.RegisterEvent, ev, "DISPLAY_SIZE_CHANGED")
-pcall(ev.RegisterEvent, ev, "UI_SCALE_CHANGED")
 ev:SetScript("OnEvent", function(self, event)
-    if event ~= "PLAYER_LOGIN" then
-        -- the new size is known on the next frame; a window being dragged to a new size sends many
-        -- events: one resize, a quarter of a second after the last one
-        if screenTimer then screenTimer:Cancel(); screenTimer = nil end
-        if C_Timer and C_Timer.NewTimer then
-            screenTimer = C_Timer.NewTimer(0.25, function() screenTimer = nil; OnScreenChanged() end)
-        elseif C_Timer and C_Timer.After then C_Timer.After(0, OnScreenChanged) else OnScreenChanged() end
-        return
-    end
+    if event ~= "PLAYER_LOGIN" then return end
     self:UnregisterEvent("PLAYER_LOGIN")
     Migrate()
     -- Main.lua shows the guide two seconds after login unless WLDTDB.hidden: clearing it here

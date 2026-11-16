@@ -567,15 +567,25 @@ function K.StateText(k, st)
 end
 
 -- ---------------------------------------------------------------- the passport window
--- 640 wide, sized to its content (DESIGN 3.2). The keys are a grid (T-55, T-56): two tiles of 296
--- a row, 16 apart (x = 0 and 312 in the content), 8 between two rows; the two tiles of a row take
--- the height of the taller one. Each section ("Pour entrer", "Raccourcis et portes") starts its
--- own rows.
-local W, PAD = 640, 16
+-- A workspace window (DESIGN 3.1): its size comes from the screen, the user can resize it, the
+-- content scrolls inside. The keys are a grid of tiles (ns.Grid, minW 280, up to 3 a line, 12
+-- apart); the tiles of a line take the height of the tallest. Each section ("Pour entrer",
+-- "Raccourcis et portes") starts its own lines.
+local W, PAD = 956, 16
 local CW = W - 2 * PAD
-local GAP, VGAP = 16, 8
-local TILE_W = math.floor((CW - GAP) / 2)
+local PASSPORT = { minW = 280, gap = 12, rowGap = 12, maxCols = 3, minPx = 200, equal = true }
+-- the guild tab: one ListRow per key, 2 or 3 a line (dense rows as a grid, minW 300)
+local GUILD_ROWS = { minW = 300, gap = 12, rowGap = 2, maxCols = 3, minPx = 200, equal = true }
 local win, sa, rows, heads, measure = nil, nil, {}, {}, nil
+local grid
+-- the content width, from the window's current width
+local function Dims()
+    local w = win and Num(win:GetWidth())
+    -- a width the game cannot give yet (or not a real one): the size rule's default
+    if not (w and w >= 320) then w = ns.WinSize and ns.WinSize("workspace") or W end
+    W = math.floor(w + 0.5)
+    CW = W - 2 * PAD
+end
 
 local function GuideTip(k)
     local mode = K.GuideMode(k)
@@ -604,12 +614,12 @@ local function RowTip(r)
     return t
 end
 
--- A key tile, TILE_W wide: icon 30 at (8, 8), the name 13, what it is for 11 muted, the status 11;
+-- A key tile, as wide as its grid cell: icon 30 at (8, 8), the name 13, what it is for 11 muted, the status 11;
 -- "Guide-moi" under the text, at the text's left edge. The whole tile is the click target.
 local function KeyRow(parent)
     local r = CreateFrame("Button", nil, parent)
     r.wlOwned = true
-    r:SetWidth(TILE_W)
+    r:SetWidth(280)
     r.bg = S.Solid(r, "BACKGROUND", C.cardFill); r.bg:SetAllPoints()
     r.hl = S.Solid(r, "BORDER", C.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
     S.Border(r, C.cardEdge)
@@ -645,10 +655,11 @@ local function KeyRow(parent)
         self.btn:SetShown(not have and K.GuideMode(k) ~= nil)
         if self.icon.SetDesaturated then pcall(self.icon.SetDesaturated, self.icon, not have and st.state ~= "prog") end
     end
-    -- measures the tile (its own height); the grid then gives the row's height with SetHeight
-    function r:Fit()
+    -- measures the tile at `width` (its cell; its own height); the grid then gives the line's height
+    function r:Fit(width)
+        width = width or Num(self:GetWidth()) or 280
         local x = 8 + 30 + 8
-        local tw = TILE_W - x - 12
+        local tw = width - x - 12
         local y = 8
         self.name:ClearAllPoints(); self.name:SetPoint("TOPLEFT", x, -y)
         y = y + S.FitText(self.name, 2, tw, self)
@@ -681,18 +692,15 @@ end
 local function Render()
     if not (win and win:IsShown()) then return end
     win.subtitle:SetText(Subtitle())
+    Dims()
+    grid = grid or ns.Grid()
     local y, i = 0, 0
     for s, sec in ipairs({ { true, L("Pour entrer") }, { false, L("Raccourcis et portes") } }) do
         local h = heads[s]
         h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -y); h:SetPoint("TOPRIGHT", sa.child, "TOPRIGHT", 0, -y)
         y = y + (Num(h:GetHeight()) or 32) + 8
-        -- the keys of this section, two a row: left, right, left...
-        local col, pair, rowH, any = 0, {}, 0, false
-        local function EndRow()
-            for _, t in ipairs(pair) do t:SetHeight(rowH) end
-            y = y + rowH + VGAP
-            col, pair, rowH, any = 0, {}, 0, true
-        end
+        -- the keys of this section, left to right, then the next line
+        grid:Begin(sa.child, 0, y, CW, PASSPORT)
         for _, key in ipairs(SHOW) do
             local k = BY[key]
             if k.need == sec[1] then
@@ -700,16 +708,11 @@ local function Render()
                 local r = rows[i]
                 if not r then r = KeyRow(sa.child); rows[i] = r end
                 r:Set(k); r:Show()
-                r:ClearAllPoints(); r:SetPoint("TOPLEFT", col * (TILE_W + GAP), -y)
-                rowH = math.max(rowH, r:Fit())
-                pair[#pair + 1] = r
-                col = col + 1
-                if col == 2 then EndRow() end
+                grid:Add(r, function(t, w) return t:Fit(w) end)
             end
         end
-        if col > 0 then EndRow() end
-        -- the last row's gap goes; a section without keys keeps the 8 under its header
-        if any then y = y - VGAP end
+        -- a section without keys keeps the 8 under its header
+        y = y + grid:End()
         if s == 1 then y = y + 16 end
     end
     for j = i + 1, #rows do rows[j]:Hide() end
@@ -720,8 +723,10 @@ end
 K.Render = Render
 
 local function Build()
-    win = S.Window("WLHelperKeys", W, 400, L("Passeport des clés"), nil, WLWritsDB, "keysPos",
-        { header = S.HEADER_H, minH = 200 })
+    win = S.Window("WLHelperKeys", W, 614, L("Passeport des clés"), nil, WLWritsDB, "keysPos",
+        { header = S.HEADER_H, minH = 200, size = "workspace" })
+    -- dragged or re-sized by a screen change: the tiles again at the new width
+    win.OnResize = function() Render() end
     -- who has which key in the guild: the Guild window's tab
     win:AddHeaderButton(S.IconButton(win.header, "group", 28,
         function() return { L("Qui a la clé dans la guilde ?"), L("Les membres qui ont WL Helper partagent leurs clés."), L("Clic : ouvrir l'onglet de la guilde") } end,
@@ -825,7 +830,9 @@ function K.RenderGuildTab(page, width, pad)
     local list = {}
     for _, key in ipairs(SHOW) do if BY[key].need then list[#list + 1] = BY[key] end end
     for _, key in ipairs(SHOW) do if not BY[key].need then list[#list + 1] = BY[key] end end
-    local listH = 0
+    -- the rows through a grid (2 or 3 a line); the names line takes the cell's width
+    gt.grid = gt.grid or ns.Grid()
+    gt.grid:Begin(gt.sa.child, 0, 0, cw, GUILD_ROWS)
     for i, k in ipairs(list) do
         local r = gt.rows[i]
         if not r then
@@ -833,16 +840,17 @@ function K.RenderGuildTab(page, width, pad)
             r.valueW = 32
             gt.rows[i] = r
         end
-        local h = Holders(k, roster)
-        local names = NamesLine(h.have, roster, cw - 8 - 30 - 8 - 12 - 32 - 8)
-        r:Set({ icon = K.Icon(k), name = K.Name(k) .. "  " .. S.Hex(C.muted) .. WhatText(k) .. "|r",
-            detail = names or L("Personne pour l'instant"), value = tostring(#h.have),
-            tip = GuildRowTip(k, h, roster) })
-        r:SetWidth(cw)
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -listH)
         r:Show()
-        listH = listH + r:Fit(cw) + 2
+        gt.grid:Add(r, function(row, w)
+            local h = Holders(k, roster)
+            local names = NamesLine(h.have, roster, w - 8 - 30 - 8 - 12 - 32 - 8)
+            row:Set({ icon = K.Icon(k), name = K.Name(k) .. "  " .. S.Hex(C.muted) .. WhatText(k) .. "|r",
+                detail = names or L("Personne pour l'instant"), value = tostring(#h.have),
+                tip = GuildRowTip(k, h, roster) })
+            return row:Fit(w)
+        end)
     end
+    local listH = gt.grid:End()
     for j = #list + 1, #gt.rows do gt.rows[j]:Hide() end
     gt.sa:ClearAllPoints()
     gt.sa:SetPoint("TOPLEFT", page, "TOPLEFT", pad, -y)
@@ -851,6 +859,8 @@ function K.RenderGuildTab(page, width, pad)
     gt.sa:SetContentHeight(listH)
     return y - 12 + listH
 end
+-- for the tests: the passport window, its scroll area, tiles and grid, and the guild tab
+function K.Parts() return win, sa, rows, grid, gt end
 function K.GuildTip()
     return { L("Qui a la clé ?"), L("Les clés des membres qui ont WL Helper, ceux en ligne d'abord."),
         L("Les membres qui ont WL Helper partagent leurs clés.") }

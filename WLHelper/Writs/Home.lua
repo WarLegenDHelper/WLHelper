@@ -3,10 +3,11 @@
 -- From the top: "Où veux-tu aller ?" (a search field on WP.GoTo: Enter guides you to the first place);
 -- "now", only what a line cannot do (start the Writs tour, an event about to start, the city tour,
 -- a nearly full log, a running GPS; hidden when nothing waits); a line when a newer version exists;
--- then each activity of WP.HUB_GROUPS with its windows, two lines a row (S.HubRow: icon, name, where
--- you stand; what the window does is in the tooltip; a dot when it has something to do now; a
--- right-click opens its settings); last, "Recharges" (WP.Cooldowns: each character's profession
--- cooldowns and the time left, ready in green; hidden when none is known). The lines never move. Opened by /wlh, a click on the minimap
+-- then each activity of WP.HUB_GROUPS with its windows, 2 lines a row, 3 on a wide window
+-- (ns.GRID.hubRows; S.HubRow: icon, name, where you stand; what the window does is in the tooltip;
+-- a dot when it has something to do now; a right-click opens its settings); last, "Recharges"
+-- (WP.Cooldowns: one card per character with its profession cooldowns and the time left, ready in
+-- green, 2 or 3 cards a line; hidden when none is known). The lines never move. Opened by /wlh, a click on the minimap
 -- button and the "<" of every window.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
@@ -170,6 +171,12 @@ ns.AddEnglish({
 
 local GAP = 12             -- between blocks (search, now, the activities)
 local ROW_GAP = 6          -- between two rows of lines
+-- the activity lines: ns.GRID.hubRows (280 at least, up to 3 a line: 2 at 668-724 px, 3 from 1112)
+-- with Home's 16 px gutter between the columns, as before the grid
+local function RowsGrid()
+    local g = root.GRID and root.GRID.hubRows or {}
+    return { minW = g.minW or 280, gap = 16, rowGap = ROW_GAP, maxCols = g.maxCols or 3, minPx = g.minPx or 200 }
+end
 local SEARCH_ROWS = 3
 
 local function Version()
@@ -255,6 +262,8 @@ local cards = {}         -- one HubRow per WP.HUB entry, by key
 local tiles = {}         -- the rows of the smaller tools (city, keys, shared, triage), same frames
 local heads = {}         -- one section title per activity, by group key
 local CW, COL_W = 628, 306
+local rowGrids = {}      -- one ns.Grid per activity, kept between layouts
+local cdGrid             -- the cooldown cards' ns.Grid
 
 local function Close() if WP.CloseHub then WP.CloseHub() elseif win then win:Hide() end end
 local function Visible() return win ~= nil and WP.HubShows ~= nil and WP.HubShows("home") end
@@ -372,7 +381,7 @@ end
 
 -- ---------------------------------------------------------------- "Où veux-tu aller ?"
 
-local Layout
+local Layout, LayoutCooldowns
 local searchRes = {}     -- the last search's results (WP.GoTo.Search), the first 3 shown
 local searchState        -- nil (fewer than 2 letters: nothing under the field), "list" or "none"
 local pending            -- the debounce timer
@@ -517,7 +526,7 @@ end
 -- ---------------------------------------------------------------- layout
 
 -- Stacks what is shown: the search at the top, "now", the update line, then each activity (its
--- title, then its lines two a row, left then right, in the registry's order: a line never moves).
+-- title, then its lines 2 or 3 a row, left to right, in the registry's order: a line never moves).
 Layout = function()
     if not (win and win.inner) then return end
     local inner = win.inner
@@ -581,20 +590,25 @@ Layout = function()
             if not first then y = y + GAP end
             first = false
             Place(head, 24); y = y + 24 + 8
-            for i, r in ipairs(rows) do
-                local left = (i % 2 == 1)
-                Place(r, 46, left and 0 or (COL_W + 16), COL_W)
-                if not left or i == #rows then y = y + 46 + ROW_GAP end
+            -- the lines in the registry's order, left to right then the next line (a line never
+            -- moves to another activity)
+            local grid = rowGrids[g.key] or root.Grid()
+            rowGrids[g.key] = grid
+            grid:Begin(inner, 16, 12 + y, CW, RowsGrid())
+            for _, r in ipairs(rows) do
+                grid:Add(r, function(f) f:SetHeight(46); return 46 end)
             end
-            y = y - ROW_GAP
+            local gh, _, colW = grid:End()
+            COL_W = colW
+            y = y + gh
         end
     end
-    -- profession cooldowns on every character
+    -- profession cooldowns on every character: one card per character, in the cards grid
     if win.cdHead and win.cdHead:IsShown() then
         if not first then y = y + GAP end
         first = false
         Place(win.cdHead, 24); y = y + 24 + 8
-        local h = win.cdH or 0
+        local h = LayoutCooldowns()
         Place(win.cdBox, math.max(1, h)); y = y + h
     end
     y = math.ceil(y + 12)
@@ -640,6 +654,8 @@ local function Build(p, width, hub)
     win = hub
     CW = math.floor((width or 660) - 32)
     COL_W = math.floor(((width or 660) - 32 - 16) / 2)
+    rowGrids, cdGrid = {}, nil
+    win.rowGrids = rowGrids
     win.scroll, win.inner = p.sa, p
     -- the Hub lays its pages out through p:Layout()
     function p:Layout() Layout(); return win.homeH end
@@ -690,7 +706,7 @@ local function Build(p, width, hub)
     win.cdHead:Hide()
     win.cdBox = CreateFrame("Frame", nil, win.inner)
     win.cdBox:Hide()
-    win.cdStack = root.TextStack(win.cdBox)
+    win.cdCards, win.cdGroups = {}, {}
     win.cdMeasure = S.Text(win.cdBox, 12, C.muted)   -- the fact labels' size, to line the times up
     win.cdMeasure:Hide()
     win.cdH = 0
@@ -746,41 +762,85 @@ local function Put(key, method, ...)
     if r then r[method](r, ...) end
 end
 
--- "Recharges": each character's cooldowns (WP.Cooldowns.Rows), yours first; a character's name
--- as the block heading, then one fact per cooldown, the time left or "Prête" in green.
+-- "Recharges": each character's cooldowns (WP.Cooldowns.Rows), yours first; one card per
+-- character (ns.GRID.cards: 2 a line at 668-724 px, 3 from 1112), its name as the card's heading,
+-- then one fact per cooldown, the time left or "Prête" in green. Every card uses the same label
+-- column, so the times line up across the cards of a line.
+local function CdCard(i)
+    win.cdCards = win.cdCards or {}
+    local c = win.cdCards[i]
+    if c then return c end
+    c = CreateFrame("Frame", nil, win.cdBox)
+    c.wlOwned = true
+    S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
+    S.Border(c, C.cardEdge)
+    c.stack = root.TextStack(c)
+    win.cdCards[i] = c
+    return c
+end
+
 local function RefreshCooldowns()
     if not (win and win.cdBox) then return end
     local CDm = WP.Cooldowns
     local ok, rows = false, nil
     if CDm and CDm.Rows then ok, rows = pcall(CDm.Rows) end
     rows = (ok and type(rows) == "table") and rows or {}
+    win.cdGroups = {}
     if #rows == 0 then
         win.cdHead:Hide(); win.cdBox:Hide(); win.cdH = 0
+        for _, c in ipairs(win.cdCards or {}) do c:Hide() end
         return
     end
-    local stk = win.cdStack
-    stk:Begin(0, 0, CW)
     -- one label column for every line, so the times line up
     local labelW = 0
     for _, r in ipairs(rows) do
         local w = root.TextWidth(win.cdMeasure, r.label)
         if type(w) == "number" and w > labelW then labelW = w end
     end
-    labelW = math.min(math.ceil(labelW) + 4, math.floor(CW * 0.6))
+    win.cdLabelW = math.ceil(labelW) + 4
     local myRealm = GetRealmName and GetRealmName() or ""
-    local last
+    local last, grp
     for _, r in ipairs(rows) do
         if r.key ~= last then
             last = r.key
             local who = r.name
             if r.realm ~= "" and r.realm ~= myRealm then who = who .. " - " .. r.realm end
-            stk:Heading(who)
+            grp = { who = who, facts = {} }
+            win.cdGroups[#win.cdGroups + 1] = grp
         end
         local ready = (r.left or 0) <= 0
-        stk:Fact(r.label, CDm.FormatLeft(r.left), { labelW = labelW, valueColor = ready and "ok" or nil })
+        grp.facts[#grp.facts + 1] = { r.label, CDm.FormatLeft(r.left), ready }
     end
-    win.cdH = math.ceil(stk:End())
+    for i = #win.cdGroups + 1, #(win.cdCards or {}) do win.cdCards[i]:Hide() end
     win.cdHead:Show(); win.cdBox:Show()
+end
+
+-- the cards at the width of now (Layout) -> the block's height
+LayoutCooldowns = function()
+    local groups = win.cdGroups or {}
+    cdGrid = cdGrid or root.Grid()
+    local go = root.GRID.cards
+    cdGrid:Begin(win.cdBox, 0, 0, CW, { minW = go.minW, gap = go.gap, rowGap = go.rowGap, maxCols = go.maxCols,
+        minPx = go.minPx, equal = true })
+    local _, colW = root.Cols(CW, go.minW, go.gap, go.maxCols, go.minPx)
+    local labelW = math.min(win.cdLabelW or 0, math.floor((colW - 24) * 0.6))
+    for i, grp in ipairs(groups) do
+        local c = CdCard(i)
+        c:Show()
+        cdGrid:Add(c, function(f, w)
+            local stk = f.stack
+            stk:Begin(12, 12, w - 24)
+            stk:Heading(grp.who)
+            for _, ft in ipairs(grp.facts) do
+                stk:Fact(ft[1], ft[2], { labelW = labelW, valueColor = ft[3] and "ok" or nil })
+            end
+            return math.ceil(12 + stk:End() + 12)
+        end)
+    end
+    local h = math.ceil(cdGrid:End())
+    win.cdH = h
+    win.cdGrid = cdGrid
+    return h
 end
 
 local function Refresh()
@@ -1045,6 +1105,11 @@ WP.HomePage = {
         Refresh()
     end,
     Layout = function() Layout() end,
+    -- the Hub's content column got a new width (the window was resized): used by the next Layout
+    SetWidth = function(width)
+        CW = math.floor((width or 660) - 32)
+        COL_W = math.floor((CW - 16) / 2)
+    end,
 }
 
 -- Redraws Home's states, only while Home is on screen (never for a hidden page).

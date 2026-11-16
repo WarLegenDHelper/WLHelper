@@ -437,17 +437,25 @@ local function Destroy()
 end
 
 -- ---------------------------------------------------------------- window
--- Sacs (Bags), 420 wide: one sentence, the list grouped by risk under section headers, the step in
+-- Sacs (Bags), a panel (576 to 860 wide from the screen, the player can drag it): one sentence, the list grouped by risk under section headers, the step in
 -- progress as a banner, and the one action. The window fits its content (scrolls past 80 % of the
 -- screen height).
 
-local W, INSET = 420, 16
-local LIST_W = W - 2 * INSET
+local INSET = 16
+local LIST_W = 614 - 2 * INSET   -- the list width, read again by Dims() at every layout
 local rows = {}
 local heads = {}            -- section headers, pooled
 local RANK_TITLE = { "Sans risque", "À vérifier", "À détruire toi-même" }
 
 local function num(v) return type(v) == "number" and not (root.IsSecret and root.IsSecret(v)) and v or nil end
+
+-- The list width from the window (not sized yet: the panel rule's default).
+local function Dims()
+    local w = win and num(win:GetWidth())
+    if not w or w < 300 then w = (root.WinSize and root.WinSize("panel")) or 614 end
+    LIST_W = math.floor(w) - 2 * INSET
+    return LIST_W
+end
 
 -- The entry Destroy picks up next: the first checked one.
 local function FirstChecked()
@@ -560,6 +568,7 @@ Refresh = function(rescan)
     -- the item left the cursor (destroyed, put back): the step is over
     local kind = GetCursorInfo and GetCursorInfo()
     if kind ~= "item" and win.step then win.step:Hide() end
+    Dims()
     local count = { 0, 0, 0 }
     for _, e in ipairs(entries) do count[rank(e)] = count[rank(e)] + 1 end
     local child = win.list.child
@@ -597,8 +606,10 @@ Refresh = function(rescan)
 end
 
 local function Build()
-    win = S.Window("WLHelperCleaner", W, 300, L("Sacs"), L("Objets de quête qui ne servent plus"), WLWritsDB, "cleanerPos",
-        { header = S.HEADER_H, minH = 160 })
+    win = S.Window("WLHelperCleaner", (root.WinSize("panel")) or 614, 300, L("Sacs"), L("Objets de quête qui ne servent plus"), WLWritsDB, "cleanerPos",
+        { header = S.HEADER_H, minH = 160, size = "panel" })
+    -- dragged to a new width: the same entries laid out again (no new scan unless the bags changed)
+    win.OnResize = function() Refresh(false) end
     local top = win:ContentTop() + 12
 
     win.intro = S.Text(win, S.F.body, C.text)

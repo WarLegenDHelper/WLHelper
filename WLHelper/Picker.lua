@@ -1,37 +1,52 @@
 -- Choisir les donjons : cartes avec image, niveau, progression ; plusieurs donjons = une route.
--- Built with the design system (docs/DESIGN.md): header 44, tabs, a 640 px window that fits its
--- cards, a footer with the one main action.
+-- Built with the design system (docs/DESIGN.md): header 44, tabs, a workspace window (3.1: its size
+-- from the screen, resizable, the size kept; the cards scroll inside), a footer with the one main
+-- action.
 local ADDON, ns = ...
 local L, T = ns.L, ns.T_
 local Text, Tex, Hex = ns.Text, ns.Tex, ns.Hex
 
 local p, qp
--- two columns of picture cards inside a 640 window (inset 16, 12 between cards)
--- 3 or 4 columns of cards as the screen allows (2 on a very small one): less scrolling. The width
--- follows the screen (80 % of it, 640 to 1000 px), the cards keep at least MIN_CW of width.
+-- 2 to 4 columns of picture cards (inset 16, 12 between cards) as the window allows: less
+-- scrolling. The window has the workspace size (ns.WinSize: 70 % of the screen, 900 to 1400 units)
+-- or the size the player dragged it to; the cards keep at least MIN_CW of width (ns.Cols).
 -- UIParent's width is in UI units: a small UI scale makes it larger, so the columns are also held
--- to MIN_PX real screen pixels per card (at UI scale 0.64 on 1920 px: 3 columns, not 4 of 146 px).
+-- to MIN_PX real screen pixels per card (at UI scale 0.64: 4 cards of 146 px become 3).
 local PAD, GAP, MIN_CW, MIN_PX = 16, 12, 220, 200
-local PW, COLS, CW = 640, 2, 298
+local PW, COLS, CW = 956, 4, 222
 local SMALL = false     -- UI scale under 0.8: the small muted lines of a card go up to 12
+local function snum(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) and v or nil end
 local function EffScale()
   local ok, e = pcall(function() return UIParent:GetEffectiveScale() end)
   if not ok or type(e) ~= "number" or (issecretvalue and issecretvalue(e)) or e <= 0 then return 1 end
   return e
 end
+-- A tiered window's size now: what it was given (the rule or the player's drag), or the rule's
+-- default while the frame cannot tell (not laid out yet).
+local function WinSize(win, tier)
+  local defW, defH, minW, minH
+  if win and win.SizeRule then defW, defH, minW, minH = win:SizeRule()
+  elseif ns.WinSize then defW, defH, minW, minH = ns.WinSize(tier) end
+  defW, minW = defW or 900, minW or 0
+  local w = win and snum(win:GetWidth())
+  if not w or w < minW - 1 then w = defW end
+  local h = win and snum(win:GetHeight())
+  if minH and (not h or h < minH - 1) then h = defH end
+  return math.floor(w), h and math.floor(h) or nil
+end
 local function Dims()
-  local sw = (UIParent and UIParent.GetWidth and tonumber(UIParent:GetWidth())) or 1024
-  if issecretvalue and issecretvalue(sw) then sw = 1024 end
   local eff = EffScale()
-  local w = math.max(640, math.min(1000, math.floor(sw * 0.80)))
-  local cols = math.max(2, math.min(4, math.floor((w - 2 * PAD + GAP) / (MIN_CW + GAP))))
-  local function cwOf(n) return math.floor((w - 2 * PAD - (n - 1) * GAP) / n) end
-  while cols > 2 and cwOf(cols) * eff < MIN_PX do cols = cols - 1 end
-  PW, COLS = w, cols
-  CW = cwOf(COLS)
+  PW = WinSize(p, "workspace")
+  local cw = PW - 2 * PAD
+  local n, colW = 2, math.floor((cw - GAP) / 2)
+  if ns.Cols then n, colW = ns.Cols(cw, MIN_CW, GAP, 4, MIN_PX) end
+  -- 2 columns at least, as before (a very small window or UI scale)
+  if n < 2 then n, colW = 2, math.floor((cw - GAP) / 2) end
+  COLS, CW = n, colW
   SMALL = eff < 0.8
 end
 Dims()
+ns.PickerDims = function() Dims(); return PW, COLS, CW end   -- for the offline tests
 -- Card height: at least CH_MIN; every render takes the tallest card's need (2-line name on top,
 -- the level line, the quests stat and its prerequisite line at the bottom), so a row stays even
 -- and nothing is cut, in French as in English, down to MIN_CW.
@@ -421,7 +436,7 @@ local function Build()
   p = CreateFrame("Frame", "WLDTPicker", UIParent)
   p.wlOwned = true
   Dims()
-  p:SetSize(PW, 400); p:SetPoint("CENTER"); p:SetFrameStrata("HIGH")
+  p:SetSize(PW, 600); p:SetPoint("CENTER"); p:SetFrameStrata("HIGH")
   p:SetMovable(true); p:EnableMouse(true); p:SetClampedToScreen(true); p:SetToplevel(true)
   ns.Flat(p, T.bg, T.cardEdge)
   p:SetScript("OnMouseDown", function(self) self:Raise() end)
@@ -508,6 +523,11 @@ local function Build()
   ns.ClampLabel(p.selText, nil, p.foot)
   tinsert(UISpecialFrames, "WLDTPicker")
   if ns.RegisterWindow then ns.RegisterWindow(p) end
+  -- the workspace size rule (DESIGN 3.1): size from the screen, a grip, the size kept
+  if S.MakeResizable then
+    S.MakeResizable(p, "workspace", WLDTDB, "pick")
+    p.OnResize = function() Render() end
+  end
   p:Hide()
 end
 
@@ -602,9 +622,8 @@ Render = function()
   end
   p.tabBar:Update()
   p.filter:Update()
-  -- the screen may have changed since last time: width, columns and card size follow it
+  -- the window's width (the screen's rule or the player's drag): columns and card size follow it
   Dims()
-  if p.GetWidth and p:GetWidth() ~= PW then p:SetWidth(PW) end
   for _, c in ipairs(p.cards or {}) do c:SetWidth(CW) end
   local contentW = PW - 2 * PAD
   if searching then p.hint:SetText(L.PICK_HINT_SEARCH:format(p.query))
@@ -666,20 +685,16 @@ Render = function()
     y = 24 + eh + 24
   else p.empty:Hide() end
   local gridH = math.max(10, y)
-  -- the window fits the cards, up to 80 % of the screen; the grid scrolls past that
+  -- a workspace window keeps its height (DESIGN 0.4): the grid scrolls inside, the footer at the bottom
   local footH = 12 + 32 + PAD
-  local cap = math.max(160, ScreenCap() - top - footH)
-  local viewH = math.min(gridH, cap)
+  local _, winH = WinSize(p, "workspace")
+  local viewH = math.max(160, (winH or ScreenCap()) - top - footH)
   p.sa:ClearAllPoints()
   p.sa:SetPoint("TOPLEFT", PAD, -top); p.sa:SetPoint("TOPRIGHT", -PAD, -top); p.sa:SetHeight(viewH)
   p.grid:SetWidth(contentW)
   p.sa:SetContentHeight(gridH)
   p.foot:ClearAllPoints()
   p.foot:SetPoint("TOPLEFT", p.sa, "BOTTOMLEFT", 0, -12); p.foot:SetPoint("TOPRIGHT", p.sa, "BOTTOMRIGHT", 0, -12)
-  -- keep the top edge where it is: the window grows downward
-  local l, t = num(p:GetLeft()), num(p:GetTop())
-  if l and t and p:GetPoint() ~= "TOPLEFT" then p:ClearAllPoints(); p:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t) end
-  p:SetHeight(top + viewH + footH)
 
   local nSel = SelCount()
   p.selText:SetText(nSel == 0 and L.PICK_SEL0 or ns.Plural(nSel, "PICK_SEL1", "PICK_SEL", nSel))
@@ -713,11 +728,17 @@ function ns.HidePicker() if p then p:Hide() end end
 -- =====================================================================
 --  Choix des quêtes d'un donjon : une liste à cocher (cases dessinées, coche HD)
 -- =====================================================================
-local QROWS, QH, QW = 22, 28, 420
+-- A panel window (DESIGN 3.1: its width from the screen, the width can be dragged and is kept, the
+-- height fits the list). QW and QTXT_W follow its width at every render.
+local QROWS, QH, QW = 22, 28, 560
 local QSTATUS = 130                       -- the status column ("Prerequisites done" at 11 px fits)
 local QLV_W = 40                          -- the level column, with its unit ("niv. 30")
 local QTXT_X = 32 + QLV_W + 4
 local QTXT_W = (QW - 16) - QTXT_X - 8 - QSTATUS - 8   -- the quest name: up to the status column
+local function QDims()
+  QW = WinSize(qp, "panel")
+  QTXT_W = (QW - 16) - QTXT_X - 8 - QSTATUS - 8
+end
 local function BuildQuests()
   local S = SW()
   qp = CreateFrame("Frame", "WLDTQuestPicker", UIParent)
@@ -802,6 +823,11 @@ local function BuildQuests()
   end
   tinsert(UISpecialFrames, "WLDTQuestPicker")
   if ns.RegisterWindow then ns.RegisterWindow(qp) end
+  if S.MakeResizable then
+    qp.minH = 120
+    S.MakeResizable(qp, "panel", WLDTDB, "pickQuests")
+    qp.OnResize = function() if qp.dkey then ns.OpenQuests(qp.dkey, true) end end
+  end
   qp:Hide()
 end
 
@@ -810,6 +836,7 @@ function ns.OpenQuests(dkey, keep)
   local _, cls = UnitClass("player")
   qp.dkey = dkey
   qp.title:SetText(L.PICK_CUSTOM_T:format(ns.DName(dkey))); qp.hint:SetText(L.PICK_CUSTOM_H)
+  QDims()
   local hintH = ns.FitText(qp.hint, 0, QW - 2 * PAD, qp)
   local top = HEADER + 1 + 12 + hintH + 8
   local qs = ns.DungeonQuests(dkey, cls)
@@ -841,6 +868,7 @@ function ns.OpenQuests(dkey, keep)
       row.boxEdge(on and T.accent or T.btnEdge)
       local tc = on and T.fg or T.muted
       row.txt:SetTextColor(tc[1], tc[2], tc[3])
+      row.txt:SetWidth(QTXT_W)
       local th = ns.FitText(row.txt, 2, QTXT_W, row)
       local rh = math.max(QH, math.ceil(th) + 12)
       row:SetHeight(rh)

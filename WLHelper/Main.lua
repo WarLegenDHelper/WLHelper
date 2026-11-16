@@ -79,7 +79,8 @@ function ns.Assemble(recalc, order, byKey)
       local moved = false
       for idx, n in ipairs(pending) do
         local ok = true
-        for _, d in ipairs(n.deps) do if inRoute[d] and not placed[d] then ok = false break end end
+        -- a done step never has to come first (a loot done outside before its turn-in)
+        for _, d in ipairs(n.deps) do if inRoute[d] and not placed[d] and not (d.ins and ns.NodeOK(log, d)) then ok = false break end end
         if ok then table.insert(order, n); placed[n] = true; table.remove(pending, idx); moved = true; break end
       end
       if not moved then for _, n in ipairs(pending) do table.insert(order, n) end break end
@@ -142,12 +143,33 @@ local function Replan()
   local viewKey = seen0 and seen0.key
   local order, byKey = ns.BuildRoute(db.sel, ns.PlayerWorld())
   local log = ns.LogEntries()
-  local new, seen = {}, {}
+  local new, seen, held = {}, {}, {}
   for _, k in ipairs(db.order or {}) do
     local n = byKey and byKey[k]
-    if n and ns.NodeOK(log, n) and not seen[n] then new[#new + 1] = n; seen[n] = true end
+    if n and ns.NodeOK(log, n) and not seen[n] then
+      seen[n] = true
+      -- a done line inside a dungeon waits for that dungeon's next visit: alone at the top it
+      -- would open a visit of its own (entrance + every boss) before the steps outside
+      if n.ins then held[n.ins] = held[n.ins] or {}; table.insert(held[n.ins], n); held[n] = true
+      else new[#new + 1] = n end
+    end
   end
-  for _, n in ipairs(order) do if not seen[n] then new[#new + 1] = n; seen[n] = true end end
+  for _, n in ipairs(order) do
+    if not seen[n] then
+      local h = n.ins and held[n.ins]
+      if h then for _, x in ipairs(h) do new[#new + 1] = x end; held[n.ins] = nil end
+      new[#new + 1] = n; seen[n] = true
+    end
+  end
+  -- nothing left in that dungeon: its done lines stay at the top, as before
+  local top = {}
+  for _, k in ipairs(db.order or {}) do
+    local n = byKey and byKey[k]
+    -- only the lines still held (a key twice in the saved order, or an open line dropped from
+    -- the route, is never put back on top)
+    if n and n.ins and held[n.ins] and held[n] then top[#top + 1] = n; held[n] = nil end
+  end
+  for j = #top, 1, -1 do table.insert(new, 1, top[j]) end
   db.order = {}
   for _, n in ipairs(new) do db.order[#db.order + 1] = n.key end
   ns.Assemble(false, order, byKey)
@@ -179,6 +201,14 @@ function ns.Recalc()
   f.auto, f.view, f.sig = nil, nil, nil
   ns.Refresh(true)
   if ns.route then ns.Print(L.ROUTE_BUILT:format(#ns.route.steps, ns.route.label)) end
+end
+
+-- "Start the route over" (/wlh reset, the guide's Actions menu and the foot of the step list):
+-- the steps ticked by hand and the saved order are forgotten, the route is built from the start
+function ns.ResetRoute()
+  WLDTDB.manual = {}; WLDTDB.order = nil
+  ns.Recalc()
+  ns.Print(L.RESET)
 end
 
 -- =====================================================================
@@ -680,7 +710,7 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "minimap" then WLDTDB.hideMinimap = not WLDTDB.hideMinimap; if WLDTMinimapButton then WLDTMinimapButton:SetShown(not WLDTDB.hideMinimap) end
   elseif cmd == "all" or cmd == "tout" then WLDTDB.useful = (WLDTDB.useful == false); ns.Print(WLDTDB.useful and L.USEFUL_ON or L.USEFUL_OFF); ns.Recalc(); if ns.RenderPicker then ns.RenderPicker() end
   elseif cmd == "macro" then WLDTDB.macro = (WLDTDB.macro == false); ns.Print(WLDTDB.macro and L.MACRO_ON or L.MACRO_OFF); ns.UpdateMacro()
-  elseif cmd == "reset" then WLDTDB.manual = {}; WLDTDB.order = nil; ns.Recalc(); ns.Print(L.RESET)
+  elseif cmd == "reset" then ns.ResetRoute()
   elseif cmd == "help" or cmd == "aide" or cmd == "?" then
     ns.Print("WL Helper v" .. (ns.VERSION or "?"))
     for line in L.HELP:gmatch("[^\n]+") do print("   " .. line) end
@@ -702,11 +732,23 @@ BINDING_NAME_WLDT_PREV = ns.L.B_PREV
 BINDING_NAME_WLDT_POINTS = ns.L.B_POINTS
 BINDING_NAME_WLDT_ARROW = ns.L.B_ARROW
 BINDING_NAME_WLDT_TARGET = ns.L.B_TARGET
+BINDING_NAME_WLDT_ITEM = ns.L.B_ITEM
 function WLDT_Binding(what)
   -- the key bound to WLDT_TARGET clicks WLDTTargetButton through an override binding; this runs
   -- only while the override waits for the end of combat
   if what == "target" then
     if InCombatLockdown and InCombatLockdown() then ns.Print(L.TARGET_LATER) else ns.ApplyTargetBinding() end
+    return
+  end
+  -- the key bound to WLDT_ITEM clicks the action bar's first quest item button (UI.lua, override
+  -- binding set out of combat); this runs only while the step has no item or the bar waits
+  if what == "item" then
+    if InCombatLockdown and InCombatLockdown() then
+      ns.Print((ns.ActionBarPending and ns.ActionBarPending()) and L.ITEM_LATER or L.ITEM_NONE)
+    else
+      if ns.UpdateActionBar then ns.UpdateActionBar() end
+      if not (ns.ItemBindingButton and ns.ItemBindingButton()) then ns.Print(L.ITEM_NONE) end
+    end
     return
   end
   if not ns.frame then return end
@@ -716,6 +758,32 @@ function WLDT_Binding(what)
   elseif what == "prev" then ns.GoTo((ns.frame.view or 1) - 1)
   elseif what == "points" then ns.PlacePoints()
   elseif what == "arrow" then ns.ToggleArrow(); ns.Render() end
+end
+
+-- The game's key bindings (Actions menu, right-click on a bar button with no key): the Settings
+-- key bindings page on this client, else the old KeyBindingFrame; the path in the chat either way
+-- (neither scrolls to the AddOns section). Never in combat.
+function ns.OpenKeyBindings()
+  if InCombatLockdown and InCombatLockdown() then ns.Print(L.KEYS_COMBAT) return false end
+  local opened = false
+  local S = rawget(_G, "Settings")
+  if type(S) == "table" and type(S.OpenToCategory) == "function" and S.KEYBINDINGS_CATEGORY_ID ~= nil then
+    opened = pcall(S.OpenToCategory, S.KEYBINDINGS_CATEGORY_ID) and true or false
+    local P = rawget(_G, "SettingsPanel")
+    if opened and P and P.IsShown then opened = P:IsShown() and true or false end
+  end
+  if not opened then
+    if not rawget(_G, "KeyBindingFrame") and type(rawget(_G, "KeyBindingFrame_LoadUI")) == "function" then
+      pcall(KeyBindingFrame_LoadUI)
+    end
+    local K = rawget(_G, "KeyBindingFrame")
+    if K and type(ShowUIPanel) == "function" then
+      opened = pcall(ShowUIPanel, K) and true or false
+      if opened and K.IsShown then opened = K:IsShown() and true or false end
+    end
+  end
+  ns.Print(opened and L.KEYS_OPENED or L.KEYS_HINT)
+  return opened
 end
 
 -- =====================================================================
@@ -780,6 +848,8 @@ do
     if busy then return end
     if e == "PLAYER_LOGIN" then Ensure() end
     ns.ApplyTargetBinding()
+    -- the bar's item key and its buttons' right-click follow the bindings too (UI.lua)
+    if e == "UPDATE_BINDINGS" and ns.RefreshActionKeys then ns.RefreshActionKeys() end
   end)
 end
 

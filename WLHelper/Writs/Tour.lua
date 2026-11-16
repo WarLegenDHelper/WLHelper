@@ -538,14 +538,22 @@ local function Relayout()
     end
 end
 
--- One line of the checklist: a check (or an empty ring), the title (13 fg) and its sentence (11
--- muted), the button that opens the place, and "C'est fait" (or "Décocher") as a ghost.
+-- One thing to set, as a card of the activity's grid (ns.GRID.cards: 2 a line at 668-724 px, 3
+-- from 1112): a check (or an empty ring) and the title (13 fg), its sentence (12 muted, 2 lines at
+-- most, the full text in the card's tooltip when cut), then on a line under the text the button that
+-- opens the place and "C'est fait" (or "Décocher") as a ghost.
+local TEXT_LINES = 2
 local function ItemRow(parent, e)
     local r = CreateFrame("Frame", nil, parent)
     r.wlOwned = true
     r.entry = e
+    S.Solid(r, "BACKGROUND", C.cardFill):SetAllPoints()
+    S.Border(r, C.cardEdge)
     r.mark = root.Icon(r, "ring", 16, "ARTWORK", C.muted)
-    r.stack = root.TextStack(r)
+    r.title = S.Text(r, F.body, C.fg)
+    r.title:SetJustifyH("LEFT"); r.title:SetJustifyV("TOP")
+    r.text = S.Text(r, F.label, C.muted)
+    r.text:SetJustifyH("LEFT"); r.text:SetJustifyV("TOP")
     r.go = S.Button(r, L(e.button), 0, 24, "secondary", function() if r.entry.open then r.entry.open() end end,
         { L(e.button), L("Clic : ouvrir et montrer où régler") })
     r.tick = S.Button(r, L("C'est fait"), 0, 24, "ghost", function()
@@ -556,49 +564,56 @@ local function ItemRow(parent, e)
         if r.entry.ticked then return { L("Décocher"), L("Clic : remettre cette étape à faire") } end
         return { L("C'est fait"), L("Clic : cocher cette étape") }
     end)
-    r.rule = S.Rule(r)
-    r.rule:SetPoint("TOPLEFT", 16, 0); r.rule:SetPoint("TOPRIGHT", -16, 0)
-    function r:Fit(width, first)
+    -- the whole sentence (it may be cut at 2 lines)
+    r:EnableMouse(true)
+    r:SetScript("OnEnter", function(self)
         local en = self.entry
-        self.rule:SetShown(not first)
+        S.Tip(self, { L(en.title), L(en.text) })
+    end)
+    r:SetScript("OnLeave", S.HideTip)
+    function r:Fit(width)
+        local en = self.entry
         if en.isDone then root.SetHDIcon(self.mark, "check", C.ok) else root.SetHDIcon(self.mark, "ring", C.muted) end
         -- the tick: "C'est fait" while to do, "Décocher" when ticked by hand, nothing when the
         -- settings already say it is set
         self.tick:SetShown(not en.auto)
         self.tick:SetText(en.ticked and L("Décocher") or L("C'est fait"))
-        local okG, gw = pcall(self.go.GetWidth, self.go)
-        gw = (okG and num(gw)) or 96
-        local okT, tw = pcall(self.tick.GetWidth, self.tick)
-        tw = en.auto and 0 or ((okT and num(tw)) or 72)
-        local x = 16 + 16 + 12
-        local textW = math.max(120, width - x - 16 - gw - (tw > 0 and (tw + 4) or 0) - 12)
-        local stk = self.stack
-        stk:Begin(x, 12, textW)
-        stk:Body(L(en.title), en.isDone and "muted" or "fg")
-        stk:Muted(L(en.text))
-        local th = stk:End()
-        local h = math.max(48, math.ceil(12 + th + 12))
-        self.mark:ClearAllPoints(); self.mark:SetPoint("TOPLEFT", 16, -13)
-        self.go:ClearAllPoints(); self.go:SetPoint("RIGHT", self, "RIGHT", -16, 0)
-        self.tick:ClearAllPoints(); self.tick:SetPoint("RIGHT", self.go, "LEFT", -4, 0)
+        local tc = en.isDone and C.muted or C.fg
+        self.title:SetTextColor(tc[1], tc[2], tc[3])
+        self.title:SetText(L(en.title))
+        self.text:SetText(L(en.text))
+        local x = 12 + 16 + 8
+        local textW = math.max(80, width - x - 12)
+        self.mark:ClearAllPoints(); self.mark:SetPoint("TOPLEFT", 12, -13)
+        self.title:ClearAllPoints(); self.title:SetPoint("TOPLEFT", x, -12)
+        local th = math.max(15, root.FitText(self.title, 2, textW, self))
+        self.text:ClearAllPoints(); self.text:SetPoint("TOPLEFT", x, -(12 + th + 4))
+        if self.text.SetMaxLines then self.text:SetMaxLines(TEXT_LINES) end
+        self.text:SetWidth(textW)
+        self.text:SetWordWrap(true)
+        local tx = math.max(14, root.FitText(self.text, TEXT_LINES, textW, self))
+        local by = 12 + th + 4 + tx + 10
+        self.go:ClearAllPoints(); self.go:SetPoint("TOPLEFT", self, "TOPLEFT", x, -by)
+        self.tick:ClearAllPoints(); self.tick:SetPoint("LEFT", self.go, "RIGHT", 4, 0)
+        local h = math.ceil(by + 24 + 12)
         self:SetHeight(h)
         return h
     end
     return r
 end
 
--- an activity: its section header ("n/m", the "Visiter" link) and a card of its lines
+-- an activity: its section header ("n/m", the "Visiter" link), then its cards in a grid
 local function Group(def)
-    local g = { def = def, rows = {} }
-    g.head = S.SectionHeader(page, L(def.label), nil, L("Visiter"), function() Tour.Start(def.key) end)
+    local g = { def = def, rows = {}, grid = root.Grid() }
+    -- a tight header (24 + 8): five activities on a page that should not scroll much
+    g.head = S.SectionHeader(page, L(def.label), nil, L("Visiter"), function() Tour.Start(def.key) end, { tight = true })
     if g.head.link then
         g.head.link:SetScript("OnEnter", function(self) S.Tip(self, { L("Visiter"), L("Clic : la visite de cette activité") }) end)
         g.head.link:SetScript("OnLeave", S.HideTip)
     end
+    -- the frame the cards sit in (no fill of its own: each thing is its own card)
     g.card = CreateFrame("Frame", nil, page)
     g.card.wlOwned = true
-    S.Solid(g.card, "BACKGROUND", C.cardFill):SetAllPoints()
-    S.Border(g.card, C.cardEdge)
     return g
 end
 
@@ -629,7 +644,7 @@ local function Layout()
     -- the progress, the tour
     local n, total = WP.WelcomeProgress()
     local stk = intro.stack
-    stk:Begin(16, 16, CW - 32)
+    stk:Begin(16, 16, math.min(CW - 32, 480))   -- a running sentence: 480 at most (4.2)
     stk:Stat(L("Ta mise en route"), n, total, { sub = (total > 0 and n >= total)
         and L("Tout est réglé. La visite reste là si tu veux revoir où est chaque chose.")
         or L("Dans l'ordre que tu veux. Une étape se coche toute seule quand c'est réglé, ou avec « C'est fait ».") })
@@ -652,21 +667,23 @@ local function Layout()
             g.head:Set(L(def.label), done .. "/" .. #items)
             if g.head.link then g.head.link:SetShown(Tour.HasGroup(def.key)) end
             g.head:Show(); g.card:Show()
-            y = y + 16
-            Put(g.head, 32)
+            y = y + 12
+            Put(g.head, 24)
             y = y + 8
-            local seen, ch = {}, 0
-            for i, e in ipairs(items) do
+            local seen = {}
+            local go = root.GRID.cards
+            g.grid:Begin(g.card, 0, 0, CW, { minW = go.minW, gap = go.gap, rowGap = go.rowGap, maxCols = go.maxCols,
+                minPx = go.minPx, equal = true })
+            for _, e in ipairs(items) do
                 local r = g.rows[e.key]
                 if not r then r = ItemRow(g.card, e); g.rows[e.key] = r end
                 r.entry = e
                 seen[e.key] = true
-                r:ClearAllPoints(); r:SetPoint("TOPLEFT", g.card, "TOPLEFT", 0, -ch); r:SetWidth(CW)
-                ch = ch + r:Fit(CW, i == 1)
                 r:Show()
+                g.grid:Add(r, function(f, w) return f:Fit(w) end)
             end
             for k, r in pairs(g.rows) do if not seen[k] then r:Hide() end end
-            Put(g.card, ch)
+            Put(g.card, math.max(1, math.ceil(g.grid:End())))
         end
     end
     y = math.ceil(y + 16)
@@ -681,12 +698,15 @@ WP.WelcomePage = {
         page = p
         CW = math.floor((width or 660) - 32)
         groups = {}
+        p.welcomeGroups = groups
         intro = BuildIntro()
         -- the Hub lays the page out each time it shows (Relayout): the checks are read again then
         function p:Layout() return Layout() end
         Layout()
     end,
     Layout = function() return Layout() end,
+    -- the Hub's content column got a new width (the window was resized): used by the next Layout
+    SetWidth = function(width) CW = math.floor((width or 660) - 32) end,
 }
 
 -- Redraws the page while it is on screen (after the tour, a tick elsewhere)

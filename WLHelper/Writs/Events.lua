@@ -53,6 +53,7 @@ ns.AddEnglish({
     ["Personne d'autre n'est inscrit pour l'instant."] = "Nobody else has signed up yet.",
     ["Annuler l'événement"] = "Cancel event",
     ["Confirmer l'annulation"] = "Confirm cancel",
+    ["De 30 min avant à 30 min après le début."] = "30 min before to 30 min after the start.",
     ["Annulé"] = "Cancelled",
     ["Organisateur"] = "Organizer",
     ["Inscrit"] = "Signed up",
@@ -750,20 +751,17 @@ local function LoginRecap()
 end
 
 -- ---------------------------------------------------------------- the window
--- "Groupes" / "LFG": 640 wide, sized to its content (f:FitHeight); lists scroll inside the window
--- only once it reached 80 % of the screen. Three tabs: Agenda, Create, Group now.
--- Agenda (T-55 V4): the events on the left (240), a 1 px rule at x = 272, the chosen event on the
--- right (336): 16 + 240 + 16 + 1 + 15 + 336 + 16 = 640. Create and Group now stay one column, their
--- fields and sentences 480 wide at most (DESIGN 4.2).
-local W, PAD = 640, 16
-local CW = W - 2 * PAD          -- content width
-local FW = 480                  -- form width (Create, Group now)
-local LIST_W, DW = 240, 336     -- Agenda: the list, the detail
-local RULE_X = PAD + LIST_W + 16
-local DET_X = RULE_X + 1 + 15
+-- "Groupes" / "LFG": a workspace window (DESIGN 3.1: ~70 % of the screen, resizable, size saved);
+-- its pages scroll inside. Every width is read from the window at layout time (Dims):
+-- Agenda: the events on the left (LIST_W = 30 % of the content, 240-340), a 1 px rule, the chosen
+-- event on the right (DW = the rest): 16 + LIST_W + 16 + 1 + 15 + DW + 16 = W.
+-- Create: two columns (ns.Columns(CW, 2, 24)), its fields 480 wide at most (DESIGN 4.2).
+local PAD = 16
+local W, CW, FW                 -- window, content, form field width (set by Dims)
+local LIST_W, DW                -- Agenda: the list, the detail
+local RULE_X, DET_X
+local COL2_X                    -- Create: the x of the right column
 local ROW_H = 52                -- an event line of the list
-local PW = 520                  -- the dungeon picker keeps its width
-local PCWW = PW - 2 * PAD       -- the picker's content width
 local LBL = S.F.meta + 2 + 4    -- a field label (11 px) and its 4 px gap
 local F = S.F
 local win, tabs, current = nil, nil, nil
@@ -771,6 +769,29 @@ local pages, ui = {}, {}
 local draft = { day = 0, tank = 1, heal = 1, dps = 3 }
 
 local function Num(v) return type(v) == "number" and not (root.IsSecret and root.IsSecret(v)) and v or nil end
+local function Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
+-- the widths of the window as it is now (a window not built yet, or a size not readable: the rule's
+-- default for this screen)
+local function Dims()
+    local w = win and Num(win:GetWidth())
+    if not w or w < 320 then w = (ns.WinSize and ns.WinSize("workspace")) or 956 end
+    W = math.floor(w)
+    CW = W - 2 * PAD
+    LIST_W = Clamp(math.floor(CW * 0.30), 240, 340)
+    DW = CW - LIST_W - 32
+    RULE_X = PAD + LIST_W + 16
+    DET_X = RULE_X + 1 + 15
+    local xs, colW = ns.Columns(CW, 2, 24)
+    FW = math.min(480, colW)
+    COL2_X = PAD + xs[2]
+    return W, CW
+end
+Dims()
+-- read by Writs/Finder.lua and Writs/FinderPeople.lua at render time (they draw tabs of this window)
+function WP.EventsDims()
+    Dims()
+    return { W = W, CW = CW, PAD = PAD, LIST_W = LIST_W, DW = DW, FW = FW, COL2_X = COL2_X }
+end
 local function TextW(fs) return root.TextWidth(fs) end
 local function Place(obj, x, y)
     obj:ClearAllPoints(); obj:SetPoint("TOPLEFT", x, -y)
@@ -789,35 +810,6 @@ local function List(parent, make)
     function l.HideFrom(i) for j = i, #l.items do l.items[j]:Hide() end end
     return l
 end
--- A settings row: label 13 on the left, switch on the right, a description on a second line.
--- The whole row is the click target.
-local function SettingRow(parent, label, desc, get, set, noRule)
-    local r = CreateFrame("Button", nil, parent)
-    r.wlOwned = true
-    if not noRule then r.rule = S.Rule(r); r.rule:SetPoint("TOPLEFT"); r.rule:SetPoint("TOPRIGHT") end
-    r.label = S.Text(r, F.body, C.fg)
-    r.desc = S.Text(r, F.meta, C.muted)
-    r.label:SetText(label); r.desc:SetText(desc or "")
-    r.switch = S.Switch(r, get, set)
-    r.switch:SetPoint("TOPRIGHT", 0, -8)
-    r.switch:AttachRow(r)
-    function r:Fit(w)
-        self:SetWidth(w)
-        local textW = w - 40 - 12
-        Place(self.label, 0, 8)
-        local lh = S.FitText(self.label, 2, textW, self)
-        local h = 8 + math.max(lh, 16)
-        if desc then
-            Place(self.desc, 0, 8 + lh + 3)
-            h = 8 + lh + 3 + S.FitText(self.desc, 0, textW, self)
-        end
-        h = math.max(36, math.ceil(h + 8))
-        self:SetHeight(h)
-        return h
-    end
-    return r
-end
-
 local function SignupsText(n)
     if n == 0 then return L("aucun inscrit pour l'instant") end
     if n == 1 then return L("1 inscrit") end
@@ -1096,6 +1088,7 @@ local function EventRow(parent)
         local cancelled = e.status ~= "open"
         if cancelled then self.pill:Set(L("Annulé"), C.bad)
         else self.pill:Set(tostring(CountSignups(e)), nil, "group") end
+        self:SetWidth(LIST_W)
         local right = 12 + (Num(self.pill:GetWidth()) or 24) + 8
         local tw = LIST_W - 12 - right
         local tc = cancelled and C.muted or C.fg
@@ -1135,7 +1128,7 @@ function RenderUpcoming()
     if #list == 0 then
         ui.events.sa:Hide(); ui.detail.sa:Hide(); ui.split:Hide()
         ui.noEvents:Show()
-        ui.noEvents:ClearAllPoints(); ui.noEvents:SetPoint("TOP", p, "TOPLEFT", W / 2, -24)
+        ui.noEvents:ClearAllPoints(); ui.noEvents:SetPoint("TOP", p, "TOPLEFT", math.floor(W / 2), -24)
         win:FitHeight(12 + ui.noEvents:Fit())
         return
     end
@@ -1153,6 +1146,7 @@ function RenderUpcoming()
     ui.events.HideFrom(#list + 1)
     -- the detail: the chosen event's card, or one sentence when none is chosen
     local y = 0
+    ui.card.w = DW; ui.card:SetWidth(DW)
     if chosen then
         ui.noPick:Hide()
         ui.card:Show()
@@ -1166,11 +1160,13 @@ function RenderUpcoming()
         y = 24 + S.FitText(ui.noPick, 0, DW, ui.detail.content) + 24
     end
     -- the organizer's invite, accepted by itself: a setting that belongs right under the event
-    ui.autoRow.switch:Update()
+    ui.autoRow:Update()
     Place(ui.autoRow, 0, y)
     y = y + ui.autoRow:Fit(DW)
     PlaceCol(ui.events, p, PAD, LIST_W)
     PlaceCol(ui.detail, p, DET_X, DW)
+    ui.split:ClearAllPoints()
+    ui.split:SetPoint("TOPLEFT", p, "TOPLEFT", RULE_X, -12); ui.split:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", RULE_X, 12)
     ui.events.sa:SetContentHeight(listH)
     ui.detail.sa:SetContentHeight(y)
     win:FitHeight(math.max(listH, y))
@@ -1236,11 +1232,18 @@ local function FitCardName(fs, text, maxW)
 end
 
 -- ---------------------------------------------------------------- the dungeon / raid picker
--- Cards with the loading-screen art of the guide's picker, two columns, several can be ticked.
+-- Cards with the loading-screen art of the guide's picker, 2 to 4 columns (ns.Cols, cards of 220
+-- at least) across a panel window; several can be ticked.
 -- The choice is kept aside (sel) until the main button: closing the window changes nothing.
 local PGAP = 8
-local PCW = math.floor((PCWW - PGAP) / 2)   -- two cards across the picker's content width
 local PCH = 88
+local PCWW, PCW, PN, PXS = 544, 268, 2, { 0, 276 }   -- the picker's content width, card width, columns
+local function PickerDims(f)
+    local w = f and Num(f:GetWidth())
+    if not w or w < 320 then w = (ns.WinSize and ns.WinSize("panel")) or 576 end
+    PCWW = math.floor(w) - 2 * PAD
+    PN, PCW, PXS = ns.Cols(PCWW, 220, PGAP, 4, 200)
+end
 local picker
 local sel = {}
 
@@ -1298,8 +1301,10 @@ local function PickCard(parent)
 end
 
 local function BuildPicker()
-    local f = S.Window("WLHelperEventsPicker", PW, 420, L("Choisir les donjons"), nil, nil, nil,
-        { header = S.HEADER_H, minH = 240, strata = "DIALOG", noHome = true })
+    local f = S.Window("WLHelperEventsPicker", (ns.WinSize and ns.WinSize("panel")) or 576, 420, L("Choisir les donjons"), nil,
+        WLWritsDB, "eventsPickerPos", { header = S.HEADER_H, minH = 240, strata = "DIALOG", noHome = true, size = "panel" })
+    -- a new width (the grip, a screen change): the same cards, laid out again
+    f.OnResize = function(self) if self.parts and self.Layout then self:Layout() end end
     f:EnableMouse(true)
     f.hint = S.Text(f, F.label, C.muted)
     f.hint:SetText(L("Tu peux en cocher plusieurs : l'événement portera tous leurs noms."))
@@ -1353,6 +1358,62 @@ local function BuildPicker()
     f:SetScript("OnHide", function()
         if C_Timer and C_Timer.After then C_Timer.After(0, Relist) else Relist() end
     end)
+    -- the cards of f.parts in ns.Cols columns, the hint, the grid (scrolls past the height cap), the bar
+    function f:Layout()
+        PickerDims(self)
+        local parts = self.parts or {}
+        for _, c in ipairs(self.cards) do c:Hide() end
+        for _, h in ipairs(self.heads) do h:Hide() end
+        local y, i, hi = 0, 0, 0
+        for pi, part in ipairs(parts) do
+            if part[1] then
+                hi = hi + 1
+                local h = self.heads[hi]
+                if not h then h = S.SectionHeader(self.content, "", nil, nil, nil, true); self.heads[hi] = h end
+                h:SetWidth(PCWW)
+                if pi > 1 then y = y + 8 end
+                Place(h, 0, y)
+                h:Set(part[1], #part[2]); h:Show()
+                y = y + 24 + 8
+            end
+            for j, e in ipairs(part[2]) do
+                i = i + 1
+                local c = self.cards[i] or PickCard(self.content); self.cards[i] = c
+                local col, row = (j - 1) % PN, math.floor((j - 1) / PN)
+                c:SetSize(PCW, PCH)
+                c.name:SetWidth(PCW - 20); c.lv:SetWidth(PCW - 20)
+                Place(c, PXS[col + 1], y + row * (PCH + PGAP))
+                c.key = e[1]
+                if root.DungeonArt then
+                    root.DungeonArt(c.art, e[1], c.icon)
+                else
+                    c.art:SetColorTexture(0.10, 0.11, 0.13, 1)
+                end
+                c.fullName = e[2]
+                FitCardName(c.name, e[2], PCW - 20)
+                -- "niv. 35 à 45" / "level 35-45", the summary window's words
+                c.lvText = e[3] == e[4] and string.format(L("niv. %s"), e[3]) or string.format(L("niv. %s à %s"), e[3], e[4])
+                c.lv:SetText(c.lvText)
+                c.lvTip = e[3] == e[4] and string.format(L("Niv. %s"), e[3]) or string.format(L("Niv. %s à %s"), e[3], e[4])
+                PaintPickCard(c)
+                c:Show()
+            end
+            y = y + math.ceil(#part[2] / PN) * (PCH + PGAP) - PGAP
+        end
+        local top = S.HEADER_H + 1 + 12
+        Place(self.hint, PAD, top)
+        local hh = S.FitText(self.hint, 2, PCWW, self)
+        local gridTop = top + hh + 12
+        local barH = 12 + 1 + 12 + 28
+        self.sa:ClearAllPoints()
+        self.sa:SetPoint("TOPLEFT", self, "TOPLEFT", PAD, -gridTop)
+        self.sa:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -PAD, barH + 12)
+        self.content:SetWidth(PCWW)
+        self.sa:SetContentHeight(y)
+        self.UpdateOk()
+        self:FitHeight(hh + 12 + y + barH)
+        return y
+    end
     f:Hide()
     return f
 end
@@ -1378,57 +1439,10 @@ function WP.OpenEventPicker()
     else
         parts = { { nil, #mine > 0 and mine or rest } }
     end
-    for _, c in ipairs(picker.cards) do c:Hide() end
-    for _, h in ipairs(picker.heads) do h:Hide() end
-    local y, i, hi = 0, 0, 0
-    for pi, part in ipairs(parts) do
-        if part[1] then
-            hi = hi + 1
-            local h = picker.heads[hi]
-            if not h then h = S.SectionHeader(picker.content, "", nil, nil, nil, true); picker.heads[hi] = h end
-            h:SetWidth(PCWW)
-            if pi > 1 then y = y + 8 end
-            Place(h, 0, y)
-            h:Set(part[1], #part[2]); h:Show()
-            y = y + 24 + 8
-        end
-        for j, e in ipairs(part[2]) do
-            i = i + 1
-            local c = picker.cards[i] or PickCard(picker.content); picker.cards[i] = c
-            local col, row = (j - 1) % 2, math.floor((j - 1) / 2)
-            Place(c, col * (PCW + PGAP), y + row * (PCH + PGAP))
-            c.key = e[1]
-            if root.DungeonArt then
-                root.DungeonArt(c.art, e[1], c.icon)
-            else
-                c.art:SetColorTexture(0.10, 0.11, 0.13, 1)
-            end
-            c.fullName = e[2]
-            FitCardName(c.name, e[2], PCW - 20)
-            -- "niv. 35 à 45" / "level 35-45", the summary window's words
-            c.lvText = e[3] == e[4] and string.format(L("niv. %s"), e[3]) or string.format(L("niv. %s à %s"), e[3], e[4])
-            c.lv:SetText(c.lvText)
-            c.lvTip = e[3] == e[4] and string.format(L("Niv. %s"), e[3]) or string.format(L("Niv. %s à %s"), e[3], e[4])
-            PaintPickCard(c)
-            c:Show()
-        end
-        y = y + math.ceil(#part[2] / 2) * (PCH + PGAP) - PGAP
-    end
-    -- the window: hint, the grid (scrolls past the height cap), the bar
-    local top = S.HEADER_H + 1 + 12
-    Place(picker.hint, PAD, top)
-    local hh = S.FitText(picker.hint, 2, PCWW, picker)
-    local gridTop = top + hh + 12
-    local barH = 12 + 1 + 12 + 28
-    picker.sa:ClearAllPoints()
-    picker.sa:SetPoint("TOPLEFT", picker, "TOPLEFT", PAD, -gridTop)
-    picker.sa:SetPoint("BOTTOMRIGHT", picker, "BOTTOMRIGHT", -PAD, barH + 12)
-    picker.content:SetWidth(PCWW)
-    picker.sa:SetContentHeight(y)
-    picker.UpdateOk()
+    picker.parts = parts
     if win then picker:ClearAllPoints(); picker:SetPoint("TOP", win, "TOP", 0, -24) end
     picker:Show(); picker:Raise()
-    picker:FitHeight(hh + 12 + y + barH)
+    picker:Layout()
     picker.sa:ScrollTo(0, true)
     return picker
 end
@@ -1556,16 +1570,26 @@ local function BuildCreate(p)
             draft.day = math.max(0, draft.day - math.floor((today - ui.dayBuiltFor) / 86400 + 0.5))
         end
         ui.dayBuiltFor = today
-        if ui.day then ui.day:Hide() end
-        ui.day = S.Segmented(p, DayChoices(), function() return draft.day end, DaySet, 28)
-        -- as wide as the form's other fields at most (FW), its right edge in line with theirs
-        if (Num(ui.day:GetWidth()) or 0) > FW then
-            -- the day numbers do not fit seven times: the day names alone
-            ui.day:Hide()
-            ui.day = S.Segmented(p, DayChoices(true), function() return draft.day end, DaySet, 28)
+        if ui.dayLong then ui.dayLong:Hide() end
+        if ui.dayShort then ui.dayShort:Hide() end
+        ui.dayLong = S.Segmented(p, DayChoices(), function() return draft.day end, DaySet, 28)
+        ui.dayShort = S.Segmented(p, DayChoices(true), function() return draft.day end, DaySet, 28)
+        ui.day = nil
+        ui.ChooseDay()
+    end
+    -- as wide as the form's other fields at most (FW), its right edge in line with theirs; the day
+    -- numbers that do not fit seven times: the day names alone (chosen again when FW changes)
+    function ui.ChooseDay()
+        local long = (Num(ui.dayLong.natural) or Num(ui.dayLong:GetWidth()) or 0) <= FW
+        local pick = long and ui.dayLong or ui.dayShort
+        local other = long and ui.dayShort or ui.dayLong
+        other:Hide()
+        if ui.day ~= pick or ui.dayW ~= FW then
+            ui.day, ui.dayW = pick, FW
+            pick:SetMaxWidth(FW)
         end
-        ui.day:SetMaxWidth(FW)
-        ui.day:Update()
+        pick:Show()
+        pick:Update()
     end
     ui.MakeDay()
     -- the hour, and four usual ones a click away
@@ -1625,31 +1649,43 @@ local function BuildCreate(p)
         if not box.err:IsShown() then return 0 end
         return 4 + S.FitText(box.err, 0, FW, box)
     end
+    -- two columns (DESIGN 3.22: ns.Columns(CW, 2, 24), fields FW = 480 at most): what (kind, the
+    -- dungeons, name, note) on the left; when and who (day, hour, places) and the recap on the
+    -- right; Publish under both
     function ui.LayoutCreate()
+        Dims()
+        ui.ChooseDay()
+        ui.pick:SetWidth(FW); PickUpdate()
+        ui.title:SetWidth(FW); ui.note:SetWidth(FW)
+        local L1, L2 = PAD, COL2_X
         local y = 12
-        Place(ui.kindLabel, PAD, y); y = y + LBL
-        Place(ui.kind, PAD, y); y = y + 28 + 12
-        if ui.pick:IsShown() then Place(ui.pick, PAD, y); y = y + 32 + 12 end
+        Place(ui.kindLabel, L1, y); y = y + LBL
+        Place(ui.kind, L1, y); y = y + 28 + 12
+        if ui.pick:IsShown() then Place(ui.pick, L1, y); y = y + 32 + 12 end
         y = y + LBL
-        Place(ui.title, PAD, y); y = y + 28 + ErrH(ui.title) + 12
-        Place(ui.dayLabel, PAD, y); y = y + LBL
-        Place(ui.day, PAD, y); y = y + 28 + 12
+        Place(ui.title, L1, y); y = y + 28 + ErrH(ui.title) + 12
         y = y + LBL
-        Place(ui.hour, PAD, y); y = y + 28 + ErrH(ui.hour) + 12
+        Place(ui.note, L1, y); y = y + 28
+        local left = y
+        y = 12
+        Place(ui.dayLabel, L2, y); y = y + LBL
+        Place(ui.day, L2, y); y = y + 28 + 12
         y = y + LBL
-        for i, role in ipairs(ROLES) do Place(ui["n_" .. role], PAD + (i - 1) * 132, y) end
-        y = y + 28 + 12
+        Place(ui.hour, L2, y); y = y + 28 + ErrH(ui.hour) + 12
         y = y + LBL
-        Place(ui.note, PAD, y); y = y + 28 + 12
+        for i, role in ipairs(ROLES) do Place(ui["n_" .. role], L2 + (i - 1) * 132, y) end
+        y = y + 28
         local recap = ui.recap:GetText()
         if recap and recap ~= "" then
             ui.recap:Show()
-            Place(ui.recap, PAD, y)
-            y = y + S.FitText(ui.recap, 2, FW, p) + 8
+            y = y + 12
+            Place(ui.recap, L2, y)
+            y = y + S.FitText(ui.recap, 2, FW, p)
         else
             ui.recap:Hide()
         end
-        Place(ui.go, PAD, y); y = y + 32
+        y = math.max(left, y) + 20
+        Place(ui.go, L1, y); y = y + 32
         return y - 12
     end
     ui.recapNow = Recap
@@ -1682,8 +1718,12 @@ local function Resolve(k)
 end
 
 local function Build()
-    win = S.Window("WLHelperEvents", W, 480, L("Groupes"), GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "eventsPos",
-        { header = S.HEADER_H, minH = 240 })
+    local dw, dh = ns.WinSize("workspace")
+    win = S.Window("WLHelperEvents", dw or W, dh or 480, L("Groupes"), GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "eventsPos",
+        { header = S.HEADER_H, minH = 240, size = "workspace" })
+    Dims()
+    -- a new size (the grip, a screen change): the shown tab laid out again at the new widths
+    win.OnResize = function() Dims(); WP.RefreshEvents() end
     win:AddHeaderButton(S.IconButton(win.header, "info", 28, InfoTip))
     local defs = {}
     for _, d in ipairs(extraTabs) do defs[#defs + 1] = d end
@@ -1722,9 +1762,11 @@ local function Build()
         L("Les donjons et raids prévus par la guilde apparaîtront ici."), L("Créer un événement"),
         function() WP.ShowEventsTab("create") end, "primary")
     ui.noEvents:Hide()
-    ui.autoRow = SettingRow(ui.detail.content, L("Accepter l'invitation de l'organisateur"),
-        L("Quand tu es inscrit, son invitation est acceptée pour toi, de 30 min avant le début à 30 min après."),
-        function() return WLWritsDB.eventsAutoAccept ~= false end, function(v) WLWritsDB.eventsAutoAccept = v end)
+    ui.autoRow = S.SettingRow(ui.detail.content, { label = L("Accepter l'invitation de l'organisateur"),
+        desc = L("De 30 min avant à 30 min après le début."),
+        long = L("Quand tu es inscrit, son invitation est acceptée pour toi, de 30 min avant le début à 30 min après."),
+        control = "switch",
+        get = function() return WLWritsDB.eventsAutoAccept ~= false end, set = function(v) WLWritsDB.eventsAutoAccept = v end })
     BuildCreate(pages.create)
     for _, d in ipairs(extraTabs) do
         if d.build then
@@ -1756,6 +1798,7 @@ function WP.EventsTab() return current end
 function WP.GroupsWindow() return win end
 function WP.RefreshEvents()
     if not (win and win:IsShown()) then return end
+    Dims()
     tabs:Update()
     local d = TabDef(current)
     if current == "upcoming" then RenderUpcoming()

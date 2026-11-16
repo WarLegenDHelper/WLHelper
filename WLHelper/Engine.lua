@@ -1,5 +1,8 @@
 -- Moteur : état des quêtes, calcul de la route (plusieurs donjons, depuis la position du joueur), étapes.
 local ADDON, ns = ...
+-- BEGIN NPC_ELITE (baked by bake_elite.py from LibForeverData Npcs.lua rank: 1 elite / rare elite / boss, 0 normal / rare)
+ns.NPC_ELITE = {["Alina"]=0,["Ambassador Malcin"]=1,["Amnennar the Coldbringer"]=1,["Andorhal Tower Four"]=0,["Andorhal Tower One"]=0,["Andorhal Tower Three"]=0,["Andorhal Tower Two"]=0,["Anguished Highborne"]=0,["Anvilrage Footman"]=1,["Anvilrage Guardsman"]=1,["Anvilrage Medic"]=1,["Anvilrage Officer"]=1,["Anvilrage Soldier"]=1,["Anvilrage Warden"]=1,["Archaedas"]=1,["Archivist Galford"]=1,["Archmage Arugal"]=1,["Arugal"]=1,["Atal'ai Warrior"]=1,["Atal'ai Witch Doctor"]=1,["Atal'alarion"]=1,["Avalanchion"]=1,["Axtroz"]=1,["Balnazzar"]=1,["Baron Aquanis"]=1,["Baron Charr"]=1,["Baron Geddon"]=1,["Baron Kazum"]=1,["Baron Rivendare"]=1,["Baroness Anastari"]=1,["Bazzalan"]=1,["Bile Spewer"]=1,["Black Drake"]=1,["Blackbreath Crony"]=1,["Blackfathom Tide Priestess"]=1,["Blackhand Assassin"]=1,["Blackhand Dreadweaver"]=1,["Blackhand Elite"]=1,["Blackhand Incarcerator"]=0,["Blackhand Iron Guard"]=1,["Blackhand Summoner"]=1,["Bleeding Horror"]=0,["Blood Elf Reclaimer"]=0,["Blood Elf Surveyor"]=0,["Blood Wraith"]=0,["Bloodaxe Evoker"]=1,["Bloodpetal Flayer"]=0,["Bloodpetal Lasher"]=0,["Bloodpetal Thresher"]=0,["Bloodpetal Trapper"]=0,["Borelgore"]=1,["Burning Blade Apprentice"]=0,["Burning Blade Fanatic"]=0,["Burning Blade Summoner"]=0,["Buzzard"]=0,["Cannon Master Willey"]=1,["Carrion Devourer"]=0,["Carrion Grub"]=0,["Carrion Lurker"]=0,["Carrion Vulture"]=0,["Caverndeep Ambusher"]=0,["Caverndeep Burrower"]=1,["Caverndeep Invader"]=1,["Charlga Razorflank"]=1,["Chieftain Bloodmaw"]=0,["Chillwind Chimaera"]=0,["Chillwind Ravager"]=0,["Cho'Rush the Observer"]=1,["Chronalis"]=1,["Cliff Breaker"]=1,["Cliff Thunderer"]=1,["Cliff Walker"]=1,["Coast Strider"]=1,["Commander Gor'shak"]=1,["Crag Coyote"]=0,["Crazed Owlbeast"]=0,["Crimson Battle Mage"]=1,["Crimson Defender"]=1,["Crimson Initiate"]=1,["Crimson Inquisitor"]=1,["Crimson Monk"]=1,["Crimson Priest"]=1,["Crimson Sorcerer"]=1,["Crypt Beast"]=1,["Crypt Crawler"]=1,["Cursed Atal'ai"]=1,["Cursed Centaur"]=0,["Cursed Justicar"]=1,["Cursed Paladin"]=1,["Cyrus Therepentous"]=1,["Dalaran Summoner"]=0,["Dark Iron Taskmaster"]=0,["Dark Shade"]=1,["Deadwood Gardener"]=0,["Death Knight Darkreaver"]=1,["Death Talon Captain"]=1,["Death Talon Seether"]=1,["Death's Head Cultist"]=1,["Deathstalker Agent"]=1,["Deep Lurker"]=1,["Demon of the Orb"]=1,["Dermot"]=0,["Desert Rumbler"]=0,["Deviate Coiler"]=1,["Deviate Creeper"]=1,["Deviate Dreadfang"]=1,["Deviate Ravager"]=1,["Deviate Shambler"]=1,["Deviate Stinglash"]=1,["Deviate Viper"]=1,["Devilsaur"]=1,["Devouring Ectoplasm"]=1,["Discordant Surge"]=0,["Diseased Black Bear"]=0,["Diseased Grizzly"]=0,["Doctor Theolen Krastinov"]=1,["Doomguard Commander"]=1,["Doomguard Minion"]=0,["Dreamroarer"]=1,["Duskwing"]=1,["Dust Stormer"]=0,["Dustwraith"]=1,["El Pollo Grande"]=0,["Elder Crag Coyote"]=0,["Elder Lake Creeper"]=0,["Elder Lake Skulker"]=0,["Eldreth Apparition"]=1,["Eldreth Sorcerer"]=1,["Eldreth Spirit"]=1,["Elemental Slave"]=0,["Emperor Dagran Thaurissan"]=1,["Enraged Rock Elemental"]=0,["Evolving Ectoplasm"]=1,["Eyeless Watcher"]=0,["Ezra Grimm"]=1,["Faldrim Anvilmar"]=1,["Felcular"]=1,["Feral Crag Coyote"]=0,["Ferocious Grizzled Bear"]=0,["Fineous Darkvire"]=1,["Firebrand Dreadweaver"]=1,["Firebrand Legionnaire"]=1,["Firebrand Pyromancer"]=1,["Fledgling Chillwind"]=0,["Fleshflayer Ghoul"]=1,["Frenzied Black Drake"]=1,["Frenzied Plaguehound"]=0,["Frostmaul Giant"]=1,["Frostmaul Preserver"]=1,["Gahz'rilla"]=1,["Gasher"]=1,["General Angerforge"]=1,["General Drakkisath"]=1,["Ghoul Ravener"]=1,["Giant Buzzard"]=0,["Giant Grizzled Bear"]=0,["Gizrul the Slavener"]=1,["Goblin Woodcarver"]=1,["Golem Lord Argelmach"]=1,["Golemagg the Incinerator"]=1,["Gordok Bushwacker"]=1,["Gordok Reaver"]=1,["Gorishi Hive Guard"]=0,["Gorishi Hive Queen"]=0,["Gorishi Wasp"]=0,["Great Wavethrasher"]=0,["Greater Healing Ward"]=0,["Greater Kraul Bat"]=1,["Greater Obsidian Elemental"]=0,["Greater Rock Elemental"]=0,["Grenka Bloodscreech"]=0,["Grimlok"]=1,["Guard Fengus"]=1,["Guard Slip'kik"]=1,["Gyth"]=1,["Halycon"]=1,["Hearthsinger Forresten"]=1,["Heavy War Golem"]=0,["Helboar"]=0,["Herod"]=1,["High Inquisitor Whitemane"]=1,["Highlord Omokk"]=1,["Hillsbrad Miner"]=0,["Hive'Ashi Defender"]=1,["Hive'Ashi Stinger"]=1,["Hive'Ashi Worker"]=1,["Hive'Regal Ambusher"]=1,["Hive'Regal Burrower"]=1,["Hive'Regal Spitfire"]=1,["Houndmaster Loksey"]=1,["Hukku"]=1,["Hurley Blackbreath"]=1,["Hydromancer Velratha"]=1,["Hydrospawn"]=1,["Illyanna Ravenoak"]=1,["Immol'thar"]=1,["Instructor Malicia"]=1,["Irontree Stomper"]=0,["Irontree Wanderer"]=0,["Isalien"]=1,["Ishamuhale"]=0,["J'eevee"]=0,["Jammal'an the Prophet"]=1,["Jandice Barov"]=1,["Jarien"]=1,["Jergosh the Invoker"]=1,["Kalaran Windblade"]=1,["Kegan Darkmar"]=0,["Kharan Mighthammer"]=1,["Kirtonos the Herald"]=1,["Kormok"]=1,["Kraul Bat"]=1,["Krethis Shadowspinner"]=0,["Lady Anacondra"]=1,["Lady Illucia Barov"]=1,["Lake Creeper"]=0,["Lake Skulker"]=0,["Lesser Rock Elemental"]=0,["Lethtendris"]=1,["Lorax"]=0,["Lord Cobrahn"]=1,["Lord Incendius"]=1,["Lord Kazzak"]=1,["Lord Pythas"]=1,["Lord Serpentis"]=1,["Lord Skwol"]=1,["Lord Valthalak"]=1,["Lord Vyletongue"]=1,["Lore Keeper of Norgannon"]=0,["Lorekeeper Polkelt"]=1,["Lorgus Jett"]=1,["Loro"]=1,["Mad Magglish"]=1,["Magister Kalendris"]=1,["Magma Lord Bokk"]=0,["Maleki the Pallid"]=1,["Malfunctioning Reaver"]=0,["Mana Remnant"]=1,["Mangled Cadaver"]=1,["Master Feardred"]=0,["Masterwork Target Dummy"]=0,["Mekgineer Thermaplugg"]=1,["Mercutio Filthgorger"]=0,["Mijan"]=1,["Mist Creeper"]=0,["Monstrous Plaguebat"]=0,["Mor Grayhoof"]=1,["Morphaz"]=1,["Moss Stalker"]=0,["Mosshoof Courser"]=0,["Mother Smolderweb"]=1,["Murk Worm"]=1,["Nancy Vishas"]=1,["Nathanos Blightcaller"]=1,["Neeru Fireblade"]=0,["Nerub'enkan"]=1,["Nightmare Ectoplasm"]=0,["Noxious Plaguebat"]=0,["Noxxion"]=1,["Noxxion's Spawn"]=0,["Noxxious Scion"]=0,["Oasis Snapjaw"]=0,["Obsidian Sentinel"]=1,["Old Vicejaw"]=0,["Ott"]=0,["Overlord Wyrmthalak"]=1,["Overmaster Pyron"]=1,["Patchwork Horror"]=1,["Pathstrider"]=0,["Petrified Treant"]=1,["Plague Ghoul"]=1,["Plaguebat"]=0,["Plagued Hatchling"]=0,["Plaguehound"]=0,["Plaguehound Runt"]=0,["Postmaster Malown"]=1,["Prince Skaldrenox"]=1,["Prince Tortheldrin"]=1,["Princess Tempestria"]=1,["Princess Theradras"]=1,["Pusillin"]=1,["Putridus Satyr"]=1,["Putridus Trickster"]=1,["Pyroguard Emberseer"]=1,["Rage Talon Dragon Guard"]=1,["Rage Talon Dragonspawn"]=1,["Rage Talon Fire Tongue"]=1,["Rage Talon Flamescale"]=1,["Ragefire Shaman"]=1,["Ragefire Trogg"]=1,["Ragereaver Golem"]=1,["Ragged John"]=0,["Ragged Owlbeast"]=0,["Raging Owlbeast"]=0,["Ramstein the Gorger"]=1,["Ranger"]=0,["Ras Frostwhisper"]=1,["Rath'mael"]=1,["Rattlegore"]=1,["Ravaged Cadaver"]=1,["Razorfen Battleguard"]=1,["Razorfen Thornweaver"]=1,["Restless Soul"]=0,["Ribbly Screwspigot"]=1,["Ricter"]=0,["Risen Construct"]=1,["Rok'Alim the Pounder"]=1,["Roogug"]=1,["Rookery Guardian"]=1,["Rumbling Exile"]=0,["Sandarr Dunereaver"]=1,["Saturated Ooze"]=1,["Scald"]=0,["Scarab"]=0,["Scarlet Commander Mograine"]=1,["Scarlet Magician"]=1,["Scarlet Praetorian"]=1,["Scarlet Preserver"]=1,["Scarlet Scout"]=1,["Scarshield Grunt"]=1,["Scarshield Legionnaire"]=1,["Scarshield Sentry"]=1,["Scarshield Spellbinder"]=1,["Scholomance Adept"]=1,["Scholomance Handler"]=1,["Scholomance Necromancer"]=1,["Scholomance Occultist"]=1,["Scholomance Student"]=1,["Scooty"]=0,["Screecher Spirit"]=0,["Scryer"]=1,["Searing Blade Cultist"]=1,["Searing Blade Warlock"]=1,["Sergeant Bly"]=1,["Shade of Eranikus"]=1,["Shadow Hunter Vosh'gajin"]=1,["Shadowfang Darksoul"]=1,["Shadowforge Digger"]=1,["Shadowforge Ruffian"]=1,["Shadowforge Surveyor"]=1,["Shadowshard Rumbler"]=1,["Shadowshard Smasher"]=1,["Shadowsworn Adept"]=0,["Shadowsworn Cultist"]=0,["Shadowsworn Thug"]=0,["Shore Strider"]=1,["Shrieking Banshee"]=1,["Silithid Creeper"]=0,["Silithid Grub"]=0,["Silithid Swarmer"]=0,["Singe"]=1,["Skeletal Flayer"]=0,["Skeletal Sorcerer"]=0,["Skeletal Terror"]=0,["Smolderthorn Axe Thrower"]=1,["Smolderthorn Berserker"]=1,["Smolderthorn Headhunter"]=1,["Smolderthorn Mystic"]=1,["Smolderthorn Seer"]=1,["Smolderthorn Shadow Hunter"]=1,["Smolderthorn Shadow Priest"]=1,["Smolderthorn Witch Doctor"]=1,["Solakar Flamewreath"]=1,["Somnus"]=1,["Sothos"]=1,["Spectral Teacher"]=1,["Spirestone Battle Mage"]=1,["Spirestone Mystic"]=1,["Spitelash Siren"]=0,["Starving Buzzard"]=0,["Stomper Kreeg"]=1,["Stonelash Flayer"]=0,["Stonelash Pincer"]=0,["Stonelash Scorpid"]=0,["Strashaz Serpent Guard"]=1,["Strashaz Sorceress"]=1,["Strashaz Warrior"]=1,["Suffering Highborne"]=0,["Summoned Blackhand Dreadweaver"]=1,["Sunscale Scytheclaw"]=0,["Swirling Vortex"]=0,["Tainted Ooze"]=0,["Takk the Leaper"]=1,["Tar Creeper"]=0,["Taragaman the Hungerer"]=1,["The Duke of Cynders"]=1,["The Ravenian"]=1,["The Unforgiven"]=1,["Theka the Martyr"]=1,["Theka the Martyr Shapeshift"]=1,["Theldren"]=1,["Theldren Kill Credit"]=0,["Thunderhead Patriarch"]=0,["Thunderhead Skystormer"]=0,["Thunderhead Stagwing"]=0,["Thuzadin Necromancer"]=1,["Thuzadin Shadowcaster"]=1,["Timbermaw Shaman"]=0,["Tink Sprocketwhistle"]=0,["Tirion Fordring"]=1,["Torn Screamer"]=0,["Tortured Druid"]=0,["Tortured Sentinel"]=0,["Twilight Acolyte"]=1,["Twilight Lord Kelris"]=1,["Ulathek"]=0,["Unseen Servant"]=0,["Urok Doomhowl"]=1,["Vectus"]=1,["Venom Belcher"]=1,["Venom Mist Lurker"]=0,["Veteran Commando"]=1,["Vile Fin Oracle"]=0,["Vile Fin Shredder"]=0,["Vile Fin Tidehunter"]=0,["Vilebranch Witch Doctor"]=0,["Wailing Banshee"]=1,["Wandering Spirit"]=0,["War Master Voone"]=1,["War Reaver"]=0,["Warbringer Construct"]=1,["Warchief Rend Blackhand"]=1,["Warden Belamoore"]=0,["Wavethrasher"]=0,["Weldon Barov"]=1,["Whirlwind Shredder"]=0,["Whirlwind Stormwalker"]=0,["Windshear Digger"]=0,["Windshear Tunnel Rat"]=0,["Windshear Vermin"]=0,["Witherbark Broodguard"]=0,["Withered Protector"]=0,["Woodsman"]=0,["Wrath Hammer Construct"]=1,["Writhing Mage"]=1,["Xorothian Dreadsteed"]=1,["Young Wavethrasher"]=0,["Ysida Harmon"]=0,["Zerillis"]=1,["Zolo"]=1,["Zul'Lor"]=1}
+-- END NPC_ELITE
 local CQL = C_QuestLog
 local L = ns.L
 
@@ -14,6 +17,12 @@ do
       SHARE_NONE = "Aucune quête de ton journal pour cette route ne se partage.",
       INST_IN_TRACK = "(clic sur le suivi pour ouvrir le guide)",
       INST_OFFER_TRACK = "Tu es dans %s : ouvre le guide pour l'ajouter à ta route.",
+      LOCK_PRE = "il faut d'abord « %s » (%s)",
+      LOCK_LVL = "niveau %d requis",
+      LOCK_HIGH = "la chaîne monte au niveau %d",
+      LOCK_LONG = "chaîne longue : %d quêtes avant",
+      LOCK_OTHERDG = "elle passe par %s",
+      LOCK_BAD = "chaîne impossible pour ce personnage",
     },
     en = {
       SHARE_GO1 = "Sharing 1 quest with the group", SHARE_GO = "Sharing %d quests with the group",
@@ -22,6 +31,12 @@ do
       SHARE_NONE = "No quest of your log for this route can be shared.",
       INST_IN_TRACK = "(click the tracker to open the guide)",
       INST_OFFER_TRACK = "You are in %s: open the guide to add it to your route.",
+      LOCK_PRE = "first needs \"%s\" (%s)",
+      LOCK_LVL = "level %d required",
+      LOCK_HIGH = "the chain goes up to level %d",
+      LOCK_LONG = "long chain: %d quests before",
+      LOCK_OTHERDG = "it goes through %s",
+      LOCK_BAD = "chain this character cannot do",
     },
   }
   local S = ns.LOCALE_TABLES
@@ -243,6 +258,123 @@ function ns.DungeonQuests(dkey, cls)
 end
 
 -- =====================================================================
+--  Locked quests: a main quest behind a prerequisite chain. A chain the player can do now at a
+--  bounded cost goes into the route ("before the dungeon" steps, MakeNodes); one too high or too
+--  long keeps the quest out of the route by default, and the Overview lists it as locked with
+--  ns.LockedReason's text (a quest ticked by hand still gets its chain).
+-- =====================================================================
+local CHAIN_GAP = 5     -- a chain quest more than 5 levels above the player: not now (Overview's HIGH_GAP)
+local CHAIN_MAX = 14    -- work left in the chain (ChainWork) above which the chain is too long
+-- Rough work of one prerequisite: the walk to its giver and back, one per spot outside, a run of
+-- another dungeon (its objectives inside an instance other than dkey's)
+local function ChainWork(pq, dkey)
+  local w = 1
+  local inside = false
+  for _, o in ipairs(pq.o or {}) do
+    if o.w and not o.ins then w = w + 1
+    elseif o.ins or o.unk then inside = true end
+  end
+  if not pq.o and pq.req then w = w + #pq.req end
+  local dg = pq.od or pq.d
+  if inside and dg and dkey and dg ~= dkey then
+    local a, b = ns.D[dg], ns.D[dkey]
+    if not (a and b and a.inst and a.inst == b.inst) then w = w + 8 end
+  end
+  return w
+end
+-- What is left of a main quest's chain for this character.
+-- -> { chain, left = { pid... }, first, need (r of the first left), top (highest l / r left),
+--      work, other (another dungeon on the way), started, bad (a link this character cannot do) }
+function ns.ChainPlan(qid, cls, dkey)
+  local q = ns.Q[qid]
+  if not q then return nil end
+  if not cls then cls = select(2, UnitClass("player")) end
+  local chain = FullChain(qid, cls)
+  local plan = { chain = chain or {}, left = {}, work = 0, need = 0, top = 0, ql = math.max(q.l or 0, q.r or 0) }
+  if not chain then plan.bad = true; return plan end
+  dkey = dkey or q.d
+  local log = ns.LogEntries()
+  local onQ = CQL and CQL.IsOnQuest
+  if log[qid] or (onQ and onQ(qid)) then plan.started = true end
+  for _, pid in ipairs(chain) do
+    if not ns.IsDone(pid) then
+      local pq = ns.Q[pid] or {}
+      plan.left[#plan.left + 1] = pid
+      if log[pid] or (onQ and onQ(pid)) then plan.started = true end
+      if not plan.first then plan.first = pid; plan.need = pq.r or 0 end
+      local l = math.max(pq.l or 0, pq.r or 0)
+      if l > plan.top then plan.top = l end
+      local w = ChainWork(pq, dkey)
+      plan.work = plan.work + w
+      local dg = pq.od or pq.d
+      if not plan.other and w >= 9 and dg and dg ~= dkey and ns.D[dg] then plan.other = dg end
+    end
+  end
+  return plan
+end
+-- Can the chain go into the route now? -> ok, cause ("lvl" | "high" | "long" | "bad")
+local function ChainOK(plan, lvl)
+  if not plan then return true end
+  if plan.bad then return false, "bad" end
+  if #plan.left == 0 or plan.started then return true end
+  if plan.need > lvl then return false, "lvl" end
+  -- a chain no higher than the quest itself (an item that starts it, dropped in the same dungeon)
+  -- does not lock it: the quest's own level is the Overview's call
+  if plan.top > lvl + CHAIN_GAP and plan.top > (plan.ql or 0) then return false, "high" end
+  if plan.work > CHAIN_MAX then return false, "long" end
+  return true
+end
+function ns.ChainOK(qid, lvl, cls, dkey)
+  return ChainOK(ns.ChainPlan(qid, cls, dkey), lvl or (UnitLevel and UnitLevel("player")) or 1)
+end
+-- "Jarkal Mossmeld, Kargath, Badlands" -> "Jarkal Mossmeld, Kargath"; a city at the end wins
+-- over its district ("Dran Droffers, The Drag, Orgrimmar" -> "Dran Droffers, Orgrimmar")
+local CITY = { Orgrimmar = true, Undercity = true, ["Thunder Bluff"] = true, Stormwind = true,
+  ["Stormwind City"] = true, Ironforge = true, Darnassus = true }
+local function GiverText(pq)
+  local st = pq and pq.st
+  if not st and pq and pq.s and pq.s.n then st = pq.s.n end
+  if not st then return "?" end
+  st = st:gsub("%s*%b()", "")
+  local segs = {}
+  for seg in st:gmatch("[^,]+") do segs[#segs + 1] = seg:match("^%s*(.-)%s*$") end
+  if #segs <= 2 then return table.concat(segs, ", ") end
+  local place = CITY[segs[#segs]] and segs[#segs] or segs[2]
+  return segs[1] .. ", " .. place
+end
+ns.GiverText = GiverText
+-- Why a main quest is out of the route although its dungeon is picked: its chain is too high, too
+-- long or impossible. nil when the quest is done, started, free or its chain goes into the route.
+-- -> text, cause ("lvl" | "high" | "long" | "bad"), first prerequisite left
+function ns.LockedReason(qid, lvl, cls, dkey)
+  local q = ns.Q[qid]
+  if not q or ns.IsDone(qid) then return nil end
+  lvl = lvl or (UnitLevel and UnitLevel("player")) or 1
+  local plan = ns.ChainPlan(qid, cls, dkey)
+  local ok, cause = ChainOK(plan, lvl)
+  if ok then return nil end
+  if cause == "bad" then return L.LOCK_BAD, cause end
+  local first = plan.first
+  local txt = L.LOCK_PRE:format(ns.QName(first), GiverText(ns.Q[first]))
+  local why
+  if cause == "lvl" then why = L.LOCK_LVL:format(plan.need)
+  elseif cause == "high" then why = L.LOCK_HIGH:format(plan.top)
+  elseif plan.other then why = L.LOCK_OTHERDG:format(ns.DName(plan.other))
+  else why = L.LOCK_LONG:format(#plan.left) end
+  return txt .. (GetLocale and GetLocale() == "frFR" and " : " or ": ") .. why, cause, first
+end
+-- in the route: free, a chain that fits, or ticked by hand (WLDTDB.offPick) whatever its chain.
+-- A key or class-quest card (cq) and a raid's attunement are the chain itself: always in.
+local function InRoute(qid, cls, lvl, dkey)
+  local d = dkey and ns.D[dkey]
+  if d and (d.cq or d.raid) then return true end
+  local pick = WLDTDB and WLDTDB.offPick
+  if pick and pick[qid] and not (WLDTDB.off and WLDTDB.off[qid]) then return true end
+  return (ChainOK(ns.ChainPlan(qid, cls, dkey), lvl))
+end
+ns.ChainInRoute = InRoute
+
+-- =====================================================================
 --  Positions (coordonnées monde via l'API de carte)
 -- =====================================================================
 local worldCache = {}
@@ -286,10 +418,48 @@ end
 -- =====================================================================
 --  Nœuds de la route
 -- =====================================================================
+-- An objective of the zone around a dungeon ("outer") that is outside the instance and near its
+-- entrance: same map, within OUTER_NEAR map units (the data's outer spots far from the entrance are
+-- guesses: those stay with the dungeon visit).
+local OUTER_NEAR = 15
+local function OuterNear(o, dkey)
+  local d = dkey and ns.D[dkey]
+  local e, w = d and d.e, o.w
+  if not (e and w and e.m and w.m == e.m and e.x and w.x) then return false end
+  return math.sqrt((e.x - w.x) ^ 2 + (e.y - w.y) ^ 2) <= OUTER_NEAR
+end
+-- the quest's notes say its outer spots are outside the instance (the excavation of Uldaman, the
+-- outer caves of Maraudon); an "outer" objective without such a note may be inside the instance
+-- (Wailing Caverns' Mad Magglish) and stays with the dungeon visit
+local OUTSIDE_NOTE = { "outside the instance", "before the instance portal", "without entering the instance",
+  "dig site", "excavation" }
+local function NotedOutside(q)
+  local txt = (q.ne or "")
+  for _, r in ipairs(q.req or {}) do txt = txt .. " " .. tostring(r[3] or "") end
+  txt = txt:lower()
+  for _, p in ipairs(OUTSIDE_NOTE) do if txt:find(p, 1, true) then return true end end
+  return false
+end
+-- every objective of q has a place outside the instance and at least one is such an outer spot
+local function OuterAllNear(q, dkey)
+  if not NotedOutside(q) then return false end
+  local any = false
+  for _, o in ipairs(q.o or {}) do
+    if o.ins or o.unk or not o.w then return false end
+    if o.outer then
+      if not OuterNear(o, dkey) then return false end
+      any = true
+    end
+  end
+  return any
+end
+ns.OuterAllNear = OuterAllNear
+
 -- kind : a = prendre, o = objectif dehors, c = objectifs du donjon, t = rendre, i = objet (extras)
 -- loc  : {m,x,y,n}  ou  ins = clé du donjon (alors la position est l'entrée du donjon)
 local function MakeNodes(sel, cls)
   local nodes, byKey = {}, {}
+  local lvl = (UnitLevel and UnitLevel("player")) or 1
   -- tag: the route dungeon the nodes serve (dk) and, for a prerequisite, the main quest it unlocks
   -- (forQ, a list: one prerequisite shared by two main quests is one node) and its place in that
   -- quest's chain (ci of cn)
@@ -350,8 +520,13 @@ local function MakeNodes(sel, cls)
     -- inconnus (pas de position dans les données) : dans le donjon pour une quête de donjon, ignorés sinon.
     local outs, inside, outer = {}, false, true
     local real = 0
+    -- a main quest whose every objective is outside, some of them in the zone around the dungeon
+    -- (the Uldaman excavation: fungus, tablet, chests, power stones) gets one outside step per
+    -- objective at its spot, like a prerequisite, instead of one line after the last boss: the
+    -- spot is visited once, with the other quests done there (BuildRoute, MakeSteps "area")
+    local nearAll = not isPre and OuterAllNear(q, q.od or home)
     for i, o in ipairs(q.o or {}) do
-      local outerHere = o.outer and not isPre
+      local outerHere = o.outer and not isPre and not nearAll
       local bg = o.w and (o.w.m == 1459 or o.w.m == 1460 or o.w.m == 1461)  -- butin de champ de bataille : pas un lieu de farm
       if o.w and o.k == "item" and o.src and not bg then
         -- composant d'artisanat / HV : la « meilleure » source n'a qu'un taux de butin anecdotique
@@ -365,7 +540,8 @@ local function MakeNodes(sel, cls)
         real = real + 1
         -- one action per objective: done when that objective is done (ns.ObjDone), so the route
         -- moves on objective by objective instead of waiting for the whole quest
-        table.insert(outs, add({ kind = "o", q = qid, sub = i, oi = i, loc = o.w, npc = o.t and o.t[1] or o.n, obj = o, oneObj = o, d = home, pre = isPre, deps = { A } }))
+        table.insert(outs, add({ kind = "o", q = qid, sub = i, oi = i, loc = o.w, npc = o.t and o.t[1] or o.n, obj = o, oneObj = o, d = home, pre = isPre, deps = { A },
+          area = o.outer and OuterNear(o, q.od or home) and NotedOutside(q) and (q.od or home) or nil }))
       elseif o.ins or outerHere or o.unk then
         real = real + 1
         inside = true
@@ -406,7 +582,7 @@ local function MakeNodes(sel, cls)
   for dkey in pairs(sel) do
     for _, qid in ipairs(ns.DungeonQuests(dkey, cls)) do
       local q = ns.Q[qid]
-      if not (WLDTDB.off and WLDTDB.off[qid]) and not q.extra then
+      if not (WLDTDB.off and WLDTDB.off[qid]) and not q.extra and InRoute(qid, cls, lvl, dkey) then
         local prevT
         local Tby = {}
         local chain = FullChain(qid, cls) or {}
@@ -626,6 +802,7 @@ function ns.Runnable(dkey)
   return d ~= nil and not d.cq and not d.raid and not (d.up and time() < d.up)
 end
 
+local SPOT_NEAR = 6   -- map units: objectives this close on one map are one visit
 function ns.BuildRoute(sel, startPos)
   local _, cls = UnitClass("player")
   local nodes, byKey = MakeNodes(sel, cls)
@@ -681,6 +858,96 @@ function ns.BuildRoute(sel, startPos)
     end
     return false
   end
+  -- Spots outside: objectives of the same place (one named area such as the Uldaman excavation,
+  -- or the same map within SPOT_NEAR units of each other) are one visit. Every quest done there is
+  -- picked up first (the town visit before the trip), when nothing done at that spot or inside a
+  -- dungeon comes before its pick-up.
+  local spotOf, spotTakes = {}, {}
+  do
+    local list = {}
+    for _, n in ipairs(nodes) do if n.kind == "o" and n.loc and not done[n] then list[#list + 1] = n end end
+    local id = {}
+    local function find(i) while id[i] ~= i do i = id[i] end return i end
+    for i = 1, #list do id[i] = i end
+    for i = 1, #list do
+      for j = 1, i - 1 do
+        local a, b = list[i], list[j]
+        local near = (a.area and a.area == b.area) or (a.loc.m == b.loc.m
+          and ((a.loc.x - b.loc.x) ^ 2 + (a.loc.y - b.loc.y) ^ 2) < SPOT_NEAR * SPOT_NEAR)
+        if near then id[find(i)] = find(j) end
+      end
+    end
+    for i, n in ipairs(list) do spotOf[n] = find(i) end
+    -- a prerequisite's objective there that another quest of the spot waits on (the buzzards of
+    -- Badlands Reagent Run before Uldaman Reagent Run's fungus) is done on its own, earlier
+    local inSpot = {}
+    for n, r in pairs(spotOf) do inSpot[r] = inSpot[r] or {}; inSpot[r][n.q] = true end
+    local early = {}
+    local function mark(a, r, depth, seen)
+      if seen[a] or depth > 40 then return end
+      seen[a] = true
+      for _, p in ipairs(a.deps or {}) do
+        if not done[p] then
+          if spotOf[p] == r then early[p] = true end
+          mark(p, r, depth + 1, seen)
+        end
+      end
+    end
+    for r, qs in pairs(inSpot) do
+      for q in pairs(qs) do
+        local A = byKey["a:" .. tostring(q)]
+        if A then mark(A, r, 0, {}) end
+      end
+    end
+    for p in pairs(early) do spotOf[p] = nil end
+    local quests = {}
+    for n, r in pairs(spotOf) do quests[r] = quests[r] or {}; quests[r][n.q] = true end
+    local function before(a, r, depth, seen)
+      -- can a be placed before spot r is visited? (no dependency done at r or inside an instance)
+      if seen[a] then return true end
+      seen[a] = true
+      if depth > 40 then return false end
+      for _, p in ipairs(a.deps or {}) do
+        if not done[p] then
+          if spotOf[p] == r or InsideNode(p) then return false end
+          if not before(p, r, depth + 1, seen) then return false end
+        end
+      end
+      return true
+    end
+    for r, qs in pairs(quests) do
+      local n = 0
+      for _ in pairs(qs) do n = n + 1 end
+      if n > 1 then
+        local takes = {}
+        for q in pairs(qs) do
+          local A = byKey["a:" .. tostring(q)]
+          local qq = ns.Q[q]
+          if A and not done[A] and not A.ins and not (qq and qq.r and qq.r > lvl) and before(A, r, 0, {}) then
+            takes[#takes + 1] = A
+          end
+        end
+        if takes[1] then spotTakes[r] = takes end
+      end
+    end
+  end
+  local function TakesPending(n)
+    local r = spotOf[n]
+    local takes = r and spotTakes[r]
+    if not takes then return false end
+    for _, A in ipairs(takes) do if not placed[A] and not done[A] then return true end end
+    return false
+  end
+  -- a main quest's turn-in nothing waits on: after the dungeon it serves (one trip back to town)
+  local insideLeft = {}
+  for _, n in ipairs(nodes) do
+    if not done[n] and InsideNode(n) then local d = n.ins; insideLeft[d] = (insideLeft[d] or 0) + 1 end
+  end
+  local function TurnInLater(n)
+    if n.kind ~= "t" or n.pre or n.ins or dependents[n] then return false end
+    local d = n.dk or n.d
+    return d and (insideLeft[d] or 0) > 0
+  end
   local guard = 0
   while remaining > 0 and guard < 5000 do
     guard = guard + 1
@@ -710,6 +977,8 @@ function ns.BuildRoute(sel, startPos)
           local q = ns.Q[n.q]
           if n.kind == "a" and q and q.r and q.r > lvl then cost = cost + (q.r - lvl) * 800 end
           if SiblingsPending(n) then cost = cost + 5000 end
+          if n.kind == "o" and TakesPending(n) then cost = cost + 50000 end   -- the pick-ups first, wherever they are
+          if TurnInLater(n) then cost = cost + 4000 end
           if not bestCost or cost < bestCost then best, bestCost = n, cost end
         end
       end
@@ -720,6 +989,7 @@ function ns.BuildRoute(sel, startPos)
       break
     end
     table.insert(order, best); placed[best] = true; remaining = remaining - 1
+    if InsideNode(best) and insideLeft[best.ins] then insideLeft[best.ins] = insideLeft[best.ins] - 1 end
     inDungeon = best.ins
     pos = NodePos(best) or pos
   end
@@ -732,15 +1002,22 @@ end
 function ns.MakeSteps(order)
   local steps = {}
   local cur
+  -- outside, a done line never shares a step with an open one (a replan keeps the done ones
+  -- first): the step would never read as done
+  local log = ns.LogEntries()
   local function close() if cur then table.insert(steps, cur) end cur = nil end
   for _, n in ipairs(order) do
     local np = NodePos(n)
+    local nok = ns.NodeOK(log, n) and true or false
     local same = false
     if cur then
       if n.ins and cur.ins == n.ins then same = true
+      elseif not n.ins and not cur.ins and n.area and cur.area == n.area then same = (nok == cur.ok)
       elseif not n.ins and not cur.ins and cur.loc and n.loc and cur.loc.m == n.loc.m then
         local d = math.sqrt((cur.loc.x - n.loc.x) ^ 2 + (cur.loc.y - n.loc.y) ^ 2)
-        same = d < 6 or (n.npc and cur.npcs[n.npc])
+        local l = cur.last
+        local d2 = (l and l.m == n.loc.m) and math.sqrt((l.x - n.loc.x) ^ 2 + (l.y - n.loc.y) ^ 2) or d
+        same = (d < 6 or (n.kind == "o" and d2 < 6) or (n.npc and cur.npcs[n.npc])) and nok == cur.ok
       elseif n.unknown and cur.unknown and cur.q == n.q then same = true end
     end
     if not same then
@@ -752,9 +1029,10 @@ function ns.MakeSteps(order)
           table.insert(steps, { gate = n.ins, d = n.ins, acts = {}, npcs = {} })
         end
       end
-      cur = { ins = n.ins, loc = n.loc, unknown = n.unknown, q = n.q, d = n.d, acts = {}, npcs = {}, pos = np }
+      cur = { ins = n.ins, loc = n.loc, unknown = n.unknown, q = n.q, d = n.d, acts = {}, npcs = {}, pos = np, area = n.area, ok = nok }
     end
     table.insert(cur.acts, n)
+    if n.loc and not n.ins then cur.last = n.loc end
     if n.npc then cur.npcs[n.npc] = true end
     if n.outer == false then cur.inner = true end
   end

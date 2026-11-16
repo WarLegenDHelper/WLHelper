@@ -760,6 +760,177 @@ function ns.TextStack(parent)
 end
 
 -- =====================================================================
+--  Window size rule (design system 3.1) and grids (3.22). Pure functions: no frame is made here.
+-- =====================================================================
+
+local function Clamp(v, lo, hi) if v < lo then v = lo end if v > hi then v = hi end return v end
+
+-- The screen in UI units (UIParent's size), secret-safe; 1366 x 768 when it cannot be read.
+-- A size under 320 x 240 is not a real screen (a test stub): the default is used.
+local function ScreenSide(given, getter, default, floor)
+  if type(given) == "number" and not secret(given) and given >= floor then return given end
+  if UIParent and UIParent[getter] then
+    local ok, v = pcall(UIParent[getter], UIParent)
+    if ok and type(v) == "number" and not secret(v) and v >= floor then return v end
+  end
+  return default
+end
+function ns.ScreenSize(uw, uh)
+  return ScreenSide(uw, "GetWidth", 1366, 320), ScreenSide(uh, "GetHeight", 768, 240)
+end
+
+-- The UI scale for real-pixel guards (1 when unknown, secret or not positive).
+function ns.UIScale()
+  if UIParent and UIParent.GetEffectiveScale then
+    local ok, s = pcall(UIParent.GetEffectiveScale, UIParent)
+    if ok and type(s) == "number" and not secret(s) and s > 0 then return s end
+  end
+  return 1
+end
+
+-- ns.WinSize(tier, uw, uh) -> defW, defH, minW, minH, maxW, maxH (UI units).
+--   "workspace": W = clamp(70 % of uw, min(900, 96 % uw), 1400), H = clamp(78 % of uh,
+--                min(620, 80 % uh), 900); the user drags between the minimums and 96 % x 90 %.
+--   "panel":     W = clamp(45 % of uw, min(560, 96 % uw), 860); the height fits the content
+--                (defH and minH are nil), capped at 80 % of uh.
+--   anything else: nil (hud windows keep their own fixed size).
+function ns.WinSize(tier, uw, uh)
+  uw, uh = ns.ScreenSize(uw, uh)
+  local fl = math.floor
+  local maxW = fl(uw * 0.96)
+  if tier == "workspace" then
+    local minW, minH = math.min(900, maxW), math.min(620, fl(uh * 0.80))
+    return Clamp(fl(uw * 0.70), minW, 1400), Clamp(fl(uh * 0.78), minH, 900), minW, minH, maxW, fl(uh * 0.90)
+  elseif tier == "panel" then
+    local minW = math.min(560, maxW)
+    return Clamp(fl(uw * 0.45), minW, math.max(860, minW)), nil, minW, nil, maxW, fl(uh * 0.80)
+  end
+  return nil
+end
+
+-- The standard grids (3.22), tuned here only. minPx: the real-pixel guard (3.21), min(200, minW).
+ns.GRID = {
+  settings    = { minW = 320, gap = 12, rowGap = 0,  maxCols = 3, minPx = 200 },  -- rows in a settings card
+  hubRows     = { minW = 280, gap = 12, rowGap = 6,  maxCols = 3, minPx = 200 },  -- Home lines
+  moduleTiles = { minW = 200, gap = 12, rowGap = 12, maxCols = 4, minPx = 200 },  -- General modules, Setup interests
+  profTiles   = { minW = 150, gap = 8,  rowGap = 8,  maxCols = 3, minPx = 150 },  -- Orders professions
+  cards       = { minW = 300, gap = 12, rowGap = 12, maxCols = 3, minPx = 200 },  -- Welcome, Help tasks, Keys, zones
+  orderCards  = { minW = 420, gap = 12, rowGap = 12, maxCols = 3, minPx = 200 },
+  toggles     = { minW = 200, gap = 12, rowGap = 0,  maxCols = 4, minPx = 200 },  -- Writs zones, weights
+  listGrid    = { minW = 300, gap = 12, rowGap = 0,  maxCols = 3, minPx = 200 },  -- dense rows as a grid
+}
+
+-- ns.Cols(w, minW, gap, maxCols [, minPx]) -> n, colW, xs, lastW
+--   n columns of at least minW (1..maxCols), whole pixels; the leftover pixels go to the last
+--   column (lastW). With minPx, columns are dropped until each keeps minPx real screen pixels.
+function ns.Cols(w, minW, gap, maxCols, minPx)
+  w = math.max(0, math.floor(tonumber(w) or 0))
+  gap = gap or 12
+  minW = math.max(1, minW or w)
+  maxCols = math.max(1, maxCols or 3)
+  local n = Clamp(math.floor((w + gap) / (minW + gap)), 1, maxCols)
+  local function ColW(k) return math.floor((w - (k - 1) * gap) / k) end
+  if minPx then
+    local sc = ns.UIScale()
+    while n > 1 and ColW(n) * sc < minPx do n = n - 1 end
+  end
+  local colW = math.max(0, ColW(n))
+  local xs = {}
+  for i = 1, n do xs[i] = (i - 1) * (colW + gap) end
+  return n, colW, xs, math.max(0, w - xs[n])
+end
+
+-- ns.Columns(w, n, gap) -> xs, colW, lastW: a fixed split (two panes).
+function ns.Columns(w, n, gap)
+  w = math.max(0, math.floor(tonumber(w) or 0)); n = math.max(1, n or 2); gap = gap or 16
+  local colW = math.max(0, math.floor((w - (n - 1) * gap) / n))
+  local xs = {}
+  for i = 1, n do xs[i] = (i - 1) * (colW + gap) end
+  return xs, colW, math.max(0, w - xs[n])
+end
+
+-- ns.Grid(): a reusable placer (no frame of its own). Cells go left to right, then the next line,
+-- in the order they are added (never reflowed by height).
+--   g:Begin(parent, x, y, w, { minW, gap, rowGap, maxCols, minPx, equal })   -- or ns.GRID.<name>
+--   g:Add(frame, fit [, { span = "full" }]) -> cell width, height
+--       fit(frame, cellW) -> height (nil: the frame's own height); the frame is anchored TOPLEFT of
+--       parent at the cell and given the cell width. span "full" closes the line, takes the whole
+--       width and opens a new line.
+--   g:Break()                      -- close the current line
+--   g:End() -> height, n, colW      -- height used from y (no trailing gap)
+-- g.cells = { { frame, x, y, w, h, line, col, full }, ... } and g.lines = { { y, h, n, full } }
+-- describe the last layout (x, y relative to the parent's top-left, y downward).
+function ns.Grid()
+  local g = { cells = {}, lines = {} }
+  local function CloseLine(self)
+    local line = self.cur
+    if not line or #line.cells == 0 then return end
+    if self.equal then
+      for _, c in ipairs(line.cells) do
+        c.h = line.h
+        if c.frame.SetHeight then c.frame:SetHeight(line.h) end
+      end
+    end
+    self.lines[#self.lines + 1] = { y = line.y, h = line.h, n = #line.cells, full = line.full }
+    self.bottom = line.y + line.h
+    self.y = self.bottom + self.rowGap
+    self.cur = nil
+  end
+  local function OpenLine(self, full)
+    self.cur = { y = self.y, h = 0, cells = {}, full = full }
+    return self.cur
+  end
+  local function Place(self, frame, fit, x, w, line, col, full)
+    if frame.ClearAllPoints then frame:ClearAllPoints() end
+    frame:SetPoint("TOPLEFT", self.parent, "TOPLEFT", self.x0 + x, -(self.y0 + line.y))
+    if frame.SetWidth then frame:SetWidth(w) end
+    local h = fit and fit(frame, w)
+    if type(h) ~= "number" then
+      local ok, fh = pcall(frame.GetHeight, frame)
+      h = (ok and type(fh) == "number" and not secret(fh)) and fh or 0
+    end
+    h = math.max(0, math.ceil(h))
+    local c = { frame = frame, x = x, y = line.y, w = w, h = h, line = #self.lines + 1, col = col, full = full }
+    line.cells[#line.cells + 1] = c
+    self.cells[#self.cells + 1] = c
+    if h > line.h then line.h = h end
+    return w, h
+  end
+  function g:Begin(parent, x, y, w, o)
+    o = o or {}
+    self.parent, self.x0, self.y0, self.w = parent, x or 0, y or 0, math.max(0, math.floor(w or 0))
+    self.gap = o.gap or 12
+    self.rowGap = o.rowGap or self.gap
+    self.equal = o.equal and true or false
+    self.n, self.colW, self.xs, self.lastW = ns.Cols(self.w, o.minW or self.w, self.gap, o.maxCols or 3, o.minPx)
+    self.y, self.bottom, self.cur = 0, 0, nil
+    self.cells, self.lines = {}, {}
+    return self
+  end
+  function g:Add(frame, fit, opts)
+    if opts and opts.span == "full" then
+      CloseLine(self)
+      local line = OpenLine(self, true)
+      local w, h = Place(self, frame, fit, 0, self.w, line, 1, true)
+      CloseLine(self)
+      return w, h
+    end
+    local line = self.cur
+    if line and #line.cells >= self.n then CloseLine(self); line = nil end
+    line = line or OpenLine(self, false)
+    local col = #line.cells + 1
+    local w = (col == self.n) and self.lastW or self.colW
+    return Place(self, frame, fit, self.xs[col], w, line, col, false)
+  end
+  function g:Break() CloseLine(self) end
+  function g:End()
+    CloseLine(self)
+    return self.bottom or 0, self.n, self.colW
+  end
+  return g
+end
+
+-- =====================================================================
 --  Tooltip: panel colour, 1 px dark edge, name first, facts muted, mouse lines in the link colour.
 -- =====================================================================
 local MOUSE_WORDS = { "^Clic", "^Click", "^Right%-click", "^Maj%-clic", "^Shift%-click", "^Ctrl%-clic", "^Ctrl%-click",

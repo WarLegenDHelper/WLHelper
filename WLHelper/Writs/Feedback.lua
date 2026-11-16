@@ -78,11 +78,21 @@ local function Link(kind)
     return REPO .. "?template=" .. f.template .. "&version=" .. Encode(Version()) .. "&context=" .. Encode(Context(kind))
 end
 
-local W = 520
-local CW = W - 32
+local CW = 614 - 32       -- the content width, read again by Dims() at every layout
 local TEXT_X = 28          -- the step's text starts after its number chip (20) and a gap of 8
 
 local win
+
+-- The width from the window (a panel, DESIGN 3.1: 576 to 860 from the screen, the player can drag
+-- it); not sized yet: the rule's default.
+local function WinW()
+    local w = win and win:GetWidth()
+    if type(w) ~= "number" or (root.IsSecret and root.IsSecret(w)) or w < 300 then
+        w = (root.WinSize and root.WinSize("panel")) or 614
+    end
+    return math.floor(w)
+end
+local function Dims() CW = WinW() - 32; return CW end
 
 -- A numbered step: the number in a soft round chip, the sentence beside it (wraps).
 local function Step(parent, n, text)
@@ -109,6 +119,8 @@ end
 
 local function Layout()
     if not win then return end
+    Dims()
+    if win.kinds.SetMaxWidth then win.kinds:SetMaxWidth(CW - TEXT_X) end
     local top = win:ContentTop() + 12
     local y = top
     local x = 16 + TEXT_X
@@ -146,7 +158,9 @@ local function ShowCopied(on)
 end
 
 local function Build()
-    win = S.Window("WLHelperFeedback", W, 300, L("Une idée, un bug ?"), nil, WLWritsDB, "feedbackPos", { header = 44, minH = 240 })
+    win = S.Window("WLHelperFeedback", (root.WinSize("panel")) or 614, 300, L("Une idée, un bug ?"), nil, WLWritsDB, "feedbackPos",
+        { header = 44, minH = 240, size = "panel" })
+    win.OnResize = function() Layout() end
     win.intro = S.Text(win, F.body, C.text)
     win.intro:SetJustifyH("LEFT"); win.intro:SetJustifyV("TOP"); win.intro:SetWordWrap(true)
     win.intro:SetText(L("Le jeu ne laisse pas les addons aller sur internet : tu nous écris depuis ton navigateur, en trois étapes."))
@@ -156,7 +170,6 @@ local function Build()
     local opts = {}
     for _, kind in ipairs(ORDER) do opts[#opts + 1] = { kind, L(FORMS[kind].label) } end
     win.kinds = S.Segmented(win, opts, function() return win.kind end, function(v) WP.Feedback(v) end, 28)
-    if win.kinds.SetMaxWidth then win.kinds:SetMaxWidth(CW - TEXT_X) end
     win.hint = S.Text(win, F.meta, C.muted)
     win.hint:SetJustifyH("LEFT"); win.hint:SetJustifyV("TOP")
 

@@ -562,6 +562,8 @@ end
 local ev = CreateFrame("Frame")
 pcall(ev.RegisterEvent, ev, "PLAYER_REGEN_ENABLED")
 pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
+-- the world map, when the client loads it later than you (Blizzard_WorldMap on demand)
+pcall(ev.RegisterEvent, ev, "ADDON_LOADED")
 
 -- ---------------------------------------------------------------- what is drawn
 
@@ -677,7 +679,8 @@ local function MapStep(size, mapUI, yards)
 end
 Trail._MapStep = MapStep
 
--- A map's rectangle in world yards (constant, kept): world -> map 0..1 is affine on every zone map.
+-- A map's rectangle in world yards (kept once known): world -> map 0..1 is affine on every zone map.
+-- A failed corner lookup is not kept (the map's data may not be there yet): asked again next draw.
 local rects = {}
 local function Rect(map)
     local r = rects[map]
@@ -688,7 +691,8 @@ local function Rect(map)
         local floor = Enum and Enum.UIMapType and Num(Enum.UIMapType.Continent) or 2
         if kind and kind < floor then rects[map] = false; return nil end
         local a, b = GPS.Point(map, 0, 0), GPS.Point(map, 100, 100)
-        r = (a and b and a.cont == b.cont and a.wx ~= b.wx and a.wy ~= b.wy) and { cont = a.cont, a = a, b = b } or false
+        if not (a and b and a.cont == b.cont and a.wx ~= b.wx and a.wy ~= b.wy) then return nil end
+        r = { cont = a.cont, a = a, b = b }
         rects[map] = r
     end
     return r or nil
@@ -697,46 +701,105 @@ local function ToMap(r, wx, wy)
     return (wy - r.a.wy) / (r.b.wy - r.a.wy), (wx - r.a.wx) / (r.b.wx - r.a.wx)
 end
 
--- The world map's dots for map `map`: { { x, y (0..1), alpha }, ... }, the pin { x, y } or nil, and the
--- spacing in yards. view (optional): { size = the dot (UI units), mapUI = the map's width on screen (UI
--- units), clip = { x0, y0, x1, y1 } the part of the map in view (0..1) }; without it, a medium dot on
--- a MAP_UI-wide map, all of it in view. Zoomed in, only the dots in view (and a margin) are made.
+-- OpenMap (another addon) can stitch every zone into one map on the world map's own canvas. While it
+-- does, the map underneath (WorldMapFrame:GetMapID()) is whatever zone, continent or the whole world the
+-- view sits on, and a world point's place on the canvas is OpenMapAPI.CanvasFromWorldPos (0..1 that
+-- map's rectangle, and past it: the view shows beyond it), not the map's own rectangle. Only read.
+local function Stitched()
+    local O = rawget(_G, "OpenMapAPI")
+    if type(O) ~= "table" or type(O.CanvasFromWorldPos) ~= "function" or type(O.IsStitched) ~= "function" then
+        return nil
+    end
+    local ok, on = pcall(O.IsStitched)
+    if ok and on == true then return O end
+end
+
+-- How a world point of continent `cont` lands on map `map`'s canvas: proj(cont, wx, wy) -> x, y (0..1 of
+-- the canvas, nil off it), and true when OpenMap stitches (the canvas then shows past 0..1). nil: that
+-- map has no place for the continent (another continent, the world map without OpenMap).
+local function Projection(map, cont)
+    local O = Stitched()
+    if O then
+        return function(c, wx, wy)
+            local ok, u, v = pcall(O.CanvasFromWorldPos, c, wx, wy)
+            u, v = ok and Num(u) or nil, ok and Num(v) or nil
+            if u and v then return u, v end
+        end, true
+    end
+    local r = map and Rect(map)
+    if not (r and r.cont == cont) then return nil end
+    return function(c, wx, wy) if c == r.cont then return ToMap(r, wx, wy) end end, false
+end
+Trail._Projection = Projection
+
+-- The projection near (wx, wy) as an affine map (exact on a zone, and on each of OpenMap's pieces):
+-- { u0, v0, wx, wy, a = du/dwx, b = du/dwy, c = dv/dwx, d = dv/dwy, det }, or nil.
+local function Affine(proj, cont, wx, wy)
+    local u0, v0 = proj(cont, wx, wy)
+    local u1, v1 = proj(cont, wx + 100, wy)
+    local u2, v2 = proj(cont, wx, wy + 100)
+    if not (u0 and u1 and u2) then return nil end
+    local m = { u0 = u0, v0 = v0, wx = wx, wy = wy, a = (u1 - u0) / 100, b = (u2 - u0) / 100,
+        c = (v1 - v0) / 100, d = (v2 - v0) / 100 }
+    m.det = m.a * m.d - m.b * m.c
+    if m.det == 0 then return nil end
+    return m
+end
+-- The world point at canvas fraction (u, v), and the canvas's width in yards.
+local function Unproject(m, u, v)
+    local du, dv = u - m.u0, v - m.v0
+    return m.wx + (m.d * du - m.b * dv) / m.det, m.wy + (m.a * dv - m.c * du) / m.det
+end
+local function WidthYards(m) return math.sqrt(m.c * m.c + m.d * m.d) / math.abs(m.det) end
+Trail._Affine, Trail._Unproject, Trail._WidthYards = Affine, Unproject, WidthYards
+
+-- The world map's dots for map `map`: { { x, y (canvas 0..1), alpha }, ... }, the pin { x, y } or nil,
+-- and the spacing in yards. view (optional): { size = the dot (UI units), mapUI = the canvas's width on
+-- screen (UI units), clip = { x0, y0, x1, y1 } the part of the canvas in view (fractions) }; without it,
+-- a medium dot on a MAP_UI-wide map, all of it in view. Zoomed in, only the dots in view (and a margin)
+-- are made. With OpenMap stitching, the dots past the map underneath are drawn too (the view shows them).
 function Trail.MapDots(map, view)
     local dots, pin = {}, nil
     if not (map and Trail.MapOn()) then return dots, pin end
     local cont, line, dest = Line()
-    local r = cont and Rect(map)
-    if not (r and r.cont == cont) then return dots, pin end
+    if not cont then return dots, pin end
+    local proj, stitched = Projection(map, cont)
+    local at = (line and line[1]) or dest
+    local m = proj and at and Affine(proj, cont, at.wx, at.wy)
+    if not m then return dots, pin end
+    view = view or {}
+    -- the canvas worth drawing on: the map (0..1); stitched, as far as the view goes (else a map round it)
+    local x0, y0, x1, y1 = 0, 0, 1, 1
+    if stitched then x0, y0, x1, y1 = -1, -1, 2, 2 end
+    local c = view.clip
+    if c then
+        local mx, my = (c[3] - c[1]) * 0.2, (c[4] - c[2]) * 0.2
+        x0, y0 = math.max(x0, c[1] - mx), math.max(y0, c[2] - my)
+        x1, y1 = math.min(x1, c[3] + mx), math.min(y1, c[4] + my)
+    end
     local spacing
-    if line then
-        view = view or {}
-        local width = math.abs(r.b.wy - r.a.wy)
-        spacing = MapStep(view.size or SIZES.map.medium, view.mapUI or MAP_UI, width)
-        local c = view.clip
-        local x0, y0, x1, y1 = 0, 0, 1, 1
+    if line and x1 > x0 and y1 > y0 then
+        spacing = MapStep(view.size or SIZES.map.medium, view.mapUI or MAP_UI, WidthYards(m))
         local list
         if c and (c[3] - c[1] < 0.95 or c[4] - c[2] < 0.95) then
-            -- zoomed in: the view and a fifth of it again round it, the dots made only in a circle round that
-            local mx, my = (c[3] - c[1]) * 0.2, (c[4] - c[2]) * 0.2
-            x0, y0, x1, y1 = c[1] - mx, c[2] - my, c[3] + mx, c[4] + my
-            local wyA, wyB = r.a.wy + x0 * (r.b.wy - r.a.wy), r.a.wy + x1 * (r.b.wy - r.a.wy)
-            local wxA, wxB = r.a.wx + y0 * (r.b.wx - r.a.wx), r.a.wx + y1 * (r.b.wx - r.a.wx)
-            list = Trail.Dots(line, spacing, nil, (wxA + wxB) / 2, (wyA + wyB) / 2, Yards(wxA, wyA, wxB, wyB) / 2)
-            x0, y0, x1, y1 = math.max(0, x0), math.max(0, y0), math.min(1, x1), math.min(1, y1)
+            -- zoomed in: the dots made only in a circle round the view and a fifth of it again
+            local ax, ay = Unproject(m, x0, y0)
+            local bx, by = Unproject(m, x1, y1)
+            list = Trail.Dots(line, spacing, nil, (ax + bx) / 2, (ay + by) / 2, Yards(ax, ay, bx, by) / 2)
         else
             list = Trail.Dots(line, spacing, MAP_CAP)
         end
         for _, d in ipairs(list) do
-            local x, y = ToMap(r, d.wx, d.wy)
-            if x >= x0 and x <= x1 and y >= y0 and y <= y1 then
+            local x, y = proj(cont, d.wx, d.wy)
+            if x and x >= x0 and x <= x1 and y >= y0 and y <= y1 then
                 dots[#dots + 1] = { x = x, y = y, alpha = Fade(d.along) }
                 if #dots >= MAP_CAP then break end
             end
         end
     end
     if dest then
-        local x, y = ToMap(r, dest.wx, dest.wy)
-        if x >= 0 and x <= 1 and y >= 0 and y <= 1 then pin = { x = x, y = y } end
+        local x, y = proj(cont, dest.wx, dest.wy)
+        if x and x >= x0 and x <= x1 and y >= y0 and y <= y1 then pin = { x = x, y = y } end
     end
     return dots, pin, spacing
 end
@@ -967,6 +1030,18 @@ end
 local function MapHidden()
     if mapTicker then mapTicker:Cancel(); mapTicker = nil end
 end
+-- OpenMap moves its stitched view itself (no pan of the scroll frame): its callbacks say when. Its own
+-- step, once: OpenMap may load after the world map was hooked (ADDON_LOADED "OpenMap" asks again).
+local openMapHooked = false
+local function HookOpenMap()
+    if openMapHooked then return end
+    local O = rawget(_G, "OpenMapAPI")
+    if type(O) ~= "table" or type(O.RegisterCallback) ~= "function" then return end
+    openMapHooked = true
+    local function redraw() pcall(Trail.RefreshMap) end
+    pcall(O.RegisterCallback, "WLHelperTrail", "OpenMap_ViewChanged", redraw)
+    pcall(O.RegisterCallback, "WLHelperTrail", "OpenMap_StitchedChanged", redraw)
+end
 local hooked = false
 local function HookMap()
     if hooked then return end
@@ -988,6 +1063,12 @@ local function HookMap()
         end
         pcall(W.AddDataProvider, W, p)
     end
+    -- the map's own "map set" signal too (a client whose map takes no data provider still sends it)
+    local R = rawget(_G, "EventRegistry")
+    if type(R) == "table" and R.RegisterCallback then
+        pcall(R.RegisterCallback, R, "MapCanvas.MapSet", function() pcall(Trail.RefreshMap) end, Trail)
+    end
+    HookOpenMap()
     if W.HookScript then
         W:HookScript("OnShow", MapShown)
         W:HookScript("OnHide", MapHidden)
@@ -1032,9 +1113,11 @@ function Trail.Refresh()
     pcall(Trail.RefreshMinimap)
 end
 
-ev:SetScript("OnEvent", function(_, event)
-    if event == "PLAYER_LOGIN" then
+ev:SetScript("OnEvent", function(_, event, name)
+    if event == "PLAYER_LOGIN" or (event == "ADDON_LOADED" and name == "Blizzard_WorldMap") then
         HookMap()
+    elseif event == "ADDON_LOADED" and name == "OpenMap" then
+        HookOpenMap()
     elseif event == "PLAYER_REGEN_ENABLED" and cur and cur.queued then
         cur.queued = nil
         Ask(cur)                         -- asked again from where the fight left you; the old path stays meanwhile

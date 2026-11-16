@@ -116,9 +116,13 @@ ns.AddEnglish({
     ["Afficher cette page et la liste dans le chat"] = "Show this page and the list in chat",
 })
 
-local W = 520
-local CW = W - 32            -- content width (inset 16 on both sides)
+-- A workspace window (DESIGN 3.1): its size comes from the screen (ns.WinSize) and the player can
+-- drag it; CW is the content width (inset 16 on both sides), read again by Dims() at every layout.
+local CW = 924 - 32
 local PAD = 12               -- card pad
+local TASK_GRID = { minW = 380, gap = 12, rowGap = 12, maxCols = 3, minPx = 200, equal = true }   -- 2 cols at 868-924, 3 from 1312
+local CMD_GRID = { minW = 420, gap = 12, rowGap = 0, maxCols = 2, minPx = 200, equal = true }
+local FAQ_MIN, FAQ_GAP, FAQ_MAXW = 360, 24, 480   -- the questions: columns of 360 or more, text 480 at most (4.2)
 
 -- ---------------------------------------------------------------- spotlight
 
@@ -517,18 +521,48 @@ local function TourCard(parent, onTour, onWelcome)
 end
 
 -- The questions: one card, each question a block heading (gold, DESIGN 3.21) over its answer (13
--- text); the heading's own space above sets the questions apart, no rule between them.
+-- text); the heading's own space above sets the questions apart, no rule between them. A wide card
+-- puts them in 2 or 3 columns (one text stack each, columns of 360 or more), in reading order,
+-- split so the columns hold about as much text; a column's text is 480 wide at most (4.2).
 local function FaqCard(parent, list)
     local c = CardBase(parent)
     c.list = list
     c.stack = root.TextStack(c)
-    function c:Fit(width)
-        local stk = self.stack
-        stk:Begin(PAD, PAD, width - 2 * PAD)
-        for _, q in ipairs(self.list) do
-            stk:Heading(q[1]); stk:Body(q[2])
+    c.stacks = { c.stack }
+    -- the questions of each of n columns: runs in order, of about the same length
+    local function Split(items, n)
+        local total = 0
+        for _, q in ipairs(items) do total = total + #q[1] + #q[2] end
+        local out, acc, col = { {} }, 0, 1
+        for i, q in ipairs(items) do
+            local left = #items - i + 1
+            -- the next column once this one has its share (or every column left needs one question)
+            if col < n and #out[col] > 0 and (acc >= total * col / n or left <= n - col) then
+                col = col + 1; out[col] = {}
+            end
+            table.insert(out[col], q)
+            acc = acc + #q[1] + #q[2]
         end
-        local total = math.ceil(PAD + stk:End() + PAD)
+        return out
+    end
+    function c:Fit(width)
+        local inner = width - 2 * PAD
+        local n = math.max(1, math.min((ns.Cols(inner, FAQ_MIN, FAQ_GAP, 3, 200)), #self.list))
+        local xs, colW = ns.Columns(inner, n, FAQ_GAP)
+        local textW = n > 1 and math.min(colW, FAQ_MAXW) or inner
+        local runs = n > 1 and Split(self.list, n) or { self.list }
+        local tallest = 0
+        for k = 1, math.max(#self.stacks, n) do
+            local stk = self.stacks[k]
+            if not stk then stk = root.TextStack(self); self.stacks[k] = stk end
+            stk:Begin(PAD + (xs[k] or 0), PAD, textW)
+            for _, q in ipairs(runs[k] or {}) do
+                stk:Heading(q[1]); stk:Body(q[2])
+            end
+            tallest = math.max(tallest, stk:End())
+        end
+        self.cols, self.colW = n, colW
+        local total = math.ceil(PAD + tallest + PAD)
         self:SetHeight(total)
         return total
     end
@@ -553,7 +587,7 @@ local function CommandsCard(parent, list, onRun)
         r.desc:SetJustifyH("LEFT"); r.desc:SetJustifyV("TOP")
         r.desc:SetText(cmd[2])
         r.word = cmd[3]
-        if i > 1 then r.rule = S.Rule(r); r.rule:SetPoint("TOPLEFT", PAD, 0); r.rule:SetPoint("TOPRIGHT", -PAD, 0) end
+        r.rule = S.Rule(r); r.rule:SetPoint("TOPLEFT", PAD, 0); r.rule:SetPoint("TOPRIGHT", -PAD, 0)
         if r.word then
             r:SetScript("OnEnter", function(self)
                 root.Tween(self, self.hov or 0, 1, 0.10, function(v) self.hov = v; self.hl:SetAlpha(v) end)
@@ -571,19 +605,23 @@ local function CommandsCard(parent, list, onRun)
         end
         c.rows[i] = r
     end
+    -- the rows flow in 2 columns of 420 or more (reading order: left to right, then down), with a
+    -- rule above every row but those of the first line
+    c.grid = ns.Grid()
     function c:Fit(width)
-        local y = 4
-        local descW = width - PAD - CMD_W - PAD
+        local g = self.grid
+        g:Begin(self, 0, 4, width, CMD_GRID)
         for _, r in ipairs(self.rows) do
-            local h = math.ceil(S.FitText(r.desc, 2, descW, r))
-            r.desc:ClearAllPoints(); r.desc:SetPoint("TOPLEFT", PAD + CMD_W, -7)
-            local rh = math.max(28, h + 14)
-            r:ClearAllPoints()
-            r:SetPoint("TOPLEFT", 0, -y); r:SetPoint("TOPRIGHT", 0, -y)
-            r:SetHeight(rh)
-            y = y + rh
+            g:Add(r, function(row, w)
+                local h = math.ceil(S.FitText(row.desc, 2, w - PAD - CMD_W - PAD, row))
+                row.desc:ClearAllPoints(); row.desc:SetPoint("TOPLEFT", PAD + CMD_W, -7)
+                return math.max(28, h + 14)
+            end)
         end
-        local total = y + 4
+        local gh = g:End()
+        for _, cell in ipairs(g.cells) do cell.frame.rule:SetShown(cell.line > 1) end
+        self.cols = g.n
+        local total = 4 + gh + 4
         self:SetHeight(total)
         return total
     end
@@ -594,9 +632,22 @@ end
 
 local win
 
--- Places every block in the scroll area (inset 16, 12 under the header rule) and fits the window.
+-- The content width from the window's width (not sized yet: the rule's default).
+local function Dims()
+    local w = win and win:GetWidth()
+    if type(w) ~= "number" or (root.IsSecret and root.IsSecret(w)) or w < 400 then
+        w = (root.WinSize and root.WinSize("workspace")) or 924
+    end
+    CW = math.floor(w) - 32
+    return CW
+end
+
+-- Places every block in the scroll area (inset 16, 12 under the header rule): the tour card on the
+-- whole width, the task cards in a grid (2 columns, 3 from 1312 of content), the questions in
+-- columns, the commands in 2 columns. The window keeps its size: the page scrolls inside.
 local function Layout()
     if not win then return end
+    Dims()
     local inner = win.inner
     local y = 12
     local function Place(f, h, gap)
@@ -607,9 +658,11 @@ local function Layout()
         y = y + h + (gap or 0)
     end
     if win.tour then Place(win.tour, win.tour:Fit(CW), 16) end
-    for i, card in ipairs(win.tasks) do
-        Place(card, card:Fit(CW), i < #win.tasks and 12 or 0)
-    end
+    local g = win.taskGrid
+    g:Begin(inner, 16, y, CW, TASK_GRID)
+    for _, card in ipairs(win.tasks) do g:Add(card, function(f, w) return f:Fit(w) end) end
+    y = y + g:End()
+    win.taskCols = g.n
     y = y + 16
     Place(win.faqHead, 32, 8)
     Place(win.faq, win.faq:Fit(CW), 0)
@@ -630,7 +683,9 @@ local function Run(word)
 end
 
 local function Build()
-    win = S.Window("WLHelperHelp", W, 400, L("Comment faire... ?"), nil, WLWritsDB, "helpPos", { header = 44, minH = 240 })
+    local w0, h0 = root.WinSize("workspace")
+    win = S.Window("WLHelperHelp", w0 or 924, h0 or 614, L("Comment faire... ?"), nil, WLWritsDB, "helpPos",
+        { header = 44, size = "workspace" })
     local sa = S.ScrollArea(win)
     sa:SetPoint("TOPLEFT", win, "TOPLEFT", 0, -(win.headerH + 1))
     sa:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", 0, 0)
@@ -646,6 +701,7 @@ local function Build()
             function() win:Hide(); if WP.OpenHub then WP.OpenHub("welcome") end end)
     end
     win.tasks = {}
+    win.taskGrid = ns.Grid()
     for _, t in ipairs(Tasks()) do win.tasks[#win.tasks + 1] = TaskCard(win.inner, t, onShow) end
     win.faqHead = S.SectionHeader(win.inner, L("Questions fréquentes"))
     win.faq = FaqCard(win.inner, Questions())
@@ -655,6 +711,8 @@ local function Build()
         win:Hide(); if WP.Feedback then WP.Feedback("idea") end
     end)
     win.more:SetChevron(true)
+    -- dragged to a new size: lay out again (layout only, the cards stay)
+    win.OnResize = function() Layout() end
     -- wrapped heights are right once the widths are applied: measure again on the next frame
     win:SetScript("OnShow", function()
         Layout()

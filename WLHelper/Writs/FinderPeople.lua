@@ -56,6 +56,12 @@ local F = WP.Finder
 if not F then return end
 
 ns.AddEnglish({
+    -- Settings > Groupes: the one-line descriptions (the full ones are in the tooltips)
+    ["Sinon, tu écris toi-même le chuchotement."] = "Else you write the whisper yourself.",
+    ["Jusqu'à la déconnexion, jamais sur disque."] = "Until you log out, never saved to disk.",
+    ["Guilde et Ami marqués et mis en premier."] = "Guild and Friend tagged and listed first.",
+    ["Une ligne de chat par joueur et session."] = "One chat line per player and session.",
+    ["Une ligne de chat, au plus toutes les 5 min."] = "One chat line, at most every 5 minutes.",
     ["Messages"] = "Messages",
     ["Joueurs récents"] = "Recent players",
     ["Message reçu en donjon (illisible)"] = "Message received in a dungeon (unreadable)",
@@ -375,8 +381,15 @@ function F.ImportRatings()
 end
 
 -- ================================================================= the Messages tab
-local PAD, TW = 16, 640
-local CW = TW - 2 * PAD
+-- the widths come from the Groups window at render time (Writs/Events.lua WP.EventsDims): the
+-- window is a workspace window the player can resize
+local PAD = 16
+local CW = 924
+local function Dims()
+    local d = WP.EventsDims and WP.EventsDims()
+    if d then CW = d.CW end
+    return CW
+end
 local mui = {}
 local function MsgRow(parent)
     local r = CreateFrame("Button", nil, parent)
@@ -429,6 +442,7 @@ local function MsgRow(parent)
     r:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); S.HideTip() end)
     function r:Paint(th, open)
         self.th = th
+        self:SetWidth(CW)
         local hidden = th.name == nil
         if th.cls and S.ClassIcon(self.cls, th.cls) then self.cls:Show() else self.cls:Hide() end
         self.dot:SetShown(th.unread == true)
@@ -497,6 +511,7 @@ end
 function F.RenderMessages(inserted)
     local page = mui.page
     if not (page and page:IsShown()) then return end
+    Dims()
     local atTop = true
     if inserted and mui.sa.GetScroll then
         atTop = (mui.sa:GetScroll() or 0) <= 2
@@ -588,8 +603,10 @@ local function PlayerRow(parent)
     r:SetScript("OnClick", function(self, button) if button == "RightButton" and self.p then F.Menu(self, self.p.name, nil, self.p.guid) end end)
     r:SetScript("OnEnter", function(self) self.hl:SetAlpha(1); if self.p then S.Tip(self, { self.p.name, L("Clic droit : plus d'actions") }) end end)
     r:SetScript("OnLeave", function(self) self.hl:SetAlpha(0); S.HideTip() end)
-    function r:Paint(p)
+    function r:Paint(p, width)
         self.p = p
+        width = width or CW
+        self:SetWidth(width)
         if p.class and S.ClassIcon(self.cls, p.class) then self.cls:Show() else self.cls:Hide() end
         self.name:SetText(Short(p.name))
         local c = ClassColor(p.class)
@@ -599,7 +616,7 @@ local function PlayerRow(parent)
         if p.zone then parts[#parts + 1] = p.zone end
         if p.t and p.t > 0 then parts[#parts + 1] = AgoLong(p.t) end
         self.detail:SetText(table.concat(parts, " · "))
-        local w = CW - 36 - 80
+        local w = width - 36 - 80
         self.name:SetWidth(w); self.detail:SetWidth(w)
         self.stars:Set(F.RatingOf(p.name))
         local rec = F.Ratings()[F.NormName(p.name) or ""]
@@ -632,9 +649,13 @@ local function BuildPlayers(page, win)
     page:HookScript("OnShow", function() for _, e in ipairs(evs) do pcall(evp.RegisterEvent, evp, e) end end)
     page:HookScript("OnHide", function() for _, e in ipairs(evs) do pcall(evp.UnregisterEvent, evp, e) end end)
 end
+-- the players in 1 to 3 columns (cells of 300 at least, DESIGN 3.22), one line's cells as tall as
+-- the tallest (a note makes a row taller)
+local PLAYER_GRID = { minW = 300, gap = 12, rowGap = 2, maxCols = 3, minPx = 200, equal = true }
 function F.RenderPlayers()
     local page = pui.page
     if not (page and page:IsShown()) then return end
+    Dims()
     local y = 12
     local importable = (F.DB().imported ~= true) and #F.ImportableRatings() or 0
     if importable > 0 then
@@ -645,13 +666,18 @@ function F.RenderPlayers()
     local top = y
     local list = F.RecentPlayers()
     local cy = 0
-    for i, p in ipairs(list) do
-        local r = pui.rows[i]
-        if not r then r = PlayerRow(pui.content); pui.rows[i] = r end
-        r:Show()
-        local h = r:Paint(p)
-        Place(r, 0, cy)
-        cy = cy + h + 2
+    pui.grid = pui.grid or ns.Grid()
+    pui.content:SetWidth(CW)
+    if #list > 0 then
+        local g = pui.grid
+        g:Begin(pui.content, 0, 0, CW, PLAYER_GRID)
+        for i, p in ipairs(list) do
+            local r = pui.rows[i]
+            if not r then r = PlayerRow(pui.content); pui.rows[i] = r end
+            r:Show()
+            g:Add(r, function(f, w) return f:Paint(p, w) end)
+        end
+        cy = g:End()
     end
     for i = #list + 1, #pui.rows do pui.rows[i]:Hide() end
     if #list == 0 then
@@ -681,29 +707,8 @@ if WP.RegisterGroupTab then
 end
 
 -- ================================================================= Settings > Groupes
-local function Switch(parent, label, desc, get, set)
-    local r = CreateFrame("Button", nil, parent)
-    r.wlOwned = true
-    r.rule = S.Rule(r); r.rule:SetPoint("TOPLEFT"); r.rule:SetPoint("TOPRIGHT")
-    r.label = S.Text(r, FS.body, C.fg); r.label:SetText(label)
-    r.desc = S.Text(r, FS.meta, C.muted); r.desc:SetText(desc or "")
-    r.switch = S.Switch(r, get, set)
-    r.switch:SetPoint("TOPRIGHT", 0, -8)
-    r.switch:AttachRow(r)
-    function r:Fit(w)
-        self:SetWidth(w)
-        local textW = w - 40 - 12
-        Place(self.label, 0, 8)
-        local lh = S.FitText(self.label, 2, textW, self)
-        Place(self.desc, 0, 8 + lh + 3)
-        local h = 8 + lh + 3 + S.FitText(self.desc, 0, textW, self) + 8
-        h = math.max(36, math.ceil(h))
-        self:SetHeight(h)
-        self.switch:Update()
-        return h
-    end
-    return r
-end
+-- The 5 switches in one S.SettingsCard (2 columns from 652 of width, 3 from 984); the two message
+-- templates side by side from 640, then the sentence about the placeholders (480 at most, 4.2).
 local function TemplateBox(parent, kind, label)
     local b = {}
     b.label = S.Text(parent, FS.body, C.fg); b.label:SetText(label)
@@ -731,41 +736,71 @@ local function TemplateBox(parent, kind, label)
 end
 WP.GroupsPage = {
     Build = function(p, width)
-        local CWp = math.floor((width or 660) - 32)
+        local pageW = math.floor(width or 660)
         local ask = TemplateBox(p, "ask", L("Message pour demander à rejoindre"))
         local inv = TemplateBox(p, "invite", L("Message d'invitation"))
         local help = S.Text(p, FS.meta, C.muted)
         help:SetText(L("Remplacés à l'envoi : %class%, %level%, %role%, %talents%, %dungeon%, %quests%. Vide : la fenêtre de chuchotement s'ouvre à la place."))
         help:SetJustifyH("LEFT")
-        local rows = {
-            Switch(p, L("Envoyer le message tout seul"), L("Sinon, la fenêtre de chuchotement s'ouvre avec le nom, et tu écris toi-même."),
-                function() return F.AutoSend() end, function(v) if WLWritsCharDB then WLWritsCharDB.finderAutoSend = v and true or false end end),
-            Switch(p, L("Garder les chuchotements dans Groupes"), L("Gardés en mémoire jusqu'à la déconnexion, jamais écrits sur le disque."),
-                function() return F.KeepWhispersOn() end, function(v) F.SetSetting("keepWhispers", v) end),
-            Switch(p, L("Marquer la guilde et les amis"), L("Dans les résultats : Guilde, Ami, et l'ordre qui les met en premier."),
-                function() return F.Setting("markRelations", true) end, function(v) F.SetSetting("markRelations", v) end),
-            Switch(p, L("Avertir quand un joueur noté À éviter rejoint"), L("Une ligne dans le chat, une fois par joueur et par session."),
-                function() return F.WarnAvoidOn() end, function(v) F.SetSetting("warnAvoid", v) end),
-            Switch(p, L("Proposer de noter après un départ"), L("Une ligne dans le chat, au plus une fois toutes les 5 minutes."),
-                function() return F.LeaverPromptOn() end, function(v) F.SetSetting("leaverPrompt", v) end),
-        }
-        local function Layout()
-            local y = 16
-            for _, b in ipairs({ ask, inv }) do
-                b:Sync()
-                Place(b.label, 16, y); y = y + FS.body + 6
-                Place(b.box, 16, y); b.box:SetSize(CWp, 56); y = y + 56 + 4
-                Place(b.reset, 16, y); y = y + 24 + 12
+        local card = S.SettingsCard(p)
+        local function Row(label, desc, long, get, set)
+            return card:AddRow({ label = label, desc = desc, long = long, control = "switch", get = get, set = set })
+        end
+        Row(L("Envoyer le message tout seul"), L("Sinon, tu écris toi-même le chuchotement."),
+            L("Sinon, la fenêtre de chuchotement s'ouvre avec le nom, et tu écris toi-même."),
+            function() return F.AutoSend() end, function(v) if WLWritsCharDB then WLWritsCharDB.finderAutoSend = v and true or false end end)
+        Row(L("Garder les chuchotements dans Groupes"), L("Jusqu'à la déconnexion, jamais sur disque."),
+            L("Gardés en mémoire jusqu'à la déconnexion, jamais écrits sur le disque."),
+            function() return F.KeepWhispersOn() end, function(v) F.SetSetting("keepWhispers", v) end)
+        Row(L("Marquer la guilde et les amis"), L("Guilde et Ami marqués et mis en premier."),
+            L("Dans les résultats : Guilde, Ami, et l'ordre qui les met en premier."),
+            function() return F.Setting("markRelations", true) end, function(v) F.SetSetting("markRelations", v) end)
+        Row(L("Avertir quand un joueur noté À éviter rejoint"), L("Une ligne de chat par joueur et session."),
+            L("Une ligne dans le chat, une fois par joueur et par session."),
+            function() return F.WarnAvoidOn() end, function(v) F.SetSetting("warnAvoid", v) end)
+        Row(L("Proposer de noter après un départ"), L("Une ligne de chat, au plus toutes les 5 min."),
+            L("Une ligne dans le chat, au plus une fois toutes les 5 minutes."),
+            function() return F.LeaverPromptOn() end, function(v) F.SetSetting("leaverPrompt", v) end)
+        p.groupsCard = card
+        p.templates = { ask, inv }
+        -- width: given by the caller, else the Hub's width now (p.hubWidth, set before each
+        -- p:Layout), else the page's own width (when readable), else the width it was built at.
+        -- The page follows a new width itself: the Hub lays it out again instead of rebuilding it.
+        p.wlResizes = true
+        local function Layout(w)
+            w = tonumber(w) or tonumber(p.hubWidth)
+            if not w then
+                local ok, pw = pcall(p.GetWidth, p)
+                if ok and type(pw) == "number" and not (root.IsSecret and root.IsSecret(pw)) and pw >= 320 then w = pw end
             end
-            Place(help, 16, y); y = y + S.FitText(help, 0, CWp, p) + 16
-            for _, r in ipairs(rows) do Place(r, 16, y); y = y + r:Fit(CWp) end
-            y = math.ceil(y + 16)
+            pageW = math.floor(w or pageW)
+            local CWp = pageW - 32
+            local y = 16
+            card:Update()
+            Place(card, 16, y)
+            y = y + card:Fit(CWp) + 24
+            -- the two templates: side by side from 640, else one under the other
+            local twoCols = CWp >= 640
+            local xs, colW = ns.Columns(CWp, twoCols and 2 or 1, 16)
+            local rowY, rowH = y, 0
+            for i, b in ipairs({ ask, inv }) do
+                b:Sync()
+                local x = 16 + (twoCols and xs[i] or 0)
+                local by = twoCols and rowY or y
+                Place(b.label, x, by); by = by + FS.body + 6
+                Place(b.box, x, by); b.box:SetSize(colW, 56); by = by + 56 + 4
+                Place(b.reset, x, by); by = by + 24
+                if twoCols then rowH = math.max(rowH, by - rowY) else y = by + 12 end
+            end
+            if twoCols then y = rowY + rowH + 12 end
+            Place(help, 16, y); y = y + S.FitText(help, 0, math.min(CWp, 480), p) + 16
+            y = math.ceil(y)
             p.contentH = y
             if p.sa then p.sa:SetContentHeight(y) end
             return y
         end
-        function p:Layout() return Layout() end
-        Layout()
+        function p:Layout(w) return Layout(w) end
+        Layout(pageW)
     end,
 }
 

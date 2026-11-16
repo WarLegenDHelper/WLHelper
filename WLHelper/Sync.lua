@@ -5,12 +5,15 @@
 -- (« X a déjà terminé cette quête », « X a accepté ta quête »...).
 -- ns.party[who][qid] = "on" | "ready" | "done" | "take" | "low" | "pre"; ns.partyPre[who][qid] = id
 -- of the missing link; ns.partyPush[who][qid] = what the game said after a share.
+-- ns.partyStep[who] = the key of the guide step the member is at (one "@<key>" token at the end of
+-- the message; older versions skip it), for the guide's "See where <member> is".
 local ADDON, ns = ...
 local PREFIX = "WLDT"
 ns.party = {}
 ns.partyPre = {}
 ns.partyKeys = {}    -- [who] = { dkey = true }: dungeons whose quests the member's last message covers
 ns.partyPush = {}
+ns.partyStep = {}
 ns.syncKeys = {}     -- dungeons the group asked about (my summary, the others' requests)
 
 local CI = C_ChatInfo
@@ -149,6 +152,17 @@ local function Sent(ok, res)
   return true
 end
 
+-- My current guide step as one token: "@" + its key (a comma, the separator, written ";"); none
+-- when the guide has no current step or the key is long (the message stays small)
+local function StepToken()
+  local f = ns.frame
+  local steps = ns.route and ns.route.steps
+  local st = f and f.auto and steps and steps[f.auto]
+  local k = st and st.key
+  if type(k) ~= "string" or k == "" or #k > 80 then return nil end
+  return "@" .. (k:gsub(",", ";"))
+end
+
 -- fromTimer == "retry": the call that waited out the gap, it sends
 function ns.SyncSend(force, fromTimer)
   if ns.GuideOn and not ns.GuideOn() then return end
@@ -157,6 +171,13 @@ function ns.SyncSend(force, fromTimer)
   local sig = TokenSig()
   if sig ~= tokSig or not tokCache then tokSig = sig; tokCache, keyCache = ns.SyncTokens() end
   local toks, keys = tokCache, keyCache
+  local stp = StepToken()
+  if stp then
+    local t2 = {}
+    for k2, v in ipairs(toks) do t2[k2] = v end
+    t2[#t2 + 1] = stp
+    toks = t2
+  end
   local payload = table.concat(keys, ",") .. ":" .. table.concat(toks, ",")
   if payload == lastSent and not force then return end
   -- throttled, the timers too: one full message every MIN_GAP seconds at most, the parts 0.2 s apart
@@ -188,6 +209,11 @@ Schedule = function(delay, retry)
   pending = true
   local fn = function() pending = false; ns.SyncSend(false, retry and "retry" or true) end
   if C_Timer and C_Timer.After then C_Timer.After(delay or 2, fn) else fn() end
+end
+
+-- The guide's current step changed: the group hears it with the next message (throttled as usual)
+function ns.SyncStepChanged()
+  if Channel() then Schedule(1) end
 end
 
 -- My summary is open on these dungeons: ask the group for their quests (and send mine).
@@ -255,7 +281,11 @@ local function OnMessage(prefix, msg, channel, sender)
   local b = buf[who]
   if not b then return end   -- the first part was missed: wait for the next full message
   for tok in body:gmatch("[^,]+") do
-    if v2 then
+    if tok:sub(1, 1) == "@" then
+      -- the member's current guide step
+      local k = tok:sub(2):gsub(";", ",")
+      if k ~= "" and #k <= 80 then b.step = k end
+    elseif v2 then
       local id, code, pid = tok:match("^(%d+)(%a)(%d*)$")
       id = tonumber(id)
       if id and CODES[code] then
@@ -269,6 +299,7 @@ local function OnMessage(prefix, msg, channel, sender)
   end
   if i == n then
     ns.party[who], ns.partyPre[who], ns.partyKeys[who] = b.st, b.pre, b.keys
+    ns.partyStep[who] = b.step
     buf[who] = nil
     Changed()
   end
@@ -449,7 +480,7 @@ end
 local function Prune()
   local keep = {}
   for _, m in ipairs(ns.GroupMembers()) do keep[m.name] = true end
-  for _, t in ipairs({ ns.party, ns.partyPre, ns.partyKeys, ns.partyPush, ns.pushQ }) do
+  for _, t in ipairs({ ns.party, ns.partyPre, ns.partyKeys, ns.partyPush, ns.pushQ, ns.partyStep }) do
     for who in pairs(t) do if not keep[who] then t[who] = nil end end
   end
 end
@@ -468,7 +499,7 @@ ev:SetScript("OnEvent", function(_, e, ...)
     if ch and not wasGrouped then pcall(Send, PREFIX, "HELLO", ch); lastSent = "" end
     wasGrouped = ch ~= nil
     if not ch then
-      for _, t in ipairs({ ns.party, ns.partyPre, ns.partyKeys, ns.partyPush, ns.pushQ, ns.syncKeys }) do wipe(t) end
+      for _, t in ipairs({ ns.party, ns.partyPre, ns.partyKeys, ns.partyPush, ns.pushQ, ns.syncKeys, ns.partyStep }) do wipe(t) end
     end
     -- the summary and the guide follow, once per burst of roster events
     Changed()

@@ -92,9 +92,12 @@ ns.AddEnglish({
         "For \"Go to\", the arrow follows a real path round hills and through gates (WL Helper Nav). Without it, it points straight there.",
 })
 
-local W = 420                 -- a single list (design system: 420)
+-- A panel window (DESIGN 3.1: ~45 % of the screen wide, 560 to 860, width resizable and saved,
+-- height fits the content). W and CW are the window's width now (Dims, from the window).
+local W = 576
 local INSET = 16
 local CW = W - 2 * INSET
+local GRID_SERVICES = { minW = 180, gap = 12, rowGap = 2, maxCols = 3, minPx = 180 }
 local MAX = 8                 -- results shown
 local RECENT_MAX = 3
 local NAV_ADDON = "WLHelper_Nav"
@@ -896,6 +899,12 @@ function GoTo.Trip() return trip end
 -- ---------------------------------------------------------------- the window
 
 local win, rows, heads = nil, {}, {}
+local function Dims()
+    local w = win and Num(win:GetWidth())
+    if not (w and w > 0) then w = (ns.WinSize and ns.WinSize("panel")) or 576 end
+    W = math.floor(w)
+    CW = W - 2 * INSET
+end
 local pending
 local MOVE = 3             -- yards walked before the list is measured again
 local TRACK = 0.5          -- seconds between two looks at where you are
@@ -1011,16 +1020,28 @@ local function Fill(groups)
                 h:Set(g.title); h:Show()
                 y = y + 24 + 4
             end
+            -- the nearest services side by side (2-3 per line by the width); the others one per line
+            local grid
+            if g.grid then
+                g.layout = g.layout or ns.Grid()
+                grid = g.layout
+                grid:Begin(child, 0, y, CW, GRID_SERVICES)
+            end
             for _, r in ipairs(g.items) do
                 n = n + 1
                 local row = rows[n] or MakeRow(child)
                 rows[n] = row
                 row.result = r
-                row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y); row:SetPoint("TOPRIGHT", 0, -y)
                 row:Set({ name = r.label, detail = r.detail, value = Value(r) })
                 row:Show()
-                y = y + row:Fit(CW) + 2
+                if grid then
+                    grid:Add(row, function(f, w) return f:Fit(w) end)
+                else
+                    row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y); row:SetWidth(CW)
+                    y = y + row:Fit(CW) + 2
+                end
             end
+            if grid then y = y + grid:End() + 2 end
         end
     end
     for i = n + 1, #rows do rows[i]:Hide(); rows[i].result = nil end
@@ -1032,8 +1053,9 @@ local function Layout(listH, emptyShown)
     local top = win:ContentTop() + 12
     local y = top
     win.intro:ClearAllPoints(); win.intro:SetPoint("TOPLEFT", INSET, -y)
-    y = y + math.ceil(S.FitText(win.intro, 0, CW, win)) + 12
+    y = y + math.ceil(S.FitText(win.intro, 3, CW, win)) + 12
     win.box:ClearAllPoints(); win.box:SetPoint("TOPLEFT", INSET, -y)
+    win.box:SetWidth(CW)
     y = y + 28
     if win.box.err:IsShown() then y = y + 4 + 14 end
     local listTop = y + 12
@@ -1077,7 +1099,7 @@ local function Render()
             if r then svc[#svc + 1] = r end
         end
         -- always titled: a lost player sees what the list is before reading it
-        groups[#groups + 1] = { title = L("Services les plus proches"), items = svc }
+        groups[#groups + 1] = { title = L("Services les plus proches"), items = svc, grid = true }
     elseif #Norm(text) < 2 then
         win.box:SetError(L("Tape au moins 2 lettres."))
     else
@@ -1156,6 +1178,8 @@ local function Track()
     if redo then Redraw() end
 end
 GoTo._Track = Track
+-- test access: places these groups as the list (no search), as a redraw does
+function GoTo._Place(groups) win.groups, win.emptyShown = groups, false; Redraw() end
 
 local function StartTrack()
     if tracker or not (C_Timer and C_Timer.NewTicker) then return end
@@ -1173,7 +1197,9 @@ local function Soon()
 end
 
 local function Build()
-    win = S.Window("WLHelperGoTo", W, 300, L("Aller à"), nil, WLWritsDB, "gotoPos", { header = S.HEADER_H, footer = true, minH = 160 })
+    win = S.Window("WLHelperGoTo", W, 300, L("Aller à"), nil, WLWritsDB, "gotoPos",
+        { header = S.HEADER_H, footer = true, minH = 160, size = "panel" })
+    Dims()
     win.intro = S.Text(win, F.body, C.text)
     win.intro:SetJustifyH("LEFT"); win.intro:SetJustifyV("TOP")
     win.intro:SetText(L("Tape un lieu, un service ou un PNJ : la flèche t'y emmène."))
@@ -1191,7 +1217,9 @@ local function Build()
     win.list = S.ScrollArea(win)
     win.empty = S.EmptyState(win, "search", L("Aucun lieu trouvé"), nil)
     win.empty:Hide()
-    win:SetScript("OnShow", function() win.list:ScrollTo(0, true); Render(); StartTrack() end)
+    win:SetScript("OnShow", function() Dims(); win.list:ScrollTo(0, true); Render(); StartTrack() end)
+    -- a new width: the same results placed again (no search)
+    win.OnResize = function() Dims(); Redraw() end
     -- the list stops following you when the window closes
     if win.HookScript then win:HookScript("OnHide", StopTrack) else win:SetScript("OnHide", StopTrack) end
 end
@@ -1206,6 +1234,7 @@ function GoTo.Show(text)
     win.box:SetFocus()
 end
 function GoTo.Hide() if win then win:Hide() end end
+function GoTo._UI() return win, rows, heads, CW end   -- test access
 function GoTo.Toggle() if win and win:IsShown() then win:Hide() else GoTo.Show() end end
 
 -- /wlh aller [lieu]: the window, searching what follows the word.

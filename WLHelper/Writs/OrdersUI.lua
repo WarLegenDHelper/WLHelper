@@ -322,21 +322,45 @@ ns.AddEnglish({
         "Missing from your bags: %s. Take them out of the bank or buy them, then click again.",
 })
 
--- one window, 640 wide (a wide tool: five tabs with their counters fit); content inset 16
-local W, PAD = 640, 16
+-- one workspace window (spec_ui_width 1.1: ~70 % of the screen, resizable, size saved); content
+-- inset 16. Every width below is derived from the window's width by Dims(), on open and on resize.
+local W, PAD = 900, 16
 local CW = W - 2 * PAD
--- The Crafters tab in two columns (T-55, T-57): the professions on the left (200), a 1 px rule at
--- x = 216 of the page, what you look at on the right (376, from x = 232): the search and your
--- sharing, a profession's catalogue, a search's results or a crafter's recipes.
--- 200 + 16 + 1 + 15 + 376 = 608. While nobody shares anything, the page stays one column.
+-- The Crafters tab in two columns (T-55, T-57): the professions on the left (LW, 200-260), a 1 px
+-- rule at x = LW + 16 of the page, what you look at on the right (RW, from x = LW + 32): the
+-- search, a profession's catalogue, a search's results, a crafter's recipes or the home.
+-- While nobody shares anything, the page stays one column.
 local LW = 200
 local RULE_X = LW + 16
 local RX = RULE_X + 1 + 15
 local RW = CW - RX
 local findW = CW   -- the width of the Crafters tab's right side (CW while it is one column)
 local win, tabs, pages, current = nil, nil, {}, "find"
+-- the widths from the window's width (spec 1.2): CW = W - 32, LW = clamp(CW * 0.22, 200, 260),
+-- RX = LW + 32, RW = CW - RX. A width the client does not give (or under the minimum) is the
+-- size rule's default.
+local function Dims()
+    local w = win and win.GetWidth and win:GetWidth()
+    w = (type(w) == "number" and not (root.IsSecret and root.IsSecret(w))) and w or nil
+    local defW, minW = 900, 900
+    if win and win.SizeRule then
+        local d, _, m = win:SizeRule()
+        defW, minW = d or defW, m or minW
+    end
+    if not w or w < minW - 0.5 then w = defW end
+    W = math.floor(w + 0.5)
+    CW = W - 2 * PAD
+    LW = math.max(200, math.min(260, math.floor(CW * 0.22)))
+    RULE_X = LW + 16
+    RX = RULE_X + 1 + 15
+    RW = CW - RX
+    return W, CW, LW, RW
+end
 local ui = { find = {}, mine = {}, recv = {}, new = {}, board = {}, ask = {} }
 WP.OrdersUI = ui   -- the pages' widgets, for the offline tests
+function ui.Dims() return { W = W, CW = CW, LW = LW, RX = RX, RW = RW, findW = findW } end
+function ui.Win() return win end
+ui.pages = pages
 -- the crafters' home and its pages (T-60): its functions, filled before RenderFind
 local H = {}
 ui.H = H
@@ -461,7 +485,8 @@ local function Row(parent)
                 right = right + 24 + 4
             end
         end
-        local textW = math.max(80, width - x - right)
+        -- 60 at least: a row in a narrow grid cell (my watched recipes, 150) keeps clear of its actions
+        local textW = math.max(60, width - x - right)
         local nameH = S.FitText(self.name, 2, textW, self)
         local detH = 0
         if self.detail:IsShown() then detH = S.FitText(self.detail, 2, textW, self) end
@@ -1125,7 +1150,7 @@ end
 -- which of the page's areas shows: the result list, the professions, or a catalogue; where it
 -- starts. Two columns (f.split, someone shares): the professions always on the left, the mode's
 -- area on the right ("grid" there: the search, a sentence and the sharing row, in f.list).
-local function SetMode(f, mode)
+local function SetMode(f, mode, inlineBack)
     local p = pages.find
     local split = f.split and true or false
     findW = split and RW or CW
@@ -1134,17 +1159,25 @@ local function SetMode(f, mode)
     f.list.sf:SetShown(mode == "list" or (split and mode == "grid"))
     f.cat.sf:SetShown(mode == "cat")
     f.rule:SetShown(split)
+    f.rule:ClearAllPoints(); f.rule:SetPoint("TOPLEFT", RULE_X, 0); f.rule:SetPoint("BOTTOMLEFT", RULE_X, 0)
+    f.gridEmpty.wlW = CW
     local cat = mode == "cat"
     f.chead:SetShown(cat); f.box:SetShown(not cat)
     f.back:SetShown(mode == "list" and (f.view ~= nil or f.page ~= nil))
     f.box:ClearAllPoints(); f.box:SetPoint("TOPLEFT", x, 0); f.box:SetWidth(findW)
-    f.back:ClearAllPoints(); f.back:SetPoint("TOPLEFT", x, -36)
+    -- my profile: the back button sits on the page's title line, in the list (topH 40, not 72)
+    inlineBack = inlineBack and mode == "list" and f.back:IsShown()
+    f.backInline = inlineBack or nil
+    if f.back.SetParent then f.back:SetParent(inlineBack and f.list.content or p) end
+    f.back:ClearAllPoints()
+    if inlineBack then f.back:SetPoint("TOPLEFT", f.list.content, "TOPLEFT", 0, 0)
+    else f.back:SetPoint("TOPLEFT", p, "TOPLEFT", x, -36) end
     f.chead:ClearAllPoints(); f.chead:SetPoint("TOPLEFT", x, 0); f.chead:SetWidth(findW)
     f.cbox:SetWidth(findW); f.ctitle:SetWidth(findW - 40); f.ccount:SetWidth(findW - 40)
     f.listHead:SetWidth(findW)
     f.empty.wlW, f.catEmpty.wlW = findW, findW
     if not (split and mode == "grid") then f.pickHint:Hide(); f.share:Hide() end
-    p.topH = cat and ((f.cheadH or 108) + 12) or (f.back:IsShown() and (28 + 8 + 24 + 12) or (28 + 12))
+    p.topH = cat and ((f.cheadH or 108) + 12) or ((f.back:IsShown() and not inlineBack) and (28 + 8 + 24 + 12) or (28 + 12))
     p.sideH = nil
     if split then f.grid.Top(0, 0, LW) end
     local l = mode == "list" and f.list or (mode == "grid" and (split and f.list or f.grid) or f.cat)
@@ -1169,6 +1202,7 @@ local function RenderProfList(f, g, keys)
     local tw = LW - 44 - 8
     -- the home first: selected on the home and its pages
     local hr = f.homeRow
+    hr:SetWidth(LW)
     hr:ClearAllPoints(); hr:SetPoint("TOPLEFT", 0, 0); hr:Show()
     local atHome = f.prof == nil and (f.view == nil or f.page ~= nil)
     hr.sel:SetShown(atHome)
@@ -2197,6 +2231,11 @@ function H.RecentOrderLine(e)
     return L(STATUS[st] or "Ouverte")
 end
 
+-- the home's grids (spec 4.2): tiles 280 at least (2 at 636-689, 3 from 1020); my watched recipes
+-- and favourites 150 at least, 2 per line in a 310 column; top crafters 2 per line from 640
+H.TILE_GRID = { minW = 280, gap = 12, rowGap = 12, maxCols = 3, minPx = 200 }
+H.SMALL_GRID = { minW = 150, gap = 8, rowGap = 2, maxCols = 2, minPx = 150 }
+H.TOP_GRID = { minW = 314, gap = 12, rowGap = 2, maxCols = 2, minPx = 200 }
 function H.Home(f)
     local hm = H.BuildHome(f)
     local set = O.CrafterSet()
@@ -2241,19 +2280,16 @@ function H.Home(f)
                 if off then WP.ShowOrdersTab("ask") else H.Open(f, "me") end
             end)
     end
-    -- the tiles: 2 x 2 when the side is wide, else one under the other
-    local cols = W >= 560 and 2 or 1
-    local tw = cols == 2 and math.floor((W - 12) / 2) or W
-    local function Place(i, t)
-        local col, line = (i - 1) % cols, math.floor((i - 1) / cols)
-        t:ClearAllPoints(); t:SetPoint("TOPLEFT", col * (tw + 12), -(y + line * (72 + 12)))
-    end
+    -- the tiles in a grid (spec 4.2): 2 per line on a 636-689 side, 3 from 1020
+    hm.tileGrid = hm.tileGrid or ns.Grid()
+    local tg = hm.tileGrid
+    tg:Begin(c, 0, y, W, H.TILE_GRID)
     local T = hm.tiles
-    H.TileOnline(f, T[1], tw, set); Place(1, T[1])
-    H.TileFavs(f, T[2], tw, set, d); Place(2, T[2])
-    H.TileRecent(f, T[3], tw, d); Place(3, T[3])
-    H.TileWatch(f, T[4], tw, d); Place(4, T[4])
-    y = y + math.ceil(4 / cols) * (72 + 12) - 12
+    tg:Add(T[1], function(t, w) H.TileOnline(f, t, w, set); return 72 end)
+    tg:Add(T[2], function(t, w) H.TileFavs(f, t, w, set, d); return 72 end)
+    tg:Add(T[3], function(t, w) H.TileRecent(f, t, w, d); return 72 end)
+    tg:Add(T[4], function(t, w) H.TileWatch(f, t, w, d); return 72 end)
+    y = y + tg:End()
     -- the week's top crafters (self-reported, one per customer per day)
     return H.Top(f, hm, set, y + 16, W)
 end
@@ -2357,9 +2393,14 @@ function H.Top(f, hm, set, y, W)
     hd.link:SetShown(#set.top > 0)
     y = y + 24 + 8
     local n = math.min(5, #set.top)
+    hm.topGrid = hm.topGrid or ns.Grid()
+    local tg = hm.topGrid
+    tg:Begin(f.list.content, 0, y, W, H.TOP_GRID)
+    local y0 = y
     for i = 1, n do
         local g = set.top[i]
         local r = H.TopRow(f, i)
+        local W = (tg:Add(r, function() return 36 end))
         r:SetWidth(W)
         r.rank:SetText(tostring(i))
         local rc = i <= 3 and C.gold or C.muted
@@ -2376,10 +2417,11 @@ function H.Top(f, hm, set, y, W)
         r.tip = { H.ClassText(g.name, g.class), string.format(L("%d commandes livrées ces 7 jours, %d en tout."), g.week, g.tot),
             string.format(L("Annoncé par %s ; tu en as vu %d."), g.name, g.seen), L("Clic : voir sa fiche") }
         r.onClick = function() H.Open(f, "crafter", g.name) end
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
-        y = y + 36 + 2
+        r:SetHeight(36); r:Show()
     end
+    y = y0 + tg:End() + 2
     if n == 0 then
+        y = y0
         hm.topEmpty:ClearAllPoints(); hm.topEmpty:SetPoint("TOPLEFT", 0, -y)
         y = y + S.FitText(hm.topEmpty, 0, W, f.list.content)
         hm.topEmpty:Show()
@@ -2402,7 +2444,8 @@ function H.ShareOn()
     WP.RefreshOrders()
 end
 -- a page's title (14) and its sentence (11 muted); returns where the page goes on
-function H.PageTitle(f, key, text, sentence, y, W)
+function H.PageTitle(f, key, text, sentence, y, W, x)
+    x = x or 0
     f.pt = f.pt or {}
     local t = f.pt[key]
     if not t then
@@ -2410,10 +2453,10 @@ function H.PageTitle(f, key, text, sentence, y, W)
         t.title:SetJustifyH("LEFT"); t.title:SetJustifyV("TOP"); t.sub:SetJustifyH("LEFT"); t.sub:SetJustifyV("TOP")
         f.pt[key] = t
     end
-    t.title:SetText(text); t.title:ClearAllPoints(); t.title:SetPoint("TOPLEFT", 0, -y); t.title:Show()
+    t.title:SetText(text); t.title:ClearAllPoints(); t.title:SetPoint("TOPLEFT", x, -y); t.title:Show()
     y = y + S.FitText(t.title, 2, W, f.list.content)
     if sentence then
-        t.sub:SetText(sentence); t.sub:ClearAllPoints(); t.sub:SetPoint("TOPLEFT", 0, -(y + 3)); t.sub:Show()
+        t.sub:SetText(sentence); t.sub:ClearAllPoints(); t.sub:SetPoint("TOPLEFT", x, -(y + 3)); t.sub:Show()
         y = y + 3 + S.FitText(t.sub, 0, W, f.list.content)
     end
     return y
@@ -2667,34 +2710,6 @@ function H.Crafter(f, set)
     return y
 end
 
--- a settings row of my profile: label 13, sentence 11 under it, the switch (or a control) at the right
-function H.SwitchRow(f, label, desc, get, set, tip)
-    local r = H.Own(f, CreateFrame("Button", nil, f.list.content))
-    r.wlOwned = true
-    S.Solid(r, "BACKGROUND", C.cardFill):SetAllPoints(); S.Border(r, C.cardEdge)
-    r.label = S.Text(r, F.body, C.fg); r.label:SetPoint("TOPLEFT", 12, -10); r.label:SetJustifyH("LEFT"); r.label:SetText(label)
-    S.ClampLabel(r.label, nil, r)
-    r.desc = S.Text(r, F.meta, C.muted); r.desc:SetJustifyH("LEFT"); r.desc:SetJustifyV("TOP")
-    r.desc:SetPoint("TOPLEFT", r.label, "BOTTOMLEFT", 0, -3); r.desc:SetText(desc)
-    if get then
-        r.switch = S.Switch(r, get, set, tip)
-        r.switch:SetPoint("RIGHT", -12, 0)
-        r.switch:AttachRow(r)
-    end
-    -- rightW: the control's width at the right (40 for a switch)
-    function r:Fit(width, rightW)
-        self:SetWidth(width)
-        local tw = width - 12 - (rightW or 40) - 24
-        self.label:SetWidth(math.max(40, tw))
-        local dh = S.FitText(self.desc, 2, math.max(40, tw), self)
-        local h = math.max(44, math.ceil(10 + F.body + 3 + dh + 10))
-        self:SetHeight(h)
-        if self.switch then self.switch:Update() end
-        return h
-    end
-    return r
-end
-
 -- a dense row of my profile (a profession, a watched recipe, a favourite) from the list's pool
 function H.DenseRow(f, i, y, W, tex, id, name, detail, tip)
     local r = f.list.Get(i)
@@ -2707,7 +2722,43 @@ function H.DenseRow(f, i, y, W, tex, id, name, detail, tip)
     return r
 end
 
--- ---- my crafter profile: status, note, my professions, what I share, alerts, watched, favourites
+-- a profession tile of my profile (spec 4.2): painted icon 24, the profession 13, its rank 11 muted,
+-- its recipes 11 muted; whether they are shared goes in the tooltip
+function H.ProfTile(f, i)
+    local m = f.me
+    m.tiles = m.tiles or {}
+    local t = m.tiles[i]
+    if t then return t end
+    t = H.Own(f, CreateFrame("Button", nil, f.list.content))
+    t.wlOwned = true
+    S.Solid(t, "BACKGROUND", C.cardFill):SetAllPoints(); S.Border(t, C.cardEdge)
+    Feedback(t)
+    t.iconFrame = Painted(t, 24); t.icon = t.iconFrame.tex
+    t.iconFrame:SetPoint("TOPLEFT", 8, -8)
+    t.name = S.Text(t, F.body, C.fg); t.name:SetJustifyH("LEFT"); t.name:SetJustifyV("TOP")
+    t.rank = S.Text(t, F.meta, C.muted); t.rank:SetJustifyH("LEFT"); t.rank:SetJustifyV("TOP")
+    t.recipes = S.Text(t, F.meta, C.muted); t.recipes:SetJustifyH("LEFT"); t.recipes:SetJustifyV("TOP")
+    function t:Fit(width)
+        self:SetWidth(width)
+        local tw = math.max(40, width - 40 - 8)
+        local y = 8
+        self.name:ClearAllPoints(); self.name:SetPoint("TOPLEFT", 40, -y)
+        y = y + S.FitText(self.name, 1, tw, self) + 2
+        self.rank:ClearAllPoints(); self.rank:SetPoint("TOPLEFT", 40, -y)
+        y = y + S.FitText(self.rank, 1, tw, self) + 1
+        self.recipes:ClearAllPoints(); self.recipes:SetPoint("TOPLEFT", 40, -y)
+        y = y + S.FitText(self.recipes, 1, tw, self)
+        local h = math.max(40, math.ceil(y + 8))
+        self:SetHeight(h)
+        return h
+    end
+    m.tiles[i] = t
+    return t
+end
+
+-- ---- my crafter profile (spec 4.2), two panes: on the left my status, my note, my professions (tiles),
+-- my watched recipes and my favourites; on the right what the guild sees and the alerts, as two
+-- settings cards. The back button sits on the title line.
 function H.Me(f)
     local W = findW
     local c = f.list.content
@@ -2716,8 +2767,10 @@ function H.Me(f)
     if not m.seg then
         m.seg = H.Own(f, S.Segmented(c, { { "a", O.StatusWord("a") }, { "b", O.StatusWord("b") }, { "o", O.StatusWord("o") } },
             function() return O.BaseStatus() end, function(v) O.SetCrafterStatus(v) end))
+        m.statusLabel = H.Own(f, S.Text(c, F.label, C.muted)); m.statusLabel:SetJustifyH("LEFT")
+        m.statusLabel:SetText(L("Statut"))
         m.banner = H.Own(f, S.Banner(c, "info", ""))
-        m.note = H.Own(f, S.Input(c, W, { label = L("Note pour les acheteurs"), placeholder = L("Ex. Je fournis le charbon, 5 po la pièce."),
+        m.note = H.Own(f, S.Input(c, 300, { label = L("Note pour les acheteurs"), placeholder = L("Ex. Je fournis le charbon, 5 po la pièce."),
             onEnter = function(t) H.SaveNote(f, t) end }))
         m.note:SetMaxLetters(200)
         if m.note.label then H.Own(f, m.note.label) end
@@ -2725,72 +2778,109 @@ function H.Me(f)
         m.note:HookScript("OnTextChanged", function(self)
             m.count:SetText(string.format("%d/50", math.min(50, O.NoteLength(O.CleanNote(self:GetText() or "")))))
         end)
-        m.count = H.Own(f, S.Text(c, F.foot or F.meta, C.muted)); m.count:SetJustifyH("RIGHT")
+        -- the counter on the note's label line, at the right
+        m.count = H.Own(f, S.Text(c, F.foot or F.meta, C.muted)); m.count:SetJustifyH("RIGHT"); m.count:SetWidth(48)
         m.noteErr = H.Own(f, S.Text(c, F.meta, C.bad)); m.noteErr:SetJustifyH("LEFT"); m.noteErr:SetJustifyV("TOP")
         m.noteErr:SetText(L("Les liens ne passent pas dans la note : écris le nom en toutes lettres."))
-        m.profHead = H.Own(f, Header(c))
-        m.setHead = H.Own(f, Header(c))
-        m.alertHead = H.Own(f, Header(c))
-        m.watchHead = H.Own(f, Header(c))
-        m.favHead = H.Own(f, Header(c))
-        m.tipHead = H.Own(f, Header(c))
-        local p = function() return O.Profile() end
-        m.rows = {
-            share = H.SwitchRow(f, L("Partager mes recettes"), L("La guilde voit ce que tu sais fabriquer."),
-                function() return WLWritsDB.ordersShare ~= false end, function(v) if v then H.ShareOn() else WLWritsDB.ordersShare = false; O.ShareChanged(); WP.RefreshOrders() end end),
-            hideAlts = H.SwitchRow(f, L("Cacher mes rerolls"), L("Tes autres personnages n'apparaissent pas sous ton nom."),
-                function() return p().hideAlts end, function(v) O.SetProfileFlag("hideAlts", v and true or false) end),
-            showZone = H.SwitchRow(f, L("Montrer ma zone"), L("Ta zone s'affiche sur ta fiche d'artisan. La liste de guilde du jeu la montre quand même."),
-                function() return p().showZone ~= false end, function(v) O.SetProfileFlag("showZone", v and true or false) end),
-            quiet = H.SwitchRow(f, L("Mode calme en donjon"), L("En donjon, raid ou champ de bataille, les commandes attendent sans bruit ; l'acheteur sait où tu es."),
-                function() return p().quiet end, function(v) O.SetProfileFlag("quiet", v and true or false) end),
-            autoBusy = H.SwitchRow(f, L("Occupé tout seul"), L("Quand tu es absent (AFK) ou en file d'attente. Ton état revient ensuite."),
-                function() return p().autoBusy end, function(v) O.SetProfileFlag("autoBusy", v and true or false) end),
-            main = H.SwitchRow(f, L("Personnage principal"), L("Tes rerolls sont regroupés sous ce nom.")),
-            alertFav = H.SwitchRow(f, L("Prévenir quand un favori se connecte"), L("Une alerte au plus toutes les 30 min par favori."),
-                function() return WLWritsDB.ordersAlertFav ~= false end, function(v) WLWritsDB.ordersAlertFav = v and true or false end),
-            alertWatch = H.SwitchRow(f, L("Prévenir quand une recette surveillée est apprise"), L("Une fois par membre et par recette."),
-                function() return WLWritsDB.ordersAlertWatch ~= false end, function(v) WLWritsDB.ordersAlertWatch = v and true or false end),
-            tipCrafters = H.SwitchRow(f, L("Artisans de la guilde"), L("Une ligne dit combien de membres savent fabriquer l'objet, et combien sont en ligne."),
-                function() return O.TipCraftersOn() end, function(v) O.SetTipCrafters(v and true or false) end),
-        }
-        m.mainDD = S.Dropdown(m.rows.main, { { "", L("Automatique") } }, function() return O.Profile().main or "" end,
-            function(v) O.SetProfileFlag("main", (v ~= "" and v) or nil) end, 160)
-        m.mainDD:SetPoint("RIGHT", -12, 0)
+        -- tight headers (24 + 8): they head a column, not the page
+        local function Head() return H.Own(f, S.SectionHeader(c, "", nil, nil, nil, true)) end
+        m.profHead, m.setHead, m.watchHead, m.favHead, m.tipHead = Head(), Head(), Head(), Head(), Head()
+        m.alertHead = m.tipHead   -- "Alertes" and "Infobulles des objets": one section now
+        m.shareOff = H.Own(f, S.Text(c, F.meta, C.muted)); m.shareOff:SetJustifyH("LEFT"); m.shareOff:SetJustifyV("TOP")
+        m.shareOff:SetText(L("Partage coupé : la guilde ne voit pas tes recettes."))
         m.empty = H.Own(f, S.Text(c, F.meta, C.muted)); m.empty:SetJustifyH("LEFT"); m.empty:SetJustifyV("TOP")
         m.empty2 = H.Own(f, S.Text(c, F.meta, C.muted)); m.empty2:SetJustifyH("LEFT"); m.empty2:SetJustifyV("TOP")
+        -- the settings: one line of description each, the longer text in the tooltip
+        m.seeCard = H.Own(f, S.SettingsCard(c))
+        m.alertCard = H.Own(f, S.SettingsCard(c))
+        m.altsTip = {}
+        local p = function() return O.Profile() end
+        local function Row(card, o) return H.Own(f, card:AddRow(o)) end
+        local function Flag(k) return function(v) O.SetProfileFlag(k, v and true or false) end end
+        m.rows = {
+            share = Row(m.seeCard, { label = L("Partager mes recettes"), desc = L("La guilde voit ce que tu sais fabriquer."), control = "switch",
+                get = function() return WLWritsDB.ordersShare ~= false end,
+                set = function(v) if v then H.ShareOn() else WLWritsDB.ordersShare = false; O.ShareChanged(); WP.RefreshOrders() end end }),
+            hideAlts = Row(m.seeCard, { label = L("Cacher mes rerolls"), desc = L("Seul ton nom apparaît, pas tes rerolls."),
+                long = L("Tes autres personnages n'apparaissent pas sous ton nom."), control = "switch", tip = m.altsTip,
+                get = function() return p().hideAlts end, set = Flag("hideAlts") }),
+            showZone = Row(m.seeCard, { label = L("Montrer ma zone"), desc = L("Ta zone s'affiche sur ta fiche."),
+                long = L("La liste de guilde du jeu la montre quand même."), control = "switch",
+                get = function() return p().showZone ~= false end, set = Flag("showZone") }),
+            quiet = Row(m.seeCard, { label = L("Mode calme en donjon"), desc = L("En donjon, les commandes attendent."),
+                long = L("En donjon, raid ou champ de bataille, les commandes attendent sans bruit ; l'acheteur sait où tu es."), control = "switch",
+                get = function() return p().quiet end, set = Flag("quiet") }),
+            autoBusy = Row(m.seeCard, { label = L("Occupé tout seul"), desc = L("Absent ou en file : tu passes Occupé."),
+                long = L("Quand tu es absent (AFK) ou en file d'attente. Ton état revient ensuite."), control = "switch",
+                get = function() return p().autoBusy end, set = Flag("autoBusy") }),
+            main = Row(m.seeCard, { label = L("Personnage principal"), desc = L("Tes rerolls sont regroupés sous ce nom."),
+                control = "dropdown", controlW = 160, wide = true, options = { { "", L("Automatique") } },
+                get = function() return O.Profile().main or "" end, set = function(v) O.SetProfileFlag("main", (v ~= "" and v) or nil) end }),
+            alertFav = Row(m.alertCard, { label = L("Un favori se connecte"), desc = L("Au plus une alerte toutes les 30 min."),
+                long = L("Une alerte au plus toutes les 30 min par favori."), control = "switch",
+                get = function() return WLWritsDB.ordersAlertFav ~= false end, set = function(v) WLWritsDB.ordersAlertFav = v and true or false end }),
+            alertWatch = Row(m.alertCard, { label = L("Une recette surveillée est apprise"), desc = L("Une fois par membre et par recette."),
+                control = "switch",
+                get = function() return WLWritsDB.ordersAlertWatch ~= false end, set = function(v) WLWritsDB.ordersAlertWatch = v and true or false end }),
+            tipCrafters = Row(m.alertCard, { label = L("Artisans dans les infobulles"), desc = L("Combien de membres savent fabriquer l'objet."),
+                long = L("Une ligne dit combien de membres savent fabriquer l'objet, et combien sont en ligne."), control = "switch",
+                get = function() return O.TipCraftersOn() end, set = function(v) O.SetTipCrafters(v and true or false) end }),
+        }
+        m.mainDD = m.rows.main.control
     end
-    local y = H.PageTitle(f, "me", L("Ma fiche d'artisan"), L("Ce que la guilde voit quand elle cherche un artisan."), 0, W) + 12
-    -- state
-    m.seg:SetMaxWidth(W); m.seg:Update()
-    m.seg:ClearAllPoints(); m.seg:SetPoint("TOPLEFT", 0, -y); m.seg:Show()
-    y = y + 28
+    -- the title line: the back button (when it is in the list), the title and its sentence
+    local tx = 0
+    if f.backInline and f.back:IsShown() then tx = math.ceil(num(f.back:GetWidth()) or 80) + 12 end
+    local y = H.PageTitle(f, "me", L("Ma fiche d'artisan"), L("Ce que la guilde voit quand elle cherche un artisan."), 0, math.max(80, W - tx), tx)
+    y = math.max(y, tx > 0 and 24 or 0) + 16
+    -- two panes, two cursors; the page is as tall as the taller one
+    local xs, colW, lastW = ns.Columns(W, 2, 16)
+    local lx, rx = xs[1], xs[2]
+    local ly, ry = y, y
+
+    -- LEFT. status: its label and the three states on one line (under it when the column is narrow)
+    local slw = math.ceil(root.TextWidth(m.statusLabel) or 40) + 1
+    m.statusLabel:SetWidth(slw); m.statusLabel:Show()
+    m.statusLabel:ClearAllPoints()
+    if colW >= 300 then
+        m.seg:SetMaxWidth(colW - slw - 12); m.seg:Update()
+        m.statusLabel:SetPoint("TOPLEFT", lx, -(ly + 7))
+        m.seg:ClearAllPoints(); m.seg:SetPoint("TOPLEFT", lx + slw + 12, -ly)
+    else
+        m.statusLabel:SetPoint("TOPLEFT", lx, -ly)
+        ly = ly + 16 + 4
+        m.seg:SetMaxWidth(colW); m.seg:Update()
+        m.seg:ClearAllPoints(); m.seg:SetPoint("TOPLEFT", lx, -ly)
+    end
+    m.seg:Show()
+    ly = ly + 28
     local s, why = O.MyStatus()
     local bt = (why == "afk" and L("Occupé tout seul : tu es absent (AFK).")) or (why == "queue" and L("Occupé tout seul : tu es en file d'attente."))
         or (why == "inst" and L("En donjon : tes commandes attendent sans bruit.")) or nil
     if bt then
-        m.banner:SetText(bt, "info"); m.banner:SetWidth(W)
-        m.banner:ClearAllPoints(); m.banner:SetPoint("TOPLEFT", 0, -(y + 8)); m.banner:Show()
-        y = y + 8 + m.banner:Fit(W)
+        m.banner:SetText(bt, "info"); m.banner:SetWidth(colW)
+        m.banner:ClearAllPoints(); m.banner:SetPoint("TOPLEFT", lx, -(ly + 8)); m.banner:Show()
+        ly = ly + 8 + m.banner:Fit(colW)
     end
-    -- the note (saved on Enter or when the box loses the focus)
-    y = y + 16
-    m.note:SetWidth(W)
-    m.note:ClearAllPoints(); m.note:SetPoint("TOPLEFT", 0, -(y + 16)); m.note:Show()
+    -- the note (saved on Enter or when the box loses the focus); its counter on the label's line
+    ly = ly + 12
+    m.note:SetWidth(colW)
+    m.note:ClearAllPoints(); m.note:SetPoint("TOPLEFT", lx, -(ly + 16)); m.note:Show()
     if m.note.label then m.note.label:Show() end
     if not m.note:HasFocus() then m.note:SetText(O.Profile().note or "") end
-    y = y + 16 + 28
     m.count:SetText(string.format("%d/50", O.NoteLength(O.CleanNote(m.note:GetText() or ""))))
-    m.count:ClearAllPoints(); m.count:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -(y + 4)); m.count:Show()
+    m.count:ClearAllPoints(); m.count:SetPoint("TOPLEFT", lx + colW - 48, -ly); m.count:Show()
+    ly = ly + 16 + 28
     if m.linkErr then
-        m.noteErr:ClearAllPoints(); m.noteErr:SetPoint("TOPLEFT", 0, -(y + 4)); m.noteErr:Show()
-        y = y + 4 + S.FitText(m.noteErr, 2, W - 48, c)
-    else y = y + 4 + 12 end
-    -- my professions
-    y = y + 16
-    m.profHead:SetWidth(W); m.profHead:Set(L("Mes métiers"))
-    m.profHead:ClearAllPoints(); m.profHead:SetPoint("TOPLEFT", 0, -y); m.profHead:Show()
-    y = y + 32 + 8
+        m.noteErr:ClearAllPoints(); m.noteErr:SetPoint("TOPLEFT", lx, -(ly + 4)); m.noteErr:Show()
+        ly = ly + 4 + S.FitText(m.noteErr, 2, colW, c)
+    end
+    -- my professions: one tile each (2 per line in a 310 column, 3 from 502); 12 between the
+    -- sections of a column
+    ly = ly + 12
+    m.profHead:SetWidth(colW); m.profHead:Set(L("Mes métiers"))
+    m.profHead:ClearAllPoints(); m.profHead:SetPoint("TOPLEFT", lx, -ly); m.profHead:Show()
+    ly = ly + 24 + m.profHead.after
     local mine = {}
     for prof, pr in pairs(O.DB().mine or {}) do
         if type(pr) == "table" then
@@ -2800,78 +2890,45 @@ function H.Me(f)
         end
     end
     table.sort(mine, function(a, b) if a.rank ~= b.rank then return a.rank > b.rank end return a.raw < b.raw end)
-    local i = 0
     local share = WLWritsDB.ordersShare ~= false
-    for _, e in ipairs(mine) do
-        i = i + 1
+    local G0 = ns.GRID.profTiles
+    m.profGrid = m.profGrid or ns.Grid()
+    local pg = m.profGrid
+    pg:Begin(c, lx, ly, colW, { minW = G0.minW, gap = G0.gap, rowGap = G0.rowGap, maxCols = G0.maxCols, minPx = G0.minPx, equal = true })
+    for k, e in ipairs(mine) do
         local key = ProfKey(e.raw) or ProfKey(O.ProfKeyOf(e.raw))
-        local label = ProfLabel(key, e.raw) .. " " .. e.rank .. (e.max > 0 and ("/" .. e.max) or "")
+        local t = H.ProfTile(f, k)
+        S.Painted(t.icon, ProfIcon(key))
+        local name = ProfLabel(key, e.raw)
+        local rank = e.rank .. (e.max > 0 and ("/" .. e.max) or "")
+        t.name:SetText(name); t.rank:SetText(rank); t.recipes:SetText(P(e.n, L("1 recette"), L("%d recettes")))
         local det = share and P(e.n, L("1 recette partagée"), L("%d recettes partagées")) or P(e.n, L("1 recette, non partagée"), L("%d recettes, non partagées"))
-        local r = H.DenseRow(f, i, y, W, ProfIcon(key), nil, label, det, { label, det })
-        local rh = r:Fit(W)
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
-        y = y + rh + 2
+        t.tip = { name .. " " .. rank, det }
+        t:Show()
+        pg:Add(t, function(fr, w) return fr:Fit(w) end)
     end
+    ly = ly + pg:End()
     if #mine == 0 then
         m.empty:SetText(L("Aucun métier lu : ouvre ta fenêtre de métier une fois."))
-        m.empty:ClearAllPoints(); m.empty:SetPoint("TOPLEFT", 0, -y); m.empty:Show()
-        y = y + S.FitText(m.empty, 0, W, c) + 2
+        m.empty:ClearAllPoints(); m.empty:SetPoint("TOPLEFT", lx, -ly); m.empty:Show()
+        ly = ly + S.FitText(m.empty, 0, colW, c)
+    elseif not share then
+        m.shareOff:ClearAllPoints(); m.shareOff:SetPoint("TOPLEFT", lx, -(ly + 6)); m.shareOff:Show()
+        ly = ly + 6 + S.FitText(m.shareOff, 0, colW, c)
     end
-    -- what the guild sees
-    y = y + 14
-    m.setHead:SetWidth(W); m.setHead:Set(L("Ce que la guilde voit"))
-    m.setHead:ClearAllPoints(); m.setHead:SetPoint("TOPLEFT", 0, -y); m.setHead:Show()
-    y = y + 32 + 8
-    -- the alts it hides, in the tooltip of its row
-    local alts = {}
-    for n in pairs(O.Profile().alts) do if n ~= UnitName("player") then alts[#alts + 1] = n end end
-    table.sort(alts)
-    m.rows.hideAlts.tip = { L("Cacher mes rerolls"), #alts > 0 and string.format(L("Mes rerolls : %s"), table.concat(alts, ", "))
-        or L("Aucun reroll connu : chacun s'ajoute en se connectant dans la guilde."), L("Clic : changer") }
-    local opts = { { "", L("Automatique") } }
-    local allAlts = {}
-    for n in pairs(O.Profile().alts) do allAlts[#allAlts + 1] = n end
-    table.sort(allAlts)
-    for _, n in ipairs(allAlts) do opts[#opts + 1] = { n, n } end
-    m.mainDD.options = opts
-    m.mainDD:Update()
-    for _, k in ipairs({ "share", "hideAlts", "showZone", "quiet", "autoBusy", "main" }) do
-        local r = m.rows[k]
-        local rh = r:Fit(W, k == "main" and 160 or 40)
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
-        y = y + rh + 2
-    end
-    -- alerts
-    y = y + 14
-    m.alertHead:SetWidth(W); m.alertHead:Set(L("Alertes"))
-    m.alertHead:ClearAllPoints(); m.alertHead:SetPoint("TOPLEFT", 0, -y); m.alertHead:Show()
-    y = y + 32 + 8
-    for _, k in ipairs({ "alertFav", "alertWatch" }) do
-        local r = m.rows[k]
-        local rh = r:Fit(W, 40)
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
-        y = y + rh + 2
-    end
-    -- item tooltips (T-65)
-    y = y + 14
-    m.tipHead:SetWidth(W); m.tipHead:Set(L("Infobulles des objets"))
-    m.tipHead:ClearAllPoints(); m.tipHead:SetPoint("TOPLEFT", 0, -y); m.tipHead:Show()
-    y = y + 32 + 8
-    do
-        local r = m.rows.tipCrafters
-        local rh = r:Fit(W, 40)
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
-        y = y + rh + 2
-    end
-    -- watched recipes
+    -- watched recipes, 2 per line
+    local i = 0
     local d = O.DB()
     local ids = {}
     for id in pairs(d.watch or {}) do ids[#ids + 1] = id end
     table.sort(ids, function(a, b) return Name(a) < Name(b) end)
-    y = y + 14
-    m.watchHead:SetWidth(W); m.watchHead:Set(L("Recettes surveillées"), #ids > 0 and #ids or nil)
-    m.watchHead:ClearAllPoints(); m.watchHead:SetPoint("TOPLEFT", 0, -y); m.watchHead:Show()
-    y = y + 32 + 8
+    ly = ly + 12
+    m.watchHead:SetWidth(colW); m.watchHead:Set(L("Recettes surveillées"), #ids > 0 and #ids or nil)
+    m.watchHead:ClearAllPoints(); m.watchHead:SetPoint("TOPLEFT", lx, -ly); m.watchHead:Show()
+    ly = ly + 24 + m.watchHead.after
+    m.watchGrid = m.watchGrid or ns.Grid()
+    local wg = m.watchGrid
+    wg:Begin(c, lx, ly, colW, H.SMALL_GRID)
     for _, id in ipairs(ids) do
         i = i + 1
         local who, on = {}, false
@@ -2881,7 +2938,7 @@ function H.Me(f)
         local det = #who == 0 and L("Personne ne sait la faire")
             or (table.concat(who, ", ", 1, math.min(3, #who)) .. (#who > 3 and (" +" .. (#who - 3)) or "") .. (on and L(" · en ligne") or ""))
         local qc = id > 0 and S.QualityColor(id) or C.fg
-        local r = H.DenseRow(f, i, y, W, ItemTex(id), id, Name(id), det, { S.Hex(qc) .. Name(id) .. "|r", det,
+        local r = H.DenseRow(f, i, ly, colW, ItemTex(id), id, Name(id), det, { S.Hex(qc) .. Name(id) .. "|r", det,
             #who > 0 and L("Clic : commander") or L("Clic : faire une demande à la guilde") })
         r.trash:Show()
         r.trashTip = { L("Ne plus surveiller"), L("Clic : ne plus surveiller") }
@@ -2889,23 +2946,26 @@ function H.Me(f)
         r.onRowClick = function()
             if #who > 0 then WP.NewOrder(id, nil) elseif WP.AskOrder then WP.AskOrder(id) end
         end
-        local rh = r:Fit(W)
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
-        y = y + rh + 2
+        wg:Add(r, function(fr, w) return fr:Fit(w) end)
     end
+    ly = ly + wg:End()
     if #ids == 0 then
         m.empty2:SetText(L("Le drapeau sur un objet te prévient quand un membre l'apprend."))
-        m.empty2:ClearAllPoints(); m.empty2:SetPoint("TOPLEFT", 0, -y); m.empty2:Show()
-        y = y + S.FitText(m.empty2, 0, W, c) + 2
+        m.empty2:ClearAllPoints(); m.empty2:SetPoint("TOPLEFT", lx, -ly); m.empty2:Show()
+        ly = ly + S.FitText(m.empty2, 0, colW, c)
     end
-    -- favourites (offline ones too)
+    -- favourites (offline ones too), 2 per line
     local favs = {}
     for n in pairs(d.favs or {}) do favs[#favs + 1] = n end
     table.sort(favs)
-    y = y + 14
-    m.favHead:SetWidth(W); m.favHead:Set(L("Favoris"), #favs > 0 and #favs or nil)
-    m.favHead:ClearAllPoints(); m.favHead:SetPoint("TOPLEFT", 0, -y); m.favHead:Show()
-    y = y + 32 + 8
+    ly = ly + 12
+    m.favHead:SetWidth(colW); m.favHead:Set(L("Favoris"), #favs > 0 and #favs or nil)
+    m.favHead:ClearAllPoints(); m.favHead:SetPoint("TOPLEFT", lx, -ly); m.favHead:Show()
+    ly = ly + 24
+    m.favGrid = m.favGrid or ns.Grid()
+    local fg = m.favGrid
+    if #favs > 0 then ly = ly + m.favHead.after end
+    fg:Begin(c, lx, ly, colW, H.SMALL_GRID)
     local set = f.set or O.CrafterSet()
     for _, n in ipairs(favs) do
         i = i + 1
@@ -2913,13 +2973,41 @@ function H.Me(f)
         local r = f.list.Get(i)
         H.FillGroupRow(f, r, g, not g.online)
         if g.name ~= n then r.name:SetText(n .. "  " .. H.StatusText(g)) end
-        local rh = r:Fit(W)
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
-        y = y + rh + 2
+        fg:Add(r, function(fr, w) return fr:Fit(w) end)
     end
+    ly = ly + fg:End()
     f.list.HideFrom(i + 1)
-    if #favs == 0 then y = y + 0 else y = y - 2 end
-    return y + 4
+
+    -- RIGHT. what the guild sees (6 rows), then the alerts and the item tooltips (3 rows)
+    m.setHead:SetWidth(lastW); m.setHead:Set(L("Ce que la guilde voit"))
+    m.setHead:ClearAllPoints(); m.setHead:SetPoint("TOPLEFT", rx, -ry); m.setHead:Show()
+    ry = ry + 24 + m.setHead.after
+    -- the alts it hides, in the tooltip of its row
+    local alts = {}
+    for n in pairs(O.Profile().alts) do if n ~= UnitName("player") then alts[#alts + 1] = n end end
+    table.sort(alts)
+    for k = #m.altsTip, 1, -1 do m.altsTip[k] = nil end
+    m.altsTip[1] = #alts > 0 and string.format(L("Mes rerolls : %s"), table.concat(alts, ", "))
+        or L("Aucun reroll connu : chacun s'ajoute en se connectant dans la guilde.")
+    local opts = { { "", L("Automatique") } }
+    local allAlts = {}
+    for n in pairs(O.Profile().alts) do allAlts[#allAlts + 1] = n end
+    table.sort(allAlts)
+    for _, n in ipairs(allAlts) do opts[#opts + 1] = { n, n } end
+    m.mainDD.options = opts
+    m.seeCard:Update()
+    local ch = m.seeCard:Fit(lastW)
+    m.seeCard:ClearAllPoints(); m.seeCard:SetPoint("TOPLEFT", rx, -ry); m.seeCard:Show()
+    ry = ry + ch + 12
+    m.tipHead:SetWidth(lastW); m.tipHead:Set(L("Alertes et infobulles"))
+    m.tipHead:ClearAllPoints(); m.tipHead:SetPoint("TOPLEFT", rx, -ry); m.tipHead:Show()
+    ry = ry + 24 + m.tipHead.after
+    m.alertCard:Update()
+    ch = m.alertCard:Fit(lastW)
+    m.alertCard:ClearAllPoints(); m.alertCard:SetPoint("TOPLEFT", rx, -ry); m.alertCard:Show()
+    ry = ry + ch
+    m.ly, m.ry, m.colW, m.lastW, m.xs = ly, ry, colW, lastW, xs   -- for the offline tests
+    return math.max(ly, ry) + 4
 end
 function H.SaveNote(f, t)
     local cur = O.Profile().note or ""
@@ -3163,6 +3251,18 @@ ns.AddEnglish({
     ["Ex. Je fournis le charbon, 5 po la pièce."] = "E.g. I bring the coal, 5 g each.",
     ["Les liens ne passent pas dans la note : écris le nom en toutes lettres."] = "Links don't fit in the note: type the name instead.",
     ["Mes métiers"] = "My professions",
+    -- my profile in two panes (UI width rework): one-line descriptions, the long text in the tooltip
+    ["Statut"] = "Status",
+    ["Partage coupé : la guilde ne voit pas tes recettes."] = "Sharing is off: the guild cannot see your recipes.",
+    ["Seul ton nom apparaît, pas tes rerolls."] = "Only your name shows, not your alts.",
+    ["Ta zone s'affiche sur ta fiche."] = "Your zone shows on your card.",
+    ["La liste de guilde du jeu la montre quand même."] = "The game's guild list shows it anyway.",
+    ["En donjon, les commandes attendent."] = "In a dungeon, orders wait.",
+    ["Absent ou en file : tu passes Occupé."] = "AFK or queued: you show as Busy.",
+    ["Alertes et infobulles"] = "Alerts and tooltips",
+    ["Au plus une alerte toutes les 30 min."] = "At most one alert every 30 min.",
+    ["Artisans dans les infobulles"] = "Crafters in item tooltips",
+    ["Combien de membres savent fabriquer l'objet."] = "How many members can craft the item.",
     ["1 recette partagée"] = "1 recipe shared",
     ["%d recettes partagées"] = "%d recipes shared",
     ["1 recette, non partagée"] = "1 recipe, not shared",
@@ -3349,7 +3449,7 @@ local function RenderFind()
     -- column and its empty state
     if #q < 2 then
         if f.page then
-            local l = SetMode(f, "list")
+            local l = SetMode(f, "list", f.page == "me")
             Left()
             Fit(p, l, H.RenderPage(f))
             return
@@ -3487,6 +3587,7 @@ local function RenderNew()
     local n = ui.new
     if not draft then return end
     local c = n.sa.child
+    c:SetWidth(CW); n.note:SetWidth(CW)   -- the window's width may have changed
     pages.new.topH = 0
     S.Painted(n.icon, ItemTex(draft.item))
     local qc = draft.item > 0 and S.QualityColor(draft.item) or C.fg
@@ -3760,6 +3861,7 @@ end
 local function RenderAsk()
     local a = ui.ask
     local c = a.sa.child
+    c:SetWidth(CW); a.box:SetWidth(CW); a.note:SetWidth(CW); a.profName:SetWidth(CW - 60)   -- the window's width may have changed
     pages.ask.topH = 0
     local text = a.box:GetText() or ""
     local id = Resolve(text)
@@ -4013,7 +4115,7 @@ end
 local function CancelTip() return { L("Annuler la commande"), L("La guilde ne la voit plus."), L("Clic : annuler (un second clic confirme)") } end
 local function TipTip() return { L("Ajouter 1 po de pourboire"), L("Payé à la livraison ou en échange : l'addon ne déplace jamais d'or tout seul.") } end
 
-local function PaintOrder(c, o, side)
+local function PaintOrder(c, o, side, width)
     c.o = o
     c.b1.wlOrder, c.b2.wlOrder = o.id, o.id
     local me = UnitName("player")
@@ -4253,7 +4355,7 @@ local function PaintOrder(c, o, side)
     c.b1:SetShown(c.a1 ~= nil); c.b2:SetShown(c.a2 ~= nil)
     if not c.a1 then c.b1.wlFor = nil end
     if not c.a2 then c.b2.wlFor = nil end
-    return c:Fit(CW)
+    return c:Fit(width or CW)
 end
 
 local EMPTY = {
@@ -4282,14 +4384,16 @@ end
 local function RenderOrders(key, list)
     local u = ui[key]
     local p = pages[key]
-    local y = 0
+    -- the cards in a grid (spec 4.2): 2 per line at 868-924, 3 from 1312; a line as tall as its tallest
+    u.grid = u.grid or ns.Grid()
+    local G0 = ns.GRID.orderCards
+    u.grid:Begin(u.list.content, 0, 0, CW, { minW = G0.minW, gap = G0.gap, rowGap = G0.rowGap,
+        maxCols = G0.maxCols, minPx = G0.minPx, equal = true })
     for i, o in ipairs(list) do
         local c = u.list.Get(i)
-        local h = PaintOrder(c, o, key)
-        c:ClearAllPoints(); c:SetPoint("TOPLEFT", 0, -y)
-        y = y + h + 12
+        u.grid:Add(c, function(fr, w) return PaintOrder(fr, o, key, w) end)
     end
-    if #list > 0 then y = y - 12 end
+    local y = u.grid:End()
     u.list.HideFrom(#list + 1)
     if #list == 0 then
         local icon, title, text, label, click, kind = EMPTY[key]()
@@ -4361,8 +4465,15 @@ end
 
 -- ---------------------------------------------------------------- the window
 local function Build()
-    win = S.Window("WLHelperOrders", W, 400, L("Commandes"), L("Faire fabriquer par la guilde"), WLWritsDB, "ordersPos",
-        { header = 44, minH = 280 })
+    -- a workspace window (spec 1.1): its size from the screen, resizable, the size saved in ordersPosSize
+    win = S.Window("WLHelperOrders", W, 576, L("Commandes"), L("Faire fabriquer par la guilde"), WLWritsDB, "ordersPos",
+        { size = "workspace", header = 44, minH = 280 })
+    Dims()
+    -- a new size (the grip, the screen): the widths again, then the current page laid out again
+    win.OnResize = function()
+        Dims()
+        WP.RefreshOrders()
+    end
     tabs = S.Tabs(win, { { "find", L("Artisans") }, { "ask", L("Demande") }, { "board", L("Ouvertes") }, { "mine", L("Mes commandes") }, { "recv", L("Pour moi") } },
         function() return current == "new" and "find" or current end, function(k) WP.ShowOrdersTab(k) end, function(k)
             if k == "find" or k == "ask" then return nil end
@@ -4393,6 +4504,7 @@ local function Build()
     ui.board.only:SetPoint("RIGHT", 0, 0)
     local ol = S.Text(only, F.label, C.text); ol:SetJustifyH("LEFT"); ol:SetPoint("LEFT", 0, 0); ol:SetText(L("Seulement ce que je sais fabriquer"))
     ol:SetWidth(CW - 40 - 12); S.ClampLabel(ol, nil, only)
+    ui.board.onlyLabel = ol
     ui.board.only:AttachRow(only)
     bp.topH = 28 + 12
     ui.board.list = List(bp, OrderCard)
@@ -4409,6 +4521,7 @@ end
 
 function WP.ShowOrdersTab(k)
     if not win then Build() end
+    Dims()
     current = k
     if WP.ordersPendingTab == k then WP.ordersPendingTab = nil end
     if k == "ask" then askNames = nil end
@@ -4431,6 +4544,7 @@ function WP.RefreshOrders()
     elseif current == "ask" then RenderAsk()
     elseif current == "board" then
         ui.board.only:Update()
+        ui.board.onlyLabel:SetWidth(CW - 40 - 12)
         RenderOrders("board", O.Board(WLWritsDB.ordersBoardMine ~= false))
     else
         local mine, forMe = O.Lists()

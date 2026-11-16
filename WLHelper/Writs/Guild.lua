@@ -7,8 +7,9 @@
 --            (or when the member was last on), rank (an Invite button in its place on hover).
 --            Click: whisper. Right-click: invite. The tooltip adds class and spec, the public note,
 --            the professions the member shares (Orders) and the addon's version.
---            Drawn with the design system (docs/DESIGN.md): 640 wide, sized to its content; the
---            list scrolls inside the window only past 80 % of the screen.
+--            Drawn with the design system (docs/DESIGN.md): a workspace window (size rule 3.1,
+--            resizable, size saved); the list scrolls inside. From 900 px of content the filters
+--            take two lines instead of four.
 --  Keys     "Qui a la clé ?": for each dungeon key, the members who have it (drawn by Writs/Keys.lua,
 --            which also does its sharing; the tab only shows when that file is loaded).
 --  PvP      A ranking of honorable kills, as the game counts them (battlegrounds included): this
@@ -1010,10 +1011,11 @@ function WP.GuildHours(name)
 end
 
 -- ---------------------------------------------------------------- the window
--- 640 wide (a wide tool: filters and four columns). The height follows the content (f:FitHeight);
--- the list scrolls inside the window only once it reached 80 % of the screen.
-local W, PAD = 640, 16
+-- A workspace window (DESIGN 3.1): its size comes from the screen (S.Window opts.size), the user
+-- can resize it; Dims() reads the width at render time. The lists scroll inside.
+local W, PAD = 956, 16
 local CW = W - 2 * PAD          -- content width
+local WIDE_FILTERS = 900        -- from this content width the four filter lines become two
 local ROW_H, ROW_GAP = 36, 0    -- zebra list: rows touch
 local win, tabs, current = nil, nil, "members"
 local pages, ui = {}, {}
@@ -1076,9 +1078,38 @@ end
 
 -- A member: online dot, level, class icon, name in the class colour, the WL logo (has the addon),
 -- the role of the shared spec, zone or last seen, rank. Invite takes the rank's place on hover.
+-- Columns: name floor(CW * 0.22), zone floor(CW * 0.30), rank 120 at the right; never narrower
+-- than in the old 640 window (name 116, zone 226).
 local COL = { dot = 8, lvl = 22, cls = 52, name = 80, logo = 200, role = 218, zone = 242 }
 local RANK_W = 120
-local ZONE_W = CW - COL.zone - 12 - RANK_W - 8
+local NAME_MIN, ZONE_MIN = 116, 226
+local ZONE_W = ZONE_MIN
+
+-- the derived widths, from the window's current width (called before every render and on resize)
+local function Dims()
+    local w = win and Num(win:GetWidth())
+    -- a width the game cannot give yet (or not a real one): the size rule's default
+    if not (w and w >= 320) then w = ns.WinSize and ns.WinSize("workspace") or W end
+    W = math.floor(w + 0.5)
+    CW = W - 2 * PAD
+    local nameW = math.max(NAME_MIN, math.floor(CW * 0.22))
+    COL.logo = COL.name + nameW + 4
+    COL.role = COL.logo + 18
+    COL.zone = COL.role + 24
+    ZONE_W = math.max(ZONE_MIN, math.floor(CW * 0.30))
+    ZONE_W = math.max(40, math.min(ZONE_W, CW - COL.zone - 12 - RANK_W - 8))
+end
+
+-- puts a row's columns where Dims() says (only when the width changed)
+local function LayoutMemberRow(r)
+    if r.layCW == CW then return end
+    r.layCW = CW
+    r:SetSize(CW, ROW_H)
+    r.name:SetWidth(COL.logo - COL.name - 4)
+    r.logo:ClearAllPoints(); r.logo:SetPoint("LEFT", COL.logo, 0)
+    r.role:ClearAllPoints(); r.role:SetPoint("LEFT", COL.role, 0)
+    r.where:ClearAllPoints(); r.where:SetPoint("LEFT", COL.zone, 0); r.where:SetWidth(ZONE_W)
+end
 
 local function MemberRow(parent)
     local r = CreateFrame("Button", nil, parent)
@@ -1210,6 +1241,50 @@ local function ClearFilters()
     WP.RefreshGuild()
 end
 
+-- The filters of the Members page. Under WIDE_FILTERS of content: four lines (count + online
+-- switch; search + sort; classes + role; where the guild is). From it: two lines (count, search,
+-- sort, online switch; classes, role, where the guild is), about 70 px more for the list.
+-- Returns wide, and sets ui.filtersBottom and ui.lineX (where line 4's content starts).
+local COUNT_W = 220
+local function LayoutFilters()
+    local onlyW = Num(ui.onlyRow:GetWidth()) or 0
+    local sortW = Num(ui.sort:GetWidth()) or 0
+    local roleW = Num(ui.role:GetWidth()) or 0
+    local classesW = #ui.classBtns * 32 - 4
+    -- two lines only when the search keeps its 160 between the count and the sort (long labels)
+    local wide = CW >= WIDE_FILTERS and CW - COUNT_W - 12 - sortW - 12 - onlyW - 16 >= 160
+    ui.count:ClearAllPoints(); ui.onlyRow:ClearAllPoints(); ui.sort:ClearAllPoints(); ui.search:ClearAllPoints()
+    ui.onlyRow:SetPoint("TOPRIGHT", -PAD, -12)
+    local classY
+    if wide then
+        ui.count:SetPoint("TOPLEFT", PAD, -18); ui.count:SetWidth(COUNT_W)
+        ui.sort:SetPoint("TOPRIGHT", -(PAD + onlyW + 16), -12)
+        ui.search:SetPoint("TOPLEFT", PAD + COUNT_W + 12, -12)
+        ui.search:SetWidth(math.max(160, CW - COUNT_W - 12 - sortW - 12 - onlyW - 16))
+        classY = 52
+    else
+        ui.count:SetPoint("TOPLEFT", PAD, -18); ui.count:SetWidth(CW - 220)
+        ui.sort:SetPoint("TOPRIGHT", -PAD, -52)
+        ui.search:SetPoint("TOPLEFT", PAD, -52)
+        ui.search:SetWidth(math.max(160, CW - sortW - 12))
+        classY = 92
+    end
+    for i, b in ipairs(ui.classBtns) do
+        b:ClearAllPoints(); b:SetPoint("TOPLEFT", PAD + (i - 1) * 32, -classY)
+    end
+    ui.role:ClearAllPoints()
+    if wide then
+        ui.role:SetPoint("TOPLEFT", PAD + classesW + 12, -classY)
+        ui.lineX = PAD + classesW + 12 + roleW + 16
+    else
+        ui.role:SetPoint("TOPRIGHT", -PAD, -classY)
+        ui.lineX = PAD
+    end
+    ui.filtersBottom = classY + 28
+    ui.wideFilters = wide
+    return wide
+end
+
 local function RenderMembers()
     local m = pages.members
     local inGuild = IsInGuild and IsInGuild()
@@ -1236,10 +1311,16 @@ local function RenderMembers()
     ui.role:Update()
     local filtered = WLWritsDB.guildClass ~= nil or WLWritsDB.guildRole ~= nil or searchText ~= ""
     local roleOn = WLWritsDB.guildRole ~= nil
+    local wide = LayoutFilters()
+    -- wide: the zone pills end the classes' line; the role sentence (long) keeps a line of its own
+    local inline = wide and not roleOn
 
-    -- the line under the filters: where the guild is (zones as pills), or, with a role filter, how
-    -- many members have a known role; "Clear filters" on the right when a filter is on
-    local y = ui.filtersBottom + 12
+    -- the line under the filters (inline: the end of the classes' line): where the guild is (zones
+    -- as pills), or, with a role filter, how many members have a known role; "Clear filters" on the
+    -- right when a filter is on
+    local y = inline and (ui.filtersBottom - 28) or (ui.filtersBottom + 12)
+    local x0 = inline and ui.lineX or PAD
+    local dy = inline and 5 or 0    -- inline: the 18 px pills centred on the 28 px line
     -- with no match, the empty state carries "Enlever les filtres": one such button, not two
     local showClear = filtered and #list > 0
     ui.clear:SetShown(showClear)
@@ -1254,19 +1335,19 @@ local function RenderMembers()
             or known == 1
             and string.format(L("Rôle connu pour 1 membre sur %d : seuls ceux qui ont WL Helper et ont choisi leur spé le partagent."), total or 0)
             or string.format(L("Rôle connu pour %d membres sur %d : seuls ceux qui ont WL Helper et ont choisi leur spé le partagent."), known or 0, total or 0))
-        Place(ui.roleInfo, PAD + 20, y)
-        lineH = math.max(16, S.FitText(ui.roleInfo, 2, CW - 20 - rightW, ui.roleInfoOwner))
-        Place(ui.roleIcon, PAD, y)
+        Place(ui.roleInfo, x0 + 20, y)
+        lineH = math.max(16, S.FitText(ui.roleInfo, 2, W - PAD - x0 - 20 - rightW, ui.roleInfoOwner))
+        Place(ui.roleIcon, x0, y)
     else
         ui.roleInfo:Hide(); ui.roleIcon:Hide()
         local z = {}
         for name, n in pairs(zones) do z[#z + 1] = { name, n } end
         table.sort(z, function(a, b) if a[2] ~= b[2] then return a[2] > b[2] end return a[1] < b[1] end)
         ui.zonesLabel:SetShown(#z > 0)
-        local zx = PAD
+        local zx = x0
         if #z > 0 then
-            Place(ui.zonesLabel, PAD, y + 3)
-            zx = PAD + TextW(ui.zonesLabel) + 8
+            Place(ui.zonesLabel, x0, y + dy + 3)
+            zx = x0 + TextW(ui.zonesLabel) + 8
             lineH = F.meta + 7
         end
         local limit = W - PAD - rightW
@@ -1279,13 +1360,13 @@ local function RenderMembers()
                     c.zone, c.n = z[i][1], z[i][2]
                     c.label:SetText(c.zone .. "  " .. c.n)
                     local w = TextW(c.label) + 12
-                    if zx + w > limit and i > 1 then
+                    if zx + w > limit and (i > 1 or limit - zx < 60) then
                         stop = true; c:Hide()     -- no room left on the line: the next ones stay hidden
                     else
                         w = math.min(w, limit - zx)
                         c.label:SetWidth(math.max(1, w - 12))
                         c:SetWidth(w)
-                        Place(c, zx, y)
+                        Place(c, zx, y + dy)
                         c.on = searchText == c.zone
                         c:Paint(); c:Show()
                         zx = zx + w + 4
@@ -1297,10 +1378,11 @@ local function RenderMembers()
         end
     end
     if showClear then
-        ui.clear:ClearAllPoints(); ui.clear:SetPoint("TOPRIGHT", m, "TOPRIGHT", -PAD, -(y - 3))
+        ui.clear:ClearAllPoints(); ui.clear:SetPoint("TOPRIGHT", m, "TOPRIGHT", -PAD, -(y + (inline and 2 or -3)))
         lineH = math.max(lineH, 18)
     end
-    if lineH > 0 then y = y + lineH end
+    if inline then y = ui.filtersBottom
+    elseif lineH > 0 then y = y + lineH end
     -- column heads, then the list
     y = y + 12
     for _, h in ipairs(ui.heads) do h:ClearAllPoints() end
@@ -1314,6 +1396,7 @@ local function RenderMembers()
     local board = Board()
     for i, mm in ipairs(list) do
         local r = ui.members.Get(i)
+        LayoutMemberRow(r)
         Place(r, 0, (i - 1) * (ROW_H + ROW_GAP))
         Zebra(r.bg, i)
         r.m = mm
@@ -1461,6 +1544,23 @@ local function RowTip(e)
     return t
 end
 
+-- a fact tile of the PvP tab: card fill and edge, one sentence (up to 3 lines) at 12 from the edges
+local PVP_TILES = { minW = 260, gap = 12, rowGap = 12, maxCols = 3, minPx = 200, equal = true }
+local function FactTile(parent, font, color)
+    local t = CreateFrame("Frame", nil, parent)
+    t.wlOwned = true
+    t.bg = S.Solid(t, "BACKGROUND", C.cardFill); t.bg:SetAllPoints()
+    S.Border(t, C.cardEdge)
+    t.text = S.Text(t, font, color)
+    t.text:SetPoint("TOPLEFT", 12, -12)
+    t:Hide()
+    return t
+end
+local function FitTile(t, w)
+    t.text:ClearAllPoints(); t.text:SetPoint("TOPLEFT", 12, -12)
+    return 12 + S.FitText(t.text, 3, math.max(40, w - 24), t) + 12
+end
+
 local function RenderPvP()
     ArchiveSeason()
     local p = pages.pvp
@@ -1471,11 +1571,10 @@ local function RenderPvP()
     -- a word pill: the calendar icon only repeated "Saison"
     ui.seasonPill:Set(string.format(L("Saison %s"), SeasonName(Season())))
     local y = 12 + 28 + 12
-    Place(ui.mine, PAD, y)
-    -- my numbers first (the unit named once: "VH" is the unit of the list below), then, one size
-    -- down, my battlegrounds over the selected period, in words
+    -- three fact tiles on one line (ns.Grid, minW 260: one line from 868 of content): my numbers
+    -- (the unit named once: "VH" is the unit of the list below), my battlegrounds over the selected
+    -- period in words, the last season's podium. A tile with nothing to say is left out.
     ui.mine:SetText(string.format(L("Tes victoires honorables (VH) : %s cette semaine, %s cette saison, %s au total."), Thousands(w), Thousands(s), Thousands(hk)))
-    y = y + S.FitText(ui.mine, 2, CW, p)
     local mine = Board()[Me()]
     local _, myKd = PeriodData(mine or {}, mode, mode == "week" and Week() or mode == "season" and Season() or nil)
     if myKd and (myKd[KD_M] or 0) > 0 then
@@ -1484,12 +1583,9 @@ local function RenderPvP()
         local fmt = mode == "week" and L("En champ de bataille cette semaine : %s.")
             or mode == "season" and L("En champ de bataille cette saison : %s.") or L("En champ de bataille depuis toujours : %s.")
         ui.mineKd:SetText(string.format(fmt, body))
-        y = y + 3
-        Place(ui.mineKd, PAD, y)
-        y = y + S.FitText(ui.mineKd, 2, CW, p)
-        ui.mineKd:Show()
+        ui.mineKd:Show(); ui.kdTile:Show()
     else
-        ui.mineKd:SetText(""); ui.mineKd:Hide()
+        ui.mineKd:SetText(""); ui.mineKd:Hide(); ui.kdTile:Hide()
     end
     -- the last season's podium
     local past, pastKey = Seasons().list, nil
@@ -1499,13 +1595,20 @@ local function RenderPvP()
         for i, e in ipairs(past[pastKey]) do t[#t + 1] = i .. ". " .. e[1] .. " (" .. Thousands(e[2]) .. " " .. L("VH") .. ")" end
         -- no star before it: it was decoration (icon audit, Guild)
         ui.past:SetText(string.format(L("Saison précédente (%s) : %s"), SeasonName(pastKey), table.concat(t, ", ")))
-        y = y + 4
-        Place(ui.past, PAD, y)
-        y = y + S.FitText(ui.past, 2, CW, p)
-        ui.past:Show()
+        ui.past:Show(); ui.pastTile:Show()
     else
-        ui.past:SetText(""); ui.past:Hide()
+        ui.past:SetText(""); ui.past:Hide(); ui.pastTile:Hide()
     end
+    ui.mineTile:Show()
+    -- as many columns as tiles shown: a lone sentence takes the whole width
+    local shown = 1 + (ui.kdTile:IsShown() and 1 or 0) + (ui.pastTile:IsShown() and 1 or 0)
+    PVP_TILES.maxCols = shown
+    local g = ui.tileGrid
+    g:Begin(p, PAD, y, CW, PVP_TILES)
+    for _, tile in ipairs({ ui.mineTile, ui.kdTile, ui.pastTile }) do
+        if tile:IsShown() then g:Add(tile, FitTile) end
+    end
+    y = y + g:End()
     y = y + 12
     local top = y
     local me = Me()
@@ -1554,8 +1657,11 @@ local function InfoTip()
 end
 
 local function Build()
-    win = S.Window("WLHelperGuild", W, 520, L("Guilde"), GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "guildPos",
-        { header = S.HEADER_H, minH = 240 })
+    win = S.Window("WLHelperGuild", W, 614, L("Guilde"), GetGuildInfo and GetGuildInfo("player") or nil, WLWritsDB, "guildPos",
+        { header = S.HEADER_H, minH = 240, size = "workspace" })
+    -- dragged or re-sized by a screen change: the current tab again, at the new width
+    win.OnResize = function() Dims(); WP.RefreshGuild() end
+    Dims()
     win:AddHeaderButton(S.IconButton(win.header, "info", 28, InfoTip))
     local tabList = { { "members", L("Membres") }, { "pvp", L("Classement PvP") } }
     -- the keys tab exists only when Writs/Keys.lua is loaded (it draws the tab and shares the keys)
@@ -1587,12 +1693,14 @@ local function Build()
     only:AttachRow(onlyRow)
     onlyRow:SetWidth(TextW(onlyText) + 12 + 40)
     onlyRow:SetPoint("TOPRIGHT", -PAD, -12)
+    ui.onlyRow = onlyRow
     -- line 2: search and sort
     local sort = Keep(S.Segmented(m, { { "level", L("Niveau") }, { "name", L("Nom") }, { "class", L("Classe") }, { "zone", L("Zone") }, { "rank", L("Rang") } },
         function() return WLWritsDB.guildSort or "level" end, function(v) WLWritsDB.guildSort = v; WP.RefreshGuild() end, 28))
     local sortTips = { L("Clic : trier par niveau"), L("Clic : trier par nom"), L("Clic : trier par classe"), L("Clic : trier par zone"), L("Clic : trier par rang") }
     for i, b in ipairs(sort.buttons) do b.tip = { b.label:GetText(), sortTips[i] } end
     sort:SetPoint("TOPRIGHT", -PAD, -52)
+    ui.sort = sort
     ui.search = Keep(S.Input(m, math.max(160, CW - (Num(sort:GetWidth()) or 0) - 12), {
         search = true, placeholder = L("Ex. Mylla, Orgrimmar, Officier"),
         onChange = function() WP.RefreshGuild() end }))
@@ -1679,9 +1787,10 @@ local function Build()
     for i, b in ipairs(seg.buttons) do b.tip = { b.label:GetText(), segTips[i] } end
     ui.seasonPill = S.Pill(p)
     ui.seasonPill:SetPoint("RIGHT", p, "TOPRIGHT", -PAD, -26)
-    ui.mine = S.Text(p, F.body, C.text)
-    ui.mineKd = S.Text(p, F.meta, C.muted); ui.mineKd:Hide()
-    ui.past = S.Text(p, F.meta, C.muted)
+    ui.mineTile = FactTile(p, F.body, C.text); ui.mine = ui.mineTile.text
+    ui.kdTile = FactTile(p, F.meta, C.muted); ui.mineKd = ui.kdTile.text; ui.mineKd:Hide()
+    ui.pastTile = FactTile(p, F.meta, C.muted); ui.past = ui.pastTile.text
+    ui.tileGrid = ns.Grid()
     ui.measure = S.Text(p, F.meta, C.muted); ui.measure:SetWordWrap(false); ui.measure:Hide()
     ui.rank = List(p, RankRow)
     ui.none = S.EmptyState(p, "sword", L("Aucune victoire cette semaine"))
@@ -1716,6 +1825,7 @@ local refreshing = false
 function WP.RefreshGuild()
     if not (win and win:IsShown()) or refreshing then return end
     refreshing = true
+    Dims()
     if current == "keys" and not KeysOn() then current = "members"; for key, pg in pairs(pages) do pg:SetShown(key == current) end end
     tabs:Update()
     -- the keys tab is the last one: hiding it leaves no gap in the bar
@@ -1738,6 +1848,8 @@ function WP.ToggleGuild()
     WP.ShowGuildTab(current)
 end
 function WP.HideGuild() if win then win:Hide() end end
+-- for the tests: the window, its pages and their widgets
+function WP.GuildParts() return win, pages, ui end
 
 -- ---------------------------------------------------------------- events
 local ev = CreateFrame("Frame")

@@ -12,13 +12,18 @@
 -- quand un membre n'a pas encore la quête) et le GPS. Jusqu'à 4 objets en récompense (icône bordée de
 -- sa qualité, « +12 % » sous l'icône quand WL Helper Gear y voit une amélioration, le meilleur des
 -- choix cerclé d'or). Enfin la chaîne, qui se déplie juste en dessous. Les quêtes déjà rendues sont
--- repliées en bas (« Déjà rendues (10) »). En groupe : une colonne d'icônes par membre dont l'état
--- est connu, les autres nommés sous le titre « Quêtes à faire ». Avec plusieurs donjons, le total de
--- toute la route vient à la fin. En bas : « Lancer la route » (premier écran), « Mettre à jour la
+-- repliées en bas (« Déjà rendues (10) »). En groupe, deux onglets en haut : « Quêtes » (cette liste)
+-- et « Groupe · 2 à régler » : un tableau, une ligne par quête cochée (niveau, où la prendre), une
+-- colonne par membre (nom en couleur de classe, niveau), une icône par case (l'a, prête, rendue, ne
+-- peut pas, inconnu) avec sa raison au survol (ns.PartyQuests, les données de WL Helper d'abord),
+-- « 2/3 l'ont » et « Partager » par ligne, ce qui bloque le plus en tête et « Vérifier » (relit le
+-- groupe et partage les quêtes cochées une à une). Avec plusieurs donjons, le total de toute la
+-- route vient à la fin. En bas : « Lancer la route » (premier écran), « Mettre à jour la
 -- route » (la route tourne et tes coches ont changé) ou « Retour à la route » (rien n'a changé), et
 -- « Fermer » (« Retour au choix » quand le résumé vient du choix du guide). Ouvert ailleurs pendant
 -- qu'une route tourne sur d'autres donjons : « Lancer la route ici », confirmé par un deuxième clic.
--- Design system: docs/DESIGN.md (640 px window sized to its content, scroll past 80 % of the screen).
+-- Design system: docs/DESIGN.md (a workspace window, 3.1: its size from the screen, resizable, the
+-- size kept; the list scrolls inside; quest cards and facts side by side when it is wide, 3.22).
 local ADDON, ns = ...
 local L, T = ns.L, ns.T_
 
@@ -71,9 +76,6 @@ local STR = {
     SUM_BACK_PICK = "Retour au choix", SUM_BACK_PICK_TT = "Clic : revenir au choix du guide sans lancer la route",
     SUM_GO_HERE = "Lancer la route ici", SUM_GO_CONFIRM = "Remplacer la route ?",
     SUM_GO_HERE_TT = "Clic : remplacer la route en cours par ce donjon seul, avec les quêtes cochées (les étapes cochées à la main sont perdues ; un 2e clic confirme)",
-    SUM_EXTRA1 = "Aussi dans le groupe : %s. Son état est dans la bulle de chaque quête.",
-    SUM_EXTRA = "Aussi dans le groupe : %s. Leur état est dans la bulle de chaque quête.",
-    SUM_COL_TT = "Une icône par quête : survole-la pour le détail",
     SUM_GO = "Lancer la route", SUM_GO_TT = "Clic : fermer la vue d'ensemble et ouvrir le guide sur la première étape, avec les quêtes cochées",
     SUM_GO_TT1 = "Clic : lancer la route sur ce donjon seul, avec les quêtes cochées (remplace tes donjons choisis)",
     SUM_GO_WHY = "Coche au moins une quête à faire.", SUM_CLOSE = "Fermer", SUM_CLOSE_TT = "Clic : fermer la vue d'ensemble sans lancer la route",
@@ -83,8 +85,17 @@ local STR = {
     SUM_SHARE_ALL = "Tout partager", SUM_SHARE_ALL_TT = "Clic : partager avec le groupe les quêtes cochées de ton journal, une toutes les 1,5 s",
     SUM_SHARE_WHY = "Aucune quête cochée de ton journal ne se partage.", SUM_SHARING = "Partage en cours",
     SUM_NOQ = "Aucune quête pour toi dans ce donjon.",
-    SUM_NOHELPER1 = "%s n'a pas WL Helper : son état s'affiche quand tu partages une quête.",
-    SUM_NOHELPER = "%s n'ont pas WL Helper : leur état s'affiche quand tu partages une quête.",
+    SUM_TAB_Q = "Quêtes", SUM_TAB_G = "Groupe", SUM_TAB_G_N = "Groupe · %d à régler",
+    SUM_G_CHECK = "Vérifier", SUM_G_CHECKING = "Vérification...",
+    SUM_G_CHECK_TT = "Clic : relire le groupe et partager une à une les quêtes cochées de ton journal ; les réponses du jeu remplissent le tableau",
+    SUM_G_HAVE = "%d/%d l'ont", SUM_G_CELL_TT = "Survole une case pour la raison",
+    SUM_G_BLOCK_LOW1 = "%s est trop bas pour %d quête", SUM_G_BLOCK_LOW = "%s est trop bas pour %d quêtes",
+    SUM_G_BLOCK_PRE1 = "Il manque à %s la quête d'avant pour %d quête", SUM_G_BLOCK_PRE = "Il manque à %s la quête d'avant pour %d quêtes",
+    SUM_G_BLOCK_NO1 = "%s ne peut pas prendre %d quête", SUM_G_BLOCK_NO = "%s ne peut pas prendre %d quêtes",
+    SUM_G_BLOCK_MISS1 = "%s n'a pas %d quête : partage-la", SUM_G_BLOCK_MISS = "%s n'a pas %d quêtes : partage-les",
+    SUM_G_BLOCK_UNK1 = "État inconnu pour %d quête : clique sur Vérifier", SUM_G_BLOCK_UNK = "État inconnu pour %d quêtes : clique sur Vérifier",
+    SUM_G_ALLOK = "Tout le groupe a les quêtes cochées.",
+    SUM_G_MORE1 = "%d autre membre n'a pas de colonne.", SUM_G_MORE = "%d autres membres n'ont pas de colonne.",
     SUM_G_ON = "L'a dans son journal", SUM_G_READY = "Prête à rendre", SUM_G_DONE = "Déjà rendue", SUM_G_TAKE = "À prendre",
     SUM_G_PRE = "Prérequis manquant", SUM_G_LOW = "Niveau trop bas", SUM_G_NA = "Pas pour ce personnage", SUM_G_INVALID = "Pas éligible",
     SUM_G_DECLINED = "Refusée", SUM_G_FULL = "Journal plein", SUM_G_BUSY = "Indisponible", SUM_G_FAR = "Trop loin",
@@ -153,9 +164,6 @@ local STR = {
     SUM_BACK_PICK = "Back to the picker", SUM_BACK_PICK_TT = "Click: go back to the guide picker without starting the route",
     SUM_GO_HERE = "Start the route here", SUM_GO_CONFIRM = "Replace the route?",
     SUM_GO_HERE_TT = "Click: replace the running route with this dungeon only and the ticked quests (steps marked done by hand are lost; a 2nd click confirms)",
-    SUM_EXTRA1 = "Also in the group: %s. Their state is in each quest's tooltip.",
-    SUM_EXTRA = "Also in the group: %s. Their state is in each quest's tooltip.",
-    SUM_COL_TT = "One icon per quest: hover it for the detail",
     SUM_GO = "Start the route", SUM_GO_TT = "Click: close the overview and open the guide on the first step, with the ticked quests",
     SUM_GO_TT1 = "Click: start the route with this dungeon only and the ticked quests (replaces your picked dungeons)",
     SUM_GO_WHY = "Tick at least one quest to do.", SUM_CLOSE = "Close", SUM_CLOSE_TT = "Click: close the overview without starting the route",
@@ -165,8 +173,17 @@ local STR = {
     SUM_SHARE_ALL = "Share all", SUM_SHARE_ALL_TT = "Click: share the ticked quests of your log with the group, one every 1.5 s",
     SUM_SHARE_WHY = "No ticked quest in your log can be shared.", SUM_SHARING = "Sharing",
     SUM_NOQ = "No quest for you in this dungeon.",
-    SUM_NOHELPER1 = "%s doesn't have WL Helper: their state shows once you share a quest.",
-    SUM_NOHELPER = "%s don't have WL Helper: their state shows once you share a quest.",
+    SUM_TAB_Q = "Quests", SUM_TAB_G = "Group", SUM_TAB_G_N = "Group · %d to sort out",
+    SUM_G_CHECK = "Check", SUM_G_CHECKING = "Checking...",
+    SUM_G_CHECK_TT = "Click: read the group again and share the ticked quests of your log one by one; the game's answers fill the table",
+    SUM_G_HAVE = "%d/%d have it", SUM_G_CELL_TT = "Hover a cell for the reason",
+    SUM_G_BLOCK_LOW1 = "%s is too low for %d quest", SUM_G_BLOCK_LOW = "%s is too low for %d quests",
+    SUM_G_BLOCK_PRE1 = "%s misses an earlier quest for %d quest", SUM_G_BLOCK_PRE = "%s misses an earlier quest for %d quests",
+    SUM_G_BLOCK_NO1 = "%s cannot take %d quest", SUM_G_BLOCK_NO = "%s cannot take %d quests",
+    SUM_G_BLOCK_MISS1 = "%s lacks %d quest: share it", SUM_G_BLOCK_MISS = "%s lacks %d quests: share them",
+    SUM_G_BLOCK_UNK1 = "Unknown for %d quest: click Check", SUM_G_BLOCK_UNK = "Unknown for %d quests: click Check",
+    SUM_G_ALLOK = "The whole group has the ticked quests.",
+    SUM_G_MORE1 = "%d more member has no column.", SUM_G_MORE = "%d more members have no column.",
     SUM_G_ON = "Has it in their log", SUM_G_READY = "Ready to turn in", SUM_G_DONE = "Already turned in", SUM_G_TAKE = "To pick up",
     SUM_G_PRE = "Missing prerequisite", SUM_G_LOW = "Level too low", SUM_G_NA = "Not for this character", SUM_G_INVALID = "Not eligible",
     SUM_G_DECLINED = "Declined", SUM_G_FULL = "Log full", SUM_G_BUSY = "Busy", SUM_G_FAR = "Too far",
@@ -202,14 +219,22 @@ do
 end
 
 -- =====================================================================
---  Sizes (design system: window 640, inset 16, rows 8, pills 18, group cells 64)
+--  Sizes (design system: workspace window 3.1, inset 16, rows 8, pills 18)
 -- =====================================================================
+-- W and CW follow the window (Dims, at every render): the size rule of the workspace tier
+-- (ns.WinSize), or the size the player dragged it to.
 local W, PAD = 640, 16
 local CW = W - 2 * PAD          -- content width
 local HERO_H, HERO_H_MULTI = 96, 72
+local ART_W0 = 608              -- the width the pictures' crops were chosen for (the old 640 window)
+-- quest cards side by side when the window is wide (2 from 904 px of content, 3 from 1356)
+local QGRID = { minW = 440, gap = 12, rowGap = 8, maxCols = 3, minPx = 200, equal = true }
+-- the facts (entrance and key, before you go in, you get) side by side
+local FACT_MIN, FACT_GAP, FACT_ROWGAP = 260, 24, 16
+-- the Group tab: the quest column keeps GNAME_MIN, the members' columns share the rest
+local GNAME_MIN, GCELL_MIN, GCELL_MAX = 300, 64, 96
 local ROW_GAP = 4
 local TX = 32                   -- text column of a row (after the check box)
-local CELLW, MAXCOLS = 64, 4    -- group columns (one icon each)
 local MAX_REWARDS = 4            -- reward icons per row (the last one is "+N" when there are more)
 local RW_SIZE, RW_STEP = 32, 48   -- a reward icon, and icon + gap (the "+12 %" under it fits the gap)
 local RW_LABEL = 17               -- the line under an icon: arrow and gain
@@ -1037,60 +1062,96 @@ local function ShareTarget(qid, pre, log)
   for _, pid in ipairs(pre and pre.chain or {}) do if ok(pid) then return pid end end
 end
 
--- Does sharing a row's quest still help someone? Members without WL Helper (their state shows
--- only once shared), and members who have not got it yet (to take, no answer, declined, log
--- full, busy, too far; or a missing prerequisite when the share is that prerequisite). Returns
--- the yes and the names.
-local NEED_SHARE = { take = true, unknown = true, declined = true, full = true, busy = true, far = true }
-local function NeedsShare(qid, shareId, dkey, ctx)
-  local who = {}
-  for _, m in ipairs(ctx.others or {}) do who[#who + 1] = m.name end
-  for _, list in ipairs({ ctx.cols or {}, ctx.extra or {} }) do
-    for _, m in ipairs(list) do
-      local s = ns.MemberQuest and ns.MemberQuest(m.name, qid, dkey) or "unknown"
-      if NEED_SHARE[s] or (s == "pre" and shareId ~= qid) then who[#who + 1] = m.name end
-    end
-  end
-  return #who > 0, who
-end
-
 -- =====================================================================
---  Group: one column per member whose state is known, the others on one line
+--  Group: each member's state for a quest (WL Helper's data first, then ns.PartyQuests)
 -- =====================================================================
--- state -> word (tooltip), HD icon, colour token, a second check (ready to turn in)
+-- state -> word (tooltip), HD icon ("?" text when nil), colour token, a second check (ready)
 local CELL = {
   on = { "SUM_G_ON", "check", "ok" }, ready = { "SUM_G_READY", "check", "gold", true }, done = { "SUM_G_DONE", "check", "faint" },
-  take = { "SUM_G_TAKE", "warning", "warn" }, pre = { "SUM_G_PRE", "close", "bad" }, low = { "SUM_G_LOW", "warning", "warn" },
-  na = { "SUM_G_NA", "minus", "faint" }, invalid = { "SUM_G_INVALID", "close", "bad" }, declined = { "SUM_G_DECLINED", "minus", "warn" },
-  full = { "SUM_G_FULL", "warning", "warn" }, busy = { "SUM_G_BUSY", "clock", "muted" }, far = { "SUM_G_FAR", "clock", "muted" },
-  sent = { "SUM_G_SENT", "clock", "muted" }, unknown = { "SUM_G_UNKNOWN", "dot", "faint" },
-  wait = { "SUM_G_WAIT", "clock", "muted" },
+  take = { "SUM_G_TAKE", "warning", "warn" }, pre = { "SUM_G_PRE", "close", "bad" }, low = { "SUM_G_LOW", "close", "bad" },
+  na = { "SUM_G_NA", "close", "bad" }, invalid = { "SUM_G_INVALID", "close", "bad" }, declined = { "SUM_G_DECLINED", "warning", "warn" },
+  full = { "SUM_G_FULL", "warning", "warn" }, busy = { "SUM_G_BUSY", "warning", "warn" }, far = { "SUM_G_FAR", "warning", "warn" },
+  sent = { "SUM_G_SENT", "clock", "muted" }, unknown = { "SUM_G_UNKNOWN", nil, "faint" },
 }
+-- state -> what it means for the group: has it, turned in, cannot take it, lacks it, unknown
+local BUCKET = { on = "has", ready = "has", done = "done", low = "cannot", pre = "cannot", invalid = "cannot", na = "cannot",
+  take = "missing", declined = "missing", full = "missing", busy = "missing", far = "missing", sent = "unknown", unknown = "unknown" }
+-- a WL Helper state -> the reason's key in ns.PartyQuests' strings
+local PQ_TEXT = { on = "ON", ready = "READY", done = "DONE", take = "TAKE", na = "NA", invalid = "INVALID", declined = "DECLINED",
+  full = "FULL", busy = "BUSY", far = "FAR", sent = "SENT" }
 
+local function PQText(key, ...)
+  local P = ns.PartyQuests
+  local t = P and P.STR and ((GetLocale and GetLocale() == "frFR") and P.STR.fr or P.STR.en)
+  local f = t and t[key]
+  if type(f) ~= "string" then return nil end
+  if select("#", ...) > 0 then local ok, v = pcall(string.format, f, ...); return ok and v or f end
+  return f
+end
+
+-- The other members, in party / raid order: { name, unit, class, level }.
 local function Members()
   if not ns.GroupMembers then return {} end
-  return ns.GroupMembers()
+  local out = {}
+  for _, m in ipairs(ns.GroupMembers()) do
+    local lvl = m.unit and UnitLevel and num(UnitLevel(m.unit))
+    if lvl and lvl <= 0 then lvl = nil end
+    out[#out + 1] = { name = m.name, unit = m.unit, class = m.class, level = lvl }
+  end
+  return out
 end
 
 local function ClassColor(cls)
   if not cls then return T.fg end
   local _, c = ns.ClassInfo(cls)
-  return c
+  return c or T.fg
 end
 
--- Members whose quests are known (WL Helper, or the game's answers to a share) get a column (4 at
--- most); the others are named once. Known members past the 4 columns (a raid) are named on their
--- own line, their state in each quest's tooltip.
-local function SplitMembers(members)
-  local known, others, extra = {}, {}, {}
-  for _, m in ipairs(members) do
-    local k
-    if ns.MemberKnown then k = ns.MemberKnown(m.name) else k = ns.HasHelper and ns.HasHelper(m.name) end
-    if not k then others[#others + 1] = m
-    elseif #known < MAXCOLS then known[#known + 1] = m
-    else extra[#extra + 1] = m end
+-- A member's state for a quest -> state, reason (words), source, missing prerequisite. WL Helper's
+-- data wins when it has the quest; then the game's answers (ns.PartyQuests: IsUnitOnQuest, the
+-- answers to a share); then a share answer Sync.lua heard; then the reason from the data.
+local function MemberState(m, qid, dkey)
+  local name = m.name
+  local ms, mpid, msrc = "unknown", nil, nil
+  if ns.MemberQuest then ms, mpid, msrc = ns.MemberQuest(name, qid, dkey) end
+  local helper = ns.HasHelper and ns.HasHelper(name)
+  local P = ns.PartyQuests
+  local ps, pwhy, psrc, ppid
+  if P and P.State then
+    local ok, a, b, c, d = pcall(P.State, name, qid, dkey)
+    if ok and type(a) == "string" then ps, pwhy, psrc, ppid = a, b, c, d end
   end
-  return known, others, extra
+  local function why(st, pid)
+    if st == "unknown" and helper then return L.SUM_G_WAIT_TT:format(name) end
+    if ps == st and pwhy then return pwhy end
+    if st == "pre" and pid then return PQText("PRE", ns.QName(pid)) or L.SUM_G_PRE_TT:format(ns.QName(pid)) end
+    if st == "low" then
+      local need = ns.Q[qid] and ns.Q[qid].r
+      if need then return (m.level and PQText("LOW", m.level, need)) or PQText("LOW_NOLVL", need) or L.SUM_G_LOW end
+    end
+    if st == "unknown" then return L.SUM_G_UNKNOWN_TT:format(name) end
+    return (PQ_TEXT[st] and PQText(PQ_TEXT[st])) or L[(CELL[st] or CELL.unknown)[1]]
+  end
+  if msrc == "sync" then return ms, why(ms, mpid), "sync", mpid end
+  if ps and ps ~= "unknown" and (psrc == "push" or psrc == "game" or psrc == "sync") then return ps, pwhy or why(ps, ppid), psrc, ppid end
+  -- Sync.lua's "sent" never expires: when ns.PartyQuests answers, its own "sent" (60 s) is the one
+  if msrc == "push" and ms ~= "unknown" and not (ms == "sent" and ps) then return ms, why(ms, mpid), "push", mpid end
+  if ps then return ps, why(ps, ppid), psrc, ppid end
+  return ms, why(ms, mpid), msrc, mpid
+end
+ns.SummaryMemberState = MemberState
+
+-- Does sharing a row's quest still help someone? Members who have not got it yet (to take, no
+-- answer, declined, log full, busy, too far; or a missing prerequisite when the share is that
+-- prerequisite). Returns the yes and the names.
+local NEED_SHARE = { take = true, unknown = true, declined = true, full = true, busy = true, far = true }
+local function NeedsShare(qid, shareId, dkey, ctx)
+  local who = {}
+  for _, m in ipairs(ctx.members or {}) do
+    local s = MemberState(m, qid, dkey)
+    if NEED_SHARE[s] or (s == "pre" and shareId ~= qid) then who[#who + 1] = m.name end
+  end
+  return #who > 0, who
 end
 
 -- =====================================================================
@@ -1178,38 +1239,57 @@ local function FillReward(b, rw, best, lvl)
   return u.up == true or rank ~= nil
 end
 
--- A group cell: one HD icon (two checks when ready); the member, the state and the detail in the tooltip.
+-- A group cell: one HD icon (two checks when ready, "?" when unknown); the member, the quest, the
+-- state and its reason in the tooltip.
+local GCELLW, GMAXCOLS = 72, 5   -- the group table's columns at the old 640 window (the floor)
+-- The members' columns at this width: as many as fit beside a quest column of GNAME_MIN (5 at
+-- least, 12 at most), each GCELL_MIN to GCELL_MAX wide. Returns the count shown and the cell width.
+local function GroupCols(nMembers)
+  local room = CW - 8 - GNAME_MIN
+  local maxCols = math.max(GMAXCOLS, math.min(12, math.floor(room / GCELL_MIN)))
+  local ncol = math.min(nMembers, maxCols)
+  if ncol < 1 then return 0, GCELLW end
+  local cw = math.floor(room / ncol)
+  if cw > GCELL_MAX then cw = GCELL_MAX end
+  if cw < GCELL_MIN then cw = GCELL_MIN end
+  return ncol, cw
+end
+ns.OverviewGroupCols = GroupCols   -- for the offline tests
 local function MakeCell(parent)
   local c = CreateFrame("Frame", nil, parent)
-  c:SetSize(CELLW, 18)
+  c:SetSize(GCELLW, 24)
   c:EnableMouse(true)
+  c.hl = ns.Tex(c, "BACKGROUND", T.hoverFill); c.hl:SetAllPoints(); c.hl:Hide()
   c.icon = ns.Icon(c, "dot", 16, "ARTWORK", T.muted); c.icon:SetPoint("CENTER", 0, 0)
   c.icon2 = ns.Icon(c, "check", 16, "ARTWORK", T.gold); c.icon2:SetPoint("CENTER", 5, 0); c.icon2:Hide()
-  c:SetScript("OnEnter", function(self) if self.tip then ns.ShowTip(self, self.tip) end end)
-  c:SetScript("OnLeave", ns.HideTip)
+  c.q = ns.Text(c, ns.F.body, T.faint); c.q:SetPoint("CENTER", 0, 0); c.q:SetText("?"); c.q:Hide()
+  c:SetScript("OnEnter", function(self) self.hl:Show(); if self.tip then ns.ShowTip(self, self.tip) end end)
+  c:SetScript("OnLeave", function(self) self.hl:Hide(); ns.HideTip() end)
   return c
 end
-local function FillCell(c, m, qid, dkey)
-  local s, pid, src = ns.MemberQuest(m.name, qid, dkey)
-  -- a member with WL Helper whose reply (for this dungeon) has not come yet
-  local wait = s == "unknown" and ns.HasHelper and ns.HasHelper(m.name)
-  local look = (wait and CELL.wait) or CELL[s] or CELL.unknown
+local function FillCell(c, m, qid, dkey, st)
+  -- st: the state GroupData already worked out for this cell (the counts and the cell agree)
+  local s, why, src
+  if st then s, why, src = st.s, st.why, st.src else s, why, src = MemberState(m, qid, dkey) end
+  local look = CELL[s] or CELL.unknown
   local col = T[look[3]] or T.muted
-  ns.SetHDIcon(c.icon, look[2], col)
-  -- ready to turn in: two gold checks, 10 px apart (one green check is "in the log")
-  c.icon:ClearAllPoints(); c.icon:SetPoint("CENTER", look[4] and -5 or 0, 0)
+  if look[2] then
+    ns.SetHDIcon(c.icon, look[2], col)
+    -- ready to turn in: two gold checks, 10 px apart (one green check is "in the log")
+    c.icon:ClearAllPoints(); c.icon:SetPoint("CENTER", look[4] and -5 or 0, 0)
+    c.icon:Show(); c.q:Hide()
+  else
+    c.icon:Hide(); c.q:SetTextColor(col[1], col[2], col[3]); c.q:Show()
+  end
   if look[4] then ns.SetHDIcon(c.icon2, "check", col) end
   c.icon2:SetShown(look[4] == true)
-  c.state, c.who = s, m.name
+  c.state, c.who, c.qid, c.why, c.bucket = s, m.name, qid, why, BUCKET[s] or "unknown"
   local cc = ClassColor(m.class)
-  local tip = { { m.name, cc[1], cc[2], cc[3] }, L[look[1]] }
-  if wait then tip[2] = L.SUM_G_WAIT_TT:format(m.name)
-  elseif s == "unknown" then tip[2] = L.SUM_G_UNKNOWN_TT:format(m.name) end
-  if s == "pre" and pid then tip[#tip + 1] = L.SUM_G_PRE_TT:format(ns.QName(pid)) end
-  if s == "sent" then tip[#tip + 1] = L.SUM_G_SENT_TT:format(m.name) end
-  if s == "na" then tip[#tip + 1] = L.SUM_G_NA_TT end
+  local tip = { { m.name, cc[1], cc[2], cc[3] }, ns.QName(qid), { L[look[1]], col[1], col[2], col[3] } }
+  if why and why ~= "" and why ~= L[look[1]] then tip[#tip + 1] = why end
   if src == "push" and s ~= "sent" then tip[#tip + 1] = L.SUM_G_PUSH_TT end
   c.tip = tip
+  return s
 end
 
 -- One link of an unfolded chain, as a timeline (T-69): a numbered dot on a line that joins the
@@ -1358,13 +1438,6 @@ local function RowTip(r)
   end
   if r.st ~= "done" then
     local n = r.pre and r.pre.total or 0
-    -- the members past the 4 columns: their state here
-    for _, m in ipairs(f and f.extraCols or {}) do
-      local s = ns.MemberQuest and ns.MemberQuest(m.name, qid, r.dkey) or "unknown"
-      local look = CELL[s] or CELL.unknown
-      local cc = ClassColor(m.class)
-      table.insert(lines, { m.name .. L.COLON .. L[look[1]], cc[1], cc[2], cc[3] })
-    end
     if IsOff(qid) then table.insert(lines, n > 0 and L.SUM_TICK_ON_CH:format(n) or L.SUM_TICK_ON)
     else table.insert(lines, n > 0 and L.SUM_TICK_OFF_CH:format(n) or L.SUM_TICK_OFF) end
   end
@@ -1391,6 +1464,8 @@ local function MakeRow(parent)
   r.doneIcon = ns.Icon(r, "check", 16, "ARTWORK", T.faint); r.doneIcon:SetPoint("TOPLEFT", 8, -ROW_TOP); r.doneIcon:Hide()
   r.name = ns.Text(r, ns.F.body, T.fg)
   r.detail = ns.Text(r, ns.F.meta, T.muted)
+  -- why the route leaves the quest out (its chain too high, too long, a level to reach first)
+  r.lock = ns.Text(r, ns.F.meta, T.muted); r.lock:Hide()
   -- the number column at the right: the XP you will get ("3 500" 13 + "XP" 11), the money under it
   r.xpUnit = ns.Text(r, ns.F.meta, T.muted); r.xpUnit:SetWordWrap(false)
   r.xpNum = ns.Text(r, ns.F.body, T.fg); r.xpNum:SetWordWrap(false)
@@ -1418,7 +1493,7 @@ local function MakeRow(parent)
     f.open[r.qid] = not f.open[r.qid] or nil
     Render()
   end)
-  r.pills, r.rewards, r.cells, r.links = {}, {}, {}, {}
+  r.pills, r.rewards, r.links = {}, {}, {}
   -- share: a quiet text action, shown only while a member still lacks the quest; it brightens
   -- when the card is under the mouse
   r.share = S.Button(r, L.SUM_SHARE, 0, 24, "ghost", function(self)
@@ -1450,6 +1525,8 @@ local function MakeRow(parent)
   -- the row is the check box's click target
   r:SetScript("OnClick", function(self)
     if self.st == "done" then return end
+    -- a quest the route leaves out for its chain: a tick puts it back (offPick), chain and all
+    if self.lockOut then SetOff(self.qid, false) return end
     SetOff(self.qid, not IsOff(self.qid))
   end)
   local function nudge(self, dy)
@@ -1497,7 +1574,6 @@ local function HideExtras(r)
   for _, p in ipairs(r.pills) do p:Hide() end
   for _, b in ipairs(r.rewards) do b:Hide() end
   for _, l in ipairs(r.links) do l:Hide() end
-  for _, c in ipairs(r.cells) do c:Hide() end
 end
 
 -- The fact line of a card, in words: "Quête niv. 36 · facile · se prend dès le niv. 30" (the level
@@ -1523,14 +1599,29 @@ local function FactText(q, inf, lvl)
   return #seg > 0 and table.concat(seg, " · ") or nil
 end
 
--- Fills one quest card; returns its height. Always the same order: name (XP and money at the
+-- Fills one quest card `width` wide (the grid's cell; the content width by default); returns its height. Always the same order: name (XP and money at the
 -- right), facts, state and actions, rewards, chain (its links unfold right under it).
-local function FillRow(r, qid, dkey, inf, ctx)
+local function FillRow(r, qid, dkey, inf, ctx, width)
   local q = inf.q
   local log = ctx.log
   local st, pre = inf.st, inf.pre
   local done = st == "done"
   local off = IsOff(qid)
+  -- left out of the route for its chain (ns.LockedReason: a level to reach, too high, too long),
+  -- unless ticked by hand: the box shows it unticked and a muted line says why
+  local lockTxt, lockCause
+  if not done and ns.LockedReason then
+    local okL, t, c = pcall(ns.LockedReason, qid, ctx.lvl, ctx.cls, dkey)
+    if okL and t and (c == "lvl" or c == "high" or c == "long") then lockTxt, lockCause = t, c end
+  end
+  local lockOut = false
+  if lockTxt then
+    local okR, inR = pcall(ns.ChainInRoute or function() return false end, qid, ctx.cls, ctx.lvl, dkey)
+    lockOut = not (okR and inR)
+  end
+  if not lockOut then lockTxt = nil end
+  r.lockOut = lockOut and not off or nil
+  off = off or lockOut
   r.qid, r.dkey, r.st, r.pre, r.low, r.inf = qid, dkey, st, pre, inf.low, inf
   r.point = (not done) and PointFor(log, qid, q, st, pre) or nil
 
@@ -1539,11 +1630,8 @@ local function FillRow(r, qid, dkey, inf, ctx)
   r.tick:SetShown(not off)
   r.boxEdge(off and T.btnEdge or T.accent)
 
-  -- the group's columns take the top right of a quest still to do; the XP column sits left of them
-  local cols = done and {} or ctx.cols
-  local ncol = #cols
-  local groupW = ncol > 0 and (ncol * CELLW + 8) or 0
-  local colR = CW - 12 - groupW
+  -- the XP column at the right edge (the group's state is in the Group tab)
+  local colR = (width or CW) - 12
   local nameW = colR - XPCOL - 12 - TX
   local wide = colR - TX
   r.wide, r.nameW, r.colR = wide, nameW, colR
@@ -1567,6 +1655,13 @@ local function FillRow(r, qid, dkey, inf, ctx)
     r.detail:Show()
     y = line2 + LineH(r.detail, ns.F.meta, nameW, r)
   else r.detail:SetText(""); r.detail:Hide() end
+  if lockTxt then
+    r.lock:SetText(lockTxt)
+    r.lock:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
+    r.lock:ClearAllPoints(); r.lock:SetPoint("TOPLEFT", TX, -(y + 2))
+    r.lock:Show()
+    y = y + 2 + LineH(r.lock, ns.F.meta, nameW, r)
+  else r.lock:SetText(""); r.lock:Hide() end
 
   if done then
     HideExtras(r)
@@ -1818,15 +1913,6 @@ local function FillRow(r, qid, dkey, inf, ctx)
   end
   for i = li + 1, #r.links do r.links[i]:Hide() end
 
-  -- one icon per known member, at the right edge, on the name's first line
-  for j, m in ipairs(cols) do
-    local c = r.cells[j] or MakeCell(r); r.cells[j] = c
-    FillCell(c, m, qid, dkey)
-    c:ClearAllPoints(); c:SetPoint("TOPLEFT", r, "TOPLEFT", CW - 12 - (ncol - j + 1) * CELLW, -(ROW_TOP - 1))
-    c:Show()
-  end
-  for j = ncol + 1, #r.cells do r.cells[j]:Hide() end
-
   local h = math.ceil(math.max(y + 8, 36))
   r:SetHeight(h)
   return h
@@ -1849,15 +1935,13 @@ local function MakeHero(parent)
   return hero
 end
 
--- "Quests to do 7", and over the group's columns, the members' names.
+-- "Quests to do 7".
 local function MakeHead(parent)
   local h = CreateFrame("Frame", nil, parent)
   h:SetSize(CW, 24)
   h.label = ns.Text(h, ns.F.body, T.fg); h.label:SetPoint("BOTTOMLEFT", 0, 6)
   h.count = ns.Text(h, ns.F.meta, T.muted); h.count:SetPoint("BOTTOMLEFT", h.label, "BOTTOMRIGHT", 6, 0)
   h.rule = ns.Rule(h); h.rule:SetPoint("BOTTOMLEFT"); h.rule:SetPoint("BOTTOMRIGHT")
-  h.cols = CreateFrame("Frame", nil, h); h.cols:SetAllPoints()
-  h.cols.names, h.cols.hits = {}, {}
   return h
 end
 
@@ -1892,15 +1976,325 @@ local function OpenPicker()
   if ns.ShowPicker then ns.ShowPicker() end
 end
 
+-- =====================================================================
+--  The Group tab: one row per ticked quest, one column per member
+-- =====================================================================
+-- Where a quest is taken, in a few words: "Rahauro · Thunder Bluff", "Rahauro · in the dungeon".
+local function WhereText(q)
+  local s = q.s
+  if q.si and (not s or s.i) then return L.OV_ITEM_START:format(q.si) end
+  if s and s.i then return (s.n and (s.n .. " · ") or "") .. L.OV_IN_DG end
+  if s and s.m then
+    local z = ZoneName(s.m)
+    if s.n and z ~= "" then return s.n .. " · " .. z end
+    return s.n or (z ~= "" and z or nil)
+  end
+  if q.st then return ns.T(q.st) end
+end
+
+-- "Check": reads the group again (the game's IsUnitOnQuest, WL Helper's members), then shares the
+-- ticked quests of my log one by one (the share queue, 1.5 s apart): the game's answers fill the cells.
+local function CheckGroup()
+  if not f or f.checking or ns.pushBusy then return end
+  local P = ns.PartyQuests
+  if P and P.Refresh then pcall(P.Refresh, true) end
+  if ns.SyncAsk and f.keys then pcall(ns.SyncAsk, f.keys) end
+  local list = f.shareList or {}
+  if #list > 0 and ns.PushQuests then
+    f.checking = true
+    local n = ns.PushQuests(list, function()
+      f.checking = nil
+      if f:IsShown() then Render() end
+      if ns.Render then ns.Render() end
+    end)
+    if not n or n == 0 then f.checking = nil end
+  end
+  if f:IsShown() then Render() end
+  -- the guide's share buttons grey out while the queue runs
+  if ns.Render then ns.Render() end
+end
+
+local function MakeGroupPane(gp)
+  local S = SW()
+  gp.block = ns.Text(gp, ns.F.body, T.fg)
+  gp.check = S.Button(gp, L.SUM_G_CHECK, 0, 24, "secondary", function() CheckGroup() end,
+    function() return { L.SUM_G_CHECK, L.SUM_G_CHECK_TT } end)
+  gp.check:SetPoint("TOPRIGHT", gp, "TOPRIGHT", 0, 0)
+  local h = CreateFrame("Frame", nil, gp)
+  h:SetSize(CW, 36)
+  h.label = ns.Text(h, ns.F.meta, T.muted); h.label:SetPoint("BOTTOMLEFT", 0, 6)
+  h.rule = ns.Rule(h); h.rule:SetPoint("BOTTOMLEFT"); h.rule:SetPoint("BOTTOMRIGHT")
+  h.names, h.lvls, h.hits = {}, {}, {}
+  gp.head = h
+  gp.rows = {}
+  gp.more = ns.Text(gp, ns.F.meta, T.muted); gp.more:Hide()
+end
+
+local function MakeGroupRow(parent)
+  local S = SW()
+  local r = CreateFrame("Frame", nil, parent)
+  r.wlOwned = true
+  r:SetWidth(CW)
+  r.bg = ns.Tex(r, "BACKGROUND", T.cardFill); r.bg:SetAllPoints()
+  ns.Outline(r, T.cardEdge)
+  r.name = ns.Text(r, ns.F.body, T.fg)
+  r.meta = ns.Text(r, ns.F.meta, T.muted)
+  r.have = ns.Text(r, ns.F.meta, T.muted); r.have:SetWordWrap(false)
+  r.share = S.Button(r, L.SUM_SHARE, 0, 24, "ghost", function(self)
+    if r.shareId and ns.PushQuest and ns.PushQuest(r.shareId) then self:Flash(L.SUM_SHARED) end
+  end, function()
+    local tip = { L.SUM_SHARE }
+    if r.shareWho and #r.shareWho > 0 then tip[#tip + 1] = L.SUM_SHARE_WHO:format(JoinNames(r.shareWho)) end
+    tip[#tip + 1] = L.SUM_SHARE_TT:format(r.shareId and ns.QName(r.shareId) or "")
+    return tip
+  end)
+  r.cells = {}
+  return r
+end
+
+-- The group's state on the ticked quests: rows { qid, dkey, inf, states, has, open }, the count of
+-- quests to sort out (someone lacks it, cannot take it, or is unknown) and what blocks most.
+local BLOCK_ORDER = { { "low", "pre", "no" }, { "miss" } }
+local BLOCK_KEY = { low = "SUM_G_BLOCK_LOW", pre = "SUM_G_BLOCK_PRE", no = "SUM_G_BLOCK_NO", miss = "SUM_G_BLOCK_MISS" }
+local function GroupData(members, per, keys)
+  local rows, seen = {}, {}
+  for _, dkey in ipairs(keys) do
+    for _, e in ipairs(per[dkey].todo) do
+      if not IsOff(e.qid) and not seen[e.qid] then
+        seen[e.qid] = true
+        rows[#rows + 1] = { qid = e.qid, dkey = dkey, inf = e.inf }
+      end
+    end
+  end
+  local blocks, todo, unk = {}, 0, 0
+  for _, row in ipairs(rows) do
+    row.states, row.has = {}, 0
+    local open, anyUnk = false, false
+    for j, m in ipairs(members) do
+      local s, why, src, pid = MemberState(m, row.qid, row.dkey)
+      row.states[j] = { s = s, why = why, src = src, pid = pid }
+      local b = BUCKET[s] or "unknown"
+      if b == "has" then row.has = row.has + 1 end
+      local k = (s == "low" and "low") or (s == "pre" and "pre") or (s == "invalid" and "no")
+        or (b == "missing" and "miss") or (b == "unknown" and "unk") or nil
+      if k then
+        local bl = blocks[m.name] or {}; blocks[m.name] = bl
+        bl[k] = (bl[k] or 0) + 1
+        open = true
+        if k == "unk" then anyUnk = true end
+      end
+    end
+    row.open = open
+    if open then todo = todo + 1 end
+    if anyUnk then unk = unk + 1 end
+  end
+  local g = { rows = rows, todo = todo }
+  -- what blocks most: a member who cannot take quests first, then one who lacks them, then unknowns
+  for _, kinds in ipairs(BLOCK_ORDER) do
+    local best, bn, bk = nil, 0, nil
+    for _, m in ipairs(members) do
+      local bl = blocks[m.name]
+      if bl then for _, k in ipairs(kinds) do if (bl[k] or 0) > bn then best, bn, bk = m, bl[k], k end end end
+    end
+    if best then
+      g.text = ns.Plural(bn, BLOCK_KEY[bk] .. "1", BLOCK_KEY[bk], best.name, bn)
+      g.kind, g.who, g.n = (bk == "miss") and "miss" or "cannot", best.name, bn
+      break
+    end
+  end
+  if not g.text then
+    if unk > 0 then g.text, g.kind = ns.Plural(unk, "SUM_G_BLOCK_UNK1", "SUM_G_BLOCK_UNK", unk), "unknown"
+    elseif #rows > 0 then g.text, g.kind = L.SUM_G_ALLOK, "ok"
+    else g.text, g.kind = L.SUM_GAIN0, "none" end
+  end
+  return g
+end
+
+-- Draws the Group tab; returns its height.
+local function DrawGroup(gp, g, members, ctx)
+  local y = 0
+  -- the header line: what blocks most, "Check" at the right
+  local busy = (f.checking or ns.pushBusy) and true or false
+  gp.check:SetText(busy and L.SUM_G_CHECKING or L.SUM_G_CHECK)
+  SetOn(gp.check, not busy)
+  local bw = num(gp.check:GetWidth()) or 0
+  if bw < 40 then bw = 90 end
+  gp.block:SetText(g.text)
+  local bc = (g.kind == "ok" and T.ok) or (g.kind == "cannot" and T.bad) or (g.kind == "miss" and T.warn) or T.text
+  gp.block:SetTextColor(bc[1], bc[2], bc[3])
+  gp.block:ClearAllPoints(); gp.block:SetPoint("TOPLEFT", gp, "TOPLEFT", 0, -4)
+  local bh = LineH(gp.block, ns.F.body, CW - bw - 12, gp, 3)
+  y = math.max(bh + 4, 24) + 12
+  gp.blockText = g.text
+
+  local h = gp.head
+  local ncol, GCELLW = GroupCols(#members)
+  gp.ncol, gp.cellW = ncol, GCELLW
+  local x0 = CW - 8 - ncol * GCELLW        -- the first column's left edge
+  local nameW = x0 - 12 - 12
+  if #g.rows == 0 then
+    h:Hide()
+    for _, r in ipairs(gp.rows) do r:Hide() end
+    gp.more:Hide()
+    return y
+  end
+  -- the column heads: the name in its class colour, the level under it
+  h.label:SetText(L.SUM_G_CELL_TT)
+  h.label:SetWidth(math.max(40, x0 - 8))
+  for j = 1, ncol do
+    local m = members[j]
+    local cc = ClassColor(m.class)
+    local nf = h.names[j]
+    if not nf then nf = ns.Text(h, ns.F.meta, T.fg); nf:SetJustifyH("CENTER"); h.names[j] = nf end
+    nf:SetText(m.name); nf:SetTextColor(cc[1], cc[2], cc[3])
+    nf:SetWidth(GCELLW - 4); nf:SetWordWrap(false)
+    local lf = h.lvls[j]
+    if not lf then lf = ns.Text(h, ns.F.meta, T.muted); lf:SetJustifyH("CENTER"); h.lvls[j] = lf end
+    lf:SetText(m.level and L.SUM_LINK_LV:format(m.level) or "")
+    lf:SetWidth(GCELLW - 4)
+    local hit = h.hits[j]
+    if not hit then
+      hit = CreateFrame("Frame", nil, h)
+      hit:EnableMouse(true)
+      hit:SetScript("OnEnter", function(self) if self.tip then ns.ShowTip(self, self.tip) end end)
+      hit:SetScript("OnLeave", ns.HideTip)
+      h.hits[j] = hit
+    end
+    hit.tip = { { m.name, cc[1], cc[2], cc[3] }, m.level and L.SUM_LINK_LV:format(m.level) or nil }
+    ns.ClampLabel(nf, m.name, hit)
+    local x = x0 + (j - 1) * GCELLW
+    nf:ClearAllPoints(); nf:SetPoint("TOPLEFT", h, "TOPLEFT", x + 2, -2); nf:Show()
+    lf:ClearAllPoints(); lf:SetPoint("TOPLEFT", h, "TOPLEFT", x + 2, -16); lf:Show()
+    hit:SetSize(GCELLW, 30)
+    hit:ClearAllPoints(); hit:SetPoint("TOPLEFT", h, "TOPLEFT", x, 0); hit:Show()
+  end
+  for j = ncol + 1, #h.names do h.names[j]:Hide(); h.lvls[j]:Hide(); h.hits[j]:Hide() end
+  h:SetWidth(CW)
+  h:ClearAllPoints(); h:SetPoint("TOPLEFT", gp, "TOPLEFT", 0, -y); h:Show()
+  y = y + 36 + 8
+
+  for i, row in ipairs(g.rows) do
+    local r = gp.rows[i] or MakeGroupRow(gp); gp.rows[i] = r
+    r:SetWidth(CW)
+    local q = ns.Q[row.qid] or {}
+    r.qid, r.dkey, r.row = row.qid, row.dkey, row
+    r.name:SetText(ns.QName(row.qid))
+    r.name:ClearAllPoints(); r.name:SetPoint("TOPLEFT", 12, -8)
+    local rh = 8 + LineH(r.name, ns.F.body, nameW, r)
+    local meta = {}
+    if q.l then meta[#meta + 1] = L.SUM_LINK_LV:format(q.l) end
+    local where = WhereText(q)
+    if where then meta[#meta + 1] = where end
+    if #meta > 0 then
+      r.meta:SetText(table.concat(meta, " · "))
+      r.meta:ClearAllPoints(); r.meta:SetPoint("TOPLEFT", 12, -(rh + 2)); r.meta:Show()
+      rh = rh + 2 + LineH(r.meta, ns.F.meta, nameW, r)
+    else r.meta:SetText(""); r.meta:Hide() end
+    -- "2/3 l'ont", then "Share" while someone lacks it and it can be shared
+    local lineY = rh + 4
+    r.have:SetText(L.SUM_G_HAVE:format(row.has, #members))
+    local hc = (row.has == #members) and T.ok or T.muted
+    r.have:SetTextColor(hc[1], hc[2], hc[3])
+    r.have:ClearAllPoints(); r.have:SetPoint("TOPLEFT", 12, -(lineY + 5)); r.have:Show()
+    local shareId = ctx.grouped and ShareTarget(row.qid, row.inf.pre, ctx.log) or nil
+    local who = {}
+    for j, st in ipairs(row.states) do
+      if NEED_SHARE[st.s] or (st.s == "pre" and shareId and shareId ~= row.qid) then who[#who + 1] = members[j].name end
+    end
+    r.shareId, r.shareWho = shareId, who
+    if shareId and #who > 0 then
+      local hw = ns.TextWidth and num(ns.TextWidth(r.have)) or 60
+      r.share:ClearAllPoints(); r.share:SetPoint("TOPLEFT", r, "TOPLEFT", 12 + (hw or 60) + 8, -lineY); r.share:Show()
+    else r.share:Hide() end
+    rh = lineY + 24 + 8
+    rh = math.ceil(math.max(rh, 52))
+    r:SetHeight(rh)
+    -- one cell per member, centred on the row
+    for j = 1, ncol do
+      local c = r.cells[j] or MakeCell(r); r.cells[j] = c
+      FillCell(c, members[j], row.qid, row.dkey, row.states[j])
+      c:SetWidth(GCELLW)
+      c:ClearAllPoints(); c:SetPoint("TOPLEFT", r, "TOPLEFT", x0 + (j - 1) * GCELLW, -math.floor((rh - 24) / 2))
+      c:Show()
+    end
+    for j = ncol + 1, #r.cells do r.cells[j]:Hide() end
+    r:ClearAllPoints(); r:SetPoint("TOPLEFT", gp, "TOPLEFT", 0, -y); r:Show()
+    y = y + rh + ROW_GAP
+  end
+  for i = #g.rows + 1, #gp.rows do gp.rows[i]:Hide() end
+  y = y - ROW_GAP
+  -- a raid: the members past the columns
+  if #members > ncol then
+    local n = #members - ncol
+    gp.more:SetText(ns.Plural(n, "SUM_G_MORE1", "SUM_G_MORE", n))
+    gp.more:ClearAllPoints(); gp.more:SetPoint("TOPLEFT", gp, "TOPLEFT", 0, -(y + 8)); gp.more:Show()
+    y = y + 8 + LineH(gp.more, ns.F.meta, CW, gp)
+  else gp.more:Hide() end
+  return y
+end
+
+-- The window's size now: what it was given (the rule or the player's drag), or the rule's default
+-- while the frame cannot tell (not laid out yet).
+local function WinSize()
+  local defW, defH, minW, minH = 640, 600, 600, 300
+  if f.SizeRule then defW, defH, minW, minH = f:SizeRule() end
+  local w, h = num(f:GetWidth()), num(f:GetHeight())
+  if not w or w < (minW or 0) - 1 then w = defW end
+  if not h or h < (minH or 0) - 1 then h = defH end
+  return math.floor(w), math.floor(h)
+end
+-- W and CW from the window's width (every render reads them)
+local function Dims()
+  local w, h = WinSize()
+  W = w
+  CW = W - 2 * PAD
+  return w, h
+end
+ns.OverviewDims = function() if f then Dims() end; return W, CW end   -- for the offline tests
+
+-- The picture keeps its look at any width: the crop chosen for a 608 px band gets shorter (centred)
+-- as the band gets wider, so the picture is never stretched.
+local function CropArt(tex, w)
+  if not (tex and tex.GetTexCoord and w and w > ART_W0) then return end
+  local ok, l, t, _, b, r = pcall(tex.GetTexCoord, tex)
+  if not (ok and type(l) == "number" and type(t) == "number" and type(b) == "number" and type(r) == "number") then return end
+  if secret(l) or secret(t) or secret(b) or secret(r) or b <= t then return end
+  local mid, half = (t + b) / 2, (b - t) * ART_W0 / w / 2
+  tex:SetTexCoord(l, r, mid - half, mid + half)
+end
+
 local function Build()
   local S = SW()
-  f = S.Window("WLHelperOverview", W, 300, "", L.SUM_T, WLDTDB, "ovPos", { header = 44, minH = 120, strata = "HIGH" })
+  -- a workspace window (DESIGN 3.1): its size from the screen, resizable, the size kept
+  f = S.Window("WLHelperOverview", W, 600, "", L.SUM_T, WLDTDB, "ovPos", { header = 44, minH = 120, strata = "HIGH", size = "workspace" })
   f.open, f.doneOpen = {}, {}
+  -- a new size: the same content laid out again (at most once per frame while dragging)
+  f.OnResize = function() if f.keys and Render then Render() end end
 
   f.sa = S.ScrollArea(f)
   f.child = f.sa.child
   f.child:SetWidth(CW)
-  local c = f.child
+  -- two panes in the scroll area: the quests (the list below) and the group's table, under tabs
+  -- shown only in a group
+  f.qPane = CreateFrame("Frame", nil, f.child)
+  f.qPane:SetPoint("TOPLEFT", f.child, "TOPLEFT", 0, 0); f.qPane:SetSize(CW, 1)
+  f.qGrid = ns.Grid()
+  f.gPane = CreateFrame("Frame", nil, f.child)
+  f.gPane:SetPoint("TOPLEFT", f.child, "TOPLEFT", 0, 0); f.gPane:SetSize(CW, 1); f.gPane:Hide()
+  MakeGroupPane(f.gPane)
+  f.tab = "quests"
+  f.tabBar = S.Tabs(f, { { "quests", L.SUM_TAB_Q }, { "group", L.SUM_TAB_G } }, function() return f.tab end, function(k)
+    if f.tab ~= k then
+      f.tab = k
+      if f.sa then f.sa:ScrollTo(0, true) end
+      if PlaySound then PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856) end
+    end
+    Render()
+  end)
+  local tabY = -((f.headerH or 44) + 1)
+  f.tabBar:SetPoint("TOPLEFT", f, "TOPLEFT", 0, tabY); f.tabBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, tabY)
+  f.tabBar:Hide()
+  local c = f.qPane
   f.heroes, f.gpsBtns, f.notes, f.rows, f.heads, f.folds = {}, {}, {}, {}, {}, {}
   f.rdyLines, f.rdySubs = {}, {}
   -- the facts of each dungeon: the short ones (entrance, key) as label-value rows (ns.TyFact),
@@ -1908,11 +2302,8 @@ local function Build()
   -- values (13). factLabels: every fact's label in order, row or heading
   f.factHeads, f.factLabels, f.factValues, f.factRows = {}, {}, {}, {}
   -- several dungeons: the whole route's gains at the end
-  f.routeHead = MakeHead(c); f.routeHead.cols:Hide(); f.routeHead:Hide()
+  f.routeHead = MakeHead(c); f.routeHead:Hide()
   f.routeLine = ns.Text(c, ns.F.body, T.fg); f.routeLine:Hide()
-  -- the members without WL Helper, and the known ones past the 4 columns, under "Quests to do"
-  f.noHelper = ns.Text(c, ns.F.meta, T.muted)
-  f.extra = ns.Text(c, ns.F.meta, T.muted)
   f.empty = S.EmptyState(c, "portal", L.OV_EMPTY_T, L.OV_EMPTY)
   f.empty:Hide()
   -- every quest turned in: the fact, and the way to another dungeon (secondary: the bar's
@@ -1989,6 +2380,14 @@ local function Build()
     pcall(ev.RegisterEvent, ev, e)
   end
   local queued = false
+  local function soon()
+    if queued or not f:IsShown() then return end
+    queued = true
+    local fn = function() queued = false; if f:IsShown() then Render() end end
+    if C_Timer and C_Timer.After then C_Timer.After(0.3, fn) else fn() end
+  end
+  -- the group's answers (IsUnitOnQuest, the answers to a share) fill the Group tab
+  if ns.PartyQuests and ns.PartyQuests.OnChange then ns.PartyQuests.OnChange(soon) end
   ev:SetScript("OnEvent", function(_, e, a1, a2)
     if e == "GET_ITEM_INFO_RECEIVED" then
       -- only an item the summary waits for (an id it shows, or any while a name is not cached);
@@ -2000,10 +2399,7 @@ local function Build()
       if id then pendingItems[id] = nil end
       wipe(rewardCache)
     end
-    if queued or not f:IsShown() then return end
-    queued = true
-    local fn = function() queued = false; if f:IsShown() then Render() end end
-    if C_Timer and C_Timer.After then C_Timer.After(0.3, fn) else fn() end
+    soon()
   end)
 end
 
@@ -2042,15 +2438,15 @@ Render = function()
   local keys = {}
   for _, k in ipairs(f.keys) do if ns.D[k] then keys[#keys + 1] = k end end
   if #keys == 0 then f:Hide(); return end
+  local _, winH = Dims()
+  f.qPane:SetWidth(CW); f.gPane:SetWidth(CW); f.child:SetWidth(CW)
   local log = ns.LogEntries()
   local cls, lvl = Cls(), Level()
   local members = Members()
-  local cols, others, extra = SplitMembers(members)
-  f.extraCols = extra
-  local ctx = { log = log, cls = cls, lvl = lvl, cols = cols, others = others, extra = extra, grouped = #members > 0 }
+  local ctx = { log = log, cls = cls, lvl = lvl, members = members, grouped = #members > 0 }
   local multi = #keys > 1
   f.title:SetText(multi and L.SUM_ROUTE_T or L.SUM_T)
-  local c = f.child
+  local c = f.qPane
 
   -- every quest's facts first: the defaults, then the gains of the ticked ones, per dungeon and
   -- for the whole route (a quest shared by two dungeons counts once in the route)
@@ -2154,8 +2550,7 @@ Render = function()
   local y = 0
   local hi, gi, ni, ri, hdi, fi = 0, 0, 0, 0, 0, 0
   local rli, rsi, fli, fvi, fri, fla = 0, 0, 0, 0, 0, 0
-  local noHelperShown, allDoneShown, extraShown, routeShown = false, false, false, false
-  local noHelperText, extraText
+  local allDoneShown, routeShown = false, false
 
   local function AllDoneBlock(title)
     f.allDone:ClearAllPoints(); f.allDone:SetPoint("TOP", c, "TOP", 0, -(y + 12))
@@ -2167,11 +2562,14 @@ Render = function()
 
   -- The facts: a block heading (DESIGN 3.21: gold, 14 above unless first, 4 below) over its
   -- value lines, which start at the left edge and take the whole width.
+  -- fx, fw: the column the facts go in (the whole width, or a cell of the facts' grid)
+  local fx, fw, cellFirst = 0, CW, false
   local function FactLabel(text, first)
     fli = fli + 1
     local h = f.factHeads[fli] or ns.TyHeading(c); f.factHeads[fli] = h
     fla = fla + 1; f.factLabels[fla] = h.fs
-    y = y + h:Place(text, 0, y, CW, { first = first })
+    y = y + h:Place(text, fx, y, fw, { first = first or cellFirst })
+    cellFirst = false
     return h.fs
   end
   -- a short fact on one row: label 12 muted in a column shared by the entrance and the key, the
@@ -2183,7 +2581,8 @@ Render = function()
     local lw = math.ceil(math.max(ns.TextWidth(fc.label, L.SUM_F_ENTRY) or 0, ns.TextWidth(fc.label, L.SUM_F_KEY) or 0))
     if not first then y = y + ns.TY.gap end
     local top = y
-    y = y + fc:Place(label, value, 0, y, w or CW, { labelW = lw, valueColor = color })
+    y = y + fc:Place(label, value, fx, y, w or fw, { labelW = lw, valueColor = color })
+    cellFirst = false
     return fc, top
   end
   -- one value line at y (y moves under it)
@@ -2193,9 +2592,9 @@ Render = function()
     fs:SetText(text)
     local col = color or T.text
     fs:SetTextColor(col[1], col[2], col[3])
-    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", fx, -y)
     fs:Show()
-    y = y + LineH(fs, ns.F.body, w or CW, c, maxLines)
+    y = y + LineH(fs, ns.F.body, w or fw, c, maxLines)
     return fs
   end
   -- a detail under a value (11 muted)
@@ -2204,9 +2603,9 @@ Render = function()
     local fs = f.rdySubs[rsi] or ns.Text(c, ns.F.meta, T.muted); f.rdySubs[rsi] = fs
     fs:SetText(text)
     fs:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
-    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -(y + 3))
+    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", fx, -(y + 3))
     fs:Show()
-    y = y + 3 + LineH(fs, ns.F.meta, CW, c)
+    y = y + 3 + LineH(fs, ns.F.meta, fw, c)
     return fs
   end
 
@@ -2245,7 +2644,7 @@ Render = function()
       return a < b
     end)
     y = y + 4
-    local lw = CW
+    local lw = fw
     for i, id in ipairs(miss) do
       if i > MAX_MISS then break end
       local q = ns.Q[id]
@@ -2271,7 +2670,7 @@ Render = function()
       o.tip = tip
       local th = LineH(o.text, ns.F.meta, lw - 16, o)
       o:SetSize(lw, th + 3)
-      o:ClearAllPoints(); o:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+      o:ClearAllPoints(); o:SetPoint("TOPLEFT", c, "TOPLEFT", fx, -y)
       o:Show()
       info.lines[#info.lines + 1] = o
       y = y + th + 3 + 2
@@ -2294,6 +2693,25 @@ Render = function()
     return top
   end
 
+  -- quest cards through the grid (3.22): one column in a narrow window, 2 or 3 side by side in a
+  -- wide one (a line's cards take its tallest one's height); a card with its chain unfolded takes
+  -- the whole line (the timeline reads at full width). y moves under them.
+  local function Cards(list, dkey)
+    local g = f.qGrid
+    local n = ns.Cols(CW, QGRID.minW, QGRID.gap, QGRID.maxCols, QGRID.minPx)
+    QGRID.rowGap = (n > 1) and 8 or ROW_GAP
+    g:Begin(c, 0, y, CW, QGRID)
+    for _, e in ipairs(list) do
+      ri = ri + 1
+      local r = f.rows[ri] or MakeRow(c); f.rows[ri] = r
+      g:Add(r, function(fr, w) return FillRow(fr, e.qid, dkey, e.inf, ctx, w) end, f.open[e.qid] and { span = "full" } or nil)
+      r:Show(); r.shownNow = true
+    end
+    local gh, gn, gw = g:End()
+    f.qCols, f.qColW = gn, gw
+    y = y + gh
+  end
+
   -- several dungeons, every quest turned in: the fact first
   if multi and allDone then AllDoneBlock(L.SUM_ALLDONE_TN) end
 
@@ -2309,7 +2727,9 @@ Render = function()
     local hh = multi and HERO_H_MULTI or HERO_H
     hero:SetSize(CW, hh)
     hero:ClearAllPoints(); hero:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
-    if ns.DungeonArt then ns.DungeonArt(hero.art, dkey, hero.big) end
+    -- crop only a real picture: DungeonArt sets its coords afresh each time, the plain fallback
+    -- colour does not (cropping it again at every render would shrink its coords to nothing)
+    if ns.DungeonArt and ns.DungeonArt(hero.art, dkey, hero.big) then CropArt(hero.art, CW - 2) end
     -- "Conseillé niv. 38 à 48 · Groupe de 5 · tu es niv. 41" (your level in orange when below)
     local parts = {}
     local lo = d.lvl and d.lvl[1]
@@ -2336,13 +2756,16 @@ Render = function()
     -- where is it, can I go, what do I get: only while something is left to do
     nFact = 0
     if not dgDone then
+      local cells = {}
+      -- cell 1: where is it (with its GPS) and the key, as label-value rows
+      cells[1] = function()
       local point = d.e and d.e.m and { d.e.m, d.e.x, d.e.y, ns.DName(dkey) } or nil
       local loc = (GetLocale and GetLocale() == "frFR" and d.locf) or ns.T(d.loc) or ""
       if d.cq and d.home then loc = L.CQ_IN:format(ns.DName(d.home)) end
       local entry = ns.T(d.ed) or loc
       if entry and entry ~= "" then
         nFact = nFact + 1
-        local _, top = FactRow(L.SUM_F_ENTRY, entry, T.fg, CW - (point and 32 or 0), true)
+        local _, top = FactRow(L.SUM_F_ENTRY, entry, T.fg, fw - (point and 32 or 0), true)
         do
           if point then
             gi = gi + 1
@@ -2353,8 +2776,8 @@ Render = function()
               f.gpsBtns[gi] = g
             end
             g.point = point
-            -- the pin on the row's middle; the next row clears it
-            g:ClearAllPoints(); g:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -(top - 6))
+            -- the pin on the row's middle, at the right of its column; the next row clears it
+            g:ClearAllPoints(); g:SetPoint("TOPRIGHT", c, "TOPLEFT", fx + fw, -(top - 6))
             g:Show()
             if gi == 1 then f.entryGps = g; f.entryPoint = point end
             y = math.max(y, top + 18)
@@ -2368,13 +2791,36 @@ Render = function()
         FactRow(L.SUM_F_KEY, #kv == 0 and L.OV_KEY_NONE or table.concat(kv, "\n"), #kv == 0 and T.muted or T.fg, nil, nFact == 0)
         nFact = nFact + 1
       end
-      Fact(L.SUM_F_READY, function() ReadyBlock(dkey) end)
+      end
+      -- cell 2: before you go in; cell 3: what you get
+      cells[2] = function() Fact(L.SUM_F_READY, function() ReadyBlock(dkey) end) end
       if #todo > 0 then
-        Fact(L.SUM_F_GAIN, function()
-          local a = acc[dkey]
-          if a.ticked > 0 then f.gainFs[dkey] = FactValue(GainsText(a), T.fg, nil, 3)
-          else f.gainFs[dkey] = FactValue(L.SUM_GAIN0, T.muted) end
-        end)
+        cells[3] = function()
+          Fact(L.SUM_F_GAIN, function()
+            local a = acc[dkey]
+            if a.ticked > 0 then f.gainFs[dkey] = FactValue(GainsText(a), T.fg, nil, 3)
+            else f.gainFs[dkey] = FactValue(L.SUM_GAIN0, T.muted) end
+          end)
+        end
+      end
+      -- a wide window puts them side by side (3.22, columns of at least FACT_MIN, every cell's
+      -- heading on the line's top); a narrow one keeps them one under the other
+      local nc, colW, xs, lastW = ns.Cols(CW, FACT_MIN, FACT_GAP, #cells, 200)
+      f.factCols = { n = nc, colW = colW, xs = xs }
+      if nc <= 1 then
+        for _, cell in ipairs(cells) do cell() end
+      else
+        local lineTop, lineBottom = y, y
+        for i, cell in ipairs(cells) do
+          local col = (i - 1) % nc + 1
+          if col == 1 and i > 1 then lineTop = lineBottom + FACT_ROWGAP; lineBottom = lineTop end
+          fx, fw = xs[col], (col == nc) and lastW or colW
+          y, cellFirst = lineTop, true
+          cell()
+          if y > lineBottom then lineBottom = y end
+        end
+        y = lineBottom
+        fx, fw, cellFirst = 0, CW, false
       end
       y = y + 16
     end
@@ -2408,75 +2854,20 @@ Render = function()
       if #todo > 0 then
         hdi = hdi + 1
         local hd = f.heads[hdi] or MakeHead(c); f.heads[hdi] = hd
-        if hdi == 1 then f.gHead = hd.cols end
+        hd:SetWidth(CW)
         hd.label:SetText(L.SUM_TODO)
         hd.count:SetText(tostring(#todo))
-        local gh = hd.cols
-        for j, m in ipairs(cols) do
-          local fs = gh.names[j]
-          if not fs then fs = ns.Text(gh, ns.F.meta, T.fg); fs:SetJustifyH("CENTER"); gh.names[j] = fs end
-          fs:SetText(m.name)
-          local cc = ClassColor(m.class)
-          fs:SetTextColor(cc[1], cc[2], cc[3])
-          fs:SetWidth(CELLW - 4)
-          fs:SetWordWrap(false)
-          -- each name has its own hover area: the full class-coloured name, even when cut
-          local hit = gh.hits[j]
-          if not hit then
-            hit = CreateFrame("Frame", nil, gh)
-            hit:EnableMouse(true)
-            hit:SetScript("OnEnter", function(self) if self.tip then ns.ShowTip(self, self.tip) end end)
-            hit:SetScript("OnLeave", ns.HideTip)
-            gh.hits[j] = hit
-          end
-          hit.tip = { { m.name, cc[1], cc[2], cc[3] }, L.SUM_COL_TT }
-          ns.ClampLabel(fs, m.name, hit)
-          local x = CW - 12 - (#cols - j + 1) * CELLW
-          fs:ClearAllPoints(); fs:SetPoint("BOTTOMLEFT", gh, "BOTTOMLEFT", x + 2, 6)
-          fs:Show()
-          hit:SetSize(CELLW, 18)
-          hit:ClearAllPoints(); hit:SetPoint("BOTTOMLEFT", gh, "BOTTOMLEFT", x, 3)
-          hit:Show()
-        end
-        for j = #cols + 1, #gh.names do gh.names[j]:Hide() end
-        for j = #cols + 1, #gh.hits do gh.hits[j]:Hide() end
-        gh:SetShown(#cols > 0)
         hd:ClearAllPoints(); hd:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
         hd:Show()
         y = y + 24 + 8
-        -- under the first header: who in the group has no column (no WL Helper; past the 4 columns)
-        if hdi == 1 then
-          local any = false
-          local function groupLine(fs, list, one, many)
-            local names = {}
-            for _, m in ipairs(list) do names[#names + 1] = m.name end
-            local text = ns.Plural(#list, one, many, JoinNames(names))
-            fs:SetText(text)
-            fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
-            fs:Show()
-            y = y + LineH(fs, ns.F.meta, CW, c, 3) + 4
-            any = true
-            return text
-          end
-          if #others > 0 then noHelperText = groupLine(f.noHelper, others, "SUM_NOHELPER1", "SUM_NOHELPER"); noHelperShown = true end
-          if #extra > 0 then extraText = groupLine(f.extra, extra, "SUM_EXTRA1", "SUM_EXTRA"); extraShown = true end
-          if any then y = y - 4 + 8 end
-        end
-        for _, e in ipairs(todo) do
-          ri = ri + 1
-          local r = f.rows[ri] or MakeRow(c); f.rows[ri] = r
-          r:ClearAllPoints(); r:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
-          local h = FillRow(r, e.qid, dkey, e.inf, ctx)
-          r:Show(); r.shownNow = true
-          y = y + h + ROW_GAP
-        end
-        y = y - ROW_GAP
+        Cards(todo, dkey)
       end
       -- quests turned in: folded at the bottom
       if #done > 0 then
         if #todo > 0 then y = y + 12 end
         fi = fi + 1
         local fb = f.folds[fi] or MakeFold(c); f.folds[fi] = fb
+        fb:SetWidth(CW); fb.text:SetWidth(CW - 34)
         fb.dkey = dkey
         fb.labelText = L.SUM_DONE_H:format(#done)
         fb.text:SetText(fb.labelText)
@@ -2486,15 +2877,7 @@ Render = function()
         y = y + 28
         if f.doneOpen[dkey] then
           y = y + 8
-          for _, e in ipairs(done) do
-            ri = ri + 1
-            local r = f.rows[ri] or MakeRow(c); f.rows[ri] = r
-            r:ClearAllPoints(); r:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
-            local h = FillRow(r, e.qid, dkey, e.inf, ctx)
-            r:Show(); r.shownNow = true
-            y = y + h + ROW_GAP
-          end
-          y = y - ROW_GAP
+          Cards(done, dkey)
         end
       end
     end
@@ -2507,7 +2890,8 @@ Render = function()
     if nWith >= 2 then
       y = y + 16
       local hd = f.routeHead
-      hd.label:SetText(L.SUM_ROUTE_H); hd.count:SetText(""); hd.cols:Hide()
+      hd:SetWidth(CW)
+      hd.label:SetText(L.SUM_ROUTE_H); hd.count:SetText("")
       hd:ClearAllPoints(); hd:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
       hd:Show()
       y = y + 24 + 8
@@ -2533,11 +2917,6 @@ Render = function()
   for j = ri + 1, #f.rows do f.rows[j]:Hide(); f.rows[j].shownNow = nil end
   for j = hdi + 1, #f.heads do f.heads[j]:Hide() end
   for j = fi + 1, #f.folds do f.folds[j]:Hide() end
-  if hdi == 0 and f.heads[1] then f.gHead = f.heads[1].cols; f.gHead:Hide() end
-  if not noHelperShown then f.noHelper:SetText(""); f.noHelper:Hide() end
-  f.noHelperText = noHelperText
-  if not extraShown then f.extra:SetText(""); f.extra:Hide() end
-  f.extraText = extraText
   if not allDoneShown then f.allDone:Hide() end
   if multi or nQuests > 0 then f.empty:Hide() end
 
@@ -2591,12 +2970,38 @@ Render = function()
     SetOn(f.shareAll, #shareList > 0 and not ns.pushBusy)
   end
 
-  -- the window fits its content up to 80 % of the screen; past that, the content scrolls
+  -- in a group: the tabs, "Group · 2 to sort out"; the Group tab draws its table instead of the list
+  local g
+  if ctx.grouped then
+    g = GroupData(members, per, keys)
+    local label = g.todo > 0 and L.SUM_TAB_G_N:format(g.todo) or L.SUM_TAB_G
+    local tb = f.tabBar.tabs[2]
+    if tb.labelText ~= label then
+      tb.labelText = label
+      tb.label:SetText(label)
+      ns.ClampLabel(tb.label, label, tb)
+    end
+    f.tabBar:Show()
+    f.tabBar:Update()
+  else
+    f.tabBar:Hide()
+    f.tab = "quests"
+  end
+  f.group = g
+  if f.tab == "group" and g then
+    f.qPane:Hide(); f.gPane:Show()
+    y = DrawGroup(f.gPane, g, members, ctx)
+    f.gPane:SetHeight(math.max(1, math.ceil(y)))
+  else
+    f.gPane:Hide(); f.qPane:Show()
+    f.qPane:SetHeight(math.max(1, math.ceil(y)))
+  end
+
+  -- a workspace window keeps its size (DESIGN 0.4): the list scrolls inside, the bar at the bottom
   local contentH = math.max(1, math.ceil(y))
   local saTop = f:ContentTop() + 12
   local barH = 12 + 32
-  local cap = math.floor((num(UIParent:GetHeight()) or 768) * 0.80) - saTop - barH - 12
-  local viewH = math.max(60, math.min(contentH, cap))
+  local viewH = math.max(60, winH - saTop - barH - 12)
   f.sa:ClearAllPoints()
   f.sa:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -saTop); f.sa:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -saTop)
   f.sa:SetHeight(viewH)

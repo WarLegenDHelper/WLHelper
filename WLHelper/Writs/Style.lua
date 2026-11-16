@@ -26,6 +26,13 @@ S.TABS_H = 32
 S.FOOTER_H = 24
 S.windows = root.windows
 
+-- The size rule and the grids (Theme.lua, design system 3.1 and 3.22), under both namespaces so a
+-- Writs module writes ns.Cols / ns.Grid like the guide does.
+for _, k in ipairs({ "WinSize", "ScreenSize", "UIScale", "GRID", "Cols", "Columns", "Grid" }) do
+    S[k] = root[k]
+    ns[k] = root[k]
+end
+
 local function L(s) return ns.L and ns.L(s) or s end
 local function secret(v) return root.IsSecret and root.IsSecret(v) end
 local function num(v) return type(v) == "number" and not secret(v) and v or nil end
@@ -912,8 +919,13 @@ end
 
 -- Section header (32 px, 24 when tight): label 13 fg, optional count 11 muted, optional ghost link
 -- at the right, 1 px divider at the bottom. h:Set(label, count).
+-- tight: true or { tight = true }. h.after is the space a page leaves under it: 8 when tight
+-- (24 + 8, inside a card or a column), 12 otherwise.
 function S.SectionHeader(parent, label, count, linkLabel, onLink, tight)
+    if type(tight) == "table" then tight = tight.tight end
     local h = CreateFrame("Frame", nil, parent)
+    h.tight = tight and true or false
+    h.after = tight and 8 or 12
     h:SetHeight(tight and 24 or 32)
     h.label = S.Text(h, root.F.body, T.fg)
     h.label:SetPoint("BOTTOMLEFT", 0, 6)
@@ -1271,6 +1283,9 @@ end
 -- opts.onClick, opts.tip, opts.zebra (index: black 0.10 / 0.18 fill instead of cardFill).
 -- row:Set{ icon = path | hd = name, name, nameColor, detail, value, unit, rank }
 -- row:AddAction(iconName, tip, onClick), row:SetSelected(on), row:Fit(width) -> measured height.
+-- row:Fit(width, { columns = true }): wide mode; from S.LISTROW_WIDE (640) the detail sits in its own
+-- column at x + 45 % of the text area (row.detailX), on the name's line, instead of under the name.
+S.LISTROW_WIDE = 640
 function S.ListRow(parent, opts)
     opts = opts or {}
     local reading = opts.density == "reading"
@@ -1341,7 +1356,7 @@ function S.ListRow(parent, opts)
         self.unit:SetText(o.unit or ""); self.unit:SetShown(o.unit ~= nil)
         if o.tip ~= nil then self.tip = o.tip end
     end
-    function r:Fit(width)
+    function r:Fit(width, fopts)
         width = width or num(self:GetWidth()) or 0
         local x = 8
         if self.rank:IsShown() then self.rank:ClearAllPoints(); self.rank:SetPoint("TOPLEFT", x, -6); x = x + 24 + 4 end
@@ -1368,16 +1383,269 @@ function S.ListRow(parent, opts)
         end
         local textW = math.max(40, width - x - right)
         self.name:ClearAllPoints(); self.name:SetPoint("TOPLEFT", x, -6)
-        local h = 6 + root.FitText(self.name, 2, textW, self)
-        if self.detail:IsShown() then
-            self.detail:ClearAllPoints(); self.detail:SetPoint("TOPLEFT", self.name, "BOTTOMLEFT", 0, -3)
-            h = h + 3 + root.FitText(self.detail, 2, textW, self)
+        local h
+        -- wide mode (fopts.columns, rows of 640 and more): the detail gets its own column at the
+        -- right of the name instead of a line under it
+        local wide = fopts and fopts.columns and width >= S.LISTROW_WIDE and self.detail:IsShown()
+        self.wideCols = wide and true or nil
+        if wide then
+            local detailX = x + math.floor((width - x - right) * 0.45)
+            local nameH = root.FitText(self.name, 2, math.max(40, detailX - x - 12), self)
+            self.detail:ClearAllPoints(); self.detail:SetPoint("TOPLEFT", detailX, -7)
+            local detailH = root.FitText(self.detail, 2, math.max(40, width - right - detailX), self)
+            self.detailX = detailX
+            h = 6 + math.max(nameH, detailH + 1)
+        else
+            self.detailX = nil
+            h = 6 + root.FitText(self.name, 2, textW, self)
+            if self.detail:IsShown() then
+                self.detail:ClearAllPoints(); self.detail:SetPoint("TOPLEFT", self.name, "BOTTOMLEFT", 0, -3)
+                h = h + 3 + root.FitText(self.detail, 2, textW, self)
+            end
         end
         h = math.max(self.minH, math.ceil(h + 8))
         self:SetHeight(h)
         return h
     end
     return r
+end
+
+-- ---------------------------------------------------------------- settings row
+
+-- S.SettingRow(parent, o): one setting (design system 3.18).
+--   o.label   13 fg, one line; wraps to 2 lines when it does not fit (the row grows by 17, no cut)
+--   o.desc    11 muted, ONE line, cut with its full text in the row's tooltip
+--   o.long    a longer explanation, tooltip only
+--   o.control "switch" | "segmented" | "dropdown" | "slider" | "value" | a frame (placed as is)
+--   o.get, o.set, o.options ({ { value, label }, ... }), o.tip (extra tooltip lines)
+--   o.controlW (dropdown 160, slider 160), o.min, o.max, o.step, o.fmt (slider), o.maxW (value)
+--   o.wide    takes a full grid line; the control goes under the label when wider than half the row
+-- row:Fit(width) -> height: 36 without desc, 50 with one, + 17 when the label wraps (+ the control
+-- and 8 when it sits under the label). Label at x 12, control's right edge at width - 12.
+-- row:Update() re-reads get() into the control; row:SetLabel(t), row:SetDesc(t), row:SetLong(t).
+-- row.control, row.switch (for a switch), row.label, row.desc, row.divider, row.wide.
+S.SETTING = { inset = 12, gap = 12, h = 36, hDesc = 50, wrapExtra = 17, minText = 120 }
+local function TweenAlpha(t, to)
+    root.Tween(t, num(t:GetAlpha()) or 0, to, 0.10, function(v) t:SetAlpha(v) end)
+end
+function S.SettingRow(parent, o)
+    o = o or {}
+    local K = S.SETTING
+    local row = CreateFrame("Frame", nil, parent)
+    row.wlOwned = true
+    row.wide = o.wide and true or false
+    row.hl = S.Solid(row, "BACKGROUND", T.hoverFill); row.hl:SetAllPoints(); row.hl:SetAlpha(0)
+    row.label = S.Text(row, root.F.body, T.fg)
+    row.label:SetJustifyH("LEFT"); row.label:SetJustifyV("TOP")
+    row.desc = S.Text(row, root.F.meta, T.muted)
+    row.desc:SetJustifyH("LEFT"); row.desc:SetJustifyV("TOP")
+    S.ClampLabel(row.desc, nil, row)
+    row.divider = S.Rule(row)
+    row.divider:SetPoint("BOTTOMLEFT", K.inset, 0); row.divider:SetPoint("BOTTOMRIGHT", -K.inset, 0)
+    row.divider:Hide()
+    function row:SetLabel(t) self.labelText = t or ""; self.label:SetText(self.labelText) end
+    function row:SetDesc(t)
+        self.descText = (type(t) == "string" and t ~= "") and t or nil
+        self.desc:SetText(self.descText or "")
+        self.desc.wlFull = self.descText
+        self.desc:SetShown(self.descText ~= nil)
+    end
+    function row:SetLong(t) self.longText = (type(t) == "string" and t ~= "") and t or nil end
+    row:SetLabel(o.label); row:SetDesc(o.desc); row:SetLong(o.long)
+
+    -- the control
+    local get, set = o.get or function() end, o.set or function() end
+    local kind, c = o.control, nil
+    if kind == "switch" then
+        c = S.Switch(row, get, set)
+        c:AttachRow(row)
+        row.switch = c
+    elseif kind == "segmented" then
+        c = S.Segmented(row, o.options or {}, get, set)
+    elseif kind == "dropdown" then
+        c = S.Dropdown(row, o.options or {}, get, set, o.controlW or 160)
+    elseif kind == "slider" then
+        local sw = o.controlW or 160
+        c = CreateFrame("Frame", nil, row)
+        c:SetSize(sw + 12 + 48, 20)
+        local s = S.Slider(c, o.min or 0, o.max or 100, o.step or 1, get, set, o.fmt, sw)
+        s:SetPoint("LEFT")
+        s.value:SetJustifyH("RIGHT")
+        c.slider = s
+        function c:Update() local v = get(); if num(v) then s:SetValue(v) end end
+    elseif kind == "value" then
+        c = CreateFrame("Frame", nil, row)
+        c:SetSize(24, 20)
+        c.text = S.Text(c, root.F.label, T.fg)
+        c.text:SetJustifyH("RIGHT"); c.text:SetPoint("RIGHT")
+        S.ClampLabel(c.text, nil, row)
+        local maxW = o.maxW or 220
+        function c:Update()
+            local v = get()
+            local t = (v ~= nil and not secret(v)) and tostring(v) or ""
+            self.text:SetText(t); self.text.wlFull = t
+            local w = math.max(24, math.min(maxW, root.TextWidth(self.text) + 2))
+            self.text:SetWidth(w); self:SetWidth(w)
+        end
+        c:Update()
+    elseif type(kind) == "table" then
+        c = kind
+        if c.SetParent then c:SetParent(row) end
+    end
+    row.control = c
+
+    -- tooltip: label, desc (always: it may be cut), long, extra lines, then what a click does
+    function row:TipLines()
+        local t = { self.labelText or "" }
+        if self.descText then t[#t + 1] = self.descText end
+        if self.longText then t[#t + 1] = self.longText end
+        if type(o.tip) == "table" then for _, l in ipairs(o.tip) do t[#t + 1] = l end
+        elseif type(o.tip) == "string" then t[#t + 1] = o.tip end
+        if self.switch then t[#t + 1] = get() and L("Clic : désactiver") or L("Clic : activer") end
+        return t
+    end
+    row:EnableMouse(true)
+    local function Over(f) local ok, v = pcall(f.IsMouseOver, f); return ok and v end
+    local function Enter() TweenAlpha(row.hl, 1); S.Tip(row, row:TipLines()) end
+    local function Leave() TweenAlpha(row.hl, 0); S.HideTip() end
+    row:SetScript("OnEnter", Enter)
+    row:SetScript("OnLeave", function() if not (c and c.IsMouseOver and Over(c)) then Leave() end end)
+    if c and c.HookScript and (kind == "switch") then
+        -- the switch is a button over the row: moving onto it keeps the row lit and its tooltip
+        c:HookScript("OnEnter", Enter)
+        c:HookScript("OnLeave", function() if not Over(row) then Leave() end end)
+        c:HookScript("OnClick", function()
+            local ok, owner = pcall(function() return GameTooltip:IsShown() and GameTooltip:GetOwner() end)
+            if ok and owner == row then S.Tip(row, row:TipLines()) end
+        end)
+    end
+
+    function row:Update()
+        local ctl = self.control
+        if ctl and ctl.Update then ctl:Update() end
+    end
+
+    function row:Fit(width)
+        width = math.floor(width or num(self:GetWidth()) or 0)
+        local ctl = self.control
+        local cw, ch = 0, 0
+        if ctl then
+            if ctl.SetMaxWidth then
+                -- a segmented control: a wide row may give it the whole row, a paired row keeps
+                -- minText for the texts (it becomes a dropdown when its labels need more)
+                ctl:SetMaxWidth(self.wide and (width - 2 * K.inset) or (width - 2 * K.inset - K.gap - K.minText))
+            end
+            cw, ch = num(ctl:GetWidth()) or 0, num(ctl:GetHeight()) or 0
+        end
+        local under = self.wide and cw > width * 0.5
+        self.controlUnder = under or nil
+        local textW = under and (width - 2 * K.inset) or math.max(40, width - 2 * K.inset - (cw > 0 and (cw + K.gap) or 0))
+        self.textW = textW
+        -- label: one line, two when it does not fit (never cut)
+        self.label:SetWidth(textW)
+        self.label:SetWordWrap(true)
+        if self.label.SetMaxLines then self.label:SetMaxLines(2) end
+        local wraps = root.TextWidth(self.label) > textW + 0.5
+        self.labelWraps = wraps or nil
+        local lh = wraps and 32 or 15
+        local hasDesc = self.desc:IsShown()
+        local top = hasDesc and 9 or 10
+        self.label:ClearAllPoints(); self.label:SetPoint("TOPLEFT", K.inset, -top)
+        local y = top + lh
+        if hasDesc then
+            self.desc:ClearAllPoints(); self.desc:SetPoint("TOPLEFT", K.inset, -(y + 3))
+            self.desc:SetWidth(textW)
+            y = y + 3 + 13
+        end
+        local h
+        if under then
+            y = y + 8
+            ctl:ClearAllPoints(); ctl:SetPoint("TOPLEFT", self, "TOPLEFT", K.inset, -y)
+            h = y + ch + 10
+        else
+            h = math.max(hasDesc and K.hDesc or K.h, y + (hasDesc and 10 or 11))
+            if ctl then ctl:ClearAllPoints(); ctl:SetPoint("RIGHT", self, "RIGHT", -K.inset, 0) end
+        end
+        h = math.ceil(h)
+        self:SetWidth(width)
+        self:SetHeight(h)
+        return h
+    end
+    return row
+end
+
+-- S.SettingsCard(parent): a settings card (cardFill + 1 px cardEdge) whose rows flow through
+-- ns.Grid with ns.GRID.settings: 1 column under 652, 2 from 652, 3 from 984 of card width. A wide
+-- row takes a whole line. A 1 px divider under each row except on the card's last line, and a
+-- 1 px vertical divider between the columns of a line.
+-- card:AddRow(o) -> S.SettingRow on the card; card:Add(row) adds a row built elsewhere;
+-- card:Fit(width) -> height; card:Update() re-reads every control; card.grid holds the layout;
+-- card:SetRowShown(row, on) leaves a row out of the layout.
+function S.SettingsCard(parent, opts)
+    opts = opts or {}
+    local card = CreateFrame("Frame", nil, parent)
+    card.wlOwned = true
+    card.bg = S.Solid(card, "BACKGROUND", T.cardFill); card.bg:SetAllPoints()
+    S.Border(card, T.cardEdge)
+    card.rows = {}
+    card.vlines = {}
+    card.grid = root.Grid()
+    card.gridOpts = opts.grid or root.GRID.settings
+    function card:Add(row)
+        if row.SetParent then row:SetParent(self) end
+        self.rows[#self.rows + 1] = row
+        return row
+    end
+    function card:AddRow(o) return self:Add(S.SettingRow(self, o)) end
+    -- a row left out of the layout (row.wlHidden); call card:Fit again after
+    function card:SetRowShown(row, on) row.wlHidden = not on or nil; row:SetShown(on and true or false) end
+    function card:Update() for _, r in ipairs(self.rows) do if r.Update then r:Update() end end end
+    function card:Fit(width)
+        width = math.floor(width or num(self:GetWidth()) or 0)
+        local g = self.grid
+        local go = self.gridOpts
+        g:Begin(self, 0, 0, width, { minW = go.minW, gap = go.gap, rowGap = 0, maxCols = go.maxCols, minPx = go.minPx, equal = true })
+        for _, r in ipairs(self.rows) do
+            if not r.wlHidden then
+                r:Show()
+                g:Add(r, function(f, w) return f:Fit(w) end, r.wide and { span = "full" } or nil)
+            else
+                r:Hide()
+            end
+        end
+        local h = g:End()
+        local nLines = #g.lines
+        for _, c in ipairs(g.cells) do
+            c.frame.divider:SetShown(c.line < nLines)
+            c.frame.gridLine, c.frame.gridCol = c.line, c.col
+        end
+        -- vertical dividers between the cells of a line
+        local used = 0
+        for li, line in ipairs(g.lines) do
+            if not line.full and line.n > 1 then
+                for col = 2, line.n do
+                    used = used + 1
+                    local v = self.vlines[used]
+                    if not v then
+                        v = S.Solid(self, "BORDER", T.divider); v:SetWidth(1)
+                        self.vlines[used] = v
+                    end
+                    local x = g.xs[col] - math.floor(g.gap / 2)
+                    v:ClearAllPoints()
+                    v:SetPoint("TOPLEFT", self, "TOPLEFT", x, -(line.y + 8))
+                    v:SetHeight(math.max(1, line.h - 16))
+                    v.gridLine = li
+                    v:Show()
+                end
+            end
+        end
+        for i = used + 1, #self.vlines do self.vlines[i]:Hide() end
+        h = math.max(1, h)
+        self:SetWidth(width)
+        self:SetHeight(h)
+        return h
+    end
+    return card
 end
 
 -- ---------------------------------------------------------------- empty state
@@ -1785,7 +2053,173 @@ local function MeasureBottom(f)
     return top - lowest
 end
 
+-- ---------------------------------------------------------------- resizable windows (3.1, 3.2)
+
+local function Clamp(v, lo, hi) if v < lo then v = lo end if v > hi then v = hi end return v end
+local function CallIf(f, method, ...)
+    local fn = f[method]
+    if type(fn) == "function" then return pcall(fn, f, ...) end
+    return false
+end
+
+-- Every window with a size tier, re-sized 0.25 s after the last screen change. A secure window
+-- waits for the end of combat (its secure buttons forbid SetSize in combat).
+local tiered = {}
+S.tieredWindows = tiered
+local screenTimer
+local regen = CreateFrame("Frame")
+local function InCombat() return InCombatLockdown and InCombatLockdown() and true or false end
+local function ResizeOne(f)
+    if f.wlSecure and InCombat() then
+        f.wlSizeLater = true
+        pcall(regen.RegisterEvent, regen, "PLAYER_REGEN_ENABLED")
+        return
+    end
+    f.wlSizeLater = nil
+    f:ApplySize()
+end
+function S.OnScreenChanged()
+    for _, f in ipairs(tiered) do ResizeOne(f) end
+end
+regen:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_REGEN_ENABLED" then
+        pcall(self.UnregisterEvent, self, "PLAYER_REGEN_ENABLED")
+        for _, f in ipairs(tiered) do if f.wlSizeLater then ResizeOne(f) end end
+        return
+    end
+    -- the new size is known on the next frame; a screen being dragged sends many events
+    if screenTimer and screenTimer.Cancel then screenTimer:Cancel() end
+    screenTimer = nil
+    if C_Timer and C_Timer.NewTimer then
+        screenTimer = C_Timer.NewTimer(0.25, function() screenTimer = nil; S.OnScreenChanged() end)
+    elseif C_Timer and C_Timer.After then C_Timer.After(0, S.OnScreenChanged) else S.OnScreenChanged() end
+end)
+pcall(regen.RegisterEvent, regen, "DISPLAY_SIZE_CHANGED")
+pcall(regen.RegisterEvent, regen, "UI_SCALE_CHANGED")
+S.sizeEvents = regen
+
+-- S.MakeResizable(f, tier, db, key, opts): gives a window the size rule of its tier ("workspace":
+-- both axes, size saved; "panel": width only, width saved, height fits the content), the resize
+-- grip at the bottom right, its bounds, and the re-layout hook. S.Window calls it for opts.size;
+-- a window with its own frame (the Hub) calls it directly. opts.secure: no resizing in combat.
+--   f:SizeRule() -> defW, defH, minW, minH, maxW, maxH for the current screen
+--   f:ApplySize() -> w, h: rule + saved size (clamped), bounds, SetSize
+--   f:ResetSize(): forgets the saved size (the grip's double-click)
+--   f.OnResize = function(self, w, h) end: the owner's layout, at most once per frame while the
+--   size changes and only while the window is shown (a hidden one lays out on its next show)
+-- The size is saved as db[key .. "Size"] = { w, h } (panel: { w }).
+function S.MakeResizable(f, tier, db, key, opts)
+    opts = opts or {}
+    f.wlTier = tier
+    f.wlSecure = opts.secure and true or false
+    f.wlSizeDb, f.wlSizeKey = db, key and (key .. "Size") or nil
+    function f:SizeRule()
+        local defW, defH, minW, minH, maxW, maxH = root.WinSize(self.wlTier)
+        if self.wlTier ~= "workspace" then
+            minH = self.minH or 200
+            defH = Clamp(num(self:GetHeight()) or minH, minH, math.max(minH, maxH))
+        end
+        return defW, defH, minW, minH, maxW, maxH
+    end
+    function f:SavedSize()
+        local d, k = self.wlSizeDb, self.wlSizeKey
+        local s = d and k and d[k]
+        if type(s) ~= "table" then return nil end
+        return num(s[1]), num(s[2])
+    end
+    function f:ApplySize()
+        local defW, defH, minW, minH, maxW, maxH = self:SizeRule()
+        if not defW then return nil end
+        local sw, sh = self:SavedSize()
+        local w = sw and Clamp(math.floor(sw), minW, maxW) or defW
+        local h = defH
+        if self.wlTier == "workspace" and sh then h = Clamp(math.floor(sh), minH, maxH) end
+        -- bounds while dragging (a panel keeps its height: only its width is dragged)
+        local bMinH, bMaxH = minH, maxH
+        if self.wlTier ~= "workspace" then bMinH, bMaxH = 1, math.max(maxH, h) end
+        if self.SetResizeBounds then
+            CallIf(self, "SetResizeBounds", minW, bMinH, maxW, bMaxH)
+        else
+            CallIf(self, "SetMinResize", minW, bMinH)
+            CallIf(self, "SetMaxResize", maxW, bMaxH)
+        end
+        self.wlBounds = { minW, minH, maxW, maxH }
+        if self.wlTier == "workspace" then self:SetSize(w, h) else self:SetWidth(w); self:SetHeight(h) end
+        return w, h
+    end
+    function f:ResetSize()
+        local d, k = self.wlSizeDb, self.wlSizeKey
+        if d and k then d[k] = nil end
+        return self:ApplySize()
+    end
+    function f:SaveSize()
+        local d, k = self.wlSizeDb, self.wlSizeKey
+        local w, h = num(self:GetWidth()), num(self:GetHeight())
+        if not (d and k and w) then return end
+        if self.wlTier == "workspace" and h then d[k] = { math.floor(w + 0.5), math.floor(h + 0.5) }
+        else d[k] = { math.floor(w + 0.5) } end
+    end
+    CallIf(f, "SetResizable", true)
+
+    -- the grip: the guide's look (chevron 12 turned to the corner, faint, fg on hover)
+    local grip = CreateFrame("Button", nil, f)
+    grip:SetSize(16, 16); grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    grip:SetFrameLevel((num(f:GetFrameLevel()) or 1) + 10)
+    grip.icon = root.Icon(grip, "chevron_right", 12, "OVERLAY", T.faint); grip.icon:SetPoint("CENTER", 1, -1)
+    if grip.icon.SetRotation then pcall(grip.icon.SetRotation, grip.icon, -math.pi / 4) end
+    local function Blocked() return f.wlSecure and InCombat() end
+    grip:SetScript("OnEnter", function(self)
+        self.icon:SetVertexColor(T.fg[1], T.fg[2], T.fg[3])
+        if Blocked() then S.Tip(self, { L("Redimensionner"), L("Indisponible en combat") })
+        else S.Tip(self, { L("Redimensionner"), L("Glisser : changer la taille. Double-clic : taille par défaut.") }) end
+    end)
+    grip:SetScript("OnLeave", function(self) self.icon:SetVertexColor(T.faint[1], T.faint[2], T.faint[3]); S.HideTip() end)
+    grip:SetScript("OnMouseDown", function(self, button)
+        if button == "RightButton" or Blocked() then return end
+        f.wlSizing = true
+        f:StartSizing(f.wlTier == "workspace" and "BOTTOMRIGHT" or "RIGHT")
+    end)
+    grip:SetScript("OnMouseUp", function()
+        if not f.wlSizing then return end
+        f.wlSizing = nil
+        f:StopMovingOrSizing()
+        KeepTop(f)
+        f:SaveSize()
+        local d, pk = f.wlDb, f.wlPosKey
+        if d and pk then local p, _, rp, x, y = f:GetPoint(); if p then d[pk] = { p, rp, x, y } end end
+    end)
+    grip:SetScript("OnDoubleClick", function()
+        if Blocked() then return end
+        f:ResetSize()
+    end)
+    f.grip = grip
+
+    -- re-layout: once per frame while the size changes, only while shown
+    local function Relayout()
+        f.wlResizePending = nil
+        if not f:IsShown() then return end
+        local w, h = num(f:GetWidth()), num(f:GetHeight())
+        if w and f.OnResize then f:OnResize(w, h) end
+    end
+    local function SizeChanged()
+        if f.wlResizePending then return end
+        f.wlResizePending = true
+        if C_Timer and C_Timer.After then C_Timer.After(0, Relayout) else Relayout() end
+    end
+    if f.HookScript and f.GetScript and f:GetScript("OnSizeChanged") then f:HookScript("OnSizeChanged", SizeChanged)
+    else f:SetScript("OnSizeChanged", SizeChanged) end
+
+    tinsert(tiered, f)
+    if f.wlSecure and InCombat() then f.wlSizeLater = true; pcall(regen.RegisterEvent, regen, "PLAYER_REGEN_ENABLED")
+    else f:ApplySize() end
+    return f
+end
+
 -- S.Window(name, width, height, title, subtitle, db, posKey, opts)
+-- opts.size = "workspace" | "panel" (nil: the fixed width/height given, the hud tier): the size
+-- rule of 3.1 through S.MakeResizable (grip, bounds, saved size, f.OnResize); width/height are
+-- then only the starting values. opts.secure: the grip and the screen re-size wait out combat.
+-- A workspace window keeps its size: f:FitHeight only updates f.overflow.
 -- opts: header (44 for the design-system header; 38 by default for windows not migrated yet),
 -- footer (true: a 24 px footer with f.footer.note and f.footer.status), minH, strata, noHome.
 -- f:FitHeight(contentH) sizes the window to its content (measured when contentH is nil);
@@ -1923,6 +2357,12 @@ function S.Window(name, width, height, title, subtitle, db, posKey, opts)
     function f:FitHeight(contentH)
         if contentH == nil and self.Measure then contentH = self:Measure() end
         local footH = (self.footer and self.footer:IsShown()) and S.FOOTER_H or 0
+        if self.wlTier == "workspace" then
+            -- a workspace window keeps its size (rule 0.4): its pages scroll inside
+            local cur = num(self:GetHeight())
+            if contentH and cur then self.overflow = (self:ContentTop() + 24 + contentH + footH > cur) else self.overflow = nil end
+            return cur
+        end
         local hgt
         if contentH then
             hgt = self:ContentTop() + 12 + contentH + 12 + footH
@@ -1944,6 +2384,10 @@ function S.Window(name, width, height, title, subtitle, db, posKey, opts)
         if C_Timer and C_Timer.After then C_Timer.After(0, fn) else fn() end
     end
 
+    if opts.size == "workspace" or opts.size == "panel" then
+        S.MakeResizable(f, opts.size, db, posKey, { secure = opts.secure })
+    end
+
     -- Two windows open at once must not mix: the one clicked or opened last comes on top, whole.
     f:SetToplevel(true)
     local raiser = CreateFrame("Frame", nil, f)
@@ -1956,3 +2400,11 @@ end
 function ns.AddEnglish(t)
     if ns.EN then for k, v in pairs(t) do ns.EN[k] = v end end
 end
+
+ns.AddEnglish({
+    ["Redimensionner"] = "Resize",
+    ["Clic : activer"] = "Click: turn on",
+    ["Clic : désactiver"] = "Click: turn off",
+    ["Indisponible en combat"] = "Not available in combat",
+    ["Glisser : changer la taille. Double-clic : taille par défaut."] = "Drag: change the size. Double-click: default size.",
+})

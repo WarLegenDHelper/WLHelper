@@ -6,6 +6,40 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.87] — 2026-11-16
+
+### Ajouté / Added
+- **Fenêtres plus larges et redimensionnables** (T-81) : taille proportionnelle à ton écran, poignée en bas à droite, taille retenue ; réglages en 2 ou 3 colonnes, listes en grilles, profil d'artisan des Commandes en 2 colonnes.
+  *Wider, resizable windows sized to your screen; settings and lists in columns.*
+- **Guide : onglets « Dehors · Dans le donjon · Après »** et mode consultation : reviens sur n'importe quelle étape, même faite, sans changer ton étape en cours ; « Voir où en est ... » pour un membre du groupe qui a WL Helper (T-86).
+  *Guide part tabs, browse any step, see where a group member is.*
+- **« Recommencer la route »** dans le menu Actions et la liste des étapes, confirmé par un second clic (T-84).
+  *Restart the route button.*
+- **Vue d'ensemble, onglet « Groupe »** : quêtes × coéquipiers, même sans WL Helper chez eux ; la raison au survol (niveau trop bas, déjà faite, prérequis, ne se partage pas...), « 2/3 l'ont », bouton « Vérifier » (T-82).
+  *Overview Group tab: who has each quest and why not, even without WL Helper.*
+- **Raccourcis dans les réglages** (Réglages > Guide de quêtes > Raccourcis) : clique puis appuie sur une touche, conflit signalé, Effacer ; nouvelle touche « Utiliser l'objet de quête de l'étape » (T-83).
+  *Key bindings inside the settings, plus a quest item key.*
+- **Étapes avant le donjon** : « Élite » ou « Non élite », et pourquoi la faire avant (« la suite se fait dans le donjon ») ou « Facultatif ».
+  *Elite marks and why-before line on pre-dungeon steps.*
+
+### Modifié / Changed
+- **Route** : une chaîne de prérequis faisable entre dans la route avant le donjon ; une chaîne trop haute ou trop longue est expliquée en gris dans la vue d'ensemble, et la cocher la remet. Les objectifs au même endroit se font en un seul passage (à Uldaman : collier, champignons, tablette, pierres et coffre dans l'excavation, avant d'entrer).
+  *Prerequisite chains routed or explained; same-spot objectives in one pass.*
+- **Flèche** : « Puis 690 m jusqu'à Dran Droffers » au lieu de « 690 m en monture » ; la carte du guide donne le même trajet (« Téléport : Orgrimmar, puis 690 m ») au lieu de « change de continent : zeppelin ou bateau ».
+  *Arrow says where the last walk goes; the guide card matches it.*
+- **Check-list** : le bouton devient « Fermer la check-list » quand elle est affichée, et elle liste ce qu'il reste à finir dehors avant d'entrer (T-85).
+  *Checklist button toggles; lists outside objectives left.*
+- **Première ouverture du guide** : au centre, liste des étapes fermée ; une position hors de l'écran est ramenée.
+  *Guide first opens centred with the step list closed.*
+
+### Corrigé / Fixed
+- **Fausse étape « dans le donjon »** : après avoir ramassé un objet devant l'entrée (tablette de Solution to Doom), le guide sautait à « Baelog » alors que tu étais dehors.
+  *Guide no longer jumps inside the dungeon after an item looted at the entrance.*
+- **Pointillés sur la carte du monde** : ils s'affichent aussi avec OpenMap, et une carte n'est plus bloquée « sans points » pour la session.
+  *World map trail dots show with OpenMap.*
+- **Titre « Guide de quêtes » et « Partager 4 quêtes »** ne sont plus coupés en français.
+  *French titles no longer truncated.*
+
 ## [1.0.0-beta.86] — 2026-11-16
 
 ### Corrigé / Fixed

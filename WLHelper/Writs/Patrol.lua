@@ -253,7 +253,9 @@ local function Rect(map)
         local floor = Enum and Enum.UIMapType and Num(Enum.UIMapType.Continent) or 2
         if kind and kind < floor then rects[map] = false; return nil end
         local a, b = GPS.Point(map, 0, 0), GPS.Point(map, 100, 100)
-        r = (a and b and a.cont == b.cont and a.wx ~= b.wx and a.wy ~= b.wy) and { cont = a.cont, a = a, b = b } or false
+        -- a failed lookup is not kept: asked again on the next draw
+        if not (a and b and a.cont == b.cont and a.wx ~= b.wx and a.wy ~= b.wy) then return nil end
+        r = { cont = a.cont, a = a, b = b }
         rects[map] = r
     end
     return r or nil
@@ -312,32 +314,47 @@ local function Middle(line)
     return line[1][1], line[1][2]
 end
 
--- The world map's dots for map `map`: { { x, y (0..1) }, ... } and the label's place { x, y } (0..1).
+-- How the route's points land on map `map`'s canvas: Trail.lua's projection (its OpenMap stitching
+-- too: the canvas then shows past 0..1, the second value true), else the map's own rectangle.
+local function Projection(map, cont)
+    local T = Trail()
+    if T and T._Projection then return T._Projection(map, cont) end
+    local r = Rect(map)
+    if not (r and r.cont == cont) then return nil end
+    return function(c, wx, wy) if c == r.cont then return ToMap(r, wx, wy) end end, false
+end
+
+-- The world map's dots for map `map`: { { x, y (canvas 0..1) }, ... } and the label's place { x, y }.
 -- view (optional): { w, h = the canvas's size (canvas units), k = UI units per canvas unit, size = the
--- dot (UI units) }; without it a 1000 x 1000 map, k = 1.
+-- dot (UI units) }; without it a 1000 x 1000 map, k = 1. With OpenMap stitching, past 0..1 too.
 function Patrol.MapDots(map, view)
     local dots = {}
     local a = active
     if not (a and map and MapOn()) then return dots, nil end
     local pts = World(a.spots, a.map)
-    local r = pts and Rect(map)
-    if not (r and r.cont == pts[1].cont) then return dots, nil end
+    if not (pts and pts[1]) then return dots, nil end
+    local cont = pts[1].cont
+    local proj, stitched = Projection(map, cont)
+    if not proj then return dots, nil end
+    local lo, hi = 0, 1
+    if stitched then lo, hi = -1, 2 end
     view = view or {}
     local w, h, k = view.w or 1000, view.h or 1000, view.k or 1
     local size = view.size or DotSize("map", nil)
     -- the line in canvas units, the dots GAP diameters apart on screen
     local line = {}
     for _, p in ipairs(pts) do
-        local x, y = ToMap(r, p.wx, p.wy)
+        local x, y = proj(p.cont, p.wx, p.wy)
+        if not x then return dots, nil end
         line[#line + 1] = { x * w, y * h }
     end
     for _, p in ipairs(Densify(line, GAP * size / k, MAP_CAP)) do
         local x, y = p[1] / w, p[2] / h
-        if x >= 0 and x <= 1 and y >= 0 and y <= 1 then dots[#dots + 1] = { x = x, y = y } end
+        if x >= lo and x <= hi and y >= lo and y <= hi then dots[#dots + 1] = { x = x, y = y } end
     end
     local mx, my = Middle(line)
     local label = { x = mx / w, y = my / h }
-    if label.x < 0 or label.x > 1 or label.y < 0 or label.y > 1 then label = nil end
+    if label.x < lo or label.x > hi or label.y < lo or label.y > hi then label = nil end
     return dots, label
 end
 
@@ -633,6 +650,18 @@ After(WP.Trail, "Refresh", function()
     end
 end)
 
+-- OpenMap's stitched view moving: once, and again on ADDON_LOADED "OpenMap" (it may load after the map hook)
+local openMapHooked = false
+local function HookOpenMap()
+    if openMapHooked then return end
+    local O = rawget(_G, "OpenMapAPI")
+    if type(O) ~= "table" or type(O.RegisterCallback) ~= "function" then return end
+    openMapHooked = true
+    local function again() pcall(Patrol.RefreshMap) end
+    pcall(O.RegisterCallback, "WLHelperPatrol", "OpenMap_ViewChanged", again)
+    pcall(O.RegisterCallback, "WLHelperPatrol", "OpenMap_StitchedChanged", again)
+end
+
 -- The world map: drawn when it opens, changes map or zooms.
 local hooked = false
 function HookMap()
@@ -649,13 +678,24 @@ function HookMap()
         function p:OnCanvasScaleChanged() pcall(Patrol.RefreshMap) end
         pcall(W.AddDataProvider, W, p)
     end
+    -- the map's own "map set" signal, and OpenMap's stitched view moving (Trail.lua does the same)
+    local R = rawget(_G, "EventRegistry")
+    if type(R) == "table" and R.RegisterCallback then
+        pcall(R.RegisterCallback, R, "MapCanvas.MapSet", redraw, Patrol)
+    end
+    HookOpenMap()
     if W.HookScript then W:HookScript("OnShow", redraw) end
 end
 Patrol._HookMap = HookMap
 
 local ev = CreateFrame("Frame")
 pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
-ev:SetScript("OnEvent", function()
+pcall(ev.RegisterEvent, ev, "ADDON_LOADED")      -- the world map, when the client loads it on demand
+ev:SetScript("OnEvent", function(_, event, name)
+    if event == "ADDON_LOADED" then
+        if name == "Blizzard_WorldMap" then HookMap() elseif name == "OpenMap" then HookOpenMap() end
+        return
+    end
     HookMap()
     Update()
 end)

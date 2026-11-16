@@ -1449,9 +1449,17 @@ function F.Probe(arg)
 end
 
 -- ================================================================= the tab (UI)
-local W, PAD = 640, 16
-local CW = W - 2 * PAD
+-- the widths come from the Groups window at render time (Writs/Events.lua WP.EventsDims): the
+-- window is a workspace window the player can resize
+local PAD = 16
+local W, CW = 956, 924
+local WIDE = 900                -- from this list width a result's detail gets its own column
 local ROW_H, LINE_H = 36, 36
+local function Dims()
+    local d = WP.EventsDims and WP.EventsDims()
+    if d then W, CW = d.W, d.CW end
+    return W, CW
+end
 local ui = {}
 F.ui = ui
 
@@ -1821,8 +1829,26 @@ local function ResultRow(parent)
             local w = want[i]
             if w then p:Set(w[1], w[2]); pillsW = pillsW + 6 + (F.Int(p:GetWidth()) or 60) end
         end
-        -- the name and its pills end before the rating stars (x = -196 from the right)
-        local maxName = math.max(20, CW - 36 - 196 - pillsW)
+        -- the row as wide as the list; from WIDE the detail sits in its own column on the name's line
+        -- (45 % of the space left of the stars), else under the name
+        local rw = CW
+        self:SetWidth(rw)
+        local wide = rw >= WIDE
+        local detailX = 36 + math.floor((rw - 36 - 196) * 0.45)
+        self.wideCols = wide or nil
+        self.name:ClearAllPoints(); self.detail:ClearAllPoints()
+        if wide then
+            self.name:SetPoint("LEFT", self, "TOPLEFT", 36, -math.floor(ROW_H / 2))
+            self.detail:SetPoint("LEFT", self, "TOPLEFT", detailX, -math.floor(ROW_H / 2))
+            self.detail:SetWidth(rw - 196 - detailX - 8)
+        else
+            self.name:SetPoint("TOPLEFT", 36, -5)
+            self.detail:SetPoint("TOPLEFT", 36, -(5 + FS.label + 3))
+            self.detail:SetWidth(rw - 36 - 196)
+        end
+        self.detailX = wide and detailX or 36
+        -- the name and its pills end before the detail column (wide) or the rating stars (x = -196)
+        local maxName = math.max(20, (wide and (detailX - 36 - 12) or (rw - 36 - 196)) - pillsW)
         if row.leader then
             self.name:SetText(row.leader)
             local c = ClassColor(row.cls)
@@ -1941,6 +1967,7 @@ local function GuildLine(parent)
         if self.inv:IsShown() then right = right + (self.inv:GetWidth() or 72) + 8 end
         if self.whisper:IsShown() then right = right + (self.whisper:GetWidth() or 84) + 8 end
         if self.view:IsShown() then right = right + (self.view:GetWidth() or 48) + 8 end
+        self:SetWidth(CW)
         local w = math.max(80, CW - 32 - right)
         self.text:SetWidth(w); S.ClampLabel(self.text, l.text, self)
         self.detail:SetWidth(w); S.ClampLabel(self.detail, l.detail, self)
@@ -2058,7 +2085,8 @@ local function BuildFilters()
             local c = Check(fpop, name, function()
                 if defaults[code] then return true, true end
                 return F.Filters().langs[code] == true
-            end, function(v) F.Filters().langs[code] = v and true or nil; F.SaveFilters() end)
+            end, function(v) F.Filters().langs[code] = v and true or nil; F.SaveFilters() end, 138)
+            c.text:SetWidth(138 - 22); c.text:SetWordWrap(false); S.ClampLabel(c.text, nil, c)
             fpop.langs[#fpop.langs + 1] = c
         end
     end
@@ -2112,8 +2140,12 @@ local function BuildFilters()
         self.myLevel:Update()
         if #self.langs > 0 then
             Place(self.langLabel, P, y); y = y + FS.meta + 6
-            for _, c in ipairs(self.langs) do Place(c, P, y); c:Update(); y = y + 22 end
-            y = y + 6
+            -- two columns of 138 (300 = 12 + 138 + 12 + 138)
+            for i, c in ipairs(self.langs) do
+                local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+                Place(c, P + col * (138 + 12), y + row * 22); c:Update()
+            end
+            y = y + math.ceil(#self.langs / 2) * 22 + 6
         else self.langLabel:Hide() end
         Place(self.styleLabel, P, y); y = y + FS.meta + 6
         Place(self.style, P, y); self.style:Update(); y = y + 28 + 12
@@ -2397,6 +2429,7 @@ function Render()
     if not page:IsShown() then F.dirty = true; return end
     F.dirty = false
     local win = ui.win
+    Dims()
     -- top bar
     local y = 12
     ui.src:Update(); Place(ui.src, PAD, y)
@@ -2407,12 +2440,26 @@ function Render()
     ui.go:SetDisabledReason(cd > 0 and L("Patiente 2 s entre deux recherches.") or nil)
     ui.filter:ClearAllPoints(); ui.filter:SetPoint("TOPRIGHT", page, "TOPRIGHT", -PAD, -y)
     ui.filterDot:SetShown(F.FiltersDiffer())
-    y = y + 28 + 8
-    ui.kind:Update(); Place(ui.kind, PAD, y)
-    ui.roles:Update(); ui.roles:ClearAllPoints(); ui.roles:SetPoint("LEFT", ui.kind, "RIGHT", 12, 0)
-    ui.text:ClearAllPoints(); ui.text:SetPoint("TOPRIGHT", page, "TOPRIGHT", -PAD, -y)
-    local textX = PAD + (ui.kind:GetWidth() or 212) + 12 + 120 + 12
-    ui.text:SetWidth(math.max(120, W - PAD - textX))
+    -- the second bar (kind, roles, free text) joins the first when everything fits with a text box
+    -- of 160 at least (a wide window), else it sits under it
+    local function Wd(f, d) local v = F.Int(f:GetWidth()); return (v and v > 0) and v or d end
+    local kindW = Wd(ui.kind, 212)
+    local bar1 = Wd(ui.src, 236) + 8 + Wd(ui.dg, 180) + 8 + Wd(ui.go, 100)
+    local joinedText = CW - (bar1 + 12 + kindW + 12 + 120 + 12) - 8 - 28
+    ui.barsJoined = joinedText >= 160 or nil
+    ui.kind:Update(); ui.roles:Update()
+    ui.kind:ClearAllPoints(); ui.text:ClearAllPoints()
+    if ui.barsJoined then
+        ui.kind:SetPoint("LEFT", ui.go, "RIGHT", 12, 0)
+        ui.text:SetPoint("TOPRIGHT", page, "TOPRIGHT", -(PAD + 28 + 8), -y)
+        ui.text:SetWidth(joinedText)
+    else
+        y = y + 28 + 8
+        Place(ui.kind, PAD, y)
+        ui.text:SetPoint("TOPRIGHT", page, "TOPRIGHT", -PAD, -y)
+        ui.text:SetWidth(math.max(120, CW - (kindW + 12 + 120 + 12)))
+    end
+    ui.roles:ClearAllPoints(); ui.roles:SetPoint("LEFT", ui.kind, "RIGHT", 12, 0)
     if (ui.text:GetText() or "") ~= (F.Filters().text or "") and not ui.text.focused then ui.text:SetText(F.Filters().text or "") end
     y = y + 28 + 12
     -- banner

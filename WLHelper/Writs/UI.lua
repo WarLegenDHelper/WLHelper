@@ -1,14 +1,15 @@
--- Writs/UI.lua: the Comptoir (Writs), 640 wide, sized to its content, with three tabs:
+-- Writs/UI.lua: the Comptoir (Writs), a workspace window (DESIGN 3.1: ~70 % of the screen,
+-- resizable, size saved; secure: no resizing in combat), with three tabs:
 --   Aujourd'hui    the reputation goal, then the writs to turn in now grouped by zone (the zone
---                  cards in two columns, T-55 / T-58), and one primary action (the GPS tour, or
+--                  cards in a grid of 2 to 4 columns), and one primary action (the GPS tour, or
 --                  buying the plan);
---   Achats         what to buy for today's plan, grouped by turn-in zone; a click opens the
---                  auction house's buy page;
---   Tous les writs every writ, cheapest first, then those for later and those done today.
--- The Merchant's Favor page (Favor.lua) lives in the same window, without tabs, 420 wide.
+--   Achats         what to buy for today's plan, grouped by turn-in zone (2-3 rows per line); a
+--                  click opens the auction house's buy page;
+--   Tous les writs every writ, cheapest first, then those for later and those done today (2 per line).
+-- The Merchant's Favor page (Favor.lua) lives in the same window, without tabs, at the same size.
 -- Built from Style.lua's components; frames are pooled and filled again on each refresh. Each page
--- measures its top block, its list and its bottom row; the window then fits them (and the list
--- scrolls once the window reaches 80 % of the screen height).
+-- measures its top block, its list and its bottom row; the list scrolls inside the window. Every
+-- width comes from Dims() (the window's width now); f.OnResize lays the current page out again.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -191,16 +192,25 @@ ns.AddEnglish({
     ["Faveur du marchand"] = "Merchant's Favor",
 })
 
--- 640 for the writs (a wide tool: two columns of zone cards on Today), 420 for the Favor page
--- (Favor.lua lays out a single 388 list). Today's cards: two columns of 296, 16 apart; each card
--- goes in the column that ends higher (the left one on a tie), so the list is half as long.
-local W, FAVOR_W, INSET = 640, 420, 16
-local LIST_W = W - 2 * INSET
-local COL_GAP = 16
-local COL_W = math.floor((LIST_W - COL_GAP) / 2)
-local TEXT_W = math.min(LIST_W, 480)   -- a sentence never runs wider (DESIGN 4.2)
-local curW = W                         -- the window's width now (W, or FAVOR_W on the Favor page)
+-- The window's widths, from its width now (Dims). Today's zone cards: a grid of at least 296 wide,
+-- 2 to 4 per line, read in the route's order; Achats: the item rows 2-3 per line; Tous les Writs:
+-- 2 per line. The primary buttons keep their own width (BTN_W, a control, not a column).
+local INSET, BTN_W = 16, 296
+local GRID_CARDS = { minW = 296, gap = 12, rowGap = 12, maxCols = 4, minPx = 200 }
+local GRID_SHOP = { minW = 300, gap = 12, rowGap = 2, maxCols = 3, minPx = 200 }
+local GRID_ALL = { minW = 420, gap = 12, rowGap = 2, maxCols = 2, minPx = 200 }
+local W, LIST_W, TEXT_W
 local frame, tabs, pages = nil, nil, {}
+local function Dims()
+    local w = frame and frame.GetWidth and frame:GetWidth()
+    w = (type(w) == "number" and not (root.IsSecret and root.IsSecret(w)) and w > 0) and w or nil
+    W = math.floor(w or (ns.WinSize and ns.WinSize("workspace")) or 900)
+    LIST_W = W - 2 * INSET
+    TEXT_W = math.min(LIST_W, 480)   -- a sentence never runs wider (DESIGN 4.2)
+end
+Dims()
+-- the list width now, for Favor.lua (same window)
+function WP.ComptoirListW() Dims(); return LIST_W end
 local data, plan, shop, shopTotal = {}, {}, {}, 0
 local need, pending, readyRep = nil, 0, 0
 
@@ -264,7 +274,7 @@ local function Page(key)
         self.sa:ClearAllPoints()
         self.sa:SetPoint("TOPLEFT", INSET, -top)
         self.sa:SetPoint("BOTTOMRIGHT", -INSET, bottom)
-        self.sa.child:SetWidth(curW - 2 * INSET)
+        self.sa.child:SetWidth(LIST_W)
         self.sa:SetContentHeight(listH)
         local content = topH + (topH > 0 and 12 or 0) + listH + (bottomH > 0 and 12 or 0) + bottomH
         frame:FitHeight(content)
@@ -489,12 +499,12 @@ local function MakeWritRow(parent)
     return r
 end
 
--- A zone card, one column wide (COL_W): the zone's name (wraps to two lines) and "Y aller" at the
+-- A zone card, one grid cell wide: the zone's name (wraps to two lines) and "Y aller" at the
 -- right; under the name, the zone's level pill and "~N min"; then its writ rows.
 local function MakeZoneCard(parent)
     local c = CreateFrame("Frame", nil, parent)
     c.wlOwned = true
-    c:SetWidth(COL_W)
+    c:SetWidth(GRID_CARDS.minW)
     S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
     S.Border(c, C.cardEdge)
     c.name = S.Text(c, F.heading, C.fg)
@@ -529,7 +539,8 @@ local function BuildToday(p)
     today.message = S.Text(p, F.body, C.text)
     today.message:SetJustifyH("LEFT"); today.message:SetJustifyV("TOP")
     today.reset = S.Text(p, F.meta, C.muted)
-    today.reset:SetJustifyH("LEFT")
+    today.reset:SetJustifyH("RIGHT")
+    today.reset:SetWordWrap(false)
 
     local sc = p.sa
     sc:HookScript("OnVerticalScroll", PlaceEnvelopes)
@@ -545,7 +556,7 @@ local function BuildToday(p)
     today.empty = S.EmptyState(sc.child, "mail", "", nil)
     today.empty:Hide()
 
-    today.tour = S.Button(p, L("Lancer la tournée GPS"), COL_W, 32, "primary", function()
+    today.tour = S.Button(p, L("Lancer la tournée GPS"), BTN_W, 32, "primary", function()
         if today.tour.action == "gps" then WP.ToggleGPS() elseif today.tour.action == "shop" then WP.ShowTab("shop") end
     end)
     today.tour:SetPoint("BOTTOMLEFT", INSET, 12)
@@ -632,6 +643,81 @@ local function PaintTour()
     if on then today.tour:Enable() else today.tour:Disable() end
 end
 
+-- A zone card's data (texts, colours, tips); CardFit lays it out at a width.
+local function FillCard(c, z, mins)
+    c.name:SetText(z.name)
+    local lo = WP.ZoneMin(z.map)
+    if lo then c.level:Set(string.format(L("niv. %d à %d"), lo, lo + 10), S.LevelColor(lo + 5)) else c.level:Hide() end
+    c.first = z.rows[1].w
+    c.eta:SetText(mins and string.format(L("~%d min"), mins) or "")
+    c.nrows = #z.rows
+    for j, r in ipairs(z.rows) do
+        local row = c.rows.Get(j)
+        local w = r.w
+        row.writ = w
+        row.r = r
+        S.Painted(row.icon, S.ItemIcon(w.item))
+        row.name:SetText(WP.ItemName(w.item, w.itemName) .. ((w.count or 1) > 1 and (" x" .. w.count) or ""))
+        SetColor(row.name, S.QualityColor(w.item))
+        row.envItem = nil
+        if r.state == "ready" then
+            S.HDIcon(row.status, "check", C.ok)
+            row.detail:SetText(w.npcName and string.format(L("Prêt à rendre à %s"), w.npcName) or string.format(L("Prêt à rendre · %.0f, %.0f"), w.x, w.y))
+            SetColor(row.detail, C.muted)
+        elseif r.state == "bag" then
+            S.HDIcon(row.status, "mail", r.ownItem and C.muted or C.warn)
+            row.envItem = w.writ   -- PlaceEnvelopes lays the secure button over this row
+            row.detail:SetText(r.ownItem and L("À prendre · objet dans le sac") or L("À prendre · objet manquant"))
+            SetColor(row.detail, r.ownItem and C.muted or C.warn)
+        else
+            S.HDIcon(row.status, "warning", C.warn)
+            local missingN = math.max(1, (w.count or 1) - (r.haveItems or 0))
+            row.detail:SetText(r.itemPrice and string.format(L("Dans ton journal · objet manquant, %s à l'HV"), S.Money(r.itemPrice * missingN)) or L("Dans ton journal · objet manquant"))
+            SetColor(row.detail, C.warn)
+        end
+        row.tip = { WP.ItemName(w.writ, w.writName), string.format(L("%s points de réputation · %s %.0f, %.0f"), Big(w.rep), z.name, w.x, w.y),
+            w.npcName and string.format(L("À rendre à %s"), w.npcName) or L("Lieu de remise sur la carte") }
+        if r.state == "bag" and not r.ownItem then
+            row.tip[#row.tip + 1] = { L("Objet manquant : achète-le avant d'y aller."), C.warn[1], C.warn[2], C.warn[3] }
+        end
+        if r.state == "log" or (r.state == "bag" and not r.ownItem and w.item) then
+            row.tip[#row.tip + 1] = WP.AuctionHouseOpen() and L("Clic : acheter l'objet") or L("Clic : voir l'onglet Achats")
+        else
+            row.tip[#row.tip + 1] = string.format(L("Clic : guider vers %s"), w.npcName or z.name)
+        end
+    end
+    c.rows.HideFrom(#z.rows + 1)
+end
+
+-- Lays a filled card out at width w (a grid cell) and returns its height.
+local function CardFit(c, w)
+    -- the name stops before the button; a long one wraps to two lines (never cut) and pushes the
+    -- rows down
+    local room = w - 12 - 12 - (num(c.go:GetWidth()) or 90) - 8
+    local nameH = S.FitText(c.name, 2, math.max(40, room), c)
+    if Width(c.name) + 2 < room then c.name:SetWidth(Width(c.name) + 2) end
+    local ry = math.max(15 + math.max(nameH, F.heading + 2), 10 + 24)
+    -- under the name: the level pill, then "~N min"
+    local eta = (c.eta:GetText() or "") ~= ""
+    c.eta:SetShown(eta)
+    if c.level:IsShown() or eta then
+        ry = ry + 6
+        c.level:ClearAllPoints(); c.level:SetPoint("TOPLEFT", 12, -ry)
+        c.eta:ClearAllPoints()
+        if c.level:IsShown() then c.eta:SetPoint("LEFT", c.level, "RIGHT", 8, 0)
+        else c.eta:SetPoint("TOPLEFT", 12, -(ry + 3)) end
+        ry = ry + 18
+    end
+    ry = ry + 13
+    for j = 1, (c.nrows or 0) do
+        local row = c.rows.items[j]
+        row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -ry); row:SetPoint("TOPRIGHT", 0, -ry)
+        ry = ry + row:Fit(w)
+    end
+    c:SetHeight(ry + 2)
+    return ry + 2
+end
+
 local function RenderToday()
     local p = today.page
     local name, reaction, inStanding, size = WP.Reputation()
@@ -705,8 +791,18 @@ local function RenderToday()
             end
         end
     end
-    local standW = Width(today.standing)
-    today.goal:SetWidth(math.max(60, LIST_W - (standW > 0 and (standW + 12) or 0)))
+    -- one block: the goal at the left and the reset at the right, the bar, then the sentence with
+    -- the bar's numbers at its right (under the bar's end)
+    local secs = WP.SecondsToReset()
+    if secs < 3600 then
+        today.reset:SetText(string.format(L("Nouveaux Writs dans %d min"), math.max(1, math.floor(secs / 60))))
+    else
+        today.reset:SetText(string.format(L("Nouveaux Writs dans %d h"), math.floor(secs / 3600)))
+    end
+    local resetW = math.min(math.ceil(Width(today.reset)) + 2, math.floor(LIST_W / 2))
+    today.reset:SetWidth(resetW)
+    today.reset:ClearAllPoints(); today.reset:SetPoint("TOPRIGHT", -INSET, -(y + 4))
+    today.goal:SetWidth(math.max(60, LIST_W - resetW - 12))
     y = y + Height(today.goal, F.heading + 2)
     if today.bar:IsShown() then
         y = y + 8
@@ -715,17 +811,12 @@ local function RenderToday()
         y = y + 4
     end
     y = y + 8
+    local standW = (today.standing:GetText() or "") ~= "" and math.min(math.ceil(Width(today.standing)) + 2, math.floor(LIST_W / 3)) or 0
+    today.standing:SetWidth(math.max(1, standW))
+    today.standing:ClearAllPoints(); today.standing:SetPoint("TOPRIGHT", -INSET, -(y + 2))
+    local msgW = math.max(120, math.min(TEXT_W, LIST_W - (standW > 0 and (standW + 24) or 0)))
     today.message:ClearAllPoints(); today.message:SetPoint("TOPLEFT", INSET, -y)
-    y = y + math.max(S.FitText(today.message, 3, TEXT_W, p), F.body + 2)
-    local secs = WP.SecondsToReset()
-    if secs < 3600 then
-        today.reset:SetText(string.format(L("Nouveaux Writs dans %d min"), math.max(1, math.floor(secs / 60))))
-    else
-        today.reset:SetText(string.format(L("Nouveaux Writs dans %d h"), math.floor(secs / 3600)))
-    end
-    y = y + 4
-    today.reset:ClearAllPoints(); today.reset:SetPoint("TOPLEFT", INSET, -y)
-    y = y + math.max(S.FitText(today.reset, 1, LIST_W, p), F.meta + 2)
+    y = y + math.max(S.FitText(today.message, 3, msgW, p), F.body + 2)
     local topH = y - 12
 
     -- Cards: writs you hold, by zone, biggest first.
@@ -751,81 +842,18 @@ local function RenderToday()
         ly = 32 + 8
     end
     local minutes = MinutesTo(order)
-    -- two columns, read in the route's order: cards 1 and 2 side by side, top-aligned, then 3 and 4
-    -- under the taller of the two (like the Keys tiles)
-    local rowTop, rowEnd = ly, ly
+    -- the cards in a grid (2 to 4 per line by the width), read in the route's order: each line is
+    -- top-aligned and the next one starts under its tallest card
+    today.grid = today.grid or ns.Grid()
+    local g = today.grid
+    g:Begin(today.scroll.child, 0, ly, LIST_W, GRID_CARDS)
     for i, z in ipairs(order) do
         local c = today.cards.Get(i)
-        local col = (i % 2 == 1) and 1 or 2
-        if col == 1 and i > 1 then rowTop = rowEnd end
-        c:ClearAllPoints(); c:SetPoint("TOPLEFT", (col - 1) * (COL_W + COL_GAP), -rowTop)
-        c:SetWidth(COL_W)
-        c.name:SetText(z.name)
-        local lo = WP.ZoneMin(z.map)
-        if lo then c.level:Set(string.format(L("niv. %d à %d"), lo, lo + 10), S.LevelColor(lo + 5)) else c.level:Hide() end
-        c.first = z.rows[1].w
-        local mins = minutes[i]
-        c.eta:SetText(mins and string.format(L("~%d min"), mins) or "")
-        -- the name stops before the button; a long one wraps to two lines (never cut) and pushes the
-        -- rows down
-        local room = COL_W - 12 - 12 - (num(c.go:GetWidth()) or 90) - 8
-        local nameH = S.FitText(c.name, 2, math.max(40, room), c)
-        if Width(c.name) + 2 < room then c.name:SetWidth(Width(c.name) + 2) end
-        local ry = math.max(15 + math.max(nameH, F.heading + 2), 10 + 24)
-        -- under the name: the level pill, then "~N min"
-        local eta = (c.eta:GetText() or "") ~= ""
-        c.eta:SetShown(eta)
-        if c.level:IsShown() or eta then
-            ry = ry + 6
-            c.level:ClearAllPoints(); c.level:SetPoint("TOPLEFT", 12, -ry)
-            c.eta:ClearAllPoints()
-            if c.level:IsShown() then c.eta:SetPoint("LEFT", c.level, "RIGHT", 8, 0)
-            else c.eta:SetPoint("TOPLEFT", 12, -(ry + 3)) end
-            ry = ry + 18
-        end
-        ry = ry + 13
-        for j, r in ipairs(z.rows) do
-            local row = c.rows.Get(j)
-            row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -ry); row:SetPoint("TOPRIGHT", 0, -ry)
-            local w = r.w
-            row.writ = w
-            row.r = r
-            S.Painted(row.icon, S.ItemIcon(w.item))
-            row.name:SetText(WP.ItemName(w.item, w.itemName) .. ((w.count or 1) > 1 and (" x" .. w.count) or ""))
-            SetColor(row.name, S.QualityColor(w.item))
-            row.envItem = nil
-            if r.state == "ready" then
-                S.HDIcon(row.status, "check", C.ok)
-                row.detail:SetText(w.npcName and string.format(L("Prêt à rendre à %s"), w.npcName) or string.format(L("Prêt à rendre · %.0f, %.0f"), w.x, w.y))
-                SetColor(row.detail, C.muted)
-            elseif r.state == "bag" then
-                S.HDIcon(row.status, "mail", r.ownItem and C.muted or C.warn)
-                row.envItem = w.writ   -- PlaceEnvelopes lays the secure button over this row
-                row.detail:SetText(r.ownItem and L("À prendre · objet dans le sac") or L("À prendre · objet manquant"))
-                SetColor(row.detail, r.ownItem and C.muted or C.warn)
-            else
-                S.HDIcon(row.status, "warning", C.warn)
-                local missingN = math.max(1, (w.count or 1) - (r.haveItems or 0))
-                row.detail:SetText(r.itemPrice and string.format(L("Dans ton journal · objet manquant, %s à l'HV"), S.Money(r.itemPrice * missingN)) or L("Dans ton journal · objet manquant"))
-                SetColor(row.detail, C.warn)
-            end
-            row.tip = { WP.ItemName(w.writ, w.writName), string.format(L("%s points de réputation · %s %.0f, %.0f"), Big(w.rep), z.name, w.x, w.y),
-                w.npcName and string.format(L("À rendre à %s"), w.npcName) or L("Lieu de remise sur la carte") }
-            if r.state == "bag" and not r.ownItem then
-                row.tip[#row.tip + 1] = { L("Objet manquant : achète-le avant d'y aller."), C.warn[1], C.warn[2], C.warn[3] }
-            end
-            if r.state == "log" or (r.state == "bag" and not r.ownItem and w.item) then
-                row.tip[#row.tip + 1] = WP.AuctionHouseOpen() and L("Clic : acheter l'objet") or L("Clic : voir l'onglet Achats")
-            else
-                row.tip[#row.tip + 1] = string.format(L("Clic : guider vers %s"), w.npcName or z.name)
-            end
-            ry = ry + row:Fit(COL_W)
-        end
-        c.rows.HideFrom(#z.rows + 1)
-        c:SetHeight(ry + 2)
-        rowEnd = math.max(rowEnd, rowTop + ry + 2 + 12)
+        FillCard(c, z, minutes[i])
+        g:Add(c, CardFit)
     end
-    if #order > 0 then ly = rowEnd end
+    local gh = g:End()
+    if #order > 0 then ly = ly + gh + 12 end
     today.cards.HideFrom(#order + 1)
     today.empty:SetShown(#order == 0)
     if #order == 0 then
@@ -950,14 +978,14 @@ local function BuildShop(p)
     end)
     buy.outHead = S.SectionHeader(sc.child, L("Zones laissées de côté"))
     buy.outHead:Hide()
-    buy.outRows = Pool(function()
-        local r = S.ListRow(sc.child, { density = "dense" })
-        r:AddAction("plus", { L("Remettre"), L("Clic : remettre la zone dans le plan") },
-            function() if r.map then WP.SetSkipped("zones", r.map, false) end end)
-        r.tip = function(self) return { WP.ZoneName(self.map), L("Hors du plan"), L("Clic : remettre la zone dans le plan") } end
-        r:SetScript("OnClick", function(self) if self.map then WP.SetSkipped("zones", self.map, false) end end)
-        return r
+    buy.chips = Pool(function()
+        local b
+        b = S.Button(sc.child, "", 0, 24, "secondary", function() if b.map then WP.SetSkipped("zones", b.map, false) end end,
+            function() return { WP.ZoneName(b.map), L("Hors du plan"), L("Clic : remettre la zone dans le plan") } end)
+        b:SetIcon("plus")
+        return b
     end)
+    buy.grids = {}
     buy.rows = Pool(function()
         local r = S.ListRow(sc.child, { density = "dense", onClick = function(self)
             local e = self.entry
@@ -1000,7 +1028,7 @@ local function BuildShop(p)
 
     -- one primary button opens every buy page in a row; the player still clicks the game's own Buy
     -- button each time (the addon buys nothing by itself)
-    buy.all = S.Button(p, "", COL_W, 32, "primary", function()
+    buy.all = S.Button(p, "", BTN_W, 32, "primary", function()
         local pos = WP.Scan.QueueState()
         if (pos or 0) > 0 or WP.Scan.QueueLeft() > 0 then WP.Scan.ClearQueue(); return end
         local list = {}
@@ -1048,11 +1076,9 @@ local function RenderShop()
         y = y + math.max(S.FitText(buy.sub, 2, TEXT_W, p), F.body + 2)
         y = y + 12
     end
-    -- the two controls side by side, each with its label above
-    buy.capLabel:ClearAllPoints(); buy.capLabel:SetPoint("TOPLEFT", INSET, -y)
-
-    y = y + F.meta + 2 + 4
-
+    -- the controls, each with its label above: the price cap and the zone menu, then the budget,
+    -- its own field and (with a budget) what to favour; on one line when the list is wide enough
+    -- (Dims), else on two lines
     -- groups: one per turn-in zone, in the order the list gives
     local groups, order = {}, {}
     for _, e in ipairs(shop) do
@@ -1066,17 +1092,6 @@ local function RenderShop()
     for _, k in ipairs(order) do opts[#opts + 1] = { k, k } end
     buy.zone.options = opts
     buy.zone:Update()
-    -- the zone menu grows with the zone's name: the price choice takes what is left (it becomes a
-    -- menu itself rather than cutting its labels)
-    local zoneW = num(buy.zone:GetWidth()) or 140
-    buy.zone:ClearAllPoints(); buy.zone:SetPoint("TOPRIGHT", -INSET, -y)
-    buy.cap:ClearAllPoints(); buy.cap:SetPoint("TOPLEFT", INSET, -y)
-    buy.cap:SetMaxWidth(LIST_W - zoneW - 12)
-    buy.cap:Update()
-    y = y + 28
-
-    -- the budget beside it, its own field, and (with a budget) what to favour
-    y = y + 12
     local budget = WLWritsDB.budget or 0
     local preset = budget == 0
     for _, c in ipairs(WP.BUDGET_STEPS) do if c == budget then preset = true end end
@@ -1085,21 +1100,54 @@ local function RenderShop()
         buy.budgetInput:SetText(preset and "" or (g == math.floor(g) and tostring(g) or string.format("%.2f", g)))
         if buy.budgetInput.Paint then buy.budgetInput.Paint() end
     end
-    y = y + F.meta + 2 + 4
-    buy.budget:ClearAllPoints(); buy.budget:SetPoint("TOPLEFT", INSET, -y)
-    buy.budget:SetMaxWidth(LIST_W - 88 - 8)
-    buy.budget:Update()
-    local bw = num(buy.budget:GetWidth()) or 280
-    buy.budgetInput:ClearAllPoints(); buy.budgetInput:SetPoint("TOPLEFT", INSET + bw + 8, -y)
     buy.prefLabel:SetShown(budget > 0)
     buy.pref:SetShown(budget > 0)
-    if budget > 0 then
-        local room = LIST_W - bw - 8 - 88 - 12
-        buy.pref:ClearAllPoints(); buy.pref:SetPoint("TOPRIGHT", -INSET, -y)
-        buy.pref:SetMaxWidth(room)
-        buy.pref:Update()
+    -- the zone menu grows with the zone's name: the price choice takes what is left (it becomes a
+    -- menu itself rather than cutting its labels)
+    local zoneW = num(buy.zone:GetWidth()) or 140
+    local GAP = 16
+    local oneLine = LIST_W >= 900 and (buy.cap.natural + GAP + buy.budget.natural + 8 + 88 + GAP
+        + (budget > 0 and (buy.pref.natural + GAP) or 0) + zoneW) <= LIST_W
+    buy.oneLine = oneLine
+    local labelY = y
+    y = y + F.meta + 2 + 4
+    buy.capLabel:ClearAllPoints(); buy.capLabel:SetPoint("TOPLEFT", INSET, -labelY)
+    buy.zone:ClearAllPoints(); buy.zone:SetPoint("TOPRIGHT", -INSET, -y)
+    buy.cap:ClearAllPoints(); buy.cap:SetPoint("TOPLEFT", INSET, -y)
+    if oneLine then
+        buy.cap:SetMaxWidth(buy.cap.natural)
+        buy.cap:Update()
+        local x = INSET + (num(buy.cap:GetWidth()) or buy.cap.natural) + GAP
+        buy.budget:ClearAllPoints(); buy.budget:SetPoint("TOPLEFT", x, -y)
+        buy.budget:SetMaxWidth(buy.budget.natural)
+        buy.budget:Update()
+        local bw = num(buy.budget:GetWidth()) or buy.budget.natural
+        buy.budgetInput:ClearAllPoints(); buy.budgetInput:SetPoint("TOPLEFT", x + bw + 8, -y)
+        if budget > 0 then
+            buy.pref:ClearAllPoints(); buy.pref:SetPoint("TOPRIGHT", -(INSET + zoneW + GAP), -y)
+            buy.pref:SetMaxWidth(buy.pref.natural)
+            buy.pref:Update()
+        end
+        y = y + 28
+    else
+        buy.cap:SetMaxWidth(LIST_W - zoneW - 12)
+        buy.cap:Update()
+        y = y + 28
+        y = y + 12
+        y = y + F.meta + 2 + 4
+        buy.budget:ClearAllPoints(); buy.budget:SetPoint("TOPLEFT", INSET, -y)
+        buy.budget:SetMaxWidth(LIST_W - 88 - 8)
+        buy.budget:Update()
+        local bw = num(buy.budget:GetWidth()) or 280
+        buy.budgetInput:ClearAllPoints(); buy.budgetInput:SetPoint("TOPLEFT", INSET + bw + 8, -y)
+        if budget > 0 then
+            local room = LIST_W - bw - 8 - 88 - 12
+            buy.pref:ClearAllPoints(); buy.pref:SetPoint("TOPRIGHT", -INSET, -y)
+            buy.pref:SetMaxWidth(room)
+            buy.pref:Update()
+        end
+        y = y + 28
     end
-    y = y + 28
 
     -- items the last scan found nowhere: said once, above the list
     local absent = 0
@@ -1156,6 +1204,10 @@ local function RenderShop()
         h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -ly); h:SetPoint("TOPRIGHT", 0, -ly)
         ly = ly + 32 + 4
         if not folded then
+          -- the zone's rows, 2-3 per line by the width (GRID_SHOP), in the list's order
+          buy.grids[hi] = buy.grids[hi] or ns.Grid()
+          local g = buy.grids[hi]
+          g:Begin(p.sa.child, 0, ly, LIST_W, GRID_SHOP)
           for _, c in ipairs(cards) do
             ri = ri + 1
             local r = buy.rows.Get(ri)
@@ -1180,9 +1232,9 @@ local function RenderShop()
             SetColor(r.value, vcol)
             if c.absent then SetColor(r.detail, C.bad) elseif c.short then SetColor(r.detail, C.warn) else SetColor(r.detail, C.muted) end
             r:SetAlpha(c.done and 0.5 or 1)
-            r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -ly); r:SetPoint("TOPRIGHT", 0, -ly)
-            ly = ly + r:Fit(LIST_W) + 2
+            g:Add(r, function(f, w) return f:Fit(w) end)
           end
+          ly = ly + g:End() + 2
         end
       end
     end
@@ -1198,16 +1250,20 @@ local function RenderShop()
         buy.outHead:ClearAllPoints(); buy.outHead:SetPoint("TOPLEFT", 0, -ly); buy.outHead:SetPoint("TOPRIGHT", 0, -ly)
         buy.outHead:Set(L("Zones laissées de côté"), #out)
         ly = ly + 32 + 4
+        -- one chip per zone, flowed left to right (the header already says they are left out)
+        local x, lineH = 0, 24
         for i, map in ipairs(out) do
-            local r = buy.outRows.Get(i)
-            r.map = map
-            -- the section header already says these zones are left out: the name and "Remettre" only
-            r:Set({ name = WP.ZoneName(map) })
-            r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -ly); r:SetPoint("TOPRIGHT", 0, -ly)
-            ly = ly + r:Fit(LIST_W) + 2
+            local b = buy.chips.Get(i)
+            b.map = map
+            b:SetText(WP.ZoneName(map) or "?")
+            local bw = math.min(num(b:GetWidth()) or 100, LIST_W)
+            if x > 0 and x + bw > LIST_W then x = 0; ly = ly + lineH + 8 end
+            b:ClearAllPoints(); b:SetPoint("TOPLEFT", x, -ly)
+            x = x + bw + 8
         end
+        ly = ly + lineH + 2
     end
-    buy.outRows.HideFrom(#out + 1)
+    buy.chips.HideFrom(#out + 1)
     buy.empty:SetShown(#shop == 0)
     if #shop == 0 then
         buy.empty:SetWrapWidth(LIST_W)
@@ -1349,8 +1405,7 @@ local function BuildAll(p)
     all.box:SetPoint("TOPLEFT", INSET, -12)
     all.seg = S.Segmented(p, { { "all", L("Tous") }, { "Journeyman", WP.Tier("Journeyman") }, { "Expert", WP.Tier("Expert") }, { "Artisan", WP.Tier("Artisan") } },
         function() return all.rank end, function(v) all.rank = v; WP.Refresh() end, 28)
-    all.seg:SetPoint("TOPLEFT", INSET, -(12 + 28 + 8))
-    all.seg:SetMaxWidth(LIST_W)
+    all.grids = {}
 
     local sc = p.sa
     all.heads = Pool(function()
@@ -1379,8 +1434,22 @@ end
 
 local function RenderAll()
     local p = all.page
+    -- the search and the rank choice on one line (the search takes what the choice leaves, at
+    -- least 240), else the choice under the search
+    local segW = all.seg.natural
+    local oneLine = LIST_W - segW - 12 >= 240
+    all.box:SetWidth(oneLine and (LIST_W - segW - 12) or LIST_W)
+    all.seg:ClearAllPoints()
+    if oneLine then
+        all.seg:SetPoint("TOPRIGHT", -INSET, -12)
+        all.seg:SetMaxWidth(segW)
+    else
+        all.seg:SetPoint("TOPLEFT", INSET, -(12 + 28 + 8))
+        all.seg:SetMaxWidth(LIST_W)
+    end
     all.seg:Update()
-    local topH = 28 + 8 + 28
+    all.oneLine = oneLine
+    local topH = oneLine and 28 or (28 + 8 + 28)
     local todo, later, done = {}, {}, {}
     for _, r in ipairs(data) do
         if Matches(r) then
@@ -1391,8 +1460,13 @@ local function RenderAll()
     end
     local function byCost(a, b) return (a.per100 or math.huge) < (b.per100 or math.huge) end
     table.sort(todo, byCost); table.sort(later, byCost)
-    local y, hi, ri = 0, 0, 0
+    local y, hi, ri, gi = 0, 0, 0, 0
+    local g   -- the grid of the current section's rows (2 per line from 864)
+    local function close()
+        if g then y = y + g:End() + 2; g = nil end
+    end
     local function head(text, count, key)
+        close()
         hi = hi + 1
         local h = all.heads.Get(hi)
         h.key = key
@@ -1429,8 +1503,13 @@ local function RenderAll()
         b:Set({ icon = S.ItemIcon(w.item), name = name, nameColor = S.QualityColor(w.item), detail = detail, value = value })
         SetColor(b.value, vcol)
         b:SetAlpha((r.state == "done" or r.skipped) and 0.5 or 1)
-        b:ClearAllPoints(); b:SetPoint("TOPLEFT", 0, -y); b:SetPoint("TOPRIGHT", 0, -y)
-        y = y + b:Fit(LIST_W) + 2
+        if not g then
+            gi = gi + 1
+            all.grids[gi] = all.grids[gi] or ns.Grid()
+            g = all.grids[gi]
+            g:Begin(p.sa.child, 0, y, LIST_W, GRID_ALL)
+        end
+        g:Add(b, function(f, w) return f:Fit(w) end)
     end
     if #todo > 0 then
         head(L("À faire, le moins cher d'abord"), #todo)
@@ -1444,6 +1523,7 @@ local function RenderAll()
         head(L("Rendus aujourd'hui"), #done, "done")
         if all.open.done then for _, r in ipairs(done) do row(r) end end
     end
+    close()
     all.heads.HideFrom(hi + 1)
     all.rows.HideFrom(ri + 1)
     local none = #todo + #later + #done == 0
@@ -1484,6 +1564,7 @@ end
 -- ---------------------------------------------------------------- window
 
 local current = "today"
+local RenderCurrent   -- below, after the window
 
 local function PlacePages()
     local top = frame:ContentTop()
@@ -1495,9 +1576,8 @@ end
 
 function WP.ShowTab(key)
     current = key
-    -- a writs tab asked while the Favor page showed (Scan.lua at the auction house): back to 640
-    local w = (key == "favor") and FAVOR_W or W
-    if frame and curW ~= w then curW = w; frame:SetWidth(w) end
+    -- every page has the window's size (the Favor page too): no width switch between tabs
+    Dims()
     for k, p in pairs(pages) do p:SetShown(k == key) end
     tabs:Update()
     WP.Refresh()
@@ -1505,7 +1585,11 @@ end
 
 local function Build()
     local db = WLWritsDB
-    frame = S.Window("WLHelperComptoir", W, 400, L("Writs"), nil, db, "point", { header = S.HEADER_H, minH = 240 })
+    -- workspace (DESIGN 3.1): ~70 % of the screen, resizable, size saved as db.pointSize; secure:
+    -- the envelope buttons are secure, so the grip and a screen change wait out combat
+    frame = S.Window("WLHelperComptoir", W, 576, L("Writs"), nil, db, "point",
+        { header = S.HEADER_H, minH = 240, size = "workspace", secure = true })
+    Dims()
     local opts = S.IconButton(frame.header, "gear", 28, { L("Réglages des Writs"), L("Clic : ouvrir les réglages des Writs") }, function()
         if WP.OpenOptions then WP.OpenOptions("comptoir") end
     end)
@@ -1532,7 +1616,17 @@ local function Build()
     BuildShop(pages.shop)
     BuildAll(pages.all)
     if WP.BuildFavor then WP.BuildFavor(pages.favor) end
-    frame:SetScript("OnShow", function() WP.Refresh() end)
+    frame:SetScript("OnShow", function() Dims(); WP.Refresh() end)
+    -- a new size: the current page laid out again from the data already gathered (no rebuild), then
+    -- the envelope buttons over the rows where they now are
+    frame.OnResize = function()
+        Dims()
+        PlacePages()
+        HideEnvelopes()
+        RenderCurrent()
+        WP.PaintScan()
+        PlaceEnvelopes()
+    end
     frame:HookScript("OnHide", HideEnvelopes)
     -- the envelope buttons follow the window: off while it moves, laid again where it lands
     frame.header:HookScript("OnDragStart", HideEnvelopes)
@@ -1562,7 +1656,7 @@ local function Subtitle()
 end
 
 -- Draws the page of the current tab from the data WP.Refresh gathered.
-local function RenderCurrent()
+function RenderCurrent()
     if current == "today" then RenderToday()
     elseif current == "shop" then RenderShop()
     elseif current == "favor" then if WP.RenderFavor then WP.RenderFavor() end
@@ -1571,6 +1665,7 @@ end
 
 function WP.Refresh()
     if not frame or not frame:IsShown() then return end
+    Dims()
     craftable = nil
     data = WP.Rows()
     for _, r in ipairs(data) do r.inPlan = nil end
@@ -1611,7 +1706,7 @@ function WP.PaintScan()
         frame.scanBar:ClearAllPoints()
         frame.scanBar:SetPoint("TOPLEFT", 0, -top); frame.scanBar:SetPoint("TOPRIGHT", 0, -top)
         frame.scanBar:Show()
-        frame.scanFill:SetWidth(math.max(1, curW * done / tot))
+        frame.scanFill:SetWidth(math.max(1, W * done / tot))
     else
         frame.scanBar:Hide()
     end
@@ -1631,6 +1726,8 @@ function WP.OnGPSChanged()
 end
 
 function WP.HideWindow() if frame then frame:Hide() end end
+-- test access: the pages' tables and the widths now
+function WP._ComptoirUI() return { today = today, buy = buy, all = all, frame = frame, LIST_W = LIST_W, W = W } end
 function WP.WindowShown() return frame and frame:IsShown() or false end
 -- true while the window shows the writs (not the Merchant's Favor page)
 function WP.WritsMode() return current ~= "favor" end
@@ -1641,9 +1738,8 @@ function WP.WritsMode() return current ~= "favor" end
 function WP.Open(mode)
     if WP.ModuleOff("writs") then return end
     if not frame then Build() end
-    -- the Favor page keeps its 420 (one list); the writs take 640 (Today in two columns)
-    curW = (mode == "favor") and FAVOR_W or W
-    frame:SetWidth(curW)
+    -- one size for the writs and the Favor page (the window's own, from the size rule)
+    Dims()
     if mode == "favor" then
         frame.title:SetText(L("Faveur du marchand"))
         tabs:Hide()

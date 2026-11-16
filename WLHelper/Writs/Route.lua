@@ -11,7 +11,8 @@
 -- session) and the plan is made again as answers come: it changes only when the new best is more
 -- than 10% faster than the plan you follow, so the arrow does not flip between two equal ways.
 -- GPS.Itinerary() / GPS.ItinerarySummary() say the whole way in one line ("Pierre de foyer → vol
--- jusqu'à Kargath → 300 m à pied").
+-- jusqu'à Kargath → 300 m jusqu'à Tabetha"); GPS.TripSummary() the short plan for a card
+-- ("Téléport : Orgrimmar, puis 690 m").
 --
 -- Positions are world coordinates (yards) from C_Map.GetWorldPosFromMapPos. The fixed points
 -- (docks, teleport landings, your flight masters) are converted once and kept.
@@ -59,8 +60,19 @@ ns.AddEnglish({
     ["bateau pour %s"] = "boat to %s",
     ["zeppelin pour %s"] = "zeppelin to %s",
     ["téléportation à %s"] = "teleport to %s",
-    ["%s à pied"] = "%s on foot",
-    ["%s en monture"] = "%s ride",
+    -- the walk or ride of a leg says where it goes, never how ("690 m ride" read as "take a flight")
+    ["%s jusqu'à %s"] = "%s to %s",
+    ["%s jusqu'au maître de vol"] = "%s to the flight master",
+    ["%s jusqu'au bateau"] = "%s to the boat",
+    ["%s jusqu'au zeppelin"] = "%s to the zeppelin",
+    ["%s après l'atterrissage"] = "%s after landing",
+    ["%s sur place"] = "%s on arrival",
+    -- GPS.TripSummary: "Téléport : Orgrimmar, puis 690 m"
+    ["Téléport : %s"] = "Teleport: %s",
+    ["Vol jusqu'à %s"] = "Flight to %s",
+    ["Bateau pour %s"] = "Boat to %s",
+    ["Zeppelin pour %s"] = "Zeppelin to %s",
+    ["%s, puis %s"] = "%s, then %s",
 })
 
 -- "Brackenwall Village, Dustwallow Marsh" -> "Brackenwall Village": the place without its zone, for
@@ -918,8 +930,23 @@ function GPS.Itinerary(legs)
             end
             local onFoot = speed <= RUN or (yards ~= nil and yards < 150)
             local d = yards and DistanceText(yards) or "?"
-            item = { kind = onFoot and "walk" or "ride", yards = yards,
-                text = string.format(onFoot and L("%s à pied") or L("%s en monture"), d) }
+            -- where the walk goes, not how: "690 m jusqu'à Dran Droffers" ("690 m ride" after a
+            -- teleport was read as a flight to take)
+            local text
+            local link = to.kind == "dock" and to.link
+            if to.kind == "taxi" or (link and link.mode == "flight") then
+                text = string.format(L("%s jusqu'au maître de vol"), d)
+            elseif link then
+                text = string.format(link.mode == "boat" and L("%s jusqu'au bateau") or L("%s jusqu'au zeppelin"), d)
+            elseif type(to.name) == "string" and to.name ~= "" then
+                -- no distance known (a point on another continent): the name alone, "Puis Tabetha"
+                text = yards and string.format(L("%s jusqu'à %s"), d, P) or UpperFirst(P)
+            else
+                local before = legs[i - 1]
+                local landed = before and (before.kind == "fly" or before.kind == "link")
+                text = string.format(landed and L("%s après l'atterrissage") or L("%s sur place"), d)
+            end
+            item = { kind = onFoot and "walk" or "ride", yards = yards, text = text }
         elseif leg.kind == "fly" then
             item = { kind = "fly", text = string.format(L("vol jusqu'à %s"), P) }
         elseif leg.kind == "link" then
@@ -945,7 +972,7 @@ function GPS.Itinerary(legs)
     return out
 end
 
--- The whole way in one line: "Pierre de foyer → vol jusqu'à Kargath → 300 m à pied" (first word in
+-- The whole way in one line: "Pierre de foyer → vol jusqu'à Kargath → 300 m jusqu'à Tabetha" (first word in
 -- capital). Empty when there is no plan.
 function GPS.ItinerarySummary(legs)
     local parts = {}
@@ -953,6 +980,66 @@ function GPS.ItinerarySummary(legs)
         parts[#parts + 1] = i == 1 and UpperFirst(it.text) or it.text
     end
     return table.concat(parts, " \226\134\146 ")
+end
+
+-- The planned trip in one short sentence, for a card that names the place and its distance itself:
+-- "Téléport : Orgrimmar, puis 690 m", "Vol jusqu'à Kargath, puis 300 m", "Zeppelin pour Orgrimmar,
+-- puis 1,2 km". `dest`: a GPS point (GPS.Point) or map, x, y in percent (and a name). When the GPS
+-- guides there, the plan the arrow follows (the card and the arrow say the same); else the best way
+-- now (kept 8 seconds per place). nil when there is no way, or no flight, boat or cast on it (only a
+-- ride: the card's distance says it). Second value: the legs.
+local tripCache, tripCount = {}, 0
+function GPS.TripSummary(dest, x, y, name)
+    local p
+    if type(dest) == "table" and dest.cont and dest.wx and dest.wy then
+        p = dest
+    elseif type(dest) == "number" and type(x) == "number" and type(y) == "number" then
+        p = Point(dest, x, y, { kind = "dest", name = name })
+    end
+    if not p then return nil end
+    local legs
+    local d = state.dest
+    if d and not state.zygor and type(state.legs) == "table" and d.cont == p.cont and d.wx and Dist(d, p) < NEAR then
+        legs = state.legs
+    else
+        local key = tostring(p.cont) .. ":" .. math.floor(p.wx + 0.5) .. ":" .. math.floor(p.wy + 0.5)
+        local c = tripCache[key]
+        if c and Clock() - c.at < REPLAN_EVERY then
+            legs = c.legs
+        else
+            local ok, found = pcall(GPS.FindPath, { p })
+            legs = ok and found or false
+            if tripCount >= 20 then tripCache, tripCount = {}, 0 end
+            if not c then tripCount = tripCount + 1 end
+            tripCache[key] = { at = Clock(), legs = legs }
+        end
+    end
+    if type(legs) ~= "table" or #legs == 0 then return nil end
+    local parts, last = {}, nil
+    for _, it in ipairs(GPS.Itinerary(legs)) do
+        local to = it.leg and it.leg.to or {}
+        local P = GPS.ShortPlace(to.name)
+        local first = #parts == 0
+        local part
+        if it.kind == "teleport" then
+            part = string.format(L("Téléport : %s"), P)
+        elseif it.kind == "hearth" then
+            part = string.format(it.leg.item and L("Pierre de foyer : %s") or L("Rappel astral : %s"), P)
+        elseif it.kind == "fly" then
+            part = string.format(first and L("Vol jusqu'à %s") or L("vol jusqu'à %s"), P)
+        elseif it.kind == "boat" then
+            part = string.format(first and L("Bateau pour %s") or L("bateau pour %s"), P)
+        elseif it.kind == "zeppelin" then
+            part = string.format(first and L("Zeppelin pour %s") or L("zeppelin pour %s"), P)
+        else
+            last = it      -- a walk or a ride: the one after the last flight or cast is the "puis"
+        end
+        if part then parts[#parts + 1] = part; last = nil end
+    end
+    if #parts == 0 then return nil end
+    local s = table.concat(parts, ", ")
+    if last and last.yards then s = string.format(L("%s, puis %s"), s, DistanceText(last.yards)) end
+    return s, legs
 end
 
 local function Changed()

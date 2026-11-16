@@ -6,4 +6,5 @@
   <Binding name="WLDT_POINTS" category="ADDONS">WLDT_Binding("points")</Binding>
   <Binding name="WLDT_ARROW" category="ADDONS">WLDT_Binding("arrow")</Binding>
   <Binding name="WLDT_TARGET" category="ADDONS">WLDT_Binding("target")</Binding>
+  <Binding name="WLDT_ITEM" category="ADDONS">WLDT_Binding("item")</Binding>
 </Bindings>

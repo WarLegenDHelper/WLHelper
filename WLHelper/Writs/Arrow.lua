@@ -6,8 +6,8 @@
 --   line 2, where, in gold ("Fossoyeuse");
 --   line 3, how far and how long ("550 m · 1:10": the walk left along the path when there is one,
 --   the time from your speed's moving average, hidden while you stand still);
---   line 4, muted, the whole way when it has several legs ("Pierre de foyer → vol jusqu'à Kargath →
---   300 m à pied").
+--   line 4, muted, the rest of the way when it has several legs ("Puis vol jusqu'à Kargath →
+--   300 m jusqu'à Tabetha": after a teleport, "Puis 690 m jusqu'à Dran Droffers").
 -- Lines wrap and the HUD grows with them: nothing is cut. The whole route, with the full names, is
 -- in the HUD's tooltip. While the flight map is open a button takes the planned flight.
 --
@@ -60,6 +60,8 @@ ns.AddEnglish({
     ["Clic : utiliser %s"] = "Click: use %s",
     ["La téléportation attend la fin du combat."] = "The teleport waits for the end of the fight.",
     ["En vol vers %s"] = "Flying to %s",
+    -- the itinerary line comes after the leg under way: "Puis 690 m jusqu'à Dran Droffers"
+    ["puis %s"] = "then %s",
 })
 
 local arrow, teleport, demo
@@ -384,6 +386,7 @@ local function Draw(self, now, combat)
     local changed = false
     local function T(fs, t) if SetText(fs, t) then changed = true end end
     local what, where, dist, route = "", "", "", ""
+    local told             -- a leg already said on line 2 (the ride after a flight)
     local button = nil
     self.turn = false
     self.arrived = now.arrived and true or false
@@ -428,6 +431,16 @@ local function Draw(self, now, combat)
             -- time left from the flight's own estimate
             what = string.format(L("En vol vers %s"), place ~= "" and place or "?")
             where = legs and legs[2] and GPS.DescribeNext(legs[2]) or ""
+            -- a ride after the landing: line 2 says how far and to whom ("Puis 1,2 km jusqu'à
+            -- Tabetha"), and the itinerary line does not tell it again
+            if legs and legs[2] and legs[2].kind == "ride" and GPS.Itinerary then
+                local okI, items = pcall(GPS.Itinerary, { leg, legs[2] })
+                local it = okI and type(items) == "table" and items[2]
+                if it and type(it.text) == "string" and it.text ~= "" then
+                    where = GPS.UpperFirst(string.format(L("puis %s"), it.text))
+                    told = legs[2]
+                end
+            end
             if type(leg.seconds) == "number" and flyStart then
                 dist = S.Hex(C.muted) .. Duration(math.max(0, leg.seconds - (Clock() - flyStart))) .. "|r"
             end
@@ -479,16 +492,16 @@ local function Draw(self, now, combat)
         end
     end
 
-    -- the rest of the way in one muted line ("Vol jusqu'à Kargath → 300 m à pied"), when it has more
-    -- than one leg and you are not there yet: the leg under way is lines 1-3 already (its walk measured
-    -- along the trail there), so it is not told twice
+    -- the rest of the way in one muted line ("Puis vol jusqu'à Kargath → 300 m jusqu'à Tabetha"), when
+    -- it has more than one leg and you are not there yet: the leg under way is lines 1-3 already (its
+    -- walk measured along the trail there), so it is not told twice; "puis": it comes after that leg
     if not now.arrived and legs and n > 1 and GPS.Itinerary then
         local okR, items = pcall(GPS.Itinerary, legs)
         if okR and type(items) == "table" then
             local parts = {}
             for _, it in ipairs(items) do
-                if it.leg ~= leg and type(it.text) == "string" and it.text ~= "" then
-                    parts[#parts + 1] = #parts == 0 and GPS.UpperFirst(it.text) or it.text
+                if it.leg ~= leg and it.leg ~= told and type(it.text) == "string" and it.text ~= "" then
+                    parts[#parts + 1] = #parts == 0 and GPS.UpperFirst(string.format(L("puis %s"), it.text)) or it.text
                 end
             end
             if #parts > 0 then route = table.concat(parts, " \226\134\146 ") end

@@ -3,8 +3,12 @@ local ADDON, ns = ...
 local L, T = ns.L, ns.T_
 local Text, Tex, Button, Hex = ns.Text, ns.Tex, ns.Button, ns.Hex
 
--- 520: the design system's two-column width; the grip changes it between 420 and 640.
+-- 520: the design system's two-column width; the grip changes it between 420 and 760 (hud tier,
+-- UI width spec 4.7). W is the width drawn: the player's width (Wuser), widened when the header's
+-- title or the footer's buttons need more (French "Guide de quêtes", "Partager 4 quêtes").
 local W, PAD, MAXROWS = 520, 16, 30
+local WMIN, WMAX, Wuser = 420, 760, 520
+local NAV = {}   -- the navigation helpers (T-84..T-86) in one upvalue: Render is near Lua 5.1's limit
 local CARD_MAX = 2000                 -- the card's height cap (older saves); the screen cap applies first
 local W0, CARD0 = 520, 2000
 local LISTW, LISTROWS, LISTH = 272, 30, 28
@@ -379,6 +383,8 @@ end
 -- Chapters of the route: before / inside / after each dungeon (Engine.lua sets the phases).
 -- -> key, phase, dungeon of a step (nil when the engine has no phases)
 local PH_S = { before = "PH_BEFORE_S", inside = "PH_INSIDE_S", after = "PH_AFTER_S" }
+local TAB_PH = { "before", "inside", "after" }
+local TAB_K = { before = "TAB_BEFORE", inside = "TAB_INSIDE", after = "TAB_AFTER" }
 local function StepChapter(st)
   if not (st and ns.StepPhase) then return nil end
   local ph = ns.StepPhase(st)
@@ -574,6 +580,11 @@ local Render
 
 local function num(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) and v or nil end
 local function ScreenCap() return math.floor((num(UIParent:GetHeight()) or 768) * 0.80) end
+-- the widest the guide gets: 760, never more than 96 % of the screen (UI units)
+local function MaxW()
+  local uw = ns.ScreenSize and ns.ScreenSize() or num(UIParent:GetWidth()) or 1366
+  return math.max(WMIN, math.min(WMAX, math.floor(uw * 0.96)))
+end
 local function CardW() return W - 2 * PAD - 2 end      -- inside the card's 1 px edge
 local function TextW() return CardW() - 2 * CI end
 -- y of the content under the header, with or without the progress row (24) and bar (4)
@@ -837,8 +848,13 @@ local function BuildList()
     ns.ClampLabel(row.hdr, nil, row)
     l.rows[r] = row
   end
+  -- at the bottom: "Start the route over" (/wlh reset), a second click within 4 s confirms (T-84)
+  l.restart = LabelBtn(l, L.M_RESTART, 24, "secondary", function() if ns.ResetRoute then ns.ResetRoute() end end,
+    function() return { L.M_RESTART, L.TT_RESTART, L.RESTART_CLICK } end)
+  if l.restart.SetConfirm then l.restart:SetConfirm(L.RESTART_CONFIRM) end
+  l.restart:SetPoint("BOTTOMLEFT", 12, 8); l.restart:SetWidth(LISTW - 24)
   -- more steps than rows: how many are above / below (the wheel scrolls)
-  l.hint = Text(l, ns.F.foot, T.muted); l.hint:SetPoint("BOTTOMLEFT", 16, 8); l.hint:SetPoint("BOTTOMRIGHT", -12, 8)
+  l.hint = Text(l, ns.F.foot, T.muted); l.hint:SetPoint("BOTTOMLEFT", 16, 8 + 24 + 6); l.hint:SetPoint("BOTTOMRIGHT", -12, 8 + 24 + 6)
   l.hint:SetJustifyV("MIDDLE"); l.hint:Hide()
   ns.ClampLabel(l.hint, nil, l)
   l:EnableMouseWheel(true)
@@ -921,7 +937,8 @@ local function RenderList(log)
   local entries, pos = ListEntries(log)
   l.nEntries = #entries
   -- as many rows as entries, up to what the screen holds (at least 10); the wheel scrolls the rest
-  local avail = math.max(10, math.floor((ScreenCap() - (HEADER + 1 + 4) - 8 - 20) / LISTH))
+  -- (32: "Start the route over" at the foot)
+  local avail = math.max(10, math.floor((ScreenCap() - (HEADER + 1 + 4) - 8 - 20 - 32) / LISTH))
   l.visible = math.max(1, math.min(avail, LISTROWS, #entries))
   local max = math.max(0, #entries - l.visible)
   -- the step on screen stays in the list when it changes (done steps above stay reachable with the wheel)
@@ -946,7 +963,8 @@ local function RenderList(log)
   local doneCount = 0
   for k = 1, #steps do if IsStepDone(log, k) then doneCount = doneCount + 1 end end
   l.title:SetText(L.STEPS_N:format(doneCount, #steps))
-  l:SetHeight(HEADER + 1 + 4 + l.visible * LISTH + (l.hint:IsShown() and 20 or 0) + 8)
+  l:SetHeight(HEADER + 1 + 4 + l.visible * LISTH + (l.hint:IsShown() and 20 or 0) + 8 + 24 + 8)
+  if not l.restart.armed then l.restart:SetText(L.M_RESTART) end
   local viewKey = StepChapter(steps[f.view or 0])
   for r, row in ipairs(l.rows) do
     local e = entries[l.offset + r]
@@ -1331,7 +1349,9 @@ local function DistText(m, x, y)
   if not okD then return nil end
   if far then return L.ARROW_FAR end
   if type(yd) ~= "number" or (issecretvalue and issecretvalue(yd)) then return nil end
-  local GPS = ns.WP and ns.WP.GPS
+  -- the GPS's own format (meters or yards, as set on the GPS page); WP lives on the Writs side
+  local WP = (ns.Writs and ns.Writs.WP) or ns.WP
+  local GPS = WP and WP.GPS
   if GPS and GPS.Distance then
     local okG, t = pcall(GPS.Distance, yd)
     if okG and type(t) == "string" then return t end
@@ -1344,6 +1364,23 @@ local function DistText(m, x, y)
   return L.YARDS:format(math.floor(m2 + 0.5))
 end
 ns.GuideDistText = DistText
+
+-- The travel sentence of a step: for another continent, the planned trip in short ("Zeppelin pour
+-- Orgrimmar, puis 1,2 km", GPS.TripSummary) when the GPS finds one; else the generic hint
+-- (TRAVEL_CONT / TRAVEL_FAR). nil when the step has no travel hint.
+local function TravelText(st, m, x, y)
+  if not (st and st.travel) then return nil end
+  if st.travel == "TRAVEL_CONT" and type(m) == "number" and type(x) == "number" and type(y) == "number" then
+    local WP = (ns.Writs and ns.Writs.WP) or ns.WP
+    local GPS = WP and WP.GPS
+    if GPS and GPS.TripSummary then
+      local ok, t = pcall(GPS.TripSummary, m, x, y)
+      if ok and type(t) == "string" and t ~= "" then return t end
+    end
+  end
+  return L[st.travel]
+end
+ns.GuideTravelText = TravelText
 
 -- "Shadowforge Surveyor, Shadowforge Ruffian, Shadowforge Digger (8 %)" or "A 8 % · B 3 %", 3 names
 local function DropsText(o)
@@ -1365,6 +1402,78 @@ local function DropsText(o)
   if same and p0 and p0 > 0 and p0 < 100 then t = t .. " (" .. p0 .. " %)" end
   return L.TT_DROPS:format(t)
 end
+
+-- "Élite" / "Non élite" for the mobs of an objective done outside a dungeon (ns.NPC_ELITE, baked from
+-- LibForeverData's NPC rank in Engine.lua); nil when the objective is inside or no mob is known.
+local function EliteMark(o)
+  local E = ns.NPC_ELITE
+  if not (E and o) or o.ins or o.unk then return nil end
+  local names = {}
+  if o.src and o.src[1] then for _, x in ipairs(o.src) do names[#names + 1] = x[1] end
+  elseif type(o.t) == "table" then for _, x in ipairs(o.t) do names[#names + 1] = x end end
+  local el, no = 0, 0
+  for _, nm in ipairs(names) do
+    local r = E[nm]
+    if r == 1 then el = el + 1 elseif r == 0 then no = no + 1 end
+  end
+  if el == 0 and no == 0 then return nil end
+  if no == 0 then return Hex(T.warn) .. L.CARD_ELITE .. "|r" end
+  if el == 0 then return L.CARD_NOELITE end
+  return Hex(T.warn) .. L.CARD_ELITE_SOME .. "|r"
+end
+ns.GuideEliteMark = EliteMark
+
+-- Why a step before the dungeon comes before it: the nearest later quest of its chain (p=) that is
+-- done in the same dungeon (a dungeon quest, or started / finished inside) -> its id, or false when
+-- nothing in the dungeon depends on it; nil when the question does not arise (no dungeon, or the
+-- quest is itself done inside).
+local succOf
+local function Successors()
+  if succOf then return succOf end
+  succOf = {}
+  for id, q2 in pairs(ns.Q or {}) do
+    if type(q2) == "table" and type(q2.p) == "table" then
+      for _, p in ipairs(q2.p) do
+        if type(p) == "number" then succOf[p] = succOf[p] or {}; table.insert(succOf[p], id) end
+      end
+    end
+  end
+  for _, l2 in pairs(succOf) do table.sort(l2) end
+  return succOf
+end
+local function InDungeon(q2, dk)
+  if not (q2 and q2.d) then return false end
+  local same = (q2.d == dk)
+  if not same and type(q2.ds) == "table" then for _, k in ipairs(q2.ds) do if k == dk then same = true end end end
+  if not same then return false end
+  return q2.role == "main" or (q2.f and q2.f.i == 1) or (q2.s and q2.s.i == 1) or false
+end
+local function BeforeReason(qid, dk)
+  local q = qid and ns.Q[qid]
+  dk = (q and q.d) or dk
+  if not (q and dk) then return nil end
+  if InDungeon(q, dk) then return nil end
+  -- its own objectives inside (or not placed: a boss, a mob of the dungeon): no "before" question
+  for _, o in ipairs(type(q.o) == "table" and q.o or {}) do if o.ins or o.unk then return nil end end
+  local S = Successors()
+  local seen, frontier = { [qid] = true }, { qid }
+  for _ = 1, 8 do
+    local nxt = {}
+    for _, id in ipairs(frontier) do
+      for _, c in ipairs(S[id] or {}) do
+        if not seen[c] then
+          seen[c] = true
+          if InDungeon(ns.Q[c], dk) then return c end
+          nxt[#nxt + 1] = c
+        end
+      end
+    end
+    if #nxt == 0 then break end
+    frontier = nxt
+  end
+  return false
+end
+ns.GuideBeforeReason = BeforeReason
 
 -- The name of an objective as the player reads it: ours (translated), else in French the game's own
 -- words when the quest is in the log and the game names the same objective.
@@ -1398,6 +1507,39 @@ local function ObjLine(nd, o, log, s)
   end
   return t, kind, nm
 end
+
+-- What is still to finish outside before entering a dungeon (T-85): the objectives of the open
+-- "before" steps of the check-list's dungeon ("Collier brisé 0/1"). gi: the check-list's step.
+-- -> lines, how many are needed (an optional one, BeforeReason false, does not hold you back)
+local function OutsideLeft(log, gi)
+  local steps = Steps()
+  local g = steps[gi]
+  local dk = g and g.gate
+  local out, req = {}, 0
+  if not (dk and ns.StepDungeon and ns.StepPhase) then return out, 0 end
+  local seen = {}
+  for i, st in ipairs(steps) do
+    if not st.gate and not st.split and not st.ins and ns.StepDungeon(st) == dk and ns.StepPhase(st) == "before"
+      and not IsStepDone(log, i) then
+      for _, nd in ipairs(st.acts or {}) do
+        local o = nd.kind == "o" and not nd.ins and (nd.oneObj or nd.obj) or nil
+        local k = o and (tostring(nd.q) .. ":" .. tostring(nd.oi or nd.sub or o.n))
+        if o and not seen[k] and not ns.NodeOK(log, nd) then
+          seen[k] = true
+          local nm = ObjName(nd, o, log, ns.State(log, nd.q)) or ns.QName(nd.q)
+          local a, b = ns.ObjCount(log, nd.q, o)
+          if not (a and b) then a, b = 0, (type(o.c) == "number" and o.c > 0) and o.c or 1 end
+          local opt = BeforeReason(nd.q, dk) == false
+          if not opt then req = req + 1 end
+          out[#out + 1] = nm .. " " .. a .. "/" .. b .. (opt and (Hex(T.muted) .. SEP .. L.CL_OUT_OPT .. "|r") or "")
+        end
+      end
+    end
+  end
+  return out, req
+end
+ns.GuideOutsideLeft = OutsideLeft
+NAV.OutsideLeft = OutsideLeft
 
 -- an "Ensuite" line: the objective's own verb for an objective (as the card's title), else the kind
 local function LineText(a, log)
@@ -1482,6 +1624,9 @@ local function FocusModel(card, nd, log, dkey, st)
   end
   -- the drops of the objective in the title
   M.drops = o and DropsText(o) or nil
+  -- elite or not, for the mobs of an objective outside a dungeon
+  local em = o and EliteMark(o)
+  if em then M.drops = M.drops and (M.drops .. SEP .. em) or em end
 
   -- WHERE: the NPC who gives or takes the quest, the zone, the distance
   local m, x, y = NodePoint(nd)
@@ -1508,7 +1653,7 @@ local function FocusModel(card, nd, log, dkey, st)
   else
     M.where = M.placeBase ~= "" and M.placeBase or nil
   end
-  M.travel = st and st.travel and L[st.travel] or nil
+  M.travel = TravelText(st, m, x, y)
 
   -- WHY: one muted line, the quest then the chain. When the title already names the quest (a
   -- turn-in, "Faire « X »"), the line keeps the fact (a dungeon quest) and not the name again.
@@ -1558,6 +1703,12 @@ local function FocusModel(card, nd, log, dkey, st)
     M.why[#M.why + 1] = Hex(T.warn) .. L.CARD_NOTREADY .. "|r"
   end
   if nd.unknown and src ~= "log" then M.why[#M.why + 1] = Hex(T.warn) .. L.TRAVEL_UNK .. "|r" end
+  -- a step before the dungeon: why now (its chain goes on inside) or that it is optional
+  if (nd.pre or q.role == "pre") and nd.q then
+    local okB, nx = pcall(BeforeReason, nd.q, nd.d)
+    if okB and nx then M.why[#M.why + 1] = mt .. L.CARD_BEFORE_WHY:format(ns.QName(nx)) .. "|r"
+    elseif okB and nx == false then M.why[#M.why + 1] = mt .. L.CARD_BEFORE_OPT .. "|r" end
+  end
   -- the NPC who gives or takes the quest walks along a path (Writs/Patrol.lua): his point on the
   -- map is one spot of it, the card says so (warn: he may not stand where the arrow points)
   do
@@ -1959,12 +2110,30 @@ end
 -- =====================================================================
 --  Build
 -- =====================================================================
+-- A saved position we can use: two anchor names and two plain numbers (an old or broken one is
+-- dropped, and the window opens at its first place again).
+local function SavedPos(pos)
+  if type(pos) ~= "table" or type(pos[1]) ~= "string" or type(pos[2]) ~= "string" then return nil end
+  local x, y = pos[3], pos[4]
+  if type(x) ~= "number" or type(y) ~= "number" or x ~= x or y ~= y or x == math.huge or x == -math.huge
+    or y == math.huge or y == -math.huge then return nil end
+  return pos
+end
+ns.GuideSavedPos = SavedPos
+-- The first place of the guide (no saved position): left of the screen's centre, its right edge
+-- 60 px from the middle and its top a little under the top of the screen, never on the right
+-- where the quest tracker and the minimap are. The step list stays closed until you open it.
+local function FirstPlace()
+  f:ClearAllPoints(); f:SetPoint("TOPRIGHT", UIParent, "TOP", -60, -140)
+end
+ns.GuideFirstPlace = function() if f then FirstPlace() end end
+
 local function Build()
   f = CreateFrame("Frame", "WLDTFrame", UIParent)
   f.wlOwned = true
   f:SetSize(W, 300); f:SetFrameStrata("MEDIUM")
-  local pos = WLDTDB.pos
-  if pos then f:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4]) else f:SetPoint("RIGHT", -60, 40) end
+  local pos = SavedPos(WLDTDB.pos)
+  if pos then f:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4]) else WLDTDB.pos = nil; FirstPlace() end
   f:SetMovable(true); f:EnableMouse(true); f:SetClampedToScreen(true)
   ns.Flat(f, T.bg, T.cardEdge)
   f:SetScript("OnMouseDown", function(self) self:Raise() end)
@@ -2064,6 +2233,45 @@ local function Build()
   bar.bg = Tex(bar, "BACKGROUND", T.divider); bar.bg:SetAllPoints()
   bar:SetMinMaxValues(0, 1)
   f.bar = bar
+
+  -- the route's three parts under the bar (T-86): "Outside 2/14 · In the dungeon 0/9 · After 0/3";
+  -- a click shows the part's first open step (its first step once all are done)
+  f.tabs = CreateFrame("Frame", nil, f); f.tabs:SetHeight(24); f.tabs.btn = {}
+  for k, ph in ipairs(TAB_PH) do
+    local b = CreateFrame("Button", nil, f.tabs)
+    b.ph = ph
+    b.sel = Tex(b, "BACKGROUND", T.selFill); b.sel:SetAllPoints(); b.sel:Hide()
+    b.hl = Tex(b, "HIGHLIGHT", T.hoverFill); b.hl:SetAllPoints()
+    b.line = Tex(b, "ARTWORK", T.accentSoft); b.line:SetPoint("BOTTOMLEFT"); b.line:SetPoint("BOTTOMRIGHT"); b.line:SetHeight(2); b.line:Hide()
+    b.label = Text(b, ns.F.label, T.text); b.label:SetPoint("LEFT", 6, 0); b.label:SetPoint("RIGHT", -6, 0)
+    b.label:SetJustifyH("CENTER"); b.label:SetJustifyV("MIDDLE")
+    ns.ClampLabel(b.label, nil, b)
+    b:SetScript("OnClick", function(self) if self.go then ns.GoTo(self.go) end end)
+    b:SetScript("OnEnter", function(self)
+      local c = self.c or { done = 0, total = 0 }
+      ns.ShowTip(self, { L["TAB_TT_" .. self.ph:upper()], L.CH_PROGRESS:format(c.done, c.total), L.TT_CHAPTER_CLICK })
+    end)
+    b:SetScript("OnLeave", ns.HideTip)
+    f.tabs.btn[k] = b
+  end
+  f.tabs:Hide()
+
+  -- looking at another step than the current one (T-86): one line says so and leads back; looking
+  -- never moves the current step nor marks anything
+  local vb = CreateFrame("Button", nil, f)
+  vb:SetHeight(28)
+  vb.bg = Tex(vb, "BACKGROUND", T.cardFill); vb.bg:SetAllPoints()
+  vb.tint = Tex(vb, "BACKGROUND", { T.info[1], T.info[2], T.info[3], 0.10 }); vb.tint:SetAllPoints()
+  vb.edge = ns.Outline(vb, T.info, 0.4)
+  vb.hl = Tex(vb, "HIGHLIGHT", T.hoverFill); vb.hl:SetAllPoints()
+  vb.icon = ns.Icon(vb, "chevron_left", 14, "ARTWORK", T.info); vb.icon:SetPoint("LEFT", 10, 0)
+  vb.text = Text(vb, ns.F.label, T.fg); vb.text:SetPoint("LEFT", 30, 0); vb.text:SetPoint("RIGHT", -10, 0); vb.text:SetJustifyV("MIDDLE")
+  ns.ClampLabel(vb.text, nil, vb)
+  vb:SetScript("OnClick", function() GoBack() end)
+  vb:SetScript("OnEnter", function(self) ns.ShowTip(self, { self.text:GetText() or "", L.TT_VIEW }) end)
+  vb:SetScript("OnLeave", ns.HideTip)
+  vb:Hide()
+  f.viewBand = vb
 
   -- inside a dungeon that is not in the route: one click adds it (Main.lua sets ns.instOffer)
   f.instBtn = LabelBtn(f, "", 28, "secondary", function()
@@ -2202,7 +2410,11 @@ local function Build()
   f.next:SetPoint("LEFT", f.prev, "RIGHT", 4, 0)
   -- "Checklist": straight to the before-entering check of the dungeon on screen (quests to take, key).
   -- Its icon tells the state (check = ready, warning = something first); its tooltip says it in words.
-  f.readyBtn = LabelBtn(foot, L.B_READY, 28, "secondary", function() if ns.GoReady then ns.GoReady() end end, function()
+  -- On the check-list itself it is pressed and says "Close the checklist": back to the current step.
+  f.readyBtn = LabelBtn(foot, L.B_READY, 28, "secondary", function()
+    if f.readyOn then ns.CloseReady() elseif ns.GoReady then ns.GoReady() end
+  end, function()
+    if f.readyOn then return { L.B_READY_CLOSE, L.TT_READY_CLOSE } end
     local t = { L.B_READY_T, L.TT_READY }
     if f.readyTip then table.insert(t, f.readyTip) end
     table.insert(t, L.TT_READY_CLICK)
@@ -2210,6 +2422,8 @@ local function Build()
   end)
   if f.readyBtn.SetIcon then f.readyBtn:SetIcon("check") end
   f.readyBtn:SetPoint("RIGHT", f.moreBtn, "LEFT", -4, 0)
+  f.readyBtn.onFill = Tex(f.readyBtn, "BORDER", T.selFill); f.readyBtn.onFill:SetAllPoints(); f.readyBtn.onFill:Hide()
+  f.readyBtn.onEdge = ns.Outline(f.readyBtn, T.accentSoft, 0, "OVERLAY")
 
   -- the Actions menu: everything that used to be a row of small buttons. Toggles show a check.
   local menu = CreateFrame("Frame", nil, f)
@@ -2227,10 +2441,10 @@ local function Build()
     b.press = Tex(b, "ARTWORK", T.pressFill); b.press:SetAllPoints(); b.press:Hide()
     b.check = ns.Icon(b, "check", 12, "ARTWORK", T.accentSoft); b.check:SetPoint("LEFT", 8, 0); b.check:Hide()
     b.label = Text(b, ns.F.label, T.fg); b.label:SetPoint("LEFT", 26, 0); b.label:SetPoint("RIGHT", -8, 0); b.label:SetJustifyV("MIDDLE")
-    b:SetScript("OnClick", function(...) onClick(...); menu:Hide() end)
+    b:SetScript("OnClick", function(...) if onClick(...) ~= "keep" then menu:Hide() end end)
     b:SetScript("OnMouseDown", function(self) if self:IsEnabled() ~= false then self.press:Show() end end)
     b:SetScript("OnMouseUp", function(self) self.press:Hide() end)
-    b:SetScript("OnEnter", function(self) ns.ShowTip(self, tip()) end)
+    b:SetScript("OnEnter", function(self) ns.ShowTip(self, tip(self)) end)
     b:SetScript("OnLeave", ns.HideTip)
     b:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
     b:SetScript("OnDisable", function(self) self:SetAlpha(T.disabledAlpha) end)
@@ -2240,14 +2454,50 @@ local function Build()
     menu:SetHeight(8 + #items * 24)
     return b
   end
-  -- four entries only (T-74): sharing is automatic (Writs/GuideQuests.lua) and in the inside band,
+  -- the entries one under the other, the ones switched off (wlOff) left out
+  function menu.Layout()
+    local n = 0
+    for _, b in ipairs(items) do
+      if not b.wlOff then
+        local y = -4 - n * 24
+        b:ClearAllPoints(); b:SetPoint("TOPLEFT", 4, y); b:SetPoint("TOPRIGHT", -4, y)
+        n = n + 1
+      end
+    end
+    menu:SetHeight(8 + n * 24)
+  end
+  -- short on purpose (T-74; the key bindings entry added for the "Target and items" keys): sharing is automatic (Writs/GuideQuests.lua) and in the inside band,
   -- the points at each step are in Settings > Quests & dungeons, the step list has its "Steps"
   -- button, the tracker is in Settings and /wlh tracker; /wlh share, list, recalc, arrow, boss stay.
   f.done = Item(function()
     local st = Steps()[f.view]; if not st then return end
     SetManual(st, not Manual(st)); ns.Refresh()
   end, function() return { L.M_SKIP, L.TT_FDONE } end)
-  f.recalc = Item(function() ns.Recalc() end, function() return { L.M_RECALC, L.RECALC_TT } end)
+  -- "Start the route over" (T-84, = /wlh reset) takes the place of "Rebuild the route from here":
+  -- the route is planned again by itself when a quest changes, and /wlh recalc stays. A second
+  -- click within 4 s confirms; the menu stays open in between.
+  f.restartItem = Item(function(self)
+    if self.armToken then
+      self.armToken = nil; self.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3])
+      if ns.ResetRoute then ns.ResetRoute() end
+      return
+    end
+    local token = {}
+    self.armToken = token
+    self.label:SetText(L.RESTART_CONFIRM); self.label:SetTextColor(T.warn[1], T.warn[2], T.warn[3])
+    if C_Timer and C_Timer.After then
+      C_Timer.After(4, function()
+        if self.armToken == token then self.armToken = nil; self.label:SetText(L.M_RESTART); self.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3]) end
+      end)
+    end
+    return "keep"
+  end, function() return { L.M_RESTART, L.TT_RESTART, L.RESTART_CLICK } end)
+  f.restartItem.label:SetText(L.M_RESTART)
+  f.recalc = f.restartItem   -- its older name
+  menu:HookScript("OnHide", function()
+    local it = f.restartItem
+    if it.armToken then it.armToken = nil; it.label:SetText(L.M_RESTART); it.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3]) end
+  end)
   f.arrowBtn = Item(function() ns.ToggleArrow(); Render() end, function() return { L.M_ARROW, L.TT_FARROW } end)
   -- the dungeon's bosses: the bosses and rares panel (Bosses.lua; its header opens the map and the
   -- installed dungeon journal), else, with no dungeon for it, the dungeon journal itself
@@ -2256,6 +2506,24 @@ local function Build()
     if ns.ToggleBosses and dk then ns.ToggleBosses(dk)
     elseif ns.OpenJournal and ns.JournalAvailable and ns.JournalAvailable() then ns.OpenJournal() end
   end, function() return { L.M_BOSSES, (ns.BossesShown and ns.BossesShown()) and L.BOSS_MENU_HIDE or L.BOSS_MENU_CLICK } end)
+  -- the game's key bindings (Main.lua): where the target / item / step keys are set
+  f.keysItem = Item(function() if ns.OpenKeyBindings then ns.OpenKeyBindings() end end, function() return { L.M_KEYS, L.TT_KEYS } end)
+  f.keysItem.label:SetText(L.M_KEYS)
+  -- "See where Nyx is" (T-86): a group member with WL Helper shares the step they are at (Sync.lua);
+  -- the step opens in your guide to look at, your own current step stays
+  f.memberItems = {}
+  for k = 1, 4 do
+    local it = Item(function(self) if self.go then ns.GoTo(self.go) end end, function(self)
+      local st = self and self.go and Steps()[self.go]
+      local t = { self and self.label:GetText() or "", L.TT_MEMBER }
+      if st then table.insert(t, 2, L.MEMBER_AT:format(self.go, StepTitle(st))) end
+      return t
+    end)
+    ns.ClampLabel(it.label, nil, it)   -- one line, whatever the name
+    it.wlOff = true; it:Hide()
+    f.memberItems[k] = it
+  end
+  menu.Layout()
   f:HookScript("OnHide", function() menu:Hide() end)
   -- closes once the mouse has been away from it (and its button) for a moment
   menu:SetScript("OnUpdate", function(self, dt)
@@ -2283,13 +2551,13 @@ local function Build()
     self:SetScript("OnUpdate", function(me)
       local x = GetCursorPosition()
       x = x / sc
-      local nw = math.floor(math.max(420, math.min(640, me.start[2] + (x - me.start[1]))))
-      if nw ~= W then ns.Relayout(nw); Render() end
+      local nw = math.floor(math.max(WMIN, math.min(MaxW(), me.start[2] + (x - me.start[1]))))
+      if nw ~= Wuser then ns.Relayout(nw); Render() end
     end)
   end)
   grip:SetScript("OnMouseUp", function(self)
     self:SetScript("OnUpdate", nil)
-    WLDTDB.size = { W }   -- the width only: the height always follows the content
+    WLDTDB.size = { Wuser }   -- the width only: the height always follows the content
   end)
   grip:SetScript("OnDoubleClick", function()
     ns.Relayout(W0, CARD0); WLDTDB.size = nil; Render()
@@ -2304,7 +2572,7 @@ local function Build()
   BuildList()
   f:SetScript("OnShow", function() ns.Refresh() end)
   f.mini = WLDTDB.mini
-  f.list:SetShown(WLDTDB.list ~= false)
+  f.list:SetShown(WLDTDB.list == true)
   -- a new frame is visible: closed at first; Main.lua reopens it at login if it was open before.
   -- Every way of opening or closing it (close, Escape, /wlh, home, minimap) is remembered here,
   -- except when the Dungeons module is switched off (ns.quietHide), which is not your choice.
@@ -2326,8 +2594,11 @@ ns.BuildMain = Build
 
 -- Width of the guide (the grip in the bottom-right corner). The height follows the content;
 -- nh caps the card's height when given (the reset only; saves keep the width alone).
+-- the width drawn and the player's own width (tests, the debug command)
+function ns.GuideWidth() return W, Wuser end
 function ns.Relayout(nw, nh)
-  W = math.max(420, math.min(640, nw or W0))
+  Wuser = math.max(WMIN, math.min(MaxW(), nw or W0))
+  W = Wuser
   if nh then CARD_MAX = math.max(160, nh) end
   if not f then return end
   f:SetWidth(W)
@@ -2498,6 +2769,15 @@ end
 -- (check = ready, warning = quests to take or no key); its tooltip says it in words.
 function ns.RenderReadyBtn(log)
   local b = f.readyBtn
+  -- the check-list on screen: the button is pressed and closes it (T-85)
+  local cur = Steps()[f.view or 0]
+  f.readyOn = (cur and cur.gate) and true or false
+  if b.onFill then b.onFill:SetShown(f.readyOn); b.onEdge(T.accentSoft, f.readyOn and 0.9 or 0) end
+  if f.readyOn then
+    b:SetText(L.B_READY_CLOSE); if b.SetIcon then b:SetIcon(nil) end
+    b:SetEnabled(true); f.readyHas = true; f.readyTip = nil
+    return
+  end
   b:SetText(L.B_READY)
   local ti = ReadyTarget()
   local st = ti and Steps()[ti]
@@ -2511,10 +2791,14 @@ function ns.RenderReadyBtn(log)
   end
   b:SetEnabled(true)
   local miss, _, keyMissing = ReadyState(log, st)
+  local _, outReq = OutsideLeft(log, ti)
   local dn = ns.DName(st.gate) or ""
-  if miss == 0 and not keyMissing then
+  if miss == 0 and not keyMissing and outReq == 0 then
     if b.SetIcon then b:SetIcon("check") end
     f.readyTip = { L.TT_READY_OK:format(dn), T.ok[1], T.ok[2], T.ok[3] }
+  elseif miss == 0 and outReq > 0 then
+    if b.SetIcon then b:SetIcon("warning") end
+    f.readyTip = { ns.Plural(outReq, "TT_READY_OUT1", "TT_READY_OUT", dn, outReq), T.warn[1], T.warn[2], T.warn[3] }
   elseif miss == 0 then
     if b.SetIcon then b:SetIcon("warning") end
     f.readyTip = { L.TT_READY_KEY:format(dn), T.warn[1], T.warn[2], T.warn[3] }
@@ -2534,6 +2818,14 @@ local function LayoutFoot(full, centred)
     SetShareButton(f.shareFoot, ShareN(), true)
     f.shareFoot:ClearAllPoints(); f.shareFoot:SetPoint("TOPRIGHT", f.foot, "TOPRIGHT", 0, 0); f.shareFoot:Show()
   else f.shareFoot:Hide() end
+  -- the big button and "Share 4 quests" side by side: the window widens when they do not fit
+  f.wlFootNeed = nil
+  if share then
+    f.go:SetWidth(0)
+    local need = (num(f.go:GetWidth()) or 120) + 8 + (num(f.shareFoot:GetWidth()) or 150)
+    -- kept even when it fits: the next render would otherwise shrink the window back
+    f.wlFootNeed = math.ceil(need + 2 * PAD)
+  end
   if centred then
     f.go:SetPoint("TOP", f.foot, "TOP", 0, 0); f.go:SetWidth(0)
   else
@@ -2595,10 +2887,105 @@ local function CentredBlock(card, icon, color, title, text)
   return y + 24
 end
 
+-- done / total per part of the route (every dungeon's part together) and the step a tab opens:
+-- the part's first open step, else its first step. nil when the route has no parts (class quests).
+local function PartCounts(log)
+  local out, any = {}, false
+  for _, ph in ipairs(TAB_PH) do out[ph] = { done = 0, total = 0 } end
+  for i, st in ipairs(Steps()) do
+    local key, ph = StepChapter(st)
+    local c = key and out[ph]
+    if c then
+      any = true
+      c.total = c.total + 1
+      c.first = c.first or i
+      if IsStepDone(log, i) then c.done = c.done + 1 elseif not c.go then c.go = i end
+    end
+  end
+  for _, ph in ipairs(TAB_PH) do local c = out[ph]; c.go = c.go or c.first end
+  return any and out or nil
+end
+ns.GuidePartCounts = PartCounts
+
+-- the tabs at y (from the window's top) -> their height (0: hidden)
+local function RenderTabs(log, y)
+  local tabs = f.tabs
+  local parts = PartCounts(log)
+  if not parts then tabs:Hide() return 0 end
+  local w, gap = W - 2 * PAD, 4
+  local colW = math.floor((w - 2 * gap) / 3)
+  local _, viewPh = StepChapter(Steps()[f.view or 0])
+  tabs:ClearAllPoints(); tabs:SetPoint("TOPLEFT", PAD, -y); tabs:SetPoint("TOPRIGHT", -PAD, -y); tabs:Show()
+  for k, ph in ipairs(TAB_PH) do
+    local b, c = tabs.btn[k], parts[ph]
+    b:ClearAllPoints(); b:SetPoint("TOPLEFT", tabs, "TOPLEFT", (k - 1) * (colW + gap), 0)
+    b:SetSize(k == 3 and (w - 2 * (colW + gap)) or colW, 24)
+    b.go, b.c = c.go, c
+    local nc = (c.total > 0 and c.done == c.total) and T.ok or T.muted
+    b.label:SetText(L[TAB_K[ph]] .. " " .. Hex(nc) .. c.done .. "/" .. c.total .. "|r")
+    b.on = (ph == viewPh)
+    b.sel:SetShown(b.on); b.line:SetShown(b.on)
+    local tc = b.on and T.fg or T.text
+    b.label:SetTextColor(tc[1], tc[2], tc[3])
+    b:SetEnabled(c.total > 0); b:SetAlpha(c.total > 0 and 1 or T.disabledAlpha)
+    b:Show()
+  end
+  return 24
+end
+
+-- the width the header needs: back button, the whole title, then its buttons
+local function HeaderNeed()
+  local h = f.header
+  local w = 6 + 28 + 6 + (ns.TextWidth(h.title, L.DUNGEONS) or 0) + 8
+  for _, b in ipairs({ f.ovBtn, f.pickBtn, f.gearBtn, f.miniBtn, f.closeBtn }) do
+    if b and b:IsShown() then w = w + (num(b:GetWidth()) or 0) + 6 end
+  end
+  return math.ceil(w + 8)
+end
+ns.GuideHeaderNeed = function() return f and HeaderNeed() or 0 end
+NAV.RenderTabs = RenderTabs
+-- the width the three parts tabs need: their longest name with a two-digit count, each
+local function TabsNeed()
+  local b1 = f.tabs and f.tabs:IsShown() and f.tabs.btn[1]
+  if not b1 then return 0 end
+  local mw = 0
+  for _, ph in ipairs(TAB_PH) do mw = math.max(mw, ns.TextWidth(b1.label, L[TAB_K[ph]] .. " 88/88") or 0) end
+  return 3 * (mw + 12) + 2 * 4 + 2 * PAD
+end
+-- the width drawn: the player's width, or wider when the title, the tabs or the footer need it
+-- (max 760, 96 % of the screen)
+function NAV.Need()
+  return math.max(WMIN, math.min(MaxW(), math.max(Wuser, HeaderNeed(), TabsNeed(), f.wlFootNeed or 0)))
+end
+function NAV.FitWidth()
+  W = NAV.Need()
+  return W
+end
+
+-- the group members whose current step is in your route: { { name, i } }
+function ns.MemberSteps()
+  local out = {}
+  if not (ns.partyStep and ns.GroupMembers) then return out end
+  local steps = Steps()
+  for _, m in ipairs(ns.GroupMembers()) do
+    local key = ns.partyStep[m.name]
+    if key then
+      for i, st in ipairs(steps) do if st.key == key then out[#out + 1] = { name = m.name, i = i } break end end
+    end
+  end
+  return out
+end
+
 local RenderNow
 -- every render is one pass: the step states it reads 4-5 times (progress, chapters, list, band)
 -- are asked of the quest log once (a GoTo, the wheel, the width grip render outside a refresh)
-Render = function() if ns.InPass then return ns.InPass(RenderNow) end return RenderNow() end
+local function RenderPass() if ns.InPass then return ns.InPass(RenderNow) end return RenderNow() end
+Render = function()
+  RenderPass()
+  -- the footer ("Share 4 quests") or the tabs measured during the pass need more width than was
+  -- drawn: once more at that width (never more: the second pass draws at least that wide)
+  if f and NAV.Need and NAV.Need() > W then RenderPass() end
+end
 RenderNow = function()
   if not f then return end
   f.pending = false
@@ -2614,6 +3001,8 @@ RenderNow = function()
   if f.ovBtn then f.ovBtn:SetShown(anyRoute and GuideDungeon() ~= nil) end
   h.sub:SetText(sub); f.LayoutTitle(sub ~= "")
   if f.miniBtn.SetIcon then f.miniBtn:SetIcon(f.mini and "plus" or "minus") end
+  -- the player's width, or wider when the title or the footer needs it (never above the max)
+  NAV.FitWidth()
   f:SetWidth(W)
   local card = f.card
   local TW = TextW()
@@ -2631,6 +3020,8 @@ RenderNow = function()
   -- inside: the card keeps a few lines per action (the full text is in each line's tooltip)
   f.compactIn = inKey ~= nil
   local TOP = TopBase(hasRoute)
+  local tabsH = (hasRoute and not f.mini) and NAV.RenderTabs(log, TOP) or 0
+  if tabsH > 0 then TOP = TOP + tabsH + 8 else f.tabs:Hide() end
   if offer then
     local nLeft = ns.InstLeft(offerKey)
     f.instBtn:SetText(ns.Plural(nLeft, "INST_ADD1", "INST_ADD", ns.DName(offerKey), nLeft))
@@ -2666,6 +3057,7 @@ RenderNow = function()
         for k2 in pairs(WLDTDB.sel) do WLDTDB.sel[k2] = nil end; WLDTDB.sel[kk] = true; ns.instOffer = nil; ns.instIn = kk; ns.StartGuide()
       end
     end
+    f.viewBand:Hide()
     local ch = CentredBlock(card, "portal", T.muted, title, text)
     for _, b in ipairs({ f.prev, f.next, f.moreBtn, f.readyBtn }) do b:SetEnabled(false) end
     f.readyTip = nil
@@ -2692,10 +3084,17 @@ RenderNow = function()
   -- (previous and the step list still show every step, done ones included)
   local finished = total > 0 and n == total and (st == nil)
   if not st and not finished then f.view = total; i = total; st = steps[i]; done = IsStepDone(log, i) end
+  -- looking at another step than the current one: the line that leads back (T-86)
+  if not f.mini and not finished and f.auto and i ~= f.auto then
+    local vb = f.viewBand
+    vb.text:SetText(L.VIEW_AT:format(i) .. Hex(T.muted) .. SEP .. "|r" .. (RouteFinished() and L.BACK_FIN or L.BACK_CUR))
+    vb:ClearAllPoints(); vb:SetPoint("TOPLEFT", PAD, -TOP); vb:SetPoint("TOPRIGHT", -PAD, -TOP); vb:Show()
+    TOP = TOP + 28 + 8
+  else f.viewBand:Hide() end
 
   if f.mini then
     f.menu:Hide()
-    f.holder:Hide(); f.foot:Hide(); f.prog:Hide(); f.list:Hide(); f.instBtn:Hide(); f.inBand:Hide()
+    f.holder:Hide(); f.foot:Hide(); f.prog:Hide(); f.list:Hide(); f.instBtn:Hide(); f.inBand:Hide(); f.tabs:Hide()
     if finished then f.miniText:SetText(Hex(T.ok) .. L.FIN_T .. "|r")
     else f.miniText:SetText(("%s%d.|r %s"):format(Hex(T.muted), i, StepTitle(st))) end
     f.miniRow:Show()
@@ -2707,7 +3106,7 @@ RenderNow = function()
   f.miniRow:Hide(); f.holder:Show(); f.foot:Show(); f.prog:Show()
   f.bar:ClearAllPoints()
   f.bar:SetPoint("TOPLEFT", PAD, -(HEADER + 1 + GAP + 24 + 6)); f.bar:SetPoint("TOPRIGHT", -PAD, -(HEADER + 1 + GAP + 24 + 6)); f.bar:SetHeight(4)
-  f.list:SetShown(WLDTDB.list ~= false)
+  f.list:SetShown(WLDTDB.list == true)
 
   if finished then
     f.progLabel:SetText(ns.Plural(#steps, "FIN_PROG1", "FIN_PROG", #steps)); f.progPct:SetText("")
@@ -2856,12 +3255,18 @@ RenderNow = function()
   -- every quest but no key: the banner says it, the key section then skips its own warning
   local readyNoKey, clMiss, clTotal = false, 0, 0
   local clDn = ns.DName(st.gate or st.ins) or ""
+  -- the objectives still to finish outside before entering (T-85): listed, and "Ready" waits for them
+  local outList, outReq = {}, 0
+  if st.gate then outList, outReq = NAV.OutsideLeft(log, i) end
   if isCL then
     local miss, tot, keyMissing = ReadyState(log, st)
     clMiss, clTotal = miss, tot
     local head, why, nxt, col, icon
-    if miss == 0 and not keyMissing then
+    if miss == 0 and not keyMissing and outReq == 0 then
       head, why, nxt, col, icon = L.CL_OK_H:format(clDn), L.CL_OK_T, L.CL_OK_NEXT, T.ok, "check"
+    elseif miss == 0 and outReq > 0 then
+      head = ns.Plural(outReq, "CL_OUT_H1", "CL_OUT_HN", outReq)
+      why, nxt, col, icon = L.CL_OUT_T:format(clDn), L.CL_OUT_NEXT, T.warn, "warning"
     elseif miss == 0 then
       readyNoKey = true
       head, why, nxt, col, icon = L.CL_KEY_H, L.CL_KEY_T:format(clDn), L.CL_KEY_NEXT, T.warn, "warning"
@@ -2880,7 +3285,8 @@ RenderNow = function()
   -- finished step looked at again needs none (its pill says "Faite", the big button goes back)
   Size(card.travel, ns.F.meta)
   if st.travel and not focusMode and not done then
-    card.travel:SetText(L[st.travel]); card.travel:SetTextColor(T.text[1], T.text[2], T.text[3])
+    local tl = st.loc
+    card.travel:SetText(TravelText(st, tl and tl.m, tl and tl.x, tl and tl.y) or ""); card.travel:SetTextColor(T.text[1], T.text[2], T.text[3])
   else card.travel:SetText("") end
   if card.travel:GetText() and card.travel:GetText() ~= "" then
     y = y + 8
@@ -2907,6 +3313,7 @@ RenderNow = function()
     -- the banner and the rows already count the quests: key / entrance / group under the rows
     -- a run with no quest: nothing to check, only the way in (and no quest to share)
     if st.run and clTotal == 0 then note[#note + 1] = { body = { L.RUN_GATE_N } } end
+    if #outList > 0 then after[#after + 1] = { h = L.CL_OUT, list = outList } end
     local kl = ns.KeyLines and ns.KeyLines(st.gate) or {}
     if #kl > 0 then
       local t, warn = {}, false
@@ -3202,9 +3609,20 @@ RenderNow = function()
   end
   f.done:SetEnabled(true)
   f.done.label:SetText(Manual(st) and L.M_UNSKIP or L.M_SKIP)
-  f.recalc.label:SetText(L.M_RECALC)
+  if not f.restartItem.armToken then f.restartItem.label:SetText(L.M_RESTART) end
+  local mi = 0
+  for _, m in ipairs(ns.MemberSteps()) do
+    local it = f.memberItems[mi + 1]
+    if not it then break end
+    mi = mi + 1
+    it.go, it.who = m.i, m.name
+    it.label:SetText(L.M_MEMBER:format(m.name)); it.wlOff = nil; it:Show()
+  end
+  for k = mi + 1, #f.memberItems do local it = f.memberItems[k]; it.wlOff = true; it.go = nil; it:Hide() end
+  f.menu.Layout()
   f.arrowBtn.label:SetText(L.M_ARROW); f.arrowBtn:SetOn(WLDTDB.arrow ~= false)
   f.bossItem.label:SetText(L.M_BOSSES)
+  if f.keysItem then f.keysItem.label:SetText(L.M_KEYS) end
   local bossDk = ns.instIn or GuideDungeon()
   f.bossItem:SetEnabled(((ns.ToggleBosses and bossDk) or (ns.JournalAvailable and ns.JournalAvailable())) and true or false)
   f.bossItem:SetOn(ns.BossesShown and ns.BossesShown())
@@ -3263,6 +3681,8 @@ function ns.Refresh(silent)
     f.auto = auto
     if follow then f.view = auto; ScrollTop() end
     if was and auto > was and not silent and not fin then ns.AnnounceStep(auto) end
+    -- the group sees where you are ("See where ... is", Sync.lua)
+    if ns.SyncStepChanged then ns.SyncStepChanged() end
   end
   if fin and not f.wasFin and not silent then
     ns.ClearPoints(); f.sig = nil
@@ -3336,6 +3756,14 @@ function ns.PinTopLeft()
   if not f or not f:GetLeft() then return end
   local s = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
   local x, y = f:GetLeft() * s, f:GetTop() * s
+  -- kept on screen (a position saved with another resolution or UI scale): the whole width when
+  -- it fits, and the header always
+  local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
+  if type(sw) == "number" and type(sh) == "number" and sw > 0 and sh > 0 then
+    local fw = (f:GetWidth() or W) * s
+    x = math.max(0, math.min(x, math.max(0, sw - fw)))
+    y = math.max(math.min(sh, HEADER * s), math.min(y, sh))
+  end
   f:ClearAllPoints(); f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / s, y / s)
   WLDTDB.pos = { "TOPLEFT", "BOTTOMLEFT", x / s, y / s }
 end
@@ -3346,6 +3774,59 @@ end
 -- =====================================================================
 local abar, abPending
 local AB_N, AB_S = 8, 30
+-- the bar's keys: WLDT_ITEM clicks the first item button (override binding owned by the bar, set
+-- out of combat); WLDT_TARGET (Main.lua) targets the step's target, shown on the first target button
+local abItemBtn, abKeySig, abKeyBusy
+local function BindKeys(cmd)
+  local out = {}
+  if type(GetBindingKey) ~= "function" then return out end
+  for _, k in ipairs({ GetBindingKey(cmd) }) do
+    if type(k) == "string" and k ~= "" then out[#out + 1] = k end
+  end
+  return out
+end
+-- "Key: F" or "No key: right-click to set one", for a command of Bindings.xml
+function ns.KeyTipLine(cmd)
+  local k = BindKeys(cmd)[1]
+  if not k then return L.KEY_NONE end
+  local t = type(GetBindingText) == "function" and GetBindingText(k, "KEY_") or nil
+  if type(t) ~= "string" or t == "" then t = k end
+  return L.KEY_IS:format(t)
+end
+function ns.ItemBindingButton() return abItemBtn end
+-- out of combat: right-click on a bar button whose key is not set opens the key bindings (its
+-- secure right-click then does nothing; with a key set it acts as before), and the item key
+-- follows the bar's first item button. Setting override bindings fires UPDATE_BINDINGS: only
+-- rebind when the button or the keys changed.
+function ns.RefreshActionKeys()
+  if not abar or abKeyBusy then return end
+  if InCombatLockdown() then abPending = true return end
+  for k = 1, AB_N do
+    local b = abar.btns[k]
+    local free = (b.keyCmd and b.action and BindKeys(b.keyCmd)[1] == nil) and true or false
+    if free ~= (b.kbRight or false) then
+      b.kbRight = free or nil
+      b:SetAttribute("*type2", free and "wlhnone" or nil)
+    end
+  end
+  if not (ClearOverrideBindings and SetOverrideBindingClick) then return end
+  local keys = abItemBtn and BindKeys("WLDT_ITEM") or {}
+  local sig = abItemBtn and (abItemBtn .. "|" .. table.concat(keys, " ")) or ""
+  if sig == abKeySig then return end
+  abKeyBusy = true
+  local ok, err = pcall(function()
+    ClearOverrideBindings(abar)
+    for _, key in ipairs(keys) do SetOverrideBindingClick(abar, false, key, abItemBtn, "LeftButton") end
+  end)
+  abKeyBusy = false
+  if ok then abKeySig = sig else error(err, 0) end
+end
+local function KeysRightClick(self, button, down)
+  if button ~= "RightButton" or down or not self.kbRight then return end
+  -- in combat the secure right-click does nothing: OpenKeyBindings opens nothing and says why
+  -- (KEYS_COMBAT), so the click is not silently lost
+  if ns.OpenKeyBindings then ns.OpenKeyBindings() end
+end
 -- where a target of the bar comes from: the first quest that names it (its NPC id, read live), and
 -- whether it is a world object (a chest, an herb, an urn: an objective "use the object")
 local function TargetSource(a, n, t)
@@ -3390,12 +3871,17 @@ local function BuildActionBar()
       if a.item then
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         if GameTooltip.SetItemByID then GameTooltip:SetItemByID(a.item) end
-        GameTooltip:AddLine(L.TT_USE, (T.hint or T.muted)[1], (T.hint or T.muted)[2], (T.hint or T.muted)[3]); GameTooltip:Show()
+        GameTooltip:AddLine(L.TT_USE, (T.hint or T.muted)[1], (T.hint or T.muted)[2], (T.hint or T.muted)[3])
+        if self.keyCmd then GameTooltip:AddLine(ns.KeyTipLine(self.keyCmd), (T.hint or T.muted)[1], (T.hint or T.muted)[2], (T.hint or T.muted)[3]) end
+        GameTooltip:Show()
       else
-        ns.ShowTip(self, { L.TT_TARGET, L.TT_TARGET2:format(table.concat(a.names, " / ")), L.TT_TARGET_CLICK })
+        local t = { L.TT_TARGET, L.TT_TARGET2:format(table.concat(a.names, " / ")), L.TT_TARGET_CLICK }
+        if self.keyCmd then t[#t + 1] = ns.KeyTipLine(self.keyCmd) end
+        ns.ShowTip(self, t)
       end
     end)
     b:SetScript("OnLeave", ns.HideTip)
+    b:SetScript("PostClick", KeysRightClick)
     b:Hide()
     abar.btns[k] = b
   end
@@ -3485,9 +3971,14 @@ function ns.UpdateActionBar()
     end
   end
   local labelW = ns.TextWidth(abar.label) + 8
+  local firstItem, firstTarget
+  abItemBtn = nil
   for k = 1, AB_N do
     local b, a = abar.btns[k], acts[k]
     b.action = a
+    b.keyCmd = nil
+    if a and a.item and not firstItem then firstItem = true; b.keyCmd = "WLDT_ITEM"; abItemBtn = "WLDTAction" .. k
+    elseif a and not a.item and not firstTarget then firstTarget = true; b.keyCmd = "WLDT_TARGET" end
     if a then
       if a.item then
         b:SetAttribute("type", "item"); b:SetAttribute("item", "item:" .. a.item); b:SetAttribute("macrotext", nil)
@@ -3513,7 +4004,8 @@ function ns.UpdateActionBar()
     abar:ClearAllPoints()
     abar:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", f:GetLeft(), f:GetTop() + 4)
     abar:Show()
-  else abar:Hide() end
+  else abar:Hide(); abItemBtn = nil end
+  ns.RefreshActionKeys()
 end
 function ns.ActionBarPending() return abPending end
 
@@ -3522,6 +4014,13 @@ function ns.ActionBarPending() return abPending end
 function ns.GoReady()
   local ti = ReadyTarget()
   if ti then ns.GoTo(ti) else ns.Print(L.NO_READY) end
+end
+-- "Close the checklist": back to the current step (the step after it when the check-list is the
+-- current step itself)
+function ns.CloseReady()
+  if not f then return end
+  if f.auto and f.auto ~= f.view then ns.GoTo(f.auto)
+  else ns.GoTo((f.view or 1) + 1) end
 end
 
 function ns.GuideStatus()

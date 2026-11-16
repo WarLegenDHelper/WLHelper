@@ -305,7 +305,15 @@ end)
 -- ---------------------------------------------------------------- the page
 -- In the Comptoir window (Writs/UI.lua gives the page, its scroll area and page:Fit): the Favor you
 -- have and your goal, one summary, then the plan and every crate as list rows, and two actions.
-local INSET, LIST_W = 16, 420 - 32
+-- The window is a workspace (wide): under 900 of list the page is one column of at most 720,
+-- centred; from 900, the plan and every crate side by side (two columns, the summary above both).
+local INSET, MAX_COL, WIDE, COL_GAP = 16, 720, 900, 24
+local LIST_W, COL_X = 388, 0   -- the page's column (Dims): its width and its x in the list
+local function Dims()
+    local lw = WP.ComptoirListW and WP.ComptoirListW() or 388
+    if lw >= WIDE then LIST_W, COL_X = lw, 0
+    else LIST_W = math.min(lw, MAX_COL); COL_X = math.floor((lw - LIST_W) / 2) end
+end
 
 local function num(v) return type(v) == "number" and not (root.IsSecret and root.IsSecret(v)) and v or nil end
 local function Height(fs, minH)
@@ -415,9 +423,14 @@ function WP.BuildFavor(p)
     ui.go:SetPoint("BOTTOMRIGHT", -INSET, 12)
 end
 
+function WP._FavorUI() return ui, LIST_W, COL_X end   -- test access
+
 function WP.RenderFavor()
     if not ui.page then return end
     local p = ui.page
+    Dims()
+    ui.now:ClearAllPoints(); ui.now:SetPoint("TOPLEFT", INSET + COL_X, -18)
+    ui.box:ClearAllPoints(); ui.box:SetPoint("TOPRIGHT", -(INSET + COL_X), -12)
     local now = WP.FavorNow()
     ui.now:SetText(string.format(L("Tu as %s Faveur"), Big(now or 0)))
     ui.now:SetWidth(math.max(60, LIST_W - 84 - 8 - 60 - 12))
@@ -445,12 +458,12 @@ function WP.RenderFavor()
     local bottomH = 32
     ui.scan:ClearAllPoints(); ui.go:ClearAllPoints()
     if (num(ui.scan:GetWidth()) or 0) + 8 + (num(ui.go:GetWidth()) or 0) > LIST_W then
-        ui.go:SetPoint("BOTTOMLEFT", INSET, 12)
-        ui.scan:SetPoint("BOTTOMLEFT", INSET, 12 + 32 + 8)
+        ui.go:SetPoint("BOTTOMLEFT", INSET + COL_X, 12)
+        ui.scan:SetPoint("BOTTOMLEFT", INSET + COL_X, 12 + 32 + 8)
         bottomH = 72
     else
-        ui.scan:SetPoint("BOTTOMLEFT", INSET, 12)
-        ui.go:SetPoint("BOTTOMRIGHT", -INSET, 12)
+        ui.scan:SetPoint("BOTTOMLEFT", INSET + COL_X, 12)
+        ui.go:SetPoint("BOTTOMRIGHT", -(INSET + COL_X), 12)
     end
 
     if not rows then
@@ -462,7 +475,7 @@ function WP.RenderFavor()
         ui.summary:Hide(); ui.detail:Hide()
         ui.empty:Show()
         ui.empty:SetWrapWidth(LIST_W)
-        ui.empty:ClearAllPoints(); ui.empty:SetPoint("TOP", p.sa.child, "TOP", 0, -12)
+        ui.empty:ClearAllPoints(); ui.empty:SetPoint("TOP", p.sa.child, "TOPLEFT", COL_X + math.floor(LIST_W / 2), -12)
         p:Fit(28, 12 + ui.empty:Fit() + 12, bottomH)
         return
     end
@@ -517,22 +530,27 @@ function WP.RenderFavor()
     y = y + 12
     ui.summary:Show()
     ui.summary:SetText(sentence)
-    ui.summary:ClearAllPoints(); ui.summary:SetPoint("TOPLEFT", INSET, -y)
-    y = y + math.max(S.FitText(ui.summary, 2, LIST_W, p), F.body + 2)
+    ui.summary:ClearAllPoints(); ui.summary:SetPoint("TOPLEFT", INSET + COL_X, -y)
+    y = y + math.max(S.FitText(ui.summary, 2, math.min(LIST_W, 480), p), F.body + 2)
     ui.detail:SetShown(detail ~= nil)
     if detail then
         y = y + 4
         ui.detail:SetText(detail)
-        ui.detail:ClearAllPoints(); ui.detail:SetPoint("TOPLEFT", INSET, -y)
-        y = y + math.max(S.FitText(ui.detail, 3, LIST_W, p), F.meta + 2)
+        ui.detail:ClearAllPoints(); ui.detail:SetPoint("TOPLEFT", INSET + COL_X, -y)
+        y = y + math.max(S.FitText(ui.detail, 3, math.min(LIST_W, 480), p), F.meta + 2)
     end
     local topH = y - 12
 
+    -- the columns: one (x0 = COL_X, LIST_W), or the plan at the left and every crate at the right
+    local twoCols = LIST_W >= WIDE and #plan > 0
+    local xs, colW = ns.Columns(LIST_W, twoCols and 2 or 1, COL_GAP)
+    local cx, cw = COL_X + xs[1], twoCols and colW or LIST_W
+    ui.twoCols = twoCols
     local function head(text, count)
         hi = hi + 1
         local h = ui.heads.Get(hi)
         if ly > 0 then ly = ly + 8 end
-        h:ClearAllPoints(); h:SetPoint("TOPLEFT", 0, -ly); h:SetPoint("TOPRIGHT", 0, -ly)
+        h:ClearAllPoints(); h:SetPoint("TOPLEFT", cx, -ly); h:SetWidth(cw)
         h:Set(text, count)
         ly = ly + 32 + 4
     end
@@ -542,7 +560,7 @@ function WP.RenderFavor()
         r.entry = e
         local rr = e.row
         local x = e.mat and 24 or 0
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", x, -ly); r:SetPoint("TOPRIGHT", 0, -ly)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", cx + x, -ly); r:SetWidth(cw - x)
         local name, value
         if e.mat then
             name = string.format("%d x %s", e.total, WP.ItemName(e.mat))
@@ -552,8 +570,9 @@ function WP.RenderFavor()
         end
         value = cost and ((cost == 0) and L("Dans le sac") or S.Money(cost)) or "?"
         r:Set({ icon = S.ItemIcon(e.mat or rr.id), name = name, detail = sub, value = value })
-        ly = ly + r:Fit(LIST_W - x) + 2
+        ly = ly + r:Fit(cw - x) + 2
     end
+    local leftH = 0
     if #plan > 0 then
         head(L("À acheter, la moins chère d'abord"), #plan)
         for _, e in ipairs(plan) do
@@ -571,6 +590,7 @@ function WP.RenderFavor()
                 row({ row = r, mat = o.item, total = o.taken, buy = o.buy }, o.cost, sub)
             end
         end
+        if twoCols then leftH = ly; ly = 0; cx = COL_X + xs[2] end
     end
     head(L("Toutes les caisses, par prix de la Faveur"), #rows)
     for _, r in ipairs(rows) do
@@ -583,6 +603,7 @@ function WP.RenderFavor()
         end
         row({ row = r }, r.total, sub)
     end
+    ly = math.max(ly, leftH)
     if ly > 0 then ly = ly - 2 end
     p:Fit(topH, ly, bottomH)
 end

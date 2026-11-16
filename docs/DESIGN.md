@@ -11,7 +11,7 @@ Client: WoW Forever (interface 16001, Lua 5.1, vanilla content on a modern engin
 1. **One accent.** WaR LegenD red `#CE1918` marks only three things: the one main action of a view, what is selected or on, and keyboard focus. Every other surface is a neutral dark colour or white at an alpha.
 2. **No side stripes.** No coloured bar on the left or right of a card, row, chip or nav item, ever. Show state with a fill, a brighter text colour, an icon or a word.
 3. **No "..." from the engine.** Text wraps to 2 lines and its container grows. Only text whose container truly cannot grow (tab label, pill, single-line HUD) is cut, and then the full text is in the tooltip.
-4. **Windows fit their content.** Height is measured after every render. A window is never more than about 40 px taller than what it shows.
+4. **Panel windows fit their content; workspace windows take the room they need.** A panel window's height is measured after every render, never more than about 40 px taller than what it shows. A workspace window (the Hub, Orders, Groups, Guild, the Comptoir, Help, the dungeon overview and picker) has a fixed size from the size rule (3.1) and scrolls inside, like the Hub. Pages flow in 2-3 columns (3.22), not in one tall stack.
 5. **HD icons only.** Interface glyphs come from `Media/Icons/*.tga` (and `Media/Arrow.tga` for the GPS). Things (items, professions, classes, dungeons, modules) use painted `Interface\\Icons\\*`, cropped 0.08-0.92, 48 px max. No font glyphs, no stock low-res buttons.
 6. **Every sentence is written for its place.** Read the title, the sentence and the button of a view out loud in order before shipping. French and English are each written as natural sentences, not translated word by word.
 7. **One primary button per view.** Everything else is secondary, ghost or a row click.
@@ -195,10 +195,26 @@ All components live in one module (`ns.UI`, reused by Writs through `S`), each w
 ```
 
 - Backdrop `bg` at 0.97, 1 px `cardEdge` outline. No title-bar gradient.
-- Width is fixed per window and chosen from: 360 (HUD-like), 420 (single list), 520 (two columns), 640 (wide tools). Width is never computed from text.
-- One recorded exception: the guide tracker (Tracker.lua) is 300, a compact overlay that stays on screen beside the game's own trackers.
-- Second recorded exception: the dungeon boss panel (Bosses.lua) is 248, five 40 px portraits with 6 px gaps and a 12 px pad, docked beside the guide like a dungeon journal.
-- 860: the Hub, the one WL Helper window (Home and Settings, 3.20). Width = min(860, floor(UIParent:GetWidth() x 0.90)), never under 640.
+- The size comes from the window's tier, never from text. Sizes are in UI units (`UIParent:GetWidth()/GetHeight()`, `uw`/`uh`, read secret-safe, 1366 x 768 when unreadable). `ns.WinSize(tier [, uw, uh])` (Theme.lua) returns `defW, defH, minW, minH, maxW, maxH`; `S.Window(..., { size = tier })` and the Hub use it.
+
+| Tier | Width | Height | Resizable | Windows |
+|---|---|---|---|---|
+| workspace | clamp(floor(uw x 0.70), min(900, floor(uw x 0.96)), 1400) | clamp(floor(uh x 0.78), min(620, floor(uh x 0.80)), 900), fixed: pages scroll inside | both axes, grip bottom-right, size saved | Hub, Orders, Groups/LFG, Guild, Comptoir (all tabs, Favor included), Help, Keys passport, dungeon overview, dungeon picker |
+| panel | clamp(floor(uw x 0.45), min(560, floor(uw x 0.96)), 860) | fits the content (3.2), cap floor(uh x 0.80) | width only (grip), width saved | Setup, Go to, Shared quests, What's new, Feedback, Log triage, Cleaner, the Events dungeon picker, the picker's quests sub-panel |
+| hud | fixed, as given | as given | no | guide frame (its own width grip, 420-760), step list 272, Tracker 300, boss panel 248, rare alert 300, junk banner 360, city tour 360, tour bubble 320, Orders message/decline dialogs 360, mail side panel 280, popovers 300 |
+
+Reference sizes (the tests assert them):
+
+| UIParent | workspace W x H | Hub content (W - 200) / usable (- 32) | Orders CW / LW / RW | panel W |
+|---|---|---|---|---|
+| 1280 x 720 | 900 x 576 | 700 / 668 | 868 / 200 / 636 | 576 |
+| 1366 x 768 | 956 x 614 | 756 / 724 | 924 / 203 / 689 | 614 |
+| 1920 x 1080 | 1344 x 842 | 1144 / 1112 | 1312 / 260 / 1020 | 860 |
+| 2560 x 1440 | 1400 x 900 | 1200 / 1168 | 1368 / 260 / 1076 | 860 |
+
+(Orders: CW = W - 32, LW = clamp(floor(CW x 0.22), 200, 260), RW = CW - LW - 32.) The minimums never exceed the screen, so a 1024-wide UI still gets a window that fits.
+- The hud exceptions stay recorded: the guide tracker (Tracker.lua) is 300, a compact overlay beside the game's own trackers; the dungeon boss panel (Bosses.lua) is 248, five 40 px portraits with 6 px gaps and a 12 px pad, docked beside the guide like a dungeon journal.
+- A tiered window reads its widths when it lays out (`Dims()` from `win:GetWidth()`), never from module constants, and lays out again in `f.OnResize`.
 - Movable by the header; position saved per window; clamped to screen.
 - Strata MEDIUM, raised on mouse down. Escape closes (UISpecialFrames).
 
@@ -211,7 +227,7 @@ Header (44 px):
 
 ### 3.2 Window sizing to content
 
-Every window exposes `f:FitHeight()`, called at the end of every Render, after every tab change, and on the next frame after wrapped text was set (GetStringHeight is only right once the width is applied).
+Every window exposes `f:FitHeight()`, called at the end of every Render, after every tab change, and on the next frame after wrapped text was set (GetStringHeight is only right once the width is applied). On a workspace window it changes nothing but `f.overflow`: the size is the size rule's (3.1) and the content scrolls inside. Panel and hud windows fit as below.
 
 ```
 height = header 44 + (tabs 32 + 1 if tabs) + 12 + contentH + 12 + (footer 24 if footer)
@@ -223,8 +239,12 @@ height = clamp(height, minH, floor(UIParent:GetHeight() * 0.80))
 - Over the cap, the content scrolls inside the fixed frame (3.15). Under it, no scrollbar is shown and no empty space is left.
 - The window keeps its TOP anchor when it changes height, so it grows downward and the header never jumps.
 - The footer sticks to the content (it is the last element), not to an arbitrary bottom.
-- Resizable windows (if any) save the size and use `SetResizeBounds(minW, minH, maxW, 0.8 * screenH)`.
-- Recorded exception: the Hub (3.20) has a fixed height, H = clamp(floor(UIParent:GetHeight() x 0.80), 520, 680), recomputed on `DISPLAY_SIZE_CHANGED` and `UI_SCALE_CHANGED`. Each page's content scrolls (3.15). It never calls `FitHeight`: a nav that changed height with every page would make the frame jump.
+- Resizable windows (`S.Window(..., { size = "workspace" | "panel" })`, or `S.MakeResizable(f, tier, db, key, opts)` for a window with its own frame): `f:SetResizable(true)`, bounds `SetResizeBounds(minW, minH, maxW, maxH)` (feature-detected, else `SetMinResize`/`SetMaxResize`, through `pcall`) with the tier minimums, maxW = floor(uw x 0.96), maxH = floor(uh x 0.90) (workspace; a panel drags its width only).
+- The size is saved as `db[posKey .. "Size"] = { w, h }` (panel: `{ w }`), clamped to the bounds on every open and screen change; no saved size gives the tier default. A double-click on the grip forgets it.
+- Grip: 16 x 16 at the bottom-right corner, frame level + 10, `chevron_right` 12 turned -45 deg, `faint`, `fg` on hover; tooltip "Redimensionner" + "Glisser : changer la taille. Double-clic : taille par défaut.". Mouse down `StartSizing("BOTTOMRIGHT")` (panel `"RIGHT"`), mouse up stops, keeps the top anchor, saves the size and the position.
+- Re-layout: `OnSizeChanged` calls the owner's `f:OnResize(w, h)` at most once per frame (live while dragging: layout only, no data rebuild), only while the window is shown (a hidden window lays out when it next shows). A screen change (`DISPLAY_SIZE_CHANGED`, `UI_SCALE_CHANGED`) re-sizes every tiered window 0.25 s after the last event.
+- A window holding secure frames (`opts.secure`, the Comptoir) cannot change size in combat: its grip says "Indisponible en combat" and does nothing, a screen change waits for `PLAYER_REGEN_ENABLED`. Every other window resizes in combat.
+- The Hub is a workspace window (3.20): its size never follows the page (a nav that changed height with every page would make the frame jump).
 
 ### 3.3 Tabs
 
@@ -301,7 +321,7 @@ Two densities:
 
 ### 3.10 Section headers
 
-- Height 32 (24 when tight, in a card). Label 13 `fg` sentence case, bottom-left at x=16, 6 px above a 1 px `divider` spanning the content width.
+- Height 32 (24 when tight, in a card or a column: `S.SectionHeader(..., { tight = true })` or `true`, 8 px under it, `h.after`). Label 13 `fg` sentence case, bottom-left at x=16, 6 px above a 1 px `divider` spanning the content width.
 - Optional count in 11 `muted` after the label ("Commandes ouvertes 3"), optional ghost link at the right ("Tout voir").
 - Space above a section header: 16 (the first one: 8).
 
@@ -360,10 +380,13 @@ Designed states for every list and card, before shipping: unknown/loading ("Fact
 
 ### 3.18 Settings rows
 
-- Label 13 `fg` at left 16, control right-aligned at right 16, at least 12 px between them.
-- Description 11 `muted` on a SECOND line under the label, wrapping across the full row width minus the control column (control width + 12). Never squeezed between label and control on the label's line.
-- Height: 36 without description; 6 + 13 + 3 + description height + 8 with one (50 for a one-line description, grows when it wraps).
-- Rows separated by a 1 px `divider`, grouped under section headers (3.10) inside a settings card.
+- One component: `S.SettingRow(parent, { label, desc, long, control = "switch" | "segmented" | "dropdown" | "slider" | "value" | frame, get, set, options, tip, wide })`, `row:Fit(width) -> height`. No module re-implements it.
+- Label 13 `fg` at left 12, control right-aligned at right 12, at least 12 px between them. The label is one line; when it does not fit it wraps to 2 lines and the row grows by 17 (never cut).
+- Description 11 `muted` on a second line under the label, ONE line, cut, its full text in the row's tooltip. About 55 characters fit at 320 px in French and English: write it to fit. A longer explanation goes in `long`, tooltip only.
+- Tooltip (the whole row is the hover target): label, description, long text, then what a click does.
+- Height: 36 without description, 50 with one, + 17 when the label wraps.
+- `wide = true` (segmented controls of 3+ options, sliders, text boxes): the row takes a whole grid line, and its control goes under the label when wider than half the row. A paired segmented control leaves 120 px to the texts, or becomes a dropdown.
+- Rows flow in 2-3 columns inside a settings card, `S.SettingsCard(parent)` (`card:AddRow(o)`, `card:Fit(width)`), through `ns.Grid` with `ns.GRID.settings` (min 320, gap 12): 2 columns from 652 px of card, 3 from 984. Rows of one line share their height. A 1 px `divider` under each row except on the card's last line, a 1 px vertical `divider` between the columns of a line.
 
 ### 3.19 GPS HUD
 
@@ -397,14 +420,14 @@ The one WL Helper window (`WLHelperHub`, Writs/Options.lua; `WLHelperHome` and `
 ```
 
 - Header 44 (3.1) with the logo, no back chevron: title "WL Helper", subtitle "%s, niv. %d". Right cluster: close, then "?" (How do I...?). No gear, no primary button, no Reload UI.
-- Nav: 199 px, then a 1 px `divider` rule. Content: W - 200 (660 at 860), inset 16, usable 628.
+- Size: the workspace rule (3.1), resizable, size saved. Nav: 199 px, then a 1 px `divider` rule. Content: W - 200 (756 at 956), inset 16, usable W - 232 (724 at 956, 1112 at 1344).
 - Nav from the top: the settings search 175 x 28 at (12, -12); items 32 px, 2 px apart, 8 px from both edges; an activity title (`S.NavHeader`) 24 px, text 11 `muted` at x=16, its baseline 4 px above the first item, sentence case, never capitals (1.2). An activity without a page is not drawn. When the items do not fit, this part scrolls (3.15).
 - Nav bottom block, anchored to the bottom: the "Settings" title and its pages (General, About), then a 28 px row 12 px from the bottom: IconButton 28 "star" (What's new) at x=12, "mail" (Write to us) at x=44 (How do I...? is the header's "?", so the "info" glyph means About only), the version 10 `muted` right-aligned at x=-12 (the full "WL Helper x.y" in its tooltip).
 - Nav item (`S.NavItem`): icon 20 at x=8 (a painted icon in a 1 px `cardEdge`; an HD glyph is 16, no edge, tinted like the label), label 12 at x=36, `muted` at rest, `fg` on hover or selected. Selected: `selFill`, no side band. A counter at the right while searching.
 - Page header (fixed, does not scroll): title 16 `fg` at (16, -16); one sentence 11 `muted` 2 px under it, one line, cut with the full text in the tooltip; `divider` rule at y=-60. The page's scroll area starts at y=-61, its content 12 px below its top.
 - Home line (`S.HubRow`), 306 x 46, 6 px between two rows: the whole line is the click target (3.9), `cardFill` and a 1 px `cardEdge`, `hoverFill` on hover, `pressFill` on click. Icon 28 at x=8, centred, 1 px `cardEdge` (an HD glyph is 16 in the box). Name 13 `fg` at x=44, top 7. State line 11 (`muted` unless it says something to act on) 2 px under the name, one line, cut, full text in the tooltip. `chevron_right` 16 `muted` at x=-8; a 6 px `accent` dot at x=-30 when something waits. A switched-off module: alpha 0.5, an "Éteint" pill instead of the chevron, a click turns it back on. Right-click: the line's settings page, scrolled to its section, which flashes in `selFill` for 1.5 s.
 - Home: "Où veux-tu aller ?" (628 wide) at the top, the "Now" strip, the update banner, then one section title per activity (3.10, tight, 24) with its lines two a row, left then right, in the order of the registry (`WP.HUB`, Writs/Hub.lua). The order never changes with the state.
-- Settings pages: one column of 628 for now (V1); two columns of 306 per page come with the regrouping (V2).
+- Settings pages: rows in 2 columns (3 from 1000 px of content) through `S.SettingsCard` (3.18), cards in a grid (3.22); a note stays full width, its sentence capped at 480 (4.2). Home lines 2-3 per line (`ns.GRID.hubRows`).
 - A button in the Hub that opens another window closes the Hub. Keyboard (Ctrl+F) is off in combat.
 - A page is refreshed only while it is visible (`IsVisible`); a hidden page does no work and has no event registered (Home: one listener for the session, its events registered while Home shows).
 - Home is built with the Hub; a settings page is built the first time it shows, or all of them the first time the settings search is used (its index needs every row). A screen change rebuilds once, 0.25 s after the last event, and only when the Hub opens if it is hidden.
@@ -431,6 +454,27 @@ A card that explains something (the guide's boss step, a dungeon card, a summary
 - Numbers: every spacing and size above lives in `ns.TY`; change it there, not in a view.
 - The 2 px stat bar is a fill, not a border: it is the one other thing thicker than 1 px besides the active tab's underline (1.4).
 
+### 3.22 Grids
+
+- `ns.Cols(w, minW, gap, maxCols [, minPx]) -> n, colW, xs, lastW` (Theme.lua): n = clamp(floor((w + gap) / (minW + gap)), 1, maxCols); colW = floor((w - (n - 1) x gap) / n); the leftover pixels go to the last column (lastW); xs are whole pixels. `ns.Columns(w, n, gap) -> xs, colW, lastW` for fixed splits (two panes).
+- `ns.Grid()`: a placer with no frame of its own. `g:Begin(parent, x, y, w, opts)`, `g:Add(frame, fit [, { span = "full" }])` (fit(frame, cellW) returns the height; the frame is anchored TOPLEFT at the cell and given the cell width), `g:Break()`, `g:End() -> height, n, colW`. Reading order = the order of `Add`, left to right then the next line, never reflowed by height. A line is as tall as its tallest cell (`equal = true` gives every cell that height). `g.cells` and `g.lines` describe the last layout.
+- One table of minimums, `ns.GRID` (Theme.lua), tuned there only:
+
+| Use | name | minW | gap | maxCols |
+|---|---|---|---|---|
+| settings rows | `settings` | 320 | 12 | 3 |
+| Home lines | `hubRows` | 280 | 12 (row gap 6) | 3 |
+| module tiles (General modules, Setup interests) | `moduleTiles` | 200 | 12 | 4 |
+| profession tiles (Orders) | `profTiles` | 150 | 8 | 3 |
+| cards (Welcome items, Help tasks, Keys, zone cards) | `cards` | 300 | 12 | 3 |
+| order cards | `orderCards` | 420 | 12 | 3 |
+| compact toggles (Writs zones, upgrade weights) | `toggles` | 200 | 12 | 4 |
+| dense list rows as a grid (shop, recent players, Keys guild) | `listGrid` | 300 | 12 | 3 |
+
+- Real-pixel guard (3.21): every grid passes `minPx` (200, or minW when smaller): columns are dropped until each keeps that many real screen pixels (UI units x `UIParent:GetEffectiveScale()`).
+- Two side-by-side text blocks are two `ns.TextStack`s at `xs[1]` / `xs[2]`; the height is the max.
+- List rows (3.9) in wide panes: `row:Fit(width, { columns = true })` puts the detail in its own column at 45 % of the text area from 640 px, on the name's line.
+
 ---
 
 ## 4. Text rules
@@ -446,13 +490,13 @@ A card that explains something (the guide's boss step, a dungeon card, a summary
 
 | Text | Max width |
 |---|---|
-| Body paragraph in a window | content width (window - 32), never more than 480 |
+| Body paragraph in a window | content width (window - 32), never more than 480. The cap is for running sentences only and does not decide a page's width: a sentence at the top of a wide page sits at 480 max, the grid under it uses the full width |
 | Empty-state sentence | 320 |
 | Tooltip | 260 |
 | Toast | 300 |
 | GPS destination | 260 |
 | Button label | 22 characters by design; the button grows, it never cuts |
-| Settings description | row width - control column |
+| Settings description | one line at the row's text width (about 55 characters at 320), the rest in the tooltip |
 
 ### 4.3 Numbers, plurals and dates
 

@@ -479,9 +479,19 @@ end
 
 -- ---------------------------------------------------------------- the window
 
-local W, INSET = 520, 16
-local LIST_W = W - 2 * INSET
+local INSET = 16
+local LIST_W = 614 - 2 * INSET   -- the list width, read again by Dims() at every layout
 local win
+-- The width from the window (a panel, DESIGN 3.1: 576 to 860 from the screen, the player can drag
+-- it); not sized yet: the rule's default.
+local function WinW()
+    local w = win and win:GetWidth()
+    if type(w) ~= "number" or (root.IsSecret and root.IsSecret(w)) or w < 300 then
+        w = (root.WinSize and root.WinSize("panel")) or 614
+    end
+    return math.floor(w)
+end
+local function Dims() LIST_W = WinW() - 2 * INSET; return LIST_W end
 local rows = {}
 local current, currentCount = {}, 0
 
@@ -597,19 +607,14 @@ Refresh = function()
     win.intro:SetText(intro)
 
     local child = win.list.child
-    local y = 0
     for i, e in ipairs(current) do
         local row = rows[i]
         if not row then row = MakeRow(child); rows[i] = row end
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", 0, -y); row:SetPoint("TOPRIGHT", 0, -y)
-        row:SetWidth(LIST_W)
         Paint(row, e)
         row:Show()
-        y = y + FitRow(row) + 2
     end
     for i = #current + 1, #rows do rows[i]:Hide(); rows[i].entry = nil end
-    win.listH = math.max(0, y - 2)
+    win.PlaceRows()
 
     local kept = KeptCount()
     if kept > 0 then
@@ -630,7 +635,8 @@ Refresh = function()
 end
 
 local function Build()
-    win = S.Window("WLHelperTriage", W, 300, L("Tri du journal"), "", WLWritsDB, "triagePos", { header = S.HEADER_H, minH = 200 })
+    win = S.Window("WLHelperTriage", (root.WinSize("panel")) or 614, 300, L("Tri du journal"), "", WLWritsDB, "triagePos",
+        { header = S.HEADER_H, minH = 200, size = "panel" })
     local top = win:ContentTop() + 12
     win.intro = S.Text(win, F.body, C.text)
     win.intro:SetPoint("TOPLEFT", INSET, -top)
@@ -648,6 +654,21 @@ local function Build()
     win.empty = S.EmptyState(win, "check", L("Rien à abandonner"), L("Toutes tes quêtes servent encore."))
     win.empty:ClearAllPoints(); win.empty:SetPoint("TOP", win, "TOP", 0, -(top + 12))
     win.empty:Hide()
+
+    -- The rows of the list at the window's width (layout only: a resize calls it with the same rows).
+    function win.PlaceRows()
+        Dims()
+        local y = 0
+        for i = 1, #current do
+            local row = rows[i]
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", 0, -y); row:SetPoint("TOPRIGHT", 0, -y)
+            row:SetWidth(LIST_W)
+            y = y + FitRow(row) + 2
+        end
+        win.listH = math.max(0, y - 2)
+    end
+    win.OnResize = function() win.PlaceRows(); win.Fit() end
 
     -- Sizes the window: the intro, the list (scrolls only past 80 % of the screen), then the note
     -- and the kept line, which stick to the bottom.

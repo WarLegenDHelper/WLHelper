@@ -86,6 +86,8 @@ ns.AddEnglish({
     ["Chasseur : avec « Aucune », le clic droit tire toujours et ne lance plus ton attaque au corps-à-corps. Garde plutôt une touche, Maj par exemple."] =
         "Hunter: with \"None\", right-click always shoots and no longer starts your melee attack. Better keep a key, Shift for example.",
     ["Déjà géré par un autre de tes addons."] = "Already handled by another of your addons.",
+    ["Un nom dans le chat : une invitation."] = "A name in chat: an invite.",
+    ["Un clic : l'Accueil. Clic droit : le menu."] = "Click: Home. Right-click: the menu.",
     ["Ces raccourcis sont déjà gérés par un autre de tes addons."] = "These shortcuts are already handled by another of your addons.",
     ["Bouton de la minimap"] = "Minimap button",
     ["Afficher le bouton"] = "Show the button",
@@ -117,12 +119,13 @@ ns.AddEnglish({
     -- "Voir les Writs" and "Clic : ouvrir les Writs" come from Home.lua (same words everywhere)
 })
 
-local W = 520
-local CW = W - 32       -- content width
+-- A panel window (DESIGN 3.1): its width comes from the screen (ns.WinSize "panel", 576 to 860)
+-- and the player can drag it; the height fits the tallest step. CW is the content width, read
+-- again by Dims() at every layout.
+local CW = 614 - 32
 local BAR_H = 56        -- the bottom bar: 12 pad, 32 controls, 12 pad
 local MIN_BODY = 260    -- the body never gets shorter than this: the bottom edge does not jump
-local CARD_W = 238      -- interests: two columns of cards, 12 apart
-local TILE_W = math.floor((CW - 24) / 3)
+local READY_GRID = { minW = 300, gap = 12, rowGap = 8, maxCols = 2, minPx = 200, equal = true }   -- 2 x 2 from 612
 local win
 local switches = {}
 local texts = {}        -- every FontString of the window (the tests check none is cut)
@@ -182,111 +185,40 @@ end
 
 -- ---------------------------------------------------------------- settings rows (comfort step)
 
--- A settings row (design system 3.18): label 13 fg, an optional description 11 muted on its own
--- line, the control at the right edge. With a switch, the whole row is the click target.
--- desc is a string or a function (re-read at every Fit, for a description that names a setting).
-local function Row(parent, label, desc, makeControl)
-    local r = CreateFrame("Frame", nil, parent)
-    r.wlOwned = true
-    r.hl = S.Solid(r, "BACKGROUND", C.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
-    r.label = Txt(r, F.body, C.fg)
-    r.label:SetText(label)
+-- A settings row (S.SettingRow, design system 3.18): label 13, a one-line description (its full
+-- text and `long` in the tooltip), the switch at the right; the whole row is the click target.
+-- desc may be a function (re-read at every layout: a description that names a setting). takenBy:
+-- another addon handles it, the switch is off and the tooltip says so.
+local function SwitchRow(parent, label, desc, get, set, takenBy, long)
+    local r = S.SettingRow(parent, { label = label, desc = type(desc) == "function" and desc() or desc, long = long,
+        control = "switch", get = get, set = set })
     r.descOf = function() if type(desc) == "function" then return desc() end return desc end
-    if desc then
-        r.desc = Txt(r, F.meta, C.muted)
-        r.desc:SetText(r.descOf())
-    end
-    r.control = makeControl(r)
-    function r:Fit(width)
-        if self.desc then self.desc:SetText(self.descOf() or "") end
-        local okW, cw = pcall(self.control.GetWidth, self.control)
-        cw = (okW and type(cw) == "number") and cw or 40
-        local textW = math.max(80, width - 16 - cw - 12 - 16)
-        local y = 6
-        local lh = math.ceil(S.FitText(self.label, 0, textW, self))
-        self.label:ClearAllPoints(); self.label:SetPoint("TOPLEFT", 16, -y)
-        y = y + math.max(13, lh)
-        if self.desc then
-            y = y + 3
-            self.desc:ClearAllPoints(); self.desc:SetPoint("TOPLEFT", 16, -y)
-            y = y + math.ceil(S.FitText(self.desc, 0, textW, self))
-        end
-        local h = math.max(36, y + 8)
-        self:SetHeight(h)
-        self.control:ClearAllPoints(); self.control:SetPoint("RIGHT", self, "RIGHT", -16, 0)
-        return h
-    end
-    return r
-end
-
-local function SwitchRow(parent, label, desc, get, set, takenBy)
-    local r = Row(parent, label, desc, function(row)
-        return S.Switch(row, get, set)
-    end)
-    local sw = r.control
-    r.sw = sw
-    switches[#switches + 1] = sw
-    r:EnableMouse(true)
+    r.sw = r.switch
+    switches[#switches + 1] = r.sw
+    texts[#texts + 1] = r.label
     if takenBy then
-        -- what it does stays on the row; who handles it goes in the tooltip
-        sw:Disable()
-        sw.disabledReason = L("Déjà géré par un autre de tes addons.")
-        r:SetScript("OnEnter", function(self)
-            local lines = { label }
-            if desc then lines[#lines + 1] = self.descOf() end
-            lines[#lines + 1] = L("Déjà géré par un autre de tes addons.")
-            S.Tip(self, lines)
-        end)
-        r:SetScript("OnLeave", function(self) if not MouseStillIn(self) then S.HideTip() end end)
-    else
-        r:SetScript("OnEnter", function(self)
-            Hover(self, true)
-            local lines = { label }
-            if desc then lines[#lines + 1] = self.descOf() end
-            lines[#lines + 1] = L("Clic : allumer ou éteindre")
-            S.Tip(self, lines)
-        end)
-        r:SetScript("OnLeave", function(self)
-            if MouseStillIn(self) then return end   -- onto the switch: keep the hover and the tip
-            Hover(self, false); S.HideTip()
-        end)
-        sw:AttachRow(r)
-        KeepHoverOver(sw, r)
+        r.sw:Disable()
+        r.sw.disabledReason = L("Déjà géré par un autre de tes addons.")
+        r.TipLines = function(self)
+            local t = { self.labelText or "" }
+            if self.descText then t[#t + 1] = self.descText end
+            if self.longText then t[#t + 1] = self.longText end
+            t[#t + 1] = L("Déjà géré par un autre de tes addons.")
+            return t
+        end
     end
     return r
 end
 
--- A settings card: cardFill + 1 px edge, rows separated by 1 px dividers. A row with wlHidden
--- set is left out (progressive disclosure) and the card shrinks.
+-- A settings card (S.SettingsCard): rows in 1 column, 2 from 652 of width; a row with wlHidden
+-- set is left out (progressive disclosure) and the card shrinks. Fit re-reads the descriptions.
 local function Group(parent, rows)
-    local g = CreateFrame("Frame", nil, parent)
-    g.wlOwned = true
-    S.Solid(g, "BACKGROUND", C.cardFill):SetAllPoints()
-    S.Border(g, C.cardEdge)
-    g.rows, g.rules = rows, {}
-    for i, r in ipairs(rows) do
-        r:SetParent(g)
-        g.rules[i] = S.Rule(g)
-    end
+    local g = S.SettingsCard(parent)
+    for _, r in ipairs(rows) do g:Add(r) end
+    local fit = g.Fit
     function g:Fit(width)
-        local y, n = 0, 0
-        for i, r in ipairs(self.rows) do
-            local rule = self.rules[i]
-            if r.wlHidden then
-                r:Hide(); rule:Hide()
-            else
-                n = n + 1
-                r:Show()
-                rule:SetShown(n > 1)
-                rule:ClearAllPoints()
-                rule:SetPoint("TOPLEFT", 16, -y); rule:SetPoint("TOPRIGHT", -16, -y)
-                local h = r:Fit(width)
-                r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:SetPoint("TOPRIGHT", 0, -y)
-                y = y + h
-            end
-        end
-        self:SetHeight(math.max(1, y))
-        return y
+        for _, r in ipairs(self.rows) do if r.descOf then r:SetDesc(r.descOf() or "") end end
+        return fit(self, width)
     end
     return g
 end
@@ -490,7 +422,7 @@ STEPS.hello = {
             L("Les événements de la guilde et les commandes aux artisans."),
         }
         f.foot:SetText(L("Une minute pour tout régler. Tout se change ensuite dans les Réglages."))
-        local BW = 400
+        local BW = math.min(400, CW)
         local y = 8
         f.logo:ClearAllPoints(); f.logo:SetPoint("TOP", f, "TOP", 0, -y)
         y = y + 48 + 12
@@ -563,15 +495,12 @@ STEPS.interests = {
         y = y + math.ceil(S.FitText(f.title, 0, CW, f)) + 4
         f.text:ClearAllPoints(); f.text:SetPoint("TOPLEFT", 0, -y)
         y = y + math.ceil(S.FitText(f.text, 0, CW, f)) + 12
-        for row = 0, 2 do
-            local a, b = f.cards[row * 2 + 1], f.cards[row * 2 + 2]
-            local h = math.max(a:Fit(CARD_W), b:Fit(CARD_W))
-            for col, c in ipairs({ a, b }) do
-                c:SetSize(CARD_W, h)
-                c:ClearAllPoints(); c:SetPoint("TOPLEFT", (col - 1) * (CARD_W + 12), -y)
-            end
-            y = y + h + (row < 2 and 12 or 0)
-        end
+        -- the module tiles grid (ns.GRID.moduleTiles): 2 columns, 3 from 636 of content
+        f.grid = f.grid or ns.Grid()
+        local go = ns.GRID.moduleTiles
+        f.grid:Begin(f, 0, y, CW, { minW = go.minW, gap = go.gap, rowGap = go.rowGap, maxCols = 3, minPx = go.minPx, equal = true })
+        for _, c in ipairs(f.cards) do f.grid:Add(c, function(card, w) return card:Fit(w) end) end
+        y = y + f.grid:End()
         f.note:SetText(L("Ce que tu éteins se cache. Tout se rallume dans les Réglages."))
         y = y + 8
         f.note:ClearAllPoints(); f.note:SetPoint("TOPLEFT", 0, -y)
@@ -637,16 +566,16 @@ STEPS.spec = {
         end
         set = set or {}
         local pick = class and SpecPick(class)
-        local th = 0
-        for _, t in ipairs(set) do th = math.max(th, t:Fit(TILE_W)) end
-        for i, t in ipairs(set) do
+        -- the tiles side by side (ns.Cols(CW, 140, 12, 3)), one height per line
+        f.grid = f.grid or ns.Grid()
+        f.grid:Begin(f, 0, y, CW, { minW = 140, gap = 12, rowGap = 12, maxCols = 3, equal = true })
+        for _, t in ipairs(set) do
             t:Show()
             t:SetSelected(pick ~= nil and pick ~= "auto" and pick == t.key)
-            t:SetSize(TILE_W, th)
-            t:ClearAllPoints(); t:SetPoint("TOPLEFT", (i - 1) * (TILE_W + 12), -y)
+            f.grid:Add(t, function(tile, w) return tile:Fit(w) end)
         end
         f.shownTiles = set
-        y = y + th + 12
+        y = y + f.grid:End() + 12
         f.unsure:ClearAllPoints(); f.unsure:SetPoint("TOPLEFT", -12, -y)
         y = y + 24
         return y
@@ -677,10 +606,10 @@ STEPS.comfort = {
             f.shootTaken = shootTaken
             f.allTaken = inviteTaken and shootTaken
             local rows = {}
-            f.invite = SwitchRow(f, L("Alt-clic pour inviter"),
-                L("Alt + clic sur un nom dans le chat ou sur un joueur : il reçoit une invitation de groupe. Un lien [Inviter] s'ajoute aussi aux messages qui demandent une invitation."),
+            f.invite = SwitchRow(f, L("Alt-clic pour inviter"), L("Un nom dans le chat : une invitation."),
                 function() return d.chat or d.world or d.link end,
-                function(v) d.chat, d.world, d.link = v, v, v; apply() end, inviteTaken)
+                function(v) d.chat, d.world, d.link = v, v, v; apply() end, inviteTaken,
+                L("Alt + clic sur un nom dans le chat ou sur un joueur : il reçoit une invitation de groupe. Un lien [Inviter] s'ajoute aussi aux messages qui demandent une invitation."))
             rows[#rows + 1] = f.invite
             -- the description names the key to hold (Shift for most classes), so a right-click alone
             -- is not read as the shortcut
@@ -705,15 +634,16 @@ STEPS.comfort = {
                 end, shootTaken)
             rows[#rows + 1] = f.shoot
             if not shootTaken and WP.ShootKeys then
-                f.key = Row(f, L("Touche à maintenir"), L("Avec « Aucune », le clic droit seul tire."), function(row)
-                    local seg = S.Segmented(row, WP.ShootKeys(), function() return d.shootMod end, function(v)
+                -- a whole line of the card: the keys' segmented control goes under the label when wide
+                f.key = S.SettingRow(f, { label = L("Touche à maintenir"), desc = L("Avec « Aucune », le clic droit seul tire."),
+                    control = "segmented", options = WP.ShootKeys(), wide = true,
+                    get = function() return d.shootMod end,
+                    set = function(v)
                         if WP.OfferWand then WP.OfferWand() end   -- your own choice wins from now on
                         d.shootMod = v; apply()
                         if win and win.Relayout then win.Relayout() end
-                    end, 28)
-                    if seg.SetMaxWidth then seg:SetMaxWidth(240) end
-                    return seg
-                end)
+                    end })
+                texts[#texts + 1] = f.key.label
                 rows[#rows + 1] = f.key
             end
             f.group = Group(f, rows)
@@ -722,13 +652,13 @@ STEPS.comfort = {
             f.taken = Txt(f, F.body, C.muted)
         end
         f.mmHead = S.SectionHeader(f, L("Bouton de la minimap"))
-        f.mmRow = SwitchRow(f, L("Afficher le bouton"), L("Un clic ouvre l'Accueil, un clic droit le menu de WL Helper."),
+        f.mmRow = SwitchRow(f, L("Afficher le bouton"), L("Un clic : l'Accueil. Clic droit : le menu."),
             MinimapShown,
             function(v)
                 WLDTDB = WLDTDB or {}
                 WLDTDB.hideMinimap = not v
                 if WLDTMinimapButton then WLDTMinimapButton:SetShown(v) end
-            end)
+            end, nil, L("Un clic ouvre l'Accueil, un clic droit le menu de WL Helper."))
         f.mmGroup = Group(f, { f.mmRow })
     end,
     Enter = function(f)
@@ -853,12 +783,11 @@ STEPS.ready = {
             cards[#cards + 1] = f.tour
         end
         f.shownCards = cards
-        for i, c in ipairs(cards) do
-            local h = math.max(64, c:Fit(CW))
-            c:SetSize(CW, h)
-            c:ClearAllPoints(); c:SetPoint("TOPLEFT", 0, -y)
-            y = y + h + (i < #cards and 8 or 0)
-        end
+        -- 2 x 2 when the cards keep 300 each (a narrower card would cut its sentence), else one column
+        f.grid = f.grid or ns.Grid()
+        f.grid:Begin(f, 0, y, CW, READY_GRID)
+        for _, c in ipairs(cards) do f.grid:Add(c, function(card, w) return math.max(64, card:Fit(w)) end) end
+        y = y + f.grid:End()
         y = y + 16
         f.head:ClearAllPoints(); f.head:SetPoint("TOPLEFT", 0, -y); f.head:SetSize(CW, 24)
         y = y + 24 + 8
@@ -940,8 +869,23 @@ local function MeasureBody(steps)
     win.bodyH, win.bodyN = tallest, #steps
 end
 
+-- The content width from the window's width (not sized yet: the rule's default); every built step
+-- frame takes it. True when it changed (the steps then measure again).
+local function Dims()
+    local w = win and win:GetWidth()
+    if type(w) ~= "number" or (root.IsSecret and root.IsSecret(w)) or w < 300 then
+        w = (root.WinSize and root.WinSize("panel")) or 614
+    end
+    local cw = math.floor(w) - 32
+    local changed = cw ~= CW
+    CW = cw
+    for _, f in pairs(win and win.frames or {}) do f:SetWidth(CW) end
+    return changed
+end
+
 local function Layout()
     if not (win and win.stepKey) then return end
+    if Dims() then win.bodyH = nil end
     local key = win.stepKey
     local f = win.frames[key]
     local h = math.ceil(STEPS[key].Layout(f) or 0)
@@ -1018,7 +962,8 @@ local function Ended()
 end
 
 local function Build()
-    win = S.Window("WLHelperWelcome", W, 400, L("Bienvenue dans WL Helper"), nil, nil, nil, { header = 44, strata = "DIALOG", minH = 300, logo = true })
+    win = S.Window("WLHelperWelcome", (root.WinSize("panel")) or 614, 400, L("Bienvenue dans WL Helper"), nil, nil, nil,
+        { header = 44, strata = "DIALOG", minH = 300, logo = true, size = "panel" })
     local sa = S.ScrollArea(win)
     sa:SetPoint("TOPLEFT", win, "TOPLEFT", 0, -(win.headerH + 1))
     sa:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", 0, BAR_H)
@@ -1026,6 +971,9 @@ local function Build()
     win.frames = {}
     win.texts = texts
     win.Relayout = Layout
+    -- dragged to a new width: every step measures again (Dims sees the new width; the tallest sets
+    -- the body height). A height change alone (FitHeight) measures nothing again.
+    win.OnResize = function() Layout() end
 
     -- the bottom bar: Passer or Retour on the left, the dots in the middle, the primary on the right
     win.barRule = S.Rule(win)

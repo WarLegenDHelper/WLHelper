@@ -5,8 +5,11 @@
 -- (Nouveautés, Changements, Corrections: a block heading, DESIGN 3.21, in the heading colour:
 -- 12, 14 px above it, 4 under it), each change a 5 px dot in the kind's colour (green new, blue
 -- changed, gold fixed), its title (fg 13) and one muted sentence (12) under it, 8 px between changes.
--- English items without an English text fall back to the French one. The window fits its content
--- (DESIGN 3.2) and scrolls past 80 % of the screen; the footer says how to open it again.
+-- English items without an English text fall back to the French one. A panel window (DESIGN 3.1:
+-- its width from the screen, the width can be dragged and is kept); its height fits the content
+-- (3.2) and scrolls past 80 % of the screen; the footer says how to open it again. From 600 px of
+-- content a version's changes go in two columns (New on the left, Changes and Fixes on the right);
+-- one column keeps lines of READ_W at most (a readable line length).
 local ADDON, ns = ...
 
 local function S() return ns.Writs and ns.Writs.S end
@@ -27,8 +30,11 @@ local function Key(v)
 end
 ns.WhatsNewKey = Key   -- for the offline tests
 
-local W, PAD = 480, 16
-local CW = W - 2 * PAD
+local W, PAD = 560, 16
+local CW = W - 2 * PAD          -- follows the window (Dims, at every fill)
+local TWO_COLS = 600            -- two columns of changes from this content width
+local COL_GAP = 24              -- between the two columns
+local READ_W = 600              -- one column: a change's lines stop there (readable length)
 local INDENT = 16            -- the dot, then the change's text
 local DOT = 5                -- the kind's dot before each change
 local ITEM_GAP = 8           -- between two changes
@@ -66,11 +72,27 @@ local function ItemText(it)
 end
 
 local win
+local Fill
+-- W and CW from the window's width: the panel rule (ns.WinSize) or the player's drag; the rule's
+-- default while the frame cannot tell
+local function Dims()
+  local defW, minW = W, 0
+  if win and win.SizeRule then
+    local d, _, m = win:SizeRule()
+    defW, minW = d or W, m or 0
+  end
+  local w = win and win:GetWidth()
+  if type(w) ~= "number" or (issecretvalue and issecretvalue(w)) or w < minW - 1 then w = defW end
+  W = math.floor(w)
+  CW = W - 2 * PAD
+end
 local function Build()
   local St = S()
   if not (St and St.Window) then return end
   win = St.Window("WLHelperWhatsNew", W, 420, Fr() and "Quoi de neuf" or "What's new", nil, WLDTDB, "newsPos",
-    { header = St.HEADER_H, footer = true, minH = 160 })
+    { header = St.HEADER_H, footer = true, minH = 160, size = "panel" })
+  -- a new width: the same list laid out again (at most once per frame while dragging)
+  win.OnResize = function() if win.sinceKey and Fill then Fill(win.sinceKey) end end
   local top = (win.ContentTop and win:ContentTop() or 44) + 12
   local foot = St.FOOTER_H or 24
   local sa = St.ScrollArea and St.ScrollArea(win)
@@ -82,9 +104,16 @@ local function Build()
   win.texts, win.dots, win.rules, win.dates = {}, {}, {}, {}
 end
 
-local function Fill(sinceKey)
+Fill = function(sinceKey)
   local St = S()
   local fr = Fr()
+  win.sinceKey = sinceKey
+  Dims()
+  win.holder:SetWidth(CW)
+  -- the column the changes go in: colX, colW (one column, or one of the two)
+  local colX, colW = 0, math.min(CW, READ_W)
+  local twoCols = CW >= TWO_COLS
+  win.twoCols, win.nTwo = twoCols, 0
   local F = ns.F or { heading = 14, body = 13, label = 12, meta = 11 }
   local C = St.C or {}
   local TYH = (ns.TY and ns.TY.head) or { size = 12, top = 14, bottom = 4 }
@@ -105,7 +134,7 @@ local function Fill(sinceKey)
     fs:SetTextColor(c[1], c[2], c[3], 1)
     fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", x or 0, -y)
     fs:SetText(text); fs:Show()
-    w = w or (CW - (x or 0))
+    w = w or (colX + colW - (x or 0))
     local h = St.FitText and St.FitText(fs, 0, w, win.holder)
     if not (type(h) == "number" and h > 0) then
       fs:SetWidth(w)
@@ -152,7 +181,7 @@ local function Fill(sinceKey)
     d:SetSize(DOT, DOT)
     d:SetVertexColor(color[1], color[2], color[3])
     -- centred on the title's first line
-    d:ClearAllPoints(); d:SetPoint("TOPLEFT", 3, -(at + math.floor((size + 2 - DOT) / 2 + 0.5)))
+    d:ClearAllPoints(); d:SetPoint("TOPLEFT", colX + 3, -(at + math.floor((size + 2 - DOT) / 2 + 0.5)))
     d:Show()
   end
   local function Rule()
@@ -184,8 +213,18 @@ local function Fill(sinceKey)
         items = {}
         for _, t in ipairs((fr and e.fr) or e.en or e.fr or {}) do items[#items + 1] = { s = "chg", fr = { t }, en = { t } } end
       end
-      local groups = 0
+      -- the kinds this version has, in order
+      local has = {}
       for _, kind in ipairs(KINDS) do
+        for _, it in ipairs(items) do
+          if it.s == kind[1] then
+            local title, text = ItemText(it)
+            if title or text then has[kind[1]] = true; break end
+          end
+        end
+      end
+      local groups = 0
+      local function Group(kind)
         local col = C[kind[4]] or C.fg
         local any = false
         for _, it in ipairs(items) do
@@ -198,15 +237,36 @@ local function Fill(sinceKey)
                 groups = groups + 1
                 -- the group's words in the heading colour like every block heading; the kind's
                 -- colour stays on its items' dots (green new, blue changed, gold fixed)
-                Text(fr and kind[2] or kind[3], TYH.size, C.head or (ns.T_ and ns.T_.head) or col, 0, TYH.bottom)
+                Text(fr and kind[2] or kind[3], TYH.size, C.head or (ns.T_ and ns.T_.head) or col, colX, TYH.bottom)
                 any = true
               end
-              local at2 = Text(title or text, F.body, C.fg, INDENT, (title and text) and 3 or ITEM_GAP)
+              local at2 = Text(title or text, F.body, C.fg, colX + INDENT, (title and text) and 3 or ITEM_GAP)
               Dot(col, at2, F.body)
-              if title and text then Text(text, F.label, C.muted, INDENT, ITEM_GAP) end
+              if title and text then Text(text, F.label, C.muted, colX + INDENT, ITEM_GAP) end
             end
           end
         end
+      end
+      -- two columns when wide and the version has new things and changes or fixes: New on the
+      -- left, Changes then Fixes on the right, both from the same top; the next version starts
+      -- under the longer one
+      if twoCols and has.add and (has.chg or has.fix) then
+        local half = math.floor((CW - COL_GAP) / 2)
+        local top, endY = y, y
+        for side = 1, 2 do
+          colX, colW = (side == 1) and 0 or (half + COL_GAP), (side == 1) and half or (CW - half - COL_GAP)
+          y, gap, groups = top, 0, 0
+          for _, kind in ipairs(KINDS) do
+            if (side == 1) == (kind[1] == "add") then Group(kind) end
+          end
+          if y - gap > endY then endY = y - gap end
+        end
+        y, gap = endY + ITEM_GAP, ITEM_GAP
+        colX, colW = 0, math.min(CW, READ_W)
+        win.nTwo = win.nTwo + 1
+      else
+        colX, colW = 0, math.min(CW, READ_W)
+        for _, kind in ipairs(KINDS) do Group(kind) end
       end
       if shown >= 8 then break end
     end
