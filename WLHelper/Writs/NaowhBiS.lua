@@ -23,6 +23,8 @@
 --   JudgeKey(spec) / TipShows(key)  the Naowh spec key judging one of our specs (only when the
 --                        player changed its weights in Naowh: else WL Helper Gear judges, with
 --                        its caps and leveling), and whether Naowh's own tooltip line shows that spec
+--   Explain(item, spec)  why Gain gives its percent: { pct, rows = { { stat, amount, pct }, ... } },
+--                        biggest first, by Naowh's weights (the same sum Naowh makes), or nil
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -494,6 +496,91 @@ function NB.Gain(item, spec)
     end)
     if not ok then return nil, "error" end
     return g, why
+end
+
+-- ---------------------------------------------------------------- why a percent
+-- Naowh's stat names -> WL Helper Gear's (the tooltip's labels): "spell" is spell damage
+local NAOWH_STAT = { spell = "sp", shit = "hit", scrit = "crit" }
+-- the stats of an item by Naowh's weights: { [stat] = { amount, worth } }
+local function WorthParts(S, stats, weights, share, acc, sign)
+    local keys, per = S.GAME_KEYS, S.PER_PERCENT or {}
+    for gk, value in pairs(stats) do
+        local mine = keys[gk]
+        if mine and type(value) == "number" then
+            local v = per[gk] and value / per[gk] or value
+            local worth, stat = 0, nil
+            if type(mine) == "table" then
+                for i = 1, #mine do worth = worth + (weights[mine[i]] or 0) * v end
+                stat = mine[1]
+            elseif mine == "dps" then
+                worth = (weights.dps or 0) * v * (share or 0)
+                stat = "dps"
+            else
+                worth = (weights[mine] or 0) * v
+                stat = mine
+            end
+            if worth ~= 0 then
+                stat = NAOWH_STAT[stat] or stat
+                local r = acc[stat]
+                if not r then r = { stat = stat, amount = 0, worth = 0 }; acc[stat] = r end
+                r.amount, r.worth = r.amount + sign * value, r.worth + sign * worth
+            end
+        end
+    end
+end
+-- { pct, rows = { { stat, amount, pct }, ... } } or nil. spec: as for Gain.
+function NB.Explain(item, spec)
+    local S, n = SW()
+    if not (S and type(S.GAME_KEYS) == "table" and type(S.Stats) == "function") then return nil end
+    local ok, res = pcall(function()
+        local key
+        if spec == nil then key = NB.ActiveKey()
+        elseif type(spec) == "string" and type(S.Spec) == "function" and S.Spec(spec) then key = spec
+        else key = MatchKey(S.ClassSpecs(), spec, NB.ActiveKey()) end
+        if not key then return nil end
+        local weights, power = Weighed(S, key)
+        if not weights or type(power) ~= "number" or not (power > 0) then return nil end
+        local id = ItemID(item)
+        local link = type(item) == "string" and item:find("item:", 1, true) and item or nil
+        local Items = n.Shared and n.Shared.Items
+        local slots = id and Items and Items.SlotsFor and Items.SlotsFor(id)
+        if not slots then return nil end
+        local stats = S.Stats(link or id)
+        if type(stats) ~= "table" then return nil end
+        -- the slot Naowh's percent comes from: the best one
+        local twoHand = Items.IsTwoHand and Items.IsTwoHand(id)
+        local main = GetInventoryItemID and GetInventoryItemID("player", 16)
+        local wornTwoHand = main and Items.IsTwoHand and Items.IsTwoHand(main)
+        local best, bestSlot, bestAlso
+        for _, slot in ipairs(slots) do
+            local also = (slot == 16 and twoHand and 17) or (slot == 17 and wornTwoHand and 16) or nil
+            local g = S.Gain(link or id, slot, weights, power, also)
+            if type(g) == "number" and (not best or g > best) then best, bestSlot, bestAlso = g, slot, also end
+        end
+        if not best then return nil end
+        local function share(slot)
+            if type(S.DpsShare) == "function" then return S.DpsShare(slot) end
+            return slot == 16 and 1 or (slot == 17 and 0.5) or 0
+        end
+        local acc = {}
+        WorthParts(S, stats, weights, share(bestSlot), acc, 1)
+        for _, slot in ipairs({ bestSlot, bestAlso }) do
+            local worn = GetInventoryItemLink("player", slot)
+            local ws = worn and S.Stats(worn)
+            if type(ws) == "table" then WorthParts(S, ws, weights, share(slot), acc, -1) end
+        end
+        local rows = {}
+        for _, r in pairs(acc) do
+            local pct = (S.PERCENT or 100) * r.worth / power
+            if math.abs(pct) > 1e-6 then rows[#rows + 1] = { stat = r.stat, amount = r.amount, pct = pct } end
+        end
+        table.sort(rows, function(a, b)
+            if math.abs(a.pct) ~= math.abs(b.pct) then return math.abs(a.pct) > math.abs(b.pct) end
+            return a.stat < b.stat
+        end)
+        return { pct = best, rows = rows }
+    end)
+    return ok and res or nil
 end
 
 local ev = CreateFrame("Frame")

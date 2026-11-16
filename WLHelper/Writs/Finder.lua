@@ -1111,6 +1111,8 @@ function F.LiveName(row)
         if ok and Readable(info) and type(info) == "table" then
             local n = Str(info.leaderName)
             if not n then return nil, "hidden" end
+            -- listed in the game's finder right now: online (a listing goes when its owner logs off)
+            if root.HeardFrom then root.HeardFrom(n) end
             return n
         end
         return nil, "hidden"
@@ -1124,13 +1126,15 @@ local function Whisper(name)
     if ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. name .. " ") end
 end
 F.OpenWhisper = Whisper
--- a whisper we send ourselves: never a hidden name or text
+-- a whisper we send ourselves: never a hidden name or text, and only to a player surely online
+-- (root.ChatWhisper: in my group, online in the guild, listed or heard from in the last minute).
+-- false, "offline" when not sent for that reason: the caller opens the whisper box instead.
 function F.Send(text, name)
     if not (Readable(text) and Readable(name)) or type(text) ~= "string" or type(name) ~= "string" or text == "" then return false end
-    local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
-    if type(send) ~= "function" then return false end
+    if not root.ChatWhisper then return false, "offline" end
     F.actAt = Clock()
-    return (pcall(send, Cut(text, 255), "WHISPER", nil, name))
+    local ok, why = root.ChatWhisper(Cut(text, 255), name)
+    return ok and true or false, why
 end
 
 -- the message templates (Settings > Groupes); the default follows the client's language
@@ -1246,7 +1250,14 @@ function F.Ask(row)
         return true, "box"
     end
     if F.CooldownLeft() > 0 then Notice("cooldown"); return false, "cooldown" end
-    if not F.Send(text, name) then Notice("blocked"); return false, "blocked" end
+    local sent, why2 = F.Send(text, name)
+    if not sent and why2 == "offline" then
+        -- not surely online: no whisper sent for us, the whisper box opens and the player decides
+        Whisper(name)
+        F.contacted[name] = Now()
+        return true, "box"
+    end
+    if not sent then Notice("blocked"); return false, "blocked" end
     F.StartCooldown()
     if row.guid then F.asked[row.guid] = true end
     F.contacted[name] = Now()

@@ -6,6 +6,50 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.93] — 2026-11-17
+
+### Ajouté / Added
+- **Zones sur la carte** (T-90) : quand les objets ou monstres d'un objectif sont éparpillés (ex. Artefacts atal'ai dans l'eau autour de l'île du bassin des larmes), une zone est dessinée sur la carte du monde et la minimap, la flèche mène au plus proche, et l'étiquette dit « Dans la zone » ; 49 objectifs de 39 quêtes.
+  *Quest zones drawn for scattered targets; arrow to the nearest one.*
+- **Horaires des zeppelins et bateaux** : « Zeppelin pour Grom'gol dans 1:20 » / « à quai, part dans 0:35 » ; horaires de NaowhForever s'il est installé, sinon relevés en jeu et partagés dans la guilde (et ceux de NauticusClassic / ForeverTransport) ; le GPS compte la vraie attente.
+  *Zeppelin and boat departure timers, used by the route planner.*
+- **Vols connus** : si le GPS ne connaît pas encore tes vols sur un continent, il suppose connus ceux des zones bien en dessous de ton niveau (« Vol supposé connu : ouvre la carte du maître de vol pour vérifier ») ; ouvrir une carte de vol corrige tout. La flèche explique quand elle te met à cheval.
+  *Assumed known flights until a flight map is opened; ride reasons explained.*
+- **Pourquoi d'abord là-bas** : « D'abord à Feralas : il faut « Le Temple englouti » avant de parler à Marvon Rivetseeker à Tanaris. »
+  *The card says why the route goes elsewhere first.*
+- **Améliorations** : une ligne courte dit pourquoi (« Surtout : DPS de baguette en plus, moins de dégâts de givre ») ; Maj pour le détail chiffré. Réglages « J'utilise ma baguette » (automatique : parfois dès le niv. 40 pour mage, démoniste, prêtre) et « Ignorer les armures plus légères que la mienne (dès le niv. 40) ».
+  *Upgrade reasons, wand usage and lighter-armor settings.*
+- **Maraudon** : les gemmes des Khans pour « Les instructions du paria » (Prophète sans nom, Kolk, Gelk, Magra dehors ; Veng et Maraudos dedans), et où remplir la fiole de « La corruption de Vylelangue ».
+  *Pariah's Instructions step by step.*
+
+### Modifié / Changed
+- **Ordre des boss de Maraudon** corrigé, selon l'aile où tu entres (orange ou violette).
+  *Maraudon boss order by wing.*
+- **Liste « En chemin » dans le donjon** : seulement ce qui se fait sur le chemin de ce boss, avec où et combien ; « Carte du donjon » au lieu du bouton grisé.
+  *Per-boss on-the-way lists.*
+- **Moins d'allers-retours** : ce qui se fait sur place passe avant de partir (40 % d'allers-retours en moins).
+  *Fewer back-and-forth trips.*
+- **Textes des cartes du guide relus** (3589 cartes) : distances et « change de continent » cohérents, « Avant / Après le donjon » justes, listes avec verbe et compte.
+  *Guide card texts proofread.*
+- **Trajet sur la flèche** : « Puis vol jusqu'à Orgrimmar > zeppelin pour Fossoyeuse > vol jusqu'à Moulin-de-Tarren » (plus de carrés), détail dans l'infobulle.
+  *Readable itinerary line.*
+- **Pierre de foyer** : la carte du guide donne aussi la durée et l'autre trajet.
+  *Trip time on the card.*
+
+### Corrigé / Fixed
+- **XP des quêtes grises** : ce que Forever donne vraiment (chiffre du jeu, sinon courbe apprise, sinon 80/60/50 %) ; ex. 1 900 XP au lieu de 380.
+  *Grey quest XP matches Forever.*
+- **Objets portés à suffixe** (« de force », « de l'ours ») lus avec leurs vraies stats : fini les +1128 % et « Emplacement vide » à tort.
+  *Random-suffix worn items read correctly.*
+- **Spam « Aucun joueur nommé... »** : WL Helper ne chuchote qu'aux joueurs en ligne, et la ligne est masquée sinon.
+  *No more "player not found" spam from WL Helper.*
+- **Partage des quêtes en combat** : attend la fin du combat au lieu d'être bloqué par le jeu.
+  *Quest sharing waits for the end of combat.*
+- **Check-list** : une quête dont la chaîne n'est pas faite (« Rot and Regret ») est « Bloquée » en gris au lieu de « Requise » ; la chaîne ajoutée après coup se place avant le donjon.
+  *Locked quests no longer block the checklist.*
+- **Fenêtres opaques**, la dernière cliquée passe devant.
+  *Opaque windows, last clicked on top.*
+
 ## [1.0.0-beta.92] — 2026-11-16
 
 ### Ajouté / Added

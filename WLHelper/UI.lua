@@ -378,9 +378,11 @@ local function SetShareButton(b, n, withLabel)
   if not b then return end
   -- a share running (this button or the overview's): greyed, "Sharing" until it ends
   local busy = ns.pushBusy and true or false
-  if withLabel then b:SetText(busy and L.SUM_SHARING or ShareLabel(n)) end
-  if n > 0 and not busy then b:Enable() else b:Disable() end
-  b.disabledReason = busy and L.SUM_SHARING or ((IsInGroup and IsInGroup()) and L.NOSHARE or L.NOGROUP_TIP)
+  -- in combat the game blocks the share: « Après le combat », greyed, until combat ends
+  local combat = (busy or n > 0) and ns.ShareInCombat and ns.ShareInCombat() or false
+  if withLabel then b:SetText(combat and L.SHARE_AFTER or (busy and L.SUM_SHARING or ShareLabel(n))) end
+  if n > 0 and not busy and not combat then b:Enable() else b:Disable() end
+  b.disabledReason = combat and L.SHARE_AFTER_TT or (busy and L.SUM_SHARING or ((IsInGroup and IsInGroup()) and L.NOSHARE or L.NOGROUP_TIP))
 end
 local function DoShare()
   ns.ShareQuests(); shareAt = -10
@@ -430,15 +432,25 @@ local function RouteDungeons()
 end
 
 -- What a check-list still misses: quests not in the log, and whether a needed key is missing.
+-- An optional check-list quest (the dungeon is done without it, BeforeReason false): its row
+-- says "Optional" and it does not hold the banner back
+function ns.GuideOptionalCheck(nd, dk)
+  if not (nd and nd.kind == "h" and nd.q and ns.GuideBeforeReason) then return false end
+  local ok, r = pcall(ns.GuideBeforeReason, nd.q, dk)
+  return ok and r == false
+end
+
 local function ReadyState(log, st)
-  local miss, total = 0, 0
+  local miss, total, opt = 0, 0, 0
   for _, nd in ipairs(st.checks or {}) do
     total = total + 1
-    if not ns.NodeOK(log, nd) then miss = miss + 1 end
+    if not ns.NodeOK(log, nd) then
+      if ns.GuideOptionalCheck(nd, st.gate or st.ins) then opt = opt + 1 else miss = miss + 1 end
+    end
   end
   local keyMissing = false
   for _, k in ipairs(ns.KeyLines and ns.KeyLines(st.gate or st.ins) or {}) do if k[3] and not k[2] then keyMissing = true end end
-  return miss, total, keyMissing
+  return miss, total, keyMissing, opt
 end
 
 -- The check-list step the "Check-list" button opens: the one of the dungeon on screen,
@@ -505,7 +517,13 @@ local function StepPoints(log, st, all)
   for _, n in ipairs(st.acts) do
     if n.loc and n.loc.m and (all or not ns.NodeOK(log, n)) then
       local x, y = n.loc.x, n.loc.y
-      if n.kind == "o" then
+      -- an objective spread over an area (o.area): the spawn nearest to you in the nearest camp,
+      -- before the game's quest area (a ring round an island has its middle there, on dry land)
+      local a = n.kind == "o" and ns.AreaOf and ns.AreaOf(n)
+      local am, ax, ay
+      if a then am, ax, ay = ns.AreaFollow(a) end
+      if am == n.loc.m and ax then x, y = ax, ay
+      elseif n.kind == "o" then
         local gx, gy = GamePOI(n.q, n.loc.m)
         if gx then x, y = gx, gy end
       end
@@ -537,6 +555,41 @@ ns.StepPoints = StepPoints
 -- =====================================================================
 --  Textes d'une étape
 -- =====================================================================
+-- The class token a class quest shows: yours when the quest lists it ("WARRIOR,PALADIN,SHAMAN" on
+-- a Paladin: PALADIN), else the first one
+-- A quest's objective sentence for the card: the French one when we have it, unless it is the
+-- quest's flavour text (it talks to "<nom>", "<classe>"): then the objective itself
+function ns.GuideObjSentence(q)
+  if not q then return nil end
+  local fr = ns.lang == "fr" and q.of or nil
+  if type(fr) == "string" and fr:find("<%a+>") then fr = nil end
+  return fr or ns.T(q.oe)
+end
+
+-- Where a prerequisite stands in its chain: "étape 3 sur 9 avant « X »"; when the chain's quests
+-- share one name, "partie 1 sur 2 de la suite « X »" (never "before X" on X itself); others it
+-- also leads to: " (et 1 autre quête)". row: the row's capitalised form.
+function ns.GuideChainText(nd, row)
+  local lead = nd and nd.forQ and nd.forQ[1]
+  if not (lead and nd.ci and nd.cn) then return nil end
+  local ln = ns.QName(lead)
+  local t
+  if ln == ns.QName(nd.q) then t = (row and L.CH_PART or L.CARD_PART):format(nd.ci, nd.cn, ln)
+  else t = (row and L.CH_BEFORE or L.CARD_CHAIN):format(nd.ci, nd.cn, ln) end
+  local more = #nd.forQ - 1
+  if more > 0 then t = t .. ns.Plural(more, "CARD_PLUS_P1", "CARD_PLUS_P", more) end
+  return t
+end
+
+function ns.GuideClassTok(c)
+  if type(c) ~= "string" then return nil end
+  local ok, _, mine = pcall(UnitClass, "player")
+  if ok and type(mine) == "string" then
+    for tok in c:gmatch("[^,]+") do if tok == mine then return tok end end
+  end
+  return (c:match("^[^,]+"))
+end
+
 local function ZoneName(m)
   local info = C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(m)
   return info and info.name or ""
@@ -550,7 +603,15 @@ local function StepTitle(st, noZone)
     if st.bossStep then return L.BOSS_STEP_N:format(st.bossIdx, st.bossN or st.bossIdx, ns.BossStepName(st)) end
     if st.way then return L.IN_WAY:format(st.wayName or "?") end
     if st.bossIdx == 0 then return L.IN_START .. pr end
-    if st.bossIdx == 999 then return L.IN_TRASH .. pr end
+    if st.bossIdx == 999 then
+      -- "trash loot" only when every action is a drop; takes, turn-ins and searches: plain wording
+      local loot = #(st.acts or {}) > 0
+      for _, n in ipairs(st.acts or {}) do
+        local o = n.oneObj or (n.kind == "o" and n.obj) or nil
+        if not (n.kind == "c" or n.kind == "o") or not (o and o.k == "item" and o.src) then loot = false; break end
+      end
+      return (loot and L.IN_TRASH or L.IN_TRASH_ANY) .. pr
+    end
     return L.BOSS_STEP:format(st.bossName or "?") .. pr
   end
   if st.ins then
@@ -1061,8 +1122,13 @@ local function MakeRow(parent)
   if gb.SetIcon then gb:SetIcon("pin") end
   gb.row = row
   row.gb = gb
-  row:SetScript("OnClick", function(self) local n = self.node; if ns.NodeCanGo(n) then ns.SetOne(n) end end)
-  row:SetScript("OnMouseDown", function(self) if ns.NodeCanGo(self.node) then self.press:Show() end end)
+  -- a locked check-list line (T-91): the click ticks the quest by hand, its chain joins the route
+  row:SetScript("OnClick", function(self)
+    local n = self.node
+    if n and n.lock then if ns.GuideLockPick then ns.GuideLockPick(n.q) end return end
+    if ns.NodeCanGo(n) then ns.SetOne(n) end
+  end)
+  row:SetScript("OnMouseDown", function(self) if (self.node and self.node.lock) or ns.NodeCanGo(self.node) then self.press:Show() end end)
   row:SetScript("OnMouseUp", function(self) self.press:Hide() end)
   row:SetScript("OnEnter", function(self) ns.RowTip(self) end)
   row:SetScript("OnLeave", ns.HideTip)
@@ -1093,6 +1159,14 @@ function ns.RowTip(row)
   if not n then
     -- a boss header: its name and tip (cut labels first)
     if row.bossName then ns.ShowTip(row, { row.bossName, row.bossTip }) end
+    return
+  end
+  if n.lock then
+    local t = { ns.QName(n.q) }
+    local why = ns.CheckLockText and ns.CheckLockText(n.q, nil, n.d)
+    if why then t[#t + 1] = why end
+    t[#t + 1] = L.CL_LOCK_CLICK
+    ns.ShowTip(row, t)
     return
   end
   local q = ns.Q[n.q] or {}
@@ -1143,7 +1217,7 @@ function ns.RowTip(row)
       reqs[#reqs + 1] = "- " .. r[1] .. (r[2] and r[2] > 1 and (" x" .. r[2]) or "") .. (r[3] and (L.COLON .. ns.T(r[3])) or "")
     end
   end
-  local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
+  local obj = ns.GuideObjSentence(q)
   -- the game's own description, in grey under the objectives, when our data is thin (as the card)
   local gdesc
   if ns.GameQuestText and (s == "on" or s == "ready") then
@@ -1195,7 +1269,7 @@ function ns.RowTip(row)
   end
   -- the chain, what blocks it
   local chain = {}
-  if n.pre and n.ci and n.cn and n.forQ and n.forQ[1] then chain[#chain + 1] = { L.CH_BEFORE:format(n.ci, n.cn, ns.QName(n.forQ[1])), txt[1], txt[2], txt[3] } end
+  if n.pre and n.ci and n.cn and n.forQ and n.forQ[1] then chain[#chain + 1] = { ns.GuideChainText(n, true), txt[1], txt[2], txt[3] } end
   -- the level it needs is already in the level line under the title
   local pb = n.kind == "a" and not NeedShown(n.q, s) and ns.PrereqProblem(n.q)
   if pb then chain[#chain + 1] = { L.BLOCKED:format(pb), T.bad[1], T.bad[2], T.bad[3] } end
@@ -1271,6 +1345,16 @@ local SEP = "  ·  "
 -- an objective's verb and icon, the tracker's words (Tracker.lua TR.Action uses the same keys)
 local OBJ_KIND = { kill = "kill", item = "loot", object = "use", talk = "talk", event = "go" }
 local OBJ_TEXT = { kill = "TR_KILL", loot = "TR_LOOT", use = "TR_USE", talk = "TR_TALK", go = "TR_GO" }
+-- The verb key of an objective's line: its kind's own; a "go" objective that is not a place but a
+-- sentence ("Find Varian Wrynn", "Explore the waters of ...") reads "Objective: ..."
+function ns.ObjVerbKey(o, nm)
+  local kind = OBJ_KIND[o and o.k] or "go"
+  if kind == "go" and type(nm) == "string" then
+    local _, words = nm:gsub("%S+", "")
+    if words > 3 or nm:match("^Find ") or nm:match("[%.!]$") then return "TR_OBJ" end
+  end
+  return OBJ_TEXT[kind]
+end
 local OBJ_ICON = { kill = "sword", loot = "bag", use = "hammer", talk = "user", go = "flag" }
 local CHECK_T = "|TInterface\\AddOns\\WLHelper\\Media\\Icons\\check:14:14:0:-1|t "
 
@@ -1316,6 +1400,11 @@ ns.ArrowSource = ArrowSource
 -- an objective. -> m, x, y (nil when nothing places it)
 local function NodePoint(nd)
   if nd.loc and nd.loc.m then
+    local a = nd.kind == "o" and ns.AreaOf and ns.AreaOf(nd)
+    if a then
+      local am, ax, ay = ns.AreaFollow(a)
+      if am == nd.loc.m and ax then return am, ax, ay end
+    end
     if nd.kind == "o" then
       local gx, gy = GamePOI(nd.q, nd.loc.m)
       if gx then return nd.loc.m, gx, gy end
@@ -1333,6 +1422,33 @@ local function NodePoint(nd)
   end
 end
 ns.NodePoint = NodePoint
+
+-- An objective spread over an area: its spot is picked again once you moved 30 yd (ns.AreaFollow).
+-- Asked every second while the current step has one (Writs/Patrol.lua, Zones): when the spot of a
+-- line the arrow follows changed, the arrow goes to the new one (the whole step when the guide
+-- places its points itself, else that line).
+local areaSeen = setmetatable({}, { __mode = "k" })
+function ns.AreaRefollow()
+  if not f or (ns.GuideOn and not ns.GuideOn()) then return false end
+  local st = Steps()[f.auto or 0]
+  if not (st and st.acts) then return false end
+  local log = ns.LogEntries()
+  local moved
+  for _, n in ipairs(st.acts) do
+    local a = ns.AreaOf and ns.AreaOf(n)
+    if a and not ns.NodeOK(log, n) then
+      local m, x, y = ns.AreaFollow(a)
+      if m then
+        local key, was = ns.PKey(m, x, y), areaSeen[a]
+        areaSeen[a] = key
+        if was and was ~= key and ns.active[was] then moved = moved or n end
+      end
+    end
+  end
+  if not moved then return false end
+  if WLDTDB.autoWay then f.sig = nil; ns.Refresh(true) else ns.SetOne(moved) end
+  return true
+end
 -- a click on the line (or its GPS button) leads somewhere: its own place, or the game's quest area
 function ns.NodeCanGo(nd)
   if not nd then return false end
@@ -1347,7 +1463,9 @@ end
 
 -- How far a point is from you: "350 m", "1,2 km" (the GPS's own words), "Autre continent"; nil
 -- inside an instance, with no position, or when the position is secret.
-local function DistText(m, x, y)
+-- How far a point is from you, raw: "far" (another continent), the yards, or nil (inside an
+-- instance, no position, secret position).
+function ns.GuideLiveSpan(m, x, y)
   if not (m and x and y and ns.PlayerWorld and ns.World) then return nil end
   if IsInInstance then
     local okI, inst = pcall(IsInInstance)
@@ -1361,8 +1479,28 @@ local function DistText(m, x, y)
     return false, math.sqrt((here[2] - there[2]) ^ 2 + (here[3] - there[3]) ^ 2)
   end)
   if not okD then return nil end
-  if far then return L.ARROW_FAR end
+  if far then return "far" end
   if type(yd) ~= "number" or (issecretvalue and issecretvalue(yd)) then return nil end
+  return yd
+end
+
+-- The travel hint of a step, from the same spot as the distance: your live position when there
+-- is one (another continent: TRAVEL_CONT; same continent, farther than 1400 yd: TRAVEL_FAR; nearer:
+-- none), else the route's own hint (from the previous step). So a card never says "9 km" and
+-- "change continent" at once.
+function ns.GuideLiveTravelKey(st, m, x, y)
+  local tr = st and st.travel
+  if tr == "TRAVEL_UNK" then return tr end
+  local live = ns.GuideLiveSpan(m, x, y)
+  if live == "far" then return "TRAVEL_CONT" end
+  if type(live) == "number" then return live > 1400 and "TRAVEL_FAR" or nil end
+  return tr
+end
+
+local function DistText(m, x, y)
+  local yd = ns.GuideLiveSpan(m, x, y)
+  if yd == nil then return nil end
+  if yd == "far" then return L.ARROW_FAR end
   -- the GPS's own format (meters or yards, as set on the GPS page); WP lives on the Writs side
   local WP = ns.Writs and ns.Writs.WP
   local GPS = WP and WP.GPS
@@ -1384,9 +1522,10 @@ ns.GuideDistText = DistText
 -- (TRAVEL_CONT / TRAVEL_FAR). nil when the step has no travel hint. The trip's time follows it ("(~10 min)")
 -- and, on a line of its own, its runner-up ("Autre trajet : pierre de foyer jusqu'à Grom'gol, puis vol
 -- jusqu'à Kargath (~7 min)", TripSummary's 3rd and 4th values) when there is one.
-local function TravelText(st, m, x, y)
-  if not (st and st.travel) then return nil end
-  if st.travel == "TRAVEL_CONT" and type(m) == "number" and type(x) == "number" and type(y) == "number" then
+local function TravelText(st, m, x, y, key)
+  key = key or (st and st.travel)
+  if not key then return nil end
+  if key == "TRAVEL_CONT" and type(m) == "number" and type(x) == "number" and type(y) == "number" then
     local WP = ns.Writs and ns.Writs.WP
     local GPS = WP and WP.GPS
     if GPS and GPS.TripSummary then
@@ -1398,7 +1537,7 @@ local function TravelText(st, m, x, y)
       end
     end
   end
-  return L[st.travel]
+  return L[key]
 end
 ns.GuideTravelText = TravelText
 
@@ -1658,6 +1797,9 @@ end
 -- The name of an objective as the player reads it: ours (translated), else in French the game's own
 -- words when the quest is in the log and the game names the same objective.
 local function ObjName(nd, o, log, s)
+  -- the whole quest sentence (no objective of its own): the line says "Do « quest »" and the card
+  -- shows the sentence, in French when we have it
+  if o.k == "text" then return nil end
   local nm = o.n and (ns.T(o.n) or o.n) or nil
   if ns.lang == "fr" and o.n and nm == o.n and (s == "on" or s == "ready") then
     local lines, fromGame = ObjectiveBlock({ kind = "o", q = nd.q, obj = o }, log, s)
@@ -1680,8 +1822,10 @@ end
 local function ObjLine(nd, o, log, s)
   local kind = OBJ_KIND[o.k] or "go"
   local nm = ObjName(nd, o, log, s)
-  local t = nm and L[OBJ_TEXT[kind]]:format(nm) or L.TR_DO:format(ns.QName(nd.q))
+  local t = nm and L[ns.ObjVerbKey(o, nm)]:format(nm) or L.TR_DO:format(ns.QName(nd.q))
   local a, b, fin = ns.ObjCount(log, nd.q, o)
+  -- not in the log yet: the count still says how many it takes ("0 sur 6")
+  if not (a and b) and type(o.c) == "number" and o.c > 1 then a, b, fin = 0, o.c, false end
   if a and type(b) == "number" and b > 1 then
     t = t .. Hex(T.muted) .. SEP .. "|r" .. Hex(fin and T.ok or T.muted) .. L.CARD_COUNT:format(a, b) .. "|r"
   end
@@ -1727,11 +1871,65 @@ local function LineText(a, log)
     local o = a.oneObj or (a.kind == "o" and a.obj) or nil
     if o then
       local nm = ObjName(a, o, log, ns.State(log, a.q))
-      if nm then return L[OBJ_TEXT[OBJ_KIND[o.k] or "go"]]:format(nm) end
+      if nm then
+        local t = L[ns.ObjVerbKey(o, nm)]:format(nm)
+        local ca, cb = ns.ObjCount(log, a.q, o)
+        if not (ca and cb) and type(o.c) == "number" and o.c > 1 then ca, cb = 0, o.c end
+        if ca and type(cb) == "number" and cb > 1 then t = t .. SEP .. L.CARD_COUNT:format(ca, cb) end
+        return t
+      end
     end
   end
   local lk = LINE_KEY[a.kind]
   return lk and L[lk]:format(NodeName(a)) or NodeName(a)
+end
+ns.GuideLineText = LineText
+
+-- "En chemin, fais aussi" of a step inside a dungeon (T-92): st.trash = the lines on the way to this
+-- step's boss (where from st.trashWhere: "Tuer : X · <où> · 0 sur 8 · Tombe sur : ..."), st.trashAll =
+-- what drops everywhere, on the first step inside only ("Tout le donjon : 25 x Y (tombent sur les
+-- monstres)"). Done lines are left out. (No new main-chunk local: UI.lua is at Lua's 200 limit.)
+function ns.GuideAlsoLines(st, log)
+  local out, seen = {}, {}
+  local function add(t) if t and t ~= "" and not seen[t] then seen[t] = true; out[#out + 1] = t end end
+  for _, nd in ipairs(st.trashAll or {}) do
+    if not ns.NodeOK(log, nd) then
+      local o = nd.oneObj
+      local nm = o and ObjName(nd, o, log, ns.State(log, nd.q))
+      if nm then
+        local c = type(o.c) == "number" and o.c or 1
+        local t = L.ALSO_ALL:format(c > 1 and (c .. " x " .. nm) or nm)
+        local ca, cb = ns.ObjCount(log, nd.q, o)
+        if ca and type(cb) == "number" and cb > 1 then t = t .. SEP .. L.CARD_COUNT:format(ca, cb) end
+        local go = ns.GROUP_OBJ and o.n and ns.GROUP_OBJ[o.n]
+        local dr = (go ~= "*") and DropsText(o) or nil
+        t = t .. (dr and (SEP .. dr) or (" " .. (c > 1 and L.ALSO_MOBS or L.ALSO_MOB)))
+        add(t)
+      else add(LineText(nd, log)) end
+    end
+  end
+  for _, nd in ipairs(st.trash or {}) do
+    if not ns.NodeOK(log, nd) then
+      local a = st.trashWhere and st.trashWhere[nd]
+      local where = a and ((ns.lang == "fr") and a[3] or a[2]) or nil
+      local o = nd.oneObj
+      local nm = o and log and ObjName(nd, o, log, ns.State(log, nd.q))
+      if nm then
+        local t = L[ns.ObjVerbKey(o, nm)]:format(nm)
+        if where then t = t .. SEP .. where end
+        local ca, cb = ns.ObjCount(log, nd.q, o)
+        if not (ca and cb) and type(o.c) == "number" and o.c > 1 then ca, cb = 0, o.c end
+        if ca and type(cb) == "number" and cb > 1 then t = t .. SEP .. L.CARD_COUNT:format(ca, cb) end
+        local dr = o.k == "item" and DropsText(o) or nil
+        if dr then t = t .. SEP .. dr end
+        add(t)
+      else
+        local t = LineText(nd, log)
+        add(where and t and (t .. SEP .. where) or t)
+      end
+    end
+  end
+  return out
 end
 
 -- The XP and money of a quest (the summary's numbers), for the turn-in's details
@@ -1758,6 +1956,24 @@ end
 -- chain), then the details, folded. -> table:
 --   title, icon (HD name, nil = the kind's own mark), lead, drops, where, placeBase, pt {m,x,y},
 --   noFar, travel, why {..}, objs {..}, details {..}, desc, gpsTip {..}, ok
+-- The card's "first to <zone>" line of a step (ns.StepWhyFirst's text) or nil, cached per step
+-- (weak keys: a rebuilt route drops its old steps) and per player's map and route
+-- (in a do block: the main chunk is at Lua 5.1's 200 locals)
+do
+  local whyFirstCache = setmetatable({}, { __mode = "k" })
+  function ns.GuideWhyFirst(st)
+    if not (st and ns.StepWhyFirst) then return nil end
+    local steps = ns.route and ns.route.steps
+    local here = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+    local c = whyFirstCache[st]
+    if c and c.here == here and c.steps == steps then return c.text end
+    local okW, w = pcall(ns.StepWhyFirst, st, steps, here)
+    local text = okW and type(w) == "table" and type(w.text) == "string" and w.text ~= "" and w.text or nil
+    whyFirstCache[st] = { here = here, steps = steps, text = text }
+    return text
+  end
+end
+
 local function FocusModel(card, nd, log, dkey, st)
   local q = ns.Q[nd.q] or {}
   local s = ns.State(log, nd.q)
@@ -1767,7 +1983,7 @@ local function FocusModel(card, nd, log, dkey, st)
   local M = { why = {}, objs = {}, details = {}, detBlocks = {}, gpsTip = {}, ok = ok }
   local qn = nd.q and ns.QName(nd.q) or ""
   local kind = nd.kind
-  local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
+  local obj = ns.GuideObjSentence(q)
   local desc
   if inLog and ns.GameQuestText then
     local gdesc, gobj = ns.GameQuestText(nd.q, log)
@@ -1790,6 +2006,8 @@ local function FocusModel(card, nd, log, dkey, st)
     if o then
       local t, ok2, nm = ObjLine(nd, o, log, s)
       M.title, M.icon, objName = t, OBJ_ICON[ok2], nm
+      -- the quest's whole sentence as its only objective: "Do « X »", then the sentence (French when we have it)
+      if o.k == "text" and obj and not ok then M.lead = obj; objMoved = true end
     else
       local game = (inLog and ns.GameObjectives) and ns.GameObjectives(nd.q, log) or {}
       local g
@@ -1824,7 +2042,13 @@ local function FocusModel(card, nd, log, dkey, st)
   else
     M.placeBase = table.concat(place, SEP)
   end
-  M.noFar = st and st.travel == "TRAVEL_CONT" or nil
+  local trKey = st and st.travel
+  if M.pt then trKey = ns.GuideLiveTravelKey(st, m, x, y) end
+  -- the place line already says the spot is unknown: the travel line does not say it again
+  -- (or the WHY line says it, for an action with no known spot)
+  if trKey == "TRAVEL_UNK" and (src == "log" or nd.unknown) then trKey = nil end
+  M.trKey = trKey
+  M.noFar = trKey == "TRAVEL_CONT" or nil
   local dist = M.pt and DistText(m, x, y) or nil
   if dist == L.ARROW_FAR and M.noFar then dist = nil end
   M.dist = dist
@@ -1833,7 +2057,7 @@ local function FocusModel(card, nd, log, dkey, st)
   else
     M.where = M.placeBase ~= "" and M.placeBase or nil
   end
-  M.travel = TravelText(st, m, x, y)
+  M.travel = trKey and TravelText(st, m, x, y, trKey) or nil
 
   -- WHY: one muted line, the quest then the chain. When the title already names the quest (a
   -- turn-in, "Faire « X »"), the line keeps the fact (a dungeon quest) and not the name again.
@@ -1849,10 +2073,21 @@ local function FocusModel(card, nd, log, dkey, st)
     local lf = LevelFact(nd.q, s)
     if lf then why[#why + 1] = lf .. mt end
   end
+  -- the dungeon's own quest, taken outside: why now (it is done inside)
+  if kind == "a" and q.role == "main" and q.d and not nd.pre and not nd.ins and nd.phase ~= "after" and s == "none" then
+    local okB, r = pcall(BeforeReason, nd.q, nd.d)
+    if okB and r == nil then why[#why + 1] = L.CARD_TAKE_MAIN end
+  end
   if nd.pre then
     local lead = nd.forQ and nd.forQ[1]
-    if nd.ci and nd.cn and lead then
-      why[#why + 1] = L.CARD_CHAIN:format(nd.ci, nd.cn, ns.QName(lead)) .. ((#nd.forQ > 1) and L.CARD_PLUS_P:format(#nd.forQ - 1) or "")
+    -- the card also says "Requis pour « Y »" below when the dungeon needs another quest of the
+    -- chain: then the chain line does not name a different end
+    local okB, nx = false, nil
+    if nd.q and nd.phase ~= "after" then okB, nx = pcall(BeforeReason, nd.q, nd.d) end
+    if nd.ci and nd.cn and lead and okB and nx and nx ~= lead and ns.QName(nx) ~= ns.QName(lead) then
+      why[#why + 1] = L.CARD_PRE_N:format(nd.ci, nd.cn)
+    elseif nd.ci and nd.cn and lead then
+      why[#why + 1] = ns.GuideChainText(nd)
     elseif nd.ci and nd.cn then why[#why + 1] = L.CARD_PRE_N:format(nd.ci, nd.cn)
     else why[#why + 1] = Low(L.PRE) end
   elseif kind == "a" and ns.ChainState then
@@ -1887,7 +2122,12 @@ local function FocusModel(card, nd, log, dkey, st)
   -- (T-87) and the same for a main quest of the dungeon done outside it (Shadowshard Fragments):
   -- "Optional: the dungeon can be done without it · on the way to the portal" or "Required for X";
   -- nothing on a step after the dungeon (the follow-up of a chain done inside)
-  if nd.q and nd.phase ~= "after" and (nd.pre or q.role == "pre" or (q.role == "main" and not nd.ins and kind ~= "t" and kind ~= "h")) then
+  -- A step away from the player's zone that comes first because a line back here needs it
+  -- (ns.StepWhyFirst, "First to Feralas: you need X before talking to Y in Tanaris"): that one
+  -- line takes the place of the "Required for" / "Optional" line, never both
+  local wf = ns.GuideWhyFirst(st)
+  if wf then M.why[#M.why + 1] = mt .. wf .. "|r"
+  elseif nd.q and nd.phase ~= "after" and (nd.pre or q.role == "pre" or (q.role == "main" and not nd.ins and kind ~= "t" and kind ~= "h")) then
     local okB, nx, way = pcall(BeforeReason, nd.q, nd.d)
     if okB and nx then M.why[#M.why + 1] = mt .. (way and L.CARD_BEFORE_KEY or L.CARD_BEFORE_WHY):format(ns.QName(nx)) .. "|r"
     elseif okB and nx == false then M.why[#M.why + 1] = mt .. L.CARD_BEFORE_OPT .. (way and L.CARD_BEFORE_WAY or "") .. "|r" end
@@ -1902,12 +2142,17 @@ local function FocusModel(card, nd, log, dkey, st)
       if okP and type(pt) == "string" and pt ~= "" then M.why[#M.why + 1] = Hex(T.warn) .. pt .. "|r" end
     end
   end
+  -- an objective spread over an area (o.area, Curated.lua): where to look in it, when the data says
+  do
+    local a = ns.AreaOf and ns.AreaOf(nd)
+    if a and type(a.note) == "string" and a.note ~= "" then M.why[#M.why + 1] = tx .. ns.T(a.note) .. "|r" end
+  end
   if ns.PartyLine then
     local pl = ns.PartyLine(nd.q)
     if pl then M.why[#M.why + 1] = tx .. pl .. "|r" end
   end
   if q.c and not (card and card.clsChip and card.clsChip:IsShown()) then
-    local tok = q.c:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
+    local tok = ns.GuideClassTok(q.c); local cn, cc = ns.ClassInfo(tok)
     M.why[#M.why + 1] = ns.ClassIconText(tok, 12) .. Hex(cc) .. L.CLASS_TAG:format(cn) .. "|r"
   end
 
@@ -2028,6 +2273,9 @@ local function FocusTick(fo, el)
   if fo.relayoutDue then Relayout(); return end
   local M = fo.model
   if not (M and M.pt and fo.node and fo:IsShown()) then return end
+  -- you crossed to or from another continent, or the 1400 yd mark: the travel line changes
+  if M.trKey ~= "TRAVEL_UNK" and ns.GuideLiveSpan(M.pt[1], M.pt[2], M.pt[3]) ~= nil
+    and ns.GuideLiveTravelKey(fo.step, M.pt[1], M.pt[2], M.pt[3]) ~= M.trKey and fo.step then Relayout(); return end
   local d = DistText(M.pt[1], M.pt[2], M.pt[3])
   if d == L.ARROW_FAR and M.noFar then d = nil end
   if d == M.dist then return end
@@ -2154,7 +2402,7 @@ local function RenderFocus(card, st, log, y, dkey)
   local nd = st.acts[k]
   local M = FocusModel(card, nd, log, dkey, st)
   local ok = M.ok
-  fo.node, fo.model = nd, M
+  fo.node, fo.model, fo.step = nd, M, st
   -- hover feedback only when a click does something (a place to follow)
   local canGo = ns.NodeCanGo(nd)
   fo.hl:SetShown(canGo)
@@ -2253,7 +2501,15 @@ local function RenderFocus(card, st, log, y, dkey)
   end
   local TW = TextW()
   local npc = NpcShort(nd)
-  local atNpc = npc and (nd.kind == "a" or nd.kind == "t" or nd.kind == "h") and npc or nil
+  local function atKind(a) return a.kind == "a" or a.kind == "t" or a.kind == "h" end
+  local atNpc = npc and atKind(nd) and npc or nil
+  -- "Then at <NPC>:" only when every open action is at that NPC; else "Then:" and each line names
+  -- its own NPC
+  if atNpc then
+    for _, a in ipairs(others) do
+      if not (atKind(a) and NpcShort(a) == atNpc) then atNpc = nil; break end
+    end
+  end
   if #others > 0 then
     y = y + 16
     card.nextRule:ClearAllPoints(); card.nextRule:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.nextRule:SetWidth(TW); card.nextRule:Show()
@@ -2270,8 +2526,10 @@ local function RenderFocus(card, st, log, y, dkey)
       ln.icon:SetVertexColor(1, 1, 1)
       if not SetKindIcon(ln.icon, a) then ns.SetHDIcon(ln.icon, "dot", T.muted, 0) end
       local t = LineText(a, log)
-      local an = NpcShort(a)
-      if an and an ~= atNpc then t = t .. Hex(T.muted) .. SEP .. an .. "|r" end
+      -- the NPC where the line is done (a quest giver or taker); a kill or loot line's "NPC" is its
+      -- own target, already in the text
+      local an = atKind(a) and NpcShort(a) or nil
+      if an and an ~= atNpc and not t:find(an, 1, true) then t = t .. Hex(T.muted) .. SEP .. an .. "|r" end
       ln.text:SetText(t)
       ln:SetWidth(rowW)
       ln:ClearAllPoints(); ln:SetPoint("TOPLEFT", card, "TOPLEFT", 4, -y); ln:Show()
@@ -2499,7 +2757,8 @@ local function Build()
   band.shareBtn = SW().IconButton(band, "group", 24, function()
     local n = ShareN()
     local t = { L.M_SHARE, L.TT_FSHARE }
-    if n > 0 then t[#t + 1] = { ShareLabel(n), T.accentSoft[1], T.accentSoft[2], T.accentSoft[3] }
+    if n > 0 and ns.ShareInCombat and ns.ShareInCombat() then t[#t + 1] = { L.SHARE_AFTER_TT, T.muted[1], T.muted[2], T.muted[3] }
+    elseif n > 0 then t[#t + 1] = { ShareLabel(n), T.accentSoft[1], T.accentSoft[2], T.accentSoft[3] }
     else t[#t + 1] = { (IsInGroup and IsInGroup()) and L.NOSHARE or L.NOGROUP_TIP, T.muted[1], T.muted[2], T.muted[3] } end
     return t
   end, DoShare)
@@ -3366,7 +3625,7 @@ RenderNow = function()
   for _, nd in ipairs(st.acts) do local q = ns.Q[nd.q]; if not (q and q.c) then allCls = false else cls = q.c end end
   card.clsChip:Hide()
   if allCls and cls then
-    local tok = cls:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
+    local tok = ns.GuideClassTok(cls); local cn, cc = ns.ClassInfo(tok)
     card.clsChip:Set(ns.ClassIconText(tok, 12) .. L.CLASSQ:format(cn), cc)
     chips[#chips + 1] = card.clsChip
   end
@@ -3450,7 +3709,8 @@ RenderNow = function()
   -- the check-list "before entering": a banner (state, why, what next).
   -- Inside the dungeon it is over: the "inside the dungeon" band above the card takes its place.
   local checks = st.checks
-  local isCL = checks and #checks > 0 and not (st.ins and InInstanceOf(st.ins))
+  -- only on the gate itself: a step inside (whose own rows take quests there) never says "taken outside"
+  local isCL = st.gate and checks and #checks > 0 and not (st.ins and InInstanceOf(st.ins))
   -- every quest but no key: the banner says it, the key section then skips its own warning
   local readyNoKey, clMiss, clTotal = false, 0, 0
   local clDn = ns.DName(st.gate or st.ins) or ""
@@ -3471,7 +3731,7 @@ RenderNow = function()
       head, why, nxt, col, icon = L.CL_KEY_H, L.CL_KEY_T:format(clDn), L.CL_KEY_NEXT, T.warn, "warning"
     else
       head = (miss == 1) and L.CL_MISS_H1 or L.CL_MISS_HN:format(miss)
-      why, nxt, col, icon = L.CL_MISS_T:format(clDn), L.CL_MISS_NEXT, T.warn, "warning"
+      why, nxt, col, icon = ((miss == 1) and L.CL_MISS_T1 or L.CL_MISS_T):format(clDn), L.CL_MISS_NEXT, T.warn, "warning"
     end
     card.readyBg:SetColorTexture(col[1], col[2], col[3], 0.16); card.readyEdge(col, 0.4)
     ns.SetHDIcon(card.readyIcon, icon, col)
@@ -3483,9 +3743,11 @@ RenderNow = function()
   -- the travel sentence is plain text (icon audit); on an ordinary step it sits in the block, and a
   -- finished step looked at again needs none (its pill says "Faite", the big button goes back)
   Size(card.travel, ns.F.meta)
-  if st.travel and not focusMode and not done then
-    local tl = st.loc
-    card.travel:SetText(TravelText(st, tl and tl.m, tl and tl.x, tl and tl.y) or ""); card.travel:SetTextColor(T.text[1], T.text[2], T.text[3])
+  local tl = st.loc
+  local trKey = st.travel
+  if trKey and tl then trKey = ns.GuideLiveTravelKey(st, tl.m, tl.x, tl.y) end
+  if trKey and not focusMode and not done then
+    card.travel:SetText(TravelText(st, tl and tl.m, tl and tl.x, tl and tl.y, trKey) or ""); card.travel:SetTextColor(T.text[1], T.text[2], T.text[3])
   else card.travel:SetText("") end
   if card.travel:GetText() and card.travel:GetText() ~= "" then
     y = y + 8
@@ -3528,7 +3790,10 @@ RenderNow = function()
     local d = ns.D[st.gate]
     if d and d.ed then after[#after + 1] = { h = L.CL_ENTRY, body = { ns.T(d.ed) } } end
     -- in a group: the header, then the share button; alone: why sharing waits
-    if not grouped and not (st.run and clTotal == 0) then after[#after + 1] = { h = L.CL_GROUP, body = { L.GATE_N } } end
+    -- class quests only: nothing to share with the group
+    local allClsQ = #(st.checks or {}) > 0
+    for _, nd in ipairs(st.checks or {}) do local q = ns.Q[nd.q]; if not (q and q.c) then allClsQ = false end end
+    if not grouped and not allClsQ and not (st.run and clTotal == 0) then after[#after + 1] = { h = L.CL_GROUP, body = { L.GATE_N } } end
   end
   if st.split then
     -- a boss: where it stands, how to fight it, what it drops for you; then a tip, then "on the
@@ -3547,15 +3812,11 @@ RenderNow = function()
       if loot then note[#note + 1] = loot end
     elseif st.bossTip then table.insert(tipLines, Hex(T.muted) .. st.bossTip .. "|r") end
     if #tipLines > 0 then note[#note + 1] = { h = L.H_TIP, body = tipLines } end
-    if st.trash then
-      local names, seen = {}, {}
-      for _, nd in ipairs(st.trash) do
-        if not ns.NodeOK(log, nd) then
-          local o = nd.oneObj
-          local nm = o and ((o.c and o.c > 1 and (o.c .. " x ") or "") .. (o.n or "")) or ns.QName(nd.q)
-          if nm ~= "" and not seen[nm] then seen[nm] = true; table.insert(names, nm) end
-        end
-      end
+    if st.trash or st.trashAll then
+      -- only what is done on the way to THIS boss (T-92), each line with its verb, where, count and
+      -- who drops it ("Tuer : Noxxious Scion · Aile orange, ... avant Noxxion · 0 sur 8"); what drops
+      -- everywhere once, on the first step inside ("Tout le donjon : 25 x ... (tombent sur les monstres)")
+      local names = ns.GuideAlsoLines(st, log)
       if #names > 0 then note[#note + 1] = { h = L.H_ALSO, list = names } end
     end
   end
@@ -3576,6 +3837,13 @@ RenderNow = function()
   local rowW = CardW() - 8
   local subW = rowW - ROW_NAME_X - 12
   local view = focusMode and {} or ns.StepView(st, log)
+  -- T-91: under a check-list, the quests whose chain is not done before it, greyed (st.locks)
+  if not focusMode and st.gate and st.locks and #st.locks > 0 then
+    local v = {}
+    for _, nd in ipairs(view) do v[#v + 1] = nd end
+    for _, nd in ipairs(st.locks) do v[#v + 1] = nd end
+    view = v
+  end
   local mt = Hex(T.muted)
   for r, row in ipairs(card.rows) do
     local nd = view[r]
@@ -3614,7 +3882,12 @@ RenderNow = function()
       local s = ns.State(log, nd.q)
       local ok = (nd.vok ~= nil) and nd.vok or ns.NodeOK(log, nd)
       local kc = KCOL[nd.kind] or T.text
-      row.tag:SetText(L[KTAG[nd.kind]] or ""); row.tag:SetTextColor(kc[1], kc[2], kc[3])
+      -- a locked check-list line (T-91, st.locks): "Locked", greyed, never "Required"
+      if nd.lock then
+        row.tag:SetText(L.CL_LOCKED); row.tag:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
+      elseif nd.kind == "h" and ns.GuideOptionalCheck(nd, st.gate or st.ins or dkey) then
+        row.tag:SetText(L.HAVE_OPT); row.tag:SetTextColor(T.muted[1], T.muted[2], T.muted[3])
+      else row.tag:SetText(L[KTAG[nd.kind]] or ""); row.tag:SetTextColor(kc[1], kc[2], kc[3]) end
       row.name:SetText(nd.label or ns.QName(nd.q))
       -- the NPC on the right, unless the step's title already names it (then the quest's state);
       -- a check-list row keeps its state ("To take"): its detail line already names the giver
@@ -3625,9 +3898,10 @@ RenderNow = function()
       local right = npcShort or ((nd.kind == "a" and s == "none") and "" or (Hex(sc) .. L[SLABEL[s] or "S_NONE"] .. "|r"))
       -- check-list row: plainly "In your log" (green) or "To take" (orange)
       if nd.kind == "h" then right = ok and (Hex(T.ok) .. L.CL_HAVE .. "|r") or (Hex(T.warn) .. L.CL_TAKE .. "|r") end
+      if nd.lock then right = "" end
       row.npc:SetText(right)
       SetSecureRow(row, nd, ok)
-      local canGo = ns.NodeCanGo(nd)
+      local canGo = not nd.lock and ns.NodeCanGo(nd)
       row.gb:SetShown(canGo)
       local isActive = canGo and NodeFollowed(nd) and not ok
       row.wpOn:SetShown(isActive and true or false)
@@ -3655,16 +3929,17 @@ RenderNow = function()
         row.kicon:SetAlpha(1)
         row.kicon:SetShown(SetKindIcon(row.kicon, nd))
         row.name:SetTextColor(T.fg[1], T.fg[2], T.fg[3]); row.tag:SetAlpha(1)
+        if nd.lock then row.kicon:SetAlpha(0.5); row.name:SetTextColor(T.muted[1], T.muted[2], T.muted[3]) end
       end
       -- detail lines
       local parts = {}
       local tags = {}
       if nd.d and nd.d ~= dkey then table.insert(tags, mt .. ns.DName(nd.d) .. "|r") end
-      if nd.pre then
+      local preKnown = nd.pre and ((nd.ci and nd.cn) or not ((nd.kind == "a" or nd.kind == "h") and ns.ChainState))
+      if preKnown then
         -- where you are in the chain, and what it leads to: "Step 3 of 9 before Agamaggan's Blood"
         local lead = nd.forQ and nd.forQ[1]
-        local txt = (nd.ci and nd.cn and lead) and (L.CH_BEFORE:format(nd.ci, nd.cn, ns.QName(lead))
-            .. ((#nd.forQ > 1) and L.CARD_PLUS_P:format(#nd.forQ - 1) or ""))
+        local txt = (nd.ci and nd.cn and lead) and ns.GuideChainText(nd, true)
           or (nd.ci and nd.cn) and L.CH_STEP:format(nd.ci, nd.cn) or L.PRE
         table.insert(tags, Hex(T.text) .. txt .. "|r")
       elseif (nd.kind == "a" or nd.kind == "h") and not ok and ns.ChainState then
@@ -3676,7 +3951,7 @@ RenderNow = function()
       end
       -- the class, unless the card's "Class quest" pill already says it
       if q.c and not card.clsChip:IsShown() then
-        local tok = q.c:match("^[^,]+"); local cn, cc = ns.ClassInfo(tok)
+        local tok = ns.GuideClassTok(q.c); local cn, cc = ns.ClassInfo(tok)
         table.insert(tags, ns.ClassIconText(tok, 12) .. Hex(cc) .. L.CLASS_TAG:format(cn) .. "|r")
       end
       if #tags > 0 then table.insert(parts, table.concat(tags, mt .. "  ·  |r")) end
@@ -3688,9 +3963,9 @@ RenderNow = function()
         end
         if nd.kind == "h" then
           local A = q.s and q.s.n or q.st
-          if A then table.insert(parts, tx .. L.GIVER:format(A) .. "|r") end
+          if A then table.insert(parts, tx .. ns.Elide(L.GIVER:format(A)) .. "|r") end
         elseif nd.kind ~= "t" then
-          local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
+          local obj = ns.GuideObjSentence(q)
           local lines = (nd.kind == "c" or nd.kind == "o") and ObjectiveLines(nd, log) or {}
           if obj and (nd.kind == "a" or #lines == 0) then table.insert(parts, tx .. obj .. "|r") end
           if nd.kind == "c" or nd.kind == "o" then
@@ -3712,7 +3987,7 @@ RenderNow = function()
         end
         if nd.kind == "t" and s == "on" then
           -- quest not finished yet when it is time to turn it in: what is left to do
-          local obj = (ns.lang == "fr" and q.of) or ns.T(q.oe)
+          local obj = ns.GuideObjSentence(q)
           if obj then table.insert(parts, tx .. obj .. "|r") end
         end
         if (nd.kind == "t" and s == "on") or (nd.kind == "c" and #ObjectiveLines(nd) == 0) then
@@ -3726,6 +4001,8 @@ RenderNow = function()
           if pl then table.insert(parts, Hex(T.info) .. pl .. "|r") end
         end
       end
+      -- a locked line says only why, greyed: "Locked: first needs "X" (NPC, zone) · prerequisite 4/7"
+      if nd.lock then parts = { mt .. (ns.CheckLockText and ns.CheckLockText(nd.q, nil, nd.d) or L.CL_LOCKED) .. "|r" } end
       if npcInSub then table.insert(parts, 1, npcInSub) end
       -- the lines before the list, the list ({ li = text }), the lines after it
       local pre, items, post = {}, {}, {}
@@ -3776,7 +4053,11 @@ RenderNow = function()
   else HideStack(card.afterStk) end
   if shareAfter and not f.compactIn then
     y = y + 8
-    card.shareBtn:SetText(L.SHARE_SHORT)
+    -- in combat the game blocks the share: « Après le combat », greyed
+    local shareCombat = ns.ShareInCombat and ns.ShareInCombat() or false
+    card.shareBtn:SetText(shareCombat and L.SHARE_AFTER or L.SHARE_SHORT)
+    if card.shareBtn.Disable then if shareCombat then card.shareBtn:Disable() else card.shareBtn:Enable() end end
+    card.shareBtn.disabledReason = shareCombat and L.SHARE_AFTER_TT or nil
     card.shareBtn:ClearAllPoints(); card.shareBtn:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.shareBtn:Show()
     if skipQ then
       card.skipBtn:ClearAllPoints(); card.skipBtn:SetPoint("LEFT", card.shareBtn, "RIGHT", 8, 0); card.skipBtn:Show()
@@ -3811,6 +4092,15 @@ RenderNow = function()
     end
     f.go:SetText(label); if f.go.SetIcon then f.go:SetIcon("pin") end
     f.go.action = GoPoints; f.go:SetEnabled(true)
+  elseif st.ins and not st.gate and ns.ShowBosses and ns.D[st.ins] then
+    -- inside a dungeon a step has no map point (T-92): the big button opens the dungeon's map and
+    -- bosses panel instead of a greyed "No map point"
+    f.go:SetText(L.DUNGEON_MAP); if f.go.SetIcon then f.go:SetIcon("skull") end
+    local dk = st.ins
+    f.go.action = function() ns.ShowBosses(dk) end; f.go:SetEnabled(true)
+  elseif st.ins and not st.gate and i < #steps then
+    f.go:SetText(L.NEXT2); if f.go.SetIcon then f.go:SetIcon("chevron_right") end
+    f.go.action = function() ns.GoTo(i + 1) end; f.go:SetEnabled(true)
   else
     -- disabled and labelled: its tooltip says why, an info icon added nothing
     f.go:SetText(L.NOPOINT_S); if f.go.SetIcon then f.go:SetIcon(nil) end

@@ -10,7 +10,7 @@
 --
 -- API (global table WLHelperGear)
 --
---   WLHelperGear.VERSION                      "1.3.0"
+--   WLHelperGear.VERSION                      "1.4.0"
 --   WLHelperGear.UPSTREAM                     "Geared Forever 1.1.1"
 --
 --   WLHelperGear.Spec() -> classToken, specKey, specName, auto
@@ -73,11 +73,21 @@
 --                top = list length (default 10), quest = include quest rewards with no
 --                level requirement (default true), show = { raid = false, ... } source filter }
 --
---   WLHelperGear.SetOptions({ neutral =, raid =, raidAuto = })   WL Helper change (v2)
+--   WLHelperGear.Explain(itemLink, level?) -> { pct, old, rows = { { stat =, amount =, pct = }, ... } }
+--       WL Helper change (1.4.0): why Compare gives its percent. One row per stat that moves
+--       the score (stat: a Weights key, "dps" for weapon damage, "set" for set bonuses,
+--       "other" for effects), amount = the stat's change (new item minus what it replaces,
+--       DPS for "dps"), pct = its share of the percent (the rows add up to pct). Biggest
+--       first. nil when Compare gives no percent (empty slot, worn, not usable, unknown).
+--
+--   WLHelperGear.SetOptions({ neutral =, raid =, raidAuto =, wand =, lighter = })   WL Helper change (v2)
 --       neutral = true: none of the v2 changes below (Geared Forever's maths plus talents,
 --       real hit and enchants). raid = true/false: raid hit caps (17% spells, 8% melee) at
 --       58+ or dungeon caps (5% / 6%); raidAuto = true: automatic (60 once raids open).
---   WLHelperGear.Options() -> { neutral, raid }
+--       WL Helper change (1.4.0): wand = how much the wand's DPS counts for the wand classes
+--       (1 by default, 0.5, 0.1); lighter = true: from level 40, armor lighter than the best
+--       your class wears is not compared (Compare and Score: canUse "lighter", lighter = true).
+--   WLHelperGear.Options() -> { neutral, raid, wand, lighter }
 --
 --   WLHelperGear.QuestRewards(questID) -> { itemID, ... }, names or nil   WL Helper change (v4)
 --       The items a quest gives (QuestieDB, WoW Forever data set), in the quest's order:
@@ -107,7 +117,7 @@ local E = ns.engine
 local API = {}
 WLHelperGear = API
 
-API.VERSION = "1.3.1"
+API.VERSION = "1.4.0"
 API.UPSTREAM = "Geared Forever 1.1.1"
 
 local STAT_NAMES = {}
@@ -254,6 +264,11 @@ function API.Score(x, level)
     if not bestSec then bestSec = E.SLOT_SECTIONS[item.slot][1] best = details.sections[E.SECTIONS[bestSec]] end
     details.section, details.sectionIndex = E.SECTIONS[bestSec], bestSec
     details.canUse = E.CanUse(item, bestSec, cls, lvl)
+    -- WL Helper change (1.4.0): lighter armor than yours, when the player ignores it
+    if E.Lighter(item, cls, lvl) then
+        details.lighter = true
+        if details.canUse == true then details.canUse = "lighter" end
+    end
     if best < 0 then best = 0 end
     return best, details
 end
@@ -270,6 +285,7 @@ function API.Compare(link, level)
     local itemNotes
     item, itemNotes = E.Prepare(item, link)
     local base = E.BaseScore(item, w)
+    local lighter = E.Lighter(item, cls, lvl)   -- WL Helper change (1.4.0)
     local results = {}
     for _, sec in ipairs(Sections(item, cls, oh)) do
         local score = E.SectionScore(item, sec, base, mh, oh, rg, slowBonus, prefer)
@@ -284,6 +300,10 @@ function API.Compare(link, level)
             -- WL Helper change (v2)
             unscored = r.unscored == true, setGain = r.setGain, setLost = r.setLost, notes = {},
         }
+        if lighter then
+            res.lighter = true
+            if res.canUse == true then res.canUse = "lighter" end
+        end
         for _, n in ipairs(itemNotes or {}) do res.notes[#res.notes + 1] = n end
         for _, n in ipairs(r.notes or {}) do res.notes[#res.notes + 1] = n end
         results[#results + 1] = res
@@ -348,7 +368,7 @@ end
 function API.SetOptions(t) E.SetOptions(t) end
 function API.Options()
     local o = E.Options()
-    return { neutral = o.neutral, raid = o.raid }
+    return { neutral = o.neutral, raid = o.raid, wand = o.wand, lighter = o.lighter }
 end
 
 -- WL Helper change (v4): the items a quest gives, and their English names.
@@ -385,6 +405,96 @@ function API.Best(slot, opts)
                    source = it.source, kind = E.KIND_NAME[it.kind] }
     end
     return out
+end
+
+-- WL Helper change (1.4.0): the stats behind Compare's percent.
+local function AddParts(acc, item, sec, sign, w, mh, oh, rg, slowBonus, prefer)
+    local function add(stat, amount, delta)
+        if delta == 0 then return end
+        local r = acc[stat]
+        if not r then r = { stat = stat, amount = 0, delta = 0 }; acc[stat] = r end
+        r.amount = r.amount + sign * (amount or 0)
+        r.delta = r.delta + sign * delta
+    end
+    local st, listed = item.st, 0
+    for k = 1, E.NUM_STATS do
+        local v, wk = st[k] or 0, w[k] or 0
+        if v ~= 0 and wk ~= 0 then
+            add(STAT_NAMES[k], v, v * wk)
+            listed = listed + v * wk
+        end
+    end
+    -- percent lines kept apart by kind (spell or melee), as the engine counts them
+    local b
+    if w.role == "caster" or w.role == "healer" then b = st.spell else b = st.melee end
+    for k, v in pairs(b or {}) do
+        local wk = w[k] or 0
+        if wk ~= 0 and v ~= 0 then
+            add(type(k) == "number" and STAT_NAMES[k] or tostring(k), v, v * wk)
+            listed = listed + v * wk
+        end
+    end
+    local base = E.BaseScore(item, w)
+    -- effects (procs, use lines) the engine values
+    if math.abs(base - listed) > 1e-6 then add("other", 0, base - listed) end
+    -- the weapon's damage (and the weapon type's preference, which scales the whole score)
+    local total = E.SectionScore(item, sec, base, mh, oh, rg, slowBonus, prefer)
+    if math.abs(total - base) > 1e-6 then add("dps", item.dps or 0, total - base) end
+end
+
+function API.Explain(link, level)
+    local cls = PlayerClass()
+    if not cls or type(link) ~= "string" then return nil end
+    local res = API.Compare(link, level)
+    if type(res) ~= "table" then return nil end
+    if res.empty and res.other then res = res.other end
+    if res.canUse ~= true or res.empty or res.equipped or res.unknown or res.unscored or res.blocked
+        or type(res.old) ~= "number" or res.old <= 0 or not res.pctExact then return nil end
+    local item = ReadItem(link)
+    if not item then return nil end
+    local lvl = PlayerLevel(level)
+    local key = CurrentSpec(cls)
+    local mh, oh, rg, slowBonus, w, prefer = E.Weights(cls, key, lvl)
+    item = E.Prepare(item, link)
+    local sec = SECTION_BY_NAME[tostring(res.section or ""):lower()]
+    if not sec then return nil end
+    local acc = {}
+    AddParts(acc, item, sec, 1, w, mh, oh, rg, slowBonus, prefer)
+    -- what it replaces: the slot compared, and the off hand for a two-hander
+    local slots = { res.slot }
+    if sec == E.SEC_TWOHAND and res.offLink then slots[2] = 17 end
+    for _, invSlot in ipairs(slots) do
+        local _, worn = E.EquippedScore(invSlot, mh, oh, rg, slowBonus, w, prefer)
+        if worn then
+            local wsec
+            if invSlot == 17 then wsec = (worn.slot == 17) and E.SEC_SHIELD or E.SEC_OFFHAND
+            else wsec = E.SLOT_SECTIONS[worn.slot][1] end
+            AddParts(acc, worn, wsec, -1, w, mh, oh, rg, slowBonus, prefer)
+        end
+    end
+    local setDelta = (res.setGain or 0) - (res.setLost or 0)
+    if setDelta ~= 0 then acc.set = { stat = "set", amount = 0, delta = setDelta } end
+    -- whatever the parts miss (a worn item scored at its floor, a slot read without its link)
+    -- goes in "other": the rows always add up to the percent
+    local sum = 0
+    for _, r in pairs(acc) do sum = sum + r.delta end
+    local rest = ((res.score or 0) - res.old) - sum
+    if math.abs(rest) > 1e-6 then
+        local o = acc.other
+        if not o then o = { stat = "other", amount = 0, delta = 0 }; acc.other = o end
+        o.delta = o.delta + rest
+    end
+    local rows = {}
+    for _, r in pairs(acc) do
+        if math.abs(r.delta) > 1e-6 then
+            rows[#rows + 1] = { stat = r.stat, amount = r.amount, pct = r.delta / res.old * 100 }
+        end
+    end
+    table.sort(rows, function(a, b)
+        if math.abs(a.pct) ~= math.abs(b.pct) then return math.abs(a.pct) > math.abs(b.pct) end
+        return a.stat < b.stat
+    end)
+    return { pct = res.pctExact, old = res.old, rows = rows }
 end
 
 -- Talents and spec change: read them again next time. Item data arriving or gear

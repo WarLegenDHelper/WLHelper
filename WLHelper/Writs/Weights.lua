@@ -399,23 +399,81 @@ function W.Table(spec)
     return t
 end
 
--- the item's score in a slot for a spec
-function W.Score(link, slot, spec)
-    spec = spec or W.Spec()
-    if not (link and spec) then return 0 end
-    local key = link .. "|" .. (slot or 0) .. "|" .. spec[1] .. "|" .. (Bracket())
-    if scoreCache[key] then return scoreCache[key] end
+-- ---------------------------------------------------------------- the wand, as much as you use it
+-- Settings > Upgrades > "I use my wand": often (default), sometimes, never. The wand's DPS counts
+-- in full, half or a tenth (a better wand stays a little better). Only the wand classes.
+local WAND_CLASSES = { MAGE = true, PRIEST = true, WARLOCK = true }
+local WAND_FACTOR = { often = 1, sometimes = 0.5, never = 0.1 }
+W.WAND_FACTOR = WAND_FACTOR
+W.WAND_AUTO_LEVEL = 40
+function W.WandClass() return WAND_CLASSES[Class()] == true end
+-- true when no choice was made in Settings: the automatic one applies (often below level 40,
+-- sometimes from 40, when your spells matter more); a choice made in Settings always wins
+function W.WandAuto()
+    local v = WLWritsDB and WLWritsDB.upgradeWand
+    return not WAND_FACTOR[v]
+end
+-- "often", "sometimes" or "never" (the automatic one at your level when none was chosen)
+function W.WandUse(level)
+    local v = WLWritsDB and WLWritsDB.upgradeWand
+    if WAND_FACTOR[v] then return v end
+    level = level or UnitLevel("player") or 0
+    return level < W.WAND_AUTO_LEVEL and "often" or "sometimes"
+end
+function W.WandFactor()
+    if not W.WandClass() then return 1 end
+    return WAND_FACTOR[W.WandUse()]
+end
+
+-- ---------------------------------------------------------------- lighter armor (T-88)
+-- Settings > Upgrades > "Ignore armor lighter than mine (from level 40)", on by default: from 40,
+-- a shaman or hunter gets no % for leather or cloth, a warrior or paladin for mail, leather or
+-- cloth, a druid or rogue for cloth. Armor slots only (not cloaks, rings, shields).
+local ARMOR_TOP = { WARRIOR = 4, PALADIN = 4, HUNTER = 3, SHAMAN = 3, DRUID = 2, ROGUE = 2 }
+local ARMOR_LOCS = {
+    INVTYPE_HEAD = true, INVTYPE_SHOULDER = true, INVTYPE_CHEST = true, INVTYPE_ROBE = true, INVTYPE_WAIST = true,
+    INVTYPE_LEGS = true, INVTYPE_FEET = true, INVTYPE_WRIST = true, INVTYPE_HAND = true,
+}
+function W.LighterOn() return not (WLWritsDB and WLWritsDB.upgradeLighter == false) end
+-- true when the item is armor lighter than yours and the setting ignores it; nil when not loaded
+function W.Lighter(link, level)
+    if not W.LighterOn() or type(link) ~= "string" then return false end
+    level = level or UnitLevel("player") or 0
+    if level < 40 then return false end
+    local top = ARMOR_TOP[Class()]
+    if not top then return false end
+    local name, _, equipLoc, classID, subID = Info(link)
+    if not name then
+        local Instant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+        if not Instant then return nil end
+        local _, _, _, loc, _, cid, sid = Instant(link)
+        if not loc then return nil end
+        equipLoc, classID, subID = loc, cid, sid
+    end
+    return classID == 4 and ARMOR_LOCS[equipLoc or ""] == true and type(subID) == "number"
+        and subID >= 1 and subID <= 4 and subID < top or false
+end
+
+-- the parts of an item's score in a slot for a spec: { [code] = { amount, score } } (code: one of
+-- KEYS' codes, a school "frost"..., "DPS"), and the score
+local function Parts(link, slot, spec)
     local w = spec[4]
-    local s = 0
+    local parts, s = {}, 0
+    local function add(code, amount, v)
+        local p = parts[code]
+        if not p then p = { 0, 0 }; parts[code] = p end
+        p[1], p[2] = p[1] + amount, p[2] + v
+        s = s + v
+    end
     for k, v in pairs(Stats(link)) do
         local code = KEYS[k]
-        if code and code ~= "DPS" and w[code] and type(v) == "number" then s = s + W.WeightOf(spec, code) * v end
+        if code and code ~= "DPS" and w[code] and type(v) == "number" then add(code, v, W.WeightOf(spec, code) * v) end
     end
     -- one school's spell damage, worth the spec's spell damage times the school's share
     local shares = SCHOOL_SHARE[Class()] and SCHOOL_SHARE[Class()][spec[1]]
     if shares and w.SP then
         for school, n in pairs(SchoolDamage(link)) do
-            if shares[school] then s = s + W.WeightOf(spec, "SP") * shares[school] * n end
+            if shares[school] then add(school, n, W.WeightOf(spec, "SP") * shares[school] * n) end
         end
     end
     -- weapon damage per second: main hand and ranged in full, off hand half
@@ -423,6 +481,11 @@ function W.Score(link, slot, spec)
     if dps and w.DPS then
         local f = (slot == 17 and 0.5) or 1
         if slot == 18 and Class() ~= "HUNTER" and not (spec[4] == CASTER or w.SP) then f = 0.3 end
+        -- a wand: as much as you use it
+        if slot == 18 then
+            local _, _, _, classID, subID = Info(link)
+            if classID == 2 and subID == 19 then f = f * W.WandFactor() end
+        end
         -- the speed, for melee: a slow main hand hits harder with each special attack (Sinister
         -- Strike, Mortal Strike, Seal of Command, Windfury), a fast off hand lands more hits and
         -- poisons; in Classic special attacks use the weapon's own swing, not a normalized one
@@ -431,17 +494,36 @@ function W.Score(link, slot, spec)
             if slot == 16 then f = f * math.max(0.8, math.min(1.3, 1 + 0.15 * (speed - 2.4)))
             elseif slot == 17 then f = f * math.max(0.8, math.min(1.3, 1 + 0.2 * (1.9 - speed))) end
         end
-        s = s + W.WeightOf(spec, "DPS") * dps * f
+        add("DPS", dps, W.WeightOf(spec, "DPS") * dps * f)
     end
+    return parts, s
+end
+
+-- the item's score in a slot for a spec
+function W.Score(link, slot, spec)
+    spec = spec or W.Spec()
+    if not (link and spec) then return 0 end
+    local key = link .. "|" .. (slot or 0) .. "|" .. spec[1] .. "|" .. (Bracket()) .. "|" .. W.WandFactor()
+    if scoreCache[key] then return scoreCache[key] end
+    local _, s = Parts(link, slot, spec)
     scoreCache[key] = s
     return s
 end
 
 local function Equipped(slot) return GetInventoryItemLink("player", slot) end
+-- true when something is worn in the slot although its link or its data can't be read now (secret
+-- value, not loaded yet): the slot is not empty, the gain waits ("pending")
+local function WornUnread(slot, cur)
+    local function secret(v) return issecretvalue ~= nil and issecretvalue(v) == true end
+    if cur ~= nil and (secret(cur) or type(cur) ~= "string") then return true end
+    if cur then return Info(cur) == nil end
+    return (GetInventoryItemID and GetInventoryItemID("player", slot)) ~= nil
+end
 
--- Gain of an item against what you wear: percent (number), or "empty" for an empty slot; nil when it
--- is not for you / not better. Second value: the slot compared. spec: one of W.SPECS (default: the
--- main spec).
+-- Gain of an item against what you wear: percent (number), "empty" for an empty slot, "pending" when
+-- something is worn there but can't be read yet (its data is asked for: GET_ITEM_INFO_RECEIVED);
+-- nil when it is not for you / not better. Second value: the slot compared. spec: one of W.SPECS
+-- (default: the main spec).
 function W.Gain(link, spec)
     spec = spec or W.Spec()
     if not spec then return nil end
@@ -454,27 +536,87 @@ function W.Gain(link, spec)
     local mh = Equipped(16)
     local mhLoc = mh and select(3, Info(mh))
     local twoHanded = mhLoc == "INVTYPE_2HWEAPON"
-    local bestGain, bestSlot
+    local bestGain, bestSlot, waitSlot
     for _, slot in ipairs(slots) do
         if not (slot == 17 and twoHanded) then
             local new = W.Score(link, slot, spec)
             local cur = Equipped(slot)
-            local old
-            if equipLoc == "INVTYPE_2HWEAPON" then
-                old = (cur and W.Score(cur, 16, spec) or 0) + (Equipped(17) and W.Score(Equipped(17), 17, spec) or 0)
+            if WornUnread(slot, cur) then
+                -- its data is asked for only when the client does not have it (a cached item
+                -- whose link is missing would answer at once, over and over)
+                local id = GetInventoryItemID and GetInventoryItemID("player", slot)
+                local Req = C_Item and C_Item.RequestLoadItemDataByID
+                local Cached = C_Item and C_Item.IsItemDataCachedByID
+                if type(id) == "number" and Req then
+                    local okC, cached = true, false
+                    if Cached then okC, cached = pcall(Cached, id) end
+                    if not (okC and cached == true) then pcall(Req, id) end
+                end
+                -- the other ring or trinket slot may still be empty: that answer wins
+                waitSlot = waitSlot or slot
             else
-                old = cur and W.Score(cur, slot, spec) or 0
+                local old
+                if equipLoc == "INVTYPE_2HWEAPON" then
+                    old = (cur and W.Score(cur, 16, spec) or 0) + (Equipped(17) and W.Score(Equipped(17), 17, spec) or 0)
+                else
+                    old = cur and W.Score(cur, slot, spec) or 0
+                end
+                if cur and cur == link then return nil end
+                local g
+                if new <= 0 then g = nil
+                elseif not cur and old == 0 then g = "empty"
+                elseif old > 0 then g = (new - old) / old * 100 end
+                if g == "empty" then return "empty", slot end
+                if g and (not bestGain or g > bestGain) then bestGain, bestSlot = g, slot end
             end
-            if cur and cur == link then return nil end
-            local g
-            if new <= 0 then g = nil
-            elseif not cur and old == 0 then g = "empty"
-            elseif old > 0 then g = (new - old) / old * 100 end
-            if g == "empty" then return "empty", slot end
-            if g and (not bestGain or g > bestGain) then bestGain, bestSlot = g, slot end
         end
     end
+    -- one slot can't be read: which one you'd replace is not known yet
+    if waitSlot then return "pending", waitSlot end
     return bestGain, bestSlot
+end
+
+-- Why W.Gain gives its percent: { pct, old, rows = { { stat, amount, pct }, ... } }, biggest first
+-- (stat: WL Helper Gear's names, "dps" for weapon damage; amount: the new item minus what it
+-- replaces; the rows' pct add up to pct). nil when there is no percent.
+local STAT_OF = {
+    STR = "str", AGI = "agi", STA = "sta", INT = "int", SPI = "spi", ARMOR = "armor", AP = "ap", RAP = "rap",
+    SP = "sp", HEAL = "heal", CRIT = "crit", SCRIT = "crit", HIT = "hit", SHIT = "hit", MP5 = "mp5", DEF = "def",
+    DODGE = "dodge", PARRY = "parry", BLOCK = "block", BLOCKV = "bv", DPS = "dps",
+}
+function W.Explain(link, spec)
+    spec = spec or W.Spec()
+    if not (spec and type(link) == "string") then return nil end
+    local gain, slot = W.Gain(link, spec)
+    if type(gain) ~= "number" or not slot then return nil end
+    local _, _, equipLoc = Info(link)
+    local acc = {}
+    local function take(l, sl, sign)
+        local parts = Parts(l, sl, spec)
+        for code, p in pairs(parts) do
+            local stat = STAT_OF[code] or code
+            local r = acc[stat]
+            if not r then r = { stat = stat, amount = 0, score = 0 }; acc[stat] = r end
+            r.amount, r.score = r.amount + sign * p[1], r.score + sign * p[2]
+        end
+    end
+    take(link, slot, 1)
+    local old = 0
+    local cur = Equipped(slot)
+    if cur then take(cur, slot, -1); old = W.Score(cur, slot, spec) end
+    if equipLoc == "INVTYPE_2HWEAPON" and Equipped(17) then
+        take(Equipped(17), 17, -1); old = old + W.Score(Equipped(17), 17, spec)
+    end
+    if old <= 0 then return nil end
+    local rows = {}
+    for _, r in pairs(acc) do
+        if math.abs(r.score) > 1e-6 then rows[#rows + 1] = { stat = r.stat, amount = r.amount, pct = r.score / old * 100 } end
+    end
+    table.sort(rows, function(a, b)
+        if math.abs(a.pct) ~= math.abs(b.pct) then return math.abs(a.pct) > math.abs(b.pct) end
+        return a.stat < b.stat
+    end)
+    return { pct = gain, old = old, rows = rows }
 end
 
 function W.Reset() wipe(scoreCache); wipe(schoolCache) end

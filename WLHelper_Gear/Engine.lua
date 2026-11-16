@@ -125,7 +125,10 @@ end
 --     to check the rest still gives Geared Forever's numbers.
 --   raid = true / false forces raid hit caps (17% spell, 8% melee) at 58+; nil = automatic:
 --     at level 60 once WoW Forever's raids are open (December 9, 2026).
-local opts = { neutral = false, raid = nil }
+--   WL Helper change (1.4.0): wand = how much the wand counts (1 often, 0.5 sometimes, 0.1
+--     never: the player's own answer); lighter = true: armor lighter than the best your class
+--     wears is not compared from level 40 (Compare and Score say canUse "lighter").
+local opts = { neutral = false, raid = nil, wand = 1, lighter = false }
 local RAIDS_OPEN = 20261209
 local function Today()
     local d = (type(date) == "function" and date) or (os and os.date)
@@ -990,8 +993,15 @@ local function Weights(cls, key, level)
     local ok, mh, oh, rg, slow, w, prefer = pcall(FindSpec(cls, key).weights, level, RaceFor(cls))
     ctx = nil
     if not ok then error(mh, 0) end
+    -- WL Helper change (1.4.0): the wand's DPS as much as the player says he uses it (only the
+    -- wand classes: their ranged slot holds a wand), for the player's own class only
+    if not opts.neutral and own and cls.weapons and cls.weapons[29] and type(opts.wand) == "number"
+        and type(rg) == "number" then
+        rg = rg * opts.wand
+    end
     return mh, oh, rg, slow, w, prefer
 end
+
 
 local armorPick = 0       -- armor type filter: 0 = all (the engine never filters armor)
 
@@ -1038,6 +1048,16 @@ local function Category(item)
 end
 
 local ARMOR_SLOT = { [1] = true, [3] = true, [5] = true, [6] = true, [7] = true, [8] = true, [9] = true, [10] = true }
+
+-- WL Helper change (1.4.0): armor lighter than the best your class wears (cloth or leather for a
+-- shaman or hunter, anything but plate for a warrior or paladin, cloth for a druid or rogue),
+-- from level 40, when the lighter option is on. Cloaks, rings, shields... never.
+local function Lighter(item, cls, level)
+    if opts.neutral or not opts.lighter or not (item and cls) then return false end
+    if (level or 0) < 40 or not ARMOR_SLOT[item.slot] then return false end
+    local kind = item.kind or 0
+    return kind >= 1 and kind <= 4 and kind < (cls.armor or 1)
+end
 
 -- The window's filters past the level range: armor type and unknown sources.
 -- Necks, rings, cloaks, trinkets, and weapons always pass the armor filter.
@@ -1469,6 +1489,28 @@ local function ItemDataReady(id, link)
     return true
 end
 
+-- WL Helper change (beta.93): random suffixes outside the suffix field. suffixMemo[link] is
+-- true when the link's stats have one the list's copy lacks (read live), false otherwise.
+local suffixMemo = {}
+local SUFFIX_KEYS = {
+    ITEM_MOD_STRENGTH_SHORT = 2, ITEM_MOD_AGILITY_SHORT = 3, ITEM_MOD_STAMINA_SHORT = 4,
+    ITEM_MOD_ATTACK_POWER_SHORT = 5, ITEM_MOD_CRIT_RATING_SHORT = 6, ITEM_MOD_HIT_RATING_SHORT = 7,
+    ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = 10, ITEM_MOD_DODGE_RATING_SHORT = 11,
+    ITEM_MOD_INTELLECT_SHORT = 15, ITEM_MOD_SPIRIT_SHORT = 16, ITEM_MOD_SPELL_POWER_SHORT = 17,
+    ITEM_MOD_SPELL_HEALING_DONE_SHORT = 18, ITEM_MOD_MANA_REGENERATION_SHORT = 20,
+}
+local function ExtraStats(known, live)
+    for key, k in pairs(SUFFIX_KEYS) do
+        local v = live[key]
+        if type(v) == "number" and not Secret(v) and v > 0 and (known.st[k] or 0) == 0 then return true end
+    end
+    return false
+end
+local function NoStatsButArmor(known)
+    for k = 2, #known.st do if known.st[k] ~= 0 then return false end end
+    return true
+end
+
 local function LiveItem(id, link)
     ns.Parse()
     local known = ns.byId[id]
@@ -1482,7 +1524,25 @@ local function LiveItem(id, link)
         -- on English clients; elsewhere (frFR) every name would differ and every item would
         -- be read live instead of from the checked list.
         local renamed = linkName and known.name and linkName ~= known.name and EnglishClient()
-        if not bare and not renamed then return known end
+        if not bare and not renamed then
+            -- WL Helper change (beta.93): on other clients a random-suffix item whose suffix
+            -- is not in the suffix field ("Heaume de champion de force") was read from the list
+            -- (armor only), so what you wear lost its stats and the gains came out huge
+            -- (+1128 %). The link's own stats are read once: a stat the list does not have
+            -- means a suffix, and the item is read live (below).
+            if not link or not GetStats or suffixMemo[link] == false then return known end
+            if suffixMemo[link] == nil then
+                if not ItemDataReady(id, link) then
+                    -- not loaded yet: a list item with nothing but armor may carry a suffix,
+                    -- so it waits ("unknown", retried); any other list item is read as listed
+                    if (known.q or 0) >= 2 and NoStatsButArmor(known) then return nil end
+                    return known
+                end
+                local live = GetStats(link)
+                suffixMemo[link] = type(live) == "table" and ExtraStats(known, live) or false
+                if not suffixMemo[link] then return known end
+            end
+        end
         if not link then return known end
     end
     if not link or not GetStats then return known end
@@ -1977,10 +2037,28 @@ end
 
 -- Score of what's in a character slot. 0 = empty, nil = can't read it.
 -- WL Helper change: returns the link too, and counts the equipped item's enchant.
+-- WL Helper change (beta.93): a slot is empty only when neither its item ID nor its link
+-- nor its icon says otherwise; a worn item that can't be read (secret, no ID yet) is nil
+-- ("unknown", retried), never an empty slot.
 local function EquippedScore(invSlot, mh, oh, rg, slowBonus, w, prefer)
     local id = GetInventoryItemID("player", invSlot)
-    if not id then return 0 end
-    local link = GetInventoryItemLink("player", invSlot)
+    local link = GetInventoryItemLink and GetInventoryItemLink("player", invSlot)
+    if Secret(id) or Secret(link) then return nil end
+    if type(link) ~= "string" then link = nil end
+    if not id and link then id = tonumber(link:match("item:(%d+)")) end
+    if not id then
+        local tex = GetInventoryItemTexture and GetInventoryItemTexture("player", invSlot)
+        if tex ~= nil and not Secret(tex) then return nil end
+        return 0
+    end
+    -- an item ID but no link yet: a listed green or better with nothing but armor may carry a
+    -- random suffix only its link shows, so it waits ("unknown", retried) rather than being read
+    -- without its stats
+    if not link and not opts.neutral then
+        ns.Parse()
+        local known = ns.byId[id]
+        if known and (known.q or 0) >= 2 and NoStatsButArmor(known) then return nil end
+    end
     local item = LiveItem(id, link)
     if not item then return nil end
     item = WithEnchant(item, link)
@@ -2011,9 +2089,11 @@ local function Upgrade(target, sec, newScore, mh, oh, rg, slowBonus, w, prefer)
     -- WL Helper change (v2): a worn item with no score (a use or proc trinket nothing can
     -- value) is not an empty slot. With two slots the weaker scored one is compared.
     local unscoredSlot, unscoredLink
+    local allWorn = true   -- WL Helper change (beta.93): every compared slot holds an item
     for _, invSlot in ipairs(INV_SLOTS[sec]) do
         local score, item, link = EquippedScore(invSlot, mh, oh, rg, slowBonus, w, prefer)
         if not score then r.unknown = true return r end
+        if not item then allWorn = false end
         -- WL Helper change (v2): same base item with another random suffix ("of the Bear" vs
         -- "of the Monkey") is a different item.
         if item and item.id == target.id and (neutral or not target.link or SuffixID(link) == SuffixID(target.link)) then
@@ -2061,7 +2141,16 @@ local function Upgrade(target, sec, newScore, mh, oh, rg, slowBonus, w, prefer)
         for _, n in ipairs(notes) do r.notes[#r.notes + 1] = n end
     end
     r.old = old
-    if old <= 0 then r.empty = true return r end
+    if old <= 0 then
+        -- WL Helper change (beta.93): something is worn there, so it is not an empty slot:
+        -- no percent rather than "empty slot" (neutral mode keeps Geared Forever's answer).
+        if allWorn and r.invSlot and not neutral then
+            r.unscored = true
+            r.notes[#r.notes + 1] = "the item you wear has no score"
+            return r
+        end
+        r.empty = true return r
+    end
     r.pctExact = (newScore - old) / old * 100
     r.pct = math.floor(r.pctExact + 0.5)
     return r
@@ -2089,7 +2178,7 @@ ns.engine = {
     SEC_TWOHAND = SEC_TWOHAND, SEC_MAINHAND = SEC_MAINHAND, SEC_OFFHAND = SEC_OFFHAND, SEC_SHIELD = SEC_SHIELD,
     SEC_RANGED = SEC_RANGED, ARMOR_SLOT = ARMOR_SLOT,
     Clamp = Clamp, FindSpec = FindSpec, Weights = Weights, BaseScore = BaseScore, SectionScore = SectionScore,
-    Usable = Usable, CanUse = CanUse, LiveItem = LiveItem, Upgrade = Upgrade, EquippedScore = EquippedScore,
+    Usable = Usable, CanUse = CanUse, Lighter = Lighter, LiveItem = LiveItem, Upgrade = Upgrade, EquippedScore = EquippedScore,
     EnchantStats = EnchantStats, WithEnchant = WithEnchant, ParseEnchantLine = ParseEnchantLine,
     ScanTalents = ScanTalents, ClearTalentCache = ClearTalentCache, OwnedHit = OwnedHit,
     -- WL Helper change (v2)
@@ -2101,6 +2190,9 @@ ns.engine = {
         if type(t) ~= "table" then return end
         if t.neutral ~= nil then opts.neutral = t.neutral == true end
         if t.raidAuto then opts.raid = nil elseif t.raid ~= nil then opts.raid = t.raid == true end
+        -- WL Helper change (1.4.0)
+        if t.wand ~= nil then opts.wand = tonumber(t.wand) or 1 end
+        if t.lighter ~= nil then opts.lighter = t.lighter == true end
         for k in pairs(enchantCache) do enchantCache[k] = nil end
         for k in pairs(effectCache) do effectCache[k] = nil end
         for k in pairs(setCache) do setCache[k] = nil end
@@ -2123,6 +2215,7 @@ ns.engine = {
             for k in pairs(effectCache) do effectCache[k] = nil end
             for k in pairs(setCache) do setCache[k] = nil end
             for k in pairs(notReady) do notReady[k] = nil end   -- WL Helper change (v3)
+            for k in pairs(suffixMemo) do suffixMemo[k] = nil end   -- WL Helper change (beta.93)
             wornSets = nil
         end
     end,

@@ -666,7 +666,7 @@ local function HookOpenMap()
     local O = rawget(_G, "OpenMapAPI")
     if type(O) ~= "table" or type(O.RegisterCallback) ~= "function" then return end
     openMapHooked = true
-    local function again() pcall(Patrol.RefreshMap) end
+    local function again() pcall(Patrol.RefreshMap); local Z = Patrol.Zones; if Z then pcall(Z.RefreshMap) end end
     pcall(O.RegisterCallback, "WLHelperPatrol", "OpenMap_ViewChanged", again)
     pcall(O.RegisterCallback, "WLHelperPatrol", "OpenMap_StitchedChanged", again)
 end
@@ -678,13 +678,14 @@ function HookMap()
     local W = rawget(_G, "WorldMapFrame")
     if not W then return end
     hooked = true
-    local function redraw() Update(); pcall(Patrol.RefreshMap) end
+    local function zones() local Z = Patrol.Zones; if Z then pcall(Z.Update); pcall(Z.RefreshMap) end end
+    local function redraw() Update(); pcall(Patrol.RefreshMap); zones() end
     if type(rawget(_G, "MapCanvasDataProviderMixin")) == "table" and CreateFromMixins and W.AddDataProvider then
         local p = CreateFromMixins(MapCanvasDataProviderMixin)
         function p:RefreshAllData() redraw() end
         function p:RemoveAllData() end
         function p:OnMapChanged() redraw() end
-        function p:OnCanvasScaleChanged() pcall(Patrol.RefreshMap) end
+        function p:OnCanvasScaleChanged() pcall(Patrol.RefreshMap); local Z = Patrol.Zones; if Z then pcall(Z.RefreshMap) end end
         pcall(W.AddDataProvider, W, p)
     end
     -- the map's own "map set" signal, and OpenMap's stitched view moving (Trail.lua does the same)
@@ -708,3 +709,254 @@ ev:SetScript("OnEvent", function(_, event, name)
     HookMap()
     Update()
 end)
+
+-- ---------------------------------------------------------------- zones
+-- The current step's objectives whose spawns spread over an area (o.area: a ring round an island,
+-- several camps, a wide field; Engine.lua ns.AreaOf): each camp's outline as a dotted line in the
+-- objective colour, on the world map (on the walking path's frame logic: Trail.MapLevel - 2, under
+-- the patrol path) and on the minimap. Only the unfinished objectives of the step the guide is on
+-- (frame.auto), cleared when that step changes or the guide closes. While one shows, the arrow's
+-- spot follows you (root.AreaRefollow, UI.lua: picked again once you moved 30 yd), every second.
+-- API: Zones.Active() -> nil | { { area, q, oi }, ... }; Zones.Update(); Zones.MapDots(map, view);
+-- Zones.MinimapDots(); Zones.RefreshMap(); Zones.RefreshMinimap(); Zones._Drawn() (for the tests).
+local Zones = {}
+Patrol.Zones = Zones
+
+local ZONE_SHARE = 0.8         -- a zone dot: this share of the patrol dot
+local ZONE_ALPHA = 0.8
+local ZONE_CAP = 300           -- dots at most on the world map, all camps together (as MAP_CAP)
+
+local zActive, zKey
+function Zones.Active() return zActive end
+
+local function ZoneColor()
+    local c = root.Tok and root.Tok.fg or { 0.941, 0.945, 0.953 }
+    return c[1], c[2], c[3]
+end
+
+local function ZCompute()
+    local f, steps = root.frame, root.route and root.route.steps
+    if type(f) ~= "table" or type(steps) ~= "table" then return nil end
+    if root.GuideOn and not root.GuideOn() then return nil end
+    local st = f.auto and steps[f.auto]
+    if not (st and type(st.acts) == "table") then return nil end
+    local list, log
+    for _, n in ipairs(st.acts) do
+        local a = root.AreaOf and root.AreaOf(n)
+        if a then
+            if log == nil then
+                local ok, l = pcall(function() return root.LogEntries and root.LogEntries() end)
+                log = ok and l or false
+            end
+            local okD, done = pcall(function() return log and root.NodeOK and root.NodeOK(log, n) end)
+            if not (okD and done) then
+                list = list or {}
+                list[#list + 1] = { area = a, q = n.q, oi = n.oi }
+            end
+        end
+    end
+    return list, f.auto
+end
+
+-- The camps as closed world lines { { {wx, wy}, ... }, ... } and their continent.
+local function Lines()
+    local out, cont = {}, nil
+    for _, z in ipairs(zActive or {}) do
+        local w = root.AreaWorld and root.AreaWorld(z.area)
+        if w and (not cont or w.cont == cont) then
+            cont = w.cont
+            for _, poly in ipairs(w.polys) do
+                local line = {}
+                for _, p in ipairs(poly) do line[#line + 1] = { p[1], p[2] } end
+                if #line >= 3 then line[#line + 1] = { poly[1][1], poly[1][2] } end
+                out[#out + 1] = line
+            end
+        end
+    end
+    return out, cont
+end
+
+-- The world map's dots for map `map`: { { x, y (canvas 0..1) }, ... } (view: as Patrol.MapDots).
+function Zones.MapDots(map, view)
+    local dots = {}
+    if not (zActive and map and MapOn()) then return dots end
+    local lines, cont = Lines()
+    if not cont then return dots end
+    local proj, stitched = Projection(map, cont)
+    if not proj then return dots end
+    local lo, hi = 0, 1
+    if stitched then lo, hi = -1, 2 end
+    view = view or {}
+    local w, h, k = view.w or 1000, view.h or 1000, view.k or 1
+    local size = view.size or DotSize("map", nil) * ZONE_SHARE
+    -- every camp's outline on the canvas, then one spacing for all: zoomed in, the cap widens the
+    -- gaps of every camp alike (never the first camps taking every dot and the others none)
+    local cls, total = {}, 0
+    for _, line in ipairs(lines) do
+        local cl = {}
+        for _, p in ipairs(line) do
+            local x, y = proj(cont, p[1], p[2])
+            if not x then cl = nil; break end
+            cl[#cl + 1] = { x * w, y * h }
+        end
+        if cl then
+            cls[#cls + 1] = cl
+            for i = 2, #cl do total = total + math.sqrt((cl[i][1] - cl[i - 1][1]) ^ 2 + (cl[i][2] - cl[i - 1][2]) ^ 2) end
+        end
+    end
+    local step = GAP * size / k
+    local room = ZONE_CAP - 2 * #cls
+    if room > 0 and step > 0 and total / step > room then step = total / room end
+    for _, cl in ipairs(cls) do
+        local pts = #cl == 1 and { cl[1] } or Densify(cl, step, ZONE_CAP)
+        for _, p in ipairs(pts) do
+            local x, y = p[1] / w, p[2] / h
+            if x >= lo and x <= hi and y >= lo and y <= hi and #dots < ZONE_CAP then dots[#dots + 1] = { x = x, y = y } end
+        end
+    end
+    return dots
+end
+
+-- The minimap's dots: { { x, y (pixels from its centre) }, ... } and the dot's width.
+function Zones.MinimapDots()
+    local dots = {}
+    if not (zActive and MinimapOn()) then return dots end
+    local lines, cont = Lines()
+    local pc, px, py = PlayerWorld()
+    if not (cont and pc == cont) then return dots end
+    local radius, half, facing, square, blind = MinimapView()
+    if blind or not (radius and half) then return dots end
+    local size = DotSize("minimap", Eff(rawget(_G, "Minimap"))) * ZONE_SHARE
+    local spacing = math.max(2, GAP * size * radius / half)
+    local lim = half - size / 2 - RING.minimap - 1
+    local reach2 = (radius * 1.5) ^ 2
+    for _, line in ipairs(lines) do
+        local near = false
+        for i = 1, #line do
+            local a, b = line[i], line[i + 1] or line[i]
+            local dx, dy = b[1] - a[1], b[2] - a[2]
+            local l2 = dx * dx + dy * dy
+            local t = l2 > 0 and math.max(0, math.min(1, ((px - a[1]) * dx + (py - a[2]) * dy) / l2)) or 0
+            local ex, ey = a[1] + t * dx - px, a[2] + t * dy - py
+            if ex * ex + ey * ey <= reach2 then near = true; break end
+        end
+        if near then
+            local pts = #line == 1 and { line[1] } or Densify(line, spacing, 2000)
+            for _, p in ipairs(pts) do
+                local x, y = Project(p[1], p[2], px, py, radius, half, facing)
+                if Inside(x, y, lim, square) and #dots < MM_CAP then dots[#dots + 1] = { x = x, y = y } end
+            end
+        end
+    end
+    return dots, size
+end
+
+local zdrawn = { map = 0, minimap = 0 }
+function Zones._Drawn() return zdrawn end
+local zwm, zmm = { dots = {} }, { dots = {} }
+
+local function ZPlace(t, rel, point, x, y)
+    Place(t, rel, point, x, y)
+    t:SetAlpha(ZONE_ALPHA)
+    t.wlRing:SetAlpha(ZONE_ALPHA * RING_ALPHA)
+end
+
+function Zones.RefreshMap()
+    local W, canvas = Canvas()
+    local shown = W and W.IsShown and W:IsShown()
+    local map = shown and W.GetMapID and W:GetMapID()
+    local w, h = Num(canvas and canvas:GetWidth()) or 0, Num(canvas and canvas:GetHeight()) or 0
+    local k = canvas and CanvasK(W, canvas) or 1
+    local size = DotSize("map", Eff(rawget(_G, "UIParent"))) * ZONE_SHARE
+    local dots = {}
+    if map and canvas and w > 0 and h > 0 then dots = Zones.MapDots(map, { w = w, h = h, k = k, size = size }) end
+    if not zwm.frame then
+        if not canvas or #dots == 0 then zdrawn.map = 0; return end
+        zwm.frame = CreateFrame("Frame", nil, canvas)
+        zwm.frame:SetAllPoints(canvas)
+        if zwm.frame.EnableMouse then pcall(zwm.frame.EnableMouse, zwm.frame, false) end
+    end
+    local f = zwm.frame
+    -- two levels under the walking path's dots (Trail.MapLevel), one under the patrol path
+    if canvas then
+        local T = Trail()
+        local want = (T and T.MapLevel and T.MapLevel(canvas)
+            or ((canvas.GetFrameLevel and Num(canvas:GetFrameLevel()) or 1) + 2000)) - 2
+        if f.wlLevel ~= want and not (f.wlLevel and InCombatLockdown and InCombatLockdown()) then
+            if pcall(f.SetFrameLevel, f, want) then f.wlLevel = want end
+        end
+        zdrawn.level = f.wlLevel
+    end
+    local r, g, b = ZoneColor()
+    Pool(f, zwm.dots, #dots, size / k, RING.map / k, r, g, b)
+    for i, d in ipairs(dots) do ZPlace(zwm.dots[i], f, "TOPLEFT", d.x * w, -d.y * h) end
+    zdrawn.map, zdrawn.mapDot, zdrawn.color, zdrawn.frame = #dots, size / k, { r, g, b }, f
+end
+
+function Zones.RefreshMinimap()
+    local M = rawget(_G, "Minimap")
+    local dots, size = Zones.MinimapDots()
+    if not M then zdrawn.minimap = 0; return end
+    if not zmm.frame then
+        if #dots == 0 then zdrawn.minimap = 0; return end
+        zmm.frame = CreateFrame("Frame", nil, M)
+        zmm.frame:SetAllPoints(M)
+        zmm.frame:SetFrameLevel((M.GetFrameLevel and M:GetFrameLevel() or 1) + 3)
+    end
+    size = size or DotSize("minimap", Eff(M)) * ZONE_SHARE
+    local r, g, b = ZoneColor()
+    Pool(zmm.frame, zmm.dots, #dots, size, RING.minimap, r, g, b)
+    for i, d in ipairs(dots) do ZPlace(zmm.dots[i], M, "CENTER", d.x, d.y) end
+    zdrawn.minimap = #dots
+end
+
+local zTicker, zTicks = nil, 0
+local function ZStop() if zTicker then zTicker:Cancel(); zTicker = nil end end
+local ZUpdate
+local function ZStart()
+    if zTicker or not (C_Timer and C_Timer.NewTicker) then return end
+    zTicks = 0
+    zTicker = C_Timer.NewTicker(MM_EVERY, function()
+        zTicks = zTicks + 1
+        if zTicks % CHECK_EVERY == 0 then
+            ZUpdate()
+            if zActive and root.AreaRefollow then pcall(root.AreaRefollow) end
+        end
+        if not zActive then ZStop(); return end
+        if MinimapOn() then pcall(Zones.RefreshMinimap) end
+    end)
+end
+
+local zBusy = false
+function ZUpdate()
+    if zBusy then return end
+    zBusy = true
+    local ok, list, at = pcall(ZCompute)
+    zBusy = false
+    list = ok and list or nil
+    local key
+    if list then
+        local parts = { tostring(at) }
+        for _, z in ipairs(list) do parts[#parts + 1] = tostring(z.q) .. ":" .. tostring(z.oi) end
+        key = table.concat(parts, "|")
+    end
+    if key ~= zKey then
+        zActive, zKey = list, key
+        if HookMap then pcall(HookMap) end
+        pcall(Zones.RefreshMap)
+        pcall(Zones.RefreshMinimap)
+    end
+    if zActive then ZStart() else ZStop() end
+end
+Zones.Update = ZUpdate
+
+-- the guide's step moves (Refresh, PlacePoints, GoTo), the GPS starts or stops, the trail's settings
+After(root, "Refresh", ZUpdate)
+After(root, "PlacePoints", ZUpdate)
+After(root, "GoTo", ZUpdate)
+After(GPS, "GoPoint", ZUpdate)
+After(GPS, "Stop", ZUpdate)
+After(WP.Trail, "Refresh", function() if zActive then pcall(Zones.RefreshMap); pcall(Zones.RefreshMinimap) end end)
+local zev = CreateFrame("Frame")
+pcall(zev.RegisterEvent, zev, "PLAYER_LOGIN")
+zev:SetScript("OnEvent", function() ZUpdate() end)

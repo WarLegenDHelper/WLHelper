@@ -5,7 +5,7 @@
 ## Notes: WL Helper's gear scoring engine (no window of its own), based on Geared Forever by Nathan.
 ## Notes-frFR: Moteur de notation d'équipement de WL Helper (sans fenêtre), basé sur Geared Forever de Nathan.
 ## Author: WaR LegenD (based on Geared Forever by Nathan)
-## Version: 1.3.1
+## Version: 1.4.0
 ## Dependencies: WLHelper
 ## X-License: GPLv3
 ## X-Credits: Geared Forever by Nathan. Item data from ForeverDB. Quest data from QuestieDB by the Questie team, plus Wowhead Forever

@@ -419,18 +419,38 @@ function ns.OnPushAnswer(text)
   return false
 end
 
--- Shares one quest of my log with the group (guarded: in a group, in the log, shareable).
-function ns.PushQuest(qid)
+-- In combat the game blocks the share (QuestLogPushQuest after selecting the quest: "UNKNOWN()"
+-- blocked on the French client): every share waits for the end of combat, nothing is pushed before.
+local function InCombat()
+  if InCombatLockdown and InCombatLockdown() then return true end
+  if UnitAffectingCombat and UnitAffectingCombat("player") then return true end
+  return false
+end
+ns.ShareInCombat = InCombat
+-- « Partage des quêtes après le combat », once per combat (the queue and the auto-share both say it)
+local waitSaid = false
+function ns.ShareWaitSay()
+  if waitSaid then return end
+  waitSaid = true
+  if ns.Print and ns.L then ns.Print(ns.L.SHARE_COMBAT) end
+end
+-- the time of the last push: the blocked-action line (Writs/Core.lua) stays quiet just after one
+function ns.SharePushed() ns.sharePushAt = Now() end
+
+-- Shares one quest of my log with the group (guarded: in a group, in the log, shareable, out of combat).
+local function PushNow(qid)
+  if InCombat() then return false end
   if not (IsInGroup and IsInGroup()) then return false end
   local e = ns.LogEntries()[qid]
   if not e then return false end
   local q = ns.Q[qid]
   if q and q.sh == false then return false end
   if ns.Pushable and not ns.Pushable(qid, e) then return false end
-  if SelectQuestLogEntry and e.index then pcall(SelectQuestLogEntry, e.index)
-  elseif C_QuestLog and C_QuestLog.SetSelectedQuest then pcall(C_QuestLog.SetSelectedQuest, qid) end
   local push = QuestLogPushQuest or (C_QuestLog and C_QuestLog.PushQuest)
   if not push then return false end
+  ns.SharePushed()
+  if SelectQuestLogEntry and e.index then pcall(SelectQuestLogEntry, e.index)
+  elseif C_QuestLog and C_QuestLog.SetSelectedQuest then pcall(C_QuestLog.SetSelectedQuest, qid) end
   local ok = pcall(push)
   if not ok then return false end
   local now = Now()
@@ -450,19 +470,84 @@ function ns.PushQuest(qid)
 end
 
 -- Shares a list of quests, one every 1.5 s (the game answers each one before the next).
+-- In combat the queue waits (« Partage des quêtes après le combat ») and goes on after it; a combat
+-- that starts while it runs stops it the same way.
 ns.pushBusy = false
+local GAP = 1.5
+local run          -- { list, i, onDone, gen, waiting }
+local lastAt       -- time of the queue's last push
+local function Finish()
+  local cb = run and run.onDone
+  run = nil
+  ns.pushBusy = false
+  if cb then cb() end
+end
+local Step
+local function Later(d)
+  local g = run.gen
+  if C_Timer and C_Timer.After then C_Timer.After(d, function() Step(g) end) else Step(g) end
+end
+Step = function(g)
+  if not run or g ~= run.gen then return end
+  if run.i > #run.list then Finish() return end
+  if InCombat() then
+    run.waiting = true
+    ns.ShareWaitSay()
+    return
+  end
+  local qid = run.list[run.i]
+  run.i = run.i + 1
+  if PushNow(qid) then lastAt = Now() end
+  if run.i > #run.list then Finish() else Later(GAP) end
+end
 function ns.PushQuests(list, onDone)
   if ns.pushBusy or not list or #list == 0 then return 0 end
   ns.pushBusy = true
-  local n = #list
-  local function step(i)
-    if i > n then ns.pushBusy = false; if onDone then onDone() end; return end
-    ns.PushQuest(list[i])
-    if C_Timer and C_Timer.After and i < n then C_Timer.After(1.5, function() step(i + 1) end) else step(i + 1) end
-  end
-  step(1)
-  return n
+  local copy = {}
+  for i, id in ipairs(list) do copy[i] = id end
+  run = { list = copy, i = 1, onDone = onDone, gen = 1 }
+  Step(1)
+  return #copy
 end
+function ns.ShareWaiting() return (run and run.waiting) and true or false end
+-- One quest (a row's « Partager »): now, or in the queue until the end of combat.
+function ns.PushQuest(qid)
+  if not InCombat() then return PushNow(qid) end
+  if run then
+    for k = run.i, #run.list do if run.list[k] == qid then return false end end
+    run.list[#run.list + 1] = qid
+    run.waiting = true
+    ns.ShareWaitSay()
+  else
+    ns.PushQuests({ qid })
+  end
+  return false
+end
+-- combat starts: the queue stops; it ends: the queue goes on (1.5 s after its last push)
+local cev = CreateFrame("Frame")
+ns.ShareCombatFrame = cev
+pcall(cev.RegisterEvent, cev, "PLAYER_REGEN_DISABLED")
+pcall(cev.RegisterEvent, cev, "PLAYER_REGEN_ENABLED")
+cev:SetScript("OnEvent", function(_, e)
+  if e == "PLAYER_REGEN_DISABLED" then
+    if run then
+      run.gen = run.gen + 1      -- the pending step is dropped
+      run.waiting = true
+      ns.ShareWaitSay()
+    end
+  elseif e == "PLAYER_REGEN_ENABLED" then
+    waitSaid = false
+    if run and run.waiting then
+      run.waiting = false
+      run.gen = run.gen + 1
+      local wait = lastAt and (lastAt + GAP - Now()) or 0
+      if wait > 0 then Later(wait) else Step(run.gen) end
+    end
+  end
+  -- the share buttons say « Après le combat » in combat, and come back after
+  if ns.Render then pcall(ns.Render) end
+  if ns.RenderSummary then pcall(ns.RenderSummary) end
+end)
 
 -- A member's state for a quest: state, missing link id, source ("sync", "push" or nil).
 -- state: on, ready, done, take, low, pre (sync); invalid, declined, full, busy, far, sent (push);

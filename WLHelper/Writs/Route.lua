@@ -10,8 +10,8 @@
 -- are asked for their real length (3 questions at a time, 12 per destination, each pair once a
 -- session) and the plan is made again as answers come: it changes only when the new best is more
 -- than 10% faster than the plan you follow, so the arrow does not flip between two equal ways.
--- GPS.Itinerary() / GPS.ItinerarySummary() say the whole way in one line ("Pierre de foyer → vol
--- jusqu'à Kargath → 300 m jusqu'à Tabetha"); GPS.TripSummary() the short plan for a card
+-- GPS.Itinerary() / GPS.ItinerarySummary() say the whole way in one line ("Pierre de foyer > vol
+-- jusqu'à Kargath > 300 m jusqu'à Tabetha"); GPS.TripSummary() the short plan for a card
 -- ("Téléport : Orgrimmar, puis 690 m").
 --
 -- Positions are world coordinates (yards) from C_Map.GetWorldPosFromMapPos. The fixed points
@@ -82,6 +82,15 @@ ns.AddEnglish({
     ["à pied"] = "on foot",
     ["sur ta monture"] = "on your mount",
     ["Trajet changé : %s"] = "Route changed: %s",
+    -- the arrow's line when the plan rides far with no flight (T-89)
+    ["À cheval : ouvre la carte d'un maître de vol pour que le GPS connaisse tes vols"] =
+        "On your mount: open a flight master's map so the GPS learns your flight paths",
+    ["À cheval : tu ne connais pas encore le vol de %s"] = "On your mount: you don't know the flight path at %s yet",
+    ["À cheval : pas de maître de vol plus près"] = "On your mount: no flight master closer",
+    -- a flight path guessed on a continent where no flight map was opened yet
+    ["Vol supposé connu : ouvre la carte du maître de vol pour vérifier"] =
+        "Flight path assumed known: open the flight master's map to check",
+    ["(vol supposé)"] = "(assumed flight)",
 })
 
 -- "Brackenwall Village, Dustwallow Marsh" -> "Brackenwall Village": the place without its zone, for
@@ -98,14 +107,15 @@ local function UpperFirst(s)
 end
 GPS.UpperFirst = UpperFirst
 
--- Zeppelins and boats: both ends (uiMapID, x, y in percent), what it is, who may take it.
+-- Zeppelins and boats: both ends (uiMapID, x, y in percent), what it is, who may take it; id: the ship
+-- in Transports.lua (when it leaves, from NaowhForever_QoL, our own sightings or the guild).
 local LINKS = {
-    { a = { 1420, 60.70, 58.76 }, b = { 1411, 50.82, 13.81 }, mode = "zeppelin", side = "Horde", nameA = "Undercity", nameB = "Orgrimmar" },
-    { a = { 1420, 61.88, 59.10 }, b = { 1434, 31.53, 29.15 }, mode = "zeppelin", side = "Horde", nameA = "Undercity", nameB = "Grom'gol" },
-    { a = { 1411, 50.57, 12.66 }, b = { 1434, 31.35, 30.12 }, mode = "zeppelin", side = "Horde", nameA = "Orgrimmar", nameB = "Grom'gol" },
-    { a = { 1434, 25.92, 73.15 }, b = { 1413, 63.66, 38.65 }, mode = "boat", nameA = "Booty Bay", nameB = "Ratchet" },
-    { a = { 1453, 22.60, 56.13 }, b = { 1439, 30.76, 41.00 }, mode = "boat", side = "Alliance", nameA = "Stormwind", nameB = "Auberdine" },
-    { a = { 1437, 5.08, 63.40 }, b = { 1445, 71.54, 56.34 }, mode = "boat", side = "Alliance", nameA = "Menethil Harbor", nameB = "Theramore" },
+    { a = { 1420, 60.70, 58.76 }, b = { 1411, 50.82, 13.81 }, mode = "zeppelin", side = "Horde", nameA = "Undercity", nameB = "Orgrimmar", id = "uc-org" },
+    { a = { 1420, 61.88, 59.10 }, b = { 1434, 31.53, 29.15 }, mode = "zeppelin", side = "Horde", nameA = "Undercity", nameB = "Grom'gol", id = "uc-grom" },
+    { a = { 1411, 50.57, 12.66 }, b = { 1434, 31.35, 30.12 }, mode = "zeppelin", side = "Horde", nameA = "Orgrimmar", nameB = "Grom'gol", id = "org-grom" },
+    { a = { 1434, 25.92, 73.15 }, b = { 1413, 63.66, 38.65 }, mode = "boat", nameA = "Booty Bay", nameB = "Ratchet", id = "bb-rat" },
+    { a = { 1453, 22.60, 56.13 }, b = { 1439, 30.76, 41.00 }, mode = "boat", side = "Alliance", nameA = "Stormwind", nameB = "Auberdine", id = "sw-aub" },
+    { a = { 1437, 5.08, 63.40 }, b = { 1445, 71.54, 56.34 }, mode = "boat", side = "Alliance", nameA = "Menethil Harbor", nameB = "Theramore", id = "men-ther" },
     -- a druid's flight home from Moonglade (one way, gossip with the NPC): ends in world yards (continent,
     -- north, west), from LibForeverData 2026.11.1's spawns of Bunthen Plainswind / Silva Fil'naveth
     -- (Moonglade) and Tal (Thunder Bluff) / Vesprystus (Rut'theran Village)
@@ -198,7 +208,7 @@ GPS._INNS = INNS
 local RUN, MOUNT = 7, 11.2         -- yards a second on foot and on a 60% mount
 local TERRAIN = 1.3                -- roads and hills: a ride is longer than the straight line
 local FLY, FLY_DETOUR, FLY_STOP = 30, 1.25, 20
-local LINK_TIME, TELEPORT_TIME = 150, 15
+local LINK_TIME, TELEPORT_TIME = 150, 15   -- LINK_TIME: a zeppelin or boat whose timing is unknown (wait + ride)
 local HEARTH_TIME = 25             -- 10 s cast, the loading screen, a few seconds to get going
 local NEAR = 15                    -- yards: a leg's end reached
 local REPLAN_EVERY = 8             -- seconds between two plans while guiding
@@ -345,18 +355,114 @@ local function RecordTaxi()
     local db = WLWritsCharDB
     db.taxi = db.taxi or {}
     local added = false
+    local seenNow = {}
     for _, n in ipairs(nodes) do
-        if n.nodeID and n.position and n.position.GetXY and n.state ~= unreachable and not db.taxi[n.nodeID] then
+        if n.nodeID and n.position and n.position.GetXY then
             local x, y = n.position:GetXY()
-            db.taxi[n.nodeID] = { name = n.name, map = mapID, x = x * 100, y = y * 100 }
-            added = true
+            if n.state ~= unreachable and not db.taxi[n.nodeID] then
+                db.taxi[n.nodeID] = { name = n.name, map = mapID, x = x * 100, y = y * 100 }
+                added = true
+            end
+            -- the flight map is the last word: its continent is "seen"
+            local okW, cont = pcall(World, mapID, x, y)
+            if okW and type(cont) == "number" then
+                db.taxiSeen = db.taxiSeen or {}
+                if db.taxiSeen[cont] ~= "map" then db.taxiSeen[cont] = "map"; added = true end
+                seenNow[cont] = true
+            end
+        end
+    end
+    if added then fixed, knownCount = nil, nil end
+    -- the guesses there are over: a master this map does not show as known is never guessed again
+    for cont in pairs(seenNow) do pcall(GPS._ForgetGuesses, cont) end
+end
+GPS._RecordTaxi = RecordTaxi
+
+-- ---------------------------------------------------------------- flight paths read anywhere (T-89)
+-- Without a flight map opened on a continent since the install, the GPS knew none of its flight paths
+-- (Erril rode 3.6 km from Grom'gol to Stonard). C_TaxiMap.GetTaxiNodesForMap lists the flight masters
+-- of a world map with isUndiscovered (and on some clients state): read on login, on a zone change
+-- and every few minutes. It is trusted for a continent only when it tells found from not found (at
+-- least one of your side's masters undiscovered): WoW Forever's world map lists them all as found,
+-- learned or not (OpenMap, ForeverDungeonJournal), and then only a flight map tells. A continent with
+-- neither a trusted read nor a flight map opened is "unseen": the GPS guesses there (Guessed, below).
+local TAXI_MAPS = { 1415, 1414, 1463, 1464 }   -- the continents' world maps, then Forever's flight maps
+local BOOT_NEAR = 300                          -- yards: the master you stand at is guessed, whatever his zone
+local masters = {}       -- [continent] = every flight master of your side the client lists, known or not
+local mastersRead        -- a read was made (GPS.ReadTaxiNodes)
+
+local function Readable(v) return v ~= nil and not IsSecret(v) end
+
+function GPS.ReadTaxiNodes()
+    mastersRead = true
+    if not (C_TaxiMap and C_TaxiMap.GetTaxiNodesForMap and WLWritsCharDB) then return end
+    local db = WLWritsCharDB
+    local side = UnitFactionGroup and UnitFactionGroup("player")
+    local FF = Enum and Enum.FlightPathFaction
+    local neutral = FF and FF.Neutral or 0
+    local mine = side == "Horde" and (FF and FF.Horde or 1) or side == "Alliance" and (FF and FF.Alliance or 2) or nil
+    local unreachable = Enum and Enum.FlightPathState and Enum.FlightPathState.Unreachable or 2
+    local per, seenID = {}, {}
+    for _, mapID in ipairs(TAXI_MAPS) do
+        local ok, nodes = pcall(C_TaxiMap.GetTaxiNodesForMap, mapID)
+        if ok and type(nodes) == "table" then
+            for _, n in ipairs(nodes) do
+                local id = type(n) == "table" and n.nodeID
+                local name = type(n) == "table" and n.name
+                if type(id) == "number" and Readable(id) and not seenID[id] and type(name) == "string" and Readable(name)
+                    and not name:find("^zz") and type(n.position) == "table"
+                    and (not Readable(n.faction) or n.faction == neutral or n.faction == mine) then
+                    local x, y = n.position.x, n.position.y
+                    if (x == nil or y == nil) and n.position.GetXY then x, y = n.position:GetXY() end
+                    if type(x) == "number" and type(y) == "number" and Readable(x) and Readable(y)
+                        and x >= 0 and x <= 1 and y >= 0 and y <= 1 then
+                        local cont, wx, wy = World(mapID, x, y)
+                        if cont then
+                            seenID[id] = true
+                            local c = per[cont] or { all = {}, found = {}, hidden = 0 }
+                            per[cont] = c
+                            local m = { kind = "taxi", nodeID = id, name = name, map = mapID, x = x * 100, y = y * 100,
+                                cont = cont, wx = wx, wy = wy }
+                            c.all[#c.all + 1] = m
+                            local found
+                            if Readable(n.isUndiscovered) then found = n.isUndiscovered == false end
+                            if type(n.state) == "number" and Readable(n.state) then
+                                found = (found ~= false) and n.state ~= unreachable
+                            end
+                            if found == false then c.hidden = c.hidden + 1 elseif found then c.found[#c.found + 1] = m end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    local added = false
+    db.taxi = db.taxi or {}
+    for cont, c in pairs(per) do
+        masters[cont] = c.all
+        if c.hidden > 0 and #c.found > 0 then
+            for _, m in ipairs(c.found) do
+                if not db.taxi[m.nodeID] then
+                    db.taxi[m.nodeID] = { name = m.name, map = m.map, x = m.x, y = m.y }
+                    added = true
+                end
+            end
+            db.taxiSeen = db.taxiSeen or {}
+            if not db.taxiSeen[cont] then db.taxiSeen[cont] = "api"; added = true end
         end
     end
     if added then fixed, knownCount = nil, nil end
 end
 
+-- The flight masters of your side the client listed on a continent (known or not), for the arrow's
+-- explanation and the guess. Read them, don't change them.
+function GPS._Masters(cont)
+    if not mastersRead then pcall(GPS.ReadTaxiNodes) end
+    return masters[cont] or {}
+end
+
 -- tests: the fixed points built again (faction, class, flight paths changed)
-function GPS._ResetFixed() fixed, knownCount = nil, nil end
+function GPS._ResetFixed() fixed, knownCount = nil, nil; masters, mastersRead = {}, nil end
 
 function GPS.KnownFlights()
     if not knownCount then
@@ -364,6 +470,221 @@ function GPS.KnownFlights()
         for _ in pairs(WLWritsCharDB.taxi or {}) do knownCount = knownCount + 1 end
     end
     return knownCount
+end
+
+-- Flight paths known on a continent (0 Eastern Kingdoms, 1 Kalimdor).
+function GPS.KnownFlightsOn(cont)
+    if not fixed then BuildFixed() end
+    local k = 0
+    for _, p in ipairs(fixed.taxi) do if p.cont == cont then k = k + 1 end end
+    return k
+end
+
+-- A continent whose flight paths the GPS cannot know: no flight map opened there, no trusted read,
+-- no flight path recorded on it.
+function GPS.Unseen(cont)
+    local db = WLWritsCharDB
+    if db and db.taxiSeen and db.taxiSeen[cont] then return false end
+    return GPS.KnownFlightsOn(cont) == 0
+end
+
+-- The guess on an unseen continent (Erril, 55, never opened a flight map in the Eastern Kingdoms: the
+-- GPS sent him by teleport and two zeppelins from the Hinterlands to Stonard): every flight master of
+-- your side whose zone starts GUESS_GAP levels or more below yours (you have very likely been there and
+-- talked to him), plus the one you stand at (BOOT_NEAR yards). Such a node is p.guess: a flight from or
+-- to it costs GUESS_COST more (a sure way wins a near tie), GUESS_FAR more again when you get there by a
+-- cast or a ship (you could not check it before going); the arrow and the card say the flight is
+-- supposed known. Opening a flight map tells the truth (RecordTaxi: the continent is seen, its guesses
+-- are over, a master it does not show as known is never guessed again, WLWritsCharDB.taxiNoGuess).
+local GUESS_GAP = 5
+local GUESS_COST, GUESS_FAR = 60, 180
+
+-- The zones' first levels (uiMapID, level, names in English and French, without "The"/"Les"): the
+-- zone of a master is the end of his name ("Stonard, Swamp of Sorrows") or his map (LibForeverData).
+local ZONE_LEVELS = {
+    { 1429, 1, "Elwynn Forest", "Forêt d'Elwynn", "Elwynn" }, { 1426, 1, "Dun Morogh" }, { 1420, 1, "Tirisfal Glades", "Clairières de Tirisfal", "Tirisfal" },
+    { 1453, 1, "Stormwind City", "Stormwind", "Hurlevent", "Cité de Hurlevent" }, { 1455, 1, "Ironforge", "Forgefer" },
+    { 1458, 1, "Undercity", "Fossoyeuse" },
+    { 1436, 10, "Westfall", "Marche de l'Ouest" }, { 1432, 10, "Loch Modan" }, { 1421, 10, "Silverpine Forest", "Forêt des Pins-Argentés", "Silverpine", "Pins-Argentés" },
+    { 1433, 15, "Redridge Mountains", "Carmines", "Les Carmines", "Montagnes des Carmines", "Redridge" },
+    { 1431, 18, "Duskwood", "Bois de la Pénombre" }, { 1437, 20, "Wetlands", "Paluns", "Les Paluns" },
+    { 1424, 20, "Hillsbrad Foothills", "Contreforts de Hautebrande", "Hillsbrad", "Hautebrande" }, { 1416, 30, "Alterac Mountains", "Montagnes d'Alterac", "Alterac" },
+    { 1417, 30, "Arathi Highlands", "Hautes-terres d'Arathi", "Arathi" },
+    { 1434, 30, "Stranglethorn Vale", "Stranglethorn", "Vallée de Strangleronce", "Strangleronce" },
+    { 1418, 35, "Badlands", "Terres ingrates", "Les Terres ingrates" }, { 1435, 35, "Swamp of Sorrows", "Marais des Chagrins" },
+    { 1425, 40, "Hinterlands", "The Hinterlands", "Les Hinterlands" }, { 1427, 43, "Searing Gorge", "Gorge des Vents brûlants" },
+    { 1419, 45, "Blasted Lands", "Terres foudroyées" }, { 1428, 50, "Burning Steppes", "Steppes ardentes" },
+    { 1422, 51, "Western Plaguelands", "Maleterres de l'Ouest" }, { 1423, 53, "Eastern Plaguelands", "Maleterres de l'Est" },
+    { 1430, 55, "Deadwind Pass", "Défilé de Deuillevent" },
+    { 1411, 1, "Durotar" }, { 1412, 1, "Mulgore" }, { 1438, 1, "Teldrassil" }, { 1454, 1, "Orgrimmar" },
+    { 1456, 1, "Thunder Bluff", "Pitons-du-Tonnerre", "Les Pitons-du-Tonnerre" }, { 1457, 1, "Darnassus" },
+    { 1413, 10, "Barrens", "The Barrens", "Tarides", "Les Tarides", "Northern Barrens", "Tarides du Nord" },
+    { 1439, 10, "Darkshore", "Sombrivage" }, { 1442, 15, "Stonetalon Mountains", "Serres-Rocheuses", "Les Serres-Rocheuses" },
+    { 1440, 18, "Ashenvale", "Orneval" }, { 1441, 25, "Thousand Needles", "Mille pointes" }, { 1443, 30, "Desolace", "Désolace" },
+    { 1445, 35, "Dustwallow Marsh", "Marécage d'Âprefange" }, { 1444, 40, "Feralas", "Féralas" }, { 1446, 40, "Tanaris" },
+    { 1447, 45, "Azshara" }, { 1448, 48, "Felwood", "Gangrebois" }, { 1449, 48, "Un'Goro Crater", "Cratère d'Un'Goro" },
+    { 1451, 55, "Silithus" }, { 1452, 55, "Winterspring", "Berceau-de-l'Hiver" }, { 1450, 55, "Moonglade", "Reflet-de-Lune" },
+}
+local zoneByName, zoneByMap
+local function ZoneKey(s)
+    s = tostring(s):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    s = s:gsub("^the ", ""):gsub("^les ", ""):gsub("^le ", ""):gsub("^la ", ""):gsub("^l'", "")
+    return s
+end
+-- The first level of a master's zone, nil when unknown (never guessed then).
+local function ZoneMin(name, map)
+    if not zoneByName then
+        zoneByName, zoneByMap = {}, {}
+        for _, z in ipairs(ZONE_LEVELS) do
+            zoneByMap[z[1]] = z[2]
+            for i = 3, #z do zoneByName[ZoneKey(z[i])] = z[2] end
+        end
+    end
+    if type(map) == "number" and zoneByMap[map] then return zoneByMap[map] end
+    if type(name) ~= "string" then return nil end
+    local zone = name:match(".*,%s*(.-)%s*$")
+    return zoneByName[ZoneKey(zone or name)]
+end
+GPS._ZoneMin = ZoneMin
+
+local function PlayerLevel()
+    local ok, l = pcall(UnitLevel, "player")
+    if ok and type(l) == "number" and not IsSecret(l) and l > 0 then return l end
+end
+
+-- A master's key in WLWritsCharDB.taxiNoGuess: his node, else (LibForeverData) his place.
+local function GuessKey(m)
+    if m.nodeID then return "n" .. m.nodeID end
+    return "l" .. tostring(m.cont) .. ":" .. math.floor(m.wx / 20 + 0.5) .. ":" .. math.floor(m.wy / 20 + 0.5)
+end
+
+-- The masters of a continent to guess from: the client's list, else LibForeverData's flight masters
+-- of your side (GoTo.FlightMasters: the same places the "Aller à" window finds).
+local function GuessPool(cont)
+    local all = GPS._Masters(cont)
+    if #all == 0 and WP.GoTo and WP.GoTo.FlightMasters then
+        local ok, t = pcall(WP.GoTo.FlightMasters, cont)
+        if ok and type(t) == "table" then all = t end
+    end
+    return all
+end
+
+local function Guessed(cont, px, py)
+    if not GPS.Unseen(cont) then return nil end
+    local all = GuessPool(cont)
+    if #all == 0 then return nil end
+    local no = WLWritsCharDB and WLWritsCharDB.taxiNoGuess or {}
+    local near, nd
+    if px and py then
+        for _, m in ipairs(all) do
+            local d = math.sqrt((m.wx - px) ^ 2 + (m.wy - py) ^ 2)
+            if d <= BOOT_NEAR and (not nd or d < nd) then near, nd = m, d end
+        end
+    end
+    local lvl = PlayerLevel()
+    local out = {}
+    for _, m in ipairs(all) do
+        if not no[GuessKey(m)] then
+            local minL = ZoneMin(m.name, m.zoneMap)
+            if m == near or (lvl and minL and minL <= lvl - GUESS_GAP) then
+                out[#out + 1] = { kind = "taxi", guess = true, nodeID = m.nodeID, name = m.name,
+                    cont = m.cont, wx = m.wx, wy = m.wy, map = m.map, x = m.x, y = m.y }
+            end
+        end
+    end
+    return #out > 0 and out or nil
+end
+GPS._Guessed = Guessed
+
+-- A flight map was opened on `cont` (RecordTaxi): every master of it the map does not show as known
+-- (not recorded, nor within 60 yards of a recorded node) is never guessed again.
+function GPS._ForgetGuesses(cont)
+    local db = WLWritsCharDB
+    if not db then return end
+    local known, knownID = {}, {}
+    for id, t in pairs(db.taxi or {}) do
+        local p = type(t) == "table" and Point(t.map, t.x, t.y)
+        if p and p.cont == cont then known[#known + 1] = p; knownID[id] = true end
+    end
+    db.taxiNoGuess = db.taxiNoGuess or {}
+    for _, m in ipairs(GuessPool(cont)) do
+        local ok = m.nodeID and knownID[m.nodeID]
+        if not ok then
+            for _, p in ipairs(known) do
+                if math.sqrt((p.wx - m.wx) ^ 2 + (p.wy - m.wy) ^ 2) < 60 then ok = true; break end
+            end
+        end
+        if not ok then db.taxiNoGuess[GuessKey(m)] = true end
+    end
+end
+
+-- The plan flies a supposed flight path (a guessed master at one end of a flight).
+function GPS.GuessedFlight(legs)
+    for _, l in ipairs(type(legs) == "table" and legs or {}) do
+        if l.kind == "fly" and ((l.from and l.from.guess) or (l.to and l.to.guess)) then return true end
+    end
+    return false
+end
+
+-- Flight masters' places in English and French (the short name of a node, "Stonard, Swamp of Sorrows"
+-- -> "Stonard"), for the arrow's explanation when the client names them in the other language.
+local FLIGHT_NAMES = {
+    { "Stonard", "Pierrêche" }, { "Booty Bay", "Baie-du-Butin" }, { "Hammerfall", "Trépas-d'Orgrim" },
+    { "Tarren Mill", "Moulin-de-Tarren" }, { "Undercity", "Fossoyeuse" }, { "The Sepulcher", "Le Sépulcre" },
+    { "Revantusk Village", "Village des Vengebroches" }, { "Light's Hope Chapel", "Chapelle de l'Espoir de Lumière" },
+    { "Thorium Point", "Halte du Thorium" }, { "Stormwind", "Hurlevent" }, { "Ironforge", "Forgefer" },
+    { "Sentinel Hill", "Colline des Sentinelles" }, { "Lakeshire", "Comté-du-Lac" }, { "Darkshire", "Sombre-Comté" },
+    { "Menethil Harbor", "Port de Menethil" }, { "Southshore", "Austrivage" }, { "Aerie Peak", "Nid-de-l'Aigle" },
+    { "Chillwind Camp", "Camp du Noroît" }, { "Thunder Bluff", "Les Pitons-du-Tonnerre" },
+    { "Crossroads", "La Croisée" }, { "The Crossroads", "La Croisée" }, { "Ratchet", "Cabestan" },
+    { "Splintertree Post", "Poste de Bois-Brisé" }, { "Zoram'gar Outpost", "Avant-poste de Zoram'gar" },
+    { "Sun Rock Retreat", "Retraite de Roche-Soleil" }, { "Freewind Post", "Poste de Librevent" },
+    { "Everlook", "Long-Guet" }, { "Cenarion Hold", "Fort cénarien" }, { "Moonglade", "Reflet-de-Lune" },
+    { "Nijel's Point", "Pointe de Nijel" }, { "Feathermoon Stronghold", "Bastion de Pennelune" },
+    { "Talrendis Point", "Pointe de Talrendis" }, { "Rut'theran Village", "Village de Rut'theran" },
+    { "Stonetalon Peak", "Pic des Serres-Rocheuses" },
+}
+local function PlaceIn(name)
+    local short = GPS.ShortPlace(name)
+    local en = ns.English and ns.English()
+    for _, r in ipairs(FLIGHT_NAMES) do
+        if r[1] == short or r[2] == short then return en and r[1] or r[2] end
+    end
+    return short
+end
+GPS._PlaceIn = PlaceIn
+
+-- The arrow's one muted line when the plan rides far (more than RIDE_NOTE yards) on a continent with
+-- no flight in the plan: why ("ouvre la carte d'un maître de vol", "tu ne connais pas encore le vol de
+-- Pierrêche", "pas de maître de vol plus près"). nil when the plan flies or rides little; a plan that
+-- flies a guessed flight path says so ("Vol supposé connu : ouvre la carte du maître de vol pour vérifier").
+local RIDE_NOTE = 1500
+function GPS.RideNote(legs)
+    if type(legs) ~= "table" then return nil end
+    if GPS.GuessedFlight(legs) then return L("Vol supposé connu : ouvre la carte du maître de vol pour vérifier") end
+    local long
+    for _, l in ipairs(legs) do
+        if l.kind == "fly" then return nil end
+        if l.kind == "ride" and l.from and l.to and l.from.cont == l.to.cont and l.from.wx and l.to.wx then
+            local d = Dist(l.from, l.to)
+            if d > RIDE_NOTE and (not long or d > long.d) then long = { leg = l, d = d } end
+        end
+    end
+    if not long then return nil end
+    local to, cont = long.leg.to, long.leg.to.cont
+    if GPS.Unseen(cont) then return L("À cheval : ouvre la carte d'un maître de vol pour que le GPS connaisse tes vols") end
+    if not fixed then BuildFixed() end
+    local known = {}
+    for _, p in ipairs(fixed.taxi) do if p.nodeID then known[p.nodeID] = true end end
+    local best, bd
+    for _, m in ipairs(GPS._Masters(cont)) do
+        local d = Dist(m, to)
+        if not bd or d < bd then best, bd = m, d end
+    end
+    if best and not known[best.nodeID] and bd < long.d * 0.5 then
+        return string.format(L("À cheval : tu ne connais pas encore le vol de %s"), PlaceIn(best.name))
+    end
+    return L("À cheval : pas de maître de vol plus près")
 end
 
 -- ---------------------------------------------------------------- the route
@@ -565,6 +886,48 @@ local function HearthWay(dead, pol)
     return inn, ASTRAL_RECALL
 end
 
+-- What a zeppelin or boat costs when you reach its dock `base` seconds from now: the real wait for the
+-- next departure plus the crossing when the ship is timed (Transports.lua), else the flat LINK_TIME; a
+-- druid's flight home: its flight time. sNow: the server time of "now" (one per search). follow: the
+-- plan you follow (a ship missed by a few seconds still counts as caught: no flip-flop, Transports.Cost).
+local function LinkCost(a, b, base, sNow, follow)
+    local l = a.link
+    if l.mode == "flight" then return FlyCost(Dist(a, b)) end
+    local T = WP.Transports
+    if T and T.Cost and l.id then
+        local ok, c = pcall(T.Cost, l, a.start == true, (sNow or T._Now()) + (base or 0), follow)
+        if ok and type(c) == "number" then return c end
+    end
+    return LINK_TIME
+end
+local function ServerNow()
+    local T = WP.Transports
+    return T and T._Now and T._Now() or nil
+end
+
+-- A ship leg says when it leaves, as planned (Transports.lua): leg.wait (seconds at the dock), leg.ride,
+-- leg.conf ("naowh" | "synced" | "estimated"), leg.departAt (server time; nil when estimated).
+local function NoteDeparture(leg, base, sNow, follow)
+    local l = leg.from and leg.from.link
+    local T = WP.Transports
+    if not (l and l.id and T and T.Next and l.mode ~= "flight") then return end
+    local at = (sNow or T._Now()) + (base or 0)
+    local ok, total, conf, wait, ride = pcall(T.Cost, l, leg.from.start == true, at, follow)
+    if not ok or not total then return end
+    leg.conf, leg.wait, leg.ride = conf, wait, ride
+    leg.departAt = wait and (at + wait) or nil
+end
+
+-- On board the ship of a plan's first leg (Transports.Aboard: you stood at its dock until it left):
+-- the seconds of the crossing left, else nil.
+local function Aboard(leg)
+    local T = WP.Transports
+    local d = leg and leg.kind == "link" and leg.from
+    if not (d and d.link and d.link.id and T and T.Aboard) then return nil end
+    local ok, left = pcall(T.Aboard, d.link, d.start == true, d)
+    return ok and type(left) == "number" and left or nil
+end
+
 -- One Dijkstra over every pair of points (a few dozen), from where you stand. With `firstOnly` it
 -- stops at the nearest of `dests`; otherwise it prices every destination. `exclude`: points left out
 -- (the next best plans).
@@ -590,6 +953,17 @@ local function Search(dests, firstOnly, exclude, pol)
     for _, d in ipairs(dests) do d._key = NodeKey(d); nodes[#nodes + 1] = d; isDest[#nodes] = true end
     if not dead then
         for _, p in ipairs(fixed.taxi) do Add(p) end
+        -- an unseen continent: the flight masters you very likely know, guessed (Guessed)
+        local have = {}
+        for _, p in ipairs(fixed.taxi) do if p.nodeID then have[p.nodeID] = true end end
+        local conts = { [0] = true, [1] = true }
+        conts[cont] = true
+        for c in pairs(conts) do
+            local okG, guess = pcall(Guessed, c, c == cont and px or nil, c == cont and py or nil)
+            if okG and guess then
+                for _, p in ipairs(guess) do if not (p.nodeID and have[p.nodeID]) then Add(p) end end
+            end
+        end
     end
     for _, p in ipairs(fixed.docks) do Add(p) end
     if Opt("teleports", true) and not dead then
@@ -603,7 +977,9 @@ local function Search(dests, firstOnly, exclude, pol)
     if inn then Add(inn) end
 
     local n, speed = #nodes, RideSpeed()
+    local sNow = ServerNow()
     local cost, prev, how, done = {}, {}, {}, {}
+    local far = {}         -- [i]: reached by a cast or a ship (a guessed flight there could not be checked)
     for i = 1, n do cost[i] = math.huge end
     cost[1] = 0
     local reached
@@ -625,16 +1001,21 @@ local function Search(dests, firstOnly, exclude, pol)
                     kind = "ride"
                     if a.kind == "taxi" and b.kind == "taxi" then
                         local f = FlyCost(d)
+                        -- a supposed flight path: a sure way wins a near tie
+                        if a.guess or b.guess then f = f + GUESS_COST + (far[u] and GUESS_FAR or 0) end
                         if f < c then c, kind = f, "fly" end
                     end
                 end
                 if a.kind == "dock" and a.other == b and (a.start or not a.link.oneWay) then
-                    local lt = a.link.mode == "flight" and FlyCost(Dist(a, b)) or LINK_TIME
+                    local lt = LinkCost(a, b, base, sNow)
                     if lt < c then c, kind = lt, "link" end
                 end
                 if u == 1 and b.kind == "port" and TELEPORT_TIME < c then c, kind = TELEPORT_TIME, "teleport" end
                 if u == 1 and b == inn and HEARTH_TIME < c then c, kind = HEARTH_TIME, "hearth" end
-                if kind and base + c < cost[v] then cost[v], prev[v], how[v] = base + c, u, kind end
+                if kind and base + c < cost[v] then
+                    cost[v], prev[v], how[v] = base + c, u, kind
+                    far[v] = far[u] or kind == "link" or kind == "teleport" or kind == "hearth"
+                end
             end
         end
     end
@@ -668,8 +1049,10 @@ local function PathWith(dests, exclude, pol)
     local nodes, cost, prev, how, reached, via = Search(dests, true, exclude, pol)
     if not reached then return nil end
     local legs, v = {}, reached
+    local sNow = ServerNow()
     while prev[v] do
         local leg = { kind = how[v], from = nodes[prev[v]], to = nodes[v], seconds = cost[v] - cost[prev[v]] }
+        if leg.kind == "link" then NoteDeparture(leg, cost[prev[v]], sNow) end
         if leg.kind == "hearth" then
             if via == "item" then leg.item = HEARTH_ITEM else leg.spell = via end
         end
@@ -709,7 +1092,9 @@ local function PlanCost(legs)
     start._key = NodeKey(start)
     local dead = UnitIsDeadOrGhost and UnitIsDeadOrGhost("player")
     local speed = RideSpeed()
+    local sNow = ServerNow()
     local total, at = 0, start
+    local farNow          -- a cast or a ship before: a guessed flight then costs GUESS_FAR more (Search)
     for i, leg in ipairs(legs) do
         local k = leg.kind
         if k == "teleport" or k == "hearth" then
@@ -727,7 +1112,11 @@ local function PlanCost(legs)
             end
         else
             local from = leg.from
-            if i == 1 then
+            local aboard = i == 1 and k == "link" and Aboard(leg)
+            if aboard then
+                -- on the ship already: the crossing left, not the walk back nor the next departure
+                total = total + aboard
+            elseif i == 1 then
                 if k == "ride" then
                     from = at        -- the first ride starts where you stand now
                 else
@@ -741,10 +1130,21 @@ local function PlanCost(legs)
                 total = total + RideCost(from, leg.to, speed)
             elseif k == "fly" then
                 total = total + FlyCost(Dist(from, leg.to))
-            elseif k == "link" then
-                total = total + (from.link and from.link.mode == "flight" and FlyCost(Dist(from, leg.to)) or LINK_TIME)
+                if (from.guess or leg.to.guess) then
+                    -- a flight map opened since: the guess is over, a new plan
+                    if not GPS.Unseen(leg.to.cont) then return nil end
+                    total = total + GUESS_COST + (farNow and GUESS_FAR or 0)
+                end
+            elseif k == "link" and not aboard then
+                if from.link then
+                    NoteDeparture(leg, total, sNow, true)
+                    total = total + LinkCost(from, leg.to, total, sNow, true)
+                else
+                    total = total + LINK_TIME
+                end
             end
         end
+        if k == "link" or k == "teleport" or k == "hearth" then farNow = true end
         at = leg.to
     end
     return total
@@ -1018,14 +1418,39 @@ function GPS.Itinerary(legs)
     return out
 end
 
--- The whole way in one line: "Pierre de foyer → vol jusqu'à Kargath → 300 m jusqu'à Tabetha" (first word in
+-- Between two legs of a way told in one line. Plain ASCII: the game's fonts (FRIZQT, ARIALN) have no
+-- arrow glyph (U+2192 drew as a box on the French client), and U+203A may be missing too.
+GPS.SEP = " > "
+
+-- The whole way in one line: "Pierre de foyer > vol jusqu'à Kargath > 300 m jusqu'à Tabetha" (first word in
 -- capital). Empty when there is no plan.
 function GPS.ItinerarySummary(legs)
     local parts = {}
     for i, it in ipairs(GPS.Itinerary(legs)) do
         parts[#parts + 1] = i == 1 and UpperFirst(it.text) or it.text
     end
-    return table.concat(parts, " \226\134\146 ")
+    return table.concat(parts, GPS.SEP)
+end
+
+-- The next legs in a few words, for a line with no room for the whole way: of `items` (GPS.Itinerary),
+-- the casts, flights and crossings and the last walk (the one to the place), at most `max` (3) of them:
+-- "vol jusqu'à Orgrimmar", "zeppelin pour Undercity", "vol jusqu'à Moulin-de-Tarren". The walks between
+-- two of them ("610 m jusqu'au zeppelin") are left to the tooltip, which lists every leg. `skip(it)`:
+-- true for an item not to tell (the leg under way). Returns the kept texts (a list, maybe empty).
+function GPS.NextLegs(items, max, skip)
+    max = max or 3
+    local left = {}
+    for _, it in ipairs(type(items) == "table" and items or {}) do
+        if type(it.text) == "string" and it.text ~= "" and not (skip and skip(it)) then left[#left + 1] = it end
+    end
+    local out = {}
+    for i, it in ipairs(left) do
+        if not (it.kind == "walk" or it.kind == "ride") or i == #left then
+            if #out >= max then break end
+            out[#out + 1] = it.text
+        end
+    end
+    return out
 end
 
 -- The planned trip in one short sentence, for a card that names the place and its distance itself:
@@ -1094,11 +1519,17 @@ function GPS.TripSummary(dest, x, y, name)
         else
             last = it      -- a walk or a ride: the one after the last flight or cast is the "puis"
         end
+        -- a timed ship says when it leaves: "Zeppelin pour Grom'gol (départ dans ~3 min)"
+        if part and (it.kind == "boat" or it.kind == "zeppelin") and WP.Transports and WP.Transports.CardPart then
+            local okC, p2 = pcall(WP.Transports.CardPart, part, it.leg)
+            if okC and type(p2) == "string" then part = p2 end
+        end
         if part then parts[#parts + 1] = part; last = nil end
     end
     if #parts == 0 then return nil end
     local s = table.concat(parts, ", ")
     if last and last.yards then s = string.format(L("%s, puis %s"), s, DistanceText(last.yards)) end
+    if GPS.GuessedFlight(legs) then s = s .. " " .. L("(vol supposé)") end
     return s, legs, minutes, alt
 end
 
@@ -1225,6 +1656,8 @@ end
 function GPS.Replan()
     if not state.dest or state.zygor then return end
     if UnitOnTaxi and UnitOnTaxi("player") then return end
+    -- on a zeppelin or boat of the plan: it holds until you land (a plan from mid-air is no plan)
+    if state.legs and Aboard(state.legs[1]) then state.plannedAt = GetTime(); return end
     -- the other trip the player took (Alt-click on the arrow) holds until the destination changes
     local choice = state.choice
     if choice and choice.dest ~= state.dest then choice = nil; state.choice = nil end
@@ -1237,7 +1670,12 @@ function GPS.Replan()
     local old = state.legs
     if legs and old and #old > 0 and state.planFor == state.dest and Signature(legs) ~= Signature(old) then
         local oldCost = PlanCost(old)
-        if oldCost and eta >= oldCost * (1 - SWITCH) then legs, eta = old, oldCost end
+        -- the Hearthstone's "gain" policy holds against the plan you follow too: a stone that saves less
+        -- than HEARTH_GAIN over it does not replace it (a ship's countdown moving would flip the two)
+        local function Stone(l) return l[1] and l[1].kind == "hearth" end
+        local gainHeld = oldCost and Stone(legs) and not Stone(old)
+            and ((choice and choice.pol) or HearthPolicy()) == "gain" and oldCost - eta < HEARTH_GAIN
+        if oldCost and (eta >= oldCost * (1 - SWITCH) or gainHeld) then legs, eta = old, oldCost end
     end
     state.legs, state.eta, state.planFor = legs, eta, state.dest
     -- "step 2 of 4" keeps counting across plans: legs already done plus the legs left
@@ -1685,6 +2123,26 @@ local function Here()
     return cont, wx, wy
 end
 
+GPS._Here = Here
+-- The dock points of the zeppelins and boats, for Transports.lua's watcher: your side's once the GPS
+-- has planned, else every ship's (built once, without touching the GPS's own list). Read them, don't
+-- change them.
+local shipDocks
+function GPS._Docks()
+    if fixed then return fixed.docks end
+    if shipDocks then return shipDocks end
+    local out = {}
+    for _, l in ipairs(LINKS) do
+        if l.id and l.a and l.b then
+            local a = Point(l.a[1], l.a[2], l.a[3], { kind = "dock", name = l.nameA, link = l, start = true })
+            local b = Point(l.b[1], l.b[2], l.b[3], { kind = "dock", name = l.nameB, link = l })
+            if a and b then a.other, b.other = b, a; out[#out + 1] = a; out[#out + 1] = b end
+        end
+    end
+    if #out > 0 then shipDocks = out end
+    return out
+end
+
 -- You talk to an innkeeper about binding: the inn nearest to you (or where you stand) for that name,
 -- used once GetBindLocation gives that name.
 function GPS._OnBinder(area)
@@ -1741,6 +2199,13 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3)
     end
     if event == "LOADING_SCREEN_DISABLED" and landing then
         if C_Timer and C_Timer.After then C_Timer.After(1, function() pcall(GPS._OnLanded) end) end
+    end
+    if event == "PLAYER_LOGIN" or event == "ZONE_CHANGED_NEW_AREA" then
+        -- the flight paths you know, read anywhere (T-89); again every 5 minutes
+        pcall(GPS.ReadTaxiNodes)
+        if event == "PLAYER_LOGIN" and C_Timer and C_Timer.NewTicker then
+            pcall(C_Timer.NewTicker, 300, function() pcall(GPS.ReadTaxiNodes) end)
+        end
     end
     if event == "PLAYER_LOGIN" then
         pcall(GPS.MigrateProvider)

@@ -63,12 +63,12 @@ function TR.Action(n, st, log)
   elseif o then
     a.obj = o
     a.kind = OBJ_KIND[o.k] or "go"
-    local nm = o.n and (ns.T(o.n) or o.n) or nil
-    if o.n and log and ns.ObjDisplayName then
+    local nm = o.k ~= "text" and o.n and (ns.T(o.n) or o.n) or nil
+    if nm and log and ns.ObjDisplayName then
       local ok, g = pcall(ns.ObjDisplayName, n, o, log)
       if ok and type(g) == "string" and g ~= "" then nm = g end
     end
-    if nm then a.text = L[OBJ_TEXT[a.kind]]:format(nm)
+    if nm then a.text = L[(ns.ObjVerbKey and ns.ObjVerbKey(o, nm)) or OBJ_TEXT[a.kind]]:format(nm)
     else a.text = L.TR_DO:format(qn) end
     a.sub = qn
   elseif n.kind == "c" then

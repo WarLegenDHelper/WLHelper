@@ -55,7 +55,7 @@ local S = {
     STEP = "Étape %d / %d", STEPS = "Étapes", NOROUTE = "Aucune route",
     NOROUTE_TXT = "La route part de là où tu es et passe par les quêtes de prérequis.",
     -- kind of a line, and a quest's state (design system 5.5)
-    TAKE = "Prendre", DO = "Faire", TURNIN = "Rendre", HAVE = "Requise", OUTSIDE = "Dehors", ITEM = "Objet",
+    TAKE = "Prendre", DO = "Faire", TURNIN = "Rendre", HAVE = "Requise", HAVE_OPT = "Facultative", OUTSIDE = "Dehors", ITEM = "Objet",
     S_NONE = "À prendre", S_ON = "Dans ton journal", S_READY = "Prête à rendre", S_DONE = "Rendue",
     B_DONE = "Faite", B_CUR = "En cours", B_LATE = "À finir", B_NEXT = "À venir",
     IN_DUNGEON = "Dans le donjon : %s", OUTER = "Zone de %s, avant le portail", GATE = "Avant d'entrer : %s",
@@ -112,7 +112,8 @@ local S = {
     H_PATH = "Chemin", H_TACTIC = "Tactique", H_LOOT = "Butin pour toi", LOOT_QUEST = "objet de quête",
     BIS_1 = "BiS", BIS_2 = "2e choix", BIS_TT = "%s pour ta spé (Naowh)", BIS_2S = "2e", BIS_LVS = "BiS %d",
     ROLE_TANK = "Tank", ROLE_HEAL = "Soigneur", ROLE_ALL = "Tous", TR_BOSS_N = "Boss %d sur %d",
-    BOSS_STEP = "Boss : %s", IN_START = "Sur le chemin : PNJ et objets du donjon", IN_TRASH = "À finir dans le donjon : butin des monstres", NAOWH_TIP = "", H_TIP = "Conseil", H_ALSO = "En chemin, ramasse aussi", ALSO_TRASH = "En chemin, ramasse aussi : %s",
+    BOSS_STEP = "Boss : %s", IN_START = "Sur le chemin : PNJ et objets du donjon", IN_TRASH = "À finir dans le donjon : butin des monstres", IN_TRASH_ANY = "À finir dans le donjon", NAOWH_TIP = "", H_TIP = "Conseil", H_ALSO = "En chemin, fais aussi", ALSO_TRASH = "En chemin, ramasse aussi : %s",
+    ALSO_ALL = "Tout le donjon : %s", ALSO_MOBS = "(tombent sur les monstres)", ALSO_MOB = "(tombe sur les monstres)", DUNGEON_MAP = "Carte du donjon",
     TT_FPOINTS = "Pose les points de l'étape sur la carte. S'il y en a plusieurs, un deuxième clic passe au suivant.",
     TT_FSHARE = "Partage avec le groupe les quêtes de donjon de ton journal qui se partagent.",
     TT_FDONE = "Valide l'étape à la main et passe à la suivante, quand le guide ne peut pas le voir seul (quête faite avant, objet reçu d'un ami...). Un deuxième clic annule.",
@@ -153,7 +154,8 @@ local S = {
     CL_KEY_NEXT = "Quelqu'un du groupe doit l'avoir. Sinon, la partie Clé plus bas dit où la trouver.",
     CL_MISS_H1 = "Pas encore prêt : 1 quête à prendre",
     CL_MISS_HN = "Pas encore prêt : %d quêtes à prendre",
-    CL_MISS_T = "Elles se prennent dehors : sans elles, ce que tu fais dans %s ne compte pas.",
+    CL_MISS_T = "Ces quêtes se prennent hors du donjon (%s) : sans elles, tes objectifs à l'intérieur ne comptent pas.",
+    CL_MISS_T1 = "Cette quête se prend hors du donjon (%s) : sans elle, tes objectifs à l'intérieur ne comptent pas.",
     CL_MISS_NEXT = "Clique sur une quête « À prendre » : le GPS te guide jusqu'au PNJ qui la donne.",
     CL_WHAT_H = "Ce que vérifie la check-list",
     CL_WHAT = "Avant d'entrer dans %s : les quêtes qui se font dedans (elles se prennent dehors), puis la clé s'il en faut une.",
@@ -179,7 +181,7 @@ local S = {
     PH_BEFORE_S = "Avant le donjon", PH_INSIDE_S = "Dans le donjon", PH_AFTER_S = "Après le donjon",
     TR_WHAT = "Suivi du guide : l'action à faire maintenant", TR_TITLE = "Suivi du guide",
     TR_TAKE = "Prendre « %s »", TR_TURN = "Rendre « %s »", TR_DO = "Faire « %s »", TR_HAVE = "Avoir « %s » dans ton journal",
-    TR_KILL = "Tuer : %s", TR_LOOT = "Récupérer : %s", TR_USE = "Utiliser : %s", TR_TALK = "Parler à %s", TR_GO = "Aller à : %s",
+    TR_KILL = "Tuer : %s", TR_LOOT = "Récupérer : %s", TR_USE = "Utiliser : %s", TR_TALK = "Parler à %s", TR_GO = "Aller à : %s", TR_OBJ = "Objectif : %s",
     TR_ITEM = "Obtenir : %s", TR_ENTER = "Entrer dans %s", TR_BOSS = "Boss : %s",
     TR_MISSING1 = "%d quête à prendre avant d'entrer", TR_MISSING = "%d quêtes à prendre avant d'entrer",
     TR_TIP_CLICK = "Clic : ouvrir le guide sur cette étape", TR_TIP_SHIFT = "Maj-clic : marquer l'étape comme faite",
@@ -203,7 +205,7 @@ local S = {
     KEYS_COMBAT = "Les raccourcis ne s'ouvrent pas en combat : réessaie après.",
     SHARE_N1 = "Partager %d quête", SHARE_N = "Partager %d quêtes",
     -- prerequisite chains and the ranked status words (picker, list and card)
-    CH_STEP = "Prérequis %d/%d", CH_BEFORE = "Étape %d sur %d avant « %s »",
+    CH_STEP = "Prérequis %d/%d", CH_BEFORE = "Étape %d sur %d avant « %s »", CH_PART = "Partie %d sur %d de la suite « %s »",
     CH_NONE = "Sans prérequis", CH_COUNT1 = "%d prérequis", CH_COUNT = "%d prérequis", CH_ALLDONE = "Prérequis faits",
     ST_PRE = "Prérequis %d/%d", ST_PRELOG = "Prérequis %d/%d en cours", ST_LOW = "Niveau %d requis",
     ST_PICKUP = "À prendre", ST_ACTIVE = "En cours", ST_READY = "Prête à rendre", ST_DONE = "Rendue",
@@ -269,12 +271,13 @@ local S = {
     CARD_PH_BEFORE_D = "Avant le donjon : %s · %d sur %d", CARD_PH_INSIDE_D = "Dans le donjon : %s · %d sur %d",
     CARD_PH_AFTER_D = "Après le donjon : %s · %d sur %d",
     CARD_WHY_Q = "Quête « %s »", CARD_WHY_MAIN = "Quête de donjon « %s »", CARD_WHY_MAIN_S = "Quête de donjon",
-    CARD_CHAIN = "étape %d sur %d avant « %s »", CARD_PRE_N = "prérequis %d sur %d",
+    CARD_CHAIN = "étape %d sur %d avant « %s »", CARD_PART = "partie %d sur %d de la suite « %s »", CARD_PRE_N = "prérequis %d sur %d",
     CARD_ELITE = "Élite", CARD_NOELITE = "Non élite", CARD_ELITE_SOME = "En partie élite",
     CARD_BEFORE_WHY = "Requis pour « %s » (dans le donjon)", CARD_BEFORE_OPT = "Facultatif : le donjon se fait sans", CARD_BEFORE_WAY = " · sur le chemin du portail", CARD_BEFORE_KEY = "Requis pour « %s » : la clé pour entrer dans le donjon",
+    WHY_FIRST = "D'abord à %s : il faut « %s » avant de parler à %s à %s.", WHY_FIRST_DO = "D'abord à %s : il faut « %s » avant « %s » à %s.",
     SKIP_Q = "Passer", SKIP_Q_CONFIRM = "Clique encore pour passer", SKIP_Q_DONE = "Quête « %s » retirée de la route : recoche-la dans la vue d'ensemble pour la remettre.",
     TT_SKIP_Q = "Retire cette quête facultative de la route, comme la décocher dans la vue d'ensemble. Elle n'est pas abandonnée : si elle est dans ton journal, elle y reste.", SKIP_Q_LOG = "Elle reste dans ton journal de quêtes.",
-    CARD_PLUS = "+%d", CARD_PLUS_P = " (+%d)", CARD_FOR_DG = "pour %s",
+    CARD_PLUS = "+%d", CARD_PLUS_P = " (et %d autres quêtes)", CARD_PLUS_P1 = " (et 1 autre quête)", CARD_FOR_DG = "pour %s", CARD_TAKE_MAIN = "à faire dans le donjon : prends-la avant d'entrer",
     CARD_NOTLOG = "Pas encore dans ton journal : prends-la d'abord.",
     CARD_NOTREADY = "Pas encore prête : il te reste ces objectifs.",
     CARD_ENTRY = "Entrée : %s",
@@ -327,7 +330,7 @@ local S = {
     AUTO_ON = "Auto points: on", AUTO_OFF = "Auto points: off", ARROW = "Arrow",
     STEP = "Step %d / %d", STEPS = "Steps", NOROUTE = "No route",
     NOROUTE_TXT = "The route starts where you stand and includes the prerequisite quests.",
-    TAKE = "Accept", DO = "Do", TURNIN = "Turn in", HAVE = "Required", OUTSIDE = "Outside", ITEM = "Item",
+    TAKE = "Accept", DO = "Do", TURNIN = "Turn in", HAVE = "Required", HAVE_OPT = "Optional", OUTSIDE = "Outside", ITEM = "Item",
     S_NONE = "To take", S_ON = "In your log", S_READY = "Ready to turn in", S_DONE = "Turned in",
     B_DONE = "Done", B_CUR = "In progress", B_LATE = "To finish", B_NEXT = "Upcoming",
     IN_DUNGEON = "Inside the dungeon: %s", OUTER = "%s area, before the portal", GATE = "Before entering: %s",
@@ -383,7 +386,8 @@ local S = {
     H_PATH = "Path", H_TACTIC = "Tactics", H_LOOT = "Loot for you", LOOT_QUEST = "quest item",
     BIS_1 = "BiS", BIS_2 = "2nd pick", BIS_TT = "%s for your spec (Naowh)", BIS_2S = "2nd", BIS_LVS = "BiS %d",
     ROLE_TANK = "Tank", ROLE_HEAL = "Healer", ROLE_ALL = "Everyone", TR_BOSS_N = "Boss %d of %d",
-    BOSS_STEP = "Boss: %s", IN_START = "Along the way: dungeon NPCs and objects", IN_TRASH = "Finish in the dungeon: trash loot", NAOWH_TIP = "", H_TIP = "Tip", H_ALSO = "On the way, also loot", ALSO_TRASH = "On the way, also loot: %s",
+    BOSS_STEP = "Boss: %s", IN_START = "Along the way: dungeon NPCs and objects", IN_TRASH = "Finish in the dungeon: trash loot", IN_TRASH_ANY = "Finish in the dungeon", NAOWH_TIP = "", H_TIP = "Tip", H_ALSO = "On the way, also do", ALSO_TRASH = "On the way, also loot: %s",
+    ALSO_ALL = "Throughout the dungeon: %s", ALSO_MOBS = "(drop from the monsters)", ALSO_MOB = "(drops from the monsters)", DUNGEON_MAP = "Dungeon map",
     TT_FPOINTS = "Puts the step's points on the map. When there are several, a second click moves to the next one.",
     TT_FSHARE = "Shares the dungeon quests in your log with the group (those that can be shared).",
     TT_FDONE = "Completes the step by hand and moves on, when the guide cannot see it on its own (quest done earlier, item from a friend...). A second click undoes it.",
@@ -424,7 +428,8 @@ local S = {
     CL_KEY_NEXT = "Someone in the group must have it. Otherwise, the Key part below says where to get it.",
     CL_MISS_H1 = "Not ready yet: 1 quest to take",
     CL_MISS_HN = "Not ready yet: %d quests to take",
-    CL_MISS_T = "They are taken outside: without them, what you do in %s does not count.",
+    CL_MISS_T = "These quests are taken outside the dungeon (%s): without them, your objectives inside do not count.",
+    CL_MISS_T1 = "This quest is taken outside the dungeon (%s): without it, your objectives inside do not count.",
     CL_MISS_NEXT = "Click a \"To take\" quest to point the GPS at the NPC who gives it.",
     CL_WHAT_H = "What the checklist checks",
     CL_WHAT = "Before entering %s: the quests done inside (they are taken outside), then the key if one is needed.",
@@ -450,7 +455,7 @@ local S = {
     PH_BEFORE_S = "Before the dungeon", PH_INSIDE_S = "In the dungeon", PH_AFTER_S = "After the dungeon",
     TR_WHAT = "Guide tracker: what to do now", TR_TITLE = "Guide tracker",
     TR_TAKE = "Accept \"%s\"", TR_TURN = "Turn in \"%s\"", TR_DO = "Do \"%s\"", TR_HAVE = "Have \"%s\" in your log",
-    TR_KILL = "Kill: %s", TR_LOOT = "Loot: %s", TR_USE = "Use: %s", TR_TALK = "Talk to %s", TR_GO = "Go to: %s",
+    TR_KILL = "Kill: %s", TR_LOOT = "Loot: %s", TR_USE = "Use: %s", TR_TALK = "Talk to %s", TR_GO = "Go to: %s", TR_OBJ = "Objective: %s",
     TR_ITEM = "Get %s", TR_ENTER = "Enter %s", TR_BOSS = "Boss: %s",
     TR_MISSING1 = "%d quest to take before going in", TR_MISSING = "%d quests to take before going in",
     TR_TIP_CLICK = "Click: open the guide on this step", TR_TIP_SHIFT = "Shift-click: mark the step as done",
@@ -474,7 +479,7 @@ local S = {
     KEYS_COMBAT = "The key bindings cannot open in combat: try again after.",
     SHARE_N1 = "Share %d quest", SHARE_N = "Share %d quests",
     -- prerequisite chains and the ranked status words (picker, list and card)
-    CH_STEP = "Prerequisite %d of %d", CH_BEFORE = "Step %d of %d before \"%s\"",
+    CH_STEP = "Prerequisite %d of %d", CH_BEFORE = "Step %d of %d before \"%s\"", CH_PART = "Part %d of %d of the \"%s\" chain",
     CH_NONE = "No prerequisite", CH_COUNT1 = "%d prerequisite", CH_COUNT = "%d prerequisites", CH_ALLDONE = "Prerequisites done",
     ST_PRE = "Prerequisite %d of %d", ST_PRELOG = "Prerequisite %d of %d in progress", ST_LOW = "Level %d required",
     ST_PICKUP = "To take", ST_ACTIVE = "In progress", ST_READY = "Ready to turn in", ST_DONE = "Turned in",
@@ -538,12 +543,13 @@ local S = {
     CARD_PH_BEFORE_D = "Before the dungeon: %s · %d of %d", CARD_PH_INSIDE_D = "In the dungeon: %s · %d of %d",
     CARD_PH_AFTER_D = "After the dungeon: %s · %d of %d",
     CARD_WHY_Q = "Quest \"%s\"", CARD_WHY_MAIN = "Dungeon quest \"%s\"", CARD_WHY_MAIN_S = "Dungeon quest",
-    CARD_CHAIN = "step %d of %d before \"%s\"", CARD_PRE_N = "prerequisite %d of %d",
+    CARD_CHAIN = "step %d of %d before \"%s\"", CARD_PART = "part %d of %d of the \"%s\" chain", CARD_PRE_N = "prerequisite %d of %d",
     CARD_ELITE = "Elite", CARD_NOELITE = "Not elite", CARD_ELITE_SOME = "Partly elite",
     CARD_BEFORE_WHY = "Required for \"%s\" (in the dungeon)", CARD_BEFORE_OPT = "Optional: the dungeon can be done without it", CARD_BEFORE_WAY = " · on the way to the portal", CARD_BEFORE_KEY = "Required for \"%s\": the key to get into the dungeon",
+    WHY_FIRST = "First to %s: you need \"%s\" before talking to %s in %s.", WHY_FIRST_DO = "First to %s: you need \"%s\" before \"%s\" in %s.",
     SKIP_Q = "Skip", SKIP_Q_CONFIRM = "Click again to skip", SKIP_Q_DONE = "Quest \"%s\" removed from the route: tick it again in the overview to bring it back.",
     TT_SKIP_Q = "Takes this optional quest out of the route, like unticking it in the overview. It is not abandoned: if it is in your quest log, it stays there.", SKIP_Q_LOG = "It stays in your quest log.",
-    CARD_PLUS = "+%d", CARD_PLUS_P = " (+%d)", CARD_FOR_DG = "for %s",
+    CARD_PLUS = "+%d", CARD_PLUS_P = " (and %d other quests)", CARD_PLUS_P1 = " (and 1 other quest)", CARD_FOR_DG = "for %s", CARD_TAKE_MAIN = "done in the dungeon: take it before going in",
     CARD_NOTLOG = "Not in your log yet: accept it first.",
     CARD_NOTREADY = "Not ready yet: these objectives are left.",
     CARD_ENTRY = "Entrance: %s",
@@ -580,6 +586,16 @@ ns.TR = ns.TR or {}  -- traductions des textes de quêtes (anglais -> français)
 
 -- n == 1 picks the singular key ("1 quête" / "2 quêtes"): ns.Plural(n, "PICK_QUESTS1", "PICK_QUESTS", ...)
 -- French also takes the singular for 0 ("0 quête", "0 faite"); English does not ("0 quests").
+-- French elision after "de": "auprès de Eva" -> "auprès d'Eva", "Butin de Arcanist Doan" ->
+-- "Butin d'Arcanist Doan" (a vowel only: an "h" may be aspirated); English is left as is
+function ns.Elide(s)
+  if ns.lang ~= "fr" or type(s) ~= "string" then return s end
+  local out = s:gsub("(%f[%w][dD]e) ([AEIOUYaeiouy\195])", function(de, c)
+    return de:sub(1, 1) .. "'" .. c
+  end)
+  return out
+end
+
 function ns.Plural(n, one, many, ...)
   local single = (n == 1) or (ns.lang == "fr" and n == 0)
   local f = (single and ns.L[one]) or ns.L[many]

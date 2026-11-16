@@ -206,7 +206,8 @@ function GQ.Judge(link)
             local ok, v = pcall(WP.UpgradeSpecVerdict, link, spec, true)
             if ok then
                 if Num(v) then return v end
-                if v == nil then return nil end
+                -- nil: not loaded yet; WP.UPGRADE_WAIT: what you wear is not loaded yet
+                if v == nil or v == WP.UPGRADE_WAIT then return nil end
                 return false
             end
         end
@@ -289,6 +290,7 @@ local function CanShare()
     return On("questAutoShare") and GuideOn() and IsInGroup and IsInGroup() and #GQ.Owners("share") == 0
 end
 local function Push(qid)
+    if InCombat() then return nil end                -- never pushed in combat: tried again after
     local log = root.LogEntries and root.LogEntries() or {}
     local e = log[qid]
     if not e and not InLog(qid) then return nil end          -- not in the log yet: try again
@@ -310,6 +312,7 @@ local function Push(qid)
         if CQL.GetSelectedQuest then local okG, v = pcall(CQL.GetSelectedQuest); prevQ = okG and Num(v) or nil end
         if not pcall(CQL.SetSelectedQuest, qid) then return false end
     else return false end
+    if root.SharePushed then root.SharePushed() end   -- the blocked-action line stays quiet just after
     local ok = pcall(QuestLogPushQuest)
     -- the quest the player had selected comes back
     if type(prev) == "number" and prev > 0 then SelectQuestLogEntry(prev)
@@ -322,7 +325,12 @@ local function Now() return Num(GetTime and GetTime()) or 0 end
 local function Pump()
     if pumping then return end
     if #queue == 0 then return end
-    if InCombat() then return end                    -- PLAYER_REGEN_ENABLED pumps again
+    -- the game blocks the share in combat: « Partage des quêtes après le combat », and
+    -- PLAYER_REGEN_ENABLED pumps again
+    if InCombat() then
+        if CanShare() and root.ShareWaitSay then root.ShareWaitSay() end
+        return
+    end
     -- SHARE_GAP between any two pushes, also across separate accepts
     local wait = lastPush and (lastPush + SHARE_GAP - Now()) or 0
     if wait > 0 and C_Timer and C_Timer.After then

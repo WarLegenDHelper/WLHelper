@@ -170,6 +170,10 @@ ns.AddEnglish({
     ["Tes sorts de téléportation (mage, druide), quand ils sont prêts."] = "Your teleport spells (mage, druid), when they are ready.",
     ["Choisir le vol automatiquement"] = "Pick the flight automatically",
     ["Chez le maître de vol, le bon trajet est choisi pour toi."] = "At the flight master, the right route is picked for you.",
+    ["Partager les horaires des zeppelins"] = "Share zeppelin and boat times",
+    ["Avec la guilde, quand tu en prends un."] = "With the guild, when you take one.",
+    ["Quand tu prends un zeppelin ou un bateau, son heure d'arrivée part à la guilde (un court message) : le GPS de chacun sait alors quand il repart. Les horaires reçus de la guilde servent toujours."] =
+        "When you take a zeppelin or a boat, its arrival time goes to the guild (a short message): everyone's GPS then knows when it leaves again. Times received from the guild are always used.",
     ["Toujours si plus rapide"] = "Always when faster",
     ["Seulement si elle fait gagner au moins 3 min"] = "Only if it saves at least 3 min",
     ["Une heure de recharge : à garder pour un vrai gain."] = "An hour's cooldown: keep it for a real gain.",
@@ -177,6 +181,9 @@ ns.AddEnglish({
         "The Hearthstone has an hour's cooldown: by default the GPS only suggests it when it saves at least 3 minutes over the best route without it. The shaman's Astral Recall follows the same setting; the mage's teleports, with no cooldown, are not affected. The route set aside stays in the arrow's tooltip (Alt-click to take it).",
     ["Points de vol connus"] = "Known flight paths",
     ["Ceux que ce personnage a déjà découverts."] = "Already discovered by this character.",
+    ["Royaumes de l'Est %s · Kalimdor %s"] = "Eastern Kingdoms %s · Kalimdor %s",
+    ["Ceux que ce personnage a déjà découverts, par continent. « ? » : aucune carte de maître de vol ouverte sur ce continent, ouvre-en une pour que le GPS connaisse tes vols."] =
+        "Already discovered by this character, per continent. \"?\": no flight master's map opened on that continent yet, open one so the GPS learns your flight paths.",
     ["Distances en yards"] = "Distances in yards",
     ["Sinon en mètres et en kilomètres."] = "Otherwise in meters and kilometers.",
     ["Flèche"] = "Arrow",
@@ -1498,6 +1505,10 @@ function BUILD.gps(p)
         L("Mage, druide : quand elles sont prêtes."), L("Tes sorts de téléportation (mage, druide), quand ils sont prêts."))
     SwitchRow(p, L("Choisir le vol automatiquement"), function() return Gps().autoFlight end, SetGps("autoFlight"),
         L("Chez le maître de vol."), L("Chez le maître de vol, le bon trajet est choisi pour toi."))
+    -- Transports.lua: an arrival seen goes to the guild (nil = on)
+    SwitchRow(p, L("Partager les horaires des zeppelins"), function() return Gps().shipShare ~= false end, SetGps("shipShare"),
+        L("Avec la guilde, quand tu en prends un."),
+        L("Quand tu prends un zeppelin ou un bateau, son heure d'arrivée part à la guilde (un court message) : le GPS de chacun sait alors quand il repart. Les horaires reçus de la guilde servent toujours."))
     -- the Hearthstone's policy (Route.lua HearthPolicy): "always" | "gain" (default, nil) | "never"
     Choice(p, Row(p, L("Pierre de foyer"), L("Une heure de recharge : à garder pour un vrai gain."),
         L("La pierre de foyer a une heure de recharge : par défaut, le GPS ne la propose que si elle fait gagner au moins 3 minutes sur le meilleur trajet sans elle. Le Rappel astral du chaman suit le même réglage ; les téléportations du mage, sans recharge, ne sont pas concernées. Le trajet écarté reste dans la bulle d'aide de la flèche (Alt-clic pour le prendre)."),
@@ -1513,12 +1524,22 @@ function BUILD.gps(p)
         local G = ns.WP and ns.WP.GPS
         if G and G.ResetPlan then pcall(G.ResetPlan) end
     end, true)
-    row = Row(p, L("Points de vol connus"), L("Ceux que ce personnage a déjà découverts."))
-    local known = ValueText(row, 80)
+    row = Row(p, L("Points de vol connus"), L("Ceux que ce personnage a déjà découverts."),
+        L("Ceux que ce personnage a déjà découverts, par continent. « ? » : aucune carte de maître de vol ouverte sur ce continent, ouvre-en une pour que le GPS connaisse tes vols."))
+    local known = ValueText(row, 260)
+    -- per continent (T-89): "Royaumes de l'Est 12 · Kalimdor ?" (? = unseen: no flight map opened there)
     function known:Sync()
         local G = ns.WP and ns.WP.GPS
-        local ok, n = pcall(function() return G and G.KnownFlights and G.KnownFlights() end)
-        self:SetText(tostring(ok and tonumber(n) or 0))
+        local function On(cont)
+            local ok, n, unseen = pcall(function()
+                if not (G and G.KnownFlightsOn) then return G and G.KnownFlights and G.KnownFlights() or 0, false end
+                return G.KnownFlightsOn(cont), G.Unseen and G.Unseen(cont)
+            end)
+            if not ok then return "0" end
+            if unseen then return "?" end
+            return tostring(tonumber(n) or 0)
+        end
+        self:SetText(string.format(L("Royaumes de l'Est %s · Kalimdor %s"), On(0), On(1)))
     end
     known:Sync()
     Place(p, row, known)
@@ -1675,6 +1696,29 @@ function BUILD.upgrades(p)
     SwitchRow(p, L("Masquer le bloc en double des infobulles"), function() return WLWritsDB.hideGFTip ~= false end,
         function(v) WLWritsDB.hideGFTip = v; ApplyTip() end, L("Si ton addon d'équipement l'affiche déjà."),
         L("Quand ton addon d'équipement affiche déjà le même pourcentage."))
+
+    -- the grey line under the percent: the stats behind it (strings in Upgrades.lua)
+    SwitchRow(p, L("Expliquer le pourcentage"), function() return WLWritsDB.upgradeWhy ~= false end,
+        function(v) WLWritsDB.upgradeWhy = (not v) and false or nil; Refresh() end,
+        L("Pourquoi, en mots. Maj : les chiffres."),
+        L("Sous le pourcentage, une ligne grise dit en mots ce qui le fait le plus : « Surtout : DPS de baguette en plus, moins de dégâts de givre ». Garde Maj enfoncée pour les chiffres : « +12,8 DPS baguette (+30 %) · -4 dégâts de givre (-5 %) »."))
+
+    -- what counts: the wand (wand classes only) and lighter armor (strings in Upgrades.lua)
+    Section(p, L("Calcul"))
+    if Wt.WandClass and Wt.WandClass() then
+        -- Automatique (nothing stored): often below level 40, sometimes from 40 (Weights.lua)
+        local wrow = Row(p, L("J'utilise ma baguette"), L("Ce que vaut le DPS d'une baguette."),
+            L("Automatique : souvent avant le niveau 40, parfois ensuite (tes sorts comptent plus). Souvent : son DPS compte en entier. Parfois : à moitié. Jamais : presque pas, une meilleure baguette reste un peu meilleure."))
+        Choice(p, wrow, { { "bylevel", L("Automatique (souvent avant 40, parfois après)") }, { "often", L("Souvent") },
+                { "sometimes", L("Parfois") }, { "never", L("Jamais") } },
+            function() return (Wt.WandAuto and Wt.WandAuto()) and "bylevel" or Wt.WandUse() end,
+            function(v) WLWritsDB.upgradeWand = (v ~= "bylevel") and v or nil; Refresh() end, true)
+    end
+    SwitchRow(p, L("Ignorer les armures plus légères que la mienne (dès le niv. 40)"),
+        function() return WLWritsDB.upgradeLighter ~= false end,
+        function(v) WLWritsDB.upgradeLighter = (not v) and false or nil; Refresh() end,
+        L("Ni % ni flèche sur une armure plus légère."),
+        L("Dès le niveau 40 : chaman et chasseur sans cuir ni tissu, guerrier et paladin sans mailles, cuir ni tissu, druide et voleur sans tissu. L'infobulle dit « Armure plus légère que la tienne »."))
 
     local _, label = Wt.Bracket()
     -- built once: a level-up across a bracket or a respec on Auto rebuilds this page when shown

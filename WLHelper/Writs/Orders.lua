@@ -138,7 +138,10 @@ local function PumpOnce(Pump)
     tokens = math.min(10, tokens + (now - tokensAt)); tokensAt = now
     if tokens < 1 then C_Timer.After(1 - tokens, Pump); return end
     local ok, r = false, nil
-    if SendRaw then ok, r = pcall(SendRaw, PREFIX, m[1], m[2], m[3]) end
+    if m[2] == "WHISPER" then
+        -- a whisper only to a player still surely online (root.AddonWhisper checks it again)
+        if root.AddonWhisper then ok = pcall(root.AddonWhisper, PREFIX, m[1], m[3]) end
+    elseif SendRaw then ok, r = pcall(SendRaw, PREFIX, m[1], m[2], m[3]) end
     -- false, or a non-zero result code (modern clients: 0 = success), means throttled or refused
     local refused = ok and (r == false or (type(r) == "number" and r ~= 0))
     if refused and (m.tries or 0) < 3 then
@@ -168,6 +171,8 @@ end
 local OUTBOX_MAX = 500
 local function Send(msg, channel, target)
     if not channel then return end
+    -- everything goes on the guild channel; a whisper (none today) only to a player surely online
+    if channel == "WHISPER" and not (root.OnlineNow and root.OnlineNow(target)) then return end
     for _, m in ipairs(outbox) do if m[1] == msg and m[2] == channel and m[3] == target then return end end
     if #outbox >= OUTBOX_MAX then return end
     outbox[#outbox + 1] = { msg, channel, target }

@@ -3,11 +3,13 @@
 --   item icon IS the button (click it to cast); at the flight master the flight icon; at a dock the
 --   boat icon; else the HD arrow (the HD check once you are there);
 --   line 1, what to do ("Lance Téléportation : Fossoyeuse", "Va voir Woodwyrd");
---   line 2, where, in gold ("Fossoyeuse");
+--   line 2, where, in gold ("Fossoyeuse"); on the way to a zeppelin or boat and at its dock, when it
+--   leaves, counting down ("Zeppelin pour Grom'gol dans 1:20", Transports.lua);
 --   line 3, how far and how long ("550 m · 1:10": the walk left along the path when there is one,
 --   the time from your speed's moving average, hidden while you stand still);
---   line 4, muted, the rest of the way when it has several legs ("Puis vol jusqu'à Kargath →
---   300 m jusqu'à Tabetha": after a teleport, "Puis 690 m jusqu'à Dran Droffers").
+--   line 4, muted, the next legs when it has several ("Puis vol jusqu'à Orgrimmar > zeppelin pour
+--   Undercity > vol jusqu'à Moulin-de-Tarren": its casts, flights and crossings and the last walk, at
+--   most 3; after a teleport, "Puis 690 m jusqu'à Dran Droffers").
 -- Lines wrap and the HUD grows with them: nothing is cut. The whole route, with the full names, is
 -- in the HUD's tooltip. While the flight map is open a button takes the planned flight.
 --
@@ -162,6 +164,19 @@ local function Place(name)
     if type(name) ~= "string" or name == "" then return "" end
     return GPS.ShortPlace(name) or ""
 end
+
+-- A zeppelin's or boat's departure from `dock` (a GPS dock point), live (Transports.lua): "Zeppelin
+-- pour Grom'gol dans 1:20" in green, "à quai, part dans 0:35" in gold (under 30 s in amber), "~2 min
+-- (estimé)" muted. "" for a druid's flight or when the timing module is not there.
+local function ShipLine(dock)
+    local T = WP.Transports
+    local l = dock and dock.link
+    if not (T and T.Line and l and l.mode ~= "flight") then return "" end
+    local ok, text, color = pcall(T.Line, l, dock.start == true, Place(dock.other and dock.other.name))
+    if not ok or type(text) ~= "string" then return "" end
+    return S.Hex(C[color] or C.muted) .. text .. "|r"
+end
+GPS._ShipLine = ShipLine
 
 local function CastIcon(kind, id)
     if kind == "item" then return ItemIcon(id) end
@@ -466,7 +481,9 @@ local function Draw(self, now, combat)
         elseif atDock then
             if SetVisual(self, "painted", ICON_LINK) then changed = true end
             what = mode == "boat" and L("Attends le bateau") or L("Attends le zeppelin")
-            where = Place(leg.to and leg.to.name)
+            -- when it leaves, counting down; the place alone when it is not known
+            where = ShipLine(leg.from)
+            if where == "" then where = Place(leg.to and leg.to.name) end
         else
             if SetVisual(self, "arrow") then changed = true end
             self.turn = true
@@ -483,30 +500,48 @@ local function Draw(self, now, combat)
                 end
             else
                 what = GPS.Describe(leg)
+                -- on the way to a zeppelin or a boat: when it leaves ("Zeppelin pour Grom'gol dans 1:20")
+                if leg and leg.kind == "ride" and leg.to and leg.to.kind == "dock" then where = ShipLine(leg.to) end
             end
             dist = now.dist and DistLine(now.dist) or (S.Hex(C.muted) .. L("Autre continent") .. "|r")
         end
+        -- a long ride with no flight: why, in one muted line (T-89); worked out once per plan
+        local note
+        if legs and GPS.RideNote then
+            if self.noteLegs ~= legs then
+                local okN, s = pcall(GPS.RideNote, legs)
+                self.noteLegs, self.note = legs, okN and type(s) == "string" and s or nil
+            end
+            note = self.note
+        end
         if not legs then
             route = L("Pas d'itinéraire connu : la flèche va tout droit.")
+        elseif note then
+            route = note
         elseif GPS.KnownFlights() == 0 then
             route = L("Parle à un maître de vol : le GPS apprendra tes trajets.")
         end
     end
 
-    -- the rest of the way in one muted line ("Puis vol jusqu'à Kargath → 300 m jusqu'à Tabetha"), when
-    -- it has more than one leg and you are not there yet: the leg under way is lines 1-3 already (its
-    -- walk measured along the trail there), so it is not told twice; "puis": it comes after that leg
-    if not now.arrived and legs and n > 1 and GPS.Itinerary then
+    -- the next legs in one muted line ("Puis vol jusqu'à Orgrimmar > zeppelin pour Undercity > vol
+    -- jusqu'à Moulin-de-Tarren"), when the way has more than one leg and you are not there yet: the leg
+    -- under way is lines 1-3 already (its walk measured along the trail there), so it is not told twice;
+    -- the walks between two crossings are left out and at most 3 legs are told (the tooltip lists every
+    -- leg); "puis": it comes after that leg
+    if not now.arrived and legs and n > 1 and GPS.Itinerary and GPS.NextLegs then
         local okR, items = pcall(GPS.Itinerary, legs)
         if okR and type(items) == "table" then
-            local parts = {}
-            for _, it in ipairs(items) do
-                if it.leg ~= leg and it.leg ~= told and type(it.text) == "string" and it.text ~= "" then
-                    parts[#parts + 1] = #parts == 0 and GPS.UpperFirst(string.format(L("puis %s"), it.text)) or it.text
-                end
+            local parts = GPS.NextLegs(items, 3, function(it) return it.leg == leg or it.leg == told end)
+            if #parts > 0 then
+                parts[1] = GPS.UpperFirst(string.format(L("puis %s"), parts[1]))
+                route = table.concat(parts, GPS.SEP or " > ")
             end
-            if #parts > 0 then route = table.concat(parts, " \226\134\146 ") end
         end
+    end
+    -- a supposed flight path ahead (Route.lua's guess, a continent with no flight map opened yet): the
+    -- line says to check it on the flight master's map (opening it ends the guess, the plan is made again)
+    if not now.arrived and not onTaxi and legs and GPS.GuessedFlight and GPS.GuessedFlight(legs) then
+        route = L("Vol supposé connu : ouvre la carte du maître de vol pour vérifier")
     end
 
     T(self.what, what)

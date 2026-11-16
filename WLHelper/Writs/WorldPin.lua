@@ -46,6 +46,8 @@ ns.AddEnglish({
     ["Si tu as déjà posé un repère sur la carte, il est gardé et l'étiquette ne s'affiche pas."] =
         "If you already placed a map pin, it is kept and the label stays hidden.",
     ["Déjà fait par %s."] = "Already done by %s.",
+    -- in the area of an objective spread over a zone (Engine.lua ns.AreaAt), in place of the distance
+    ["Dans la zone"] = "In the area",
 })
 
 local UPDATE_EVERY, TEXT_EVERY, SYNC_EVERY = 0.05, 0.25, 1
@@ -480,6 +482,21 @@ local function HideLabel()
     shown.key, speed = nil, nil
 end
 
+-- The GPS guides to a spot of an objective spread over an area (a spawn of o.area, Engine.lua
+-- ns.AreaAt) and you stand in that area (ns.AreaInside): the label says "Dans la zone" instead of a
+-- distance (the spot is only the nearest spawn; any spawn of the area will do).
+local function InZone(now)
+    local d = type(now) == "table" and now.dest
+    if type(d) ~= "table" or LegTarget(now) ~= d then return false end
+    local m, x, y = Num(d.map), Num(d.x), Num(d.y)
+    if not (m and x and y and root.AreaAt and root.AreaInside and root.PlayerWorld) then return false end
+    local a = root.AreaAt(m, x, y)
+    if not a then return false end
+    local ok, here = pcall(root.PlayerWorld)
+    return (ok and type(here) == "table" and root.AreaInside(a, here)) and true or false
+end
+WorldPin._InZone = InZone
+
 -- Distance and time from one GPS answer; the text changes only when the words do.
 local function Paint(now)
     local yards = Num(now.dist) or Num(now.straight)
@@ -490,8 +507,9 @@ local function Paint(now)
     end
     local card = pin.card
     local changed = SetFS(card.name, shown.name)
-    changed = SetFS(card.dist, yards and DistanceText(yards) or "") or changed
-    shown.eta = (yards and speed and spd and spd >= STILL) and EtaText(yards / speed) or ""
+    local zone = InZone(now)
+    changed = SetFS(card.dist, zone and L("Dans la zone") or (yards and DistanceText(yards) or "")) or changed
+    shown.eta = (not zone and yards and speed and spd and spd >= STILL) and EtaText(yards / speed) or ""
     changed = SetFS(card.eta, shown.eta) or changed
     local len = StemFor(yards)
     if len ~= pin.stemLen then pin.stemLen = len; pin.stem:SetHeight(len); changed = true end

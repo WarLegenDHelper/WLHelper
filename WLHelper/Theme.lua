@@ -1330,3 +1330,131 @@ if EllesmereUI and EllesmereUI.RegisterSkin then
     ns.ApplyLooks()
   end)
 end
+
+-- =====================================================================
+--  Whispers (guild report: « Aucun joueur nommé 'X' ne joue actuellement. » spam). Every whisper
+--  WL Helper sends, chat or addon message, goes through ns.ChatWhisper / ns.AddonWhisper: only to a
+--  player confirmed online right now (in my group, online in the guild roster, or heard from in the
+--  last 60 s), never in a loop over names. The game's "not playing" line for a name we whispered in
+--  the last 10 s is hidden (a player logged off between the check and the send). Everything else
+--  goes on the GUILD or group channel.
+-- =====================================================================
+local HEARD_FOR, HIDE_FOR, ROSTER_FOR = 60, 10, 10
+local heard, whispered = {}, {}     -- [lower short name] = GetTime()
+local rosterAt, rosterOn = nil, {}  -- [lower short name] = true/false (the guild roster's online flag)
+local function WClock() return (GetTime and GetTime()) or 0 end
+-- a readable name as the key ("Name-Realm" or "Name Realm" -> "name"); nil when hidden or malformed
+local function WKey(n)
+  if type(n) ~= "string" or secret(n) or not ns.Readable(n) or n == "" or #n > 64 or n:find("[|%c]") then return nil end
+  local s = n:match("^([^%-%s]+)") or n
+  return s:lower()
+end
+local function Yes(v) return v ~= nil and not secret(v) and ns.Readable(v) and v and true or false end
+
+-- a player we just heard from (a whisper, a chat line, an addon message): online at that moment
+function ns.HeardFrom(name)
+  local k = WKey(name)
+  if k then heard[k] = WClock() end
+end
+function ns.ForgetWhispers() heard, whispered, rosterAt, rosterOn = {}, {}, nil, {} end
+
+local function RosterOnline(k)
+  local now = WClock()
+  if not rosterAt or now - rosterAt >= ROSTER_FOR then
+    rosterAt, rosterOn = now, {}
+    local inGuild = IsInGuild and select(2, pcall(IsInGuild))
+    if Yes(inGuild) and GetNumGuildMembers and GetGuildRosterInfo then
+      local ok, n = pcall(GetNumGuildMembers)
+      n = (ok and type(n) == "number" and not secret(n)) and n or 0
+      for i = 1, math.min(n, 1000) do
+        local ok2, name, _, _, _, _, _, _, _, online = pcall(GetGuildRosterInfo, i)
+        local key = ok2 and WKey(name)
+        if key then rosterOn[key] = Yes(online) end
+      end
+    end
+  end
+  return rosterOn[k]
+end
+
+-- OnlineNow(name): true only when the player is surely online right now
+function ns.OnlineNow(name)
+  local k = WKey(name)
+  if not k then return false end
+  local me = UnitName and WKey((UnitName("player")))
+  if me and me == k then return false end
+  if UnitInParty and Yes(select(2, pcall(UnitInParty, name))) then return true end
+  if UnitInRaid and Yes(select(2, pcall(UnitInRaid, name))) then return true end
+  local t = heard[k]
+  if t and WClock() - t <= HEARD_FOR then return true end
+  return RosterOnline(k) == true
+end
+
+local function Mark(name)
+  local k = WKey(name)
+  if k then whispered[k] = WClock() end
+end
+-- the one way WL Helper whispers a chat line; false (nothing sent) when the player is not surely online
+function ns.ChatWhisper(text, name)
+  if type(text) ~= "string" or text == "" or not ns.Readable(text) or not ns.OnlineNow(name) then return false, "offline" end
+  local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+  if type(send) ~= "function" then return false, "none" end
+  Mark(name)
+  return (pcall(send, text, "WHISPER", nil, name)), nil
+end
+-- the one way WL Helper whispers an addon message (none does today: the guild channel carries them)
+function ns.AddonWhisper(prefix, msg, name)
+  if type(msg) ~= "string" or not ns.OnlineNow(name) then return false, "offline" end
+  local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
+  if type(send) ~= "function" then return false, "none" end
+  Mark(name)
+  return (pcall(send, prefix, msg, "WHISPER", name)), nil
+end
+
+-- the game's "No player named '%s' is currently playing." as a pattern, built from its own string
+local notFound
+local function NotFoundPattern()
+  if notFound ~= nil then return notFound or nil end
+  local g = ERR_CHAT_PLAYER_NOT_FOUND_S
+  notFound = false
+  if type(g) == "string" and not secret(g) and ns.Readable(g) then
+    local p = g:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
+    -- "%s", or "%1$s" in a translation that numbers its arguments
+    local n
+    p, n = p:gsub("%%%%%d%%%$s", "(.-)", 1)
+    if n == 0 then p, n = p:gsub("%%%%s", "(.-)", 1) end
+    if n == 1 then notFound = "^" .. p .. "$" end
+  end
+  return notFound or nil
+end
+-- the name of a "not playing" line when we whispered that player in the last 10 s, else nil
+function ns.OurNotFound(text)
+  if type(text) ~= "string" or secret(text) or not ns.Readable(text) then return nil end
+  local p = NotFoundPattern()
+  if not p then return nil end
+  local ok, name = pcall(string.match, text, p)
+  local k = ok and WKey(name)
+  local t = k and whispered[k]
+  if t and WClock() - t <= HIDE_FOR then return name end
+  return nil
+end
+local function NotFoundFilter(_, _, text)
+  local ok, name = pcall(ns.OurNotFound, text)
+  return (ok and name) and true or false
+end
+ns.NotFoundFilter = NotFoundFilter
+local AddFilter = (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter) or ChatFrame_AddMessageEventFilter
+if type(AddFilter) == "function" then pcall(AddFilter, "CHAT_MSG_SYSTEM", NotFoundFilter) end
+
+-- who we hear from: the sender of a chat line (2nd argument) or of an addon message (4th)
+if CreateFrame then
+  local hf = CreateFrame("Frame")
+  local CHAT = { "CHAT_MSG_WHISPER", "CHAT_MSG_SAY", "CHAT_MSG_YELL", "CHAT_MSG_CHANNEL", "CHAT_MSG_GUILD",
+    "CHAT_MSG_OFFICER", "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER", "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_ADDON" }
+  for _, e in ipairs(CHAT) do pcall(hf.RegisterEvent, hf, e) end
+  pcall(hf.RegisterEvent, hf, "GUILD_ROSTER_UPDATE")
+  hf:SetScript("OnEvent", function(_, e, a1, a2, a3, a4)
+    if e == "GUILD_ROSTER_UPDATE" then rosterAt = nil; return end
+    -- the name is never tested here: HeardFrom drops a hidden (secret) one
+    if e == "CHAT_MSG_ADDON" then pcall(ns.HeardFrom, a4) else pcall(ns.HeardFrom, a2) end
+  end)
+end

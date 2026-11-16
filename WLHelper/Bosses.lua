@@ -235,6 +235,8 @@ local function NewRun(k, iid)
   k.xp, k.money, k.at, k.lastKill, k.dkey, k.reported = 0, 0, {}, nil, nil, nil
   -- the panel's right-click: marked killed by hand / marked not killed by hand
   k.manual, k.off = nil, nil
+  -- the wing the run started in, per dungeon (ns.WALK_WINGS)
+  k.wing = nil
 end
 -- Inside an instance: a new run when it is another instance, or the same one reset or left long ago.
 -- Outside: remember when you left.
@@ -694,6 +696,174 @@ local function RunDungeon(k)
   if not k.dkey and CurrentInstance() == k.iid then k.dkey = DungeonHere() end
   return k.dkey
 end
+
+-- ---------------------------------------------------------------- wings (several ways in)
+-- ns.WALK_WINGS (Curated.lua): a dungeon entered by several wings that meet further in (Maraudon:
+-- the orange and the purple wing, then the inner caves). The run walks the wing it started in
+-- first, then the other wings, then the shared part. ns.WALK[dkey] holds that order, so the
+-- bosses panel and the guide's boss steps (ns.BossOrder) follow it; a kill still completes its
+-- own boss's step, whichever wing it is in.
+-- The wing the run started in: the wing of the first boss killed in this run, else where you
+-- stand (the subzone's name, your position on the instance map, a wing boss you target; kept for
+-- the run), else the data's first wing.
+local Wing = { now = {} }   -- now: dkey -> the wing ns.WALK[dkey] was built for (one local: the chunk is near Lua's 200)
+
+-- The run order with `first` (a wing key) first -> list of English names, or nil (no wings)
+function ns.WingWalk(dkey, first)
+  local W = ns.WALK_WINGS and ns.WALK_WINGS[dkey]
+  if not W then return nil end
+  local out, seen = {}, {}
+  local function add(l) for _, nm in ipairs(l or {}) do if not seen[nm] then seen[nm] = true; out[#out + 1] = nm end end end
+  for _, w in ipairs(W) do if w.key == first then add(w.bosses) end end
+  for _, w in ipairs(W) do add(w.bosses) end
+  add(W.tail)
+  return out
+end
+-- the wing a boss (English or local name) belongs to, nil for the shared part
+function Wing.Of(dkey, name)
+  local W = ns.WALK_WINGS and ns.WALK_WINGS[dkey]
+  if not (W and name) then return nil end
+  for _, w in ipairs(W) do
+    for _, en in ipairs(w.bosses or {}) do
+      if en == name or (ns.BossLocalName and ns.BossLocalName(dkey, en) == name) then return w.key end
+    end
+  end
+  return nil
+end
+ns.BossWingOf = Wing.Of
+-- The wing you stand in: the subzone's name, else your position on the wing's instance map
+-- (nil: the shared part, the entrance, outside, unknown).
+function Wing.Here(dkey)
+  local W = ns.WALK_WINGS and ns.WALK_WINGS[dkey]
+  if not W then return nil end
+  for _, fn in ipairs({ GetSubZoneText or false, GetMinimapZoneText or false }) do
+    local okZ, zone = false, nil
+    if fn then okZ, zone = pcall(fn) end
+    zone = okZ and str(zone) or nil
+    if zone and zone ~= "" then
+      for _, w in ipairs(W) do
+        for _, z in ipairs(w.zones or {}) do if z == zone then return w.key end end
+      end
+    end
+  end
+  if W.map and C_Map and C_Map.GetBestMapForUnit and C_Map.GetPlayerMapPosition then
+    local okM, m = pcall(C_Map.GetBestMapForUnit, "player")
+    if okM and num(m) == W.map then
+      local okP, pos = pcall(C_Map.GetPlayerMapPosition, m, "player")
+      local x, y
+      if okP and type(pos) == "table" and pos.GetXY then
+        local okX, a, b = pcall(pos.GetXY, pos)
+        if okX then x, y = num(a), num(b) end
+      end
+      if x and y and not (x == 0 and y == 0) then
+        local best, bd
+        for _, w in ipairs(W) do
+          for _, p in ipairs(w.pts or {}) do
+            local dd = (p[1] - x) ^ 2 + (p[2] - y) ^ 2
+            if not bd or dd < bd then best, bd = w.key, dd end
+          end
+        end
+        if bd and bd <= (W.near or 0.2) ^ 2 then return best end
+      end
+    end
+  end
+  return nil
+end
+ns.BossWingHere = Wing.Here
+-- when a boss of this dungeon died in this run (its names, NPC ids, encounters), nil if it did not
+function Wing.KillAt(k, dkey, en)
+  if not k.at or (k.off and k.off[en]) then return nil end
+  local keys = { en }
+  if ns.BossLocalName then keys[#keys + 1] = ns.BossLocalName(dkey, en) end
+  for _, id in ipairs(ns.BossNpcIds and ns.BossNpcIds(dkey, en) or {}) do keys[#keys + 1] = "#" .. id end
+  local bo = ns.BossOrder and ns.BossOrder(dkey)
+  local i = bo and bo.idx and bo.idx[en]
+  local B = i and bo.list[i]
+  if B and B.npc then keys[#keys + 1] = "#" .. B.npc end
+  for _, e in ipairs(B and B.enc or {}) do keys[#keys + 1] = "e" .. e end
+  local t
+  for _, key in ipairs(keys) do
+    local v = key and num(k.at[key])
+    if v and (not t or v < t) then t = v end
+  end
+  return t
+end
+-- The wing this run of dkey started in (see above)
+function Wing.First(dkey)
+  local W = ns.WALK_WINGS and ns.WALK_WINGS[dkey]
+  if not (W and W[1]) then return nil end
+  local k = Kills()
+  local d = ns.D and ns.D[dkey]
+  local thisRun = d and d.inst and k.iid == d.inst
+  if thisRun then
+    -- the first boss killed in a wing
+    local best, bt
+    for _, w in ipairs(W) do
+      for _, en in ipairs(w.bosses or {}) do
+        local t = Wing.KillAt(k, dkey, en)
+        if t and (not bt or t < bt) then best, bt = w.key, t end
+      end
+    end
+    if best then return best end
+    -- nothing killed in a wing yet: where you stand, kept for the run
+    if CurrentInstance() == k.iid then
+      local here = Wing.Here(dkey)
+      if here then k.wing = k.wing or {}; k.wing[dkey] = here end
+    end
+    if k.wing and k.wing[dkey] then return k.wing[dkey] end
+  end
+  return W[1].key
+end
+-- Build ns.WALK[dkey] for a wing -> true when the order changed
+function Wing.Apply(dkey, key)
+  local W = ns.WALK_WINGS and ns.WALK_WINGS[dkey]
+  local list = key and ns.WingWalk(dkey, key)
+  if not (W and list and ns.WALK) then return false end
+  -- an objective done once two wings are: at whichever of its bosses comes later
+  local rank = {}
+  for i, nm in ipairs(list) do rank[nm] = i end
+  for obj, bosses in pairs(W.last or {}) do
+    local best
+    for _, b in ipairs(bosses) do if rank[b] and (not best or rank[b] > rank[best]) then best = b end end
+    if best and ns.GROUP_OBJ then ns.GROUP_OBJ[obj] = best end
+  end
+  if Wing.now[dkey] == key then return false end
+  Wing.now[dkey] = key
+  ns.WALK[dkey] = list
+  mobsCache[dkey] = nil
+  if ns.BossOrderReset then ns.BossOrderReset() end
+  if ns.BossWatchReset then ns.BossWatchReset() end
+  return true
+end
+-- The wing ns.WALK[dkey] follows now (nil: the dungeon has no wings)
+function ns.BossWing(dkey) return Wing.now[dkey] end
+-- Set the order for a wing (tests; the checks below) -> true when it changed
+function ns.SetBossWing(dkey, key) return Wing.Apply(dkey, key) end
+-- Inside a dungeon with wings: the order follows the wing the run started in. A change rebuilds
+-- the bosses panel and the guide's steps (done steps keep their keys: they stay done).
+function Wing.Check()
+  if not CurrentInstance() then return end
+  local dkey = DungeonHere()
+  if not (dkey and ns.WALK_WINGS and ns.WALK_WINGS[dkey]) then return end
+  if Wing.Apply(dkey, Wing.First(dkey)) then
+    if ns.RefreshBosses then ns.RefreshBosses() end
+    if ns.OnBossIndexReady then pcall(ns.OnBossIndexReady) end
+  end
+end
+ns.BossWingCheck = Wing.Check
+-- A boss of a wing in your target: that is where you are (when nothing says otherwise)
+function Wing.Seen(name)
+  local dkey = DungeonHere()
+  local w = dkey and Wing.Of(dkey, name)
+  if not w then return end
+  local k = Kills()
+  if CurrentInstance() ~= k.iid then return end
+  k.wing = k.wing or {}
+  if k.wing[dkey] ~= w and not Wing.Here(dkey) then k.wing[dkey] = w end
+  Wing.Check()
+end
+-- at load: every wing dungeon's order starts with its first wing
+for dkey, W in pairs(ns.WALK_WINGS or {}) do if W[1] then Wing.Apply(dkey, W[1].key) end end
 
 -- XP and money seen last (session only: a loading screen sets them again, nothing counts across it)
 local xpLast, xpMax, xpLvl, moneyLast
@@ -2516,6 +2686,8 @@ local function OnEntering()
   -- back inside before the report of the last exit went out: it goes with the next exit
   k.reportDue = nil
   if dkey and k.iid == iid and not k.dkey then k.dkey = dkey end
+  -- a dungeon with wings: the order of the wing you came in by
+  Wing.Check()
   if Lib() then
     StartIndex(false)
     -- the dungeon's boss list (local names, NPC ids) is built even with the panel hidden: the
@@ -2568,6 +2740,8 @@ local function MarkKilled(name, id, enc, en)
     end
     k.lastKill = t
     RunDungeon(k)
+    -- the first kill in a wing says which wing the run started in
+    Wing.Check()
     liveIid, liveRun = k.iid, k.run; ns.RefreshBosses(); GuideAfterKill()
   end
 end
@@ -2831,7 +3005,8 @@ end
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "ENCOUNTER_START", "ENCOUNTER_END", "BOSS_KILL", "PLAYER_LOGOUT",
   "PLAYER_TARGET_CHANGED", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "NAME_PLATE_UNIT_ADDED", "UPDATE_MOUSEOVER_UNIT", "CHAT_MSG_SYSTEM",
-  "PLAYER_XP_UPDATE", "PLAYER_MONEY", "PLAYER_UNGHOST", "PLAYER_ALIVE", "NAME_PLATE_UNIT_REMOVED", "UNIT_HEALTH" }) do
+  "PLAYER_XP_UPDATE", "PLAYER_MONEY", "PLAYER_UNGHOST", "PLAYER_ALIVE", "NAME_PLATE_UNIT_REMOVED", "UNIT_HEALTH",
+  "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
 -- UNIT_HEALTH: the target (TargetCheck), and the nameplates, focus, mouseover and boss frames of
@@ -2900,6 +3075,16 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
     SeenCheck("target")
     TargetCheck("target")
     ns.NpcPortraitUnit("target")
+    -- a living boss of a wing in your target: you are in that wing (Maraudon)
+    if UnitExists and UnitExists("target") then
+      local okD, dead = pcall(UnitIsDead or function() return nil end, "target")
+      local okN, nm = pcall(UnitName, "target")
+      nm = okN and str(nm)
+      if nm and okD and bool(dead) == false then Wing.Seen(nm) end
+    end
+  elseif e == "ZONE_CHANGED" or e == "ZONE_CHANGED_INDOORS" or e == "ZONE_CHANGED_NEW_AREA" then
+    -- walking into a wing's subzone (Maraudon's orange or purple caves)
+    Wing.Check()
   elseif e == "UPDATE_MOUSEOVER_UNIT" then
     SeenCheck("mouseover")
     TargetCheck("mouseover")

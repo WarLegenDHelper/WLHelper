@@ -2057,6 +2057,54 @@ local function KeepOnScreen(f)
 end
 S.KeepOnScreen = KeepOnScreen
 
+-- Window focus (rule: the window clicked or opened last is on top, whole). Raise only orders
+-- frames inside one strata, and the windows do not all share one (the dungeon Overview is HIGH so
+-- it covers the guide's Picker, the Hub is MEDIUM): a window brought forward first climbs to the
+-- highest strata of the other WL Helper windows shown (DIALOG popups excepted, they stay above),
+-- then Raise puts it above them. It drops back to its own strata when it is shown alone.
+local STRATA_RANK = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5, FULLSCREEN = 6, FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
+local styledWins = {}
+function S.FocusWindow(f)
+    if not f then return end
+    local base = f.wlStrata or "MEDIUM"
+    local want, wantR = base, STRATA_RANK[base] or 3
+    if wantR < STRATA_RANK.DIALOG then
+        for _, w in ipairs(styledWins) do
+            if w ~= f and w:IsShown() then
+                local st = w:GetFrameStrata()
+                local r = STRATA_RANK[st or ""]
+                if r and r > wantR and r < STRATA_RANK.DIALOG then want, wantR = st, r end
+            end
+        end
+    end
+    -- a window holding secure buttons is protected in combat: no strata change there (the game
+    -- refuses it, ADDON_ACTION_BLOCKED); its SetToplevel still raises it inside its strata
+    local locked = f.wlSecure and InCombatLockdown and InCombatLockdown()
+    if not locked and f:GetFrameStrata() ~= want then f:SetFrameStrata(want) end
+    if f.wlRawRaise then f.wlRawRaise(f) end
+end
+
+-- A window closing lets the others that climbed above their own strata come back down (the Hub
+-- raised over the Overview must not stay HIGH, above the guide's Picker, once the Overview is gone).
+local function SettleWindows()
+    for _, w in ipairs(styledWins) do
+        if w:IsShown() and not (w.wlSecure and InCombatLockdown and InCombatLockdown()) then
+            local base = w.wlStrata or "MEDIUM"
+            local want, wantR = base, STRATA_RANK[base] or 3
+            for _, o in ipairs(styledWins) do
+                if o ~= w and o:IsShown() then
+                    local ob = o.wlStrata or "MEDIUM"
+                    local r = STRATA_RANK[ob]
+                    if r and r > wantR and r < STRATA_RANK.DIALOG then want, wantR = ob, r end
+                end
+            end
+            local cur = w:GetFrameStrata()
+            if cur ~= want and (STRATA_RANK[cur] or 0) > wantR then w:SetFrameStrata(want) end
+        end
+    end
+end
+S.SettleWindows = SettleWindows
+
 -- Lowest visible point of the window's content (not anchored to the window's bottom), for
 -- windows that do not give their content height.
 local function MeasureBottom(f)
@@ -2251,7 +2299,8 @@ function S.Window(name, width, height, title, subtitle, db, posKey, opts)
     opts = opts or {}
     local f = CreateFrame("Frame", name, UIParent)
     f:SetSize(width, height)
-    f:SetFrameStrata(opts.strata or "MEDIUM")
+    f.wlStrata = opts.strata or "MEDIUM"
+    f:SetFrameStrata(f.wlStrata)
     f:SetClampedToScreen(true)
     f:SetMovable(true)
     f:EnableMouse(true)
@@ -2260,7 +2309,9 @@ function S.Window(name, width, height, title, subtitle, db, posKey, opts)
     if pos then f:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4]) else f:SetPoint("CENTER") end
     if name then tinsert(UISpecialFrames, name) end
     root.RegisterWindow(f)
-    S.Solid(f, "BACKGROUND", T.bg):SetAllPoints()
+    -- opaque: a window behind must never show through (T.bg carries 0.97 for the guide's frames)
+    f.wlBg = S.Solid(f, "BACKGROUND", T.bg, 1)
+    f.wlBg:SetAllPoints()
     S.Border(f, T.cardEdge)
 
     local HH = opts.header or S.LEGACY_HEADER_H
@@ -2410,9 +2461,16 @@ function S.Window(name, width, height, title, subtitle, db, posKey, opts)
     end
 
     -- Two windows open at once must not mix: the one clicked or opened last comes on top, whole.
+    -- f:Raise() (the header, the bare background, every module that brings its window forward)
+    -- goes through S.FocusWindow, which can change the strata first.
     f:SetToplevel(true)
+    f.wlRawRaise = f.Raise
+    f.Raise = S.FocusWindow
+    table.insert(styledWins, f)
+    f:HookScript("OnMouseDown", function() f:Raise() end)
     local raiser = CreateFrame("Frame", nil, f)
     raiser:SetScript("OnShow", function() f:Raise(); KeepOnScreen(f) end)
+    raiser:SetScript("OnHide", function() SettleWindows() end)
     f:Hide()
     return f
 end

@@ -62,15 +62,27 @@ function ns.Assemble(recalc, order, byKey)
     order = full
     local rank = {}
     for i, k in ipairs(db.order) do rank[k] = i end
-    local known, extra = {}, {}
-    for _, n in ipairs(order) do if rank[n.key] then table.insert(known, n) else table.insert(extra, n) end end
+    -- a node the saved order does not know (a chain that joined the route since: a level up, a
+    -- quest ticked by hand inside) goes where the new route puts it, just before the known node
+    -- that follows it there, not after everything (T-91: the chain after the dungeon)
+    local known, extra, ahead = {}, {}, {}
+    local buf = {}
+    for _, n in ipairs(order) do
+      if rank[n.key] then
+        table.insert(known, n)
+        if #buf > 0 then ahead[n] = buf; buf = {} end
+      else table.insert(extra, n); table.insert(buf, n) end
+    end
     table.sort(known, function(a, b) return rank[a.key] < rank[b.key] end)
     -- respecter les dépendances après le tri (au cas où)
     order = {}
     local placed = {}
     local pending = {}
-    for _, n in ipairs(known) do table.insert(pending, n) end
-    for _, n in ipairs(extra) do table.insert(pending, n) end
+    for _, n in ipairs(known) do
+      for _, x in ipairs(ahead[n] or {}) do table.insert(pending, x) end
+      table.insert(pending, n)
+    end
+    for _, n in ipairs(buf) do table.insert(pending, n) end
     local inRoute = {}
     for _, n in ipairs(pending) do inRoute[n] = true end
     local guard = 0
@@ -89,6 +101,7 @@ function ns.Assemble(recalc, order, byKey)
   db.order = {}
   for _, n in ipairs(order) do table.insert(db.order, n.key) end
   local steps = ns.SplitInside(ns.MakeSteps(order))
+  if ns.FixAfterPhases then ns.FixAfterPhases(steps) end
   StepKeys(steps)
   -- a copy: the route keeps its own choice (the picker's draft or a later edit of db.sel never
   -- changes the running route behind its back)

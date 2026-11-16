@@ -2,6 +2,26 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.93", date = "2026-11-17", items = {
+    { s = "add", fr = { "Zones sur la carte", "Quand les objets ou monstres d'un objectif sont éparpillés (ex. Artefacts atal'ai dans l'eau autour de l'île du bassin des larmes), une zone est dessinée sur la carte du monde et la minimap, la flèche mène au plus proche, et l'étiquette dit « Dans la zone » ; 49 objectifs de 39 quêtes." }, en = { "Quest zones drawn for scattered targets; arrow to the nearest one.", "" } },
+    { s = "add", fr = { "Horaires des zeppelins et bateaux", "« Zeppelin pour Grom'gol dans 1:20 » / « à quai, part dans 0:35 » ; horaires de NaowhForever s'il est installé, sinon relevés en jeu et partagés dans la guilde (et ceux de NauticusClassic / ForeverTransport) ; le GPS compte la vraie attente." }, en = { "Zeppelin and boat departure timers, used by the route planner.", "" } },
+    { s = "add", fr = { "Vols connus", "Si le GPS ne connaît pas encore tes vols sur un continent, il suppose connus ceux des zones bien en dessous de ton niveau (« Vol supposé connu : ouvre la carte du maître de vol pour vérifier ») ; ouvrir une carte de vol corrige tout. La flèche explique quand elle te met à cheval." }, en = { "Assumed known flights until a flight map is opened; ride reasons explained.", "" } },
+    { s = "add", fr = { "Pourquoi d'abord là-bas", "« D'abord à Feralas : il faut « Le Temple englouti » avant de parler à Marvon Rivetseeker à Tanaris. »" }, en = { "The card says why the route goes elsewhere first.", "" } },
+    { s = "add", fr = { "Améliorations", "Une ligne courte dit pourquoi (« Surtout : DPS de baguette en plus, moins de dégâts de givre ») ; Maj pour le détail chiffré. Réglages « J'utilise ma baguette » (automatique : parfois dès le niv. 40 pour mage, démoniste, prêtre) et « Ignorer les armures plus légères que la mienne (dès le niv. 40) »." }, en = { "Upgrade reasons, wand usage and lighter-armor settings.", "" } },
+    { s = "add", fr = { "Maraudon", "Les gemmes des Khans pour « Les instructions du paria » (Prophète sans nom, Kolk, Gelk, Magra dehors ; Veng et Maraudos dedans), et où remplir la fiole de « La corruption de Vylelangue »." }, en = { "Pariah's Instructions step by step.", "" } },
+    { s = "chg", fr = { "Ordre des boss de Maraudon", "Corrigé, selon l'aile où tu entres (orange ou violette)." }, en = { "Maraudon boss order by wing.", "" } },
+    { s = "chg", fr = { "Liste « En chemin » dans le donjon", "Seulement ce qui se fait sur le chemin de ce boss, avec où et combien ; « Carte du donjon » au lieu du bouton grisé." }, en = { "Per-boss on-the-way lists.", "" } },
+    { s = "chg", fr = { "Moins d'allers-retours", "Ce qui se fait sur place passe avant de partir (40 % d'allers-retours en moins)." }, en = { "Fewer back-and-forth trips.", "" } },
+    { s = "chg", fr = { "Textes des cartes du guide relus", "Distances et « change de continent » cohérents, « Avant / Après le donjon » justes, listes avec verbe et compte." }, en = { "Guide card texts proofread.", "" } },
+    { s = "chg", fr = { "Trajet sur la flèche", "« Puis vol jusqu'à Orgrimmar > zeppelin pour Fossoyeuse > vol jusqu'à Moulin-de-Tarren » (plus de carrés), détail dans l'infobulle." }, en = { "Readable itinerary line.", "" } },
+    { s = "chg", fr = { "Pierre de foyer", "La carte du guide donne aussi la durée et l'autre trajet." }, en = { "Trip time on the card.", "" } },
+    { s = "fix", fr = { "XP des quêtes grises", "Ce que Forever donne vraiment (chiffre du jeu, sinon courbe apprise, sinon 80/60/50 %) ; ex. 1 900 XP au lieu de 380." }, en = { "Grey quest XP matches Forever.", "" } },
+    { s = "fix", fr = { "Objets portés à suffixe", "Lus avec leurs vraies stats : fini les +1128 % et « Emplacement vide » à tort." }, en = { "Random-suffix worn items read correctly.", "" } },
+    { s = "fix", fr = { "Spam « Aucun joueur nommé... »", "WL Helper ne chuchote qu'aux joueurs en ligne, et la ligne est masquée sinon." }, en = { "No more \"player not found\" spam from WL Helper.", "" } },
+    { s = "fix", fr = { "Partage des quêtes en combat", "Attend la fin du combat au lieu d'être bloqué par le jeu." }, en = { "Quest sharing waits for the end of combat.", "" } },
+    { s = "fix", fr = { "Check-list", "Une quête dont la chaîne n'est pas faite (« Rot and Regret ») est « Bloquée » en gris au lieu de « Requise » ; la chaîne ajoutée après coup se place avant le donjon." }, en = { "Locked quests no longer block the checklist.", "" } },
+    { s = "fix", fr = { "Fenêtres opaques", ", la dernière cliquée passe devant." }, en = { "Opaque windows, last clicked on top.", "" } },
+  } },
   { v = "1.0.0-beta.92", date = "2026-11-16", items = {
     { s = "add", fr = { "Facultatif ou requis", "Les étapes faites dehors d'une quête de donjon disent clairement « Facultatif : le donjon se fait sans · sur le chemin du portail » (ex. Fragments d'Ombréclat à Maraudon), « Requis pour « X » (dans le donjon) » quand une suite en dépend, ou « Requis : la clé pour entrer dans le donjon »." }, en = { "Outside steps say whether they are optional or required.", "" } },
     { s = "add", fr = { "Bouton « Passer »", "Sur les étapes facultatives : deux clics retirent la quête de la route (elle reste dans ton journal), à recocher dans la vue d'ensemble." }, en = { "Skip button for optional quests.", "" } },
@@ -130,8 +150,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "Équipement", "WL Helper Gear suit Geared Forever 1.1.1. Le réglage « baguette » est fusionné en un seul, et le choix « Méthode » des améliorations disparaît (automatique)." }, en = { "Gear synced to Geared Forever 1.1.1; wand settings merged; upgrade method is automatic.", "" } },
     { s = "fix", fr = { "Budget des Writs", "Un Writ trop cher pour ce qui restait ne fait plus sauter les Writs moins chers de la même zone." }, en = { "Writs budget no longer skips cheaper writs behind a too-dear one.", "" } },
     { s = "fix", fr = { "", "Les messages des commandes ne peuvent plus boucler quand beaucoup partent d'un coup." }, en = { "Orders messages can no longer loop when many are sent at once.", "" } },
-  } },
-  { v = "1.0.0-beta.78", date = "2026-11-16", items = {
-    { s = "fix", fr = { "Échap ne ferme plus le guide", "On le suit en jouant, il se ferme avec sa croix. Ça règle aussi pour de bon sa fermeture après un téléport." }, en = { "Escape no longer closes the guide; close it with its X.", "" } },
   } },
 }

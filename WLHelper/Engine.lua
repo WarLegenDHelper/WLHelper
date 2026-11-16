@@ -15,6 +15,8 @@ do
       SHARE_SKIP1 = "%d ne se partage pas", SHARE_SKIP = "%d ne se partagent pas",
       SHARE_BUSY = "Partage déjà en cours : attends la fin avant de recommencer.",
       SHARE_NONE = "Aucune quête de ton journal pour cette route ne se partage.",
+      SHARE_COMBAT = "Partage des quêtes après le combat", SHARE_AFTER = "Après le combat",
+      SHARE_AFTER_TT = "Le jeu bloque le partage en combat : il partira à la fin du combat.",
       INST_IN_TRACK = "(clic sur le suivi pour ouvrir le guide)",
       INST_OFFER_TRACK = "Tu es dans %s : ouvre le guide pour l'ajouter à ta route.",
       LOCK_PRE = "il faut d'abord « %s » (%s)",
@@ -23,12 +25,18 @@ do
       LOCK_LONG = "chaîne longue : %d quêtes avant",
       LOCK_OTHERDG = "elle passe par %s",
       LOCK_BAD = "chaîne impossible pour ce personnage",
+      CL_LOCKED = "Bloquée", CL_LOCK_LINE = "Bloquée : %s · prérequis %d/%d",
+      CL_LOCK_CLICK = "Clic : l'ajouter à la route avec sa chaîne de quêtes",
+      WHY_FIRST = "D'abord à %s : il faut « %s » avant de parler à %s à %s.",
+      WHY_FIRST_DO = "D'abord à %s : il faut « %s » avant « %s » à %s.",
     },
     en = {
       SHARE_GO1 = "Sharing 1 quest with the group", SHARE_GO = "Sharing %d quests with the group",
       SHARE_SKIP1 = "%d cannot be shared", SHARE_SKIP = "%d cannot be shared",
       SHARE_BUSY = "Already sharing: wait until it ends before sharing again.",
       SHARE_NONE = "No quest of your log for this route can be shared.",
+      SHARE_COMBAT = "Sharing the quests after combat", SHARE_AFTER = "After combat",
+      SHARE_AFTER_TT = "The game blocks sharing in combat: it goes out when combat ends.",
       INST_IN_TRACK = "(click the tracker to open the guide)",
       INST_OFFER_TRACK = "You are in %s: open the guide to add it to your route.",
       LOCK_PRE = "first needs \"%s\" (%s)",
@@ -37,6 +45,10 @@ do
       LOCK_LONG = "long chain: %d quests before",
       LOCK_OTHERDG = "it goes through %s",
       LOCK_BAD = "chain this character cannot do",
+      CL_LOCKED = "Locked", CL_LOCK_LINE = "Locked: %s · prerequisite %d/%d",
+      CL_LOCK_CLICK = "Click: add it to the route with its quest chain",
+      WHY_FIRST = "First to %s: you need \"%s\" before talking to %s in %s.",
+      WHY_FIRST_DO = "First to %s: you need \"%s\" before \"%s\" in %s.",
     },
   }
   local S = ns.LOCALE_TABLES
@@ -162,7 +174,24 @@ end
 function ns.QName(qid)
   local q = ns.Q[qid]
   if not q then return tostring(qid) end
-  if GetLocale and GetLocale() == "frFR" and q.nf then return q.nf end
+  if GetLocale and GetLocale() == "frFR" then
+    if q.nf then return q.nf end
+    -- a chain whose parts share one English title (Hidden Enemies 1 to 3) but only some have a
+    -- French one: the French one, so one card never names the chain in two languages
+    if q.n then
+      if not ns.nfByN then
+        local m = {}
+        for _, x in pairs(ns.Q) do
+          if type(x) == "table" and x.n and x.nf then
+            if m[x.n] == nil then m[x.n] = x.nf elseif m[x.n] ~= x.nf then m[x.n] = false end
+          end
+        end
+        ns.nfByN = m
+      end
+      local nf = ns.nfByN[q.n]
+      if nf then return nf end
+    end
+  end
   return q.n or tostring(qid)
 end
 
@@ -393,6 +422,26 @@ local function InRoute(qid, cls, lvl, dkey)
   return (ChainOK(ns.ChainPlan(qid, cls, dkey), lvl))
 end
 ns.ChainInRoute = InRoute
+-- T-91: a check-list line for a quest whose chain is not done before the gate: "Locked: first
+-- needs "X" (NPC, zone) · prerequisite 4/7" (the n/m of the guide's "Prerequisite 4/7" pill)
+function ns.CheckLockText(qid, cls, dkey)
+  local plan = ns.ChainPlan(qid, cls, dkey)
+  local first = plan and plan.first
+  if not first then return nil end
+  local cs = ns.ChainState(qid)
+  return L.CL_LOCK_LINE:format(L.LOCK_PRE:format(ns.QName(first), GiverText(ns.Q[first])),
+    math.min(cs.done + 1, cs.total), cs.total)
+end
+-- A click on a locked line: the quest ticked by hand (offPick), so its chain joins the route
+-- (ChainInRoute), as a tick in the Overview does
+function ns.GuideLockPick(qid)
+  if not qid then return end
+  if ns.SummarySetOff then ns.SummarySetOff(qid, false) return end
+  WLDTDB.offPick = WLDTDB.offPick or {}
+  WLDTDB.offPick[qid] = true
+  if WLDTDB.off then WLDTDB.off[qid] = nil end
+  if ns.Replan then pcall(ns.Replan) end
+end
 
 -- =====================================================================
 --  Positions (coordonnées monde via l'API de carte)
@@ -526,7 +575,10 @@ local function MakeNodes(sel, cls)
       end
       startDg = ns._insideFinish[sl.n] or home
     end
-    if q.si and (not sl or sl.i) then
+    -- an item start dropped in the dungeon ("Item start: Glowing Shard, dropped by Mutanus"): taken
+    -- there even when the data gives the turn-in NPC as the giver
+    local itemStart = q.si and type(q.st) == "string" and q.st:match("^Item start") and q.st:match("dropped by") and q.d
+    if q.si and (not sl or sl.i or itemStart) then
       A = add({ kind = "a", q = qid, ins = startDg, startItem = q.si, d = startDg, pre = isPre })
     elseif sl and sl.i then
       A = add({ kind = "a", q = qid, ins = startDg, npc = sl.n, d = startDg, pre = isPre })
@@ -540,6 +592,7 @@ local function MakeNodes(sel, cls)
     -- inconnus (pas de position dans les données) : dans le donjon pour une quête de donjon, ignorés sinon.
     local outs, inside, outer = {}, false, true
     local real = 0
+    local objNode = {}   -- objective index -> its outside node (o.after links)
     -- a main quest whose every objective is outside, some of them in the zone around the dungeon
     -- (the Uldaman excavation: fungus, tablet, chests, power stones) gets one outside step per
     -- objective at its spot, like a prerequisite, instead of one line after the last boss: the
@@ -561,7 +614,8 @@ local function MakeNodes(sel, cls)
         -- one action per objective: done when that objective is done (ns.ObjDone), so the route
         -- moves on objective by objective instead of waiting for the whole quest
         table.insert(outs, add({ kind = "o", q = qid, sub = i, oi = i, loc = o.w, npc = o.t and o.t[1] or o.n, obj = o, oneObj = o, d = home, pre = isPre, deps = { A },
-          area = o.outer and OuterNear(o, q.od or home) and NotedOutside(q) and (q.od or home) or nil }))
+          area = (o.outer or o.near) and OuterNear(o, q.od or home) and NotedOutside(q) and (q.od or home) or nil }))
+        objNode[i] = outs[#outs]
       elseif o.ins or outerHere or o.unk then
         real = real + 1
         inside = true
@@ -593,6 +647,17 @@ local function MakeNodes(sel, cls)
     if not isPre and not q.noin and real == 0 and (q.o == nil or #q.o > 0 or q.ne) then inside = true; outer = false end
     local C
     if inside then C = add({ kind = "c", q = qid, ins = inDg, outer = outer, d = inDg, pre = isPre, deps = { A } }) end
+    -- o.after = k: this objective needs objective k first (the Amulet of Spirits before the Khans'
+    -- gems): its outside step, or the dungeon's objectives (C), wait on k's outside step
+    for i, o in ipairs(q.o or {}) do
+      local p = o.after and objNode[o.after]
+      local me = objNode[i] or C
+      if p and me and me ~= p then
+        local has = false
+        for _, d in ipairs(me.deps) do if d == p then has = true break end end
+        if not has then table.insert(me.deps, p) end
+      end
+    end
     -- rendre
     local fl = q.f
     local tdeps = { A }
@@ -827,7 +892,8 @@ function ns.Runnable(dkey)
 end
 
 local SPOT_NEAR = 6   -- map units: objectives this close on one map are one visit
-function ns.BuildRoute(sel, startPos)
+-- startMap: the player's map (ns.PlayerWorld's second value): the zone the route starts in
+function ns.BuildRoute(sel, startPos, startMap)
   local _, cls = UnitClass("player")
   local nodes, byKey = MakeNodes(sel, cls)
   local log = ns.LogEntries()
@@ -1004,6 +1070,36 @@ function ns.BuildRoute(sel, startPos)
     end
     doorOf[n] = d
   end
+  -- a step of a quest in the zone around a dungeon's entrance (o.near: the Khans' gems and the
+  -- Prophet in Maraudon's outer caves) is the last stop before its door: it waits for the dungeon's
+  -- other outside lines (doorOf), except those that wait on it
+  local downOf = {}
+  local function Down(n)
+    if downOf[n] then return downOf[n] end
+    local seen, todo = { [n] = true }, { n }
+    while #todo > 0 do
+      local x = table.remove(todo)
+      for _, o in ipairs(dependents[x] or {}) do if not seen[o] then seen[o] = true; todo[#todo + 1] = o end end
+    end
+    downOf[n] = seen
+    return seen
+  end
+  local doorList = {}
+  for _, x in ipairs(nodes) do
+    local d = doorOf[x]
+    if d then doorList[d] = doorList[d] or {}; table.insert(doorList[d], x) end
+  end
+  local function AreaWaits(n)
+    if not (n.kind == "o" and n.area and n.oneObj and n.oneObj.near) then return false end
+    local down
+    for _, x in ipairs(doorList[n.area] or {}) do
+      if x.area ~= n.area and not done[x] and not placed[x] then
+        down = down or Down(n)
+        if not down[x] then return true end
+      end
+    end
+    return false
+  end
   local guard = 0
   while remaining > 0 and guard < 5000 do
     guard = guard + 1
@@ -1047,6 +1143,7 @@ function ns.BuildRoute(sel, startPos)
       if SiblingsPending(n) then cost = cost + 5000 end
       if n.kind == "o" and TakesPending(n) then cost = cost + 50000 end   -- the pick-ups first, wherever they are
       if TurnInLater(n) then cost = cost + 4000 end
+      if AreaWaits(n) then cost = cost + 20000 end
       if not bestCost or cost < bestCost then best, bestCost = n, cost end
     end
     if not best then
@@ -1059,12 +1156,138 @@ function ns.BuildRoute(sel, startPos)
     inDungeon = best.ins
     pos = NodePos(best) or pos
   end
+  ns.PullLocal(order, done, startPos, startMap, function(n, placedAt)
+    -- an objective waits for every pick-up of its spot (TakesPending), a pick-up for its level
+    local q = ns.Q[n.q]
+    if n.kind == "a" and q and q.r and q.r > lvl then return false end
+    local r = spotOf[n]
+    for _, A in ipairs(r and spotTakes[r] or {}) do
+      if not done[A] and not placedAt(A) then return false end
+    end
+    return true
+  end)
   return order, byKey
+end
+
+-- =====================================================================
+--  No back-and-forth: when the route leaves a zone and comes back to it within two zones, the
+--  lines of that return visit that could already be done before leaving (their dependencies are
+--  placed, nothing inside a dungeon in between) are done before leaving, when that does not make
+--  the trip longer. The start counts: the player's own zone (startMap) first.
+-- =====================================================================
+local function ZoneOfNode(n)
+  if n.ins then local d = ns.D[n.ins]; return d and d.e and d.e.m end
+  if n.unknown or not n.loc then return nil end
+  return n.loc.m
+end
+local function Travel(order, from, a, b)
+  local t, pos = 0, from
+  for i = a, b do
+    local p = NodePos(order[i])
+    if p then t = t + Dist(pos, p); pos = p end
+  end
+  return t
+end
+-- order: changed in place. done: lines already done (not in the order). ok(n, placedAt): may n
+-- move earlier (the caller's soft rules), placedAt(x) true when x sits before the new place.
+local PULL_SLACK = 250   -- yards
+function ns.PullLocal(order, done, startPos, startMap, ok)
+  local passes = 0
+  local changed = true
+  while changed and passes < 6 do
+    changed, passes = false, passes + 1
+    local Z = startMap
+    for i = 0, #order - 1 do
+      if i > 0 then Z = ZoneOfNode(order[i]) or Z end
+      local nx = order[i + 1]
+      local zn = ZoneOfNode(nx)
+      if Z and zn and zn ~= Z and not nx.ins then
+        -- the next two zones after leaving: a return to Z there, before any dungeon line
+        local runs, last, from, to = 1, zn, nil, nil
+        for j = i + 2, #order do
+          local n = order[j]
+          if n.ins then break end
+          local z = ZoneOfNode(n)
+          if z and z ~= last then
+            runs = runs + 1; last = z
+            if runs > 3 then break end
+            if z == Z then from = j end
+            if from and z ~= Z then to = j - 1; break end
+          end
+          if from then to = j end
+        end
+        if from then
+          local idx = {}
+          for k, n in ipairs(order) do idx[n] = k end
+          local moved, set = {}, {}
+          local function placedAt(x) return set[x] or (idx[x] and idx[x] <= i) end
+          for j = from, to do
+            local n = order[j]
+            -- a line with no place of its own in that visit (an objective with no known spot) goes too
+            local zj = ZoneOfNode(n)
+            if (zj == Z or (zj == nil and not n.ins)) and n.kind ~= "h" and n.kind ~= "r" then
+              local free = true
+              for _, p in ipairs(n.deps or {}) do
+                if not done[p] and not placedAt(p) then free = false break end
+              end
+              if free and ok and not ok(n, placedAt) then free = false end
+              if free then moved[#moved + 1] = n; set[n] = true end
+            end
+          end
+          if moved[1] then
+            local new = {}
+            for k = 1, i do new[k] = order[k] end
+            for _, n in ipairs(moved) do new[#new + 1] = n end
+            for k = i + 1, #order do if not set[order[k]] then new[#new + 1] = order[k] end end
+            local startP = startPos
+            for k = i, 1, -1 do local p = NodePos(order[k]); if p then startP = p; break end end
+            -- the rest of the trip from i (a line after the window with no place of its own, such as
+            -- an objective with no known spot, is done where the window left you)
+            local was = Travel(order, startP, i + 1, #order)
+            local now = Travel(new, startP, i + 1, #order)
+            -- a return visit costs a trip of its own: a little longer on the map is still better
+            if startP and now <= was + PULL_SLACK then
+              for k = 1, #new do order[k] = new[k] end
+              changed = true
+            end
+          end
+        end
+      end
+    end
+  end
+  return order
 end
 
 -- =====================================================================
 --  Étapes : on regroupe les nœuds consécutifs au même endroit
 -- =====================================================================
+-- A step of a dungeon that comes after its last inside step (and before the next gate) is done
+-- after the dungeon, whatever its actions' own phase says (a merged turn-in with an optional
+-- outside quest, a lone turn-in): it never reads "before the dungeon" there. Also run on the
+-- final step list (after SplitInside).
+function ns.FixAfterPhases(steps)
+  local lastIn = {}
+  for i, st in ipairs(steps) do if st.phase == "inside" and st.dk then lastIn[st.dk] = i end end
+  for dk, li in pairs(lastIn) do
+    for i = li + 1, #steps do
+      local st = steps[i]
+      if st.gate then break end
+      if st.dk == dk and st.phase == "before" then st.phase = "after" end
+    end
+  end
+  -- after the route's last inside step with no gate later: nothing is left to prepare, every
+  -- remaining step (a turn-in for a wing outside the route) is after the dungeon
+  local last = 0
+  for _, li in pairs(lastIn) do if li > last then last = li end end
+  if last > 0 then
+    local gateLater = false
+    for i = last + 1, #steps do if steps[i].gate then gateLater = true; break end end
+    if not gateLater then
+      for i = last + 1, #steps do if steps[i].phase == "before" then steps[i].phase = "after" end end
+    end
+  end
+end
+
 function ns.MakeSteps(order)
   local steps = {}
   local cur
@@ -1128,6 +1351,54 @@ function ns.MakeSteps(order)
       if visit then visit.checks = st.acts end
     end
   end
+  -- T-91: one decision per quest (ns.ChainInRoute). A check-list quest whose prerequisites are
+  -- not all turned in before its gate (by the route or by the player) is not "Required" and does
+  -- not hold "Ready" back: it moves to st.locks, a greyed "Locked" line. So does a quest of the
+  -- dungeon the route leaves out for its chain (ns.LockedReason), on the dungeon's first gate.
+  -- A click on the line ticks it by hand (ns.GuideLockPick) and its chain joins the route.
+  do
+    local _, cls = UnitClass("player")
+    local lvl = (UnitLevel and UnitLevel("player")) or 1
+    local at = {}
+    for i, st in ipairs(steps) do
+      for _, n in ipairs(st.acts) do if n.key and not at[n.key] then at[n.key] = i end end
+    end
+    local gated = {}
+    for i, st in ipairs(steps) do
+      if st.gate and st.checks then
+        local keep, locks, seen = {}, {}, {}
+        for _, n in ipairs(st.acts) do
+          local plan = n.kind == "h" and n.q and ns.ChainPlan(n.q, cls, st.gate)
+          local late = false
+          for _, pid in ipairs(plan and plan.left or {}) do
+            -- turned in later than the visit that follows this gate, or not in the route at all
+            local ti = at["t:" .. pid]
+            if not ti or ti > i + 1 then late = true break end
+          end
+          if n.kind == "h" then seen[n.q] = true end
+          if late then n.lock = true; locks[#locks + 1] = n else keep[#keep + 1] = n end
+        end
+        if not gated[st.gate] then
+          gated[st.gate] = true
+          for _, qid in ipairs(ns.DungeonQuests(st.gate, cls)) do
+            local q = ns.Q[qid]
+            if not seen[qid] and not q.extra and not ns.IsDone(qid) and not (WLDTDB.off and WLDTDB.off[qid])
+              and not at["a:" .. qid] and not at["c:" .. qid] and not InRoute(qid, cls, lvl, st.gate) then
+              local _, cause = ns.LockedReason(qid, lvl, cls, st.gate)
+              if cause == "lvl" or cause == "high" or cause == "long" then
+                locks[#locks + 1] = { kind = "h", q = qid, key = "h:" .. qid .. ":lock", d = st.gate, lock = true, deps = {} }
+              end
+            end
+          end
+        end
+        if #locks > 0 then
+          for j = #st.acts, 1, -1 do st.acts[j] = nil end
+          for _, n in ipairs(keep) do st.acts[#st.acts + 1] = n end
+          st.locks = locks
+        end
+      end
+    end
+  end
   -- une étape « prêt ? » sans rien à vérifier n'apporte rien : on la retire
   for i = #steps, 1, -1 do
     local st = steps[i]
@@ -1149,7 +1420,71 @@ function ns.MakeSteps(order)
   end
   -- the phase of each step (before / inside / after) and the route dungeon it serves
   for _, st in ipairs(steps) do ns.StepPhase(st); st.dk = ns.StepDungeon(st) end
+  ns.FixAfterPhases(steps)
   return steps
+end
+
+-- =====================================================================
+--  Why a step far away comes first: the next step back in the player's zone needs it
+-- =====================================================================
+local function StepZone(st)
+  if not st then return nil end
+  local g = st.gate or st.ins
+  if g then local d = ns.D[g]; return d and d.e and d.e.m end
+  if st.unknown then return nil end
+  for _, n in ipairs(st.acts or {}) do if n.loc and n.loc.m and not n.ins then return n.loc.m end end
+  return nil
+end
+ns.StepZone = StepZone
+local function ZoneText(m)
+  local ok, info = false, nil
+  if m and C_Map and C_Map.GetMapInfo then ok, info = pcall(C_Map.GetMapInfo, m) end
+  return ok and info and info.name or nil
+end
+-- step: a step of the route (steps: its list, ns.route.steps by default); here: the player's map
+-- (C_Map.GetBestMapForUnit by default). When step is in another zone than the player's and the
+-- route's next step back in the player's zone needs one of its lines (directly or through the
+-- steps between), -> { q = quest of that line, qname, npc = who waits for it, zone = the step's
+-- zone, there = the player's zone, step = index of the waiting step, text = the card's line
+-- (L.WHY_FIRST: "D'abord à Feralas : il faut « X » avant de parler à Y à Tanaris.") }; else nil.
+function ns.StepWhyFirst(step, steps, here)
+  steps = steps or (ns.route and ns.route.steps)
+  if not (step and steps) then return nil end
+  local si
+  for i, st in ipairs(steps) do if st == step then si = i break end end
+  if not si then return nil end
+  if not here and C_Map and C_Map.GetBestMapForUnit then here = C_Map.GetBestMapForUnit("player") end
+  local z = StepZone(step)
+  if not (z and here) or z == here then return nil end
+  -- the lines of this step, then those of the steps up to the waiting one (a chain through them)
+  local from = {}
+  for _, n in ipairs(step.acts or {}) do from[n] = n end
+  for j = si + 1, #steps do
+    local st = steps[j]
+    local zj = StepZone(st)
+    for _, n in ipairs(st.acts or {}) do
+      if not from[n] then
+        for _, p in ipairs(n.deps or {}) do
+          if from[p] then
+            if zj == here and n.kind ~= "h" then
+              local src = from[p]
+              local who = (n.kind == "a" or n.kind == "t") and n.npc or nil
+              local zt, ht = ZoneText(z) or "?", ZoneText(here) or "?"
+              local qn = ns.QName(src.q)
+              local text = who and L.WHY_FIRST and L.WHY_FIRST:format(zt, qn, who, ht)
+                or (L.WHY_FIRST_DO and L.WHY_FIRST_DO:format(zt, qn, ns.QName(n.q), ht)) or nil
+              return { q = src.q, qname = qn, npc = who, wq = n.q, zone = zt, there = ht, step = j, text = text }
+            end
+            from[n] = from[p]
+            break
+          end
+        end
+      end
+    end
+    -- only the first visit back in the player's zone
+    if zj == here then return nil end
+  end
+  return nil
 end
 
 -- =====================================================================
@@ -1286,14 +1621,15 @@ end
 function ns.ShareQuests()
   local P = ns.Print
   if not (IsInGroup and IsInGroup()) then P(L.NOGROUP) return end
-  if ns.pushBusy then P(L.SHARE_BUSY) return end
+  if ns.pushBusy then P((ns.ShareWaiting and ns.ShareWaiting()) and L.SHARE_COMBAT or L.SHARE_BUSY) return end
   local queue, skip = ShareQueue()
   if #queue == 0 then P(skip > 0 and L.SHARE_NONE or L.NOSHARE) return end
   local GQ = GuideQuests()
   if GQ and GQ.MarkShared then for _, id in ipairs(queue) do GQ.MarkShared(id) end end
   local line = ns.Plural(#queue, "SHARE_GO1", "SHARE_GO", #queue)
   if skip > 0 then line = line .. " · " .. ns.Plural(skip, "SHARE_SKIP1", "SHARE_SKIP", skip) end
-  P(line)
+  -- in combat the queue waits and says « Partage des quêtes après le combat » itself
+  if not (ns.ShareInCombat and ns.ShareInCombat()) then P(line) end
   if ns.PushQuests then
     -- the summary's "share all" greys out while this runs and comes back when it ends
     local function Redraw()
@@ -1519,6 +1855,12 @@ function ns.ObjCount(log, qid, o)
     if mk then memo[mk] = (fin == nil) and NIL or { a, b, fin } end
     return a, b, fin
   end
+  -- a step of ours the game does not list (o.have: the Khans' gems, the Amulet of Spirits): done
+  -- while you carry one of its items (the item itself or what it is combined into)
+  if o.have then
+    local fin = ns.HasItem(o.have) and true or false
+    return keep(fin and 1 or 0, 1, fin)
+  end
   if CQL and CQL.GetQuestObjectives then
     local ok, objs = pcall(CQL.GetQuestObjectives, qid)
     if ok and type(objs) == "table" and #objs > 0 then
@@ -1657,6 +1999,16 @@ local function SplitOne(st, full, visit)
     local gq = ns.GROUP_QUEST and ns.GROUP_QUEST[n.q]
     if gq then it.boss = bossByName(gq) or it.boss end
     if not it.boss then it.boss = PlaceHint(st.ins, bo, n) end
+    -- a rare boss may not be there: a line that is not about the boss itself (its kill, its drop)
+    -- is never pinned to it, it goes to "in the whole dungeon"
+    local B = not (go or gq) and it.boss and it.boss == math.floor(it.boss) and bo.list[it.boss] or nil
+    if B and ns.BossIsRare(st.ins, B) then
+      local own = false
+      for _, nm in ipairs({ n.npc or false, o and o.n or false }) do if nm and (nm == B.en or nm == B.name) then own = true end end
+      for _, x in ipairs(o and o.src or {}) do if x[1] == B.en or x[1] == B.name then own = true end end
+      for _, t in ipairs(o and o.t or {}) do if t == B.en or t == B.name then own = true end end
+      if not own then it.boss = 999 end
+    end
   end
   -- même PNJ / objet = même étape ; une prise sans boss emmène ses objectifs non rattachés
   local byNpc = {}
@@ -1719,20 +2071,46 @@ local function SplitOne(st, full, visit)
   local anyBoss = false
   for _, g in ipairs(groups) do if g.boss >= 0.5 and g.boss < 999 then anyBoss = true end end
   if not anyBoss then return Whole(st) end
-  local trash = {}
+  -- "on the way, also do" (T-92): a line of the "whole dungeon" group shows on the step of the boss
+  -- whose path it is on (ns.ALONG_OBJ, with where: trashWhere[node] = that entry); one picked up
+  -- everywhere (GROUP_OBJ "*", or ALONG_OBJ "*") once, on the first step inside (trashAll); any
+  -- other only on the "finish in the dungeon" step
+  local along = ns.ALONG_OBJ and ns.ALONG_OBJ[st.ins] or {}
+  local trashAt, trashAll, trashWhere = {}, {}, {}
   for _, g in ipairs(groups) do
-    if g.boss == 999 then for _, n in ipairs(g.acts) do table.insert(trash, n) end end
+    if g.boss == 999 then
+      for _, n in ipairs(g.acts) do
+        local o = n.oneObj
+        local a = n.kind == "c" and ((o and o.n and along[o.n]) or along[n.q]) or nil
+        local go = o and o.n and ns.GROUP_OBJ and ns.GROUP_OBJ[o.n]
+        if (a and a[1] == "*") or (not a and go == "*") then
+          table.insert(trashAll, n)
+        elseif a and bossByName(a[1]) then
+          local bi = bossByName(a[1])
+          trashAt[bi] = trashAt[bi] or {}
+          table.insert(trashAt[bi], n)
+          trashWhere[n] = a
+        end
+      end
+    end
   end
   local out = {}
+  -- the lines on the way to boss i go on the "on the way to i" step when there is one, else on
+  -- boss i's own step (never on both)
+  local hasWay = {}
+  for _, g in ipairs(groups) do if g.boss > 0 and g.boss < 999 and g.boss ~= math.floor(g.boss) then hasWay[math.ceil(g.boss)] = true end end
   for k, g in ipairs(groups) do
+    local bi = (g.boss > 0 and g.boss < 999) and math.ceil(g.boss) or nil
+    local tl = bi and (g.boss ~= math.floor(g.boss) or not hasWay[bi]) and trashAt[bi] or nil
     local s2 = { ins = st.ins, d = st.d, pos = st.pos, inner = st.inner, q = st.q, acts = g.acts, npcs = st.npcs,
-      split = true, part = k, parts = #groups, bossIdx = g.boss, trash = (g.boss ~= 999) and trash or nil,
+      split = true, part = k, parts = #groups, bossIdx = g.boss, trash = tl, trashWhere = tl and trashWhere or nil,
+      trashAll = (k == 1 and g.boss ~= 999 and #trashAll > 0) and trashAll or nil,
       phase = "inside", dk = st.ins or st.dk, bossN = #bo.list, run = run or nil }
     local whole = g.boss == math.floor(g.boss)
     local B = whole and bo.list[g.boss]
     if B then
       s2.bossName, s2.bossEn, s2.bossTip, s2.bossModel, s2.bossNpc = B.name, B.en, B.tip, B.model, B.npc
-      s2.bossStep, s2.bossEnc, s2.bossFlag = true, B.enc, (B.rare and "rare") or (B.optional and "optional") or nil
+      s2.bossStep, s2.bossEnc, s2.bossFlag = true, B.enc, (ns.BossIsRare(st.ins, B) and "rare") or (B.optional and "optional") or nil
       -- one key per visit of the dungeon in the route (a second visit has its own steps), the
       -- same across replans
       s2.bkey = "b:" .. st.ins .. ":" .. B.en .. ((visit and visit > 1) and (":v" .. visit) or "")
@@ -1868,6 +2246,16 @@ function ns.BossStepLoot(st)
   for _, e in ipairs(out) do e._k = nil end
   return out
 end
+-- A rare boss (not always there): the journal says so, or our own tactic starts "Rare".
+function ns.BossIsRare(dkey, B)
+  if not B then return false end
+  if B.rare then return true end
+  local t = ns.BOSS_NOTES and ns.BOSS_NOTES[dkey]
+  local e = t and B.en and t[B.en]
+  local l = type(e) == "table" and type(e[1]) == "table" and e[1][2] or nil
+  return type(l) == "string" and l:match("^Rare[,:.]") ~= nil
+end
+
 -- Optional: nothing for you at this boss (no open quest line, no upgrade, no quest item).
 function ns.BossStepOptional(st, log)
   if not (st and st.bossStep) then return false end
@@ -2056,4 +2444,188 @@ function ns.PatrolReached(spots, idx, here, within)
   local w = ns.World(s[1], s[2], s[3])
   if not w or w[1] ~= here[1] then return false end
   return Dist(here, w) <= (within or 15)
+end
+
+-- =====================================================================
+--  Objectives spread over an area (a ring of spawns round an island, several camps, a wide field):
+--  o.area = { m = map, pts = hull or { hull, hull, ... } (one per camp, {x, y} in percent),
+--  sp = { {x, y, camp}, ... } (spawns spread over each camp), note = "..." (optional) }, set in
+--  Curated.lua from the real spawns. The GPS goes to the spawn nearest to you in the camp nearest to
+--  you (inside a camp counts as 0), picked again once you moved AREA_MOVE yards; within AREA_MARGIN
+--  yards of a camp you are "in the zone" (Writs/WorldPin.lua says so instead of a distance).
+--  Drawn on the maps by Writs/Patrol.lua (Zones), for the current step's objectives.
+-- =====================================================================
+local AREA_MOVE, AREA_MARGIN = 30, 25
+ns.AREA_MOVE, ns.AREA_MARGIN = AREA_MOVE, AREA_MARGIN
+
+-- The camps of an area: { { {x, y}, ... }, ... } (one hull or a list of hulls in the data).
+function ns.AreaPolys(a)
+  if type(a) ~= "table" or type(a.pts) ~= "table" or type(a.pts[1]) ~= "table" then return {} end
+  if type(a.pts[1][1]) == "number" then return { a.pts } end
+  return a.pts
+end
+
+-- The area of a route line (an objective whose point is on the area's map), or nil.
+function ns.AreaOf(n)
+  if type(n) ~= "table" or n.kind ~= "o" then return nil end
+  local o = n.oneObj or n.obj
+  local a = type(o) == "table" and o.area
+  if type(a) == "table" and a.m and type(n.loc) == "table" and n.loc.m == a.m then return a end
+  return nil
+end
+
+-- The area in world yards: { cont, polys = { { {wx, wy}, ... }, ... }, sp = { {wx, wy, camp, x, y}, ... } }.
+-- A map not readable yet is asked again later (nothing kept); camps on two continents: no area.
+local areaWorld = setmetatable({}, { __mode = "k" })
+local function AreaWorld(a)
+  local w = areaWorld[a]
+  if w ~= nil then return w or nil end
+  local polys, cont = {}, nil
+  for k, poly in ipairs(ns.AreaPolys(a)) do
+    local wp = {}
+    for _, p in ipairs(poly) do
+      local v = ns.World(a.m, p[1], p[2])
+      if not v then return nil end
+      if cont and v[1] ~= cont then areaWorld[a] = false; return nil end
+      cont = v[1]
+      wp[#wp + 1] = { v[2], v[3] }
+    end
+    polys[k] = wp
+  end
+  if not cont then return nil end
+  local sp = {}
+  for _, s in ipairs(a.sp or {}) do
+    local v = ns.World(a.m, s[1], s[2])
+    if v and v[1] == cont then sp[#sp + 1] = { v[2], v[3], s[3] or 1, s[1], s[2] } end
+  end
+  w = { cont = cont, polys = polys, sp = sp }
+  areaWorld[a] = w
+  return w
+end
+ns.AreaWorld = AreaWorld
+
+local function SegDist(px, py, ax, ay, bx, by)
+  local dx, dy = bx - ax, by - ay
+  local l2 = dx * dx + dy * dy
+  local t = l2 > 0 and math.max(0, math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) or 0
+  local ex, ey = ax + t * dx - px, ay + t * dy - py
+  return math.sqrt(ex * ex + ey * ey)
+end
+-- Distance from (x, y) to a camp (same units): 0 inside it, else to its edge (a camp of 1 or 2
+-- spawns: to them).
+local function PolyDist(poly, x, y)
+  local n = #poly
+  if n == 0 then return math.huge end
+  if n == 1 then return math.sqrt((poly[1][1] - x) ^ 2 + (poly[1][2] - y) ^ 2) end
+  if n >= 3 then
+    local inside, j = false, n
+    for i = 1, n do
+      local xi, yi, xj, yj = poly[i][1], poly[i][2], poly[j][1], poly[j][2]
+      if ((yi > y) ~= (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi) then inside = not inside end
+      j = i
+    end
+    if inside then return 0 end
+  end
+  local best = math.huge
+  for i = 1, n do
+    local a, b = poly[i], poly[i % n + 1]
+    local d = SegDist(x, y, a[1], a[2], b[1], b[2])
+    if d < best then best = d end
+  end
+  return best
+end
+ns.AreaPolyDist = PolyDist
+
+-- Yards from a world position ({cont, x, y}) to the area (0 inside a camp), and that camp's index;
+-- nil on another continent or when the map is not readable.
+function ns.AreaDist(a, here)
+  local w = AreaWorld(a)
+  if not (w and type(here) == "table" and here[1] == w.cont) then return nil end
+  local best, bk
+  for k, poly in ipairs(w.polys) do
+    local d = PolyDist(poly, here[2], here[3])
+    if not best or d < best then best, bk = d, k end
+  end
+  return best, bk
+end
+
+-- True when the world position stands in the area (within `margin` yards of a camp, AREA_MARGIN by default).
+function ns.AreaInside(a, here, margin)
+  local d = ns.AreaDist(a, here)
+  return d ~= nil and d <= (margin or AREA_MARGIN)
+end
+
+-- The spot the GPS goes to: the spawn nearest to `here` in the camp nearest to `here` -> m, x, y, camp
+-- (nil without a position on the area's continent). `prefer`: the camp picked before, kept until
+-- another camp is AREA_MOVE yards nearer (no flip-flop between two camps about as far).
+function ns.AreaPick(a, here, prefer)
+  local w = AreaWorld(a)
+  if not (w and type(here) == "table" and here[1] == w.cont) then return nil end
+  local campD = {}
+  for k, poly in ipairs(w.polys) do campD[k] = PolyDist(poly, here[2], here[3]) end
+  if prefer and campD[prefer] then campD[prefer] = math.max(0, campD[prefer] - AREA_MOVE) end
+  local best, bc, bd
+  for _, s in ipairs(w.sp) do
+    local c = campD[s[3]] or math.huge
+    local d = math.sqrt((s[1] - here[2]) ^ 2 + (s[2] - here[3]) ^ 2)
+    if not best or c < bc - 1e-6 or (math.abs(c - bc) <= 1e-6 and d < bd) then best, bc, bd = s, c, d end
+  end
+  if best then return a.m, best[4], best[5], best[3] end
+  -- no spawn listed: the nearest corner of the nearest camp
+  local polys, bk = ns.AreaPolys(a), nil
+  for k in ipairs(w.polys) do if not bk or campD[k] < campD[bk] then bk = k end end
+  local poly, wp = bk and polys[bk], bk and w.polys[bk]
+  if not (poly and wp) then return nil end
+  local bi
+  for i, p in ipairs(wp) do
+    local d = (p[1] - here[2]) ^ 2 + (p[2] - here[3]) ^ 2
+    if not bd or d < bd then bi, bd = i, d end
+  end
+  return a.m, poly[bi][1], poly[bi][2], bk
+end
+
+-- AreaPick with a memory: the same spot until you moved AREA_MOVE yards from where it was picked
+-- (here: a world position, else yours). -> m, x, y | nil (no position yet and nothing picked).
+local follow = setmetatable({}, { __mode = "k" })
+function ns.AreaFollow(a, here)
+  if type(a) ~= "table" then return nil end
+  if here == nil and ns.PlayerWorld then
+    local ok, h = pcall(ns.PlayerWorld)
+    here = ok and type(h) == "table" and h or nil
+  end
+  local c = follow[a]
+  if c and (not here or (c.here[1] == here[1] and Dist(c.here, here) <= AREA_MOVE)) then return c.m, c.x, c.y end
+  if not here then return nil end
+  local m, x, y, camp = ns.AreaPick(a, here, c and c.camp)
+  if not m then
+    if c then return c.m, c.x, c.y end
+    return nil
+  end
+  follow[a] = { here = { here[1], here[2], here[3] }, m = m, x = x, y = y, camp = camp }
+  return m, x, y
+end
+function ns.AreaFollowReset() for k in pairs(follow) do follow[k] = nil end end
+
+-- The area whose spot (a spawn of sp, or the objective's own point) is (m, x, y), or nil: what the
+-- in-world marker asks for the GPS's point.
+local areaList
+function ns.AreaAt(m, x, y)
+  if not (m and x and y) then return nil end
+  if not areaList then
+    areaList = {}
+    for _, q in pairs(ns.Q or {}) do
+      for _, o in ipairs(type(q) == "table" and q.o or {}) do
+        if type(o) == "table" and type(o.area) == "table" and o.area.m then areaList[#areaList + 1] = { o.area, o.w } end
+      end
+    end
+  end
+  local function near(px, py) return math.abs(px - x) <= 0.06 and math.abs(py - y) <= 0.06 end
+  for _, e in ipairs(areaList) do
+    local a, w = e[1], e[2]
+    if a.m == m then
+      if type(w) == "table" and w.x and w.y and near(w.x, w.y) then return a end
+      for _, s in ipairs(a.sp or {}) do if near(s[1], s[2]) then return a end end
+    end
+  end
+  return nil
 end

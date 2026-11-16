@@ -1142,6 +1142,12 @@ pcall(blocked.RegisterEvent, blocked, "ADDON_ACTION_FORBIDDEN")
 local blockedSaid = {}
 blocked:SetScript("OnEvent", function(_, _, addon, func)
     if addon ~= ADDON then return end
+    -- a quest share (QuestLogPushQuest after selecting the quest) blocked in combat comes as
+    -- "UNKNOWN()" on the French client: ours, and the shares now wait for the end of combat, so
+    -- no "/wlh idee" line and nothing for the bug form when a push went out in the last 2 s
+    local fname = tostring(func)
+    if (fname == "UNKNOWN()" or fname == "UNKNOWN") and root.sharePushAt and GetTime
+        and GetTime() - root.sharePushAt <= 2 then return end
     local combat = InCombatLockdown and InCombatLockdown() or false
     local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
     if WLWritsDB then

@@ -527,7 +527,8 @@ local function BuildStatic()
     end
 end
 -- For the tests: the places are read again (another faction or class).
-function GoTo._Reset() static = nil; guideNames = {} end
+local mastersOf = {}       -- [continent] = the flight masters of your side (GoTo.FlightMasters)
+function GoTo._Reset() static = nil; guideNames = {}; mastersOf = {} end
 
 -- ---------------------------------------------------------------- nearest spawn and service
 
@@ -668,6 +669,31 @@ local function NpcDetail(sub, map)
     local what = sub and (zone and string.format(L("%s, %s"), sub, zone) or sub) or (zone or "?")
     return string.format(L("PNJ · %s"), what)
 end
+-- The flight masters open to your side on a continent, from LibForeverData (Route.lua's guess on a
+-- continent whose flight paths are unknown, when the client lists no master there): { cont, wx, wy,
+-- map, x, y, zoneMap, name = "Gorkas, The Hinterlands" }. Empty without the library or its index; kept
+-- once found (mastersOf, emptied by GoTo._Reset).
+function GoTo.FlightMasters(cont)
+    if mastersOf[cont] then return mastersOf[cont] end
+    local lib = Lib()
+    local svc = SERVICE.flight
+    if not (lib and svc) then return {} end
+    local out = {}
+    for _, p in ipairs(ServicePoints(svc)) do
+        if not p.taxi and p.cont == cont then
+            local m, x, y = Safe(lib.ToUiMap, p.cont, p.wx, p.wy)
+            if Num(m) and Num(x) and Num(y) then
+                local zone = WP.ZoneName and WP.ZoneName(m)
+                if zone == tostring(m) or zone == "?" then zone = nil end
+                local name = p.who and zone and string.format(L("%s, %s"), p.who, zone) or p.who or zone or "?"
+                out[#out + 1] = { kind = "taxi", cont = p.cont, wx = p.wx, wy = p.wy, map = m, x = x, y = y, zoneMap = m, name = name }
+            end
+        end
+    end
+    if #out > 0 then mastersOf[cont] = out end
+    return out
+end
+
 GoTo.ResolveService = function(key) local s = SERVICE[key]; return s and ResolveService(s, Here()) end
 
 -- ---------------------------------------------------------------- search
@@ -982,7 +1008,7 @@ local function RowTip(row)
     if not r then return nil end
     local t = { r.label }
     if r.detail and r.detail ~= "" then t[#t + 1] = r.detail end
-    -- the way there, worked out only on hover: "Pierre de foyer → vol jusqu'à Kargath → 300 m à pied"
+    -- the way there, worked out only on hover: "Pierre de foyer > vol jusqu'à Kargath > 300 m à pied"
     local m, x, y = Num(r.map), Num(r.x), Num(r.y)
     local p = m and x and y and GPS.Point and GPS.Point(m, x, y)
     if p and GPS.FindPath and GPS.ItinerarySummary then

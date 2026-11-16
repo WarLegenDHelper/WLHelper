@@ -271,6 +271,13 @@ local function Big(n)
 end
 ns.BigNumber = Big
 local function SetOn(b, on) if on then b:Enable() else b:Disable() end end
+-- a row's « Partager »: « Après le combat », greyed, in combat (the game blocks the share)
+local function ShareRowState(b)
+  local combat = ns.ShareInCombat and ns.ShareInCombat() or false
+  b:SetText(combat and L.SHARE_AFTER or L.SUM_SHARE)
+  if b.SetDisabledReason then b:SetDisabledReason(combat and L.SHARE_AFTER_TT or nil) end
+  SetOn(b, not combat)
+end
 local function Lib()
   local lib = _G.LibForeverData
   return (type(lib) == "table" and type(lib.Get) == "function") and lib or nil
@@ -656,7 +663,8 @@ local function UpInfo(rw, lvl)
   if res.up and not res.text then
     if res.empty then res.text = L.SUM_UP_EMPTY
     else
-      local p = math.floor(res.pct + 0.5)
+      -- capped at +999 % (a worn item read without its stats once gave +1128 %)
+      local p = math.min(999, math.floor(res.pct + 0.5))
       res.text = L.SUM_UP_PCT:format(p)
       if p > LABEL_MAX then res.short = L.SUM_UP_PCT:format(LABEL_MAX) end
     end
@@ -739,26 +747,153 @@ local function AtCap()
   end
   return Level() >= maxL
 end
--- XP the player really gets for a quest at level plvl (vanilla rule): full up to 5 levels above
--- the quest, then 80/60/40/20 %, then 10 %; rounded like the server. 0 at the level cap.
--- If the Forever server differs on a grey quest, only XP_CUT and RoundXP change.
-local XP_CUT = { [6] = 0.8, [7] = 0.6, [8] = 0.4, [9] = 0.2 }
+-- XP the player really gets for a quest at level plvl; 0 at the level cap. In this order:
+--  1. the game's own figure: the quest log's reward (GetQuestLogRewardXP) for a quest in the log,
+--     the quest frame's (GetRewardXP) when talking to its NPC; kept per quest and player level;
+--  2. the share learned from those figures at the same level gap (player level - quest level):
+--     WLWritsDB.xpCurve[gap] = the last CURVE_N { q = quest, r = real / data XP }, their median;
+--  3. Forever's rule (the one Polestar's Levels.Share uses, from players' recordings; seen in game:
+--     quest 1429, level 44, 3 750 XP, pays 1 900 XP at level 55): full up to 5 levels above the
+--     quest, 80 % at 6, 60 % at 7, half from 8 on (not vanilla's 40/20/10 %); rounded like the server.
+local XP_CUT, XP_FLOOR = { [6] = 0.8, [7] = 0.6 }, 0.5
+local CURVE_N = 9                    -- quests kept per level gap
+local GAP_MIN, GAP_MAX = -5, 59      -- the gaps learned
 local function RoundXP(x)
   local step = x <= 100 and 5 or x <= 500 and 10 or x <= 1000 and 25 or 50
   return math.floor(x / step + 0.5) * step
 end
--- returns got, base, diff (player level minus quest level)
-local function XPFor(qid, plvl)
-  local base = QuestXP(qid)
-  if base <= 0 or AtCap() then return 0, base, 0 end
+local xpSeen = {}   -- [qid] = { lvl = player level, xp = the game's figure at that level }
+local xpMiss = {}   -- [qid] = log change and level when the log had no figure (one API call per log change)
+local logGen = 0
+-- the median share learned at a gap and how many quests it rests on (at most CURVE_N to sort)
+local function LearnedShare(d)
+  local c = type(WLWritsDB) == "table" and type(WLWritsDB.xpCurve) == "table" and WLWritsDB.xpCurve
+  if not c then return nil, 0 end
+  local t = c[d]
+  local r = {}
+  if type(t) == "table" then
+    for _, e in ipairs(t) do
+      local v = type(e) == "table" and num(e.r)
+      if v and v >= 0.05 and v <= 2 then r[#r + 1] = v end
+    end
+  end
+  local share
+  if #r > 0 then
+    table.sort(r)
+    local m = math.floor((#r + 1) / 2)
+    share = (#r % 2 == 1) and r[m] or (r[m] + r[m + 1]) / 2
+  end
+  return share, #r
+end
+
+-- one figure from the game: remembered for the quest, and its share for the level gap
+local function LearnXP(qid, real, plvl)
+  qid, real, plvl = num(qid), num(real), num(plvl)
+  if not (qid and real and plvl and qid > 0 and real > 0) then return end
+  local prev = xpSeen[qid]
+  if prev and prev.lvl == plvl and prev.xp == real then return end
+  xpSeen[qid] = { lvl = plvl, xp = real }
   local q = ns.Q[qid]
   local ql = q and num(q.l)
-  if not ql then return base, base, 0 end
-  local d = (plvl or Level()) - ql
-  if d <= 5 then return base, base, d end
-  return RoundXP(base * (XP_CUT[d] or 0.1)), base, d
+  local base = QuestXP(qid)
+  if not ql or base <= 0 then return end
+  local d = plvl - ql
+  if d < GAP_MIN or d > GAP_MAX then return end
+  local r = real / base
+  if r < 0.05 or r > 2 then return end          -- not this quest's figure
+  if type(WLWritsDB) ~= "table" then return end
+  local c = WLWritsDB.xpCurve
+  if type(c) ~= "table" then c = {}; WLWritsDB.xpCurve = c end
+  local t = type(c[d]) == "table" and c[d] or {}
+  for i = #t, 1, -1 do
+    if type(t[i]) ~= "table" or t[i].q == qid then table.remove(t, i) end
+  end
+  t[#t + 1] = { q = qid, r = math.floor(r * 1000 + 0.5) / 1000 }
+  while #t > CURVE_N do table.remove(t, 1) end
+  c[d] = t
+end
+ns.QuestXPLearn = LearnXP
+
+local function InLog(qid)
+  local f = C_QuestLog and C_QuestLog.GetLogIndexForQuestID or GetQuestLogIndexByID
+  if type(f) ~= "function" then return false end
+  local ok, i = pcall(f, qid)
+  i = ok and num(i)
+  return i and i > 0 or false
+end
+-- the quest log's reward for a quest in the log (Forever's client takes the quest id)
+local function LogRewardXP(qid)
+  local f = (C_QuestLog and C_QuestLog.GetQuestLogRewardXP) or GetQuestLogRewardXP
+  if type(f) ~= "function" or not InLog(qid) then return nil end
+  local ok, v = pcall(f, qid)
+  v = ok and num(v)
+  return v and v > 0 and v or nil
+end
+local function GameXP(qid, plvl)
+  local seen = xpSeen[qid]
+  if seen and seen.lvl == plvl then return seen.xp end
+  local key = logGen * 1000 + plvl
+  if plvl ~= Level() or xpMiss[qid] == key then return nil end
+  local v = LogRewardXP(qid)
+  if v then LearnXP(qid, v, plvl) else xpMiss[qid] = key end
+  return v
+end
+
+-- returns got, base, diff (player level minus quest level), source ("game", "learned", "rule")
+local function XPFor(qid, plvl)
+  local base = QuestXP(qid)
+  if base <= 0 or AtCap() then return 0, base, 0, "rule" end
+  plvl = num(plvl) or Level()
+  local real = GameXP(qid, plvl)
+  local q = ns.Q[qid]
+  local ql = q and num(q.l)
+  if not ql then return real or base, base, 0, real and "game" or "rule" end
+  local d = plvl - ql
+  if real then return real, base, d, "game" end
+  local rule = d <= 5 and 1 or (XP_CUT[d] or XP_FLOOR)
+  local share, n = LearnedShare(d)
+  -- fewer than 3 quests at this gap: only trusted near the rule, so one odd figure cannot skew it
+  if share and n < 3 and math.abs(share - rule) > 0.15 then share = nil end
+  if share and (d > 5 or share < 0.97) then return RoundXP(base * share), base, d, "learned" end
+  if d <= 5 then return base, base, d, "rule" end
+  return RoundXP(base * rule), base, d, "rule"
 end
 ns.QuestXPFor = XPFor
+
+-- the game's figures, as they show: the quest frame (offer, turn-in) and the quest log
+do
+  local ev = CreateFrame and CreateFrame("Frame")
+  if ev then
+    for _, e in ipairs({ "QUEST_DETAIL", "QUEST_COMPLETE", "QUEST_LOG_UPDATE" }) do pcall(ev.RegisterEvent, ev, e) end
+    local lastScan
+    ev:SetScript("OnEvent", function(_, e)
+      pcall(function()
+        if e == "QUEST_DETAIL" or e == "QUEST_COMPLETE" then
+          if not (GetQuestID and GetRewardXP) then return end
+          local ok1, qid = pcall(GetQuestID)
+          local ok2, xp = pcall(GetRewardXP)
+          if ok1 and ok2 and ns.Q[num(qid) or 0] then LearnXP(qid, xp, Level()) end
+        elseif e == "QUEST_LOG_UPDATE" then
+          logGen = logGen + 1
+          if type(GetQuestLogTitle) ~= "function" or type(GetNumQuestLogEntries) ~= "function" or AtCap() then return end
+          local now = GetTime and GetTime() or 0
+          if lastScan and now - lastScan < 5 then return end
+          lastScan = now
+          local n = GetNumQuestLogEntries() or 0
+          local lvl = Level()
+          for i = 1, n do
+            local _, _, _, header, _, _, _, qid = GetQuestLogTitle(i)
+            qid = num(qid)
+            if not header and qid and ns.Q[qid] then
+              local v = LogRewardXP(qid)
+              if v then LearnXP(qid, v, lvl) end
+            end
+          end
+        end
+      end)
+    end)
+  end
+end
 
 -- Difficulty band of a quest level for the player: "red", "orange", "yellow", "green", "grey".
 -- The game's own colour table first (GetQuestDifficultyColor returns one of its entries), else
@@ -1719,6 +1854,7 @@ local function FillRow(r, qid, dkey, inf, ctx, width)
     ax = ax - 24 - 4
   else r.gps:Hide() end
   if r.shareId and need then
+    ShareRowState(r.share)
     local sw = num(r.share:GetWidth()) or 0
     if sw < 40 then sw = 70 end
     r.share:ClearAllPoints(); r.share:SetPoint("TOPRIGHT", r, "TOPLEFT", ax, -lineY); r.share:Show()
@@ -2114,8 +2250,11 @@ local function DrawGroup(gp, g, members, ctx)
   local y = 0
   -- the header line: what blocks most, "Check" at the right
   local busy = (f.checking or ns.pushBusy) and true or false
-  gp.check:SetText(busy and L.SUM_G_CHECKING or L.SUM_G_CHECK)
-  SetOn(gp.check, not busy)
+  -- in combat the game blocks the share: « Après le combat », greyed
+  local combat = ns.ShareInCombat and ns.ShareInCombat() or false
+  gp.check:SetText(combat and L.SHARE_AFTER or (busy and L.SUM_G_CHECKING or L.SUM_G_CHECK))
+  if gp.check.SetDisabledReason then gp.check:SetDisabledReason(combat and L.SHARE_AFTER_TT or nil) end
+  SetOn(gp.check, not busy and not combat)
   local bw = num(gp.check:GetWidth()) or 0
   if bw < 40 then bw = 90 end
   gp.block:SetText(g.text)
@@ -2202,6 +2341,7 @@ local function DrawGroup(gp, g, members, ctx)
     end
     r.shareId, r.shareWho = shareId, who
     if shareId and #who > 0 then
+      ShareRowState(r.share)
       local hw = ns.TextWidth and num(ns.TextWidth(r.have)) or 60
       r.share:ClearAllPoints(); r.share:SetPoint("TOPLEFT", r, "TOPLEFT", 12 + (hw or 60) + 8, -lineY); r.share:Show()
     else r.share:Hide() end
@@ -2375,7 +2515,8 @@ local function Build()
   -- the summary follows the quest log, the level and the bags while it is open
   local ev = CreateFrame("Frame", nil, f)
   f.events = ev
-  for _, e in ipairs({ "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "PLAYER_LEVEL_UP", "BAG_UPDATE_DELAYED", "GET_ITEM_INFO_RECEIVED", "GROUP_ROSTER_UPDATE" }) do
+  for _, e in ipairs({ "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "PLAYER_LEVEL_UP", "BAG_UPDATE_DELAYED", "GET_ITEM_INFO_RECEIVED", "GROUP_ROSTER_UPDATE",
+      "PLAYER_EQUIPMENT_CHANGED" }) do   -- what you wear changes every gain
     pcall(ev.RegisterEvent, ev, e)
   end
   local queued = false
@@ -2965,8 +3106,13 @@ Render = function()
   else f.closeBtn:SetPoint("RIGHT", f.bar, "RIGHT", 0, 0) end
   f.shareAll:SetShown(ctx.grouped and nTodo > 0)
   if f.shareAll:IsShown() then
-    if not ns.pushBusy then f.shareAll:SetText(L.SUM_SHARE_ALL) end
-    SetOn(f.shareAll, #shareList > 0 and not ns.pushBusy)
+    -- in combat the game blocks the share: « Après le combat », greyed
+    local combat = ns.ShareInCombat and ns.ShareInCombat() or false
+    if combat then f.shareAll:SetText(L.SHARE_AFTER)
+    elseif not ns.pushBusy then f.shareAll:SetText(L.SUM_SHARE_ALL)
+    else f.shareAll:SetText(L.SUM_SHARING) end
+    f.shareAll:SetDisabledReason(combat and L.SHARE_AFTER_TT or L.SUM_SHARE_WHY)
+    SetOn(f.shareAll, #shareList > 0 and not ns.pushBusy and not combat)
   end
 
   -- in a group: the tabs, "Group · 2 to sort out"; the Group tab draws its table instead of the list
