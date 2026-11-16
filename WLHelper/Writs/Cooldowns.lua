@@ -127,17 +127,8 @@ local function ItemCount(id, bank)
     if ok and not Secret(n) and type(n) == "number" then return n end
     return 0
 end
-local function Knows(id)
-    if IsPlayerSpell then
-        local ok, v = pcall(IsPlayerSpell, id)
-        if ok and not Secret(v) and v then return true end
-    end
-    if IsSpellKnown then
-        local ok, v = pcall(IsSpellKnown, id)
-        if ok and not Secret(v) and v then return true end
-    end
-    return false
-end
+-- C_SpellBook first, then the old globals (Writs/Locale.lua)
+local function Knows(id) return ns.SpellKnown(id) end
 
 -- the recipes of the open profession window (no TRADE_SKILL_UPDATE on Forever: read on
 -- TRADE_SKILL_SHOW). { [spell] = seconds left, or true when only known }.

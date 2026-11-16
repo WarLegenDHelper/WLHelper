@@ -299,12 +299,21 @@ local function ClassTrainerOpen(n)
             if tr and tr[3] == npc then return true end
         end
     end
-    if type(GetTrainerServiceSkillLine) ~= "function" or type(GetSpellTabInfo) ~= "function" then return true end
+    -- the spellbook's tabs: C_SpellBook's skill lines first (Forever may lack GetSpellTabInfo)
+    local SB = C_SpellBook
+    local modern = SB and type(SB.GetSpellBookSkillLineInfo) == "function"
+    if type(GetTrainerServiceSkillLine) ~= "function" or not (modern or type(GetSpellTabInfo) == "function") then return true end
     local tabs, anyTab = {}, false
-    local nt = num(safe(GetNumSpellTabs)) or 4
+    local nt = num(safe(modern and SB.GetNumSpellBookSkillLines or GetNumSpellTabs)) or 4
     -- tab 1 is "General" (shared by everyone): the class tabs follow
     for i = 2, math.min(nt, 8) do
-        local name = str((safe(GetSpellTabInfo, i)))
+        local name
+        if modern then
+            local info = safe(SB.GetSpellBookSkillLineInfo, i)
+            name = type(info) == "table" and str(info.name) or nil
+        else
+            name = str((safe(GetSpellTabInfo, i)))
+        end
         if name and name ~= "" then tabs[name] = true; anyTab = true end
     end
     if not anyTab then return true end

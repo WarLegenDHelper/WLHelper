@@ -261,3 +261,20 @@ function ns.L(s)
     if English() then return EN[s] or s end
     return s
 end
+
+-- Is this spell known? Forever's client may lack IsPlayerSpell and IsSpellKnown: C_SpellBook first,
+-- then the old globals (any of them saying yes is enough; AltClick.lua reads it the same way).
+local function Secret(v) return issecretvalue ~= nil and issecretvalue(v) end
+function ns.SpellKnown(id)
+    if id == nil then return false end
+    local SB = C_SpellBook
+    for _, f in ipairs({ SB and SB.IsSpellKnown or false, IsPlayerSpell or false, IsSpellKnown or false }) do
+        if type(f) == "function" then
+            local ok, v = pcall(f, id)
+            if ok and not Secret(v) and v then return true end
+        end
+    end
+    return false
+end
+-- the root's item lookups (Locale.lua), for the Writs files
+ns.ItemInfo, ns.ItemCount, ns.ItemIcon, ns.IsEquipped = root.ItemInfo, root.ItemCount, root.ItemIcon, root.IsEquipped

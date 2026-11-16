@@ -375,12 +375,8 @@ local function SpellCooldownReady(id)
     return not onCD
 end
 
-local function SpellKnown(id)
-    local ok, known = pcall(function()
-        return (IsPlayerSpell and IsPlayerSpell(id)) or (IsSpellKnown and IsSpellKnown(id))
-    end)
-    return ok and known and not IsSecret(known) and true or false
-end
+-- C_SpellBook first, then the old globals (Writs/Locale.lua)
+local function SpellKnown(id) return ns.SpellKnown(id) end
 
 local function SpellReady(id)
     if not SpellKnown(id) then return false end

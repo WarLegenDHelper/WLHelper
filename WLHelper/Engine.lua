@@ -1807,10 +1807,7 @@ end
 local function OwnsItem(id)
   if not id then return false end
   local function plain(v) return not (issecretvalue and issecretvalue(v)) end
-  if IsEquippedItem then
-    local ok, eq = pcall(IsEquippedItem, id)
-    if ok and plain(eq) and eq then return true end
-  end
+  if ns.IsEquipped(id) then return true end
   local count = (C_Item and C_Item.GetItemCount) or GetItemCount
   if count then
     local ok, n = pcall(count, id, true)
@@ -1829,8 +1826,8 @@ function ns.BossStepLoot(st)
   local WP = ns.Writs and ns.Writs.WP
   for _, it in ipairs(list) do
     local name, link, icon = it.name, nil, nil
-    if GetItemInfo and it.id then
-      local ok, n2, l2, _, _, _, _, _, _, _, tex = pcall(GetItemInfo, it.id)
+    if it.id then
+      local ok, n2, l2, _, _, _, _, _, _, _, tex = pcall(ns.ItemInfo, it.id)
       if ok then
         if type(n2) == "string" and not (issecretvalue and issecretvalue(n2)) then name = n2 end
         if type(l2) == "string" and not (issecretvalue and issecretvalue(l2)) then link = l2 end

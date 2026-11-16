@@ -592,3 +592,45 @@ function ns.SetLang(l)
   ns.lang = l
   if WLDTDB then WLDTDB.lang = l end
 end
+
+-- ---------------------------------------------------------------- item lookups
+-- Forever's client may lack the old item globals (GetItemInfo, GetItemCount, GetItemIcon,
+-- IsEquippedItem): C_Item first, the old global as the fallback. Each returns what the old global
+-- did (ns.ItemInfo: GetItemInfo's values, nil while the item is not cached).
+local function Secret(v) return issecretvalue ~= nil and issecretvalue(v) end
+local function Pack(...) return { n = select("#", ...), ... } end
+local function Try(f, ...)
+  if type(f) ~= "function" then return nil end
+  local r = Pack(pcall(f, ...))
+  -- a secret first value is still an answer (no comparison on it); the callers drop it
+  if r[1] and (Secret(r[2]) or r[2] ~= nil) then return r end
+end
+function ns.ItemInfo(item)
+  if item == nil then return nil end
+  local r = Try(C_Item and C_Item.GetItemInfo, item) or Try(GetItemInfo, item)
+  if r then return unpack(r, 2, r.n) end
+end
+function ns.ItemCount(item, bank)
+  if item == nil then return 0 end
+  for _, f in ipairs({ C_Item and C_Item.GetItemCount or false, GetItemCount or false }) do
+    local r = f and Try(f, item, bank and true or false)
+    local n = r and r[2]
+    if type(n) == "number" and not Secret(n) then return n end
+  end
+  return 0
+end
+function ns.ItemIcon(item)
+  if item == nil then return nil end
+  local r = Try(C_Item and C_Item.GetItemIconByID, item) or Try(GetItemIcon, item)
+  if r and not Secret(r[2]) then return r[2] end
+  r = Try(C_Item and C_Item.GetItemInfoInstant, item) or Try(GetItemInfoInstant, item)
+  if r and r[6] ~= nil and not Secret(r[6]) then return r[6] end
+end
+function ns.IsEquipped(item)
+  if item == nil then return false end
+  for _, f in ipairs({ C_Item and C_Item.IsEquippedItem or false, IsEquippedItem or false }) do
+    local r = f and Try(f, item)
+    if r and not Secret(r[2]) and r[2] then return true end
+  end
+  return false
+end

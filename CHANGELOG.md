@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.90] — 2026-11-16
+
+### Corrigé / Fixed
+- **Sorts appris reconnus sur Forever** : le GPS propose de nouveau tes sorts de voyage (téléports, Rappel astral), les recharges de métier sont suivies, et le tir automatique du chasseur est bien utilisé.
+  *Known spells detected on Forever: travel spells, profession cooldowns, hunter Auto Shot.*
+- **Clés de donjon** : la clé a son nom en jeu, son icône, et « possédée » quand elle est dans tes sacs.
+  *Dungeon keys show their name, icon and "owned" again.*
+- **Butin des boss et récompenses** : nom, lien et icône des objets s'affichent de nouveau ; les icônes des étapes « objet » aussi.
+  *Boss loot and reward items show name, link and icon again.*
+- **Invitation en Alt-clic** : ne peut plus provoquer d'erreur selon le réglage « action à l'appui ».
+  *Alt-click invite no longer errors.*
+
 ## [1.0.0-beta.89] — 2026-11-16
 
 ### Corrigé / Fixed

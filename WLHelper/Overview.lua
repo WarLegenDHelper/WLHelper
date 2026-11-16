@@ -392,8 +392,7 @@ local function GearRewards(qid)
   return nil
 end
 local function CachedName(id)
-  if not GetItemInfo then return nil end
-  local ok, n = pcall(GetItemInfo, id)
+  local ok, n = pcall(ns.ItemInfo, id)
   return ok and type(n) == "string" and not secret(n) and n or nil
 end
 local function Loose(s) return (s:lower():gsub("[%p%s]", "")) end
@@ -546,8 +545,8 @@ local function ItemInfo(rw)
       end
     end
   end
-  if GetItemInfo and key then
-    local ok, _, l, qu, _, _, _, _, _, _, tex = pcall(GetItemInfo, key)
+  if key then
+    local ok, _, l, qu, _, _, _, _, _, _, tex = pcall(ns.ItemInfo, key)
     if ok then link = type(l) == "string" and not secret(l) and l or nil; quality = num(qu); icon = icon or tex end
   end
   if not quality and rw.id and C_Item and C_Item.GetItemQualityByID then

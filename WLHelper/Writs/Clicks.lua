@@ -160,7 +160,9 @@ inviteButton:SetScript("PreClick", function(self, _, down)
         return
     end
     self:SetAttribute("type", nil)
-    if down ~= GetCVarBool("ActionButtonUseKeyDown") then return end
+    local cvarBool = (C_CVar and C_CVar.GetCVarBool) or GetCVarBool
+    local keyDown = cvarBool and cvarBool("ActionButtonUseKeyDown") and true or false
+    if down ~= keyDown then return end
     if UnitIsUnit("mouseover", "player") then return end
     Invite(GetUnitName("mouseover", true))
 end)
@@ -204,7 +206,7 @@ local function ShotSpell()
     local _, _, _, _, _, classID, subID = GetInfo(link)
     local spell = classID == 2 and SHOT_BY_WEAPON[subID]
     -- hunters without Auto Shot learned yet, or another class with a bow: the weapon's own shot
-    local known = (IsPlayerSpell and IsPlayerSpell(75)) or (IsSpellKnown and IsSpellKnown(75))
+    local known = ns.SpellKnown(75)
     if spell == 75 and not known then
         spell = ({ [SUB.Bows or 2] = 2480, [SUB.Guns or 3] = 7918, [SUB.Crossbow or 18] = 7919 })[subID]
     end

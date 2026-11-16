@@ -793,7 +793,7 @@ local function SetKindIcon(tex, nd)
   if nd.kind == "i" then
     local id = nd.items and nd.items[1]
     tex:SetVertexColor(1, 1, 1)
-    SetIcon(tex, nil, (id and GetItemIcon and GetItemIcon(id)) or "Interface\\Icons\\INV_Misc_Bag_10", true)
+    SetIcon(tex, nil, (id and ns.ItemIcon(id)) or "Interface\\Icons\\INV_Misc_Bag_10", true)
     return true
   end
   if not KICON[nd.kind] then return false end

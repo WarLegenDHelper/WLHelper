@@ -2,6 +2,12 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.90", date = "2026-11-16", items = {
+    { s = "fix", fr = { "Sorts appris reconnus sur Forever", "Le GPS propose de nouveau tes sorts de voyage (téléports, Rappel astral), les recharges de métier sont suivies, et le tir automatique du chasseur est bien utilisé." }, en = { "Known spells detected on Forever", "Travel spells, profession cooldowns, hunter Auto Shot." } },
+    { s = "fix", fr = { "Clés de donjon", "La clé a son nom en jeu, son icône, et « possédée » quand elle est dans tes sacs." }, en = { "Dungeon keys show their name, icon and \"owned\" again.", "" } },
+    { s = "fix", fr = { "Butin des boss et récompenses", "Nom, lien et icône des objets s'affichent de nouveau ; les icônes des étapes « objet » aussi." }, en = { "Boss loot and reward items show name, link and icon again.", "" } },
+    { s = "fix", fr = { "Invitation en Alt-clic", "Ne peut plus provoquer d'erreur selon le réglage « action à l'appui »." }, en = { "Alt-click invite no longer errors.", "" } },
+  } },
   { v = "1.0.0-beta.89", date = "2026-11-16", items = {
     { s = "fix", fr = { "Talents dans le score d'équipement", "WL Helper Gear lit maintenant les talents sur Forever (le système de talents du client) : ta spé est détectée toute seule et les talents comme Cœur sauvage ou Instinct naturel changent les poids." }, en = { "Gear now reads talents on Forever", "Spec detected, talent modifiers applied." } },
     { s = "fix", fr = { "Quêtes de métier", "Elles sont de nouveau masquées pour les personnages qui n'ont pas le métier, avec le filtre « quêtes utiles »." }, en = { "Profession quests hidden again for characters without the profession.", "" } },
@@ -116,8 +122,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.76", date = "2026-11-16", items = {
     { s = "fix", fr = { "« Le jeu a bloqué SetRaidTarget() »", "La macro « DG_Cible » créée par une ancienne version gardait sa ligne de marque de raid ; elle est nettoyée à la connexion et ne fait plus que cibler." }, en = { "The old \"DG_Cible\" macro is cleaned at login", "Targeting only, no more blocked marker error." } },
-  } },
-  { v = "1.0.0-beta.75", date = "2026-11-16", items = {
-    { s = "fix", fr = { "Le guide se fermait encore après un téléport", "Le jeu ferme ses fenêtres avant que l'addon regarde si le guide était ouvert. Le moment de la fermeture est maintenant retenu : un guide ouvert revient après un téléport, un portail ou un /reload." }, en = { "The guide no longer closes after a teleport, a portal or a /reload.", "" } },
   } },
 }

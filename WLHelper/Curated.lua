@@ -154,8 +154,9 @@ end
 function ns.KeyLines(dkey, bare)
   local out = {}
   for _, k in ipairs(KEYS[dkey] or {}) do
-    local name = (GetItemInfo and GetItemInfo(k.item)) or k.name
-    local have = (GetItemCount and GetItemCount(k.item) or 0) > 0 or (k.quest and ns.IsDone(k.quest))
+    local name = ns.ItemInfo(k.item)
+    if type(name) ~= "string" or (issecretvalue and issecretvalue(name)) then name = k.name end
+    local have = ns.ItemCount(k.item) > 0 or (k.quest and ns.IsDone(k.quest))
     local how
     if k.quest then how = ns.L.KEY_QUEST:format(ns.QName(k.quest))
     elseif k.boss then how = ns.L.KEY_BOSS:format(BossName(k.boss, k.bossn), k.src and ns.DName(k.src) or "") end
@@ -163,7 +164,7 @@ function ns.KeyLines(dkey, bare)
     local Tk = ns.T_
     local txt = ((bare and not k.opt) and "" or (label .. ns.L.COLON)) .. name .. " · " .. (have and (ns.Hex(Tk.ok) .. ns.L.KEY_HAVE .. "|r") or (ns.Hex(Tk.warn) .. ns.L.KEY_MISSING .. "|r"))
     -- the key's own icon from the game, to spot it in the bags
-    local ic = GetItemIcon and GetItemIcon(k.item)
+    local ic = ns.ItemIcon(k.item)
     if ic then txt = ("|T%s:14:14:0:0:64:64:5:59:5:59|t "):format(tostring(ic)) .. txt end
     if not have and how then txt = txt .. "\n   " .. ns.Hex(Tk.muted) .. how .. "|r" end
     table.insert(out, { txt, have, k.opt == nil })
