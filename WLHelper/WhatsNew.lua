@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.75", date = "2026-11-16", items = {
+    { s = "fix", fr = { "Le guide se fermait encore après un téléport", "Le jeu ferme ses fenêtres avant que l'addon regarde si le guide était ouvert. Le moment de la fermeture est maintenant retenu : un guide ouvert revient après un téléport, un portail ou un /reload." }, en = { "The guide no longer closes after a teleport, a portal or a /reload.", "" } },
+  } },
   { v = "1.0.0-beta.74", date = "2026-11-16", items = {
     { s = "add", fr = { "Fenêtre WL Helper façon Naowh", "Une seule fenêtre avec, à gauche, une recherche et les activités (Quêtes & donjons, Objets & métiers, Guilde & groupes, Voyage) et leurs réglages ; à droite, l'accueil en deux colonnes. La minimap, /wlh et les boutons retour l'ouvrent sur la bonne page." }, en = { "WL Helper hub like Naowh", "One window, sidebar grouped by activity with search, Home in two columns, settings next to each activity." } },
     { s = "add", fr = { "Chemin à pied comme Polestar", "La flèche suit le vrai chemin, virage après virage, pour toutes les destinations ; la distance est celle qu'il reste à marcher ; des points sur la carte du monde et la minimap, une épingle sur l'endroit exact." }, en = { "Walking path like Polestar for every destination, drawn on the map and minimap.", "" } },
@@ -85,8 +88,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.61", date = "2026-11-15", items = {
     { s = "chg", fr = { "Le petit suivi est désactivé par défaut", "Le guide et son bouton « – » (mode réduit) suffisent. Pour le retrouver : /wlh suivi." }, en = { "The small tracker is now opt-in (/wlh suivi).", "" } },
-  } },
-  { v = "1.0.0-beta.60", date = "2026-11-15", items = {
-    { s = "fix", fr = { "« Me guider dans le donjon »", "Le choix des donjons se ferme et le résumé s'ouvre à sa place (il restait ouvert par-dessus)." }, en = { "The dungeon picker closes when the summary opens.", "" } },
   } },
 }

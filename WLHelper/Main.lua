@@ -186,14 +186,36 @@ pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED")
 -- guide with them: that hide is not the player's choice. Whether the guide was open is noted when
 -- the world is left, the hide during the loading screen does not count as "closed", and the guide
 -- comes back once the new world is there.
+-- The game closes its special windows in its own PLAYER_LEAVING_WORLD handler, which runs before
+-- ours: when we look, the guide is already hidden. So every hide is timed, and a hide in the same
+-- moment as the world being left counts as "was open".
+local lastHide, hooked = nil, false
+local function Now() return (GetTime and GetTime()) or 0 end
+local function HookHide()
+  local f = ns.frame
+  if hooked or not (f and f.HookScript) then return end
+  hooked = true
+  f:HookScript("OnHide", function() lastHide = Now() end)
+end
 local loading = CreateFrame("Frame")
+pcall(loading.RegisterEvent, loading, "PLAYER_LOGIN")
 pcall(loading.RegisterEvent, loading, "PLAYER_LEAVING_WORLD")
 pcall(loading.RegisterEvent, loading, "PLAYER_ENTERING_WORLD")
 loading:SetScript("OnEvent", function(_, e)
   local f = ns.frame
+  if e == "PLAYER_LOGIN" then
+    C_Timer.After(0, HookHide)
+    return
+  end
+  HookHide()
   if e == "PLAYER_LEAVING_WORLD" then
-    ns.openAtLeave = (f and f:IsShown()) and true or false
-    if ns.openAtLeave then ns.quietHide = true end
+    local justClosed = lastHide and (Now() - lastHide) < 1
+    ns.openAtLeave = ((f and f:IsShown()) or justClosed) and true or false
+    if ns.openAtLeave then
+      ns.quietHide = true
+      -- the hide already saved "closed": not the player's doing (a /reload must find it open too)
+      if WLDTDB then WLDTDB.hidden = false end
+    end
   elseif ns.openAtLeave ~= nil then
     local wasOpen = ns.openAtLeave
     ns.openAtLeave = nil

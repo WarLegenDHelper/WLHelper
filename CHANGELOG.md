@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.75] — 2026-11-16
+
+### Corrigé / Fixed
+- **Le guide se fermait encore après un téléport** : le jeu ferme ses fenêtres avant que l'addon regarde si le guide était ouvert. Le moment de la fermeture est maintenant retenu : un guide ouvert revient après un téléport, un portail ou un /reload.
+  *The guide no longer closes after a teleport, a portal or a /reload.*
+
 ## [1.0.0-beta.74] — 2026-11-16
 
 ### Ajouté / Added
