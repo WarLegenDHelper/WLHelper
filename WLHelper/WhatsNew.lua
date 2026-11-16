@@ -2,6 +2,11 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.92", date = "2026-11-16", items = {
+    { s = "add", fr = { "Facultatif ou requis", "Les étapes faites dehors d'une quête de donjon disent clairement « Facultatif : le donjon se fait sans · sur le chemin du portail » (ex. Fragments d'Ombréclat à Maraudon), « Requis pour « X » (dans le donjon) » quand une suite en dépend, ou « Requis : la clé pour entrer dans le donjon »." }, en = { "Outside steps say whether they are optional or required.", "" } },
+    { s = "add", fr = { "Bouton « Passer »", "Sur les étapes facultatives : deux clics retirent la quête de la route (elle reste dans ton journal), à recocher dans la vue d'ensemble." }, en = { "Skip button for optional quests.", "" } },
+    { s = "fix", fr = { "« Requis pour » faux", "Une quête n'est plus dite « dans le donjon » quand elle se fait dehors ou dans un autre donjon." }, en = { "Wrong \"required for\" labels fixed.", "" } },
+  } },
   { v = "1.0.0-beta.91", date = "2026-11-16", items = {
     { s = "add", fr = { "« Quoi de neuf » en grand", "Fenêtre large et redimensionnable (largeur et hauteur, taille retenue), versions à gauche avec un point sur celles pas encore vues, changements en cartes sur 2 ou 3 colonnes avec « Voir plus », résumé à la connexion, filtres Tout / Nouveau / Changé / Corrigé, et « Ne plus afficher à la connexion »." }, en = { "Wide, resizable What's new with a version list, card grid, filters.", "" } },
     { s = "add", fr = { "Pierre de foyer", "Par défaut, la pierre de foyer et le Rappel astral ne sont utilisés que s'ils font gagner au moins 3 min (sinon le GPS prend par exemple le zeppelin d'Orgrimmar pour Grom'gol). La flèche et la carte du guide donnent la durée du trajet et un « Autre trajet » ; Alt-clic sur la flèche pour le prendre." }, en = { "Hearthstone policy (default", "Only if it saves 3 min), trip time and an alternative route." } },
@@ -128,8 +133,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.78", date = "2026-11-16", items = {
     { s = "fix", fr = { "Échap ne ferme plus le guide", "On le suit en jouant, il se ferme avec sa croix. Ça règle aussi pour de bon sa fermeture après un téléport." }, en = { "Escape no longer closes the guide; close it with its X.", "" } },
-  } },
-  { v = "1.0.0-beta.77", date = "2026-11-16", items = {
-    { s = "fix", fr = { "Centaur Pariah (Maraudon)", "Il fait des allers-retours sur le chemin au sud du Convent de Mannoroc. Le repère est maintenant au milieu de son trajet, et l'étape dit de suivre le chemin vers l'ouest s'il n'est pas là." }, en = { "Centaur Pariah patrols", "The marker is now mid-path, with a note to follow the path." } },
   } },
 }

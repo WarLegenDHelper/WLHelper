@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.92] — 2026-11-16
+
+### Ajouté / Added
+- **Facultatif ou requis** (T-87) : les étapes faites dehors d'une quête de donjon disent clairement « Facultatif : le donjon se fait sans · sur le chemin du portail » (ex. Fragments d'Ombréclat à Maraudon), « Requis pour « X » (dans le donjon) » quand une suite en dépend, ou « Requis : la clé pour entrer dans le donjon ».
+  *Outside steps say whether they are optional or required.*
+- **Bouton « Passer »** sur les étapes facultatives : deux clics retirent la quête de la route (elle reste dans ton journal), à recocher dans la vue d'ensemble.
+  *Skip button for optional quests.*
+
+### Corrigé / Fixed
+- **« Requis pour » faux** : une quête n'est plus dite « dans le donjon » quand elle se fait dehors ou dans un autre donjon.
+  *Wrong "required for" labels fixed.*
+
 ## [1.0.0-beta.91] — 2026-11-16
 
 ### Ajouté / Added

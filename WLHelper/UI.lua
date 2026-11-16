@@ -1458,42 +1458,202 @@ local function Successors()
       end
     end
   end
+  -- the route's own order rules (Curated ns.AFTER: pid is taken once x is turned in)
+  for pid, xs in pairs(ns.AFTER or {}) do
+    for _, x in ipairs(type(xs) == "table" and xs or {}) do
+      if type(x) == "number" then succOf[x] = succOf[x] or {}; table.insert(succOf[x], pid) end
+    end
+  end
   for _, l2 in pairs(succOf) do table.sort(l2) end
   return succOf
 end
+-- the instance it is done in, as Engine.lua's qnodes places it: its own dungeon (another one of its
+-- list, q.ds, only for a quest done in any of them, q.anyd); the objectives in q.od when set (a
+-- quest listed for Sunken Temple but done in Zul'Farrak is not done in Sunken Temple)
 local function InDungeon(q2, dk)
-  if not (q2 and q2.d) then return false end
-  local same = (q2.d == dk)
-  if not same and type(q2.ds) == "table" then for _, k in ipairs(q2.ds) do if k == dk then same = true end end end
-  if not same then return false end
-  return q2.role == "main" or (q2.f and q2.f.i == 1) or (q2.s and q2.s.i == 1) or false
+  if not (q2 and q2.d and dk) then return false end
+  local home = q2.d
+  if q2.anyd and type(q2.ds) == "table" then for _, k in ipairs(q2.ds) do if k == dk then home = dk end end end
+  if home == dk and ((q2.f and q2.f.i) or (q2.s and q2.s.i)) then return true end
+  if (q2.od or home) ~= dk then return false end
+  if q2.role == "main" then return true end
+  -- a prerequisite with an objective inside (or not placed: Engine.lua makes it a node inside)
+  for _, o in ipairs(type(q2.o) == "table" and q2.o or {}) do if o.ins or o.unk then return true end end
+  return false
 end
+-- T-87: a main quest of the dungeon done outside the instance: one with nothing to do inside
+-- (Curated noin: a talk, a delivery, the turn-in that follows the dungeon), or given and turned in
+-- outside with every objective placed outside or in the zone around the dungeon (Shadowshard
+-- Fragments in Maraudon's outer caves, the Uldaman dig site, Wailing Essence). Engine.lua makes no
+-- node inside the instance for it (qnodes; InsideNode leaves the zone around out)
+local function OutsideMain(q2, dk)
+  if not (q2 and q2.role == "main") then return false end
+  if (q2.s and q2.s.i) or (q2.f and q2.f.i) then return false end
+  if q2.noin then return true end
+  if ns.OuterAllNear and ns.OuterAllNear(q2, q2.od or dk) then return true end
+  -- as qnodes: an objective inside or not placed (o.unk) is done inside; one with no spot at all
+  -- (bought, made) adds nothing; none placed: done inside
+  local placed = false
+  for _, o in ipairs(type(q2.o) == "table" and q2.o or {}) do
+    if o.ins or o.unk then return false end
+    if o.w or o.outer then placed = true end
+  end
+  return placed
+end
+-- done in the dungeon: InDungeon, less such an outside main quest
+local function DoneInside(q2, dk) return InDungeon(q2, dk) and not OutsideMain(q2, dk) end
+-- the quest gives the key needed to get in (Curated ns.KEYS; a shortcut key is not needed)
+local function KeyQuest(c, dk)
+  for _, k in ipairs(ns.KEYS and ns.KEYS[dk] or {}) do
+    if k.quest == c and k.opt ~= "shortcut" then return true end
+  end
+  return false
+end
+-- every objective's spot is on the entrance's map, within ON_WAY map units of it
+local ON_WAY = 10
+local function OnTheWay(q2, dk)
+  local d = ns.D[(q2 and q2.od) or dk]
+  local e = d and d.e
+  if not (e and e.m and e.x) then return false end
+  local any = false
+  for _, o in ipairs(type(q2.o) == "table" and q2.o or {}) do
+    local w = o.w
+    if not (w and w.m == e.m and w.x and w.y) then return false end
+    if math.sqrt((e.x - w.x) ^ 2 + (e.y - w.y) ^ 2) > ON_WAY then return false end
+    any = true
+  end
+  return any
+end
+-- the running route: its dungeons (a class quest or key card counts as its dungeon) and its
+-- quests, or nil
+local rtCache, rtFor
+local function RouteScope()
+  local r = ns.route
+  if not (r and type(r.sel) == "table") then return nil end
+  if rtFor == r and rtCache then return rtCache end
+  local dks, qs, cards = {}, {}, true
+  for k, on in pairs(r.sel) do
+    if on then
+      local d = ns.D[k]
+      dks[#dks + 1] = (d and d.cq and d.home) or k   -- a class quest or key card: its dungeon
+      if not (d and d.cq and d.cq ~= "KEY") then cards = false end
+    end
+  end
+  table.sort(dks)
+  for _, st in ipairs(r.steps or {}) do
+    for _, nd in ipairs(st.acts or {}) do if type(nd.q) == "number" then qs[nd.q] = true end end
+  end
+  rtCache, rtFor = { dks = dks, qs = qs, cards = cards and #dks > 0 }, r
+  return rtCache
+end
+-- -> the id of the nearest later quest the dungeon needs (done inside, or its key; then true as
+-- 2nd value for a key), or false (optional; then true as 2nd value when its spots are on the way to
+-- the portal), or nil when the question does not arise. With a route running, only the route's
+-- dungeons and the quests in it count: a quest of another dungeon, of another class or left out
+-- of the route needs nothing here.
 local function BeforeReason(qid, dk)
   local q = qid and ns.Q[qid]
-  dk = (q and q.d) or dk
-  if not (q and dk) then return nil end
-  if InDungeon(q, dk) then return nil end
+  local home = (q and q.d) or dk
+  if not (q and home) then return nil end
+  if DoneInside(q, home) then return nil end
   -- its own objectives inside (or not placed: a boss, a mob of the dungeon): no "before" question
   for _, o in ipairs(type(q.o) == "table" and q.o or {}) do if o.ins or o.unk then return nil end end
+  local R = RouteScope()
+  -- a class quest card's route is that quest's chain: every step is for it (the card says so)
+  if R and R.cards then return nil end
+  local dks = R and R.dks or { home }
+  local function Needed(c)
+    if R and not R.qs[c] then return nil end
+    for _, k in ipairs(dks) do
+      if KeyQuest(c, k) then return true, true end
+      if DoneInside(ns.Q[c], k) then return true end
+    end
+  end
+  -- the key quest itself (The Key to Scholomance)
+  for _, k in ipairs(dks) do if KeyQuest(qid, k) then return qid, true end end
   local S = Successors()
+  -- breadth first, every link (no depth limit: a long chain is still required)
   local seen, frontier = { [qid] = true }, { qid }
-  for _ = 1, 8 do
+  while #frontier > 0 do
     local nxt = {}
     for _, id in ipairs(frontier) do
       for _, c in ipairs(S[id] or {}) do
         if not seen[c] then
           seen[c] = true
-          if InDungeon(ns.Q[c], dk) then return c end
+          local need, key = Needed(c)
+          if need then return c, key or false end
           nxt[#nxt + 1] = c
         end
       end
     end
-    if #nxt == 0 then break end
     frontier = nxt
   end
-  return false
+  return false, OnTheWay(q, home)
 end
 ns.GuideBeforeReason = BeforeReason
+-- T-87: the quest a "Skip" button takes out of the route: a quest of the dungeon's own list (the
+-- Overview ticks those, WLDTDB.off) that the dungeon does not need -> qid or nil
+local function SkipQuest(qid, dk)
+  local q = qid and ns.Q[qid]
+  local home = q and (q.d or dk)
+  local d = home and ns.D[home]
+  if not (d and type(d.q) == "table") then return nil end
+  local listed = false
+  for _, x in ipairs(d.q) do if x == qid then listed = true break end end
+  if not listed then return nil end
+  local ok, r = pcall(BeforeReason, qid, home)
+  if not (ok and r == false) then return nil end
+  -- a later quest of the route keeps it as its prerequisite: unticking it would change nothing
+  local R = RouteScope()
+  if R then
+    for _, c in ipairs(Successors()[qid] or {}) do
+      if R.qs[c] and not (WLDTDB and WLDTDB.off and WLDTDB.off[c]) then return nil end
+    end
+  end
+  return qid
+end
+ns.GuideSkipQuest = SkipQuest
+-- the quest a step's "Skip" button is for: the open actions outside of one optional quest, before
+-- the dungeon (a turn-in, or a step after the dungeon, is not worth skipping)
+function ns.GuideStepSkipQuest(st, log, dk)
+  if not (st and type(st.acts) == "table") or st.gate or st.ins or st.split then return nil end
+  local qid
+  for _, nd in ipairs(st.acts) do
+    if nd.q and not nd.ins and not ns.NodeOK(log or {}, nd) then
+      if nd.kind == "t" or nd.kind == "h" or nd.phase == "after" then return nil end
+      if qid and qid ~= nd.q then return nil end
+      qid = nd.q
+    end
+  end
+  return qid and SkipQuest(qid, dk) or nil
+end
+function ns.GuideSkipDisarm(b)
+  if not (b and b.armToken) then return end
+  b.armToken = nil
+  b:SetText(L.SKIP_Q)
+end
+function ns.GuideSkipClick(b)
+  local qid = b and b.qid
+  if not qid then return end
+  if b.armToken then
+    b.armToken = nil; b:SetText(L.SKIP_Q)
+    if not ns.SummarySetOff then return end
+    -- the quest is only left out of the route, never abandoned: one in the log stays there
+    local log = ns.LogEntries and ns.LogEntries() or {}
+    -- looking at another step (T-86): that step leaves the route, back to the current one
+    local fr = ns.frame
+    if fr and fr.view and fr.view ~= fr.auto then fr.view = nil end
+    ns.SummarySetOff(qid, true)
+    ns.Print(L.SKIP_Q_DONE:format(ns.QName(qid)) .. (log[qid] and (" " .. L.SKIP_Q_LOG) or ""))
+    return
+  end
+  local token = {}
+  b.armToken = token
+  b:SetText(L.SKIP_Q_CONFIRM)
+  if C_Timer and C_Timer.After then
+    C_Timer.After(4, function() if b.armToken == token then ns.GuideSkipDisarm(b) end end)
+  end
+end
 
 -- The name of an objective as the player reads it: ours (translated), else in French the game's own
 -- words when the quest is in the log and the game names the same objective.
@@ -1724,10 +1884,13 @@ local function FocusModel(card, nd, log, dkey, st)
   end
   if nd.unknown and src ~= "log" then M.why[#M.why + 1] = Hex(T.warn) .. L.TRAVEL_UNK .. "|r" end
   -- a step before the dungeon: why now (its chain goes on inside) or that it is optional
-  if (nd.pre or q.role == "pre") and nd.q then
-    local okB, nx = pcall(BeforeReason, nd.q, nd.d)
-    if okB and nx then M.why[#M.why + 1] = mt .. L.CARD_BEFORE_WHY:format(ns.QName(nx)) .. "|r"
-    elseif okB and nx == false then M.why[#M.why + 1] = mt .. L.CARD_BEFORE_OPT .. "|r" end
+  -- (T-87) and the same for a main quest of the dungeon done outside it (Shadowshard Fragments):
+  -- "Optional: the dungeon can be done without it · on the way to the portal" or "Required for X";
+  -- nothing on a step after the dungeon (the follow-up of a chain done inside)
+  if nd.q and nd.phase ~= "after" and (nd.pre or q.role == "pre" or (q.role == "main" and not nd.ins and kind ~= "t" and kind ~= "h")) then
+    local okB, nx, way = pcall(BeforeReason, nd.q, nd.d)
+    if okB and nx then M.why[#M.why + 1] = mt .. (way and L.CARD_BEFORE_KEY or L.CARD_BEFORE_WHY):format(ns.QName(nx)) .. "|r"
+    elseif okB and nx == false then M.why[#M.why + 1] = mt .. L.CARD_BEFORE_OPT .. (way and L.CARD_BEFORE_WAY or "") .. "|r" end
   end
   -- the NPC who gives or takes the quest walks along a path (Writs/Patrol.lua): his point on the
   -- map is one spot of it, the card says so (warn: he may not stand where the arrow points)
@@ -2415,6 +2578,12 @@ local function Build()
   -- labelled buttons carry no icon that repeats their verb (design system 3.4, icon audit G3)
   card.shareBtn = LabelBtn(card, L.SHARE_SHORT, 28, "secondary", DoShare, function() return { L.M_SHARE, L.TT_FSHARE } end)
   card.shareBtn:Hide()
+  -- T-87: "Skip" on a step of an optional quest: a first click arms it ("Click again to skip",
+  -- 4 s, like Start over), the second unticks the quest as the Overview does (WLDTDB.off and
+  -- offPick, Overview.lua SetOff) and the route is planned again. A plain button, no secure frame.
+  card.skipBtn = LabelBtn(card, L.SKIP_Q, 24, "secondary", function(self) ns.GuideSkipClick(self) end,
+    function() return { L.SKIP_Q, L.TT_SKIP_Q } end)
+  card.skipBtn:Hide()
 
   -- footer, under the card: the one main action, then previous / next / check-list / actions
   local foot = CreateFrame("Frame", nil, f)
@@ -2889,7 +3058,7 @@ end
 
 local function HideStepParts(card)
   card.where:Hide(); card.clsChip:Hide(); card.badgePill:Hide(); card.prePill:Hide(); card.chapter:Hide()
-  card.travel:Hide(); card.travelIcon:Hide(); card.readyBox:Hide(); card.shareBtn:Hide()
+  card.travel:Hide(); card.travelIcon:Hide(); card.readyBox:Hide(); card.shareBtn:Hide(); card.skipBtn:Hide()
   card.model:Hide(); card.modelBg:Hide(); card.whereLine:Hide(); card.kicker:Hide()
   HideStack(card.noteStk); HideStack(card.afterStk); card.noteText, card.afterText = nil, nil
   for _, row in ipairs(card.rows) do row.node = nil; row:Hide() end
@@ -3332,6 +3501,10 @@ RenderNow = function()
     y = y + boxH
   end
   card.shareBtn:Hide()
+  local skipQ = ns.GuideStepSkipQuest(st, log, dkey)
+  if not skipQ or card.skipBtn.qid ~= skipQ then ns.GuideSkipDisarm(card.skipBtn) end
+  card.skipBtn.qid = skipQ
+  card.skipBtn:Hide()
   -- the step's text blocks (design system 3.21): above the rows (note) and under them (after),
   -- each a gold heading, then its sentence or its list
   local note, after = {}, {}
@@ -3605,7 +3778,14 @@ RenderNow = function()
     y = y + 8
     card.shareBtn:SetText(L.SHARE_SHORT)
     card.shareBtn:ClearAllPoints(); card.shareBtn:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.shareBtn:Show()
+    if skipQ then
+      card.skipBtn:ClearAllPoints(); card.skipBtn:SetPoint("LEFT", card.shareBtn, "RIGHT", 8, 0); card.skipBtn:Show()
+    end
     y = y + 28
+  elseif skipQ and not f.compactIn then
+    y = y + 8
+    card.skipBtn:ClearAllPoints(); card.skipBtn:SetPoint("TOPLEFT", card, "TOPLEFT", CI, -y); card.skipBtn:Show()
+    y = y + 24
   end
   y = y + CI
 
