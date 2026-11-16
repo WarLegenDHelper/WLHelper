@@ -922,14 +922,71 @@ local function Recents()
     return out
 end
 
+-- ---------------------------------------------------------------- the trip's time
+
+local PRICE_MOVE = 50      -- yards walked before the trips are priced again
+local priceAt              -- where the list was last priced
+
+-- "~3 min" or "< 1 min", as the world label writes it
+local function EtaText(seconds)
+    local W = WP.WorldPin
+    if W and W._Eta then return W._Eta(seconds) end
+    if seconds < 45 then return L("< 1 min") end
+    return string.format(L("~%d min"), math.max(1, math.floor(seconds / 60 + 0.5)))
+end
+
+-- Every result's trip from where you stand (r.eta, seconds, nil when no way is known), in one search:
+-- a flight path or a teleport can make a far place quick, and a place on another continent gets a time.
+local function Price(groups)
+    if not (GPS.CostsTo and GPS.Point) then return end
+    local dests, of = {}, {}
+    for _, g in ipairs(groups or {}) do
+        for _, r in ipairs(g.items or {}) do
+            r.eta = nil
+            local m, x, y = Num(r.map), Num(r.x), Num(r.y)
+            -- a fresh point each: the search writes its own key onto the points it gets
+            local p = m and x and y and GPS.Point(m, x, y)
+            if p then dests[#dests + 1] = p; of[#dests] = r end
+        end
+    end
+    priceAt = Here()
+    if #dests == 0 then return end
+    local ok, costs = pcall(GPS.CostsTo, dests)
+    if not (ok and type(costs) == "table") then return end
+    for i, r in pairs(of) do
+        local c = Num(costs[i])
+        if c then r.eta = c end
+    end
+end
+GoTo._Price = Price
+
+-- The row's value: the trip's time when it is more than a short walk (or the place is on another
+-- continent), else the distance.
+local function Value(r)
+    if r.eta and (r.eta > 90 or not r.dist) then return EtaText(r.eta) end
+    return r.dist and GPS.Distance(r.dist) or nil
+end
+GoTo._Value = Value
+
 local function RowTip(row)
     local r = row.result
     if not r then return nil end
     local t = { r.label }
     if r.detail and r.detail ~= "" then t[#t + 1] = r.detail end
+    -- the way there, worked out only on hover: "Pierre de foyer → vol jusqu'à Kargath → 300 m à pied"
+    local m, x, y = Num(r.map), Num(r.x), Num(r.y)
+    local p = m and x and y and GPS.Point and GPS.Point(m, x, y)
+    if p and GPS.FindPath and GPS.ItinerarySummary then
+        local ok, way = pcall(function()
+            local legs = GPS.FindPath({ p })
+            return legs and #legs > 0 and GPS.ItinerarySummary(legs) or nil
+        end)
+        if ok and type(way) == "string" and way ~= "" then t[#t + 1] = { way, C.muted[1], C.muted[2], C.muted[3] } end
+    end
     t[#t + 1] = L("Clic : y aller avec le GPS")
     return t
 end
+GoTo._RowTip = RowTip
 
 local function MakeRow(parent)
     local row = S.ListRow(parent, { density = "dense", tip = RowTip, onClick = function(self)
@@ -960,7 +1017,7 @@ local function Fill(groups)
                 rows[n] = row
                 row.result = r
                 row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y); row:SetPoint("TOPRIGHT", 0, -y)
-                row:Set({ name = r.label, detail = r.detail, value = r.dist and GPS.Distance(r.dist) or nil })
+                row:Set({ name = r.label, detail = r.detail, value = Value(r) })
                 row:Show()
                 y = y + row:Fit(CW) + 2
             end
@@ -1035,6 +1092,7 @@ local function Render()
     win.empty:SetShown(emptyShown)
     win.groups, win.emptyShown = groups, emptyShown
     trackAt = Here()
+    Price(groups)
     local listH = Fill(emptyShown and {} or groups)
     win.list:SetShown(listH > 0)
     Footer()
@@ -1065,10 +1123,11 @@ local function Track()
     trackAt = here
     local lib = Lib()
     local redo = false
+    local moved = false
     for _, g in ipairs(win.groups or {}) do
         local items = g.items
         for _, r in ipairs(items) do
-            if Repick(r, here, lib) then redo = true end
+            if Repick(r, here, lib) then redo = true; moved = true end
         end
         if g.sorted then
             local unsorted = false
@@ -1078,11 +1137,16 @@ local function Track()
             if unsorted then table.sort(items, Better); redo = true end
         end
     end
+    -- the trips' times: again only after a real walk (or a result moved to another place)
+    local p = priceAt
+    if moved or not p or p.cont ~= here.cont or Yards(p.wx, p.wy, here.wx, here.wy) > PRICE_MOVE then
+        Price(win.groups)
+    end
     if not redo then
         for _, row in ipairs(rows) do
             local r = row.result
             if r and row:IsShown() then
-                local v = r.dist and GPS.Distance(r.dist) or nil
+                local v = Value(r)
                 -- a distance that appears or goes away changes the row's layout
                 if (v ~= nil) ~= (row.value:IsShown() and true or false) then redo = true; break end
                 if v then row.value:SetText(v) end

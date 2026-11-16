@@ -849,15 +849,18 @@ function WP.ShoppingList(rows)
     end
     local total = 0
     for _, e in ipairs(list) do
-        e.have = OwnedCount(e.id)
+        -- e.need is already what is missing: WP.Rows took the owned items off each writ
+        -- (one owner per item), so the bags are not counted a second time here
+        e.owned = OwnedCount(e.id)
+        e.have = 0
         e.bank = WP.InBank(e.id)
         local _, listed, ago = WP.Scan.Get(e.id)
         e.listed = ago and ago < SCAN_FRESH and listed or nil
-        e.done = e.have >= e.need
+        e.done = e.need <= 0
         -- Ceiling: 25% over a fresh Auctionator price, 50% over an older or snapshot one.
         local fresh = e.src == "Auctionator" and e.age ~= nil and e.age < 2
         e.maxPrice = e.price and math.ceil(e.price * (fresh and 1.25 or 1.5) / 100) * 100 or nil
-        if not e.done and e.price then total = total + e.price * (e.need - e.have) end
+        if not e.done and e.price then total = total + e.price * e.need end
     end
     table.sort(list, function(a, b)
         -- Not bought first; items missing for writs you hold first; then each writ beside its item.

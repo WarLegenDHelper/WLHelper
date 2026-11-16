@@ -6,6 +6,42 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.85] — 2026-11-16
+
+### Ajouté / Added
+- **GPS en vol** : la flèche affiche « En vol vers Kargath », l'étape suivante et le temps restant.
+  *In flight, the arrow shows the destination, next step and time left.*
+- **Aller à** : chaque lieu affiche le temps du trajet (vols et téléports compris), et l'infobulle donne le chemin (« Pierre de foyer → vol jusqu'à Kargath → 300 m à pied »).
+  *Go to shows trip time and the itinerary.*
+- **Messages du chat cliquables** : nouvel événement, joueur qui cherche un groupe, nouvelle commande, commande livrée ou refusée : un lien [S'inscrire], [Voir], [Remercier] ou [Répondre] ouvre directement le bon onglet.
+  *Clickable chat links open the right tab.*
+- **Accueil vivant** : il se met à jour tout seul quand il est ouvert (recharges, événements, membres en ligne, niveau).
+  *Home refreshes itself while open.*
+
+### Modifié / Changed
+- **Choisir un guide** : cocher ou décocher puis fermer ne change plus la route en cours ; seule « Lancer la route » la change.
+  *Picker changes apply only with "Start route".*
+- **Partager les quêtes** : seulement celles qui se partagent, en une ligne ; bouton « Partage en cours » pendant le partage, plus de double partage.
+  *Quest sharing: shareable ones only, one line, no double share.*
+- **Moins de saccades** : le guide lit le journal de quêtes une fois par objectif ; les réponses de la guilde qui arrivent ensemble ne redessinent la fenêtre qu'une fois.
+  *Fewer stutters in the guide and guild windows.*
+- **Aujourd'hui (Writs)** : la phrase dit quoi faire (acheter les objets manquants, ouvrir les enveloppes, rendre) ou que c'est ton budget qui bloque.
+  *Writs Today explains what to do or that the budget is the limit.*
+- **Tournée en ville** : démarre même pendant la tournée des Writs (mise en pause, une ligne le dit).
+  *City tour pauses the writs tour.*
+
+### Corrigé / Fixed
+- **Combat** : le bouton de téléportation ne réagit plus aux clics en combat ; avec « Cacher en combat », la flèche ne capte plus la souris.
+  *Teleport button ignores clicks in combat; hidden arrow no longer takes the mouse.*
+- **Prérequis** : une quête faite sous une autre version (Seigneur Valthalak, quêtes à deux numéros, le Maillet) compte comme faite partout.
+  *Quests done under another ID count as done everywhere.*
+- **Achats** : un objet dont il manque des exemplaires n'est plus « Dans le sac » ; les quantités et prix ne comptent que ce qui manque.
+  *Shopping counts only what is missing.*
+- **Clés** : « personne en ligne ne l'a » ne dépend plus des filtres de la fenêtre Guilde ; un membre qui se connecte reçoit bien tes clés.
+  *Keys: online check ignores guild filters; newcomers get your keys.*
+- **Nous écrire** : l'aide du formulaire « Un bug » dit ce qui est vraiment envoyé.
+  *Bug form hint is accurate.*
+
 ## [1.0.0-beta.84] — 2026-11-16
 
 ### Ajouté / Added

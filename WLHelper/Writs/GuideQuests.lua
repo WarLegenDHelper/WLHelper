@@ -346,6 +346,14 @@ local function Pump()
 end
 GQ.Pump = Pump
 function GQ.Shared(qid) return shared[qid] == true end
+-- a quest the guide's share button pushed: the auto-share does not push it again to this group
+function GQ.MarkShared(qid)
+    qid = Num(qid)
+    if not qid then return end
+    shared[qid] = true
+    lastPush = Now()
+    for i = #queue, 1, -1 do if queue[i] == qid then table.remove(queue, i) end end
+end
 local function Queue(qid)
     if not (QuestLogPushQuest and CanShare()) or shared[qid] or fromGroup[qid] or not InRoute(qid) then return end
     for _, q in ipairs(queue) do if q == qid then return end end

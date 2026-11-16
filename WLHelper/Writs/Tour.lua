@@ -247,7 +247,7 @@ local STEPS = {
       can = function() return WP.Shared ~= nil and WP.Shared.Show ~= nil end,
       open = function() CloseHub(); if not Shown(_G.WLHelperShared) then WP.Shared.Show() end end,
       target = G("WLHelperShared"),
-      title = "Les quêtes en commun", text = "Qui dans la guilde a les mêmes quêtes de donjon que toi, pour grouper. Le partage se règle dans Réglages, Général, Guilde." },
+      title = "Les quêtes en commun", text = "Qui dans la guilde a les mêmes quêtes de donjon que toi, pour grouper. Le partage se règle dans Réglages, Guilde." },
     { id = "keys", group = "guild", module = "keys", win = G("WLHelperKeys"),
       can = function() return WP.ToggleKeys ~= nil end,
       open = function() CloseHub(); Ensure("WLHelperKeys", WP.ToggleKeys)() end,

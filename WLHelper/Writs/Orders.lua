@@ -32,23 +32,20 @@ ns.AddEnglish({
     ["Commandes"] = "Orders",
     ["%s a annulé sa commande : %s ×%d."] = "%s cancelled their order: %s ×%d.",
     ["%s a pris la commande %s avant toi : elle n'est plus pour toi."] = "%s took the order %s before you: it is no longer yours.",
-    ["Nouvelle commande de %s : %s ×%d, %s. Tape /wlh orders, onglet Pour moi, pour l'accepter."] =
-        "New order from %s: %s ×%d, %s. Type /wlh orders, For me tab, to accept it.",
-    ["Nouvelle demande de %s : %s ×%d (%s), %s. Tape /wlh orders, onglet Pour moi, pour l'accepter."] =
-        "New request from %s: %s ×%d (%s), %s. Type /wlh orders, For me tab, to accept it.",
+    ["Nouvelle commande de %s : %s ×%d, %s."] = "New order from %s: %s ×%d, %s.",
+    ["Nouvelle demande de %s : %s ×%d (%s), %s."] = "New request from %s: %s ×%d (%s), %s.",
+    ["Voir la commande"] = "View the order",
+    ["Répondre"] = "Reply",
     ["Nouvelle commande de %s : %s ×%d"] = "New order from %s: %s ×%d",
     ["Nouvelle demande de %s : %s ×%d"] = "New request from %s: %s ×%d",
     ["%s de commission"] = "%s fee",
     ["sans commission"] = "no fee",
     ["%s a accepté ta commande : %s ×%d."] = "%s accepted your order: %s ×%d.",
-    ["%s a refusé ta commande de %s (%s). Tape /wlh orders, onglet Mes commandes, puis clique sur Commander à nouveau pour la proposer à toute la guilde."] =
-        "%s declined your order for %s (%s). Type /wlh orders, My orders tab, then click Order again to offer it to the whole guild.",
+    ["%s a refusé ta commande de %s (%s)."] = "%s declined your order for %s (%s).",
     ["%s a fabriqué ta commande : %s ×%d. Elle t'arrive par la poste, contre-remboursement s'il y a une commission, ou en échange."] =
         "%s crafted your order: %s ×%d. It comes by mail, cash on delivery if there is a fee, or by trade.",
-    ["Tu as reçu ta commande : %s ×%d de %s. Tape /wlh orders, onglet Mes commandes, puis clique sur Remercier pour lui donner une étoile."] =
-        "You received your order: %s ×%d from %s. Type /wlh orders, My orders tab, then click Thank to give them a star.",
-    ["%s t'a livré %s. Tape /wlh orders, onglet Mes commandes, puis clique sur Remercier pour lui donner une étoile."] =
-        "%s delivered %s to you. Type /wlh orders, My orders tab, then click Thank to give them a star.",
+    ["Tu as reçu ta commande : %s ×%d de %s."] = "You received your order: %s ×%d from %s.",
+    ["%s t'a livré %s."] = "%s delivered %s to you.",
     ["Commande WL : %s ×%d"] = "WL order: %s ×%d",
     ["Commission trop basse"] = "Commission too low",
     ["Pas les composants"] = "Missing reagents",
@@ -57,8 +54,7 @@ ns.AddEnglish({
     ["Autre"] = "Other",
     ["L'onglet Envoyer n'est pas ouvert : ouvre-le dans la boîte aux lettres, puis reclique."] =
         "The Send tab is not open: open it in the mailbox, then click again.",
-    ["Message de %s sur la commande %s : « %s ». Tape /wlh orders pour répondre."] =
-        "Message from %s about the order %s: \"%s\". Type /wlh orders to reply.",
+    ["Message de %s sur la commande %s : « %s »."] = "Message from %s about the order %s: \"%s\".",
     ["il t'en manque %d"] = "%d missing",
     ["Envoie-lui par la poste ou en échange : %s. À la boîte aux lettres, l'addon remplit le courrier pour toi."] =
         "Send them by mail or trade: %s. At the mailbox, the addon fills in the mail for you.",
@@ -2084,6 +2080,12 @@ end
 
 -- ---------------------------------------------------------------- receiving
 local parts = {}
+-- the guild answers in bursts (each crafter sends one "H" per profession): one redraw for the lot
+local function RefreshSoon()
+    if K.RefreshSoon and C_Timer and C_Timer.After then K.RefreshSoon() elseif WP.RefreshOrders then WP.RefreshOrders() end
+end
+-- "[text]" at the end of a chat line, a link to an Orders tab (FinderPeople.lua reads it)
+local function Link(text, tab) return (WP.AddonLink and tab) and (" " .. WP.AddonLink(text, "orders", tab)) or "" end
 local function OnPayload(sender, key, payload)
     local prof, hash = key:match("^R:(.-):(%x+)$")
     if prof then
@@ -2100,7 +2102,7 @@ local function OnPayload(sender, key, payload)
         O.ListsChanged()
         -- a watched recipe learned by this member, and the search index to rebuild
         if K.OnRecipes then pcall(K.OnRecipes, sender, prof, recipes, hadList) end
-        if WP.RefreshOrders then WP.RefreshOrders() end
+        RefreshSoon()
     end
 end
 
@@ -2127,7 +2129,7 @@ local function OnMessage(msg, channel, sender)
                     Guild("W|" .. prof .. "|" .. sender)
                 end
             end
-            if WP.RefreshOrders then WP.RefreshOrders() end
+            RefreshSoon()
         end
     elseif kind == "W" then
         -- "W|prof|owner" on the guild (1.0.0-beta.29+): only the owner answers; "W|prof" by whisper
@@ -2165,7 +2167,7 @@ local function OnMessage(msg, channel, sender)
             local merged, changed = Merge(o)
             if changed then O.Notify(merged) end
             if wasMine and changed and merged then O.NotifySlip(merged) end
-            if WP.RefreshOrders then WP.RefreshOrders() end
+            RefreshSoon()
         end
     elseif kind == "M" and channel == "GUILD" then
         -- a message on an order: kept when it is between its customer and its crafter, and I am one of them
@@ -2175,9 +2177,10 @@ local function OnMessage(msg, channel, sender)
             AddMessage(o, sender, CleanText(text))
             if WP.ModuleOn("orders") then
                 WP.ordersPendingTab = (Me() == o.from) and "mine" or "recv"
-                WP.Print(string.format(L("Message de %s sur la commande %s : « %s ». Tape /wlh orders pour répondre."), sender, O.Name(o), CleanText(text)))
+                WP.Print(string.format(L("Message de %s sur la commande %s : « %s »."), sender, O.Name(o), CleanText(text))
+                    .. Link(L("Répondre"), WP.ordersPendingTab))
             end
-            if WP.RefreshOrders then WP.RefreshOrders() end
+            RefreshSoon()
         end
     elseif kind == "V" and channel == "GUILD" then
         -- a thank-you: one star per delivered order, given by its customer only
@@ -2256,8 +2259,8 @@ function O.Notify(o)
         if K.HoldQuiet and K.HoldQuiet(o) then return end
         local money = (o.fee or 0) + (o.tip or 0)
         local fee = money > 0 and string.format(L("%s de commission"), S.Money(money)) or L("sans commission")
-        local msg = o.prof and string.format(L("Nouvelle demande de %s : %s ×%d (%s), %s. Tape /wlh orders, onglet Pour moi, pour l'accepter."), o.from, name, o.qty or 1, O.ProfName(o.prof), fee)
-            or string.format(L("Nouvelle commande de %s : %s ×%d, %s. Tape /wlh orders, onglet Pour moi, pour l'accepter."), o.from, name, o.qty or 1, fee)
+        local msg = (o.prof and string.format(L("Nouvelle demande de %s : %s ×%d (%s), %s."), o.from, name, o.qty or 1, O.ProfName(o.prof), fee)
+            or string.format(L("Nouvelle commande de %s : %s ×%d, %s."), o.from, name, o.qty or 1, fee)) .. Link(L("Voir la commande"), "recv")
         -- the banner and the sound only with a new chat line (not for each copy of the same order)
         if Say(msg, o, "recv") and WLWritsDB.ordersAlert ~= false then
             -- the centre of the screen: the short line only
@@ -2272,11 +2275,11 @@ function O.Notify(o)
         for _, g in ipairs(O.ToSend(o)) do t[#t + 1] = g.need .. "× " .. O.Name(g.id) .. (g.have < g.need and (" (" .. string.format(L("il t'en manque %d"), g.need - g.have) .. ")") or "") end
         if #t > 0 then Say(string.format(L("Envoie-lui par la poste ou en échange : %s. À la boîte aux lettres, l'addon remplit le courrier pour toi."), table.concat(t, ", ")), o) end
     elseif o.from == me and o.status == "declined" then
-        Say(string.format(L("%s a refusé ta commande de %s (%s). Tape /wlh orders, onglet Mes commandes, puis clique sur Commander à nouveau pour la proposer à toute la guilde."), o.by or "?", name, L(o.reason or "Autre")), o, "mine")
+        Say(string.format(L("%s a refusé ta commande de %s (%s)."), o.by or "?", name, L(o.reason or "Autre")) .. Link(L("Voir la commande"), "mine"), o, "mine")
     elseif o.from == me and o.status == "crafted" then
         Say(string.format(L("%s a fabriqué ta commande : %s ×%d. Elle t'arrive par la poste, contre-remboursement s'il y a une commission, ou en échange."), o.by or "?", name, o.qty or 1), o, "mine")
     elseif o.from == me and o.status == "delivered" and not o.thanked then
-        Say(string.format(L("%s t'a livré %s. Tape /wlh orders, onglet Mes commandes, puis clique sur Remercier pour lui donner une étoile."), o.by or "?", name), o, "mine")
+        Say(string.format(L("%s t'a livré %s."), o.by or "?", name) .. Link(L("Remercier"), "mine"), o, "mine")
     end
 end
 
@@ -2296,8 +2299,7 @@ end
 -- ---------------------------------------------------------------- automatic steps
 local function PrintReceived(o)
     WP.ordersPendingTab = "mine"
-    WP.Print(string.format(L("Tu as reçu ta commande : %s ×%d de %s. Tape /wlh orders, onglet Mes commandes, puis clique sur Remercier pour lui donner une étoile."),
-        O.Name(o), o.qty or 1, o.by or "?"))
+    WP.Print(string.format(L("Tu as reçu ta commande : %s ×%d de %s."), O.Name(o), o.qty or 1, o.by or "?") .. Link(L("Remercier"), "mine"))
 end
 -- The crafter made the order: the item shows up in their bags (more than when they accepted it).
 -- The customer got it: the item shows up in their bags (more than when it was crafted).

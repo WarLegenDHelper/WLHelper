@@ -43,6 +43,8 @@ end
 function ns.Assemble(recalc, order, byKey)
   if ns.EnsureClassCards then ns.EnsureClassCards() end
   local db = WLDTDB
+  -- a new choice of dungeons (an offer taken inside, a key): the picker's closed draft follows it
+  if recalc and ns.PickerResetDraft and not (_G.WLDTPicker and _G.WLDTPicker:IsShown()) then ns.PickerResetDraft() end
   local any = next(db.sel) ~= nil
   -- a run choice lasts only while its dungeon stays picked
   for k in pairs(db.run or {}) do if not db.sel[k] then db.run[k] = nil end end
@@ -87,7 +89,11 @@ function ns.Assemble(recalc, order, byKey)
   for _, n in ipairs(order) do table.insert(db.order, n.key) end
   local steps = ns.SplitInside(ns.MakeSteps(order))
   StepKeys(steps)
-  ns.route = { steps = steps, sel = db.sel, label = Label(db.sel) }
+  -- a copy: the route keeps its own choice (the picker's draft or a later edit of db.sel never
+  -- changes the running route behind its back)
+  local sel = {}
+  for k, v in pairs(db.sel) do if v then sel[k] = true end end
+  ns.route = { steps = steps, sel = sel, label = Label(sel) }
 end
 
 -- run: the picked dungeons to walk through with no quest (the summary's "Guide me through the
@@ -97,6 +103,7 @@ function ns.StartGuide(run)
   WLDTDB.run = {}
   for k in pairs(run or {}) do if WLDTDB.sel and WLDTDB.sel[k] then WLDTDB.run[k] = true end end
   ns.Assemble(true)
+  if ns.PickerResetDraft then ns.PickerResetDraft() end
   ns.HidePicker()
   local f = ns.frame
   f.auto, f.view, f.sig = nil, nil, nil

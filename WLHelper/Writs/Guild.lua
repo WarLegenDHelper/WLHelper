@@ -255,8 +255,12 @@ local function GuildSlot(tbl)
     return s[k], true
 end
 
+-- the clean-up below runs once per guild board and session (Board() is called on every redraw)
+local folded = setmetatable({}, { __mode = "k" })
 local function Board()
     local b, known = GuildSlot("guildBy")
+    if not known or folded[b] then return b end
+    folded[b] = true
     -- once: the board saved before it was kept per guild goes to the current guild
     if known and WLWritsDB.guild then
         if next(b) == nil then for name, e in pairs(WLWritsDB.guild) do b[name] = e end end
@@ -591,7 +595,7 @@ local function OnMessage(msg, sender)
             local spec = msg:match("^S|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|(%a*)")
             Put(sender, { wk = wk, w = tonumber(w), sk = sk, s = tonumber(s), hk = tonumber(hk), kb = tonumber(kb),
                 week = tonumber(owk), lvl = tonumber(lvl), ver = ver, spec = spec ~= "" and spec or nil, t = time() })
-            if WP.RefreshGuild then WP.RefreshGuild() end
+            WP.RefreshGuildSoon()
         end
     elseif kind == "P" then
         -- an older copy: all-time total and open-world counts only (an "S" from the same player wins)
@@ -599,7 +603,7 @@ local function OnMessage(msg, sender)
         local cur = Board()[sender]
         if kb and not (cur and cur.sk) then
             Put(sender, { kb = tonumber(kb), week = tonumber(week), wk = wk, hk = tonumber(hk), lvl = tonumber(lvl), ver = ver, t = time() })
-            if WP.RefreshGuild then WP.RefreshGuild() end
+            WP.RefreshGuildSoon()
         end
     elseif kind == "Q" then
         -- the places of one period: "Q|w|2026-11-10|Goulet des Chanteguerres:12;Hautebrande:3;~:2"
@@ -616,7 +620,7 @@ local function OnMessage(msg, sender)
             Board()[sender] = e
             e.q = type(e.q) == "table" and e.q or {}
             e.q[per] = { k = key ~= "" and key or nil, l = l }
-            if WP.RefreshGuild then WP.RefreshGuild() end
+            WP.RefreshGuildSoon()
         end
     elseif kind == "K" then
         -- K|week|season| then for all time, the week, the season: matches, KB, HK, deaths, assists,
@@ -635,7 +639,7 @@ local function OnMessage(msg, sender)
                 local e = Board()[sender] or { t = time() }
                 Board()[sender] = e
                 e.kd = { wk = wk, sk = sk, a = seg(0), w = seg(7), s = seg(14), sow = v[22] or 0 }
-                if WP.RefreshGuild then WP.RefreshGuild() end
+                WP.RefreshGuildSoon()
             end
         end
     end
@@ -781,10 +785,14 @@ local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "
 
 -- returns the list, the number online, the zones of those online, and, among the members that pass
 -- the other filters (online, search, class), how many have a known role (spec shared) out of how many
-local function Roster(onlineOnly, filter, sort)
+-- raw: the whole roster for other windows (Home, Groups), without the Guild window's filters and unsorted
+local function Roster(onlineOnly, filter, sort, raw)
     local out, online, zones, known, total = {}, 0, {}, 0, 0
     if not (IsInGuild and IsInGuild() and GetNumGuildMembers) then return out, 0, zones, 0, 0 end
-    filter = filter and filter ~= "" and filter:lower() or nil
+    filter = not raw and filter and filter ~= "" and filter:lower() or nil
+    local wantClass = not raw and WLWritsDB.guildClass or nil
+    local wantRole = not raw and WLWritsDB.guildRole or nil
+    local board = Board()
     for i = 1, (GetNumGuildMembers() or 0) do
         local name, rank, _, level, _, zone, note, _, isOnline, _, class = GetGuildRosterInfo(i)
         if name then
@@ -795,9 +803,9 @@ local function Roster(onlineOnly, filter, sort)
             local short = Short(name)
             local hit = not filter or short:lower():find(filter, 1, true) or (zone or ""):lower():find(filter, 1, true)
                 or (rank or ""):lower():find(filter, 1, true)
-            local b0 = Board()[short]
-            local classOk = not WLWritsDB.guildClass or WLWritsDB.guildClass == class
-            local roleOk = HasRole(b0 and b0.spec, WLWritsDB.guildRole)
+            local b0 = board[short]
+            local classOk = not wantClass or wantClass == class
+            local roleOk = HasRole(b0 and b0.spec, wantRole)
             if hit and classOk and (isOnline or not onlineOnly) then
                 total = total + 1
                 if b0 and b0.spec then known = known + 1 end
@@ -805,14 +813,14 @@ local function Roster(onlineOnly, filter, sort)
             if hit and classOk and roleOk and (isOnline or not onlineOnly) then
                 local y, m, d, h = 0, 0, 0, 0
                 if not isOnline and GetGuildRosterLastOnline then y, m, d, h = GetGuildRosterLastOnline(i) end
-                local b = Board()[short]
                 out[#out + 1] = { name = short, rank = rank, level = level or 0, zone = zone, online = isOnline and true or false,
-                    spec = b and b.spec,
+                    spec = b0 and b0.spec,
                     class = class, note = note, rankIndex = select(3, GetGuildRosterInfo(i)) or 99,
                     away = ((y or 0) * 365 + (m or 0) * 30 + (d or 0)) * 24 + (h or 0) }
             end
         end
     end
+    if raw then return out, online, zones, known, total end
     sort = sort or "level"
     table.sort(out, function(a, b)
         if a.online ~= b.online then return a.online end
@@ -833,7 +841,7 @@ local function Roster(onlineOnly, filter, sort)
     end)
     return out, online, zones, known, total
 end
-WP.GuildRoster = function(onlineOnly) local list, online = Roster(onlineOnly); return list, online end
+WP.GuildRoster = function(onlineOnly) local list, online = Roster(onlineOnly, nil, nil, true); return list, online end
 
 -- ---------------------------------------------------------------- usual hours (T-66)
 -- WLWritsDB.guildHours = { obs = { [week] = hex }, m = { [name] = { [week] = hex } } }
@@ -1716,6 +1724,14 @@ function WP.RefreshGuild()
     refreshing = false
     if not ok then error(err, 0) end
 end
+-- many guild lines arrive together (each member answers "R" with up to 5): one redraw for the lot
+local refreshPending = false
+function WP.RefreshGuildSoon()
+    if refreshPending then return end
+    if not (C_Timer and C_Timer.After) then WP.RefreshGuild(); return end
+    refreshPending = true
+    C_Timer.After(0.3, function() refreshPending = false; WP.RefreshGuild() end)
+end
 function WP.ToggleGuild()
     if win and win:IsShown() then win:Hide(); return end
     if WP.ModuleOff and WP.ModuleOff("guild") then return end
@@ -1770,7 +1786,7 @@ ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
         SeeHostile("focus")
     elseif e == "GUILD_ROSTER_UPDATE" then
         pcall(ObserveHours)
-        WP.RefreshGuild()
+        WP.RefreshGuildSoon()
     elseif prefix == PREFIX and channel == "GUILD" and type(msg) == "string" and sender then
         local who = Short(sender)
         if who ~= Me() then OnMessage(msg, who) end

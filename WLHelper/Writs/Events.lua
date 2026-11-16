@@ -143,7 +143,8 @@ ns.AddEnglish({
     ["%s : commence maintenant."] = "%s: starting now.",
     ["Plus tard"] = "Later",
     -- chat
-    ["Nouvel événement : %s, %s (par %s). Tape /wlh lfg pour t'inscrire."] = "New event: %s, %s (by %s). Type /wlh lfg to sign up.",
+    ["Nouvel événement de %s : %s, %s."] = "New event by %s: %s, %s.",
+    ["S'inscrire"] = "Sign up",
     ["Rappel : %s commence dans 1 h."] = "Reminder: %s starts in 1 h.",
     ["Rappel : %s commence dans %d min."] = "Reminder: %s starts in %d min.",
     ["%s commence maintenant."] = "%s starts now.",   -- the same English as Home.lua's, never a second value
@@ -156,8 +157,8 @@ ns.AddEnglish({
     ["%s s'inscrit à %s (%s). 1 inscrit en tout."] = "%s signed up for %s (%s). 1 sign-up so far.",
     ["%s s'inscrit à %s (%s). %d inscrits en tout."] = "%s signed up for %s (%s). %d sign-ups so far.",
     ["%s se désinscrit de %s."] = "%s is no longer signed up for %s.",
-    ["%s cherche un groupe pour %s (%s, niv. %s). Tape /wlh lfg pour l'inviter."] = "%s is looking for a group for %s (%s, level %s). Type /wlh lfg to invite them.",
-    ["%s cherche un groupe (%s, niv. %s). Tape /wlh lfg pour l'inviter."] = "%s is looking for a group (%s, level %s). Type /wlh lfg to invite them.",
+    ["%s cherche un groupe pour %s (%s, niv. %s)."] = "%s is looking for a group for %s (%s, level %s).",
+    ["%s cherche un groupe (%s, niv. %s)."] = "%s is looking for a group (%s, level %s).",
     ["Ton groupe est complet : ta recherche de groupe s'arrête."] = "Your group is full: your group search has stopped.",
     ["Les autres inscrits seront invités dès que le groupe passe en raid."] = "The other sign-ups will be invited as soon as the group becomes a raid.",
     -- read by other windows (Home, the module list, the Writs window, the buttons)
@@ -329,6 +330,16 @@ function WP.LFGCount(excludeMe)
 end
 
 local function Refresh() if WP.RefreshEvents then WP.RefreshEvents() end; if WP.RefreshHome then WP.RefreshHome() end end
+-- the guild's lines come in bursts (every copy answers "Q"): one redraw for the lot; clicks stay immediate
+local refreshPending = false
+local function RefreshSoon()
+    if not (C_Timer and C_Timer.After) then Refresh(); return end
+    if refreshPending then return end
+    refreshPending = true
+    C_Timer.After(0.3, function() refreshPending = false; Refresh() end)
+end
+-- "[text]" at the end of a chat line, a link that opens the place (FinderPeople.lua reads it)
+local function Link(text, kind, arg) return WP.AddonLink and (" " .. WP.AddonLink(text, kind, arg)) or "" end
 
 function WP.CreateEvent(title, when, tank, heal, dps, note)
     local e = { id = Me() .. "-" .. time() .. "-" .. math.random(100, 999), by = Me(), when = when, tank = tank, heal = heal, dps = dps,
@@ -608,7 +619,7 @@ local function OnMessage(msg, sender)
         cur.stub = nil   -- signups that came first are kept
         d.list[id] = cur
         if isNew and status == "open" and cur.when > time() and On() then
-            Say(string.format(L("Nouvel événement : %s, %s (par %s). Tape /wlh lfg pour t'inscrire."), cur.title, When(cur.when, true), sender))
+            Say(string.format(L("Nouvel événement de %s : %s, %s."), sender, cur.title, When(cur.when, true)) .. Link(L("S'inscrire"), "event", id))
         end
         -- an event I signed up for is cancelled: in the chat and on screen
         if wasOpen and status == "cancelled" and cur.signups and cur.signups[Me()] and On() then
@@ -616,7 +627,7 @@ local function OnMessage(msg, sender)
             Say(m)
             if RaidNotice_AddMessage and RaidWarningFrame then RaidNotice_AddMessage(RaidWarningFrame, m, { r = 0.81, g = 0.1, b = 0.09 }) end
         end
-        Refresh()
+        RefreshSoon()
     elseif kind == "J" then
         local id, role, cls, lvl, name = msg:match("^J|([^|]+)|(%a+)|(%u*)|(%d+)|([^|]+)$")
         local e = id and d.list[id]
@@ -637,7 +648,7 @@ local function OnMessage(msg, sender)
                 Say(string.format(L("%s se désinscrit de %s."), sender, e.title or "?"))
             end
         end
-        Refresh()
+        RefreshSoon()
     elseif kind == "N" then
         local role, cls, lvl, what = msg:match("^N|(%a+)|(%u*)|(%d*)|(.*)$")
         if not role then return end
@@ -650,19 +661,19 @@ local function OnMessage(msg, sender)
             if not was and On() and GetTime() - askedAt > 20 then
                 local who, rl, lv = ClassHex(cls) .. sender .. "|r", L(ROLE_LABEL[role] or "DPS"), lvl ~= "" and lvl or "?"
                 if what ~= "" then
-                    Say(string.format(L("%s cherche un groupe pour %s (%s, niv. %s). Tape /wlh lfg pour l'inviter."), who, what, rl, lv))
+                    Say(string.format(L("%s cherche un groupe pour %s (%s, niv. %s)."), who, what, rl, lv) .. Link(L("Voir"), "finder", "find"))
                 else
-                    Say(string.format(L("%s cherche un groupe (%s, niv. %s). Tape /wlh lfg pour l'inviter."), who, rl, lv))
+                    Say(string.format(L("%s cherche un groupe (%s, niv. %s)."), who, rl, lv) .. Link(L("Voir"), "finder", "find"))
                 end
             end
         end
-        Refresh()
+        RefreshSoon()
     elseif kind == "K" then
         -- "K|role|cls|lvl|key1,key2|what": the same search with the guide's dungeon keys; the N sent
         -- with it already said the news in the chat
         local role, cls, lvl, keys, what = msg:match("^K|(%a+)|(%u*)|(%d*)|([%w_,]*)|(.*)$")
         if not role then return end
-        if role == "x" then d.lfg[sender] = nil; Refresh(); return end
+        if role == "x" then d.lfg[sender] = nil; RefreshSoon(); return end
         local list = {}
         for k in keys:gmatch("[%w_]+") do list[#list + 1] = k end
         local l = d.lfg[sender] or { t = time() }
@@ -670,7 +681,7 @@ local function OnMessage(msg, sender)
         l.keys = CleanKeys(list)
         l.t = time()
         d.lfg[sender] = l
-        Refresh()
+        RefreshSoon()
     elseif kind == "Q" then
         -- someone logged in: what I organize, what I signed up for, whether I'm looking
         for _, e in pairs(d.list) do

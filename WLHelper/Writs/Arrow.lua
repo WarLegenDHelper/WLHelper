@@ -59,6 +59,7 @@ ns.AddEnglish({
     ["Clic : lancer %s"] = "Click: cast %s",
     ["Clic : utiliser %s"] = "Click: use %s",
     ["La téléportation attend la fin du combat."] = "The teleport waits for the end of the fight.",
+    ["En vol vers %s"] = "Flying to %s",
 })
 
 local arrow, teleport, demo
@@ -369,6 +370,7 @@ end
 -- What the cast is doing, shown as line 1 for a moment: requested, casting, interrupted.
 local castNote, castNoteUntil, casting = nil, 0, false
 local clickedAt = -100     -- when the button was last clicked: a cast starting just after is ours
+local flyStart             -- when the current flight started (Clock), nil when not on a taxi
 local function Note(text, seconds)
     castNote, castNoteUntil = text, Clock() + (seconds or 0)
     if arrow then arrow.redraw = true end
@@ -385,6 +387,10 @@ local function Draw(self, now, combat)
     local button = nil
     self.turn = false
     self.arrived = now.arrived and true or false
+    -- on a flight the plan stays on its "fly" leg until the landing (GPS.Replan waits): the clock
+    -- starts when the taxi does
+    local onTaxi = UnitOnTaxi and UnitOnTaxi("player") == true or false
+    if onTaxi then flyStart = flyStart or Clock() else flyStart = nil end
 
     local castLeg = leg and (leg.kind == "teleport" or leg.kind == "hearth") and not now.arrived
     local kind, id
@@ -417,7 +423,15 @@ local function Draw(self, now, combat)
         if SetVisual(self, "painted", FlyIcon()) then changed = true end
         local mapOpen = (TaxiFrame and TaxiFrame:IsShown()) or (FlightMapFrame and FlightMapFrame:IsShown())
         local place = Place(leg.to and leg.to.name)
-        if mapOpen then
+        if onTaxi then
+            -- in the air (the plan waits for the landing): where to, then what comes after, and the
+            -- time left from the flight's own estimate
+            what = string.format(L("En vol vers %s"), place ~= "" and place or "?")
+            where = legs and legs[2] and GPS.DescribeNext(legs[2]) or ""
+            if type(leg.seconds) == "number" and flyStart then
+                dist = S.Hex(C.muted) .. Duration(math.max(0, leg.seconds - (Clock() - flyStart))) .. "|r"
+            end
+        elseif mapOpen then
             -- the map is open: the sentence names the place, the button takes the flight
             what = GPS.Describe(leg)
             button = "fly"
@@ -668,6 +682,15 @@ local function BuildTeleport()
         end)
         if ok and k then fill:SetHeight(math.max(1, (ICON - 2) * k)) end
     end)
+    -- in combat the button may not hide: when its leg is done or the HUD is closed it only goes
+    -- transparent. The secure wrap drops every click in combat, so a button you cannot see never casts
+    -- (the HUD says the teleport waits for the end of the fight).
+    if SecureHandlerWrapScript and not teleport.wlWrapped then
+        local okH, hdr = pcall(CreateFrame, "Frame", nil, UIParent, "SecureHandlerBaseTemplate")
+        if okH and hdr and pcall(SecureHandlerWrapScript, teleport, "OnClick", hdr, "if PlayerInCombat() then return false end") then
+            teleport.wlWrapped = true
+        end
+    end
     teleport:Hide()
 end
 
@@ -765,7 +788,11 @@ local function Build()
         local combat = InCombatLockdown()
         if combat ~= self.combat then
             self.combat = combat
-            self:SetAlpha(combat and Opt("hideCombat", false) and 0 or 1)
+            -- "hide in combat": transparent, and no longer catching clicks or drags (not a secure frame)
+            local hidden = combat and Opt("hideCombat", false) and true or false
+            self:SetAlpha(hidden and 0 or 1)
+            self:EnableMouse(not hidden)
+            if self.close then self.close:EnableMouse(not hidden) end
             textAcc = TEXT_EVERY            -- redraw now: amber, buttons off
         end
         if self.moving then PlaceTeleport() end

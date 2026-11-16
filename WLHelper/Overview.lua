@@ -1974,8 +1974,10 @@ local function Build()
     local list = f.shareList or {}
     if #list == 0 or not ns.PushQuests then return end
     SetOn(self, false)
-    ns.PushQuests(list, function() if f:IsShown() then Render() end end)
+    -- the guide's share buttons grey out while this runs and come back when it ends
+    ns.PushQuests(list, function() if f:IsShown() then Render() end; if ns.Render then ns.Render() end end)
     if self:IsEnabled() == false and ns.pushBusy then self:SetText(L.SUM_SHARING) end
+    if ns.Render then ns.Render() end
   end, function() return { L.SUM_SHARE_ALL, L.SUM_SHARE_ALL_TT } end)
   f.shareAll:SetPoint("LEFT", 0, 0)
   f.shareAll:SetDisabledReason(L.SUM_SHARE_WHY)
@@ -2671,3 +2673,5 @@ function ns.ShowOverview(dkey)
   return ns.ShowSummary({ dkey }, not (WLDTDB.sel and WLDTDB.sel[dkey] and not next(WLDTDB.sel, next(WLDTDB.sel))))
 end
 function ns.HideOverview() if f then f:Hide() end end
+-- redraws the open summary (its share button follows a share started from the guide)
+function ns.RenderSummary() if f and f:IsShown() and Render then Render() end end

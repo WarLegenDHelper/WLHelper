@@ -42,14 +42,21 @@ end
 
 local function NumBags() return NUM_BAG_SLOTS or 4 end
 
--- grey: anything; white: weapons and armour only (never shirts, tabards, bags, food or reagents)
+-- Profession tools are white weapons with a tiny sell price: exactly what "the cheapest" would pick.
+-- Fishing Pole, Mining Pick, Blacksmith Hammer, Skinning Knife, Arclight Spanner, Gyromatic Micro-Adjustor.
+local TOOLS = { [6256] = 1, [2901] = 1, [5956] = 1, [7005] = 1, [6219] = 1, [10498] = 1 }
+
+-- grey: anything; white: weapons and armour only (never shirts, tabards, bags, food or reagents,
+-- fishing poles, miscellaneous weapons or profession tools)
 local function IsJunk(id, quality)
     if not id or quality == nil or quality > 1 then return false end
+    if TOOLS[id] then return false end
     local GetInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
-    local _, _, _, _, _, _, _, _, equipLoc, _, sell, classID = GetInfo(id)
+    local _, _, _, _, _, _, _, _, equipLoc, _, sell, classID, subclassID = GetInfo(id)
     if classID == 12 then return false end                   -- quest items: the cleaner's job
     if quality == 0 then return true, sell or 0 end
     if classID ~= 2 and classID ~= 4 then return false end
+    if classID == 2 and (subclassID == 20 or subclassID == 14) then return false end   -- fishing pole, miscellaneous
     if equipLoc == "INVTYPE_BODY" or equipLoc == "INVTYPE_TABARD" or equipLoc == "" or not equipLoc then return false end
     if not sell or sell <= 0 then return false end
     return true, sell
@@ -64,6 +71,11 @@ local function Cheapest()
             local info = Info(bag, slot)
             if info and info.itemID and not info.isLocked then
                 local ok, sell = IsJunk(info.itemID, info.quality)
+                -- a white piece that would fill an empty slot or beat what you wear stays
+                if ok and info.quality == 1 and type(WP.UpgradeCheck) == "function" and type(info.hyperlink) == "string" then
+                    local okU, u = pcall(WP.UpgradeCheck, info.hyperlink)
+                    if okU and type(u) == "table" and u.up then ok = false end
+                end
                 if ok then
                     local value = (sell or 0) * (info.stackCount or 1)
                     if not best or value < best.value then

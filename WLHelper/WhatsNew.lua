@@ -2,6 +2,22 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.85", date = "2026-11-16", items = {
+    { s = "add", fr = { "GPS en vol", "La flèche affiche « En vol vers Kargath », l'étape suivante et le temps restant." }, en = { "In flight, the arrow shows the destination, next step and time left.", "" } },
+    { s = "add", fr = { "Aller à", "Chaque lieu affiche le temps du trajet (vols et téléports compris), et l'infobulle donne le chemin (« Pierre de foyer → vol jusqu'à Kargath → 300 m à pied »)." }, en = { "Go to shows trip time and the itinerary.", "" } },
+    { s = "add", fr = { "Messages du chat cliquables", "Nouvel événement, joueur qui cherche un groupe, nouvelle commande, commande livrée ou refusée : un lien [S'inscrire], [Voir], [Remercier] ou [Répondre] ouvre directement le bon onglet." }, en = { "Clickable chat links open the right tab.", "" } },
+    { s = "add", fr = { "Accueil vivant", "Il se met à jour tout seul quand il est ouvert (recharges, événements, membres en ligne, niveau)." }, en = { "Home refreshes itself while open.", "" } },
+    { s = "chg", fr = { "Choisir un guide", "Cocher ou décocher puis fermer ne change plus la route en cours ; seule « Lancer la route » la change." }, en = { "Picker changes apply only with \"Start route\".", "" } },
+    { s = "chg", fr = { "Partager les quêtes", "Seulement celles qui se partagent, en une ligne ; bouton « Partage en cours » pendant le partage, plus de double partage." }, en = { "Quest sharing", "Shareable ones only, one line, no double share." } },
+    { s = "chg", fr = { "Moins de saccades", "Le guide lit le journal de quêtes une fois par objectif ; les réponses de la guilde qui arrivent ensemble ne redessinent la fenêtre qu'une fois." }, en = { "Fewer stutters in the guide and guild windows.", "" } },
+    { s = "chg", fr = { "Aujourd'hui (Writs)", "La phrase dit quoi faire (acheter les objets manquants, ouvrir les enveloppes, rendre) ou que c'est ton budget qui bloque." }, en = { "Writs Today explains what to do or that the budget is the limit.", "" } },
+    { s = "chg", fr = { "Tournée en ville", "Démarre même pendant la tournée des Writs (mise en pause, une ligne le dit)." }, en = { "City tour pauses the writs tour.", "" } },
+    { s = "fix", fr = { "Combat", "Le bouton de téléportation ne réagit plus aux clics en combat ; avec « Cacher en combat », la flèche ne capte plus la souris." }, en = { "Teleport button ignores clicks in combat; hidden arrow no longer takes the mouse.", "" } },
+    { s = "fix", fr = { "Prérequis", "Une quête faite sous une autre version (Seigneur Valthalak, quêtes à deux numéros, le Maillet) compte comme faite partout." }, en = { "Quests done under another ID count as done everywhere.", "" } },
+    { s = "fix", fr = { "Achats", "Un objet dont il manque des exemplaires n'est plus « Dans le sac » ; les quantités et prix ne comptent que ce qui manque." }, en = { "Shopping counts only what is missing.", "" } },
+    { s = "fix", fr = { "Clés", "« personne en ligne ne l'a » ne dépend plus des filtres de la fenêtre Guilde ; un membre qui se connecte reçoit bien tes clés." }, en = { "Keys", "Online check ignores guild filters; newcomers get your keys." } },
+    { s = "fix", fr = { "Nous écrire", "L'aide du formulaire « Un bug » dit ce qui est vraiment envoyé." }, en = { "Bug form hint is accurate.", "" } },
+  } },
   { v = "1.0.0-beta.84", date = "2026-11-16", items = {
     { s = "add", fr = { "Clic droit sur Commandes, Guilde ou Groupes", "À l'Accueil : ouvre directement leurs réglages. Nouvelle commande /wlh groupes." }, en = { "Right-click Orders, Guild or Groups on Home to open their settings; new /wlh groupes.", "" } },
     { s = "add", fr = { "/way", "Le repère dans le monde (lieu, distance, temps) s'affiche aussi pour tes points /way." }, en = { "The world label also shows for /way points.", "" } },
@@ -115,8 +131,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Points d'interrogation à la place des récompenses", "Un objet connu seulement par son nom retrouve son numéro dans LibForeverData (vraie icône, qualité, comparaison)." }, en = { "Reward icons", "Names matched to item ids through LibForeverData." } },
     { s = "fix", fr = { "Commander", "Quand un seul artisan sait fabriquer l'objet, l'infobulle le dit simplement, sans la ligne Maj-clic." }, en = { "Order tooltip", "No shift-click line when only one crafter can make it." } },
     { s = "fix", fr = { "Étape « prêt ? » du guide", "Une quête qu'on rend dans le donjon compte aussi parmi celles à prendre avant d'entrer." }, en = { "The guide's ready step also counts quests turned in inside.", "" } },
-  } },
-  { v = "1.0.0-beta.70", date = "2026-11-15", items = {
-    { s = "fix", fr = { "Marque sur le boss", "Un clic sur un portrait ciblait bien le boss mais ne posait pas la marque. La marque passe maintenant par la commande du jeu /tm, faite pour les macros (le script utilisé avant est bloqué sur ce client). Pareil pour le bouton de ciblage du guide et sa touche." }, en = { "Boss mark", "Clicking a portrait now also puts the marker on (game /tm command instead of a blocked script)." } },
   } },
 }

@@ -23,8 +23,8 @@ ns.AddEnglish({
     ["Un bug"] = "A bug",
     ["Une erreur de quête"] = "Wrong quest data",
     ["Une quête, un PNJ ou une position qui ne correspond pas au jeu."] = "A quest, an NPC or a position that does not match the game.",
-    ["Ce qui ne marche pas. Le formulaire reçoit ta version et la dernière erreur de l'addon."] =
-        "What does not work. The form gets your version and the addon's last error.",
+    ["Ce qui ne marche pas. Le formulaire reçoit ta version et la dernière action bloquée par le jeu."] =
+        "What does not work. The form gets your version and the last action the game blocked.",
     ["Ce qui te manque ou ce qui pourrait être plus simple."] = "What you miss or what could be simpler.",
     ["Copie le lien : il est déjà sélectionné, fais Ctrl+C."] = "Copy the link: it is already selected, press Ctrl+C.",
     ["Lien copié"] = "Link copied",
@@ -36,7 +36,7 @@ ns.AddEnglish({
 local REPO = "https://github.com/WarLegenDHelper/WLHelper/issues/new"
 local FORMS = {
     idea = { template = "idea.yml", label = "Une idée", hint = "Ce qui te manque ou ce qui pourrait être plus simple." },
-    bug  = { template = "bug.yml",  label = "Un bug", hint = "Ce qui ne marche pas. Le formulaire reçoit ta version et la dernière erreur de l'addon." },
+    bug  = { template = "bug.yml",  label = "Un bug", hint = "Ce qui ne marche pas. Le formulaire reçoit ta version et la dernière action bloquée par le jeu." },
     data = { template = "data.yml", label = "Une erreur de quête", hint = "Une quête, un PNJ ou une position qui ne correspond pas au jeu." },
 }
 local ORDER = { "idea", "bug", "data" }

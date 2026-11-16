@@ -604,10 +604,13 @@ end
 
 local upN, bagsDirty = 0, true   -- the upgrades line's bag scan, redone only after the bags changed
 
--- Home's only event listener: the quest log, the bags and the reputations, refreshed half a second
--- later; registered while the Home page shows, never on a hidden page.
+-- Home's only event listener: the quest log, the bags, the reputations, the guild roster and a
+-- level-up, refreshed half a second later; registered while the Home page shows, never on a hidden
+-- page. A 30 s ticker runs beside it while Home shows: the cooldowns count down (and turn "Prête"),
+-- "starts in N min" moves, the online counts follow.
 local homeEv = CreateFrame("Frame")
 local homeQueued = false
+local homeTicker
 homeEv:SetScript("OnEvent", function(self, event)
     if event == "BAG_UPDATE_DELAYED" then bagsDirty = true end
     if homeQueued or not Visible() then return end
@@ -616,11 +619,20 @@ homeEv:SetScript("OnEvent", function(self, event)
 end)
 local function HomeEvents(on)
     homeEv:UnregisterAllEvents()
+    if homeTicker then homeTicker:Cancel(); homeTicker = nil end
     if not on then return end
     pcall(homeEv.RegisterEvent, homeEv, "QUEST_LOG_UPDATE")
     pcall(homeEv.RegisterEvent, homeEv, "BAG_UPDATE_DELAYED")
     pcall(homeEv.RegisterEvent, homeEv, "UPDATE_FACTION")
+    pcall(homeEv.RegisterEvent, homeEv, "GUILD_ROSTER_UPDATE")
+    pcall(homeEv.RegisterEvent, homeEv, "PLAYER_LEVEL_UP")
+    if C_Timer and C_Timer.NewTicker then
+        homeTicker = C_Timer.NewTicker(30, function()
+            if Visible() then WP.RefreshHome() elseif homeTicker then homeTicker:Cancel(); homeTicker = nil end
+        end)
+    end
 end
+WP.HomeTicker = function() return homeTicker end   -- the offline tests
 
 -- Builds Home into the Hub's page p (again after a language change): the search, "now", the update
 -- line, the activity titles and one HubRow per entry of WP.HUB whose files are loaded.

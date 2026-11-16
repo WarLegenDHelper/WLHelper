@@ -211,12 +211,13 @@ local function Unguided(k, log)
     end
     return { state = "todo", unguided = true }
 end
-function K.Status(k)
+-- log: the quest log (root.LogEntries()), read once by the caller that asks for every key
+function K.Status(k, log)
     local quest = QuestOf(k)
     if quest and root.IsDone and root.IsDone(quest) then return { state = "have" } end
     if k.item and Count(k.item) > 0 then return { state = "have" } end
     if not quest then return { state = "todo" } end
-    local log = root.LogEntries and root.LogEntries() or {}
+    log = log or (root.LogEntries and root.LogEntries()) or {}
     local chain = Chain(quest)
     if not chain then
         if quest ~= k.quest and not (root.Q and root.Q[quest]) then return Unguided(k, log) end
@@ -351,8 +352,9 @@ K.Has = Has
 -- my keys as two numbers: owned, chain started
 function K.Masks()
     local o, p = 0, 0
+    local log = root.LogEntries and root.LogEntries() or {}
     for _, k in ipairs(LIST) do
-        local st = K.Status(k)
+        local st = K.Status(k, log)
         if st.state == "have" then o = o + Bit(k.id) elseif st.state == "prog" then p = p + Bit(k.id) end
     end
     return o, p
@@ -383,14 +385,25 @@ local function Clamp(v)
     if v > MAXMASK then v = v % (MAXMASK + 1) end
     return v
 end
+local lastSent, lastMsg, queued, lastAnswer, answerQueued = 0, nil, false, -1000, false
 -- a line from another member; anything that does not look right is dropped
 function K.OnMessage(msg, sender)
     if type(msg) ~= "string" or #msg > 250 or type(sender) ~= "string" then return end
     sender = Short(sender)
     if not sender or sender == "" or #sender > 48 or sender:find("[|%c]") then return end
     if msg == "R" then
-        -- every copy in the guild hears the same request: answering a few seconds apart spreads them
-        if C_Timer and C_Timer.After then C_Timer.After(2 + math.random() * 6, function() K.Share() end) else K.Share() end
+        -- a member who just logged in asks: answer even when my keys did not change since my last
+        -- line (they never heard it). Every copy in the guild hears the same request, so answering
+        -- a few seconds apart spreads them; requests close together get one line, at most one per
+        -- 20 s, and a request inside those 20 s is answered when they end (never dropped)
+        if answerQueued then return end
+        if not (C_Timer and C_Timer.After) then
+            if GetTime() - lastAnswer < 20 then return end
+            lastAnswer = GetTime(); K.Share(true); return
+        end
+        answerQueued = true
+        local wait = math.max(2 + math.random() * 6, lastAnswer + 20 - GetTime())
+        C_Timer.After(wait, function() answerQueued = false; lastAnswer = GetTime(); K.Share(true) end)
         return
     end
     local o, p = msg:match("^H|%d+|(%d+)|(%d+)")
@@ -400,10 +413,9 @@ function K.OnMessage(msg, sender)
     local b, known = Board()
     if not known then return end
     b[sender] = { o = o, p = p, t = time() }
-    if K.Refresh then K.Refresh() end
+    K.RefreshSoon()
 end
 
-local lastSent, lastMsg, queued = 0, nil, false
 function K.Share(force)
     if not (On() and K.ShareOn() and IsInGuild and IsInGuild() and SendRaw) then return end
     local msg = K.Message()
@@ -849,18 +861,41 @@ local function RefreshAll()
     if WP.RefreshGuild then WP.RefreshGuild() end
 end
 K.Refresh = RefreshAll
+-- the guild's answers come in a burst: one redraw for the lot
+local renderPending = false
+function K.RefreshSoon()
+    if not (C_Timer and C_Timer.After) then RefreshAll(); return end
+    if not renderPending then
+        renderPending = true
+        C_Timer.After(0.3, function() renderPending = false; Render() end)
+    end
+    if WP.RefreshGuildSoon then WP.RefreshGuildSoon() elseif WP.RefreshGuild then WP.RefreshGuild() end
+end
 
 -- ---------------------------------------------------------------- events
 local ev = CreateFrame("Frame")
 pcall(ev.RegisterEvent, ev, "PLAYER_LOGIN")
 pcall(ev.RegisterEvent, ev, "CHAT_MSG_ADDON")
-local pending = false
+local pending, bagsOnly = false, true
+-- the key items held (bags, key ring and bank): a loot that brings no key changes nothing
+local lastCounts
+local function KeyCounts()
+    local t = {}
+    for _, k in ipairs(LIST) do if k.item then t[#t + 1] = Count(k.item) > 0 and "1" or "0" end end
+    return table.concat(t)
+end
 -- bags and quests change often: one look a second later is enough
-local function Changed()
+local function Changed(fromBags)
+    bagsOnly = bagsOnly and fromBags and true or false
     if pending then return end
     pending = true
     local function go()
         pending = false
+        local onlyBags = bagsOnly
+        bagsOnly = true
+        local counts = KeyCounts()
+        if onlyBags and counts == lastCounts then return end
+        lastCounts = counts
         if win and win:IsShown() then Render() end
         K.Share()
     end
@@ -889,6 +924,6 @@ ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
     elseif e == "GUILD_ROSTER_UPDATE" then
         -- the Guild window refreshes itself on this event
     elseif On() then
-        Changed()
+        Changed(e == "BAG_UPDATE_DELAYED")
     end
 end)

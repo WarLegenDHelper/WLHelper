@@ -173,7 +173,11 @@ function WP.FavorPlan(missing, rows)
                 -- the real price when the listings were read (Ladder.lua), else the lowest price x n
                 local crateCost, crateAll = WP.CostFor and WP.CostFor(r.id, crates)
                 local capped = false
-                if crateCost == nil and crates > 0 and not r.cratePrice then
+                if crateCost == nil and crateAll == false and crates > 0 then
+                    -- the listings were read a moment ago and nobody sells this crate now: only the
+                    -- crates you hold count (the old scan price would plan a purchase that cannot happen)
+                    n, crates, crateCost = r.haveCrate, 0, 0
+                elseif crateCost == nil and crates > 0 and not r.cratePrice then
                     -- no price for this crate (no scan, no price addon): only the crates you hold
                     -- are counted, the rest of the Favor comes from priced crates (never "free")
                     n, crates, crateCost, capped = r.haveCrate, 0, 0, true
@@ -191,6 +195,8 @@ function WP.FavorPlan(missing, rows)
                     local c, all = nil, true
                     if WP.CostFor then c, all = WP.CostFor(o.item, buy) end
                     if c then return c, true, all end
+                    -- read a moment ago and none for sale: this bundle cannot be bought now
+                    if c == nil and all == false and buy > 0 then return nil end
                     local unit = WP.Price(o.item)
                     -- no listing read (or none for sale): the scan price, short when nobody sells it
                     if unit then return unit * buy, false, all ~= false end

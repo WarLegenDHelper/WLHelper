@@ -3,6 +3,36 @@ local ADDON, ns = ...
 local CQL = C_QuestLog
 local L = ns.L
 
+-- strings of the guide's share button and of a dungeon entered with the tracker (added to the
+-- root locale tables)
+do
+  local STR = {
+    fr = {
+      SHARE_GO1 = "Partage d'une quête avec le groupe", SHARE_GO = "Partage de %d quêtes avec le groupe",
+      SHARE_SKIP1 = "%d ne se partage pas", SHARE_SKIP = "%d ne se partagent pas",
+      SHARE_BUSY = "Partage déjà en cours : attends la fin avant de recommencer.",
+      SHARE_NONE = "Aucune quête de ton journal pour cette route ne se partage.",
+      INST_IN_TRACK = "(clic sur le suivi pour ouvrir le guide)",
+      INST_OFFER_TRACK = "Tu es dans %s : ouvre le guide pour l'ajouter à ta route.",
+    },
+    en = {
+      SHARE_GO1 = "Sharing 1 quest with the group", SHARE_GO = "Sharing %d quests with the group",
+      SHARE_SKIP1 = "%d cannot be shared", SHARE_SKIP = "%d cannot be shared",
+      SHARE_BUSY = "Already sharing: wait until it ends before sharing again.",
+      SHARE_NONE = "No quest of your log for this route can be shared.",
+      INST_IN_TRACK = "(click the tracker to open the guide)",
+      INST_OFFER_TRACK = "You are in %s: open the guide to add it to your route.",
+    },
+  }
+  local S = ns.LOCALE_TABLES
+  if S then
+    for lang, t in pairs(STR) do
+      S[lang] = S[lang] or {}
+      for k, v in pairs(t) do if S[lang][k] == nil then S[lang][k] = v end end
+    end
+  end
+end
+
 -- =====================================================================
 --  État des quêtes
 -- =====================================================================
@@ -10,7 +40,7 @@ function ns.IsDone(id)
   if CQL and CQL.IsQuestFlaggedCompleted then return CQL.IsQuestFlaggedCompleted(id) end
   return IsQuestFlaggedCompleted and IsQuestFlaggedCompleted(id)
 end
-local IsDone = ns.IsDone
+-- no local copy of ns.IsDone: Curated.lua wraps it later (aliases, Valthalak's versions, the Mallet)
 
 -- The quest log read once per frame: a refresh asks for it several times in a row.
 local logCache, logTime
@@ -500,7 +530,7 @@ function ns.ChainState(mainQid)
   local log = ns.LogEntries()
   local out = { total = #chain, done = 0, inLog = 0, chain = chain }
   for _, pid in ipairs(chain) do
-    if IsDone(pid) then out.done = out.done + 1
+    if ns.IsDone(pid) then out.done = out.done + 1
     else
       if log[pid] then out.inLog = out.inLog + 1 end
       if not out.nextPid then out.nextPid = pid; out.nextInLog = log[pid] ~= nil end
@@ -889,32 +919,46 @@ local function Pushable(id, e)
   return true
 end
 ns.Pushable = Pushable
+local function GuideQuests() return ns.Writs and ns.Writs.WP and ns.Writs.WP.GuideQuests end
+-- The quests the share button pushes: the route's quests of your log the game lets you share, the
+-- ones the auto-share already pushed to this group left out (all of them again when only those are
+-- left: the click asks for it, a member may have joined since). -> list, how many cannot be shared
+local function ShareQueue()
+  local list, log = ns.ShareList()
+  local GQ = GuideQuests()
+  local fresh, again, skip = {}, {}, 0
+  for _, id in ipairs(list) do
+    if not Pushable(id, log[id]) then skip = skip + 1
+    elseif GQ and GQ.Shared and GQ.Shared(id) then again[#again + 1] = id
+    else fresh[#fresh + 1] = id end
+  end
+  return (#fresh > 0 and fresh or again), skip
+end
 -- How many quests of the route in your log can be shared now (the share button's count).
 function ns.ShareCount()
-  local list, log = ns.ShareList()
-  local n = 0
-  for _, id in ipairs(list) do if Pushable(id, log[id]) then n = n + 1 end end
-  return n
+  local q = ShareQueue()
+  return #q
 end
 function ns.ShareQuests()
   local P = ns.Print
-  if not IsInGroup() then P(L.NOGROUP) return end
-  local queue = ns.ShareList()
-  if #queue == 0 then P(L.NOSHARE) return end
-  local delay = 0
-  for _, id in ipairs(queue) do
-    C_Timer.After(delay, function()
-      local e = ns.LogEntries()[id]
-      if not e then return end
-      if SelectQuestLogEntry then SelectQuestLogEntry(e.index)
-      elseif CQL and CQL.SetSelectedQuest then CQL.SetSelectedQuest(id) end
-      local pushable = (GetQuestLogPushable and GetQuestLogPushable()) or (CQL and CQL.IsPushableQuest and CQL.IsPushableQuest(id))
-      if pushable then QuestLogPushQuest(); P(L.SHARED:format(e.title or id))
-      else P(L.NOTSHARE:format(e.title or id)) end
-    end)
-    delay = delay + 1.5
+  if not (IsInGroup and IsInGroup()) then P(L.NOGROUP) return end
+  if ns.pushBusy then P(L.SHARE_BUSY) return end
+  local queue, skip = ShareQueue()
+  if #queue == 0 then P(skip > 0 and L.SHARE_NONE or L.NOSHARE) return end
+  local GQ = GuideQuests()
+  if GQ and GQ.MarkShared then for _, id in ipairs(queue) do GQ.MarkShared(id) end end
+  local line = ns.Plural(#queue, "SHARE_GO1", "SHARE_GO", #queue)
+  if skip > 0 then line = line .. " · " .. ns.Plural(skip, "SHARE_SKIP1", "SHARE_SKIP", skip) end
+  P(line)
+  if ns.PushQuests then
+    -- the summary's "share all" greys out while this runs and comes back when it ends
+    local function Redraw()
+      if ns.Render then ns.Render() end
+      if ns.RenderSummary then ns.RenderSummary() end
+    end
+    ns.PushQuests(queue, Redraw)
+    if ns.RenderSummary then ns.RenderSummary() end
   end
-  P(ns.Plural(#queue, "SHARING1", "SHARING", #queue))
 end
 
 

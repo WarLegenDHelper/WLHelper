@@ -364,12 +364,15 @@ end
 -- every share button (footer, inside band, Actions menu): the count in the label, greyed at 0
 local function SetShareButton(b, n, withLabel)
   if not b then return end
-  if withLabel then b:SetText(ShareLabel(n)) end
-  if n > 0 then b:Enable() else b:Disable() end
-  b.disabledReason = (IsInGroup and IsInGroup()) and L.NOSHARE or L.NOGROUP_TIP
+  -- a share running (this button or the overview's): greyed, "Sharing" until it ends
+  local busy = ns.pushBusy and true or false
+  if withLabel then b:SetText(busy and L.SUM_SHARING or ShareLabel(n)) end
+  if n > 0 and not busy then b:Enable() else b:Disable() end
+  b.disabledReason = busy and L.SUM_SHARING or ((IsInGroup and IsInGroup()) and L.NOSHARE or L.NOGROUP_TIP)
 end
 local function DoShare()
   ns.ShareQuests(); shareAt = -10
+  if ns.Render then ns.Render() end
   if C_Timer and C_Timer.After and ns.Render then C_Timer.After(1, ns.Render) end
 end
 
@@ -2592,7 +2595,11 @@ local function CentredBlock(card, icon, color, title, text)
   return y + 24
 end
 
-Render = function()
+local RenderNow
+-- every render is one pass: the step states it reads 4-5 times (progress, chapters, list, band)
+-- are asked of the quest log once (a GoTo, the wheel, the width grip render outside a refresh)
+Render = function() if ns.InPass then return ns.InPass(RenderNow) end return RenderNow() end
+RenderNow = function()
   if not f then return end
   f.pending = false
   local log = ns.LogEntries()

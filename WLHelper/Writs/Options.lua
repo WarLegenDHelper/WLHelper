@@ -68,7 +68,19 @@ ns.AddEnglish({
     ["Repère les objets de quête qui ne servent plus et libère de la place."] = "Finds quest items you no longer need and frees up space.",
     ["Demande un objet à un artisan de la guilde, ou prends les commandes des autres."] =
         "Ask a guild crafter for an item, or take other people's orders.",
-    ["Toute la guilde et le classement PvP."] = "The whole guild and the PvP ranking.",
+    ["Toute la guilde, le classement PvP et les quêtes en commun."] = "The whole guild, the PvP ranking and the shared quests.",
+    ["Tes clés et accès de donjons et de raids, et qui les a dans la guilde."] =
+        "Your dungeon and raid keys and attunements, and who in the guild has them.",
+    ["Les quêtes à abandonner quand ton journal est presque plein."] = "The quests to abandon when your quest log is nearly full.",
+    -- the Orders and Guild pages
+    ["Les alertes des commandes : favoris, recettes surveillées, son."] = "Order alerts: favourites, watched recipes, sound.",
+    ["Ce que tu partages avec la guilde."] = "What you share with the guild.",
+    ["Alertes"] = "Alerts",
+    ["Partage"] = "Sharing",
+    ["En ville"] = "In town",
+    ["Journal de quêtes"] = "Quest log",
+    ["Les deux alertes se règlent aussi sur ta fiche d'artisan, dans la fenêtre Commandes."] =
+        "Both alerts can also be set on your crafter profile, in the Orders window.",
     ["Les événements de la guilde et les groupes du moment."] = "Guild events and the groups forming now.",
     ["Une flèche verte sur les objets meilleurs que ceux que tu portes."] = "A green arrow on items better than the ones you wear.",
     -- General
@@ -225,7 +237,7 @@ ns.AddEnglish({
     ["Dis-nous ce qui manque ou ce qui coince. Chaque bouton t'affiche un lien à ouvrir dans ton navigateur."] =
         "Tell us what's missing or broken. Each button gives you a link to open in your browser.",
     ["Commandes du chat"] = "Chat commands",
-    -- T-80: the Orders alerts (General, section Commandes)
+    -- T-80: the Orders alerts (the Commandes page)
     ["Un favori se connecte"] = "A favourite logs in",
     ["Une alerte quand un artisan de tes favoris arrive en ligne, au plus toutes les 30 min pour chacun."] =
         "An alert when one of your favourite crafters comes online, at most every 30 min for each.",
@@ -692,6 +704,8 @@ local PAGES = {
     { key = "comptoir", label = "Writs",         group = "items", icon = MI.writs or "Interface\\Icons\\INV_Letter_15", desc = "Remise des Writs, rappels, objectif et zones." },
     { key = "bags",     label = "Sacs",          group = "items", icon = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", desc = "Place dans les sacs et vente des objets gris." },
     { key = "upgrades", label = "Améliorations", group = "items", icon = MI.upgrades or { hd = "arrow_up", color = T.ok }, desc = "Calcul, spé et affichage des améliorations." },
+    { key = "orders",   label = "Commandes",     group = "items", icon = MI.orders or "Interface\\Icons\\Trade_BlackSmithing", desc = "Les alertes des commandes : favoris, recettes surveillées, son." },
+    { key = "guild",    label = "Guilde",        group = "guild", icon = MI.guild or "Interface\\Icons\\INV_BannerPVP_01", desc = "Ce que tu partages avec la guilde." },
     { key = "groups",   label = "Groupes",       group = "guild", icon = { hd = "group" },             desc = "Messages, chuchotements et notes de Trouver un groupe." },
     { key = "general",  label = "Général",       group = "settings", icon = { hd = "gear" },          desc = "Modules, clics, langue et fenêtres." },
     { key = "about",    label = "À propos",      group = "settings", icon = { hd = "info" },          desc = "Version, crédits, contact et commandes du chat." },
@@ -704,19 +718,24 @@ local MODULE_DESC = {
     writs = "Les Writs à faire, la liste d'achat et la remise automatique.",
     bags = "Repère les objets de quête qui ne servent plus et libère de la place.",
     orders = "Demande un objet à un artisan de la guilde, ou prends les commandes des autres.",
-    guild = "Toute la guilde et le classement PvP.",
+    guild = "Toute la guilde, le classement PvP et les quêtes en commun.",
     events = "Les événements de la guilde et les groupes du moment.",
     upgrades = "Une flèche verte sur les objets meilleurs que ceux que tu portes.",
+    keys = "Tes clés et accès de donjons et de raids, et qui les a dans la guilde.",
+    triage = "Les quêtes à abandonner quand ton journal est presque plein.",
 }
 local MODULE_ICON = {
     dungeons = MI.dungeons or "Interface\\Icons\\INV_Misc_Map_01", writs = MI.writs or "Interface\\Icons\\INV_Letter_15",
     bags = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", upgrades = MI.upgrades or { hd = "arrow_up", color = T.ok },
+    orders = MI.orders or "Interface\\Icons\\Trade_BlackSmithing", guild = MI.guild or "Interface\\Icons\\INV_BannerPVP_01",
 }
 
 -- A module's name, the one its window and its Home card show: "Groupes" (as WP.MODULES),
--- and "Writs" (WP.MODULES says "Writs & Favor" for the trading post).
+-- "Writs" (WP.MODULES says "Writs & Favor" for the trading post) and "Passeport des clés" (Home,
+-- Welcome and the tour: WP.MODULES says "Clés").
 local function ModLabel(m)
-    if m.key == "events" then return L("Groupes") elseif m.key == "writs" then return L("Writs") end
+    if m.key == "events" then return L("Groupes") elseif m.key == "writs" then return L("Writs")
+    elseif m.key == "keys" then return L("Passeport des clés") end
     return L(m.label)
 end
 local function ModDesc(m)
@@ -724,6 +743,7 @@ local function ModDesc(m)
 end
 
 local Rebuild   -- defined with the window: rebuilds every page after a language change
+local RebuildPage   -- defined with the window: rebuilds one settings page (a new spec, a new bracket)
 local Relayout  -- defined with the window: re-measures the page shown and fits the window
 
 local BUILD = {}
@@ -774,49 +794,6 @@ function BUILD.general(p)
         end
     end
 
-    -- the smaller tools (Home, "Outils"): each row only when its file is loaded
-    local CT, Tr = ns.WP.CityTour, ns.WP.Triage
-    if (CT and CT.IsOn) or Tr then
-        Section(p, L("Outils"))
-        if CT and CT.IsOn and CT.SetOn then
-            SwitchRow(p, L("Tournée en ville"), function() return CT.IsOn() end, function(v) CT.SetOn(v) end,
-                L("En arrivant dans une capitale, une petite fiche liste ce qu'il y a à faire : courrier, réparations, maître de classe, quêtes à rendre."))
-        end
-        if Tr then
-            SwitchRow(p, L("Proposer le tri du journal"), function() return WLWritsDB.triageNotice ~= false end,
-                function(v) WLWritsDB.triageNotice = v and true or false end,
-                L("Quand ton journal de quêtes est presque plein, une ligne dans le chat propose de voir les quêtes à abandonner."))
-        end
-    end
-
-    -- what this copy tells the guild's copies: each one can be kept private
-    local K, Sh = ns.WP.Keys, ns.WP.Shared
-    if (K and K.ShareOn) or (Sh and Sh.GetShare) then
-        Section(p, L("Guilde"))
-        if K and K.ShareOn and K.SetShare then
-            SwitchRow(p, L("Partager mes clés avec la guilde"), function() return K.ShareOn() end, function(v) K.SetShare(v) end,
-                L("Les membres qui ont WL Helper voient quelles clés tu as, dans l'onglet Qui a la clé ? de la guilde."))
-        end
-        if Sh and Sh.GetShare and Sh.SetShare then
-            SwitchRow(p, L("Partager mes quêtes de donjon"), function() return Sh.GetShare() end, function(v) Sh.SetShare(v) end,
-                L("Les membres de la guilde qui ont WL Helper voient quelles quêtes de donjon tu as, pour grouper. Rien d'autre n'est envoyé."))
-        end
-    end
-
-    -- the Orders alerts (T-80): the same switches as on my crafter profile
-    if ns.WP.Orders then
-        Section(p, L("Commandes"))
-        SwitchRow(p, L("Un favori se connecte"), function() return Writs().ordersAlertFav ~= false end,
-            function(v) Writs().ordersAlertFav = v and true or false end,
-            L("Une alerte quand un artisan de tes favoris arrive en ligne, au plus toutes les 30 min pour chacun."))
-        SwitchRow(p, L("Une recette surveillée est apprise"), function() return Writs().ordersAlertWatch ~= false end,
-            function(v) Writs().ordersAlertWatch = v and true or false end,
-            L("Une alerte quand un membre de la guilde apprend une recette que tu surveilles, une fois par membre et par recette."))
-        SwitchRow(p, L("Son quand quelqu'un sait le faire"), function() return Writs().ordersKnownSound ~= false end,
-            function(v) Writs().ordersKnownSound = v and true or false end,
-            L("Avec « Me prévenir quand quelqu'un sait le faire » sur la page Demande : un son avec la ligne du chat."))
-    end
-
     Section(p, L("Langue"))
     local row = Row(p, L("Langue de l'addon"), L("Automatique suit la langue du jeu. Les fenêtres déjà ouvertes changent après un /reload."))
     Choice(p, row, {
@@ -850,6 +827,37 @@ function BUILD.general(p)
         L("Ouvre l'Accueil de WL Helper d'un clic."))
     SwitchRow(p, L("Rouvrir le guide à la connexion"), function() return Guide().reopenGuide == true end,
         function(v) Guide().reopenGuide = v end, L("Même si tu l'avais fermé avant de te déconnecter."))
+end
+
+-- the Orders page (T-80 alerts): the first two are also on my crafter profile
+function BUILD.orders(p)
+    if not ns.WP.Orders then return end
+    Section(p, L("Alertes"))
+    SwitchRow(p, L("Un favori se connecte"), function() return Writs().ordersAlertFav ~= false end,
+        function(v) Writs().ordersAlertFav = v and true or false end,
+        L("Une alerte quand un artisan de tes favoris arrive en ligne, au plus toutes les 30 min pour chacun."))
+    SwitchRow(p, L("Une recette surveillée est apprise"), function() return Writs().ordersAlertWatch ~= false end,
+        function(v) Writs().ordersAlertWatch = v and true or false end,
+        L("Une alerte quand un membre de la guilde apprend une recette que tu surveilles, une fois par membre et par recette."))
+    SwitchRow(p, L("Son quand quelqu'un sait le faire"), function() return Writs().ordersKnownSound ~= false end,
+        function(v) Writs().ordersKnownSound = v and true or false end,
+        L("Avec « Me prévenir quand quelqu'un sait le faire » sur la page Demande : un son avec la ligne du chat."))
+    Note(p, L("Les deux alertes se règlent aussi sur ta fiche d'artisan, dans la fenêtre Commandes."))
+end
+
+-- the Guild page: what this copy tells the guild's copies, each one can be kept private
+function BUILD.guild(p)
+    local K, Sh = ns.WP.Keys, ns.WP.Shared
+    if not ((K and K.ShareOn) or (Sh and Sh.GetShare)) then return end
+    Section(p, L("Partage"))
+    if K and K.ShareOn and K.SetShare then
+        SwitchRow(p, L("Partager mes clés avec la guilde"), function() return K.ShareOn() end, function(v) K.SetShare(v) end,
+            L("Les membres qui ont WL Helper voient quelles clés tu as, dans l'onglet Qui a la clé ? de la guilde."))
+    end
+    if Sh and Sh.GetShare and Sh.SetShare then
+        SwitchRow(p, L("Partager mes quêtes de donjon"), function() return Sh.GetShare() end, function(v) Sh.SetShare(v) end,
+            L("Les membres de la guilde qui ont WL Helper voient quelles quêtes de donjon tu as, pour grouper. Rien d'autre n'est envoyé."))
+    end
 end
 
 function BUILD.dungeons(p)
@@ -900,6 +908,13 @@ function BUILD.dungeons(p)
             if root.Recalc and root.frame then root.Recalc() end
             if root.RenderPicker then root.RenderPicker() end
         end)
+    -- the quest log triage (Writs/LogTriage.lua): its chat offer
+    if ns.WP.Triage then
+        Section(p, L("Journal de quêtes"))
+        SwitchRow(p, L("Proposer le tri du journal"), function() return WLWritsDB.triageNotice ~= false end,
+            function(v) WLWritsDB.triageNotice = v and true or false end,
+            L("Quand ton journal de quêtes est presque plein, une ligne dans le chat propose de voir les quêtes à abandonner."))
+    end
 end
 
 function BUILD.comptoir(p)
@@ -1048,6 +1063,14 @@ function BUILD.gps(p)
         SwitchRow(p, L("Prendre /way"), wants, function(v) Way.SetTake(v) end, desc)
     end
 
+    -- the city tour (Writs/CityTour.lua): its card when you arrive in a capital
+    local CT = ns.WP.CityTour
+    if CT and CT.IsOn and CT.SetOn then
+        Section(p, L("En ville"))
+        SwitchRow(p, L("Tournée en ville"), function() return CT.IsOn() end, function(v) CT.SetOn(v) end,
+            L("En arrivant dans une capitale, une petite fiche liste ce qu'il y a à faire : courrier, réparations, maître de classe, quêtes à rendre."))
+    end
+
     Section(p, L("Flèche"))
     PercentSlider(p, L("Taille de la flèche"), 70, 150, function() return Gps().scale end, SetGps("scale"))
     PercentSlider(p, L("Opacité du fond"), 0, 100, function() return Gps().alpha end, SetGps("alpha"))
@@ -1101,7 +1124,11 @@ function BUILD.upgrades(p)
     local srow = Row(p, L("Spé évaluée"), L("Auto : l'arbre de talents où tu as le plus de points."))
     Choice(p, srow, Wt.SpecChoices(),
         function() local db, c = SpecDB(); return db[c] or "auto" end,
-        function(v) local db, c = SpecDB(); db[c] = v; Refresh(); if Rebuild then C_Timer.After(0, Rebuild) end end)
+        function(v)
+            local db, c = SpecDB(); db[c] = v; Refresh()
+            -- this page only, once the click has finished (this very control belongs to the old page)
+            if RebuildPage then C_Timer.After(0, function() RebuildPage("upgrades") end) end
+        end)
     local mrow = Row(p, L("Spé principale"), L("Celle de tes talents, ou celle choisie plus haut. Toujours sur la première ligne."))
     local mainName = ValueText(mrow, 200)
     function mainName:Sync() self:SetText(Wt.SpecName()) end
@@ -1129,11 +1156,14 @@ function BUILD.upgrades(p)
         function(v) WLWritsDB.hideGFTip = v; ApplyTip() end, L("Quand ton addon d'équipement affiche déjà le même pourcentage."))
 
     local _, label = Wt.Bracket()
-    -- built once: a level-up across a bracket or a respec on Auto rebuilds the pages when shown
+    -- built once: a level-up across a bracket or a respec on Auto rebuilds this page when shown
     local built = Wt.SpecName() .. label
     p.controls[#p.controls + 1] = { Sync = function()
         local _, l = Wt.Bracket()
-        if Wt.SpecName() .. l ~= built and Rebuild then C_Timer.After(0, Rebuild) end
+        if Wt.SpecName() .. l ~= built and RebuildPage then
+            built = Wt.SpecName() .. l   -- once: the new page carries the new name
+            C_Timer.After(0, function() RebuildPage("upgrades") end)
+        end
     end }
     Section(p, string.format(L("Poids utilisés : %s, niveaux %s"), Wt.SpecName(), label))
     -- a zebra list: stat name at the left, weight in a number column at the right
@@ -1289,6 +1319,8 @@ local OPEN = {
     end },
     comptoir = { "Ouvrir les Writs", function() if win then win:Hide() end; ns.WP.Open("writs") end },
     bags = { "Nettoyer les sacs", function() if win then win:Hide() end; if ns.WP.Cleaner then ns.WP.Cleaner.Toggle() end end },
+    orders = { "Ouvrir les commandes", function() if win then win:Hide() end; if ns.WP.ToggleOrders then ns.WP.ToggleOrders() end end },
+    guild = { "Ouvrir la guilde", function() if win then win:Hide() end; if ns.WP.ToggleGuild then ns.WP.ToggleGuild() end end },
 }
 local function ModuleCard(p, pageKey, mod)
     local m = { key = mod, label = mod }
@@ -1345,6 +1377,20 @@ local function ModuleCard(p, pageKey, mod)
     -- found by the search as well
     Register(p, c, ModLabel(m), ModDesc(m))
     c.pageY = 12
+end
+
+-- A settings page is built the first time it shows: its module card (a module page), then its rows.
+local PAGE_MODULE = { dungeons = "dungeons", comptoir = "writs", bags = "bags", upgrades = "upgrades",
+    orders = "orders", guild = "guild" }
+local function NewSettingsPage(p, def)
+    p.built = false
+    function p:Build()
+        if self.built then return end
+        self.built = true
+        local mod = PAGE_MODULE[def.key]
+        if mod then ModuleCard(self, def.key, mod) end
+        BUILD[def.key](self)
+    end
 end
 
 -- Builds the nav and every page into a fresh body frame (again after a language change or a new
@@ -1485,14 +1531,7 @@ local function BuildBody()
             if ns.WP.HomePage then ns.WP.HomePage.Build(p, CONTENT_W, win) end
             p.built = true
         else
-            p.built = false
-            function p:Build()
-                if self.built then return end
-                self.built = true
-                local mod = ({ dungeons = "dungeons", comptoir = "writs", bags = "bags", upgrades = "upgrades" })[def.key]
-                if mod then ModuleCard(self, def.key, mod) end
-                BUILD[def.key](self)
-            end
+            NewSettingsPage(p, def)
         end
         body.pages[def.key] = p
     end
@@ -1589,6 +1628,38 @@ Rebuild = function()
     current = nil
     ns.WP.OpenHub(keep or "home")
 end
+
+-- One settings page built again (a new spec or level bracket on Améliorations): only its holder is
+-- orphaned, its search entries replaced; the nav, Home, the other pages, the search and, when it is
+-- the page shown, its scroll position are kept.
+RebuildPage = function(key)
+    if not (win and body and body.pages and body.pages[key]) or key == "home" then return end
+    local def
+    for _, d in ipairs(PAGES) do if d.key == key then def = d end end
+    if not def then return end
+    local old = body.pages[key]
+    local scroll = (current == key and old.sa and old.sa:GetScroll()) or 0
+    for i = #INDEX, 1, -1 do
+        if INDEX[i].page == key then table.remove(INDEX, i) end
+    end
+    old:Hide()
+    old.holder:SetParent(nil)
+    local p = NewPage(body.content, def)
+    p.key, p.pageLabel, p.pageIcon = def.key, L(def.label), def.icon
+    NewSettingsPage(p, def)
+    if old.built then p:Build() end
+    body.pages[key] = p
+    local searching = body.results and body.results:IsShown()
+    if searching then
+        if body.SearchUpdate then body.SearchUpdate() end
+    elseif current == key and win:IsShown() then
+        p:Show(); p:Sync(); p:Layout()
+        p.sa:ScrollTo(math.max(0, num(scroll) or 0), true)
+        Relayout()
+    end
+end
+ns.WP.RebuildHubPage = function(key) if RebuildPage then RebuildPage(key) end end
+ns.WP.HubIndex = function() return INDEX end   -- the offline tests
 
 -- Shows the window on a page (builds it the first time).
 local ShowPage
@@ -1861,6 +1932,7 @@ BuildSearch = function(nav, content)
         Relayout()
     end
 
+    body.SearchUpdate = Update   -- a page built again (RebuildPage) re-runs the search shown
     -- opens the page, scrolls the row into view and makes it flash
     Pick = function(e)
         if not e then return end
@@ -1934,7 +2006,7 @@ function ns.WP.SyncOptions()
 end
 
 -- WP.OpenHub(page, anchor): shows the Hub on a page ("home", "dungeons", "gps", "comptoir",
--- "bags", "upgrades", "general", "about"; Home by default, or the page it was on), built the first
+-- "bags", "upgrades", "orders", "guild", "groups", "general", "about"; Home by default, or the page it was on), built the first
 -- time. anchor: a section or a row label of that page (French key): scrolled to and flashed.
 function ns.WP.OpenHub(page, anchor)
     if not win then BuildWindow()

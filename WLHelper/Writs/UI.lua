@@ -69,6 +69,10 @@ ns.AddEnglish({
     ["Rends tes Writs prêts, puis achètes-en %d de plus."] = "Turn in your ready Writs, then buy %d more.",
     ["%d Writs dépassent ton prix max : monte-le dans l'onglet Achats."] = "%d Writs are above your max price: raise it in the Shopping tab.",
     ["Aucun Writ abordable aujourd'hui : les offres changent demain."] = "No affordable Writ today: the offers change tomorrow.",
+    ["Tes Writs en main suffisent : achète les objets manquants, puis rends-les."] = "The Writs you hold are enough: buy the missing items, then turn them in.",
+    ["Ouvre tes enveloppes et rends-les : c'est bon pour aujourd'hui."] = "Open your envelopes and turn them in: that does it for today.",
+    ["Rends tes Writs en cours : c'est bon pour aujourd'hui."] = "Turn in the Writs you have taken: that does it for today.",
+    ["Rien dans ton budget : monte-le dans l'onglet Achats."] = "Nothing within your budget: raise it in the Shopping tab.",
     ["Nouveaux Writs dans %d min"] = "New Writs in %d min",
     ["Nouveaux Writs dans %d h"] = "New Writs in %d h",
     ["À rendre maintenant"] = "To turn in now",
@@ -139,7 +143,7 @@ ns.AddEnglish({
     ["Pas en vente à l'HV"] = "Not for sale at the AH",
     ["Peu en vente : pas assez pour tout"] = "Few for sale: not enough for all",
     ["Enveloppe"] = "Envelope",
-    ["Dans tes sacs : %d sur %d"] = "In your bags: %d of %d",
+    ["Dans tes sacs : %d · à acheter : %d"] = "In your bags: %d · to buy: %d",
     ["En vente au dernier scan : %d"] = "For sale at the last scan: %d",
     ["Clic : acheter l'enveloppe et l'objet"] = "Click: buy the envelope and the item",
     ["Maj-clic : chercher à l'HV"] = "Shift-click: search at the AH",
@@ -672,6 +676,22 @@ local function RenderToday()
                 else
                     today.message:SetText(string.format(L("Il te faut encore %d Writs, pour environ %s."), #plan, S.Money(cost)))
                 end
+            elseif pending >= need then
+                -- the writs in hand cover the goal, none is ready yet: say what is left to do
+                local missingItem, envelope = false, false
+                for _, r in ipairs(data) do
+                    if (r.state == "log" or r.state == "bag") and r.w.map and not r.tooHigh then
+                        if not r.ownItem then missingItem = true end
+                        if r.state == "bag" then envelope = true end
+                    end
+                end
+                -- only quests already taken (their items owned, maybe in the bank): no envelope to open
+                today.message:SetText(missingItem and L("Tes Writs en main suffisent : achète les objets manquants, puis rends-les.")
+                    or envelope and L("Ouvre tes enveloppes et rends-les : c'est bon pour aujourd'hui.")
+                    or L("Rends tes Writs en cours : c'est bon pour aujourd'hui."))
+            elseif WP.budgetInfo and (WP.budgetInfo.cands or 0) > 0 then
+                -- the budget is what leaves the plan empty (the Shopping tab says the same)
+                today.message:SetText(L("Rien dans ton budget : monte-le dans l'onglet Achats."))
             else
                 -- nothing planned: say so when the price cap is what keeps writs out
                 local capped = CappedCount()
@@ -817,6 +837,8 @@ local function RenderToday()
         local eh
         if done > 0 and #plan == 0 then
             eh = today.empty:Set("check", L("Tout est rendu pour aujourd'hui"), L("De nouveaux Writs arrivent à la réinitialisation quotidienne."))
+        elseif need and need > 0 and #plan == 0 and need > pending and WP.budgetInfo and (WP.budgetInfo.cands or 0) > 0 then
+            eh = today.empty:Set("coin", L("Rien dans ton budget"), L("Rien dans ton budget : monte-le dans l'onglet Achats."))
         elseif capped > 0 then
             eh = today.empty:Set("coin", L("Aucun Writ sous ton prix max"), L("Monte le prix max dans l'onglet Achats pour en voir plus."))
         else
@@ -944,13 +966,13 @@ local function BuildShop(p)
             local pair, entries = {}, {}
             for _, x in ipairs(shop) do
                 if x.group == e.group and not x.done then
-                    pair[#pair + 1] = { id = x.id, qty = math.max(1, x.need - x.have), order = x.order or 0 }
+                    pair[#pair + 1] = { id = x.id, qty = math.max(1, x.need), order = x.order or 0 }
                     entries[#entries + 1] = x
                 end
             end
             if IsShiftKeyDown() then WP.SearchList(#entries > 0 and entries or { e }); return end
             table.sort(pair, function(a, b) return a.order < b.order end)
-            if #pair == 0 then pair = { { id = e.id, qty = math.max(1, e.need - e.have) } } end
+            if #pair == 0 then pair = { { id = e.id, qty = math.max(1, e.need) } } end
             WP.Scan.BuyQueue(pair)
         end })
         r.valueW = 110
@@ -959,11 +981,11 @@ local function BuildShop(p)
             if not e then return nil end
             local lines = { self.title or e.name }
             for _, x in ipairs(self.entries or { e }) do
-                local left = math.max(0, x.need - x.have)
+                local left = math.max(0, x.need)
                 local price = x.done and L("Dans le sac") or (x.src == "Absent" and L("Pas en vente à l'HV"))
                     or (x.price and (S.Money(x.price * left) .. (left > 1 and (" (" .. left .. " x " .. S.Money(x.price) .. ")") or "")) or "?")
                 lines[#lines + 1] = { (x.isWrit and L("Enveloppe") or x.name) .. " : " .. price, C.fg[1], C.fg[2], C.fg[3] }
-                local sub = string.format(L("Dans tes sacs : %d sur %d"), x.have, x.need)
+                local sub = string.format(L("Dans tes sacs : %d · à acheter : %d"), x.owned or 0, left)
                 if x.listed then sub = sub .. " · " .. string.format(L("En vente au dernier scan : %d"), x.listed) end
                 lines[#lines + 1] = sub
             end
@@ -983,7 +1005,7 @@ local function BuildShop(p)
         if (pos or 0) > 0 or WP.Scan.QueueLeft() > 0 then WP.Scan.ClearQueue(); return end
         local list = {}
         for _, e in ipairs(buy.order or {}) do
-            if not e.done and e.src ~= "Absent" then list[#list + 1] = { id = e.id, qty = math.max(1, e.need - e.have) } end
+            if not e.done and e.src ~= "Absent" then list[#list + 1] = { id = e.id, qty = math.max(1, e.need) } end
         end
         if #list > 0 then WP.Scan.BuyQueue(list) end
     end, function()
@@ -1115,9 +1137,9 @@ local function RenderShop()
                 if not e.done then
                     c.done = false
                     if e.src == "Absent" then c.absent = true
-                    elseif e.price then c.cost = c.cost + e.price * (e.need - e.have)
+                    elseif e.price then c.cost = c.cost + e.price * e.need
                     else c.unknown = true end
-                    if e.listed and e.listed < e.need - e.have then c.short = true end
+                    if e.listed and e.listed < e.need then c.short = true end
                 end
             end
             zoneCost = zoneCost + c.cost

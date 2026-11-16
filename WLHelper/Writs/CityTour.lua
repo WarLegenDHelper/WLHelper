@@ -79,8 +79,8 @@ ns.AddEnglish({
     ["Clic droit : passer cette étape"] = "Right-click: skip this stop",
     ["Pas de point connu pour cette étape."] = "No known spot for this stop.",
     ["Tournée en ville terminée : tout est fait."] = "City tour finished: everything is done.",
-    ["Le GPS suit ta tournée des Writs : arrête-la avec /wlh trade stop, puis relance la tournée en ville."] =
-        "The GPS is following your Writs tour: stop it with /wlh trade stop, then start the city tour again.",
+    ["Tournée des Writs mise en pause : relance-la depuis la fenêtre Writs."] =
+        "Writs tour paused: start it again from the Writs window.",
     -- settings
     ["En arrivant dans une capitale, une petite fiche liste ce qu'il y a à faire : courrier, réparations, maître de classe, quêtes à rendre."] =
         "When you reach a capital, a small card lists what to do there: mail, repairs, class trainer, quests to turn in.",
@@ -752,17 +752,28 @@ local function Ours()
 end
 
 -- Guides to one stop. The GPS's "writs" source is the one that lends the arrow for a detour: the
--- dungeon guide's point comes back when this one stops (as the Favor tab does). It never takes the
--- arrow from a running Writs tour.
+-- dungeon guide's point comes back when this one stops (as the Favor tab does). The player's click
+-- wins over a running Writs tour, as /way and "Aller à" do: the tour pauses, one line says so.
+local going = false     -- CT.Go is moving the arrow itself: its own GPS.Stop is no "arrow closed"
 function CT.Go(t)
     local G = WP.GPS
     if not (t and t.place and visit and G and G.GoPoint) then return false end
-    if G.Active() and G.Source and G.Source() == "writs" and WLWritsCharDB and WLWritsCharDB.gps and not Ours() then
-        WP.Print(L("Le GPS suit ta tournée des Writs : arrête-la avec /wlh trade stop, puis relance la tournée en ville."), true)
-        return false
-    end
+    local paused = false
     local label = Label(t)
-    G.GoPoint(visit.map, t.place.x, t.place.y, label, "writs")
+    -- the flag always comes down, even if the GPS errors: else no closed arrow would refresh the card
+    going = true
+    local ok, err = pcall(function()
+        if G.Active() and G.Source and G.Source() == "writs" and WLWritsCharDB and WLWritsCharDB.gps and not Ours() then
+            WLWritsCharDB.gps = false
+            paused = true
+            if G.Stop then G.Stop("writs") end
+            if WP.OnGPSChanged then pcall(WP.OnGPSChanged) end
+        end
+        G.GoPoint(visit.map, t.place.x, t.place.y, label, "writs")
+    end)
+    going = false
+    if paused then WP.Print(L("Tournée des Writs mise en pause : relance-la depuis la fenêtre Writs.")) end
+    if not ok then error(err, 0) end
     current = { key = t.key, map = visit.map, x = t.place.x, y = t.place.y, label = label }
     return true
 end
@@ -1014,3 +1025,9 @@ ev:SetScript("OnEvent", function(_, e)
     local zone = e == "PLAYER_ENTERING_WORLD" or e == "ZONE_CHANGED_NEW_AREA"
     Soon(zone and 2 or 0.5)
 end)
+
+-- The arrow closed (its X, /wlh gps, "Tu y es"): the card's button says so at once, not at the next
+-- bag or zone event.
+if hooksecurefunc and WP.GPS and WP.GPS.Stop then
+    hooksecurefunc(WP.GPS, "Stop", function() if not going then Soon(0.1) end end)
+end

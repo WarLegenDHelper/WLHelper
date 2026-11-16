@@ -193,7 +193,26 @@ local function LevelOK(d)
   return lv >= lo - 4 and lv <= hi + 1
 end
 
-local function Selected() return WLDTDB.sel end
+-- The picker's ticks are a draft: they change the running route only through the summary's
+-- "start" (or StartGuide), never on their own when the window closes. Until the first tick the
+-- picker shows the route's own choice; the first tick copies it, the copy is kept across a hide
+-- and dropped when a guide starts.
+local draft
+local function Selected() return draft or WLDTDB.sel or {} end
+local function Draft()
+  if not draft then
+    draft = {}
+    for k, v in pairs(WLDTDB.sel or {}) do if v then draft[k] = true end end
+  end
+  return draft
+end
+-- the draft's dungeons, in the picker's order
+local function DraftKeys()
+  local out, sel = {}, Selected()
+  for _, k in ipairs(ns.ORDER or {}) do if sel[k] then out[#out + 1] = k end end
+  return out
+end
+function ns.PickerResetDraft() draft = nil end
 local function SelCount() local n = 0; for _ in pairs(Selected()) do n = n + 1 end; return n end
 
 -- Quêtes de classe : une carte par quête (liées aux donjons), créées à la volée
@@ -334,13 +353,14 @@ local function MakeCard(parent)
       if ns.ShowOverview then ns.ShowOverview(self.dkey) else ns.OpenQuests(self.dkey) end
       return
     end
-    Selected()[self.dkey] = not Selected()[self.dkey] or nil
+    local d = Draft()
+    d[self.dkey] = not d[self.dkey] or nil
     PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
     Render()
   end)
   -- double-click: this dungeon alone, through its summary (the route's first screen)
   c:SetScript("OnDoubleClick", function(self)
-    wipe(Selected()); Selected()[self.dkey] = true
+    draft = { [self.dkey] = true }
     if ns.ShowSummary then
       Render()
       local left, top = p:GetLeft(), p:GetTop()
@@ -349,7 +369,11 @@ local function MakeCard(parent)
         p:Hide()
         if left and top and sum.ClearAllPoints then sum:ClearAllPoints(); sum:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top) end
       end
-    else ns.StartGuide() end
+    else
+      WLDTDB.sel = WLDTDB.sel or {}
+      wipe(WLDTDB.sel); WLDTDB.sel[self.dkey] = true
+      ns.StartGuide()
+    end
   end)
   c:SetScript("OnMouseDown", function(self) self.press:Show() end)
   c:SetScript("OnMouseUp", function(self) self.press:Hide() end)
@@ -458,7 +482,10 @@ local function Build()
   p.go = S.Button(p.foot, L.PICK_GO, 0, 32, "primary", function()
     -- the picker gives way to the summary, opened at the same place on the screen
     local left, top = p:GetLeft(), p:GetTop()
-    local sum = ns.ShowSummary and ns.ShowSummary()
+    local keys = DraftKeys()
+    -- only stale keys ticked (a dungeon no longer in the list): nothing to start, the route stays
+    if #keys == 0 then return end
+    local sum = ns.ShowSummary and ns.ShowSummary(keys)
     if sum then
       p:Hide()
       if left and top and sum.ClearAllPoints then
@@ -466,11 +493,15 @@ local function Build()
       end
       return
     end
+    -- no summary: the draft becomes the route's choice here
+    WLDTDB.sel = WLDTDB.sel or {}
+    wipe(WLDTDB.sel)
+    for _, k in ipairs(keys) do WLDTDB.sel[k] = true end
     ns.StartGuide()
   end, function() return { p.go:GetText(), L.SUM_PICK_GO_TT } end)
   p.go:SetPoint("RIGHT", 0, 0)
   p.go:SetDisabledReason(L.PICK_GO_WHY)
-  p.none = S.Button(p.foot, L.PICK_NONE, 0, 28, "secondary", function() wipe(Selected()); Render() end)
+  p.none = S.Button(p.foot, L.PICK_NONE, 0, 28, "secondary", function() wipe(Draft()); Render() end)
   p.none:SetPoint("RIGHT", p.go, "LEFT", -8, 0)
   p.selText = Text(p.foot, ns.F.body, T.text); p.selText:SetPoint("LEFT", 0, 0); p.selText:SetPoint("RIGHT", p.none, "LEFT", -12, 0)
   p.selText:SetJustifyV("MIDDLE")

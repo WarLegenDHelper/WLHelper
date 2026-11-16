@@ -118,8 +118,11 @@ function WP.LadderFetch(ids, cb)
     for _, id in ipairs(ids) do
         if id and not seen[id] and not WP.Ladder(id) then seen[id] = true; queue[#queue + 1] = id end
     end
+    -- nothing to ask (every ladder is fresh, even an empty one): no callback, or a page that
+    -- fetches on each draw would redraw itself five times a second at the auction house
+    -- (a batch still in flight keeps its own callback)
+    if #queue == 0 then return true end
     onDone = cb
-    if #queue == 0 then if cb then cb() end; onDone = nil; return true end
     WP.LadderNext()
     return true
 end

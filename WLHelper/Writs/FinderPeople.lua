@@ -21,6 +21,37 @@ local L = ns.L
 local S = ns.S
 local C = S.C
 local FS = S.F
+
+-- Clickable chat links of the guild modules, "[text]" at the end of a line:
+--   addon:WLHelper:finder:<tab>   a tab of the Groups window
+--   addon:WLHelper:event:<id>     one event in the Agenda (event ids have no colon)
+--   addon:WLHelper:orders:<tab>   a tab of the Orders window
+function WP.AddonLink(text, kind, arg)
+    return S.Hex(C.accentSoft or C.info) .. "|Haddon:WLHelper:" .. kind .. ":" .. tostring(arg) .. "|h[" .. text .. "]|h|r"
+end
+-- The modern client sends "addon:" links to EventRegistry's "SetItemRef" callback and may also run
+-- the SetItemRef hook for the same click: one click opens once.
+local lastLink, lastLinkAt = nil, -1
+local ORDER_TABS = { find = true, ask = true, new = true, board = true, mine = true, recv = true }
+function WP.OpenAddonLink(link)
+    if type(link) ~= "string" or (issecretvalue and issecretvalue(link)) then return end
+    local kind, arg = link:match("^addon:WLHelper:(%a+):([^:|]+)$")
+    if not kind then return end
+    local now = GetTime and GetTime() or 0
+    if link == lastLink and now - lastLinkAt < 0.3 then return true end
+    -- a module turned off since the line was printed: its old links open nothing
+    local off = WP.ModuleOff or function() return false end
+    if kind == "finder" and arg:match("^%a+$") and WP.ShowEventsTab then
+        if not off("events") then WP.ShowEventsTab(arg) end
+    elseif kind == "event" and WP.ShowEvent then WP.ShowEvent(arg)
+    -- only the Orders tabs that exist (an unknown one would show an empty window)
+    elseif kind == "orders" and ORDER_TABS[arg] and WP.ShowOrdersTab then
+        if not off("orders") then WP.ShowOrdersTab(arg) end
+    else return end
+    lastLink, lastLinkAt = link, now
+    return true
+end
+
 local F = WP.Finder
 if not F then return end
 
@@ -756,11 +787,11 @@ evf:SetScript("OnEvent", function(_, ev, ...)
         otherFinder = (root.IsLoaded and root.IsLoaded("LFGForever")) and true or false
         -- "Clique ici": our addon links open the tab
         if EventRegistry and EventRegistry.RegisterCallback then
-            pcall(EventRegistry.RegisterCallback, EventRegistry, "SetItemRef", function(_, link)
-                if type(link) ~= "string" then return end
-                local tab = link:match("^addon:WLHelper:finder:(%a+)")
-                if tab and WP.ShowEventsTab then WP.ShowEventsTab(tab) end
-            end, F)
+            pcall(EventRegistry.RegisterCallback, EventRegistry, "SetItemRef", function(_, link) WP.OpenAddonLink(link) end, F)
+        end
+        -- clients that do not pass "addon:" links to EventRegistry
+        if SetItemRef and hooksecurefunc then
+            pcall(hooksecurefunc, "SetItemRef", function(link) WP.OpenAddonLink(link) end)
         end
     elseif ev == "PLAYER_ENTERING_WORLD" then
         local isLogin, isReload = ...
