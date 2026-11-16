@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.89] — 2026-11-16
+
+### Corrigé / Fixed
+- **Talents dans le score d'équipement** : WL Helper Gear lit maintenant les talents sur Forever (le système de talents du client) : ta spé est détectée toute seule et les talents comme Cœur sauvage ou Instinct naturel changent les poids.
+  *Gear now reads talents on Forever: spec detected, talent modifiers applied.*
+- **Quêtes de métier** : elles sont de nouveau masquées pour les personnages qui n'ont pas le métier, avec le filtre « quêtes utiles ».
+  *Profession quests hidden again for characters without the profession.*
+- **Commandes** : cliquer sur un objet dans les résultats ne provoque plus d'erreur, et Maj-clic sur un objet du sac le place de nouveau dans la recherche ou la demande.
+  *Orders: item clicks no longer error; Shift-click from bags works again.*
+- **Commandes du chat** : WL Helper ne touche plus à la liste des commandes du jeu (risque d'action bloquée).
+  *No more write to the game's slash command list.*
+
 ## [1.0.0-beta.88] — 2026-11-16
 
 ### Corrigé / Fixed

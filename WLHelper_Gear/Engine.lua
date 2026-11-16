@@ -313,9 +313,83 @@ local TALENT_MODS = {
 -- Returns { points = { tab1, tab2, ... }, ranks = { [lowercase name] = { rank, maxRank } } }
 -- or nil when the client can't tell.
 local talentCache
+
+-- Forever (modern engine): no GetNumTalentTabs, talents live in C_ClassTalents + C_Traits.
+-- Several trees: one tab per tree. A single tree: its nodes split into three bands by posX,
+-- left to right like the old tabs (same rule as WLHelper/Writs/Weights.lua). Names come from
+-- the node's entry -> definition -> spell.
+local function TraitName(cfg, ni)
+    local entry = (type(ni.activeEntry) == "table" and Num(ni.activeEntry.entryID))
+        or (type(ni.entryIDs) == "table" and Num(ni.entryIDs[1]))
+    if not entry or not (C_Traits.GetEntryInfo and C_Traits.GetDefinitionInfo) then return nil end
+    local okE, ei = pcall(C_Traits.GetEntryInfo, cfg, entry)
+    local def = okE and type(ei) == "table" and Num(ei.definitionID)
+    if not def then return nil end
+    local okD, di = pcall(C_Traits.GetDefinitionInfo, def)
+    local spell = okD and type(di) == "table" and (Num(di.spellID) or Num(di.overriddenSpellID))
+    if not spell then return nil end
+    local okS, name
+    if C_Spell and C_Spell.GetSpellName then okS, name = pcall(C_Spell.GetSpellName, spell)
+    elseif GetSpellInfo then okS, name = pcall(GetSpellInfo, spell) end
+    if okS and type(name) == "string" and not Secret(name) and name ~= "" then return name end
+    return nil
+end
+
+local function ScanTraits()
+    if not (C_ClassTalents and C_ClassTalents.GetActiveConfigID and C_Traits and C_Traits.GetConfigInfo
+        and C_Traits.GetTreeNodes and C_Traits.GetNodeInfo) then return nil end
+    local ok, cfg = pcall(C_ClassTalents.GetActiveConfigID)
+    cfg = ok and Num(cfg)
+    if not cfg then return nil end
+    local okI, info = pcall(C_Traits.GetConfigInfo, cfg)
+    local trees = okI and type(info) == "table" and info.treeIDs
+    if type(trees) ~= "table" or #trees == 0 then return nil end
+    local scan = { points = {}, ranks = {} }
+    local nodes = {}
+    for t, tid in ipairs(trees) do
+        local okN, list = pcall(C_Traits.GetTreeNodes, tid)
+        if okN and type(list) == "table" then
+            for _, nid in ipairs(list) do
+                local okD, ni = pcall(C_Traits.GetNodeInfo, cfg, nid)
+                if okD and type(ni) == "table" then
+                    local r = Num(ni.ranksPurchased) or Num(ni.currentRank) or 0
+                    local max = Num(ni.maxRanks)
+                    nodes[#nodes + 1] = { tree = t, r = r, x = Num(ni.posX) }
+                    local name = max and max > 0 and TraitName(cfg, ni)
+                    if name then
+                        local key = name:lower()
+                        local seen = scan.ranks[key]
+                        -- Same name twice in one class: keep the one with points in it.
+                        if not seen or r > seen[1] then scan.ranks[key] = { r, max } end
+                    end
+                end
+            end
+        end
+    end
+    if #nodes == 0 then return nil end
+    if #trees >= 2 then
+        for t = 1, #trees do scan.points[t] = 0 end
+        for _, n in ipairs(nodes) do scan.points[n.tree] = scan.points[n.tree] + n.r end
+    else
+        local lo, hi
+        for _, n in ipairs(nodes) do if n.x then lo = math.min(lo or n.x, n.x); hi = math.max(hi or n.x, n.x) end end
+        scan.points = { 0, 0, 0 }
+        for _, n in ipairs(nodes) do
+            if n.r > 0 then
+                local band = 1
+                if n.x and lo and hi > lo then band = math.min(3, math.floor((n.x - lo) / (hi - lo + 1) * 3) + 1) end
+                scan.points[band] = scan.points[band] + n.r
+            end
+        end
+    end
+    return scan
+end
+
 local function ScanTalents()
     if talentCache ~= nil then return talentCache or nil end
     talentCache = false
+    local traits = ScanTraits()
+    if traits then talentCache = traits; return traits end
     if not (GetNumTalentTabs and GetNumTalents and GetTalentInfo) then return nil end
     local ok, numTabs = pcall(GetNumTalentTabs)
     numTabs = ok and Num(numTabs)

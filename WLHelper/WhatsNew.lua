@@ -2,6 +2,12 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.89", date = "2026-11-16", items = {
+    { s = "fix", fr = { "Talents dans le score d'équipement", "WL Helper Gear lit maintenant les talents sur Forever (le système de talents du client) : ta spé est détectée toute seule et les talents comme Cœur sauvage ou Instinct naturel changent les poids." }, en = { "Gear now reads talents on Forever", "Spec detected, talent modifiers applied." } },
+    { s = "fix", fr = { "Quêtes de métier", "Elles sont de nouveau masquées pour les personnages qui n'ont pas le métier, avec le filtre « quêtes utiles »." }, en = { "Profession quests hidden again for characters without the profession.", "" } },
+    { s = "fix", fr = { "Commandes", "Cliquer sur un objet dans les résultats ne provoque plus d'erreur, et Maj-clic sur un objet du sac le place de nouveau dans la recherche ou la demande." }, en = { "Orders", "Item clicks no longer error; Shift-click from bags works again." } },
+    { s = "fix", fr = { "Commandes du chat", "WL Helper ne touche plus à la liste des commandes du jeu (risque d'action bloquée)." }, en = { "No more write to the game's slash command list.", "" } },
+  } },
   { v = "1.0.0-beta.88", date = "2026-11-16", items = {
     { s = "fix", fr = { "Guide dans le donjon", "La route n'est plus recalculée depuis ta position à chaque quête prise ou rendue à l'intérieur (elle te renvoyait parfois à une étape du dehors) ; elle attend ta sortie." }, en = { "The route no longer rebuilds from your position while you are inside a dungeon.", "" } },
     { s = "fix", fr = { "Étapes de boss", "Une quête ajoutée à une étape de boss déjà cochée (boss tué ou passé) n'est plus cachée, et le guide ne saute plus au rendu avant d'avoir fait l'objectif." }, en = { "A quest line added to an already ticked boss step is no longer hidden.", "" } },
@@ -113,22 +119,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.75", date = "2026-11-16", items = {
     { s = "fix", fr = { "Le guide se fermait encore après un téléport", "Le jeu ferme ses fenêtres avant que l'addon regarde si le guide était ouvert. Le moment de la fermeture est maintenant retenu : un guide ouvert revient après un téléport, un portail ou un /reload." }, en = { "The guide no longer closes after a teleport, a portal or a /reload.", "" } },
-  } },
-  { v = "1.0.0-beta.74", date = "2026-11-16", items = {
-    { s = "add", fr = { "Fenêtre WL Helper façon Naowh", "Une seule fenêtre avec, à gauche, une recherche et les activités (Quêtes & donjons, Objets & métiers, Guilde & groupes, Voyage) et leurs réglages ; à droite, l'accueil en deux colonnes. La minimap, /wlh et les boutons retour l'ouvrent sur la bonne page." }, en = { "WL Helper hub like Naowh", "One window, sidebar grouped by activity with search, Home in two columns, settings next to each activity." } },
-    { s = "add", fr = { "Chemin à pied comme Polestar", "La flèche suit le vrai chemin, virage après virage, pour toutes les destinations ; la distance est celle qu'il reste à marcher ; des points sur la carte du monde et la minimap, une épingle sur l'endroit exact." }, en = { "Walking path like Polestar for every destination, drawn on the map and minimap.", "" } },
-    { s = "add", fr = { "La meilleure route", "La pierre de foyer, le Rappel astral et Reflet-de-Lune comptent dans le calcul, avec les vrais temps à pied ; l'itinéraire complet s'affiche (« Pierre de foyer → vol jusqu'à Kargath → 300 m à pied »)." }, en = { "Best route", "Hearthstone and class teleports, real walking times, full itinerary." } },
-    { s = "add", fr = { "Repère dans le monde", "Une étiquette au-dessus de la destination (lieu, distance, temps restant), seulement si aucun autre addon ne le fait déjà. Réglages › GPS." }, en = { "In-world marker over the destination, only when no other addon already shows one.", "" } },
-    { s = "chg", fr = { "Flèche GPS façon Zygor", "En haut l'action (l'icône du sort ou de l'objet à cliquer pour un téléport ou la pierre de foyer), puis quoi faire, où, et « 550 m · 1:10 »." }, en = { "GPS arrow organised like Zygor", "Clickable spell or item icon, what, where, distance and time." } },
-    { s = "chg", fr = { "Carte de l'étape du guide refaite", "L'action en titre, le lieu avec la distance, une ligne pour la chaîne, les détails repliés ; plus aucune info répétée. Une étape « prendre la quête » ne montre plus le texte de la quête comme si c'était à faire." }, en = { "Guide step card rebuilt", "Action first, place and distance, folded details, nothing repeated." } },
-    { s = "chg", fr = { "Noms", "« vue d'ensemble » / « Vue d'ensemble » et « Pick a guide » / « Choisir un guide »." }, en = { "Names", "Overview and Pick a guide." } },
-    { s = "chg", fr = { "Commandes avec beaucoup d'artisans", "Au-delà de 8, une liste « Artisans : 3 en ligne · 24 en tout » avec recherche ; deux noms au plus sur les lignes d'objets." }, en = { "Orders scale to many crafters", "Searchable list, two names per item row." } },
-    { s = "chg", fr = { "Quoi de neuf", "Plus lisible, **Aller à...** avec distances en direct, bouton retour sur toutes les fenêtres." }, en = { "Clearer What's new, live Go-to distances, back buttons everywhere.", "" } },
-    { s = "chg", fr = { "Interface et textes", "Revus fenêtre par fenêtre : vocabulaire, niveaux, nombres, icônes." }, en = { "Interface and texts reviewed window by window.", "" } },
-    { s = "fix", fr = { "Prérequis de quêtes", "169 liens entre maillons de chaîne ajoutés (LibForeverData, et Naowh pour les quêtes propres à Forever) ; Rot and Regret n'arrive plus avant Word of the Woods." }, en = { "Quest prerequisites", "169 missing chain links added." } },
-    { s = "fix", fr = { "Le guide se fermait", "Après un téléport ou un /reload." }, en = { "The guide no longer closes after a loading screen.", "" } },
-    { s = "fix", fr = { "Marques de raid", "Le jeu ne laisse pas un addon poser une marque ; les boutons ciblent seulement, plus d'erreur." }, en = { "Raid markers", "Targeting only, no more blocked-action error." } },
-    { s = "fix", fr = { "Erreurs dans les donjons", "Valeurs cachées par le jeu (PNJ des caisses, alerte des rares)." }, en = { "Secret-value errors inside dungeons.", "" } },
-    { s = "fix", fr = { "Icônes de récompense", "Manquantes et améliorations plus lisibles." }, en = { "Missing reward icons and clearer upgrades.", "" } },
   } },
 }

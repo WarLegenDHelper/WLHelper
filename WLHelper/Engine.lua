@@ -179,7 +179,26 @@ local PROF = { MINING = { "Mining", "Minage" }, BLACKSMITHING = { "Blacksmithing
   ENGINEERING = { "Engineering", "Ingénierie" }, LEATHERWORKING = { "Leatherworking", "Travail du cuir" },
   TAILORING = { "Tailoring", "Couture" }, ALCHEMY = { "Alchemy", "Alchimie" }, ENCHANTING = { "Enchanting", "Enchantement" },
   HERBALISM = { "Herbalism", "Herboristerie" }, SKINNING = { "Skinning", "Dépeçage" } }
+-- skill line ids (7th return of GetProfessionInfo)
+local PROF_LINE = { MINING = 186, BLACKSMITHING = 164, ENGINEERING = 202, LEATHERWORKING = 165, TAILORING = 197,
+  ALCHEMY = 171, ENCHANTING = 333, HERBALISM = 182, SKINNING = 393 }
 function ns.HasProf(code)
+  -- Forever (modern engine): no skill list, professions come from GetProfessions
+  if GetProfessions and GetProfessionInfo then
+    local list = { pcall(GetProfessions) }
+    if list[1] then
+      local want, names = PROF_LINE[code], PROF[code]
+      if not want then return true end
+      for i = 2, 7 do
+        local idx = list[i]
+        if idx then
+          local ok, nm, _, _, _, _, line = pcall(GetProfessionInfo, idx)
+          if ok and (line == want or (nm and names and (nm == names[1] or nm == names[2]))) then return true end
+        end
+      end
+      return false
+    end
+  end
   if not (GetNumSkillLines and GetSkillLineInfo) then return true end
   local names = PROF[code]
   if not names then return true end

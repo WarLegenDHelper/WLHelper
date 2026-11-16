@@ -407,7 +407,6 @@ end
 
 -- ---------------------------------------------------------------- /way: ours, or left to its owner
 
-SlashCmdList = SlashCmdList or {}
 SLASH_WLHWAY1 = "/wlway"
 SlashCmdList.WLHWAY = function(msg) Way.Command(msg) end
 

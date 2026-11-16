@@ -107,7 +107,7 @@ local E = ns.engine
 local API = {}
 WLHelperGear = API
 
-API.VERSION = "1.3.0"
+API.VERSION = "1.3.1"
 API.UPSTREAM = "Geared Forever 1.1.1"
 
 local STAT_NAMES = {}
@@ -393,7 +393,7 @@ if CreateFrame then
     local f = CreateFrame("Frame")
     local ITEM_EVENTS = { GET_ITEM_INFO_RECEIVED = true, PLAYER_EQUIPMENT_CHANGED = true }
     for _, ev in ipairs({ "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE", "ACTIVE_TALENT_GROUP_CHANGED",
-                          "PLAYER_LEVEL_UP", "PLAYER_ENTERING_WORLD", "SPELLS_CHANGED",
+                          "TRAIT_CONFIG_UPDATED", "PLAYER_LEVEL_UP", "PLAYER_ENTERING_WORLD", "SPELLS_CHANGED",
                           "GET_ITEM_INFO_RECEIVED", "PLAYER_EQUIPMENT_CHANGED", "UPDATE_SHAPESHIFT_FORM" }) do
         pcall(f.RegisterEvent, f, ev)
     end

@@ -572,7 +572,12 @@ local function InsertLink(link)
     end
 end
 WP.OrdersInsertLink = InsertLink
-if hooksecurefunc and ChatEdit_InsertLink then hooksecurefunc("ChatEdit_InsertLink", InsertLink) end
+-- modern engine: links go through ChatFrameUtil.InsertLink; hook one only, so a client whose old
+-- global wraps the new one doesn't insert twice
+if hooksecurefunc then
+    if ChatFrameUtil and ChatFrameUtil.InsertLink then hooksecurefunc(ChatFrameUtil, "InsertLink", InsertLink)
+    elseif ChatEdit_InsertLink then hooksecurefunc("ChatEdit_InsertLink", InsertLink) end
+end
 
 -- a member's row: the class icon and the class colour on the name
 local function SetClass(row, name)
@@ -3082,9 +3087,11 @@ function H.Search(f, q)
             H.SetFlag(r, id)
             r.onRowClick = function()
                 Save()
-                local link = id > 0 and select(2, GetItemInfo(id))
-                if IsShiftKeyDown and IsShiftKeyDown() and link and ChatEdit_InsertLink then
-                    if not f.box:HasFocus() then ChatEdit_InsertLink(link) end
+                local gi = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+                local link = id > 0 and gi and select(2, gi(id))
+                local insert = (ChatFrameUtil and ChatFrameUtil.InsertLink) or ChatEdit_InsertLink
+                if IsShiftKeyDown and IsShiftKeyDown() and link and insert then
+                    if not f.box:HasFocus() then insert(link) end
                     return
                 end
                 if id > 0 then f.box:SetText(link or ("item:" .. id)) else WP.NewOrder(id, nil) end
