@@ -205,6 +205,23 @@ loading:SetScript("OnEvent", function(_, e)
   local f = ns.frame
   if e == "PLAYER_LOGIN" then
     C_Timer.After(0, HookHide)
+    -- The "DG_Cible" macro written by older versions still holds a raid-marker line (/tm or
+    -- SetRaidTarget), blocked on this client (ADDON_ACTION_FORBIDDEN when pressed from a bar). It is
+    -- only rewritten when the guide changes step: clean it once at login, out of combat.
+    C_Timer.After(5, function()
+      if InCombatLockdown and InCombatLockdown() then return end
+      if not (GetMacroIndexByName and GetMacroInfo and EditMacro) then return end
+      local ok, idx = pcall(GetMacroIndexByName, "DG_Cible")
+      if not (ok and type(idx) == "number" and idx > 0) then return end
+      local okI, name, _, body = pcall(GetMacroInfo, idx)
+      if not (okI and type(body) == "string") then return end
+      if not (body:find("/tm", 1, true) or body:find("SetRaidTarget", 1, true)) then return end
+      local keep = {}
+      for line in body:gmatch("[^\n]+") do
+        if not (line:find("^/tm") or line:find("SetRaidTarget", 1, true)) then keep[#keep + 1] = line end
+      end
+      pcall(EditMacro, idx, name or "DG_Cible", nil, table.concat(keep, "\n"))
+    end)
     return
   end
   HookHide()

@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.76] — 2026-11-16
+
+### Corrigé / Fixed
+- **« Le jeu a bloqué SetRaidTarget() »** : la macro « DG_Cible » créée par une ancienne version gardait sa ligne de marque de raid ; elle est nettoyée à la connexion et ne fait plus que cibler.
+  *The old "DG_Cible" macro is cleaned at login: targeting only, no more blocked marker error.*
+
 ## [1.0.0-beta.75] — 2026-11-16
 
 ### Corrigé / Fixed

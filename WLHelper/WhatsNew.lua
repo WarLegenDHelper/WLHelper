@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.76", date = "2026-11-16", items = {
+    { s = "fix", fr = { "« Le jeu a bloqué SetRaidTarget() »", "La macro « DG_Cible » créée par une ancienne version gardait sa ligne de marque de raid ; elle est nettoyée à la connexion et ne fait plus que cibler." }, en = { "The old \"DG_Cible\" macro is cleaned at login", "Targeting only, no more blocked marker error." } },
+  } },
   { v = "1.0.0-beta.75", date = "2026-11-16", items = {
     { s = "fix", fr = { "Le guide se fermait encore après un téléport", "Le jeu ferme ses fenêtres avant que l'addon regarde si le guide était ouvert. Le moment de la fermeture est maintenant retenu : un guide ouvert revient après un téléport, un portail ou un /reload." }, en = { "The guide no longer closes after a teleport, a portal or a /reload.", "" } },
   } },
@@ -85,8 +88,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.62", date = "2026-11-15", items = {
     { s = "add", fr = { "Visite du donjon boss par boss", "Dans le donjon, une étape par boss dans l'ordre (« Boss 3 sur 7 · Glutton »), avec les objectifs de quête qui s'y rattachent, la tactique (conseils de Naowh lus en direct quand il est installé, sinon nos notes), le chemin et le butin intéressant pour toi (flèche verte et %). L'étape passe toute seule quand le boss meurt (fin de rencontre ou cible morte) et que ses objectifs sont faits ; les boss facultatifs sont passés quand tu avances. Les morts sont gardées pour la sortie en cours (un retour rapide après une mort ne remet rien à zéro)." }, en = { "Dungeon walkthrough boss by boss, auto-advance on kill.", "" } },
     { s = "add", fr = { "Plusieurs spés dans l'infobulle", "Réglages › Améliorations › « Spés à comparer » ; une ligne par spé (« Protection +6 % », « Fureur −3 % »), et la flèche des sacs au choix pour ta spé principale ou n'importe laquelle." }, en = { "Several specs in the upgrade tooltip.", "" } },
-  } },
-  { v = "1.0.0-beta.61", date = "2026-11-15", items = {
-    { s = "chg", fr = { "Le petit suivi est désactivé par défaut", "Le guide et son bouton « – » (mode réduit) suffisent. Pour le retrouver : /wlh suivi." }, en = { "The small tracker is now opt-in (/wlh suivi).", "" } },
   } },
 }
