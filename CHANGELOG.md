@@ -65,7 +65,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *Orders: a chat line when an accepted order is cancelled or taken by someone else.*
 
 ### Modifié / Changed
-- **GPS** : l'étape du guide n'écrase plus ton /way, « Aller à… » ou une clé ; elle attend et revient quand ta destination est atteinte ou arrêtée. « Aller à… » vise le vrai lieu, avec le même chemin à pied que le guide. Fermer la flèche arrête la tournée en ville.
+- **GPS** : l'étape du guide n'écrase plus ton /way, « Aller à... » ou une clé ; elle attend et revient quand ta destination est atteinte ou arrêtée. « Aller à... » vise le vrai lieu, avec le même chemin à pied que le guide. Fermer la flèche arrête la tournée en ville.
   *The guide no longer overrides your /way or Go to; Go to aims at the real place; closing the arrow stops the city tour.*
 - **GPS d'un objectif** : le bouton GPS mène à la zone de quête du jeu (celle de la carte), et un objectif placé seulement par le jeu a aussi son bouton.
   *Objective GPS goes to the game's quest area.*
@@ -121,13 +121,13 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ## [1.0.0-beta.81] — 2026-11-16
 
 ### Modifié / Changed
-- **Liste des addons** : WL Helper Gear et les trois WL Helper Nav ont maintenant le logo WL Helper et un nom aligné (« WaR LegenD Helper - Gear », « - Nav »…), regroupés sous WL Helper quand le jeu le permet.
+- **Liste des addons** : WL Helper Gear et les trois WL Helper Nav ont maintenant le logo WL Helper et un nom aligné (« WaR LegenD Helper - Gear », « - Nav »...), regroupés sous WL Helper quand le jeu le permet.
   *Gear and Nav sub-addons now show the WL Helper logo and matching names in the addon list.*
 
 ## [1.0.0-beta.80] — 2026-11-16
 
 ### Ajouté / Added
-- **Badges BiS sur le butin** : les récompenses de quête de l'Overview et le butin des boss affichent « BiS ★ » ou « 2e choix » quand Naowh classe l'objet pour ta spé.
+- **Badges BiS sur le butin** : les récompenses de quête de la vue d'ensemble et le butin des boss affichent « BiS ★ » ou « 2e choix » quand Naowh classe l'objet pour ta spé.
   *BiS / 2nd choice badges on quest rewards and boss loot, from Naowh.*
 - **BiS même sans liste remplie** : si tu n'as jamais rempli ta liste BiS dans Naowh, WL Helper prend l'équipement que Naowh conseille pour ton niveau (« BiS niv. 40 » avant 60, son classement au 60). Ta propre liste passe toujours en premier.
   *No Naowh list filled? Naowh's gear for your level is used ("BiS lvl 40"), its ranking at 60.*
@@ -149,7 +149,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *Auto accept, turn in and share the guide's quests.*
 - **Les PNJ qui patrouillent** : leur chemin est tracé sur la carte et la carte du guide dit « Il se déplace le long d'un chemin ».
   *Patrolling NPCs: their path is drawn on the map.*
-- **Budget des writs** (T-70) : indique le maximum à dépenser, le plan choisit les writs les plus rentables et les plus proches dans ce budget.
+- **Budget des Writs** (T-70) : indique le maximum à dépenser, le plan choisit les Writs les plus rentables et les plus proches dans ce budget.
   *Writs budget: set a max spend, the plan picks the best and nearest writs within it.*
 - **Accueil des commandes** façon Mastercraft (T-60) : fiche artisan, recherche, tuiles par métier, top de la semaine.
   *Orders home: crafter card, search, profession tiles, weekly top.*
@@ -161,7 +161,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *Target button shows the NPC portrait instead of a skull.*
 - **Menu Actions** réduit à 4 entrées : étape faite, recalculer, flèche, boss du donjon.
   *Actions menu down to 4 entries.*
-- **Chaîne de quêtes en frise** dans l'Overview : numéros, trait, état, une ligne d'infos, détails au clic.
+- **Chaîne de quêtes en frise** dans la vue d'ensemble : numéros, trait, état, une ligne d'infos, détails au clic.
   *Overview chain as a timeline.*
 - **Choisir un guide** en 3 ou 4 colonnes selon l'écran ; **modules du Hub** en deux colonnes ; **textes** mieux structurés (titres, puces) partout.
   *Guide picker in 3-4 columns, hub modules in two columns, better text structure.*
@@ -171,7 +171,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *Gear synced to Geared Forever 1.1.1; wand settings merged; upgrade method is automatic.*
 
 ### Corrigé / Fixed
-- **Budget des writs** : un writ trop cher pour ce qui restait ne fait plus sauter les writs moins chers de la même zone.
+- **Budget des Writs** : un Writ trop cher pour ce qui restait ne fait plus sauter les Writs moins chers de la même zone.
   *Writs budget no longer skips cheaper writs behind a too-dear one.*
 - Les messages des commandes ne peuvent plus boucler quand beaucoup partent d'un coup.
   *Orders messages can no longer loop when many are sent at once.*
@@ -217,11 +217,11 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *GPS arrow organised like Zygor: clickable spell or item icon, what, where, distance and time.*
 - **Carte de l'étape du guide refaite** (T-37, T-42) : l'action en titre, le lieu avec la distance, une ligne pour la chaîne, les détails repliés ; plus aucune info répétée. Une étape « prendre la quête » ne montre plus le texte de la quête comme si c'était à faire.
   *Guide step card rebuilt: action first, place and distance, folded details, nothing repeated.*
-- **Noms** (T-38, T-39) : « Overview » / « Vue d'ensemble » et « Pick a guide » / « Choisir un guide ».
+- **Noms** (T-38, T-39) : « vue d'ensemble » / « Vue d'ensemble » et « Pick a guide » / « Choisir un guide ».
   *Names: Overview and Pick a guide.*
 - **Commandes avec beaucoup d'artisans** (T-53) : au-delà de 8, une liste « Artisans : 3 en ligne · 24 en tout » avec recherche ; deux noms au plus sur les lignes d'objets.
   *Orders scale to many crafters: searchable list, two names per item row.*
-- **Quoi de neuf** plus lisible (T-34), **Aller à…** avec distances en direct (T-36), bouton retour sur toutes les fenêtres (T-35).
+- **Quoi de neuf** plus lisible (T-34), **Aller à...** avec distances en direct (T-36), bouton retour sur toutes les fenêtres (T-35).
   *Clearer What's new, live Go-to distances, back buttons everywhere.*
 - **Interface et textes** revus fenêtre par fenêtre (T-21) : vocabulaire, niveaux, nombres, icônes.
   *Interface and texts reviewed window by window.*
@@ -261,7 +261,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *Alt-click to disenchant or pick a lock.*
 - **Carte du donjon** (T-08) : un bouton dans la fenêtre des boss ouvre la meilleure carte installée (OpenMap, Naowh, FDJ, sinon la carte du monde).
   *Dungeon map button in the boss panel.*
-- **Aller à…** (T-09) : cherche une destination (banque, HV, maître de classe, PNJ, zone, entrée de donjon) ; la flèche suit un vrai chemin à pied grâce à WLHelper_Nav, livré à côté (addon GPL séparé, tiré de Polestar Nav et de Shortest Path Forever, crédités).
+- **Aller à...** (T-09) : cherche une destination (banque, HV, maître de classe, PNJ, zone, entrée de donjon) ; la flèche suit un vrai chemin à pied grâce à WLHelper_Nav, livré à côté (addon GPL séparé, tiré de Polestar Nav et de Shortest Path Forever, crédités).
   *Go to: search a destination, walking trail from WLHelper_Nav (shipped alongside, GPL).*
 - **Classement PvP de la guilde** (T-11) : d'où viennent les victoires honorables (zones, champs de bataille) et un K/D/A en champ de bataille ; morts face aux joueurs en monde ouvert.
   *Guild PvP: where HKs come from, battleground K/D/A.*
@@ -360,9 +360,9 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ## [1.0.0-beta.63] — 2026-11-15
 
 ### Modifié / Changed
-- **Résumé du donjon plus lisible** : bouton **« Lancer la route »** en bas à droite (ou « Mettre à jour la route » / « Retour à la route » quand une route tourne déjà) ; les quêtes déjà rendues sont repliées en bas ; quand tout est fait, « Tu as déjà rendu toutes les quêtes de … » avec « Choisir un autre donjon » ; une ligne par quête avec niveau, XP et argent ; le total de ta sélection en haut.
+- **Résumé du donjon plus lisible** : bouton **« Lancer la route »** en bas à droite (ou « Mettre à jour la route » / « Retour à la route » quand une route tourne déjà) ; les quêtes déjà rendues sont repliées en bas ; quand tout est fait, « Tu as déjà rendu toutes les quêtes de ... » avec « Choisir un autre donjon » ; une ligne par quête avec niveau, XP et argent ; le total de ta sélection en haut.
   *Clearer dungeon summary with a Start the route button.*
-- **Vue groupe** : des colonnes seulement pour les membres dont on connaît l'état (WL Helper ou réponse au partage), une icône par case ; les autres en une ligne « Sans WL Helper : … ».
+- **Vue groupe** : des colonnes seulement pour les membres dont on connaît l'état (WL Helper ou réponse au partage), une icône par case ; les autres en une ligne « Sans WL Helper : ... ».
 
 ## [1.0.0-beta.62] — 2026-11-15
 
@@ -434,15 +434,15 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ## [1.0.0-beta.54] — 2026-11-15
 
 ### Modifié / Changed
-- **Infobulles** : les lignes « Clic : … » sont en gris-bleu discret au lieu du rouge, qui faisait penser à une alerte.
+- **Infobulles** : les lignes « Clic : ... » sont en gris-bleu discret au lieu du rouge, qui faisait penser à une alerte.
   *Click hints in tooltips are a calm grey-blue instead of red.*
 
 ## [1.0.0-beta.53] — 2026-11-15
 
 ### Ajouté / Added
-- **Quêtes récentes de Forever mieux guidées** : 55 quêtes des routes (chaînes de Shen'dralas et des pylônes, Krol'dok, Riverglades, prison d'Alcaz, Drowned City, Legashi, Blackmaw, Ruins of Lordaeron, Dalaran…) ont maintenant une marche à suivre en étapes, et leurs objectifs un point sur la carte quand on le connaît. Infos tirées de Wowhead Forever, réécrites, en français et en anglais.
+- **Quêtes récentes de Forever mieux guidées** : 55 quêtes des routes (chaînes de Shen'dralas et des pylônes, Krol'dok, Riverglades, prison d'Alcaz, Drowned City, Legashi, Blackmaw, Ruins of Lordaeron, Dalaran...) ont maintenant une marche à suivre en étapes, et leurs objectifs un point sur la carte quand on le connaît. Infos tirées de Wowhead Forever, réécrites, en français et en anglais.
   *55 recent Forever quests get how-to notes and objective places.*
-- **`/wlh diag`** : enregistre ce que le client propose aux addons (talents, quêtes, carte, métiers…) pour nous aider à corriger les bugs sans te faire taper de commandes.
+- **`/wlh diag`** : enregistre ce que le client propose aux addons (talents, quêtes, carte, métiers...) pour nous aider à corriger les bugs sans te faire taper de commandes.
 
 ## [1.0.0-beta.52] — 2026-11-15
 
@@ -469,13 +469,13 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ### Corrigé / Fixed
 - **Chaînes : on voit où on en est.** Chaque étape d'un prérequis dit « Étape 3 sur 9 avant « Agamaggan's Blood » ».
   *Chain steps say where you are and what they lead to.*
-- **Plus de rendu juste après la prise** pour les quêtes dont nos données n'ont que le texte (ex. Powering the Pylons) : une étape « objectifs » s'intercale et se coche quand le jeu dit la quête terminée. Les quêtes « va parler à… » n'en ont pas.
-- **Sources de butin sur leur propre ligne** sous l'objectif (« Tombe sur : … »).
+- **Plus de rendu juste après la prise** pour les quêtes dont nos données n'ont que le texte (ex. Powering the Pylons) : une étape « objectifs » s'intercale et se coche quand le jeu dit la quête terminée. Les quêtes « va parler à... » n'en ont pas.
+- **Sources de butin sur leur propre ligne** sous l'objectif (« Tombe sur : ... »).
 
 ## [1.0.0-beta.48] — 2026-11-15
 
 ### Ajouté / Added
-- **Suivi compact** à l'écran (façon RXP) : le chapitre en cours (« Avant le donjon : Uldaman 3/7 »), l'action à faire avec son icône (prendre, rendre, tuer, ramasser, utiliser, aller…), les barres de progression des objectifs et les 2 actions suivantes. Clic : ouvre le guide sur l'étape ; Maj-clic : marquer faite ; déplaçable, repliable. `/wlh suivi`.
+- **Suivi compact** à l'écran (façon RXP) : le chapitre en cours (« Avant le donjon : Uldaman 3/7 »), l'action à faire avec son icône (prendre, rendre, tuer, ramasser, utiliser, aller...), les barres de progression des objectifs et les 2 actions suivantes. Clic : ouvre le guide sur l'étape ; Maj-clic : marquer faite ; déplaçable, repliable. `/wlh suivi`.
   *Compact on-screen tracker with the chapter, the current action, objective bars and the next two actions.*
 - **Trois chapitres par donjon** : Avant le donjon, Dans le donjon, Après le donjon, avec leur progression.
 - **Vue d'ensemble du donjon** (depuis le choix des donjons et le guide) : image, niveaux, entrée avec GPS, clé, quêtes classées avant / dans / après, prérequis faits ou non, chaînes, niveau requis, et un interrupteur par quête pour la garder ou la retirer de la route.
@@ -509,7 +509,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ## [1.0.0-beta.44] — 2026-11-15
 
 ### Modifié / Changed
-- **Commandes, catalogue des métiers** : « Commander » passe la commande à **toute la guilde** (le premier artisan qui accepte s'en charge) ; Maj-clic pour la passer à un seul artisan. Les objets sont rangés comme dans la fenêtre de métier : catégories repliables (Armes, Armure par emplacement, Sacs, Consommables, Composants, Enchantements…), triés par niveau requis (« Niv. 24 ») puis par qualité.
+- **Commandes, catalogue des métiers** : « Commander » passe la commande à **toute la guilde** (le premier artisan qui accepte s'en charge) ; Maj-clic pour la passer à un seul artisan. Les objets sont rangés comme dans la fenêtre de métier : catégories repliables (Armes, Armure par emplacement, Sacs, Consommables, Composants, Enchantements...), triés par niveau requis (« Niv. 24 ») puis par qualité.
   *Orders catalogue: Order goes to the whole guild; items grouped by category, sorted by level.*
 
 ## [1.0.0-beta.43] — 2026-11-15
@@ -541,10 +541,10 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ### Modifié / Changed
 - **Refonte visuelle complète** : un guide de style commun (couleurs, tailles, espacements, boutons avec survol et appui, onglets, cartes, états vides), des icônes HD dessinées pour l'addon, des fenêtres qui s'ajustent à leur contenu, plus de texte coupé ni de traits colorés sur le côté, et tous les textes réécrits en contexte, en français et en anglais.
   *Full visual redesign: one design system, HD icons, windows sized to content, no cut text, every text rewritten.*
-- **« Comment faire… ? »** remplace le guide de démarrage : une fiche par besoin avec les clics dans l'ordre, un bouton « Montre-moi » qui ouvre la bonne fenêtre et fait briller le bon bouton, une FAQ et les commandes.
+- **« Comment faire... ? »** remplace le guide de démarrage : une fiche par besoin avec les clics dans l'ordre, un bouton « Montre-moi » qui ouvre la bonne fenêtre et fait briller le bon bouton, une FAQ et les commandes.
   *"How do I...?" task guide with Show me buttons, FAQ and commands.*
 - **Noms** : « Writs » et « LFG » partout.
-- **WL Helper Gear v2** : effets « Chance au toucher » et « Utiliser : » comptés (Hand of Justice, Ironfoe, Earthstrike…), enchantements à effet (Crusader, Fiery…), bonus de set, plafonds de toucher donjon/raid, plafond de défense des tanks ; l'infobulle explique ce qui n'est pas compté.
+- **WL Helper Gear v2** : effets « Chance au toucher » et « Utiliser : » comptés (Hand of Justice, Ironfoe, Earthstrike...), enchantements à effet (Crusader, Fiery...), bonus de set, plafonds de toucher donjon/raid, plafond de défense des tanks ; l'infobulle explique ce qui n'est pas compté.
   *Gear scoring v2: procs, use effects, proc enchants, set bonuses, hit and defense caps.*
 
 ### Ajouté / Added
@@ -577,7 +577,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *LFG: dungeon picker with loading-screen art, multi-select.*
 - **Carte des vols** : un anneau doré qui pulse autour de la destination prévue, avec son nom.
   *Flight map: a pulsing ring on the planned landing.*
-- **Guide, dans le donjon** : un bandeau « DANS LE DONJON : … » avec la progression des quêtes à l'intérieur et le boss suivant ; un clic ramène à l'étape du donjon.
+- **Guide, dans le donjon** : un bandeau « DANS LE DONJON : ... » avec la progression des quêtes à l'intérieur et le boss suivant ; un clic ramène à l'étape du donjon.
   *Guide: a clear "inside the dungeon" band.*
 
 ### Modifié / Changed
@@ -611,7 +611,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *LFG: login recap, 1 h reminder, organizer banner, auto-accept, cancellation notice.*
 
 ### Modifié / Changed
-- **Writs, onglet Achats** : une seule ligne par writ (l'enveloppe et son objet, prix additionnés ; le détail dans l'infobulle), un filtre par zone, des zones repliables d'un clic (« Exclure » est un bouton à part), « absent de l'HV », la monnaie dans la langue du jeu (20s / 40s / 1g en anglais), « Tout acheter à la suite ».
+- **Writs, onglet Achats** : une seule ligne par Writ (l'enveloppe et son objet, prix additionnés ; le détail dans l'infobulle), un filtre par zone, des zones repliables d'un clic (« Exclure » est un bouton à part), « absent de l'HV », la monnaie dans la langue du jeu (20s / 40s / 1g en anglais), « Tout acheter à la suite ».
   *Writs Shopping tab: one line per writ, zone filter, foldable zones, money in the game's language, buy everything in a row.*
 - **« Quêtes de donjon » devient « Guide de quêtes »** (donjons, raids, quêtes de classe).
   *"Dungeon quests" is now "Quest guide".*
@@ -632,7 +632,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ## [1.0.0-beta.34] — 2026-11-15
 
 ### Ajouté / Added
-- **Writs, zones à exclure** : dans Achats, un clic sur une zone (« À rendre en Les Paluns ») la laisse de côté, le plan prend d'autres writs, toujours les moins chers et le moins de zones ; les zones exclues restent en bas, un clic les remet.
+- **Writs, zones à exclure** : dans Achats, un clic sur une zone (« À rendre en Les Paluns ») la laisse de côté, le plan prend d'autres Writs, toujours les moins chers et le moins de zones ; les zones exclues restent en bas, un clic les remet.
   *Writs: click a zone in the Shopping tab to leave it out of the plan.*
 - **Guilde, filtres par classe et par rôle** : les icônes officielles des classes et des rôles (tank, soins, dégâts, d'après la spé partagée par WL Helper ; un druide farouche compte comme tank et dégâts), et l'icône de classe devant chaque nom.
   *Guild: class and role filters with the game's icons; class icon on each member.*
@@ -646,9 +646,9 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ## [1.0.0-beta.32] — 2026-11-15
 
 ### Modifié / Changed
-- **Writs et Faveur du marchand séparés** : deux tuiles sur l'accueil et deux fenêtres. **Writs** (réputation avec Durotar Supply and Logistics : Aujourd'hui, Achats, Tous) et **Faveur du marchand** (les caisses). L'onglet Achats dit « Coût » puis « pour 29 writs, qui rapportent 3 025 points de réputation » au lieu de « +3025 rép ».
+- **Writs et Faveur du marchand séparés** : deux tuiles sur l'accueil et deux fenêtres. **Writs** (réputation avec Durotar Supply and Logistics : Aujourd'hui, Achats, Tous) et **Faveur du marchand** (les caisses). L'onglet Achats dit « Coût » puis « pour 29 Writs, qui rapportent 3 025 points de réputation » au lieu de « +3025 rép ».
   *Writs and Merchant's Favor split into two tiles and two windows; clearer cost and reputation wording.*
-- **Prix max pour 100 points de réputation** réglable dans Achats (20 pa, 40 pa, 1 po, sans) : le plan prend les writs les moins chers et le moins de zones possible sous ce plafond.
+- **Prix max pour 100 points de réputation** réglable dans Achats (20 pa, 40 pa, 1 po, sans) : le plan prend les Writs les moins chers et le moins de zones possible sous ce plafond.
   *A price cap per 100 reputation in the Shopping tab.*
 - **Commandes, le circuit de bout en bout** :
   - en commandant un objet (Maj-clic), les **artisans possibles** : recette connue, ou métier compatible avec le type d'objet (potion → Alchimie, tissu → Couture, plaque → Forge...), en ligne d'abord, avec leurs étoiles ; « À lui » pour lui commander directement ;
@@ -681,7 +681,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ### Corrigé / Fixed
 - **Spam « Aucun joueur nommé X ne joue actuellement »** : les Commandes demandaient les recettes par message privé, au nom sans royaume. Plus aucun message privé : la demande passe par le canal de guilde et seul le propriétaire répond.
   *"No player named X" spam: recipe requests no longer go by whisper.*
-- **Passe complète sur tout l'addon** (audit par module, chaque défaut contre-vérifié avant correction) : textes coupés ou superposés dans le Comptoir, la flèche GPS (plus large), le guide, le sélecteur, la Guilde, le LFG, les Commandes, l'accueil, les réglages et l'écran de bienvenue ; prix de l'HV qui pouvaient compter 0 à tort ; objectif de réputation mal lu ; épingle de carte effacée à tort ; noms de writs en français reconnus ; classement PvP et événements séparés par guilde ; semaines PvP alignées sur la remise à zéro du jeu ; invitations LFG au-delà de 5 (passage en raid) ; inscription reçue avant l'événement ; flèches d'amélioration plus légères ; un deux-mains n'est plus comparé à la main gauche ; bouton « Publier la commande » qui cachait le réglage de paiement ; raisons de refus traduites chez chacun ; et d'autres.
+- **Passe complète sur tout l'addon** (audit par module, chaque défaut contre-vérifié avant correction) : textes coupés ou superposés dans le Comptoir, la flèche GPS (plus large), le guide, le sélecteur, la Guilde, le LFG, les Commandes, l'accueil, les réglages et l'écran de bienvenue ; prix de l'HV qui pouvaient compter 0 à tort ; objectif de réputation mal lu ; épingle de carte effacée à tort ; noms de Writs en français reconnus ; classement PvP et événements séparés par guilde ; semaines PvP alignées sur la remise à zéro du jeu ; invitations LFG au-delà de 5 (passage en raid) ; inscription reçue avant l'événement ; flèches d'amélioration plus légères ; un deux-mains n'est plus comparé à la main gauche ; bouton « Publier la commande » qui cachait le réglage de paiement ; raisons de refus traduites chez chacun ; et d'autres.
   *A full audit pass: dozens of layout, logic and text fixes, each one checked before being fixed.*
 
 ### Ajouté / Added
@@ -773,7 +773,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ## [1.0.0-beta.21] — 2026-11-15
 
 ### Corrigé / Fixed
-- **Nettoyeur de sacs** : les explications ne sont plus coupées (« à détruire à… ») : plus courtes, fenêtre plus large, deux lignes si besoin. Le Marteau de Zul'Farrak et les autres objets à garder ne sont plus listés. Quand rien ne peut être coché, le bouton le dit (« Rien que l'addon puisse détruire ») et l'intro explique les objets grisés : les glisser hors du sac pour les détruire soi-même.
+- **Nettoyeur de sacs** : les explications ne sont plus coupées (« à détruire à... ») : plus courtes, fenêtre plus large, deux lignes si besoin. Le Marteau de Zul'Farrak et les autres objets à garder ne sont plus listés. Quand rien ne peut être coché, le bouton le dit (« Rien que l'addon puisse détruire ») et l'intro explique les objets grisés : les glisser hors du sac pour les détruire soi-même.
   *Bag cleaner: no more cut-off texts; items to keep are no longer listed; clearer when nothing can be ticked.*
 
 ## [1.0.0-beta.20] — 2026-11-15
@@ -785,7 +785,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ### Corrigé / Fixed
 - **Textes invisibles chez certains joueurs** : avec une autre version d'EllesmereUI, la police qu'on lui emprunte pouvait manquer et les textes disparaissaient (boutons, lignes d'étape). L'addon vérifie maintenant que la police s'affiche, sinon il prend celle du jeu.
   *Invisible texts with another EllesmereUI version: the borrowed font is checked, the game's font is used otherwise.*
-- Comptoir : « reset dans 14 h » devient « nouveaux writs dans 14 h », et « Rends les 0 writs prêts » devient « Achète 8 writs dans l'onglet Achats ».
+- Comptoir : « reset dans 14 h » devient « nouveaux Writs dans 14 h », et « Rends les 0 Writs prêts » devient « Achète 8 Writs dans l'onglet Achats ».
   *Trading Post: no more English "reset", no more "hand in the 0 ready writs".*
 
 ## [1.0.0-beta.19] — 2026-11-15
@@ -812,7 +812,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ## [1.0.0-beta.17] — 2026-11-15
 
 ### Modifié / Changed
-- **Commandes rangées** : une seule commande, `/wl`, et un seul mot anglais par action, le même en français : `dungeons`, `pick`, `trade`, `bags`, `orders`, `gps`, `options`, `setup`, `idea`, `help`. Les anciens mots (`/wl reglages`, `/wl sacs`...) marchent encore mais ne sont plus affichés. `/comptoir`, `/writs`, `/wlo`, `/dg`, `/dguide`, `/wldt` et `/zfg` sont retirés.
+- **Commandes rangées** : une seule commande, `/wl`, et un seul mot anglais par action, le même en français : `dungeons`, `pick`, `trade`, `bags`, `orders`, `gps`, `options`, `setup`, `idea`, `help`. Les anciens mots (`/wl reglages`, `/wl sacs`...) marchent encore mais ne sont plus affichés. `/comptoir`, `/Writs`, `/wlo`, `/dg`, `/dguide`, `/wldt` et `/zfg` sont retirés.
   *One command, /wl, one English word per action in every language; the old extra slash commands are gone.*
 - **Sélecteur de donjons** refait : grandes cartes sur deux colonnes avec l'écran de chargement du donjon (les fichiers du jeu), le nom en haut, « 5/6 quêtes » et l'emblème de faction à droite, une coche verte quand tout est fait, les niveaux en bas. Les donjons trop hauts pour toi sont en gris.
   *Dungeon picker redone: wide picture cards, quest count, levels; too-high dungeons in grey.*
@@ -840,7 +840,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ### Ajouté / Added
 - **Améliorations** (nouveau module) : une flèche verte et le gain (« +24% ») sur les objets de tes sacs meilleurs que ce que tu portes, selon Geared Forever et la spé choisie dans /geared. Sacs du jeu et Baganator. Reprend Geared Arrows : s'il est encore installé, c'est lui qui s'en charge.
   *Upgrades: a green arrow and the gain on bag items better than yours, judged by Geared Forever.*
-- **Journal du donjon** dans le menu « … » du guide : boss et butin du donjon de l'étape, dans Naowh Dungeon Journal ou Forever Dungeon Journal.
+- **Journal du donjon** dans le menu « ... » du guide : boss et butin du donjon de l'étape, dans Naowh Dungeon Journal ou Forever Dungeon Journal.
   *Dungeon journal in the guide's "..." menu.*
 - **Alerte des monstres rares** dans les donjons : un message à l'écran et un son, une fois par monstre (Réglages › Donjons).
   *Rare monster alert inside dungeons.*
@@ -909,7 +909,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *Real AH prices: with the auction house open, the Favor plan reads every listing and computes the true cost.*
 - **Lots mélangés** : un lot par caisse, mais les caisses peuvent prendre des lots différents ; le plan choisit caisse par caisse le moins cher (il passe aux Iron Bar quand les Silver Bar bon marché sont épuisés).
   *Bundles mixed across crates, crate by crate, cheapest first.*
-- **La banque compte** : ce que tu as en banque n'est plus à racheter (liste d'achat, writs, Favor) ; la liste dit « 2 en banque ».
+- **La banque compte** : ce que tu as en banque n'est plus à racheter (liste d'achat, Writs, Favor) ; la liste dit « 2 en banque ».
   *Your bank counts: items in the bank are not bought again.*
 - Le guide ne s'ouvre plus jamais tout seul à la connexion ou au /reload : `/wl`, l'accueil ou la minimap l'ouvrent.
   *The guide never opens by itself at login or /reload.*
@@ -917,7 +917,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ## [1.0.0-beta.7] — 2026-11-15
 
 ### Ajouté / Added
-- **Rappel de mise à jour** : chaque copie de l'addon annonce discrètement sa version à ta guilde et à ton groupe. Si quelqu'un a plus récent que toi, un message te le dit une fois, et l'accueil et l'infobulle de la minimap affichent « Mise à jour disponible : … · WowUp › Update ». Seul le numéro de version est envoyé. Ça marche à partir de cette version : il faut que d'autres joueurs l'aient aussi.
+- **Rappel de mise à jour** : chaque copie de l'addon annonce discrètement sa version à ta guilde et à ton groupe. Si quelqu'un a plus récent que toi, un message te le dit une fois, et l'accueil et l'infobulle de la minimap affichent « Mise à jour disponible : ... · WowUp › Update ». Seul le numéro de version est envoyé. Ça marche à partir de cette version : il faut que d'autres joueurs l'aient aussi.
   *Update reminder: copies tell each other their version on the guild and group channels; a newer one shows on the home page and the minimap tooltip.*
 
 ### Modifié / Changed
@@ -929,14 +929,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ### Ajouté / Added
 - **Planificateur de Merchant's Favor** (onglet « Favor » du Comptoir) : tu tapes combien de Favor tu veux ; il prend les Waylaid Crates les moins chères (caisse + le lot de composants le moins cher, ce que tu as déjà est gratuit), tient compte de ce qui est en vente au dernier scan, et liste quoi acheter. Clic : acheter la caisse ; Maj-clic : le lot. La Favor de chaque caisse s'apprend quand tu en rends une. Les lots sont lus dans Naowh Forever.
   *Merchant's Favor planner: type the Favor you want; the cheapest Waylaid Crates and bundles, what to buy, one click at the AH.*
-- **Choisir ses writs** : dans « Tous », une case par writ ; le total (prix, prix après Coin Pouch, réputation) se met à jour à chaque coche, et la liste d'achat suit ta sélection. Sans coche, le plan automatique reste.
+- **Choisir ses Writs** : dans « Tous », une case par Writ ; le total (prix, prix après Coin Pouch, réputation) se met à jour à chaque coche, et la liste d'achat suit ta sélection. Sans coche, le plan automatique reste.
   *Tick the writs you want in "All": live total of cost and reputation; the shopping list follows your pick.*
 
 ### Modifié / Changed
 - **Choix des donjons** rangé en sections : à ton niveau, plus tard, terminés (coche verte, barre verte), sans quête Horde (avec « Tous »).
   *Dungeon picker in sections, with a green check on finished dungeons.*
 - Titre « WaR LegenD Helper » dans l'infobulle de la minimap et sur l'accueil.
-- Liste d'achat : groupes « À rendre en <zone> · N writs », enveloppes écrites « Enveloppe · objet » ; bouton « Liste Auctionator » retiré (l'achat est intégré).
+- Liste d'achat : groupes « À rendre en <zone> · N Writs », enveloppes écrites « Enveloppe · objet » ; bouton « Liste Auctionator » retiré (l'achat est intégré).
   *Shopping list groups and names are clearer; the Auctionator list button is gone.*
 - Textes : paragraphes coupés en lignes courtes ; « Une idée, un bug ? » en trois étapes numérotées.
   *Texts split into short lines; the feedback window in three steps.*
@@ -975,7 +975,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *Addon icon: the War Legend logo.*
 
 ### Corrigé / Fixed
-- Le menu du clic droit sur la minimap passait derrière les barres de boutons de minimap (EllesmereUI…) ; le menu « ... » du guide aussi peut passer devant tout.
+- Le menu du clic droit sur la minimap passait derrière les barres de boutons de minimap (EllesmereUI...) ; le menu « ... » du guide aussi peut passer devant tout.
   *The minimap right-click menu no longer opens behind minimap button bars; same for the guide's "..." menu.*
 
 ## [1.0.0-beta.3] — 2026-11-15
@@ -984,9 +984,9 @@ Une interface rangée : un accueil, un guide allégé, une minimap et des comman
 *A tidy interface: a home page, a lighter guide, a clear minimap button and commands.*
 
 ### Ajouté / Added
-- **Accueil** (`/wl`, clic sur la minimap) : une carte par module avec où tu en es (donjon et étape, writs prêts, objets à jeter), le GPS en cours avec un bouton pour l'arrêter, « Une idée, un bug ? » et les réglages.
+- **Accueil** (`/wl`, clic sur la minimap) : une carte par module avec où tu en es (donjon et étape, Writs prêts, objets à jeter), le GPS en cours avec un bouton pour l'arrêter, « Une idée, un bug ? » et les réglages.
   *Home page: one card per module with where you stand, the running GPS, feedback and settings.*
-- **Choisir ses writs** : clic droit sur un writ dans « Tous les writs » pour le mettre de côté ; Réglages › Comptoir › « Zones où je vais » pour écarter des zones entières. Le plan d'achat n'achète plus ce qui est écarté.
+- **Choisir ses Writs** : clic droit sur un Writ dans « Tous les Writs » pour le mettre de côté ; Réglages › Comptoir › « Zones où je vais » pour écarter des zones entières. Le plan d'achat n'achète plus ce qui est écarté.
   *Pick your writs: right-click a writ to set it aside, or turn whole zones off in the settings; the buying plan skips them.*
 - Minimap : clic droit, un menu vers chaque module ; l'infobulle dit où tu en es.
   *Minimap right-click menu to each module; the tooltip shows where you stand.*
@@ -1004,7 +1004,7 @@ Une interface rangée : un accueil, un guide allégé, une minimap et des comman
   *Two open windows no longer mix.*
 - Survoler une ligne du Comptoir ne cache plus son texte.
   *Hovering a Comptoir row no longer hides its text.*
-- Infobulles des writs sans PNJ connu : les lignes « Clic : GPS » manquaient.
+- Infobulles des Writs sans PNJ connu : les lignes « Clic : GPS » manquaient.
   *Tooltips of writs without a known NPC lost their click hints.*
 - « Arrêter le GPS » arrête vraiment la flèche, qu'elle vienne du guide ou du Comptoir ; `/wl gps` l'arrête ou la relance.
   *"Stop the GPS" really stops it, whoever started it.*
@@ -1021,7 +1021,7 @@ Refonte complète de l'interface aux couleurs de War Legend, page d'options, GPS
   *Options page (`/wl options`, `/wlo`, also in the game settings and in EllesmereUI).*
 - **Nettoyeur de sacs** (`/wl clean`) : liste les objets de quête devenus inutiles et les détruit en un clic ; ce qui peut servir à une quête suivante est signalé, les objets rares restent à la main. Demandé par Eksipump.
   *Bag cleaner: lists quest items you no longer need and deletes them in one click; items a later quest may need are flagged.*
-- **Confort du Comptoir**, chacun désactivable : acceptation et remise automatiques des writs (Maj pour l'empêcher), rappel à la connexion, infobulle des enveloppes (réputation, objet demandé, prix, lieu, déjà rendu).
+- **Confort du Comptoir**, chacun désactivable : acceptation et remise automatiques des Writs (Maj pour l'empêcher), rappel à la connexion, infobulle des enveloppes (réputation, objet demandé, prix, lieu, déjà rendu).
   *Writ comforts, each one a switch: auto-accept and auto turn-in (hold Shift to skip), login reminder, envelope tooltip.*
 - **GPS** : une seule recherche vers tous les arrêts de la tournée, étapes « 2 sur 5 », temps estimé par zone, prise du vol automatique en option, flèche Zygor utilisable à la place de la nôtre (option « auto » si son pathfinding est actif).
   *GPS: one search to every stop, "step 2 of 5", time per zone, optional auto flight, Zygor's arrow can guide instead of ours.*
@@ -1039,11 +1039,11 @@ Refonte complète de l'interface aux couleurs de War Legend, page d'options, GPS
   *War Legend logo and red throughout.*
 - La liste d'achat déduit les objets déjà dans les sacs.
   *The shopping list subtracts items already in your bags.*
-- Commandes : `/comptoir` devient la commande du Comptoir (`/wl comptoir`, `/writs` reste en alias) ; nouvelles `/wl options`, `/wl clean`.
+- Commandes : `/comptoir` devient la commande du Comptoir (`/wl comptoir`, `/Writs` reste en alias) ; nouvelles `/wl options`, `/wl clean`.
   *Commands: `/comptoir` is the Comptoir's command (`/writs` still works); new `/wl options`, `/wl clean`.*
 
 ### Supprimé / Removed
-- Le calculateur de coût des writs (remplacé par le plan du jour).
+- Le calculateur de coût des Writs (remplacé par le plan du jour).
   *The writ cost calculator (the day plan replaces it).*
 
 ### Corrigé / Fixed
@@ -1073,8 +1073,8 @@ Première version de WL Helper (bêta). WL Dungeon Guide devient **WL Helper**.
 
 ### Ajouté / Added
 
-- **Craftsman's Writs** : nouveau panneau (bouton « Writs », `/wl writs`, `/writs`, Maj-clic sur la minimap) — prix par le scan intégré de l'HV, Auctionator ou TSM ; état du jour ; plan d'achat pour le rang suivant ; liste d'achat avec rescan à l'ouverture de l'HV et achat direct ; valeur des Coin Pouch mesurée ; writs de l'autre faction masqués ; lieux de remise appris depuis le journal de quêtes.
-- **GPS intégré**, partagé par le guide de donjons et les writs : monture, points de vol connus, zeppelins, bateaux, téléportations de mage ; flèche avec l'étape en cours, boutons « Prendre le vol » et « Lancer la téléportation ». La flèche du guide passe par ce GPS.
+- **Craftsman's Writs** : nouveau panneau (bouton « Writs », `/wl Writs`, `/Writs`, Maj-clic sur la minimap) — prix par le scan intégré de l'HV, Auctionator ou TSM ; état du jour ; plan d'achat pour le rang suivant ; liste d'achat avec rescan à l'ouverture de l'HV et achat direct ; valeur des Coin Pouch mesurée ; Writs de l'autre faction masqués ; lieux de remise appris depuis le journal de quêtes.
+- **GPS intégré**, partagé par le guide de donjons et les Writs : monture, points de vol connus, zeppelins, bateaux, téléportations de mage ; flèche avec l'étape en cours, boutons « Prendre le vol » et « Lancer la téléportation ». La flèche du guide passe par ce GPS.
 - Commandes : `/wl` en commande principale, `/wl gps` ; la version s'affiche au chargement et dans `/wl help`.
 
 ### Modifié / Changed
