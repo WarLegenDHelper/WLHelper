@@ -1,13 +1,15 @@
 -- WLHelper_Nav: zone danger for WalkTo (how much dearer a walk through a zone far above the character is).
--- Adapted on 2026-11-15 for WL Helper from Polestar 0.3.7.2's Nav/Danger.lua (Danger.Mult, Danger.Table, Danger.Level,
--- Danger.ZoneAt) and the zone levels of its Maps/ZoneLevels.lua (min and max only; Polestar generated them from
--- pfQuest's data, MIT). Copyright (c) 2026 The Polestar authors. The Polestar addon is licensed under the GNU General
+-- Adapted on 2026-11-15 (updated 2026-11-16 to Polestar 0.4.0) for WL Helper from Polestar's Nav/Danger.lua (Danger.Mult, Danger.Table, Danger.Level,
+-- Danger.ZoneAt) and the zone levels of its Maps/ZoneLevels.lua (min, max and danger floor; Polestar generated them
+-- from pfQuest's data, MIT). Copyright (c) 2026 The Polestar authors. The Polestar addon is licensed under the GNU General
 -- Public License, version 3 only (GPL-3.0-only), so this file is too; see this folder's LICENSE. WL Helper's changes:
 -- the zone levels are a local table here instead of ns.Maps, the level is read from UnitLevel("player") (through
 -- issecretvalue) and PLAYER_LEVEL_UP is not watched (WalkTo reads the level for each walk), Danger.Along (the journey
--- planner's straight walks) is not copied.
+-- planner's straight walks, and with it 0.4.0's road-through rule, ROAD_GAP) is not copied.
 --
--- Polestar's rule, unchanged: a zone is dangerous for a character of level L when its lowest level is at least L + 4
+-- Polestar's rule, unchanged: a zone is dangerous for a character of level L when its lowest level (its danger floor
+-- when it has one: where a low pocket at the zone's edge pulls the lowest level under the ground walks cross, as
+-- Alterac Mountains' lake murlocs put it at 24 under Strahnbrad's 30-40, Polestar #1490) is at least L + 4
 -- (x3 per step), far above when it is more than L + 10 (x20, the other faction's towns' strength); a zone without a
 -- level range never counts, nor do the zones the walk starts and ends in. The router (Routing/Path.lua) takes the
 -- table as opts.danger; no zone is ever closed. The zone danger idea and its 4-level threshold come from Ding! by
@@ -29,12 +31,12 @@ local FAR_ABOVE = 10 -- more than this far above: x FAR_MULT
 local DANGEROUS_MULT = 3
 local FAR_MULT = 20
 
--- [uiMapID] = { minLevel, maxLevel } (Polestar 0.3.7.2, Maps/ZoneLevels.lua)
+-- [uiMapID] = { minLevel, maxLevel[, dangerFloor] } (Polestar 0.4.0, Maps/ZoneLevels.lua)
 local levels = {
 	[1411] = { 1, 10 }, -- Durotar
 	[1412] = { 3, 27 }, -- Mulgore
 	[1413] = { 8, 28 }, -- The Barrens
-	[1416] = { 24, 39 }, -- Alterac Mountains
+	[1416] = { 24, 39, 30 }, -- Alterac Mountains
 	[1417] = { 31, 39 }, -- Arathi Highlands
 	[1418] = { 36, 43 }, -- Badlands
 	[1419] = { 45, 54 }, -- Blasted Lands
@@ -108,7 +110,7 @@ function Danger.Mult(level, uiMapID)
 	if type(level) ~= "number" or not v then
 		return 1
 	end
-	local lo = v[1]
+	local lo = v[3] or v[1] -- the danger floor, else the lowest level
 	if lo > level + FAR_ABOVE then
 		return FAR_MULT
 	end

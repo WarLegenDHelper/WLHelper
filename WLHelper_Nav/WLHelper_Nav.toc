@@ -4,12 +4,12 @@
 ## Notes: WL Helper's walking router for the GPS: real paths round mountains and through gates (Polestar's router and maps, without Polestar). Loaded on demand.
 ## Notes-frFR: Routeur à pied du GPS de WL Helper : vrais chemins autour des montagnes et par les portes (routeur et cartes de Polestar, sans Polestar). Chargé à la demande.
 ## Author: WaR LegenD (router and maps from Polestar and Shortest Path Forever)
-## Version: 1.0.0
+## Version: 1.1.0
 ## Group: WLHelper
 ## LoadOnDemand: 1
 ## Dependencies: WLHelper
 ## X-License: GPL-3.0-or-later (Danger.lua: GPL-3.0-only, from Polestar)
-## X-Credits: Polestar Nav 0.3.7.2 by the Polestar authors (GPL-3.0-or-later), router started from Shortest Path Forever v1.16.0 by Cillian Berragan (GPL-3.0-or-later, used with his permission), walking maps from Leffe's navigation maps. See NOTICE.md
+## X-Credits: Polestar Nav 0.4.0 by the Polestar authors (GPL-3.0-or-later), router started from Shortest Path Forever v1.16.0 by Cillian Berragan (GPL-3.0-or-later, used with his permission, with ports from his v1.33.0), walking maps from Leffe's navigation maps. See NOTICE.md
 
 Nav\Nav.xml
 Routing\Costs.lua

@@ -1,5 +1,5 @@
 -- Polestar's walking router. Started from Shortest Path Forever v1.16.0 (b1ad5bd) by Cillian Berragan (GPL-3.0-or-later); modified for Polestar since 2026-10-16.
--- Modified copy for WL Helper (WLHelper_Nav), 2026-11-15: globals renamed so it loads beside Polestar (PolestarPathData -> WLHelperNavData, ...); see NOTICE.md. Algorithm, costs and map bytes unchanged.
+-- Modified copy for WL Helper (WLHelper_Nav), 2026-11-15, updated 2026-11-16 to Polestar Nav 0.4.0: globals renamed so it loads beside Polestar (PolestarPathData -> WLHelperNavData, ...); see NOTICE.md. Algorithm, costs and map bytes unchanged.
 -- Routing/PathGrid.lua: Copyright (C) 2026 Cillian Berragan (https://github.com/cjber/shortest-path-forever); Polestar's
 -- changes Copyright (c) 2026 The Polestar authors. This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3
@@ -1810,6 +1810,34 @@ ns.PathGrid = {
 	cellOf = cellOf,
 	chunkOf = chunkOf,
 	zoneAt = zoneAt,
+	-- Every chunk's zone of cluster k in one pass over its zone field (zoneAt reads one chunk a pass): a string of 512
+	-- bytes, chunk q (0-based, chunkOf's numbering) the uiMapID in bytes 2q + 1 (high) and 2q + 2 (low), 0 for none;
+	-- nil without the field. (A field, not a local: Path.ZoneTile is its only reader.)
+	zoneString = function(st, k)
+		local s = st.D.zone and st.D.zone[k + 1]
+		if not s then
+			return nil
+		end
+		local out, n, q, i, pair = {}, 0, 0, 1, "\0\0"
+		while i <= #s and q < 256 do
+			local a, reps = B64[byte(s, i)], 1
+			if a < 48 then
+				local value = a * 64 + B64[byte(s, i + 1)]
+				pair, i = string.char(floor(value / 256), value % 256), i + 2
+			else
+				reps, i = a - 47, i + 1
+			end
+			if q + reps > 256 then
+				reps = 256 - q
+			end
+			n, q = n + 1, q + reps
+			out[n] = string.rep(pair, reps)
+		end
+		if q < 256 then
+			out[n + 1] = string.rep("\0\0", 256 - q)
+		end
+		return table.concat(out)
+	end,
 	nodeArea = nodeArea,
 	chunkDanger = chunkDanger,
 	nodesOf = nodesOf,
@@ -1822,6 +1850,7 @@ ns.PathGrid = {
 	standing = standing,
 	snap = snap,
 	smooth = smooth,
+	unpackField = unpackField,
 	Rest = Rest,
 	Idle = Idle,
 	Reset = Reset,

@@ -4,12 +4,12 @@
 ## Notes: Walking maps of the Eastern Kingdoms for WL Helper's GPS. Loaded on demand on that continent.
 ## Notes-frFR: Cartes de marche des Royaumes de l'Est pour le GPS de WL Helper. Chargé à la demande sur ce continent.
 ## Author: WaR LegenD (router and maps from Polestar and Shortest Path Forever)
-## Version: 1.0.0
+## Version: 1.1.0
 ## Group: WLHelper
 ## LoadOnDemand: 1
 ## Dependencies: WLHelper_Nav
 ## X-License: GPL-3.0-or-later
-## X-Credits: Polestar Nav 0.3.7.2 by the Polestar authors (GPL-3.0-or-later), router started from Shortest Path Forever v1.16.0 by Cillian Berragan (GPL-3.0-or-later, used with his permission), walking maps from Leffe's navigation maps. See NOTICE.md
+## X-Credits: Polestar Nav 0.4.0 by the Polestar authors (GPL-3.0-or-later), router started from Shortest Path Forever v1.16.0 by Cillian Berragan (GPL-3.0-or-later, used with his permission, with ports from his v1.33.0), walking maps from Leffe's navigation maps. See NOTICE.md
 
 Nav0_1.lua
 Nav0_2.lua

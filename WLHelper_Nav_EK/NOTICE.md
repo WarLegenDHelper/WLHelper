@@ -1,7 +1,7 @@
 # WL Helper Nav continent maps: notice
 
-A **modified copy, made on 2026-11-15 for WL Helper**, of a Polestar Nav
-0.3.7.2 continent map addon (`Polestar_Nav_EK` / `Polestar_Nav_Kalimdor`):
+A **modified copy, made on 2026-11-15 for WL Helper** (updated on 2026-11-16
+to Polestar Nav 0.4.0, maps of 2026-11-14), of a Polestar Nav continent map addon (`Polestar_Nav_EK` / `Polestar_Nav_Kalimdor`):
 Polestar's walking maps (Copyright (c) 2026 The Polestar authors,
 [github.com/fitzforge/polestar](https://github.com/fitzforge/polestar)),
 condensed from Leffe's navigation maps, in a format started from

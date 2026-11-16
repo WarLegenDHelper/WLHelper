@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.83] — 2026-11-16
+
+### Modifié / Changed
+- **GPS à pied à jour avec Polestar 0.4.0** : départs corrigés sous les rues des villes (quartier des Nains de Hurlevent), des milliers de nouveaux passages entre étages sur les deux continents, nouveaux villages relais, et danger des Montagnes d'Alterac recalé (niveau 30).
+  *Walking GPS updated to Polestar Nav 0.4.0: better city starts, many more floor links, Alterac danger floor.*
+
 ## [1.0.0-beta.82] — 2026-11-16
 
 ### Ajouté / Added

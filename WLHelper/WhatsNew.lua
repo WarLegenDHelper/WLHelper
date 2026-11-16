@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.83", date = "2026-11-16", items = {
+    { s = "chg", fr = { "GPS à pied à jour avec Polestar 0.4.0", "Départs corrigés sous les rues des villes (quartier des Nains de Hurlevent), des milliers de nouveaux passages entre étages sur les deux continents, nouveaux villages relais, et danger des Montagnes d'Alterac recalé (niveau 30)." }, en = { "Walking GPS updated to Polestar Nav 0.4.0", "Better city starts, many more floor links, Alterac danger floor." } },
+  } },
   { v = "1.0.0-beta.82", date = "2026-11-16", items = {
     { s = "add", fr = { "Recharges de métier", "L'Accueil affiche les recharges (transmutations, Étoffe lunaire, Salière) de tous tes personnages, et une ligne dans le chat te prévient quand l'une d'elles est prête." }, en = { "Profession cooldowns of all your characters on Home, with a chat line when one is ready.", "" } },
     { s = "add", fr = { "Prix de revient à l'HV", "WL Helper retient ce que tu paies à l'hôtel des ventes (et le coût des composants pour ce que tu fabriques), l'affiche dans l'infobulle et te prévient si tu mets en vente en dessous." }, en = { "Cost price from your AH purchases in the tooltip, with a warning when you list below it.", "" } },
@@ -106,8 +109,5 @@ ns.WHATSNEW = {
     { s = "add", fr = { "Clic droit simple = baguette", "Pour les mages, prêtres et démonistes (ou toute classe avec une baguette), un clic droit seul sur un ennemi lance Tir. Proposé à l'accueil quand tu actives le tir, réglable dans Réglages › Général › Clics." }, en = { "Plain right-click = wand, offered to wand classes, in Settings too.", "" } },
     { s = "fix", fr = { "Zul'Farrak", "Theka le Martyr passe avant Antu'sul dans la visite boss par boss." }, en = { "Zul'Farrak", "Theka the Martyr now comes before Antu'sul." } },
     { s = "fix", fr = { "Fenêtre des boss", "Un boss mort ou hors de vue ne remplace plus son portrait par un rond blanc." }, en = { "Boss panel", "No more white disc portraits from dead or unseen bosses." } },
-  } },
-  { v = "1.0.0-beta.68", date = "2026-11-15", items = {
-    { s = "add", fr = { "Quoi de neuf", "Après chaque mise à jour, une fenêtre liste une fois ce qui a changé depuis la version que tu avais (que l'addon ait été mis à jour par WowUp, CurseForge ou à la main). /wlh nouveautes la rouvre." }, en = { "What's new", "After each update a window lists the changes since your last version, once; /wlh news reopens it." } },
   } },
 }

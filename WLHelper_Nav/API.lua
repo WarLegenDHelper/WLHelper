@@ -1,5 +1,5 @@
 -- WLHelper_Nav: WL Helper's walking router (main file).
--- A modified copy, made on 2026-11-15, of Polestar Nav 0.3.7.2 (Copyright (c) 2026 The Polestar authors), whose router
+-- A modified copy, made on 2026-11-15 and updated on 2026-11-16, of Polestar Nav 0.4.0 (Copyright (c) 2026 The Polestar authors), whose router
 -- started from Shortest Path Forever v1.16.0 by Cillian Berragan (Copyright (C) 2026 Cillian Berragan,
 -- https://github.com/cjber/shortest-path-forever, used with his permission). This program is free software: you can
 -- redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software

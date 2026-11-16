@@ -1,10 +1,10 @@
 -- WhatsNewUI.lua: "Quoi de neuf" — after an update (however it was installed), a window lists what
 -- changed since the version you last saw, once. /wlh nouveautes (or news) opens it again.
 -- Layout: one block per version (the version on the left, its date muted on the right; a 1 px rule
--- with 16 px of air between versions), then its changes grouped by kind (Nouveautés in green,
--- Changements in blue, Corrections in gold: a block heading, DESIGN 3.21, in the kind's colour:
--- 12, 14 px above it, 4 under it), each change a 5 px
--- dot of that colour, its title (fg 13) and one muted sentence (12) under it, 8 px between changes.
+-- with 16 px of air between versions; the date only once per day), then its changes grouped by kind
+-- (Nouveautés, Changements, Corrections: a block heading, DESIGN 3.21, in the heading colour:
+-- 12, 14 px above it, 4 under it), each change a 5 px dot in the kind's colour (green new, blue
+-- changed, gold fixed), its title (fg 13) and one muted sentence (12) under it, 8 px between changes.
 -- English items without an English text fall back to the French one. The window fits its content
 -- (DESIGN 3.2) and scrolls past 80 % of the screen; the footer says how to open it again.
 local ADDON, ns = ...

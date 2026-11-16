@@ -3,7 +3,7 @@
 ## Notes: Quest guide (dungeons, raids, class quests) step by step, Craftsman's Writs and a built-in GPS (flights, zeppelins, teleports). Dungeons: dungeon picker, custom multi-dungeon route from where you stand, ready check, waypoints, arrow, target/mark and quest item buttons, quest sharing. French / English. /wl
 ## Notes-frFR: Guide de quêtes (donjons, raids, quêtes de classe) pas à pas, Craftsman's Writs et GPS intégré (vols, zeppelins, téléportations). Donjons : sélecteur de donjons, route perso sur plusieurs donjons depuis ta position, check-list avant d'entrer, points, flèche, boutons cibler/marquer et objet de quête, partage. Français / anglais. /wl
 ## Author: Alandir (WarLegend)
-## Version: 1.0.0-beta.82
+## Version: 1.0.0-beta.83
 ## X-Credits: LibForeverData (CC BY 4.0), RestedXP Guides (CC BY-NC-SA 4.0), ForeverDungeonJournal, Naowh Forever, Wowhead via Waylaid Crate Helper, TSM, wow.gg, Zygor (coordinates). See CREDITS.txt
 ## IconTexture: Interface\AddOns\WLHelper\Media\Logo64
 ## Group: WLHelper
