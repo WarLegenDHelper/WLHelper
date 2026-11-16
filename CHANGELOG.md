@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.77] — 2026-11-16
+
+### Corrigé / Fixed
+- **Centaur Pariah (Maraudon)** : il fait des allers-retours sur le chemin au sud du Convent de Mannoroc. Le repère est maintenant au milieu de son trajet, et l'étape dit de suivre le chemin vers l'ouest s'il n'est pas là.
+  *Centaur Pariah patrols: the marker is now mid-path, with a note to follow the path.*
+
 ## [1.0.0-beta.76] — 2026-11-16
 
 ### Corrigé / Fixed

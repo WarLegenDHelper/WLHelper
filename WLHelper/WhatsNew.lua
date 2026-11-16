@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.77", date = "2026-11-16", items = {
+    { s = "fix", fr = { "Centaur Pariah (Maraudon)", "Il fait des allers-retours sur le chemin au sud du Convent de Mannoroc. Le repère est maintenant au milieu de son trajet, et l'étape dit de suivre le chemin vers l'ouest s'il n'est pas là." }, en = { "Centaur Pariah patrols", "The marker is now mid-path, with a note to follow the path." } },
+  } },
   { v = "1.0.0-beta.76", date = "2026-11-16", items = {
     { s = "fix", fr = { "« Le jeu a bloqué SetRaidTarget() »", "La macro « DG_Cible » créée par une ancienne version gardait sa ligne de marque de raid ; elle est nettoyée à la connexion et ne fait plus que cibler." }, en = { "The old \"DG_Cible\" macro is cleaned at login", "Targeting only, no more blocked marker error." } },
   } },
@@ -84,9 +87,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.63", date = "2026-11-15", items = {
     { s = "chg", fr = { "Résumé du donjon plus lisible", "Bouton **« Lancer la route »** en bas à droite (ou « Mettre à jour la route » / « Retour à la route » quand une route tourne déjà) ; les quêtes déjà rendues sont repliées en bas ; quand tout est fait, « Tu as déjà rendu toutes les quêtes de … » avec « Choisir un autre donjon » ; une ligne par quête avec niveau, XP et argent ; le total de ta sélection en haut." }, en = { "Clearer dungeon summary with a Start the route button.", "" } },
     { s = "chg", fr = { "Vue groupe", "Des colonnes seulement pour les membres dont on connaît l'état (WL Helper ou réponse au partage), une icône par case ; les autres en une ligne « Sans WL Helper : … »." }, en = { "", "" } },
-  } },
-  { v = "1.0.0-beta.62", date = "2026-11-15", items = {
-    { s = "add", fr = { "Visite du donjon boss par boss", "Dans le donjon, une étape par boss dans l'ordre (« Boss 3 sur 7 · Glutton »), avec les objectifs de quête qui s'y rattachent, la tactique (conseils de Naowh lus en direct quand il est installé, sinon nos notes), le chemin et le butin intéressant pour toi (flèche verte et %). L'étape passe toute seule quand le boss meurt (fin de rencontre ou cible morte) et que ses objectifs sont faits ; les boss facultatifs sont passés quand tu avances. Les morts sont gardées pour la sortie en cours (un retour rapide après une mort ne remet rien à zéro)." }, en = { "Dungeon walkthrough boss by boss, auto-advance on kill.", "" } },
-    { s = "add", fr = { "Plusieurs spés dans l'infobulle", "Réglages › Améliorations › « Spés à comparer » ; une ligne par spé (« Protection +6 % », « Fureur −3 % »), et la flèche des sacs au choix pour ta spé principale ou n'importe laquelle." }, en = { "Several specs in the upgrade tooltip.", "" } },
   } },
 }
