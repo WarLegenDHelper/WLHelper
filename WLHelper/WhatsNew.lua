@@ -2,6 +2,15 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.82", date = "2026-11-16", items = {
+    { s = "add", fr = { "Recharges de métier", "L'Accueil affiche les recharges (transmutations, Étoffe lunaire, Salière) de tous tes personnages, et une ligne dans le chat te prévient quand l'une d'elles est prête." }, en = { "Profession cooldowns of all your characters on Home, with a chat line when one is ready.", "" } },
+    { s = "add", fr = { "Prix de revient à l'HV", "WL Helper retient ce que tu paies à l'hôtel des ventes (et le coût des composants pour ce que tu fabriques), l'affiche dans l'infobulle et te prévient si tu mets en vente en dessous." }, en = { "Cost price from your AH purchases in the tooltip, with a warning when you list below it.", "" } },
+    { s = "add", fr = { "« Fabricable par 3 artisans de la guilde (1 en ligne) »", "Dans l'infobulle des objets." }, en = { "Item tooltip", "How many guild crafters can make it, and how many are online." } },
+    { s = "add", fr = { "Heures habituelles", "« Souvent là : 20h–23h » sur les fiches d'artisan, appris en voyant la guilde en ligne." }, en = { "Usual online hours on crafter cards.", "" } },
+    { s = "add", fr = { "Notes de boss pour tous les donjons", "Tactique et conseil, plus seulement les Mortemines, Ombrecroc et les Cavernes." }, en = { "Boss notes for every dungeon of the guide.", "" } },
+    { s = "chg", fr = { "Butin des boss", "Un objet BiS pour ta spé apparaît même quand ce n'est pas une amélioration, en premier. Les badges sous les icônes sont plus courts (« BiS 40 », « 2e »)." }, en = { "BiS items show in boss loot even when not an upgrade; shorter badges under icons.", "" } },
+    { s = "chg", fr = { "Avis de nouvelle version", "Il faut maintenant au moins 2 membres de la guilde avec la même version plus récente." }, en = { "The new-version notice needs at least 2 guild members reporting it.", "" } },
+  } },
   { v = "1.0.0-beta.81", date = "2026-11-16", items = {
     { s = "chg", fr = { "Liste des addons", "WL Helper Gear et les trois WL Helper Nav ont maintenant le logo WL Helper et un nom aligné (« WaR LegenD Helper - Gear », « - Nav »…), regroupés sous WL Helper quand le jeu le permet." }, en = { "Gear and Nav sub-addons now show the WL Helper logo and matching names in the addon list.", "" } },
   } },
@@ -100,8 +109,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.68", date = "2026-11-15", items = {
     { s = "add", fr = { "Quoi de neuf", "Après chaque mise à jour, une fenêtre liste une fois ce qui a changé depuis la version que tu avais (que l'addon ait été mis à jour par WowUp, CurseForge ou à la main). /wlh nouveautes la rouvre." }, en = { "What's new", "After each update a window lists the changes since your last version, once; /wlh news reopens it." } },
-  } },
-  { v = "1.0.0-beta.67", date = "2026-11-15", items = {
-    { s = "fix", fr = { "Clic sur un portrait de boss sans effet", "Le portrait réagit maintenant à l'appui comme au relâchement, comme les boutons de téléportation et du guide qui marchent sur ce client. Si le boss n'est pas ciblé après le clic, un message le dit dans le chat avec le nom cherché." }, en = { "Boss portraits", "Click now registered like the working buttons; a chat line says when the boss was not targeted." } },
   } },
 }

@@ -1391,9 +1391,27 @@ function ns.BossStepName(st)
   end
   return nm or st.bossEn or "?"
 end
--- Loot of this boss that matters to you: { { id, name, link, icon, quest, up, text } }. Gear shows
--- only when WL Helper's gear check calls it an upgrade; quest items always (unless a quest line
--- of the step already names them).
+-- Loot of this boss that matters to you: { { id, name, link, icon, quest, up, text, bis } }. Gear
+-- shows when WL Helper's gear check calls it an upgrade or Naowh's BiS list ranks it 1 or 2 for
+-- your spec (ns.BisBadge, bis = that rank); quest items always (unless a quest line of the step
+-- already names them). A BiS you already own (worn, bags, bank) does not count. Quest items
+-- first, then BiS (rank 1, then 2), the rest in the boss's loot order.
+-- you already own this item (worn, in your bags or bank): a BiS you have is no longer loot for you
+local function OwnsItem(id)
+  if not id then return false end
+  local function plain(v) return not (issecretvalue and issecretvalue(v)) end
+  if IsEquippedItem then
+    local ok, eq = pcall(IsEquippedItem, id)
+    if ok and plain(eq) and eq then return true end
+  end
+  local count = (C_Item and C_Item.GetItemCount) or GetItemCount
+  if count then
+    local ok, n = pcall(count, id, true)
+    if ok and type(n) == "number" and plain(n) and n > 0 then return true end
+  end
+  return false
+end
+ns.OwnsItem = OwnsItem
 function ns.BossStepLoot(st)
   local out = {}
   if not (st and st.bossStep and ns.BossLoot) then return out end
@@ -1412,15 +1430,38 @@ function ns.BossStepLoot(st)
         icon = tex
       end
     end
+    local bis
+    if ns.BisBadge and (link or it.id) then
+      local okB, rk = pcall(ns.BisBadge, link or it.id)
+      if okB and (rk == 1 or rk == 2) and not OwnsItem(it.id) then bis = rk end
+    end
     if it.quest then
-      if not (it.name and named[it.name]) then out[#out + 1] = { id = it.id, name = name or ("#" .. tostring(it.id)), link = link, icon = icon, quest = true } end
-    elseif link and WP and WP.UpgradeCheck then
-      local ok, r = pcall(WP.UpgradeCheck, link)
-      if ok and type(r) == "table" and r.up then
-        out[#out + 1] = { id = it.id, name = name, link = link, icon = icon, up = true, text = r.text }
+      if not (it.name and named[it.name]) then out[#out + 1] = { id = it.id, name = name or ("#" .. tostring(it.id)), link = link, icon = icon, quest = true, bis = bis } end
+    else
+      local up, text
+      if link and WP and WP.UpgradeCheck then
+        local ok, r = pcall(WP.UpgradeCheck, link)
+        if ok and type(r) == "table" and r.up then up, text = true, r.text end
+      end
+      if up or bis then
+        out[#out + 1] = { id = it.id, name = name or ("#" .. tostring(it.id)), link = link, icon = icon, up = up, text = text, bis = bis }
       end
     end
   end
+  -- with a BiS here: quest items first (they block the quest, never pushed out of the 3 lines),
+  -- then BiS rank 1, rank 2, then the rest, each group in loot order (a stable sort). No BiS:
+  -- the boss's loot order, as before.
+  local anyBis = false
+  for _, e in ipairs(out) do if e.bis then anyBis = true end end
+  if not anyBis then return out end
+  for i, e in ipairs(out) do e._k = i end
+  local function key(e) return e.quest and 0 or e.bis or 3 end
+  table.sort(out, function(a, b)
+    local ra, rb = key(a), key(b)
+    if ra ~= rb then return ra < rb end
+    return a._k < b._k
+  end)
+  for _, e in ipairs(out) do e._k = nil end
   return out
 end
 -- Optional: nothing for you at this boss (no open quest line, no upgrade, no quest item).

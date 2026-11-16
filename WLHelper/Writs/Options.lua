@@ -21,6 +21,14 @@ local F = root.F
 ns.AddEnglish({
     ["La flèche suit un vrai chemin autour des collines et par les portes, pour tous les guides (WL Helper Nav). Sans lui, elle va tout droit."] =
         "The arrow follows a real path around hills and through gates, for every guide (WL Helper Nav). Without it, it goes straight.",
+    -- profession cooldowns (Writs page)
+    ["Recharges de métier"] = "Profession cooldowns",
+    ["Prix de revient (HV)"] = "Cost price (AH)",
+    ["Retenir mes prix d'achat"] = "Remember what I pay",
+    ["Retient ce que tu paies à l'HV (moyenne sur 60 jours), l'affiche dans l'infobulle et prévient si tu vends en dessous."] = "Remembers what you pay at the AH (60-day average), shows it in the item tooltip and warns when you list below it.",
+    ["Prévenir quand une recharge est prête"] = "Tell me when a cooldown is ready",
+    ["Transmutations, Étoffe lunaire, Salière : une ligne dans le chat, pour tous tes personnages. Leur temps restant est sur l'Accueil."] =
+        "Transmutes, Mooncloth, Salt Shaker: one line in chat, for all your characters. Their time left is on Home.",
     -- window, nav and search
     ["Réglages"] = "Settings",
     ["Accueil"] = "Home",
@@ -910,6 +918,20 @@ function BUILD.comptoir(p)
         L("Par exemple : « 3 Writs prêts à rendre, 1 enveloppe à ouvrir »."))
     SwitchRow(p, L("Détails dans l'infobulle des enveloppes"), function() return Comfort().tooltip end, SetComfort("tooltip"),
         L("Réputation, coût, à qui la rendre, et si tu l'as déjà rendue."))
+
+    -- profession cooldowns (Writs/Cooldowns.lua): the chat line when one is ready
+    Section(p, L("Recharges de métier"))
+    SwitchRow(p, L("Prévenir quand une recharge est prête"),
+        function() local CDm = ns.WP.Cooldowns; return not CDm or CDm.AlertOn() end,
+        function(v) local CDm = ns.WP.Cooldowns; if CDm then CDm.SetAlert(v) end end,
+        L("Transmutations, Étoffe lunaire, Salière : une ligne dans le chat, pour tous tes personnages. Leur temps restant est sur l'Accueil."))
+
+    -- cost price at the AH (Writs/CostPrice.lua)
+    Section(p, L("Prix de revient (HV)"))
+    SwitchRow(p, L("Retenir mes prix d'achat"),
+        function() local C = ns.WP.CostPrice; return not C or C.On() end,
+        function(v) WLWritsDB.costPrice = v and nil or false end,
+        L("Retient ce que tu paies à l'HV (moyenne sur 60 jours), l'affiche dans l'infobulle et prévient si tu vends en dessous."))
 
     Section(p, L("Plan d'achat"))
     local row = Row(p, L("Objectif de réputation"), L("Le plan achète les Writs qu'il faut pour l'atteindre."))

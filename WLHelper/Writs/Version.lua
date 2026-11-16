@@ -1,7 +1,10 @@
 -- Writs/Version.lua: "a newer version exists". An addon cannot reach the internet, so each copy of
 -- WL Helper tells the others its version, quietly, on the guild's and the group's addon channel
--- (at login, when you join a group, and in answer to an older version). The newest version seen
--- is kept: one chat line per session, and a line on the home page, until you update.
+-- (at login, when you join a group, and in answer to an older version).
+-- A newer version is believed only once at least 2 different guild members have reported that same
+-- version (one sender alone can be wrong or lying); the reports are kept 3 weeks, across sessions.
+-- Then: one chat line per session, and a line on the home page, until you update. Malformed versions
+-- and absurd ones (a major more than one above yours) are ignored.
 -- Only the version number is sent: nothing about the character.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
@@ -11,17 +14,20 @@ local L = ns.L
 
 ns.AddEnglish({
     -- the chat line, once per session
-    ["La version %s de WL Helper est sortie (tu as la %s). Mets-la à jour dans WowUp, puis tape /reload pour la charger."] =
-        "WL Helper %s is out (you have %s). Update it in WowUp, then type /reload to load it.",
+    ["La version %s de WL Helper est sortie, vue chez %d membres (tu as la %s). Mets-la à jour dans WowUp, puis tape /reload pour la charger."] =
+        "WL Helper %s is out, seen on %d members (you have %s). Update it in WowUp, then type /reload to load it.",
     -- the home page banner and the minimap tooltip
-    ["La version %s est sortie. Mets à jour WL Helper dans WowUp, puis tape /reload pour la charger."] =
-        "Version %s is out. Update WL Helper in WowUp, then type /reload to load it.",
+    ["La version %s est sortie, vue chez %d membres. Mets à jour WL Helper dans WowUp, puis tape /reload pour la charger."] =
+        "Version %s is out, seen on %d members. Update WL Helper in WowUp, then type /reload to load it.",
 })
 
--- The sentence that tells about a newer version (home page banner, minimap tooltip).
-function WP.UpdateText(version)
-    return string.format(L("La version %s est sortie. Mets à jour WL Helper dans WowUp, puis tape /reload pour la charger."), tostring(version))
-end
+local NEEDED = 2                  -- different guild members reporting the same version
+local KEEP = 21 * 24 * 3600       -- a report is forgotten after 3 weeks
+local MAX_VERSIONS = 10           -- versions kept in the saved reports
+local MAX_SENDERS = 40            -- senders kept per version
+
+local function Secret(v) return issecretvalue and issecretvalue(v) end
+local function Now() return (time and time()) or 0 end
 
 local PREFIX = "WLHver"
 local CI = C_ChatInfo
@@ -52,11 +58,133 @@ function WP.NewerVersion(x, y)
     return false
 end
 
--- The newest version another player has, when it is newer than yours (else nil).
+-- A version worth counting: well formed ("1.2.3" or "1.2.3-beta.4", nothing else), a known stage,
+-- small numbers, and a major at most one above yours.
+local function Sane(v)
+    if type(v) ~= "string" or #v > 24 then return false end
+    if not (v:match("^%d+%.%d+%.%d+$") or v:match("^%d+%.%d+%.%d+%-%a+%.%d+$")) then return false end
+    local p = Parse(v)
+    if not p or p[4] == 0 then return false end
+    for i = 1, 5 do if p[i] > 999 then return false end end
+    local m = Parse(Mine())
+    if m and p[1] > m[1] + 1 then return false end
+    return true
+end
+WP.SaneVersion = Sane
+
+-- Saved reports: WLWritsDB.versionSeen[version][sender] = time of the last report.
+local function Reports()
+    if not WLWritsDB then return nil end
+    if type(WLWritsDB.versionSeen) ~= "table" then WLWritsDB.versionSeen = {} end
+    return WLWritsDB.versionSeen
+end
+
+-- Forget old reports, versions no longer newer than yours, and anything malformed; keep 10 versions.
+local function Prune()
+    local seen = Reports()
+    if not seen then return end
+    local now, mine = Now(), Mine()
+    local keep = {}
+    for v, who in pairs(seen) do
+        local alive = false
+        if type(v) == "string" and type(who) == "table" and Sane(v) and WP.NewerVersion(v, mine) then
+            for name, t in pairs(who) do
+                if type(t) ~= "number" or now - t > KEEP then who[name] = nil else alive = true end
+            end
+        end
+        if alive then keep[#keep + 1] = v else seen[v] = nil end
+    end
+    if #keep > MAX_VERSIONS then
+        -- too many: the versions with the fewest witnesses go first, then the oldest numbers
+        local count = {}
+        for _, v in ipairs(keep) do
+            local n = 0
+            for _ in pairs(seen[v]) do n = n + 1 end
+            count[v] = n
+        end
+        table.sort(keep, function(a, b)
+            if count[a] ~= count[b] then return count[a] > count[b] end
+            return WP.NewerVersion(a, b)
+        end)
+        for i = MAX_VERSIONS + 1, #keep do seen[keep[i]] = nil end
+    end
+end
+
+-- How many different guild members reported this version (recent reports only).
+function WP.VersionWitnesses(version)
+    local seen = WLWritsDB and type(WLWritsDB.versionSeen) == "table" and WLWritsDB.versionSeen[version]
+    if type(seen) ~= "table" then return 0 end
+    local now, n = Now(), 0
+    for _, t in pairs(seen) do
+        if type(t) == "number" and now - t <= KEEP then n = n + 1 end
+    end
+    return n
+end
+
+-- The newest version at least 2 guild members have, when it is newer than yours (else nil),
+-- and how many members reported it.
 function WP.UpdateAvailable()
-    local seen = WLWritsDB and WLWritsDB.newestVersion
-    if seen and WP.NewerVersion(seen, Mine()) then return seen end
-    return nil
+    local seen = WLWritsDB and WLWritsDB.versionSeen
+    if type(seen) ~= "table" then return nil end
+    local mine, best, count = Mine(), nil, 0
+    for v in pairs(seen) do
+        if type(v) == "string" and Sane(v) and WP.NewerVersion(v, mine) then
+            local n = WP.VersionWitnesses(v)
+            if n >= NEEDED and (not best or WP.NewerVersion(v, best)) then best, count = v, n end
+        end
+    end
+    if not best then return nil end
+    return best, count
+end
+
+-- The sentence that tells about a newer version (home page banner, minimap tooltip).
+function WP.UpdateText(version)
+    local n = math.max(WP.VersionWitnesses(version), NEEDED)
+    return string.format(L("La version %s est sortie, vue chez %d membres. Mets à jour WL Helper dans WowUp, puis tape /reload pour la charger."), tostring(version), n)
+end
+
+-- Your realm, without spaces ("" when unknown or secret).
+local function MyRealm()
+    local r = GetNormalizedRealmName and GetNormalizedRealmName()
+    if (type(r) ~= "string" or Secret(r) or r == "") and GetRealmName then
+        r = GetRealmName()
+        if type(r) == "string" and not Secret(r) then r = r:gsub("[%s%-]", "") end
+    end
+    if type(r) ~= "string" or Secret(r) then return "" end
+    return r
+end
+-- "Name-Realm" in lower case: a name without realm is on yours. Two players of different realms
+-- with the same name stay apart.
+local function Full(name)
+    name = tostring(name)
+    if not name:find("-", 1, true) then
+        local r = MyRealm()
+        if r ~= "" then name = name .. "-" .. r end
+    end
+    return name:lower()
+end
+
+-- Guild members' full names, lower case (cached a minute), to tell whether a group sender is one.
+local roster, rosterAt = nil, nil
+local function InGuild(name)
+    if not (IsInGuild and IsInGuild() and GetNumGuildMembers and GetGuildRosterInfo) then return false end
+    local now = GetTime and GetTime() or 0
+    if not roster or not rosterAt or now - rosterAt > 60 then
+        roster, rosterAt = {}, now
+        local ok, total = pcall(GetNumGuildMembers)
+        local any = false
+        for i = 1, (ok and tonumber(total) or 0) do
+            local ok2, n = pcall(GetGuildRosterInfo, i)
+            if ok2 and type(n) == "string" and n ~= "" and not Secret(n) then roster[Full(n)] = true; any = true end
+        end
+        if not any then
+            -- roster not loaded yet: ask the server, and look again next time instead of caching nothing
+            rosterAt = nil
+            local ask = (C_GuildInfo and C_GuildInfo.GuildRoster) or GuildRoster
+            if ask then pcall(ask) end
+        end
+    end
+    return roster[Full(name)] == true
 end
 
 local lastSent = {}
@@ -72,17 +200,35 @@ local function GroupChannel()
 end
 
 local told = false
-local function Seen(version, channel)
+local function Seen(version, channel, sender)
     local mine = Mine()
     if WP.NewerVersion(version, mine) then
-        if not WLWritsDB.newestVersion or WP.NewerVersion(version, WLWritsDB.newestVersion) then
-            WLWritsDB.newestVersion = version
+        if not Sane(version) then return end
+        -- only guild members count: anyone on the guild channel, a group member found in the roster
+        if channel ~= "GUILD" and not InGuild(sender) then return end
+        local seen = Reports()
+        if not seen then return end
+        local who = seen[version]
+        if type(who) ~= "table" then who = {}; seen[version] = who end
+        local key = Full(sender)
+        -- a sender counts for one version only (its latest report), so one sender cannot fill the
+        -- saved reports with made-up versions and push a confirmed one out
+        for v, other in pairs(seen) do
+            if v ~= version and type(other) == "table" then other[key] = nil end
         end
-        if not told then
+        if who[key] == nil then
+            local n = 0
+            for _ in pairs(who) do n = n + 1 end
+            if n >= MAX_SENDERS then return end
+        end
+        who[key] = Now()
+        Prune()
+        local best, n = WP.UpdateAvailable()
+        if best and not told then
             told = true
-            WP.Print(string.format(L("La version %s de WL Helper est sortie (tu as la %s). Mets-la à jour dans WowUp, puis tape /reload pour la charger."), version, mine))
+            WP.Print(string.format(L("La version %s de WL Helper est sortie, vue chez %d membres (tu as la %s). Mets-la à jour dans WowUp, puis tape /reload pour la charger."), best, n, mine))
         end
-        if WP.RefreshHome then WP.RefreshHome() end
+        if best and WP.RefreshHome then WP.RefreshHome() end
     elseif WP.NewerVersion(mine, version) then
         Announce(channel)   -- an older copy answered: tell it ours
     end
@@ -94,21 +240,23 @@ pcall(f.RegisterEvent, f, "GROUP_JOINED")
 pcall(f.RegisterEvent, f, "CHAT_MSG_ADDON")
 f:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
     if e == "PLAYER_LOGIN" then
-        -- the version you updated to is no longer "newer": forget it
-        if WLWritsDB and WLWritsDB.newestVersion and not WP.NewerVersion(WLWritsDB.newestVersion, Mine()) then
-            WLWritsDB.newestVersion = nil
-        end
+        -- a version older copies believed from a single sender: forgotten, the reports decide now
+        if WLWritsDB then WLWritsDB.newestVersion = nil end
+        -- the version you updated to is no longer "newer": its reports go
+        Prune()
         C_Timer.After(15, function()
             if IsInGuild and IsInGuild() then Announce("GUILD") end
             Announce(GroupChannel())
         end)
     elseif e == "GROUP_JOINED" then
         C_Timer.After(3, function() Announce(GroupChannel()) end)
-    elseif prefix == PREFIX and type(msg) == "string" and WLWritsDB then
+    elseif e == "CHAT_MSG_ADDON" and WLWritsDB then
+        if Secret(prefix) or Secret(msg) or Secret(channel) or Secret(sender) then return end
+        if prefix ~= PREFIX or type(msg) ~= "string" or type(sender) ~= "string" or sender == "" then return end
         local me = UnitName("player")
-        if sender and me and sender:gsub("%-.*$", "") == me then return end
+        if me and not Secret(me) and Full(sender) == Full(me) then return end
         if channel ~= "GUILD" and channel ~= "PARTY" and channel ~= "RAID" and channel ~= "INSTANCE_CHAT" then return end
         local v = msg:match("^V:(.+)$")
-        if v and Parse(v) then Seen(v, channel) end
+        if v and Parse(v) then Seen(v, channel, sender) end
     end
 end)

@@ -214,8 +214,9 @@ function ns.BossTacticText(st)
 end
 local ARROW_UP = "|TInterface\\AddOns\\WLHelper\\Media\\Icons\\arrow_up:14:14:0:-1:128:128:0:128:0:128:76:208:122|t"
 -- Naowh Forever's BiS list (WP.NaowhBiS) for an item and the player's current spec: rank 1 (BiS)
--- or 2 (second choice), its short badge ("BiS" + star / "2e choix") and colour. nil when Naowh is
--- absent or switched off, the item unranked or ranked lower, or the item a secret value.
+-- or 2 (second choice), its short badge ("BiS" + star / "2e choix") and colour, and a shorter
+-- form for the label under a 48 px icon ("BiS" / "2e" / "BiS 40"). nil when Naowh is absent or
+-- switched off, the item unranked or ranked lower, or the item a secret value.
 local BIS_STAR = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:%d:%d:0:0|t"
 function ns.BisBadge(item, size)
   if item == nil or (issecretvalue and issecretvalue(item)) then return nil end
@@ -239,16 +240,20 @@ function ns.BisBadge(item, size)
     if okC and cr then r, g, b = cr, cg, cb end
   end
   local text = rank == 1 and L.BIS_1 or L.BIS_2
-  -- an empty Naowh list falls back on Naowh's gear for a level: "BiS niv. 40"
+  local short = rank == 1 and L.BIS_1 or L.BIS_2S
+  -- an empty Naowh list falls back on Naowh's gear for a level: "BiS niv. 40" ("BiS 40" short)
   if rank == 1 and NB.Source and NB.Label then
     local okB, _, bracket = pcall(NB.Source, item, spec)
     if okB and bracket then
       local okL, lab = pcall(NB.Label, 1, bracket)
-      if okL and type(lab) == "string" and lab ~= "" then text = lab end
+      if okL and type(lab) == "string" and lab ~= "" then
+        text = lab
+        if type(bracket) == "number" and lab ~= L.BIS_1 then short = L.BIS_LVS:format(bracket) end
+      end
     end
   end
   if rank == 1 then size = size or 12; text = text .. " " .. BIS_STAR:format(size, size) end
-  return rank, text, r, g, b
+  return rank, text, r, g, b, short
 end
 -- true when Naowh's own item tooltip line (its active list) already says this rank
 function ns.BisNaowhTip(item, rank)
@@ -269,7 +274,7 @@ function ns.BisBadgeText(item, size)
   local word, star = text:match("^(.-)( |T.*)$")
   return Hex({ r, g, b }) .. (word or text) .. "|r" .. (star or "")
 end
--- the loot that matters: an upgrade (green arrow and its gain) or a quest item, 3 lines at most
+-- the loot that matters: BiS first, an upgrade (green arrow and its gain), a quest item; 3 lines at most
 function ns.BossLootText(st)
   local ok, list = pcall(ns.BossStepLoot, st)
   if not (ok and type(list) == "table" and #list > 0) then return nil end
@@ -282,8 +287,11 @@ function ns.BossLootText(st)
     if bis then name = name .. "  " .. bis end
     if it.up then
       lines[#lines + 1] = ic .. name .. "  " .. ARROW_UP .. Hex(T.ok) .. (it.text or "") .. "|r"
-    else
+    elseif it.quest then
       lines[#lines + 1] = ic .. name .. Hex(T.muted) .. "  ·  " .. L.LOOT_QUEST .. "|r"
+    else
+      -- BiS without a gain over what you wear: the badge says it
+      lines[#lines + 1] = ic .. name
     end
   end
   return table.concat(lines, "\n")

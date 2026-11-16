@@ -90,6 +90,11 @@ ns.AddEnglish({
     ["Utilise : "] = "Uses: ",
     -- T-80: "tell me when someone can make it" (the Request page)
     ["%s sait faire %s : tu peux le lui commander. Tape /wlh orders."] = "%s can make %s: you can order it from them. Type /wlh orders.",
+    -- T-65: the item tooltip line
+    ["Fabricable par 1 artisan de la guilde (en ligne)"] = "Craftable by 1 guild crafter (online)",
+    ["Fabricable par 1 artisan de la guilde (hors ligne)"] = "Craftable by 1 guild crafter (offline)",
+    ["Fabricable par %d artisans de la guilde (%d en ligne)"] = "Craftable by %d guild crafters (%d online)",
+    ["Fabricable par %d artisans de la guilde (personne en ligne)"] = "Craftable by %d guild crafters (none online)",
 })
 
 local PREFIX = "WLHord"
@@ -922,6 +927,89 @@ function O.ClassOf(name)
     if name == Me() then return select(2, UnitClass("player")) end
     O.OnlineGuild()
     return classCache[name]
+end
+
+-- ---------------------------------------------------------------- the item tooltip (T-65)
+-- One line on an item's tooltip: "Fabricable par 3 artisans de la guilde (1 en ligne)", from the
+-- shared recipe lists (exact recipes only, never a guess from the profession; me left out). No line
+-- when nobody can make it. The names per item are cached until a list changes (O.ListsChanged);
+-- who is online comes from O.OnlineGuild (itself read at most every 30 s).
+-- Turned off with WLWritsDB.orders.tipCrafters = false (My crafter profile page).
+local tipGen, tipCache, tipCacheGen = 0, {}, -1
+function O.ListsChanged() tipGen = tipGen + 1 end
+function O.TipCraftersOn() return DB().tipCrafters ~= false end
+function O.SetTipCrafters(on) if on then DB().tipCrafters = nil else DB().tipCrafters = false end end
+-- the guild members who have the recipe of this item (my own characters' lists aside: me excluded)
+function O.TipCrafters(item)
+    if tipCacheGen ~= tipGen then tipCache, tipCacheGen = {}, tipGen end
+    local names = tipCache[item]
+    if not names then
+        names = {}
+        local me = Me()
+        for name, profs in pairs(DB().crafters) do
+            if name ~= me then
+                for _, p in pairs(profs) do
+                    if type(p) == "table" and p.recipes and p.recipes[item] then names[#names + 1] = name; break end
+                end
+            end
+        end
+        tipCache[item] = names
+    end
+    if #names == 0 then return 0, 0 end
+    -- filtered at count time (the alts list can change without ListsChanged): my alts, ignored
+    -- players and people no longer in the roster (nil there; offline members are false) are left out
+    local online = O.OnlineGuild()
+    local alts = O.Profile().alts or {}
+    local total, on = 0, 0
+    for _, n in ipairs(names) do
+        if online[n] ~= nil and not alts[n] and not (K.Ignored and K.Ignored(n)) then
+            total = total + 1
+            if online[n] then on = on + 1 end
+        end
+    end
+    return total, on
+end
+function O.TipText(item)
+    if type(item) ~= "number" or item <= 0 then return nil end
+    local n, on = O.TipCrafters(item)
+    if n == 0 then return nil end
+    if n == 1 then
+        return on > 0 and L("Fabricable par 1 artisan de la guilde (en ligne)") or L("Fabricable par 1 artisan de la guilde (hors ligne)")
+    end
+    if on == 0 then return string.format(L("Fabricable par %d artisans de la guilde (personne en ligne)"), n) end
+    return string.format(L("Fabricable par %d artisans de la guilde (%d en ligne)"), n, on)
+end
+local function Secret(v) return root.IsSecret and root.IsSecret(v) end
+function O.TooltipLine(tip, id)
+    if not (tip and WLWritsDB) then return end
+    if tip.IsForbidden and tip:IsForbidden() then return end
+    if WP.ModuleOn and not WP.ModuleOn("orders") then return end
+    if not O.TipCraftersOn() then return end
+    if Secret(id) or type(id) ~= "number" then return end
+    local text = O.TipText(id)
+    if not text then return end
+    local c = S.C.muted or S.C.text
+    -- no tip:Show(): the game sizes the tooltip itself (an addon calling it can taint it)
+    tip:AddLine(text, c[1], c[2], c[3])
+end
+local function TipID(tip, data)
+    local id = type(data) == "table" and data.id or nil
+    if Secret(id) then return nil end
+    if type(id) == "number" then return id end
+    local ok, _, link = pcall(tip.GetItem, tip)
+    if ok and type(link) == "string" and not Secret(link) then return LinkID(link) end
+end
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
+    TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tip, data)
+        if tip ~= GameTooltip and tip ~= ItemRefTooltip then return end
+        pcall(function() O.TooltipLine(tip, TipID(tip, data)) end)
+    end)
+else
+    for _, t in ipairs({ GameTooltip, ItemRefTooltip }) do
+        if t and t.HookScript then
+            t:HookScript("OnTooltipSetItem", function(tip) pcall(function() O.TooltipLine(tip, TipID(tip)) end) end)
+        end
+    end
 end
 
 -- ---------------------------------------------------------------- mail: what arrived, and filling a mail
@@ -2007,6 +2095,7 @@ local function OnPayload(sender, key, payload)
         local hadList = type(c.recipes) == "table"
         c.recipes, c.hash, c.t = recipes, hash, time()
         d.crafters[sender][prof] = c
+        O.ListsChanged()
         -- a watched recipe learned by this member, and the search index to rebuild
         if K.OnRecipes then pcall(K.OnRecipes, sender, prof, recipes, hadList) end
         if WP.RefreshOrders then WP.RefreshOrders() end
@@ -2123,6 +2212,7 @@ local function Prune()
         for _, p in pairs(profs) do if (p.t or 0) > now - 30 * 86400 then recent = true end end
         if not recent then d.crafters[name] = nil end
     end
+    O.ListsChanged()
     if K.Prune then pcall(K.Prune) end
 end
 

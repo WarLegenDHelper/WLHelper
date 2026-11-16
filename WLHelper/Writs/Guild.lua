@@ -24,6 +24,9 @@
 --            "K/D/A" code on screen: "VH" is the list's unit, named once in the line above it.
 -- The combat log is closed to addons on this client: nothing here reads it (no open-world KB).
 -- Only counts, places, levels and the version travel; nothing else about the character.
+-- Usual hours (T-66): each copy notes, from the game's guild roster, who is online at which hour of
+-- the week (WLWritsDB.guildHours, the last 4 weeks, kept on this computer, never sent); the member
+-- tooltip and the crafter profiles (Orders) show "Souvent là : 20h–23h".
 local ADDON, root = ...
 root.Writs = root.Writs or {}
 local ns = root.Writs
@@ -157,6 +160,10 @@ ns.AddEnglish({
     ["Tous"] = "All",
     -- the keys tab (drawn by Writs/Keys.lua)
     ["Qui a la clé ?"] = "Who has the key?",
+    -- T-66: usual hours
+    ["Souvent là : %s"] = "Often on: %s",
+    ["à toute heure"] = "at any hour",
+    ["%dh"] = "%d:00",
 })
 
 local MONTHS = {
@@ -793,6 +800,172 @@ local function Roster(onlineOnly, filter, sort)
 end
 WP.GuildRoster = function(onlineOnly) local list, online = Roster(onlineOnly); return list, online end
 
+-- ---------------------------------------------------------------- usual hours (T-66)
+-- WLWritsDB.guildHours = { obs = { [week] = hex }, m = { [name] = { [week] = hex } } }
+-- A week is 168 hour buckets (Monday 0h = 0, local time), one bit each, written as 42 hex digits:
+-- m = the member was seen online in that hour, obs = this computer looked at the roster in it (the
+-- member could only be seen then). Only weeks with a bit set are kept; 4 weeks at most.
+local HOURS_WEEKS, HOURS_EVERY = 4, 300
+local HEX = "0123456789abcdef"
+local EMPTY_WEEK = string.rep("0", 42)
+local function HoursDB()
+    WLWritsDB.guildHours = WLWritsDB.guildHours or {}
+    local h = WLWritsDB.guildHours
+    h.obs = h.obs or {}; h.m = h.m or {}
+    return h
+end
+-- the local week number (Monday-based) and the bucket of the hour, for a time (default now)
+local function Bucket(t)
+    t = t or time()
+    local d = date("*t", t)
+    local days = math.floor(time({ year = d.year, month = d.month, day = d.day, hour = 12 }) / 86400)
+    return math.floor((days + 3) / 7), ((days + 3) % 7) * 24 + d.hour
+end
+local function SetBit(hex, b)
+    hex = hex or EMPTY_WEEK
+    local i = math.floor(b / 4) + 1
+    local v = tonumber(hex:sub(i, i), 16) or 0
+    local w = 2 ^ (b % 4)
+    if math.floor(v / w) % 2 == 1 then return hex end
+    v = v + w
+    return hex:sub(1, i - 1) .. HEX:sub(v + 1, v + 1) .. hex:sub(i + 1)
+end
+local function HasBit(hex, b)
+    local i = math.floor(b / 4) + 1
+    local v = tonumber(hex:sub(i, i), 16) or 0
+    return math.floor(v / 2 ^ (b % 4)) % 2 == 1
+end
+local hoursGen, hoursCache = 0, {}
+local function PruneHours(week)
+    local h = HoursDB()
+    local oldest = week - HOURS_WEEKS + 1
+    for wk in pairs(h.obs) do if type(wk) ~= "number" or wk < oldest then h.obs[wk] = nil end end
+    for name, weeks in pairs(h.m) do
+        for wk in pairs(weeks) do if type(wk) ~= "number" or wk < oldest then weeks[wk] = nil end end
+        if not next(weeks) then h.m[name] = nil end
+    end
+end
+local lastObs, lastBucket, prunedWeek = -1e9, nil, nil
+-- one look at the roster: every member online gets this hour (force: no throttle)
+local function ObserveHours(force)
+    if not On() then return end
+    if not (IsInGuild and IsInGuild() and GetNumGuildMembers and GetGuildRosterInfo) then return end
+    local now = GetTime and GetTime() or 0
+    local week, b = Bucket()
+    local key = week * 1000 + b
+    if not force and lastBucket == key and now - lastObs < HOURS_EVERY then return end
+    local n = N(Call(GetNumGuildMembers)) or 0
+    if n <= 0 then return end
+    lastObs, lastBucket = now, key
+    local h = HoursDB()
+    if prunedWeek ~= week then prunedWeek = week; PruneHours(week) end
+    local changed = false
+    local ob = SetBit(h.obs[week], b)
+    if ob ~= h.obs[week] then h.obs[week] = ob; changed = true end
+    for i = 1, n do
+        local ok, name, _, _, _, _, _, _, _, online = pcall(GetGuildRosterInfo, i)
+        name = ok and Clean(name)
+        if name and online and not Secret(online) then
+            local short = Short(name)
+            local weeks = h.m[short] or {}
+            h.m[short] = weeks
+            local nb = SetBit(weeks[week], b)
+            if nb ~= weeks[week] then weeks[week] = nb; changed = true end
+        end
+    end
+    -- only a new bit makes the usual hours stale (most looks within an hour change nothing)
+    if changed then hoursGen = hoursGen + 1 end
+end
+WP.GuildObserveHours = ObserveHours
+-- the usual hours of a member: { { from, to } } (hours of the day, to excluded, may wrap past
+-- midnight), at most 2 ranges, earliest first; "all" when every hour qualifies; nil without enough
+-- data. An hour counts when the member was seen in it on 2 days or more, on at least 40 % of the
+-- days this computer looked, and at least half as often as in the member's busiest hour.
+-- the hours this computer looked, shared by every member: per hour of the day, how many days, and
+-- the list of { week, bucket } looked at; rebuilt once per hoursGen (or when the week turns)
+local obsGen, obsWeek, obsCount, obsList = -1, nil, nil, nil
+local function ObsCounts(cur)
+    if obsGen == hoursGen and obsWeek == cur then return obsCount, obsList end
+    obsCount, obsList = {}, {}
+    for hr = 0, 23 do obsCount[hr] = 0 end
+    for wk, hex in pairs(HoursDB().obs) do
+        if type(wk) == "number" and wk > cur - HOURS_WEEKS and type(hex) == "string" then
+            for b = 0, 167 do
+                if HasBit(hex, b) then
+                    local hr = b % 24
+                    obsCount[hr] = obsCount[hr] + 1
+                    obsList[#obsList + 1] = { wk, b }
+                end
+            end
+        end
+    end
+    obsGen, obsWeek = hoursGen, cur
+    return obsCount, obsList
+end
+local function HoursRanges(name)
+    if type(name) ~= "string" or Secret(name) then return nil end
+    name = Short(name)
+    local c = hoursCache[name]
+    if c and c.gen == hoursGen then return c.r end
+    local h = HoursDB()
+    local weeks = h.m[name]
+    local r
+    if weeks then
+        local seen, total, peak = {}, 0, 0
+        for hr = 0, 23 do seen[hr] = 0 end
+        local obs, list = ObsCounts((Bucket()))
+        for _, e in ipairs(list) do
+            local mine = weeks[e[1]]
+            if type(mine) == "string" and HasBit(mine, e[2]) then
+                local hr = e[2] % 24
+                seen[hr] = seen[hr] + 1; total = total + 1
+            end
+        end
+        for hr = 0, 23 do if seen[hr] > peak then peak = seen[hr] end end
+        if total >= 3 then
+            local ok, all = {}, true
+            for hr = 0, 23 do
+                ok[hr] = seen[hr] >= 2 and obs[hr] > 0 and seen[hr] / obs[hr] >= 0.4 and seen[hr] * 2 >= peak
+                if not ok[hr] then all = false end
+            end
+            if all then r = "all"
+            else
+                -- runs of qualifying hours, around midnight too: start after a hole
+                local start
+                for hr = 0, 23 do if not ok[hr] then start = hr end end
+                local runs, cur2 = {}, nil
+                for k = 1, 24 do
+                    local hr = (start + k) % 24
+                    if ok[hr] then
+                        if cur2 then cur2.len = cur2.len + 1 else cur2 = { from = hr, len = 1 } end
+                    elseif cur2 then runs[#runs + 1] = cur2; cur2 = nil end
+                end
+                if cur2 then runs[#runs + 1] = cur2 end
+                table.sort(runs, function(a, b) if a.len ~= b.len then return a.len > b.len end return a.from < b.from end)
+                if #runs > 0 then
+                    r = {}
+                    for i = 1, math.min(2, #runs) do r[i] = { runs[i].from, (runs[i].from + runs[i].len) % 24 } end
+                    table.sort(r, function(a, b) return a[1] < b[1] end)
+                end
+            end
+        end
+    end
+    hoursCache[name] = { gen = hoursGen, r = r }
+    return r
+end
+WP.GuildHoursRanges = HoursRanges
+-- "Souvent là : 20h–23h" (EN "Often on: 20:00–23:00"), or nil
+function WP.GuildHours(name)
+    local r = HoursRanges(name)
+    if not r then return nil end
+    if r == "all" then return string.format(L("Souvent là : %s"), L("à toute heure")) end
+    local parts = {}
+    for i, x in ipairs(r) do
+        parts[i] = string.format(L("%dh"), x[1]) .. "\226\128\147" .. string.format(L("%dh"), x[2])   -- an en dash
+    end
+    return string.format(L("Souvent là : %s"), table.concat(parts, ", "))
+end
+
 -- ---------------------------------------------------------------- the window
 -- 640 wide (a wide tool: filters and four columns). The height follows the content (f:FitHeight);
 -- the list scrolls inside the window only once it reached 80 % of the screen.
@@ -907,6 +1080,8 @@ local function MemberRow(parent)
         lines[#lines + 1] = string.format(L("Niv. %s, %s"), m.level or "?", ClassName(m.class) .. (sp and (" " .. sp) or ""))
         lines[#lines + 1] = m.online and string.format(L("En ligne : %s"), (m.zone and m.zone ~= "") and m.zone or "?")
             or string.format(L("Vu %s"), Ago(m.away))
+        local usual = WP.GuildHours(m.name)
+        if usual then lines[#lines + 1] = usual end
         if m.rank and m.rank ~= "" then lines[#lines + 1] = string.format(L("Rang : %s"), m.rank) end
         if m.note and m.note ~= "" then lines[#lines + 1] = string.format(L("Note : %s"), m.note) end
         local profs = Professions(m.name)
@@ -1519,6 +1694,12 @@ ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
             pcall(self.RegisterEvent, self, h)
         end
         C_Timer.After(5, function() pcall(ArchiveSeason); CheckHonor(true) end)
+        -- usual hours: the roster is read when the game sends it; ask for it every 10 min
+        if C_Timer.NewTicker then
+            C_Timer.NewTicker(600, function()
+                if On() and IsInGuild and IsInGuild() and C_GuildInfo and type(C_GuildInfo.GuildRoster) == "function" then pcall(C_GuildInfo.GuildRoster) end
+            end)
+        end
         C_Timer.After(25, function() Share(true) end)
     elseif e == "PLAYER_PVP_KILLS_CHANGED" or e == "PLAYER_REGEN_ENABLED" or e == "ZONE_CHANGED_NEW_AREA" or e == "PLAYER_ENTERING_WORLD" then
         if On() then
@@ -1545,6 +1726,7 @@ ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
     elseif e == "PLAYER_FOCUS_CHANGED" then
         SeeHostile("focus")
     elseif e == "GUILD_ROSTER_UPDATE" then
+        pcall(ObserveHours)
         WP.RefreshGuild()
     elseif prefix == PREFIX and channel == "GUILD" and type(msg) == "string" and sender then
         local who = Short(sender)

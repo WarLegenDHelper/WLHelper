@@ -6,6 +6,26 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.82] — 2026-11-16
+
+### Ajouté / Added
+- **Recharges de métier** (T-63) : l'Accueil affiche les recharges (transmutations, Étoffe lunaire, Salière) de tous tes personnages, et une ligne dans le chat te prévient quand l'une d'elles est prête.
+  *Profession cooldowns of all your characters on Home, with a chat line when one is ready.*
+- **Prix de revient à l'HV** (T-64) : WL Helper retient ce que tu paies à l'hôtel des ventes (et le coût des composants pour ce que tu fabriques), l'affiche dans l'infobulle et te prévient si tu mets en vente en dessous.
+  *Cost price from your AH purchases in the tooltip, with a warning when you list below it.*
+- **« Fabricable par 3 artisans de la guilde (1 en ligne) »** (T-65) dans l'infobulle des objets.
+  *Item tooltip: how many guild crafters can make it, and how many are online.*
+- **Heures habituelles** (T-66) : « Souvent là : 20h–23h » sur les fiches d'artisan, appris en voyant la guilde en ligne.
+  *Usual online hours on crafter cards.*
+- **Notes de boss pour tous les donjons** (T-23) : tactique et conseil, plus seulement les Mortemines, Ombrecroc et les Cavernes.
+  *Boss notes for every dungeon of the guide.*
+
+### Modifié / Changed
+- **Butin des boss** : un objet BiS pour ta spé apparaît même quand ce n'est pas une amélioration, en premier. Les badges sous les icônes sont plus courts (« BiS 40 », « 2e »).
+  *BiS items show in boss loot even when not an upgrade; shorter badges under icons.*
+- **Avis de nouvelle version** (T-67) : il faut maintenant au moins 2 membres de la guilde avec la même version plus récente.
+  *The new-version notice needs at least 2 guild members reporting it.*
+
 ## [1.0.0-beta.81] — 2026-11-16
 
 ### Modifié / Changed

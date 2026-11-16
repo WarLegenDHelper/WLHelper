@@ -1360,6 +1360,8 @@ local function CrafterTip(key, c)
     local tip = { ClassHex(c) .. c.name .. "|r", CrafterFacts(key, c) }
     local sl = (not c.me) and StarLine(c.name) or nil
     if sl then tip[#tip + 1] = sl end
+    local usual = (not c.me) and H.Usual(c.name) or nil
+    if usual then tip[#tip + 1] = usual end
     if c.n == 0 then
         tip[#tip + 1] = c.me and L("Ouvre ta fenêtre de métier pour partager les tiennes.")
             or string.format(L("Pas encore de recettes partagées par %s. Elles arrivent quand ce membre ouvre sa fenêtre de métier."), c.name)
@@ -1937,6 +1939,18 @@ function H.GroupDetail(g, offline)
     if g.note then t[#t + 1] = H.Quote(g.note) end
     return table.concat(t, " · ")
 end
+-- "Souvent là : 20h–23h" (T-66, kept by Guild.lua): the name, else the first of its characters
+function H.Usual(name, chars)
+    if not WP.GuildHours then return nil end
+    local ok, t = pcall(WP.GuildHours, name)
+    if ok and t then return t end
+    for _, ch in ipairs(chars or {}) do
+        if ch.name and ch.name ~= name then
+            ok, t = pcall(WP.GuildHours, ch.name)
+            if ok and t then return t end
+        end
+    end
+end
 function H.ClassText(name, cls)
     local cc = cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls]
     if not cc then return name end
@@ -2022,10 +2036,19 @@ function H.FillGroupRow(f, r, g, offline)
     r.detail:SetText(det); r.detail:SetShown(det ~= "")
     r.btn:Hide()
     H.SetStar(r, g)
-    r.tip = { H.ClassText(g.name, g.class) }
-    if det ~= "" then r.tip[2] = det end
-    r.tip[#r.tip + 1] = string.format(L("Clic : voir la fiche de %s"), g.name)
-    r.tipFill = nil
+    local tip = { H.ClassText(g.name, g.class) }
+    if det ~= "" then tip[2] = det end
+    local base = #tip
+    local click = string.format(L("Clic : voir la fiche de %s"), g.name)
+    tip[base + 1] = click
+    r.tip = tip
+    -- the usual hours go in on hover only (before the click line), not for every row the list draws
+    r.tipFill = function()
+        for k = #tip, base + 1, -1 do tip[k] = nil end
+        local usual = H.Usual(g.name, g.chars)
+        if usual then tip[#tip + 1] = usual end
+        tip[#tip + 1] = click
+    end
     r.onRowClick = function() H.Open(f, "crafter", g.name) end
     r:SetAlpha(offline and 0.6 or 1)
 end
@@ -2571,6 +2594,8 @@ function H.Crafter(f, set)
         line[#line + 1] = lo and string.format(L("Vu il y a %s"), H.Ago(lo)) or L("hors ligne")
     elseif g and g.zone then line[#line + 1] = g.zone end
     if g and g.alts > 0 then line[#line + 1] = P(g.alts, L("+1 reroll"), L("+%d rerolls")) end
+    local usual = H.Usual(name, g and g.chars)
+    if usual then line[#line + 1] = usual end
     h.line:SetText(table.concat(line, " · ")); h.line:SetShown(#line > 0)
     local y = 12 + F.heading + 4
     h.line:ClearAllPoints(); h.line:SetPoint("TOPLEFT", 64, -y)
@@ -2708,6 +2733,7 @@ function H.Me(f)
         m.alertHead = H.Own(f, Header(c))
         m.watchHead = H.Own(f, Header(c))
         m.favHead = H.Own(f, Header(c))
+        m.tipHead = H.Own(f, Header(c))
         local p = function() return O.Profile() end
         m.rows = {
             share = H.SwitchRow(f, L("Partager mes recettes"), L("La guilde voit ce que tu sais fabriquer."),
@@ -2725,6 +2751,8 @@ function H.Me(f)
                 function() return WLWritsDB.ordersAlertFav ~= false end, function(v) WLWritsDB.ordersAlertFav = v and true or false end),
             alertWatch = H.SwitchRow(f, L("Prévenir quand une recette surveillée est apprise"), L("Une fois par membre et par recette."),
                 function() return WLWritsDB.ordersAlertWatch ~= false end, function(v) WLWritsDB.ordersAlertWatch = v and true or false end),
+            tipCrafters = H.SwitchRow(f, L("Artisans de la guilde"), L("Une ligne dit combien de membres savent fabriquer l'objet, et combien sont en ligne."),
+                function() return O.TipCraftersOn() end, function(v) O.SetTipCrafters(v and true or false) end),
         }
         m.mainDD = S.Dropdown(m.rows.main, { { "", L("Automatique") } }, function() return O.Profile().main or "" end,
             function(v) O.SetProfileFlag("main", (v ~= "" and v) or nil) end, 160)
@@ -2820,6 +2848,17 @@ function H.Me(f)
     y = y + 32 + 8
     for _, k in ipairs({ "alertFav", "alertWatch" }) do
         local r = m.rows[k]
+        local rh = r:Fit(W, 40)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
+        y = y + rh + 2
+    end
+    -- item tooltips (T-65)
+    y = y + 14
+    m.tipHead:SetWidth(W); m.tipHead:Set(L("Infobulles des objets"))
+    m.tipHead:ClearAllPoints(); m.tipHead:SetPoint("TOPLEFT", 0, -y); m.tipHead:Show()
+    y = y + 32 + 8
+    do
+        local r = m.rows.tipCrafters
         local rh = r:Fit(W, 40)
         r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:Show()
         y = y + rh + 2
@@ -3149,6 +3188,11 @@ ns.AddEnglish({
     ["Une alerte au plus toutes les 30 min par favori."] = "One alert at most every 30 min per favourite.",
     ["Prévenir quand une recette surveillée est apprise"] = "Tell me when a watched recipe is learned",
     ["Une fois par membre et par recette."] = "Once per member and recipe.",
+    -- T-65: the item tooltip line, its switch
+    ["Infobulles des objets"] = "Item tooltips",
+    ["Artisans de la guilde"] = "Guild crafters",
+    ["Une ligne dit combien de membres savent fabriquer l'objet, et combien sont en ligne."] =
+        "A line tells how many members can craft the item, and how many are online.",
     ["Personne ne sait la faire"] = "Nobody can make it",
     [" · en ligne"] = " · online",
     ["Clic : commander"] = "Click: order",

@@ -5,7 +5,8 @@
 -- a nearly full log, a running GPS; hidden when nothing waits); a line when a newer version exists;
 -- then each activity of WP.HUB_GROUPS with its windows, two lines a row (S.HubRow: icon, name, where
 -- you stand; what the window does is in the tooltip; a dot when it has something to do now; a
--- right-click opens its settings). The lines never move. Opened by /wlh, a click on the minimap
+-- right-click opens its settings); last, "Recharges" (WP.Cooldowns: each character's profession
+-- cooldowns and the time left, ready in green; hidden when none is known). The lines never move. Opened by /wlh, a click on the minimap
 -- button and the "<" of every window.
 local ADDON, root = ...
 root.Writs = root.Writs or {}
@@ -589,6 +590,14 @@ Layout = function()
             y = y - ROW_GAP
         end
     end
+    -- profession cooldowns on every character
+    if win.cdHead and win.cdHead:IsShown() then
+        if not first then y = y + GAP end
+        first = false
+        Place(win.cdHead, 24); y = y + 24 + 8
+        local h = win.cdH or 0
+        Place(win.cdBox, math.max(1, h)); y = y + h
+    end
     y = math.ceil(y + 12)
     win.homeH = y
     if win.scroll then win.scroll:SetContentHeight(y + 12) end
@@ -665,6 +674,16 @@ local function Build(p, width, hub)
     win.hubOrder = order
     win.cards, win.tiles, win.heads = cards, tiles, heads
 
+    -- "Recharges": one block per character (its name, then a cooldown and its time left per line)
+    win.cdHead = S.SectionHeader(win.inner, L("Recharges"), nil, nil, nil, true)
+    win.cdHead:Hide()
+    win.cdBox = CreateFrame("Frame", nil, win.inner)
+    win.cdBox:Hide()
+    win.cdStack = root.TextStack(win.cdBox)
+    win.cdMeasure = S.Text(win.cdBox, 12, C.muted)   -- the fact labels' size, to line the times up
+    win.cdMeasure:Hide()
+    win.cdH = 0
+
     if not win.homeHooked then
         win.homeHooked = true
         win:HookScript("OnHide", function() ClearSearch() end)
@@ -714,6 +733,43 @@ end
 local function Put(key, method, ...)
     local r = cards[key]
     if r then r[method](r, ...) end
+end
+
+-- "Recharges": each character's cooldowns (WP.Cooldowns.Rows), yours first; a character's name
+-- as the block heading, then one fact per cooldown, the time left or "Prête" in green.
+local function RefreshCooldowns()
+    if not (win and win.cdBox) then return end
+    local CDm = WP.Cooldowns
+    local ok, rows = false, nil
+    if CDm and CDm.Rows then ok, rows = pcall(CDm.Rows) end
+    rows = (ok and type(rows) == "table") and rows or {}
+    if #rows == 0 then
+        win.cdHead:Hide(); win.cdBox:Hide(); win.cdH = 0
+        return
+    end
+    local stk = win.cdStack
+    stk:Begin(0, 0, CW)
+    -- one label column for every line, so the times line up
+    local labelW = 0
+    for _, r in ipairs(rows) do
+        local w = root.TextWidth(win.cdMeasure, r.label)
+        if type(w) == "number" and w > labelW then labelW = w end
+    end
+    labelW = math.min(math.ceil(labelW) + 4, math.floor(CW * 0.6))
+    local myRealm = GetRealmName and GetRealmName() or ""
+    local last
+    for _, r in ipairs(rows) do
+        if r.key ~= last then
+            last = r.key
+            local who = r.name
+            if r.realm ~= "" and r.realm ~= myRealm then who = who .. " - " .. r.realm end
+            stk:Heading(who)
+        end
+        local ready = (r.left or 0) <= 0
+        stk:Fact(r.label, CDm.FormatLeft(r.left), { labelW = labelW, valueColor = ready and "ok" or nil })
+    end
+    win.cdH = math.ceil(stk:End())
+    win.cdHead:Show(); win.cdBox:Show()
 end
 
 local function Refresh()
@@ -965,6 +1021,7 @@ local function Refresh()
     if newer and WP.UpdateText then win.upd:SetText(WP.UpdateText(newer), "info") end
     win.upd:SetShown(newer ~= nil and WP.UpdateText ~= nil)
 
+    RefreshCooldowns()
     Layout()
 end
 

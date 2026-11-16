@@ -1131,8 +1131,8 @@ local function FillReward(b, rw, best, lvl)
   b.edge(QualityColor(quality) or T.cardEdge)
   b.ring:SetShown(best == true)
   b.upText, b.upEmpty = u.up and (u.text or "") or nil, u.empty == true
-  local rank, bisText, br, bg, bb
-  if ns.BisBadge then rank, bisText, br, bg, bb = ns.BisBadge(link or rw.id, 11) end
+  local rank, bisText, br, bg, bb, bisShort
+  if ns.BisBadge then rank, bisText, br, bg, bb, bisShort = ns.BisBadge(link or rw.id, 11) end
   b.bisRank, b.bisText, b.bisR, b.bisG, b.bisB = rank, bisText, br, bg, bb
   b.bisChip:SetShown(rank ~= nil)
   b.bisStar:SetShown(rank == 1)
@@ -1142,9 +1142,10 @@ local function FillReward(b, rw, best, lvl)
     b.pct:SetTextColor(T.ok[1], T.ok[2], T.ok[3])
     b.pct:SetText(u.short or u.text or ""); b.pct:Show()
   elseif rank then
-    -- no gain to show: the badge's words under the icon ("BiS" / "2e choix"), the star on the chip
+    -- no gain to show: the badge's short words under the icon ("BiS" / "2e" / "BiS 40": the
+    -- label is the icon's width), the star on the chip, the full words in the tooltip
     b.pct:SetTextColor(br, bg, bb)
-    b.pct:SetText((bisText and bisText:match("^(.-) |T")) or bisText or (rank == 1 and L.BIS_1 or L.BIS_2)); b.pct:Show()
+    b.pct:SetText(bisShort or (rank == 1 and L.BIS_1 or L.BIS_2S)); b.pct:Show()
   else b.pct:Hide() end
   b.upChip:SetShown(u.up == true); b.upArrow:SetShown(u.up == true)
   return u.up == true or rank ~= nil
