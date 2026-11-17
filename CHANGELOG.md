@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.108] — 2026-11-17
+
+### Corrigé / Fixed
+- **Aperçu du donjon, bulle d'une récompense** : l'amélioration n'apparaît plus deux fois avec deux pourcentages différents. La ligne « WL Helper » de l'objet suffit ; quand la quête est d'un niveau plus haut que toi, une ligne dit le gain à ce niveau (« Au niveau 53 (celui de la quête) : +51 % »), le chiffre affiché sous l'icône.
+  *Dungeon overview: the reward tooltip no longer repeats the upgrade with two different percents.*
+- **Items of Power (Mage, quête 1948)** : demande la quête 1951, comme sur Wowhead Forever.
+  *Quest 1948 now needs 1951, as on Wowhead Forever.*
+
 ## [1.0.0-beta.107] — 2026-11-17
 
 ### Ajouté / Added

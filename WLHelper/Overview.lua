@@ -592,6 +592,17 @@ local function ItemInfo(rw)
   return icon, link, quality
 end
 
+-- Does the item tooltip shown already hold WL Helper's own upgrade line (Writs/Upgrades.lua's hook)?
+local function TooltipHasOwnLine()
+  local n = GameTooltip.NumLines and GameTooltip:NumLines() or 0
+  for i = 1, n do
+    local fs = _G["GameTooltipTextLeft" .. i]
+    local t = fs and fs.GetText and fs:GetText()
+    if type(t) == "string" and not (issecretvalue and issecretvalue(t)) and t:find("WL Helper", 1, true) then return true end
+  end
+  return false
+end
+
 -- The quality colour of an item's border (common and poor keep the card edge).
 local function QualityColor(quality)
   if not quality or quality < 2 then return nil end
@@ -1356,7 +1367,17 @@ local function MakeReward(parent)
     if self.choice then GameTooltip:AddLine(L.OV_CHOICE, T.muted[1], T.muted[2], T.muted[3], true) end
     if self.best then GameTooltip:AddLine(L.SUM_BEST, T.gold[1], T.gold[2], T.gold[3], true) end
     if self.bisText and not (shown and ns.BisNaowhTip and ns.BisNaowhTip(self.id or self.link, self.bisRank)) then GameTooltip:AddLine(L.BIS_TT:format(self.bisText), self.bisR or 1, self.bisG or 0.5, self.bisB or 0, true) end
-    if self.upText then GameTooltip:AddLine(L.OV_UPGRADE .. (self.upText ~= "" and (" " .. self.upText) or ""), T.ok[1], T.ok[2], T.ok[3], true) end
+    if self.upText then
+      -- the item tooltip already carries WL Helper's own upgrade line (at your level): say the
+      -- gain again only when the quest's level judges it, and say so
+      local own = shown and TooltipHasOwnLine()
+      local atQuest = self.upLvl and self.upLvl > Level()
+      if not own then
+        GameTooltip:AddLine(L.OV_UPGRADE .. (self.upText ~= "" and (" " .. self.upText) or ""), T.ok[1], T.ok[2], T.ok[3], true)
+      elseif atQuest and self.upText ~= "" then
+        GameTooltip:AddLine(L.OV_UPGRADE_AT:format(self.upLvl, self.upText), T.ok[1], T.ok[2], T.ok[3], true)
+      end
+    end
     if self.upEmpty then GameTooltip:AddLine(L.SUM_UP_EMPTY_TT, T.muted[1], T.muted[2], T.muted[3], true) end
     if self.link then GameTooltip:AddLine(L.TT_SHIFT_LINK, (T.hint or T.muted)[1], (T.hint or T.muted)[2], (T.hint or T.muted)[3], true) end
     GameTooltip:Show()
@@ -1379,6 +1400,7 @@ local function FillReward(b, rw, best, lvl)
   b.edge(QualityColor(quality) or T.cardEdge)
   b.ring:SetShown(best == true)
   b.upText, b.upEmpty = u.up and (u.text or "") or nil, u.empty == true
+  b.upLvl = lvl
   local rank, bisText, br, bg, bb, bisShort
   if ns.BisBadge then rank, bisText, br, bg, bb, bisShort = ns.BisBadge(link or rw.id, 11) end
   b.bisRank, b.bisText, b.bisR, b.bisG, b.bisB = rank, bisText, br, bg, bb
