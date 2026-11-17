@@ -43,6 +43,9 @@ Route({ "aller", "goto" }, function(rest)
     if not G then return end
     if G.Slash then Run(G.Slash, rest) else Run(G.Show, rest ~= "" and rest or nil) end
 end)
+Route({ "pvp", "jcj" }, function()
+    if WP.PvP then Run(WP.PvP.Show) end
+end)
 Route({ "way" }, function(rest)
     if WP.Way then Run(WP.Way.Command, rest) end
 end)

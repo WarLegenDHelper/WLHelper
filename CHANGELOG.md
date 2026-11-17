@@ -6,6 +6,13 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.114] — 2026-11-17
+
+### Ajouté / Added
+- **Guide PvP** : tape « /wlh pvp ». Pour ta classe, chaque pièce du set PvP bleu « Premier » (niveau d'objet 60, dès le niveau 55) avec son prix en honneur et en marques, ce qu'il te manque d'après ton honneur et tes marques, le total pour le set, et le champ de bataille à faire en premier (celui dont il te manque le plus de marques). Quand une classe a plusieurs sets (druide, chaman, prêtre, paladin), WL Helper Gear choisit le meilleur pour ta spé et nomme les autres. Puis la quête Field of Honor (Wizzik Dustfizz à Gadgetzan) et les sceaux « Emboldened » qui rendent une pièce épique plus tard.
+  Prix lus sur Wowhead Forever (vendeur Lady Palanseer) : tête 9 000 honneur + 15 marques d'Alterac, torse 9 350 + 15 Arathi, jambes 9 000 + 15 Goulet, épaules 6 350 + 10 Arathi, mains 7 500 + 10 Goulet, pieds 7 500 + 10 Îles Darkspear, taille 6 000 + 10 Arathi, poignets 4 500 + 10 Goulet.
+  *PvP guide (/wlh pvp): the rare PvP set for your class, its Forever prices (Wowhead), what you still miss, which battleground first, Field of Honor.*
+
 ## [1.0.0-beta.113] — 2026-11-17
 
 ### Ajouté / Added
