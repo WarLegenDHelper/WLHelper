@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.100", date = "2026-11-17", items = {
+    { s = "chg", fr = { "Route réordonnée selon ta position", "Quand tu arrives dans une nouvelle zone (à pied, après un vol ou un téléport), les étapes qui restent sont remises dans l'ordre depuis là où tu es, pour éviter les allers-retours. Pas pendant un vol ni dans un donjon, au plus une fois toutes les 30 s." }, en = { "Remaining steps are reordered from your position when you enter a new zone.", "" } },
+  } },
   { v = "1.0.0-beta.99", date = "2026-11-17", items = {
     { s = "fix", fr = { "La flèche suit l'étape affichée", "« Étape suivante », les flèches ‹ › ou un clic dans la liste des étapes déplacent aussi le GPS ; « Revenir à l'étape en cours » le ramène." }, en = { "The arrow follows the step on screen.", "" } },
   } },
@@ -110,21 +113,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Points de la route vérifiés", "Contre LibForeverData, NaowhForever et Questie pour les 439 quêtes du guide : 6 points d'objectif déplacés vers le camp principal (Fledgling Chillwind, Burning Blade Summoner, Young Wavethrasher, Crag Coyote, Pathstrider, Cliff Breaker), Bath'rah the Windwatcher suit son chemin, et Nazeer Bloodpike porte son vrai nom." }, en = { "Route points checked against 3 sources for all 439 guide quests: 6 objective points moved to the main camp, one more patrolling NPC, one name fixed.", "" } },
     { s = "chg", fr = { "Textes relus dans toute l'interface", "« Writ » toujours avec une majuscule, chemins des réglages écrits d'une seule façon (« Réglages > Général > Modules »), noms de fenêtres entre « », et deux renvois corrigés." }, en = { "French text proofread across the UI.", "" } },
     { s = "chg", fr = { "Moins de travail en jeu", "Moins de calculs à chaque barre de nom et sur ta cible, la flèche crée moins de déchets mémoire, et les anciens prix de l'HV ne restent plus dans la sauvegarde." }, en = { "Less work in game", "Nameplates, arrow, saved AH prices." } },
-  } },
-  { v = "1.0.0-beta.85", date = "2026-11-16", items = {
-    { s = "add", fr = { "GPS en vol", "La flèche affiche « En vol vers Kargath », l'étape suivante et le temps restant." }, en = { "In flight, the arrow shows the destination, next step and time left.", "" } },
-    { s = "add", fr = { "Aller à", "Chaque lieu affiche le temps du trajet (vols et téléports compris), et l'infobulle donne le chemin (« Pierre de foyer → vol jusqu'à Kargath → 300 m à pied »)." }, en = { "Go to shows trip time and the itinerary.", "" } },
-    { s = "add", fr = { "Messages du chat cliquables", "Nouvel événement, joueur qui cherche un groupe, nouvelle commande, commande livrée ou refusée : un lien [S'inscrire], [Voir], [Remercier] ou [Répondre] ouvre directement le bon onglet." }, en = { "Clickable chat links open the right tab.", "" } },
-    { s = "add", fr = { "Accueil vivant", "Il se met à jour tout seul quand il est ouvert (recharges, événements, membres en ligne, niveau)." }, en = { "Home refreshes itself while open.", "" } },
-    { s = "chg", fr = { "Choisir un guide", "Cocher ou décocher puis fermer ne change plus la route en cours ; seule « Lancer la route » la change." }, en = { "Picker changes apply only with \"Start route\".", "" } },
-    { s = "chg", fr = { "Partager les quêtes", "Seulement celles qui se partagent, en une ligne ; bouton « Partage en cours » pendant le partage, plus de double partage." }, en = { "Quest sharing", "Shareable ones only, one line, no double share." } },
-    { s = "chg", fr = { "Moins de saccades", "Le guide lit le journal de quêtes une fois par objectif ; les réponses de la guilde qui arrivent ensemble ne redessinent la fenêtre qu'une fois." }, en = { "Fewer stutters in the guide and guild windows.", "" } },
-    { s = "chg", fr = { "Aujourd'hui (Writs)", "La phrase dit quoi faire (acheter les objets manquants, ouvrir les enveloppes, rendre) ou que c'est ton budget qui bloque." }, en = { "Writs Today explains what to do or that the budget is the limit.", "" } },
-    { s = "chg", fr = { "Tournée en ville", "Démarre même pendant la tournée des Writs (mise en pause, une ligne le dit)." }, en = { "City tour pauses the writs tour.", "" } },
-    { s = "fix", fr = { "Combat", "Le bouton de téléportation ne réagit plus aux clics en combat ; avec « Cacher en combat », la flèche ne capte plus la souris." }, en = { "Teleport button ignores clicks in combat; hidden arrow no longer takes the mouse.", "" } },
-    { s = "fix", fr = { "Prérequis", "Une quête faite sous une autre version (Seigneur Valthalak, quêtes à deux numéros, le Maillet) compte comme faite partout." }, en = { "Quests done under another ID count as done everywhere.", "" } },
-    { s = "fix", fr = { "Achats", "Un objet dont il manque des exemplaires n'est plus « Dans le sac » ; les quantités et prix ne comptent que ce qui manque." }, en = { "Shopping counts only what is missing.", "" } },
-    { s = "fix", fr = { "Clés", "« personne en ligne ne l'a » ne dépend plus des filtres de la fenêtre Guilde ; un membre qui se connecte reçoit bien tes clés." }, en = { "Keys", "Online check ignores guild filters; newcomers get your keys." } },
-    { s = "fix", fr = { "Nous écrire", "L'aide du formulaire « Un bug » dit ce qui est vraiment envoyé." }, en = { "Bug form hint is accurate.", "" } },
   } },
 }

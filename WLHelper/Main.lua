@@ -455,6 +455,20 @@ ev:SetScript("OnEvent", function(_, e)
       end)
     end
   elseif ns.frame then
+    -- a new zone (walked in, landed, teleported): the steps left are ordered again from where you
+    -- are now, so the route does not send you back across the map. Not on a flight (zones pass by),
+    -- not inside an instance (Replan waits there), at most every 30 s.
+    if e == "ZONE_CHANGED_NEW_AREA" and GuideOn() and ns.route then
+      local onTaxi = UnitOnTaxi and UnitOnTaxi("player")
+      if not onTaxi and not (ns.zoneReplanAt and GetTime() - ns.zoneReplanAt < 30) then
+        ns.zoneReplanAt = GetTime()
+        C_Timer.After(2, function()
+          if UnitOnTaxi and UnitOnTaxi("player") then return end
+          local ok, ran = pcall(ns.Replan)
+          if not (ok and ran) then replanWanted = true end
+        end)
+      end
+    end
     -- any quest event in the 0.3 s window counts, not only the first event of the window
     if e == "QUEST_LOG_UPDATE" or e == "QUEST_TURNED_IN" then sawQuest = true end
     if pending then return end

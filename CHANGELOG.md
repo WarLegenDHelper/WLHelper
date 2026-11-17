@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.100] — 2026-11-17
+
+### Modifié / Changed
+- **Route réordonnée selon ta position** : quand tu arrives dans une nouvelle zone (à pied, après un vol ou un téléport), les étapes qui restent sont remises dans l'ordre depuis là où tu es, pour éviter les allers-retours. Pas pendant un vol ni dans un donjon, au plus une fois toutes les 30 s.
+  *Remaining steps are reordered from your position when you enter a new zone.*
+
 ## [1.0.0-beta.99] — 2026-11-17
 
 ### Corrigé / Fixed
