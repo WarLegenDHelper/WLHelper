@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.111] — 2026-11-17
+
+### Corrigé / Fixed
+- **Quêtes du guide vérifiées sur Wowhead Forever** : les 526 quêtes du guide ont été lues une à une sur Wowhead Forever et comparées à nos données. 82 corrections :
+  - faction : 14 quêtes réservées à la Horde ou à l'Alliance étaient données pour les deux (ou l'inverse, comme Da Voodoo) ;
+  - niveau et niveau requis : 17 quêtes (Ruines de Lordaeron, Horn of Xelthos, Blood Red Bandanas...) ;
+  - partage en groupe : 36 quêtes ;
+  - noms de Forever : The Great Ezra Grimm (au lieu de Fras Siabi), Pip Quickwit (au lieu de Finkle Einhorn), Velarok Windblade, Scarshield Infiltrator, The Eastern Kingdoms, Connery's Trunk ;
+  - qui donne la quête : The Key to Scholomance (Apothecary Dithers), Heed My Call (Rau Cliffrunner, Freewind Post) ;
+  - prérequis : The Stone Circle, Grark Lorkrub, Lord Banehollow.
+  *All 526 guide quests checked page by page on Wowhead Forever: 82 fixes (factions, levels, sharing, Forever names, givers, prerequisites).*
+
 ## [1.0.0-beta.110] — 2026-11-17
 
 ### Modifié / Changed

@@ -2,6 +2,15 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.111", date = "2026-11-17", items = {
+    { s = "fix", fr = { "Quêtes du guide vérifiées sur Wowhead Forever", "Les 526 quêtes du guide ont été lues une à une sur Wowhead Forever et comparées à nos données. 82 corrections :" }, en = { "", "" } },
+    { s = "fix", fr = { "", "faction : 14 quêtes réservées à la Horde ou à l'Alliance étaient données pour les deux (ou l'inverse, comme Da Voodoo) ;" }, en = { "", "" } },
+    { s = "fix", fr = { "", "niveau et niveau requis : 17 quêtes (Ruines de Lordaeron, Horn of Xelthos, Blood Red Bandanas...) ;" }, en = { "", "" } },
+    { s = "fix", fr = { "", "partage en groupe : 36 quêtes ;" }, en = { "", "" } },
+    { s = "fix", fr = { "", "noms de Forever : The Great Ezra Grimm (au lieu de Fras Siabi), Pip Quickwit (au lieu de Finkle Einhorn), Velarok Windblade, Scarshield Infiltrator, The Eastern Kingdoms, Connery's Trunk ;" }, en = { "", "" } },
+    { s = "fix", fr = { "", "qui donne la quête : The Key to Scholomance (Apothecary Dithers), Heed My Call (Rau Cliffrunner, Freewind Post) ;" }, en = { "", "" } },
+    { s = "fix", fr = { "", "prérequis : The Stone Circle, Grark Lorkrub, Lord Banehollow." }, en = { "All 526 guide quests checked page by page on Wowhead Forever: 82 fixes (factions, levels, sharing, Forever names, givers, prerequisites).", "" } },
+  } },
   { v = "1.0.0-beta.110", date = "2026-11-17", items = {
     { s = "chg", fr = { "Choisir un guide", "Un clic sur une carte ouvre la vue d'ensemble de ce donjon, et « Lancer le guide » y remplace le guide en cours. Pour enchaîner plusieurs donjons en une seule route, coche la case de chaque carte puis « Combiner les N guides » en bas. Le guide en cours n'est plus coché d'office : sa carte a un contour vert et sa bulle dit « Guide en cours »." }, en = { "Pick a guide", "Click a card to open it alone; tick boxes to combine several." } },
     { s = "fix", fr = { "Améliorations (WL Helper Gear), le toucher", "Le toucher de l'objet porté n'est plus compté deux fois. Avant, échanger deux colliers pouvait donner +46 % dans un sens et -1 % dans l'autre ; les deux pièces sont maintenant jugées depuis ton toucher sans l'une ni l'autre." }, en = { "Gear", "The worn piece's hit no longer skews the comparison (same swap, same verdict both ways)." } },
@@ -50,9 +59,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.97", date = "2026-11-17", items = {
     { s = "fix", fr = { "Quête qui commence avec un objet", "Si elle n'est pas dans ton journal, la carte dit quel objet l'ouvre (« utilise-le dans tes sacs ; si tu ne l'as pas, passe cette étape ») au lieu de « prends-la d'abord »." }, en = { "Item-started quests say which item opens them.", "" } },
     { s = "fix", fr = { "Quêtes grises facultatives", "Aussi laissées de côté quand la route est calculée sans ouvrir la vue d'ensemble." }, en = { "Grey optional quests stay out of every route.", "" } },
-  } },
-  { v = "1.0.0-beta.96", date = "2026-11-17", items = {
-    { s = "add", fr = { "Donjon conseillé bien visible", "La première carte de « À faire à ton niveau » porte le badge « Conseillé pour toi » quand elle convient nettement mieux que la suivante ; son infobulle dit pourquoi (« De ton côté, à ton niveau, à ~12 min »)." }, en = { "A \"Suggested for you\" badge on the clear best dungeon at your level.", "" } },
-    { s = "chg", fr = { "Quêtes grises facultatives décochées", "Dans la vue d'ensemble, une quête grise pour toi (8 niveaux ou plus sous toi, la moitié de l'XP ou moins) dont le donjon n'a pas besoin est décochée d'office (« Décochée : quête grise facultative (peu d'XP) ») ; un clic la remet. Tes choix à la main restent tels quels." }, en = { "Grey optional quests start unticked; one click adds them back.", "" } },
   } },
 }
