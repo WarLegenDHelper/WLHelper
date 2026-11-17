@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.109", date = "2026-11-17", items = {
+    { s = "chg", fr = { "Guide, étapes dans le donjon", "Beaucoup moins de texte répété. Pour chaque quête, la place dans la suite (« Étape 5 sur 6 avant... »), la phrase d'objectif et la note ne s'affichent plus que sur sa première ligne de l'étape ; « À prendre » n'est plus répété sur ses lignes « Faire » et « Rendre » (la ligne « Accepter » le dit déjà). L'étape tient en bien moins de hauteur." }, en = { "Guide, dungeon steps", "Chain place, objective and note shown once per quest; no repeated \"To take\"." } },
+  } },
   { v = "1.0.0-beta.108", date = "2026-11-17", items = {
     { s = "fix", fr = { "Aperçu du donjon, bulle d'une récompense", "L'amélioration n'apparaît plus deux fois avec deux pourcentages différents. La ligne « WL Helper » de l'objet suffit ; quand la quête est d'un niveau plus haut que toi, une ligne dit le gain à ce niveau (« Au niveau 53 (celui de la quête) : +51 % »), le chiffre affiché sous l'icône." }, en = { "Dungeon overview", "The reward tooltip no longer repeats the upgrade with two different percents." } },
     { s = "fix", fr = { "Items of Power (Mage, quête 1948)", "Demande la quête 1951, comme sur Wowhead Forever." }, en = { "Quest 1948 now needs 1951, as on Wowhead Forever.", "" } },
@@ -53,16 +56,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "Une seule liste de commandes", "/wlh help et la fenêtre « Comment faire... ? » montrent les mêmes mots (donjons, choisir, Writs, sacs, commandes, guilde, groupes, reglages, idee, suivi, aide) ; /wlh help ouvre la fenêtre, /wlh help chat donne la liste dans le chat." }, en = { "One command list; /wlh help opens the window.", "" } },
     { s = "chg", fr = { "Écran de bienvenue plus clair", "Ce que le guide et les Writs font tout seuls est écrit, « avec toute la guilde » seulement si tu en as une, les Writs expliqués." }, en = { "Clearer welcome texts.", "" } },
     { s = "chg", fr = { "Visite guidée", "Le compte suit les bulles vraiment montrées." }, en = { "Tour count without gaps.", "" } },
-  } },
-  { v = "1.0.0-beta.94", date = "2026-11-17", items = {
-    { s = "fix", fr = { "Check-list du Temple englouti", "Les objectifs de la chaîne du Sceptre des Sables changeants (Tête du seigneur des couvées Lanistaire, Fragments de carapace silithide, quêtes de raid de niveau 60) ne s'affichent plus ; une quête que tu ne peux pas encore prendre n'ajoute plus d'objectif « à finir dehors »." }, en = { "Sunken Temple checklist no longer lists the level 60 raid chain.", "" } },
-    { s = "fix", fr = { "Données de quêtes vérifiées", "" }, en = { "", "" } },
-    { s = "fix", fr = { "", "L'Ichor de non-mort se farme sur les Highborne du sud-ouest d'Azshara (plus Nathanos) ou s'achète à l'HV." }, en = { "", "" } },
-    { s = "fix", fr = { "", "Calice spectral et Nogg : rubis et barres sans point fixe (mines, fonte ou HV)." }, en = { "", "" } },
-    { s = "fix", fr = { "", "Souvenir de la mémoire : le bon point à Stromgarde." }, en = { "", "" } },
-    { s = "fix", fr = { "", "Test de toxicité : zone des trois chemins des Diablosaures." }, en = { "", "" } },
-    { s = "fix", fr = { "", "Unending Torment : le sérum s'utilise à l'étage près d'Othmar." }, en = { "", "" } },
-    { s = "fix", fr = { "", "La corruption de Vylelangue ajoutée côté Alliance (Talendria)." }, en = { "", "" } },
-    { s = "fix", fr = { "", "Powering the Pylons : note précisée (Tamis à mana en 45.9, 78.2)." }, en = { "Quest data checked against two sources; Alliance Vyletongue Corruption added.", "" } },
   } },
 }

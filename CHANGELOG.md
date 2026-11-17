@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.109] — 2026-11-17
+
+### Modifié / Changed
+- **Guide, étapes dans le donjon** : beaucoup moins de texte répété. Pour chaque quête, la place dans la suite (« Étape 5 sur 6 avant... »), la phrase d'objectif et la note ne s'affichent plus que sur sa première ligne de l'étape ; « À prendre » n'est plus répété sur ses lignes « Faire » et « Rendre » (la ligne « Accepter » le dit déjà). L'étape tient en bien moins de hauteur.
+  *Guide, dungeon steps: chain place, objective and note shown once per quest; no repeated "To take".*
+
 ## [1.0.0-beta.108] — 2026-11-17
 
 ### Corrigé / Fixed

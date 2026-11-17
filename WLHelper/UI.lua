@@ -3879,6 +3879,8 @@ RenderNow = function()
     view = v
   end
   local mt = Hex(T.muted)
+  -- a quest's chain place, its note and its "To take" are said once in the card: on its first row
+  local seenChain, seenNote, seenObj = {}, {}, {}
   for r, row in ipairs(card.rows) do
     local nd = view[r]
     row:SetWidth(rowW)
@@ -3929,7 +3931,7 @@ RenderNow = function()
       local title = card.title:GetText() or ""
       if npcShort and title:find(npcShort, 1, true) then npcShort = nil end
       local sc = SCOL[s] or T.muted
-      local right = npcShort or ((nd.kind == "a" and s == "none") and "" or (Hex(sc) .. L[SLABEL[s] or "S_NONE"] .. "|r"))
+      local right = npcShort or (((nd.kind == "a" or nd.kind == "c" or nd.kind == "o" or nd.kind == "t") and s == "none") and "" or (Hex(sc) .. L[SLABEL[s] or "S_NONE"] .. "|r"))
       -- check-list row: plainly "In your log" (green) or "To take" (orange)
       if nd.kind == "h" then right = ok and (Hex(T.ok) .. L.CL_HAVE .. "|r") or (Hex(T.warn) .. L.CL_TAKE .. "|r") end
       if nd.lock then right = "" end
@@ -3970,6 +3972,8 @@ RenderNow = function()
       local tags = {}
       if nd.d and nd.d ~= dkey then table.insert(tags, mt .. ns.DName(nd.d) .. "|r") end
       local preKnown = nd.pre and ((nd.ci and nd.cn) or not ((nd.kind == "a" or nd.kind == "h") and ns.ChainState))
+      if preKnown and seenChain[nd.q] then preKnown = false end
+      if preKnown then seenChain[nd.q] = true end
       if preKnown then
         -- where you are in the chain, and what it leads to: "Step 3 of 9 before Agamaggan's Blood"
         local lead = nd.forQ and nd.forQ[1]
@@ -4001,7 +4005,7 @@ RenderNow = function()
         elseif nd.kind ~= "t" then
           local obj = ns.GuideObjSentence(q)
           local lines = (nd.kind == "c" or nd.kind == "o") and ObjectiveLines(nd, log) or {}
-          if obj and (nd.kind == "a" or #lines == 0) then table.insert(parts, tx .. obj .. "|r") end
+          if obj and (nd.kind == "a" or #lines == 0) and not seenObj[nd.q] then seenObj[nd.q] = true; table.insert(parts, tx .. obj .. "|r") end
           if nd.kind == "c" or nd.kind == "o" then
             for _, l2 in ipairs(lines) do
               -- a sources line ("    Drops from: ...") goes under its objective, in the same item
@@ -4011,7 +4015,7 @@ RenderNow = function()
             end
           end
           if nd.kind == "a" and q.si then table.insert(parts, q.si .. (q.sih and (L.COLON .. ns.T(q.sih)) or "")) end
-          if q.ne and (nd.firstOfQuest ~= false) and (nd.kind == "c" or nd.kind == "o" or (nd.kind == "a" and not q.o)) then table.insert(parts, ns.T(q.ne)) end
+          if q.ne and not seenNote[nd.q] and (nd.firstOfQuest ~= false) and (nd.kind == "c" or nd.kind == "o" or (nd.kind == "a" and not q.o)) then seenNote[nd.q] = true; table.insert(parts, ns.T(q.ne)) end
           if nd.extra then table.insert(parts, nd.extra) end
           if nd.kind == "c" and ns.BossLines and not nd.oneObj then
             for _, bl in ipairs(ns.BossLines(nd.q) or {}) do
