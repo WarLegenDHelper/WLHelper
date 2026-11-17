@@ -64,6 +64,7 @@ ns.AddEnglish({
     ["Surtout : %s"] = "Mostly: %s",
     ["Presque pareil (%s)"] = "About the same (%s)",
     ["Seulement ~%d %s d'écart : garde celui que tu préfères."] = "Only ~%d %s apart: keep the one you like.",
+    ["Écart réel : ~%d %s seulement."] = "Real gap: only ~%d %s.",
     ["de puissance des sorts"] = "spell power",
     ["de soins"] = "healing",
     ["de puissance d'attaque"] = "attack power",
@@ -701,7 +702,7 @@ end
 WP.UpgradeExplainFormat = ExplainFormat
 -- A near tie: WL Helper Gear scores in the spec's main stat (spell power, healing, attack power,
 -- or Stamina for tanks), so score minus old is the gap in those points. A gap of a few points
--- ("-14 %" for Rotgrip Mantle vs Netherfroth Shoulders = 4 spell power) reads "Presque pareil".
+-- reads "Presque pareil" under 10 %; from 10 % on the percent stays, with the gap in points under it.
 -- -> points, the unit's words; nil when not a near tie or not judged by WL Helper Gear
 local NEAR = { sp = 5, heal = 8, ap = 10, sta = 5 }
 local NEAR_WORD = { sp = "de puissance des sorts", heal = "de soins", ap = "de puissance d'attaque", sta = "d'endurance" }
@@ -731,6 +732,11 @@ local function Near(link, v, text, col)
     if type(v) ~= "number" or math.abs(math.floor(v + 0.5)) < 1 then return text, col end
     local ok, pts, word = pcall(NearTie, link)
     if not ok or not pts then return text, col end
+    -- 10 % and more stays a gain or a loss in its colour (a +12 % belt is an upgrade, even when its
+    -- 2 spell power are few): the grey line under it says how small the gap really is
+    if math.abs(v) >= 10 then
+        return text, col, string.format(L("Écart réel : ~%d %s seulement."), math.max(1, math.floor(pts + 0.5)), word)
+    end
     return string.format(L("Presque pareil (%s)"), text), GREY,
         string.format(L("Seulement ~%d %s d'écart : garde celui que tu préfères."), math.max(1, math.floor(pts + 0.5)), word)
 end

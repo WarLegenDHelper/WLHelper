@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.112", date = "2026-11-17", items = {
+    { s = "chg", fr = { "Améliorations, « Presque pareil »", "Seulement sous 10 %. À partir de 10 %, le pourcentage reste affiché en vert ou en rouge (« +12 % » est une vraie amélioration), avec en dessous l'écart réel en points (« Écart réel : ~2 de puissance des sorts seulement. »)." }, en = { "Upgrades", "\"About the same\" only under 10 %; from 10 % the percent stays, with the real gap in points under it." } },
+  } },
   { v = "1.0.0-beta.111", date = "2026-11-17", items = {
     { s = "fix", fr = { "Quêtes du guide vérifiées sur Wowhead Forever", "Les 526 quêtes du guide ont été lues une à une sur Wowhead Forever et comparées à nos données. 82 corrections :" }, en = { "", "" } },
     { s = "fix", fr = { "", "faction : 14 quêtes réservées à la Horde ou à l'Alliance étaient données pour les deux (ou l'inverse, comme Da Voodoo) ;" }, en = { "", "" } },
@@ -55,9 +58,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.98", date = "2026-11-17", items = {
     { s = "fix", fr = { "GPS dans un donjon", "Une étape dans l'instance n'envoie plus vers un point de la carte du dehors (le repère tombait sur un mur et la flèche disait « Tu y es · Maraudon ») ; sans point sur la carte du donjon, le grand bouton propose « Carte du donjon »." }, en = { "Inside a dungeon, the GPS no longer points at an outdoor spot.", "" } },
-  } },
-  { v = "1.0.0-beta.97", date = "2026-11-17", items = {
-    { s = "fix", fr = { "Quête qui commence avec un objet", "Si elle n'est pas dans ton journal, la carte dit quel objet l'ouvre (« utilise-le dans tes sacs ; si tu ne l'as pas, passe cette étape ») au lieu de « prends-la d'abord »." }, en = { "Item-started quests say which item opens them.", "" } },
-    { s = "fix", fr = { "Quêtes grises facultatives", "Aussi laissées de côté quand la route est calculée sans ouvrir la vue d'ensemble." }, en = { "Grey optional quests stay out of every route.", "" } },
   } },
 }

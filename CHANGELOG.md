@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.112] — 2026-11-17
+
+### Modifié / Changed
+- **Améliorations, « Presque pareil »** : seulement sous 10 %. À partir de 10 %, le pourcentage reste affiché en vert ou en rouge (« +12 % » est une vraie amélioration), avec en dessous l'écart réel en points (« Écart réel : ~2 de puissance des sorts seulement. »).
+  *Upgrades: "About the same" only under 10 %; from 10 % the percent stays, with the real gap in points under it.*
+
 ## [1.0.0-beta.111] — 2026-11-17
 
 ### Corrigé / Fixed
