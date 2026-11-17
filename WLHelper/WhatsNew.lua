@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.104", date = "2026-11-17", items = {
+    { s = "fix", fr = { "Temple englouti côté Alliance", "« Dans les profondeurs » et « Le secret du cercle » demandaient la quête Horde de Feralas (Docteur sorcier Uzer'i), donc l'Alliance ne les voyait jamais. Chaque faction a maintenant sa propre quête d'accroche : Uzer'i (Camp Mojache) pour la Horde, Angelas Brisebrume (Forteresse de Pennelune) pour l'Alliance." }, en = { "Sunken Temple", "Each faction gets its own lead-in quest." } },
+    { s = "add", fr = { "Quêtes Alliance manquantes", "Uldaman (Rechercher les composants à Uldaman et sa suite, Des Trésors à recouvrer, La Chambre secrète, la chaîne du collier de Talvash, La tablette de volonté), Maraudon (Fragments d'Ombréclat pour Theramore, Corruption de la terre et de la graine pour la Pointe de Nijel), Temple englouti (La brume du mal et ses deux étapes)." }, en = { "Missing Alliance quests in Uldaman, Maraudon and Sunken Temple.", "" } },
+  } },
   { v = "1.0.0-beta.103", date = "2026-11-17", items = {
     { s = "chg", fr = { "« Presque pareil »", "Quand deux objets ne diffèrent que de quelques points de ta stat principale (5 de puissance des sorts, 8 de soins, 10 de puissance d'attaque, 5 d'endurance pour un tank), l'infobulle dit « Presque pareil (-14 %) » en gris et « Seulement ~4 de puissance des sorts d'écart : garde celui que tu préfères », au lieu d'un pourcentage rouge qui fait peur." }, en = { "Near ties read \"About the same (-14%)\" with the gap in points of your main stat.", "" } },
     { s = "chg", fr = { "Réglages > Améliorations, les vrais poids", "Quand WL Helper Gear juge tes objets, la page montre ses poids (ta spé, ton niveau, ce que tu portes, plafonds de toucher compris), pas les poids de secours de WL Helper." }, en = { "Settings show WL Helper Gear's weights when it judges.", "" } },
@@ -89,11 +93,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Clés de donjon", "La clé a son nom en jeu, son icône, et « possédée » quand elle est dans tes sacs." }, en = { "Dungeon keys show their name, icon and \"owned\" again.", "" } },
     { s = "fix", fr = { "Butin des boss et récompenses", "Nom, lien et icône des objets s'affichent de nouveau ; les icônes des étapes « objet » aussi." }, en = { "Boss loot and reward items show name, link and icon again.", "" } },
     { s = "fix", fr = { "Invitation en Alt-clic", "Ne peut plus provoquer d'erreur selon le réglage « action à l'appui »." }, en = { "Alt-click invite no longer errors.", "" } },
-  } },
-  { v = "1.0.0-beta.89", date = "2026-11-16", items = {
-    { s = "fix", fr = { "Talents dans le score d'équipement", "WL Helper Gear lit maintenant les talents sur Forever (le système de talents du client) : ta spé est détectée toute seule et les talents comme Cœur sauvage ou Instinct naturel changent les poids." }, en = { "Gear now reads talents on Forever", "Spec detected, talent modifiers applied." } },
-    { s = "fix", fr = { "Quêtes de métier", "Elles sont de nouveau masquées pour les personnages qui n'ont pas le métier, avec le filtre « quêtes utiles »." }, en = { "Profession quests hidden again for characters without the profession.", "" } },
-    { s = "fix", fr = { "Commandes", "Cliquer sur un objet dans les résultats ne provoque plus d'erreur, et Maj-clic sur un objet du sac le place de nouveau dans la recherche ou la demande." }, en = { "Orders", "Item clicks no longer error; Shift-click from bags works again." } },
-    { s = "fix", fr = { "Commandes du chat", "WL Helper ne touche plus à la liste des commandes du jeu (risque d'action bloquée)." }, en = { "No more write to the game's slash command list.", "" } },
   } },
 }

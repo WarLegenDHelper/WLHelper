@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.104] — 2026-11-17
+
+### Corrigé / Fixed
+- **Temple englouti côté Alliance** : « Dans les profondeurs » et « Le secret du cercle » demandaient la quête Horde de Feralas (Docteur sorcier Uzer'i), donc l'Alliance ne les voyait jamais. Chaque faction a maintenant sa propre quête d'accroche : Uzer'i (Camp Mojache) pour la Horde, Angelas Brisebrume (Forteresse de Pennelune) pour l'Alliance.
+  *Sunken Temple: each faction gets its own lead-in quest.*
+
+### Ajouté / Added
+- **Quêtes Alliance manquantes** (vérifiées avec les données du jeu, Naowh et Wowhead) : Uldaman (Rechercher les composants à Uldaman et sa suite, Des Trésors à recouvrer, La Chambre secrète, la chaîne du collier de Talvash, La tablette de volonté), Maraudon (Fragments d'Ombréclat pour Theramore, Corruption de la terre et de la graine pour la Pointe de Nijel), Temple englouti (La brume du mal et ses deux étapes).
+  *Missing Alliance quests in Uldaman, Maraudon and Sunken Temple.*
+
 ## [1.0.0-beta.103] — 2026-11-17
 
 ### Modifié / Changed

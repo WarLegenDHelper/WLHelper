@@ -287,9 +287,21 @@ local function FullChain(qid, cls, out, seen, depth)
     if not seen[pid] then
       seen[pid] = true
       local pq = ns.Q[pid]
-      if not (pq and FactionOK(pq.fa) and ClassOK(pq.c, cls) and RaceOK(pq.race)) then return nil end
-      if not FullChain(pid, cls, out, seen, depth + 1) then return nil end
-      out[#out + 1] = pid
+      -- a quest both factions do can list each faction's own lead-in under the same name (3446:
+      -- "The Sunken Temple", 3380 for the Horde and 3445 for the Alliance; the game takes either):
+      -- the other faction's one is skipped when this faction's twin is in the list too
+      local otherSide = false
+      if pq and not FactionOK(pq.fa) and (not q.fa or q.fa == "" or q.fa == "Both") then
+        for _, tid in ipairs(q.p) do
+          local tq = ns.Q[tid]
+          if tid ~= pid and tq and tq.n == pq.n and tq.fa ~= pq.fa and FactionOK(tq.fa) then otherSide = true break end
+        end
+      end
+      if not otherSide then
+        if not (pq and FactionOK(pq.fa) and ClassOK(pq.c, cls) and RaceOK(pq.race)) then return nil end
+        if not FullChain(pid, cls, out, seen, depth + 1) then return nil end
+        out[#out + 1] = pid
+      end
     end
   end
   return out
