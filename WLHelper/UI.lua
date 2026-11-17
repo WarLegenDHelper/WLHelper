@@ -2120,7 +2120,15 @@ local function FocusModel(card, nd, log, dkey, st)
     if pb then M.why[#M.why + 1] = Hex(T.bad) .. L.BLOCKED:format(pb) .. "|r" end
   end
   if (kind == "c" or kind == "o" or kind == "t") and s == "none" then
-    M.why[#M.why + 1] = Hex(T.warn) .. L.CARD_NOTLOG .. "|r"
+    -- a quest that starts from an item in the bags (Oathstone...): say which item, not "accept it"
+    local qq = ns.Q[nd.q]
+    local startItem = qq and qq.s and qq.s.i == 1 and (qq.si or qq.s.n)
+    if startItem and L.CARD_NOTLOG_ITEM then
+      local nm = (ns.LN and ns.LN("item", startItem)) or startItem
+      M.why[#M.why + 1] = Hex(T.warn) .. L.CARD_NOTLOG_ITEM:format(nm) .. "|r"
+    else
+      M.why[#M.why + 1] = Hex(T.warn) .. L.CARD_NOTLOG .. "|r"
+    end
   elseif kind == "t" and s == "on" then
     M.why[#M.why + 1] = Hex(T.warn) .. L.CARD_NOTREADY .. "|r"
   end

@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.97] — 2026-11-17
+
+### Corrigé / Fixed
+- **Quête qui commence avec un objet** (ex. « L'Essence d'Eranikus » à rendre à Itharius) : si elle n'est pas dans ton journal, la carte dit quel objet l'ouvre (« utilise-le dans tes sacs ; si tu ne l'as pas, passe cette étape ») au lieu de « prends-la d'abord ».
+  *Item-started quests say which item opens them.*
+- **Quêtes grises facultatives** : aussi laissées de côté quand la route est calculée sans ouvrir la vue d'ensemble.
+  *Grey optional quests stay out of every route.*
+
 ## [1.0.0-beta.96] — 2026-11-17
 
 ### Ajouté / Added
