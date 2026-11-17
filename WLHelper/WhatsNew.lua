@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.107", date = "2026-11-17", items = {
+    { s = "add", fr = { "Trouver un groupe, langues", "Deux boutons « Toutes » et « Aucune » au-dessus des langues dans les filtres, pour voir les groupes de toutes les langues d'un clic (celles que le jeu impose restent cochées)." }, en = { "Group finder", "\"All\" / \"None\" for the languages." } },
+  } },
   { v = "1.0.0-beta.106", date = "2026-11-17", items = {
     { s = "add", fr = { "Relevés en jeu, suite", "WL Helper note aussi où un objectif de quête du guide avance vraiment (l'endroit où le compteur monte, dedans ou dehors l'instance ; 12 endroits au plus par objectif), les récompenses que la fenêtre de quête propose, et l'ordre dans lequel les boss meurent dans chaque donjon (les 5 dernières sorties). Ça sert à corriger les points sur la carte et l'ordre des boss du guide." }, en = { "Records where objectives really progress, the quest rewards offered, and boss kill order per dungeon.", "" } },
   } },
@@ -77,10 +80,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Partage des quêtes en combat", "Attend la fin du combat au lieu d'être bloqué par le jeu." }, en = { "Quest sharing waits for the end of combat.", "" } },
     { s = "fix", fr = { "Check-list", "Une quête dont la chaîne n'est pas faite (« Rot and Regret ») est « Bloquée » en gris au lieu de « Requise » ; la chaîne ajoutée après coup se place avant le donjon." }, en = { "Locked quests no longer block the checklist.", "" } },
     { s = "fix", fr = { "Fenêtres opaques", ", la dernière cliquée passe devant." }, en = { "Opaque windows, last clicked on top.", "" } },
-  } },
-  { v = "1.0.0-beta.92", date = "2026-11-16", items = {
-    { s = "add", fr = { "Facultatif ou requis", "Les étapes faites dehors d'une quête de donjon disent clairement « Facultatif : le donjon se fait sans · sur le chemin du portail » (ex. Fragments d'Ombréclat à Maraudon), « Requis pour « X » (dans le donjon) » quand une suite en dépend, ou « Requis : la clé pour entrer dans le donjon »." }, en = { "Outside steps say whether they are optional or required.", "" } },
-    { s = "add", fr = { "Bouton « Passer »", "Sur les étapes facultatives : deux clics retirent la quête de la route (elle reste dans ton journal), à recocher dans la vue d'ensemble." }, en = { "Skip button for optional quests.", "" } },
-    { s = "fix", fr = { "« Requis pour » faux", "Une quête n'est plus dite « dans le donjon » quand elle se fait dehors ou dans un autre donjon." }, en = { "Wrong \"required for\" labels fixed.", "" } },
   } },
 }

@@ -73,7 +73,7 @@ ns.AddEnglish({
     ["Max"] = "Max",
     ["Seulement à mon niveau"] = "Only at my level",
     ["Les activités hors de ton niveau ne sont pas cherchées (sauf celles de ta route)."] = "Activities outside your level are not searched (except your route's).",
-    ["Langues"] = "Languages",
+    ["Langues"] = "Languages", ["Toutes"] = "All", ["Aucune"] = "None", ["Toutes"] = "All", ["Aucune"] = "None",
     ["Style de jeu"] = "Playstyle",
     ["Tous les styles"] = "Any style",
     ["Apprendre"] = "Learning",
@@ -2101,6 +2101,17 @@ local function BuildFilters()
             fpop.langs[#fpop.langs + 1] = c
         end
     end
+    -- every language at once (the locked defaults stay as the game keeps them)
+    local function AllLangs(on)
+        local langs = F.Filters().langs
+        for _, code in ipairs(okA and type(avail) == "table" and avail or {}) do
+            if type(code) == "string" and not defaults[code] then langs[code] = on or nil end
+        end
+        F.SaveFilters()
+        for _, c in ipairs(fpop.langs) do c:Update() end
+    end
+    fpop.langAll = S.Button(fpop, L("Toutes"), 0, 20, "secondary", function() AllLangs(true) end)
+    fpop.langNone = S.Button(fpop, L("Aucune"), 0, 20, "secondary", function() AllLangs(false) end)
     -- playstyle
     fpop.styleLabel = Label(L("Style de jeu"))
     fpop.style = S.Dropdown(fpop, { { 0, L("Tous les styles") }, { 1, L("Apprendre") }, { 2, L("Détente") }, { 3, L("Sérieux") }, { 4, L("Expert") } },
@@ -2151,13 +2162,15 @@ local function BuildFilters()
         self.myLevel:Update()
         if #self.langs > 0 then
             Place(self.langLabel, P, y); y = y + FS.meta + 6
+            Place(self.langAll, P, y); self.langNone:ClearAllPoints(); self.langNone:SetPoint("LEFT", self.langAll, "RIGHT", 6, 0)
+            y = y + 20 + 6
             -- two columns of 138 (300 = 12 + 138 + 12 + 138)
             for i, c in ipairs(self.langs) do
                 local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
                 Place(c, P + col * (138 + 12), y + row * 22); c:Update()
             end
             y = y + math.ceil(#self.langs / 2) * 22 + 6
-        else self.langLabel:Hide() end
+        else self.langLabel:Hide(); self.langAll:Hide(); self.langNone:Hide() end
         Place(self.styleLabel, P, y); y = y + FS.meta + 6
         Place(self.style, P, y); self.style:Update(); y = y + 28 + 12
         Place(self.slotLabel, P, y); y = y + FS.meta + 6

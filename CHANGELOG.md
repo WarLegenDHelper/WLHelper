@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.107] — 2026-11-17
+
+### Ajouté / Added
+- **Trouver un groupe, langues** : deux boutons « Toutes » et « Aucune » au-dessus des langues dans les filtres, pour voir les groupes de toutes les langues d'un clic (celles que le jeu impose restent cochées).
+  *Group finder: "All" / "None" for the languages.*
+
 ## [1.0.0-beta.106] — 2026-11-17
 
 ### Ajouté / Added
