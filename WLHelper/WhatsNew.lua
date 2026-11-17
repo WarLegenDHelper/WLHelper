@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.116", date = "2026-11-18", items = {
+    { s = "add", fr = { "Meilleur pour toi", "Tape « /wlh bis » (ou « /wlh bis 60 » pour un autre niveau). Pour chaque emplacement, les 3 meilleures pièces que tu peux porter, classées par WL Helper Gear pour ta spé avec tes vraies stats, tes talents et tes plafonds de toucher ; le gain sur ce que tu portes, et d'où vient la pièce (donjon et boss, quête, métier, réputation ; les pièces PvP renvoient à « /wlh pvp »). Les raids sont laissés de côté tant qu'ils ne sont pas ouverts. La liste est calculée, pas recopiée d'un guide : Forever a changé beaucoup d'objets." }, en = { "Best for you (/wlh bis [level])", "The top 3 pieces per slot for your spec, computed by WL Helper Gear, with the gain and the source." } },
+  } },
   { v = "1.0.0-beta.115", date = "2026-11-18", items = {
     { s = "fix", fr = { "XP des quêtes", "128 quêtes affichaient l'XP de base, sans le bonus de Forever (souvent x1,75 à x2,7). Elles ont maintenant l'XP réelle, celle de Wowhead Forever, la même qu'en jeu (Blood Red Bandanas : 9 700 XP). Les totaux d'XP du guide et de la vue d'ensemble sont donc bien plus justes." }, en = { "Quest XP", "128 quests showed the base XP without Forever's bonus; they now show the real XP (Wowhead Forever, as in game)." } },
     { s = "fix", fr = { "Quêtes ajoutées", "An Ambassador of Evil (Alliance, Ironforge, avant The Lost Tablets of Will à Uldaman) et Elven Legends côté Alliance (Scholar Runethorn, Feathermoon) ; les librams de Hache-tripes s'ouvrent maintenant aussi à l'Alliance." }, en = { "Added An Ambassador of Evil and the Alliance Elven Legends (Dire Maul librams open to the Alliance).", "" } },
@@ -58,8 +61,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.102", date = "2026-11-17", items = {
     { s = "fix", fr = { "Bonus aux sorts mieux lus (WLHelper Gear)", "Sur un objet que la liste ne connaît pas (ou avec un suffixe), « Augmente les dégâts et les soins produits par les sorts » compte pour les dégâts et les soins, même sur un client français, au lieu de compter parfois comme des soins seulement." }, en = { "\"Damage and healing\" spell power is read as spell power for both, French client too.", "" } },
-  } },
-  { v = "1.0.0-beta.101", date = "2026-11-17", items = {
-    { s = "chg", fr = { "Vrai réseau de vols", "Le GPS connaît maintenant le réseau des maîtres de vol de Forever et la durée mesurée de chaque saut (données de Shortest Path Forever, sous GPL, dans le module WLHelper Nav). Un vol passe par les maîtres de vol que tu connais, avec son vrai temps, au lieu d'une ligne droite ; deux maîtres de vol non reliés ne sont plus proposés." }, en = { "Real flight network with measured times (from Shortest Path Forever, GPL, in WLHelper Nav).", "" } },
   } },
 }

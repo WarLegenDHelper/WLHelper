@@ -43,6 +43,9 @@ Route({ "aller", "goto" }, function(rest)
     if not G then return end
     if G.Slash then Run(G.Slash, rest) else Run(G.Show, rest ~= "" and rest or nil) end
 end)
+Route({ "bis", "meilleur", "best" }, function(rest)
+    if WP.Best then Run(WP.Best.Show, rest) end
+end)
 Route({ "pvp", "jcj" }, function()
     if WP.PvP then Run(WP.PvP.Show) end
 end)

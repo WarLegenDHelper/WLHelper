@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.116] — 2026-11-18
+
+### Ajouté / Added
+- **Meilleur pour toi** : tape « /wlh bis » (ou « /wlh bis 60 » pour un autre niveau). Pour chaque emplacement, les 3 meilleures pièces que tu peux porter, classées par WL Helper Gear pour ta spé avec tes vraies stats, tes talents et tes plafonds de toucher ; le gain sur ce que tu portes, et d'où vient la pièce (donjon et boss, quête, métier, réputation ; les pièces PvP renvoient à « /wlh pvp »). Les raids sont laissés de côté tant qu'ils ne sont pas ouverts. La liste est calculée, pas recopiée d'un guide : Forever a changé beaucoup d'objets.
+  *Best for you (/wlh bis [level]): the top 3 pieces per slot for your spec, computed by WL Helper Gear, with the gain and the source.*
+
 ## [1.0.0-beta.115] — 2026-11-18
 
 ### Corrigé / Fixed

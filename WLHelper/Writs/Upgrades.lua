@@ -158,6 +158,8 @@ local function SyncGearSpec(G)
     G._wlSpec, G._wlNoSpec = nil, key
     return false
 end
+-- for the other tools that ask WL Helper Gear (Best.lua): the same spec and options first
+WP.SyncGearSpec = function() local G = Gear(); if G then return SyncGearSpec(G) end end
 -- kept until Refresh (talents, spec settings, login): asked for every bag slot and tooltip
 local gfMemo
 local function UseGF()
