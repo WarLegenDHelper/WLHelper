@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.118] — 2026-11-18
+
+### Ajouté / Added
+- **GPS, repères de la carte** : un repère posé sur la carte du monde lance le GPS de WL Helper jusque-là (flèche et chemin à pied), qu'il soit posé par toi (Ctrl-clic) ou par un autre addon qui pose le repère du jeu, comme les livres, coffres et rares de Naowh Forever (« Click for a waypoint »). Repère enlevé : le GPS s'arrête. Jamais les repères que WL Helper pose lui-même, rien en donjon. Réglages > GPS > « Suivre les repères de la carte » pour l'éteindre.
+  *GPS follows map pins (yours or another addon's, like Naowh's books); Settings > GPS to turn it off.*
+
 ## [1.0.0-beta.117] — 2026-11-18
 
 ### Corrigé / Fixed

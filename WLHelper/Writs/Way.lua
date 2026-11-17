@@ -34,6 +34,11 @@ ns.AddEnglish({
     ["Le GPS de WL Helper n'est pas chargé. Tape /reload pour recharger l'interface, puis réessaie."] =
         "WL Helper's GPS isn't loaded. Type /reload to reload the interface, then try again.",
     ["un autre addon"] = "another addon",
+    ["Repère sur la carte"] = "Map pin",
+    ["Suivre les repères de la carte"] = "Follow map pins",
+    ["Un repère posé sur la carte lance le GPS."] = "A pin placed on the map starts the GPS.",
+    ["Un repère posé sur la carte du monde, par toi (Ctrl-clic) ou par un autre addon (les livres, coffres et rares de Naowh Forever : « Click for a waypoint »), lance le GPS de WL Helper jusque-là, avec la flèche et le chemin à pied. Le repère enlevé, le GPS s'arrête."] =
+        "A pin placed on the world map, by you (Ctrl-click) or by another addon (Naowh Forever's books, chests and rares: \"Click for a waypoint\"), starts WL Helper's GPS there, with the arrow and the walking path. The pin removed, the GPS stops.",
 })
 
 local SOURCE = "way"
@@ -487,6 +492,58 @@ function Way.SetTake(on)
     WLWritsDB.wayTake = on and true or false
     Way.Apply()
 end
+
+
+-- ---------------------------------------------------------------- pins placed on the map
+-- A pin placed on the world map by you (Ctrl-click) or by another addon that places the game's own
+-- pin (Naowh Forever's books, chests and rares: "Click for a waypoint") is followed by the GPS, as
+-- /way does: the arrow and the walking path go there. Never a pin WL Helper set itself (this file's,
+-- the in-world marker's, the GPS's), never in combat (the GPS waits) nor inside an instance; the
+-- same pin is taken once. The pin removed (the addon's second click): the GPS stops if it was going
+-- there. WLWritsDB.followMapPin: nil or true = on (default), false = off.
+local followed   -- { map, x, y } (fractions) of the pin we follow
+local function PinNow()
+    if not (C_Map and type(C_Map.GetUserWaypoint) == "function") then return nil end
+    local ok, p = pcall(C_Map.GetUserWaypoint)
+    if not (ok and type(p) == "table") then return nil end
+    local pos, x, y = p.position, nil, nil
+    if type(pos) == "table" then
+        if pos.GetXY then local ok2, a, b = pcall(pos.GetXY, pos); if ok2 then x, y = a, b end else x, y = pos.x, pos.y end
+    end
+    local map = p.uiMapID
+    if issecretvalue and (issecretvalue(map) or issecretvalue(x) or issecretvalue(y)) then return nil end
+    if type(map) ~= "number" or type(x) ~= "number" or type(y) ~= "number" then return nil end
+    return { map = map, x = x, y = y }
+end
+local function Near(a, b) return a and b and a.map == b.map and math.abs(a.x - b.x) < 0.002 and math.abs(a.y - b.y) < 0.002 end
+function Way.FollowOn() return not (WLWritsDB and WLWritsDB.followMapPin == false) end
+function Way.SetFollow(on) if WLWritsDB then WLWritsDB.followMapPin = on and true or false end end
+function Way.OnMapPin()
+    if not Way.FollowOn() then return end
+    if IsInInstance then local ok, inside = pcall(IsInInstance); if ok and inside == true then return end end
+    local p = PinNow()
+    if not p then
+        -- the pin we followed was removed: our point goes with it
+        if followed and Mine() then followed = nil; Way.Clear(true) end
+        followed = nil
+        return
+    end
+    if Near(p, followed) or (pin and Near(p, pin)) then return end
+    local WPn = WP.WorldPin
+    if WPn and WPn.IsOurs then local ok, ours = pcall(WPn.IsOurs); if ok and ours then return end end
+    local GPS = WP.GPS
+    local d = GPS and GPS.Dest and select(2, pcall(GPS.Dest))
+    if type(d) == "table" and d.map == p.map and tonumber(d.x) and tonumber(d.y)
+        and math.abs(d.x / 100 - p.x) < 0.002 and math.abs(d.y / 100 - p.y) < 0.002 then return end
+    followed = { map = p.map, x = p.x, y = p.y }
+    Way.Go(p.map, p.x * 100, p.y * 100, L("Repère sur la carte"))
+end
+local mf = CreateFrame("Frame")
+pcall(mf.RegisterEvent, mf, "USER_WAYPOINT_UPDATED")
+mf:SetScript("OnEvent", function()
+    -- a frame later: the addon that set the pin may still be working (tracking, its own arrow)
+    if C_Timer and C_Timer.After then C_Timer.After(0, function() pcall(Way.OnMapPin) end) else pcall(Way.OnMapPin) end
+end)
 
 -- TomTom and the others register /way while loading: decide once everything is in, a moment after login.
 local f = CreateFrame("Frame")

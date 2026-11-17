@@ -1604,6 +1604,11 @@ function BUILD.gps(p)
         SwitchRow(p, L("Prendre /way"), wants, function(v) Way.SetTake(v) end,
             L("/way envoie le point au GPS de WL Helper."), desc)
     end
+    if Way and Way.SetFollow then
+        SwitchRow(p, L("Suivre les repères de la carte"), function() return Way.FollowOn() end, function(v) Way.SetFollow(v) end,
+            L("Un repère posé sur la carte lance le GPS."),
+            L("Un repère posé sur la carte du monde, par toi (Ctrl-clic) ou par un autre addon (les livres, coffres et rares de Naowh Forever : « Click for a waypoint »), lance le GPS de WL Helper jusque-là, avec la flèche et le chemin à pied. Le repère enlevé, le GPS s'arrête."))
+    end
 
     -- the city tour (Writs/CityTour.lua): its card when you arrive in a capital
     local CT = ns.WP.CityTour

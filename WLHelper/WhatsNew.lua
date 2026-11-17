@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.118", date = "2026-11-18", items = {
+    { s = "add", fr = { "GPS, repères de la carte", "Un repère posé sur la carte du monde lance le GPS de WL Helper jusque-là (flèche et chemin à pied), qu'il soit posé par toi (Ctrl-clic) ou par un autre addon qui pose le repère du jeu, comme les livres, coffres et rares de Naowh Forever (« Click for a waypoint »). Repère enlevé : le GPS s'arrête. Jamais les repères que WL Helper pose lui-même, rien en donjon. Réglages > GPS > « Suivre les repères de la carte » pour l'éteindre." }, en = { "GPS follows map pins (yours or another addon's, like Naowh's books); Settings > GPS to turn it off.", "" } },
+  } },
   { v = "1.0.0-beta.117", date = "2026-11-18", items = {
     { s = "fix", fr = { "Guide, étapes de boss", "Une étape de boss dont toutes les quêtes sont rendues compte comme faite, même si le guide n'a pas vu le boss mourir (tué avant un /reload ou une déconnexion). Avant, l'onglet « Dans le donjon » pouvait rester à 8 sur 9 alors que tout était fait (Prison d'Alcaz, Tidemistress Ca'zass)." }, en = { "Boss steps whose quests are all turned in count as done, even without a kill seen this session.", "" } },
   } },
@@ -57,9 +60,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.104", date = "2026-11-17", items = {
     { s = "fix", fr = { "Temple englouti côté Alliance", "« Dans les profondeurs » et « Le secret du cercle » demandaient la quête Horde de Feralas (Docteur sorcier Uzer'i), donc l'Alliance ne les voyait jamais. Chaque faction a maintenant sa propre quête d'accroche : Uzer'i (Camp Mojache) pour la Horde, Angelas Moonbreeze (Forteresse de Pennelune, Feralas) pour l'Alliance." }, en = { "Sunken Temple", "Each faction gets its own lead-in quest." } },
     { s = "add", fr = { "Quêtes Alliance manquantes", "Uldaman (Rechercher les composants à Uldaman et sa suite, Des Trésors à recouvrer, La Chambre secrète, la chaîne du collier de Talvash, La tablette de volonté), Maraudon (Fragments d'Ombréclat pour Theramore, Corruption de la terre et de la graine pour la Pointe de Nijel), Temple englouti (La brume du mal et ses deux étapes)." }, en = { "Missing Alliance quests in Uldaman, Maraudon and Sunken Temple.", "" } },
-  } },
-  { v = "1.0.0-beta.103", date = "2026-11-17", items = {
-    { s = "chg", fr = { "« Presque pareil »", "Quand deux objets ne diffèrent que de quelques points de ta stat principale (5 de puissance des sorts, 8 de soins, 10 de puissance d'attaque, 5 d'endurance pour un tank), l'infobulle dit « Presque pareil (-14 %) » en gris et « Seulement ~4 de puissance des sorts d'écart : garde celui que tu préfères », au lieu d'un pourcentage rouge qui fait peur." }, en = { "Near ties read \"About the same (-14%)\" with the gap in points of your main stat.", "" } },
-    { s = "chg", fr = { "Réglages > Améliorations, les vrais poids", "Quand WL Helper Gear juge tes objets, la page montre ses poids (ta spé, ton niveau, ce que tu portes, plafonds de toucher compris), pas les poids de secours de WL Helper." }, en = { "Settings show WL Helper Gear's weights when it judges.", "" } },
   } },
 }

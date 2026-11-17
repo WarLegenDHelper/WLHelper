@@ -645,6 +645,12 @@ function WorldPin._Reset()
     HideLabel(); StopTicker()
     mine, dismissed, placedKey, pending, owner, why = nil, nil, nil, nil, nil, nil
 end
+-- Is the game's map pin one WL Helper set (this marker's, or the GPS's own)? Way.lua's map-pin
+-- follower must not chase our own pins.
+function WorldPin.IsOurs()
+    local p = GetPin()
+    return p ~= nil and (Ours(p) or GpsPin(p)) or false
+end
 function WorldPin._Mine() return mine end
 function WorldPin._Frame() return pin end
 function WorldPin._Alpha() return alpha end
