@@ -38,6 +38,7 @@ ns.AddEnglish({
     ["Aller à"] = "Go to",
     ["Tape un lieu, un service ou un PNJ : la flèche t'y emmène."] = "Type a place, a service or an NPC: the arrow takes you there.",
     ["Ex. banque, HV, Mortemines, Forgefer"] = "E.g. bank, AH, Deadmines, Ironforge",
+    ["Ex. banque, HV, Gouffre de Ragefeu, Orgrimmar"] = "E.g. bank, AH, Ragefire Chasm, Orgrimmar",
     ["Aucun lieu trouvé"] = "No place found",
     ["Essaie un autre mot : une zone, un donjon, un PNJ ou « banque »."] = "Try another word: a zone, a dungeon, an NPC or \"bank\".",
     ["La liste complète des PNJ n'est pas chargée : seuls les donjons, les zones, les PNJ du guide et tes maîtres de vol sont connus."] =
@@ -91,6 +92,13 @@ ns.AddEnglish({
     ["Pour « Aller à », la flèche suit un vrai chemin autour des collines et par les portes (WL Helper Nav). Sans lui, elle va tout droit."] =
         "For \"Go to\", the arrow follows a real path round hills and through gates (WL Helper Nav). Without it, it points straight there.",
 })
+
+-- The search's example, from your side of the map (a Horde player is not sent to Ironforge)
+function WP.GoToExample()
+    local side = UnitFactionGroup and UnitFactionGroup("player")
+    if side == "Horde" then return L("Ex. banque, HV, Gouffre de Ragefeu, Orgrimmar") end
+    return L("Ex. banque, HV, Mortemines, Forgefer")
+end
 
 -- A panel window (DESIGN 3.1: ~45 % of the screen wide, 560 to 860, width resizable and saved,
 -- height fits the content). W and CW are the window's width now (Dims, from the window).
@@ -1229,7 +1237,7 @@ local function Build()
     win.intro = S.Text(win, F.body, C.text)
     win.intro:SetJustifyH("LEFT"); win.intro:SetJustifyV("TOP")
     win.intro:SetText(L("Tape un lieu, un service ou un PNJ : la flèche t'y emmène."))
-    win.box = S.Input(win, CW, { search = true, placeholder = L("Ex. banque, HV, Mortemines, Forgefer"),
+    win.box = S.Input(win, CW, { search = true, placeholder = WP.GoToExample(),
         onChange = function() Soon() end,
         onEnter = function()
             if pending then pending:Cancel(); pending = nil; Render() end

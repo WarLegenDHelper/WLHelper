@@ -202,6 +202,40 @@ local function PreCount(dkey)
   return n
 end
 
+-- How well a dungeon suits you now, lower is better (the order of "at your level"):
+--   an entrance inside the other faction's capital goes last;
+--   then how far your level is from the middle of its range (a dungeon you are about to outlevel
+--   is not the first idea);
+--   then the trip: about one level per 1000 yards on your continent, six for another continent.
+-- Without positions (no map data) only the level counts.
+local ENEMY_CAPITAL = { Alliance = { [1454] = true, [1456] = true, [1458] = true, [1954] = true },
+                        Horde = { [1453] = true, [1455] = true, [1457] = true, [1947] = true } }
+function ns.PickerFit(k)
+  local d = ns.D[k]
+  if not d then return 9999 end
+  local score = 0
+  local side = UnitFactionGroup and UnitFactionGroup("player")
+  local e = d.e
+  if side and e and e.m and ENEMY_CAPITAL[side] and ENEMY_CAPITAL[side][e.m] then score = score + 1000 end
+  local lv = UnitLevel("player") or 1
+  if d.lvl and d.lvl[1] then
+    local lo, hi = d.lvl[1], d.lvl[2] or d.lvl[1]
+    score = score + math.abs(lv - (lo + hi) / 2)
+  end
+  if e and e.m and e.x and e.y and ns.World and ns.PlayerWorld then
+    local okW, w = pcall(ns.World, e.m, e.x, e.y)
+    local okP, pw = pcall(ns.PlayerWorld)
+    if okW and okP and type(w) == "table" and type(pw) == "table" then
+      if w[1] ~= pw[1] then score = score + 6
+      else
+        local dx, dy = (w[2] or 0) - (pw[2] or 0), (w[3] or 0) - (pw[3] or 0)
+        score = score + math.min(6, math.sqrt(dx * dx + dy * dy) / 1000)
+      end
+    end
+  end
+  return score
+end
+
 local function LevelOK(d)
   local lv = UnitLevel("player")
   local lo, hi = d.lvl and d.lvl[1] or 1, d.lvl and d.lvl[2] or 60
@@ -635,12 +669,19 @@ Render = function()
     if la ~= lb then return la < lb end
     return a < b
   end
+  -- "at your level": the best fit first (ns.PickerFit: your side's entrance, your level, close by)
+  local fit = {}
+  local function byFit(a, b)
+    fit[a] = fit[a] or ns.PickerFit(a); fit[b] = fit[b] or ns.PickerFit(b)
+    if fit[a] ~= fit[b] then return fit[a] < fit[b] end
+    return byLevel(a, b)
+  end
   -- first pass: fill every card and take the tallest one's need as the card height
   local SECS = { { "todo", L.SEC_TODO }, { "later", L.SEC_LATER }, { "below", L.SEC_BELOW }, { "done", L.SEC_DONE }, { "upcoming", L.SEC_UP }, { "noq", L.SEC_NOQ } }
   local i, need = 0, CH_MIN
   for _, s in ipairs(SECS) do
     local keys = secs[s[1]]
-    table.sort(keys, byLevel)
+    table.sort(keys, s[1] == "todo" and byFit or byLevel)
     for _, k in ipairs(keys) do
       i = i + 1
       local c = p.cards[i] or MakeCard(p.grid); p.cards[i] = c

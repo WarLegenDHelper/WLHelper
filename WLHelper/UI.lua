@@ -3384,7 +3384,8 @@ local function RenderTabs(log, y)
     b:SetSize(k == 3 and (w - 2 * (colW + gap)) or colW, 24)
     b.go, b.c = c.go, c
     local nc = (c.total > 0 and c.done == c.total) and T.ok or T.muted
-    b.label:SetText(L[TAB_K[ph]] .. " " .. Hex(nc) .. c.done .. "/" .. c.total .. "|r")
+    -- a part with no step: its name alone, greyed (no "0/0" to read)
+    b.label:SetText(c.total > 0 and (L[TAB_K[ph]] .. " " .. Hex(nc) .. c.done .. "/" .. c.total .. "|r") or L[TAB_K[ph]])
     b.on = (ph == viewPh)
     b.sel:SetShown(b.on); b.line:SetShown(b.on)
     local tc = b.on and T.fg or T.text

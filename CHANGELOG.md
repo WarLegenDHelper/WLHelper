@@ -6,6 +6,20 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.95] — 2026-11-17
+
+### Modifié / Changed
+- **Première connexion plus calme** : seul l'écran de bienvenue s'ouvre ; la carte de la tournée en ville, le rappel des Writs et la ligne « spé supposée » attendent qu'il soit fermé.
+  *Only the welcome opens at the first login.*
+- **Donjon conseillé** : « À faire à ton niveau » met d'abord le donjon de ton côté, au milieu de ta tranche de niveau et le plus proche (ex. Gouffre de Ragefeu pour un Horde à Orgrimmar, plus La salle des Thanes sous Forgefer).
+  *Picker suggests a dungeon that fits your faction, level and position.*
+- **Une seule liste de commandes** : `/wlh help` et la fenêtre « Comment faire... ? » montrent les mêmes mots (donjons, choisir, Writs, sacs, commandes, guilde, groupes, reglages, idee, suivi, aide) ; `/wlh help` ouvre la fenêtre, `/wlh help chat` donne la liste dans le chat.
+  *One command list; /wlh help opens the window.*
+- **Écran de bienvenue plus clair** : ce que le guide et les Writs font tout seuls est écrit, « avec toute la guilde » seulement si tu en as une, les Writs expliqués.
+  *Clearer welcome texts.*
+- **Visite guidée** : le compte suit les bulles vraiment montrées.
+  *Tour count without gaps.*
+
 ## [1.0.0-beta.94] — 2026-11-17
 
 ### Corrigé / Fixed

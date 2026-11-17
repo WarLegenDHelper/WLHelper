@@ -22,9 +22,9 @@ ns.AddEnglish({
     ["Objet demandé : %s"] = "Requested item: %s",
     ["À rendre à %s, %s %.0f, %.0f"] = "Turn in to %s, %s %.0f, %.0f",
     ["À rendre : %s %.0f, %.0f"] = "Turn in: %s %.0f, %.0f",
-    ["Tu as %s et %s. Tape /wlh trade pour ouvrir les Writs."] = "You have %s and %s. Type /wlh trade to open the trading post.",
-    ["Tu as %s. Tape /wlh trade gps pour lancer la tournée."] = "You have %s. Type /wlh trade gps to start the tour.",
-    ["Tu as %s. Tape /wlh trade pour ouvrir les Writs."] = "You have %s. Type /wlh trade to open the trading post.",
+    ["Tu as %s. Tape /wlh writs gps : la flèche te mène aux PNJ qui les reprennent."] = "You have %s. Type /wlh trade gps: the arrow takes you to the NPCs who take them.",
+    ["Tu as %s et %s. Tape /wlh writs pour ouvrir les Writs."] = "You have %s and %s. Type /wlh trade to open the trading post.",
+    ["Tu as %s. Tape /wlh writs pour ouvrir les Writs."] = "You have %s. Type /wlh trade to open the trading post.",
     ["Déjà rendu aujourd'hui"] = "Already turned in today",
     ["Réservé à l'autre faction"] = "Other faction only",
 })
@@ -136,15 +136,17 @@ f:SetScript("OnEvent", function(_, event, a1, a2)
             reminded = true
             -- once per login, a few seconds in so the quest log is there
             C_Timer.After(6, function()
+                -- never on top of the welcome (the first login): one window and its words at a time
+                if WP.WelcomeActive and WP.WelcomeActive() then return end
                 local ready, bag = 0, 0
                 for _, r in ipairs(WP.Rows()) do
                     if r.state == "ready" then ready = ready + 1 elseif r.state == "bag" then bag = bag + 1 end
                 end
                 local r = Count(ready, "1 Writ prêt à rendre", "%d Writs prêts à rendre")
                 local b = Count(bag, "1 enveloppe à ouvrir", "%d enveloppes à ouvrir")
-                if ready > 0 and bag > 0 then WP.Print(string.format(L("Tu as %s et %s. Tape /wlh trade pour ouvrir les Writs."), r, b), true)
-                elseif ready > 0 then WP.Print(string.format(L("Tu as %s. Tape /wlh trade gps pour lancer la tournée."), r), true)
-                elseif bag > 0 then WP.Print(string.format(L("Tu as %s. Tape /wlh trade pour ouvrir les Writs."), b), true) end
+                if ready > 0 and bag > 0 then WP.Print(string.format(L("Tu as %s et %s. Tape /wlh writs pour ouvrir les Writs."), r, b), true)
+                elseif ready > 0 then WP.Print(string.format(L("Tu as %s. Tape /wlh writs gps : la flèche te mène aux PNJ qui les reprennent."), r), true)
+                elseif bag > 0 then WP.Print(string.format(L("Tu as %s. Tape /wlh writs pour ouvrir les Writs."), b), true) end
             end)
         end
     end

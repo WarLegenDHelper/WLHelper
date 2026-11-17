@@ -31,7 +31,7 @@ ns.AddEnglish({
     ["/wlh suivi"] = "/wlh tracker", ["Afficher ou cacher le suivi du guide"] = "Show or hide the guide tracker",
     -- the tasks (a quoted label comes from the button's own text: they cannot drift apart)
     ["Faire mes quêtes de donjon"] = "Do my dungeon quests",
-    ["Sur l'Accueil, clique sur la ligne Guide de quêtes pour choisir tes donjons."] = "On Home, click the Quest guide line to pick your dungeons.",
+    ["Ouvre « Choisir un guide » (/wlh choisir, ou la ligne Guide de quêtes de l'Accueil)."] = "Open Pick a guide (/wlh pick, or the Quest guide line on Home).",
     ["Clique sur les donjons que tu veux faire. Plusieurs donjons donnent une seule route."] = "Click the dungeons you want to do. Several dungeons make one route.",
     ["Clique sur « %s » : la route part de là où tu es."] = "Click \"%s\": the route starts where you are.",
     ["Suis les étapes : « %s » lance le GPS vers l'étape en cours."] = "Follow the steps: \"%s\" starts the GPS to the current step.",
@@ -88,7 +88,7 @@ ns.AddEnglish({
     ["/wlh"] = "/wlh",
     ["/wlh donjons"] = "/wlh dungeons",
     ["/wlh choisir"] = "/wlh pick",
-    ["/wlh comptoir"] = "/wlh trade",
+    ["/wlh writs"] = "/wlh trade",
     ["/wlh sacs"] = "/wlh bags",
     ["/wlh commandes"] = "/wlh orders",
     ["/wlh groupes"] = "/wlh groups",
@@ -113,7 +113,7 @@ ns.AddEnglish({
     ["Arrêter ou relancer le GPS"] = "Stop or restart the GPS",
     ["Ouvrir les réglages"] = "Open settings",
     ["Envoyer une idée ou un bug"] = "Send an idea or a bug",
-    ["Afficher cette page et la liste dans le chat"] = "Show this page and the list in chat",
+    ["Afficher cette page (/wlh aide chat : la liste dans le chat)"] = "Show this page (/wlh help chat: the list in chat)",
 })
 
 -- A workspace window (DESIGN 3.1): its size comes from the screen (ns.WinSize) and the player can
@@ -315,7 +315,7 @@ end
 local function Tasks()
     return {
         { key = "dungeons", icon = ModIcon("dungeons", "Interface\\Icons\\INV_Misc_Map_01"), title = L("Faire mes quêtes de donjon"),
-          steps = { L("Sur l'Accueil, clique sur la ligne Guide de quêtes pour choisir tes donjons."),
+          steps = { L("Ouvre « Choisir un guide » (/wlh choisir, ou la ligne Guide de quêtes de l'Accueil)."),
                     L("Clique sur les donjons que tu veux faire. Plusieurs donjons donnent une seule route."),
                     Quote("Clique sur « %s » : la route part de là où tu es.", GuideWord("PICK_GO")),
                     Quote("Suis les étapes : « %s » lance le GPS vers l'étape en cours.", GuideWord("GO")) },
@@ -408,7 +408,7 @@ local function Commands()
         { L("/wlh"), L("Ouvrir l'Accueil"), "" },
         { L("/wlh donjons"), L("Ouvrir le guide de quêtes"), "dungeons" },
         { L("/wlh choisir"), L("Choisir un guide"), "pick" },
-        { L("/wlh comptoir"), L("Ouvrir les Writs"), "trade" },
+        { L("/wlh writs"), L("Ouvrir les Writs"), "trade" },
         { L("/wlh sacs"), L("Trier les objets de quête"), "bags" },
         { L("/wlh commandes"), L("Ouvrir les commandes"), "orders" },
         { L("/wlh groupes"), L("Ouvrir Groupes"), "groupes" },
@@ -423,7 +423,7 @@ local function Commands()
         { L("/wlh idee"), L("Envoyer une idée ou un bug"), "idea" },
         { L("/wlh visite"), L("Refaire la visite guidée"), "visite" },
         { L("/wlh suivi"), L("Afficher ou cacher le suivi du guide"), "tracker" },
-        { L("/wlh aide"), L("Afficher cette page et la liste dans le chat"), nil },
+        { L("/wlh aide"), L("Afficher cette page (/wlh aide chat : la liste dans le chat)"), nil },
     }
 end
 

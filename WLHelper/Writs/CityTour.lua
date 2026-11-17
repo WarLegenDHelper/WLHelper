@@ -986,6 +986,9 @@ function CT.Refresh()
     if win and win:IsShown() then Render(list, nOpen); return end
     if nOpen > 0 and CT.IsOn() and not visit.dismissed then
         if InCombatLockdown and InCombatLockdown() then pendingShow = true; return end
+        -- the first login's welcome comes first: one window at a time (the card comes on the next
+        -- city event once it is closed, or with /wlh ville)
+        if WP.WelcomeActive and WP.WelcomeActive() then return end
         if not win then Build() end
         win.auto = true
         win:Show()

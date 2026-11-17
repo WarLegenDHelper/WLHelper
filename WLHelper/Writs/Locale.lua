@@ -245,6 +245,7 @@ local EN = {
     ["Aucun texte coupé dans les fenêtres ouvertes."] = "No truncated text in the open windows.",
     ["1 fenêtre cachée n'a pas été vérifiée."] = "1 hidden window was not checked.",
     ["%d fenêtres cachées n'ont pas été vérifiées."] = "%d hidden windows were not checked.",
+    ["La liste des commandes est dans la fenêtre « Comment faire... ? ». Tape /wlh aide chat pour l'avoir ici."] = "The command list is in the How do I...? window. Type /wlh help chat to get it here.",
     ["Debug : /wlh textes liste les textes coupés dans les fenêtres ouvertes (ajoute « all » pour voir aussi ceux à la limite)."] = "Debug: /wlh texts lists the cut texts in the open windows (add \"all\" to also see those at the limit).",
 }
 

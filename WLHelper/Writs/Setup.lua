@@ -20,8 +20,14 @@ ns.AddEnglish({
     ["Salut !"] = "Hi!",
     ["WL Helper te guide dans tes quêtes de donjon et t'aide à monter ta Faveur du marchand, avec toute la guilde."] =
         "WL Helper guides you through your dungeon quests and helps you raise your Merchant's Favor, with the whole guild.",
+    ["WL Helper te guide dans tes quêtes de donjon et t'aide à monter ta Faveur du marchand."] =
+        "WL Helper guides you through your dungeon quests and helps you raise your Merchant's Favor.",
+    ["Quelques choix rapides, gardés au fur et à mesure. Tout se change ensuite dans la fenêtre WL Helper."] =
+        "A few quick choices, saved as you go. You can change everything later in the WL Helper window.",
+    ["Clic : étape suivante (tes choix sont déjà gardés)"] = "Click: next step (your choices are already saved)",
+    ["Clic : fermer et garder tes choix"] = "Click: close and keep your choices",
     ["Les quêtes de tes donjons dans le bon ordre, avec une flèche GPS."] = "Your dungeon quests in the right order, with a GPS arrow.",
-    ["Les Writs les moins chers et où les rendre."] = "The cheapest Writs and where to turn them in.",
+    ["Les Writs (contrats des marchands) les moins chers et où les rendre."] = "The cheapest Writs (merchant contracts) and where to turn them in.",
     ["Les événements de la guilde et les commandes aux artisans."] = "Guild events and orders to crafters.",
     ["Une minute pour tout régler. Tout se change ensuite dans les Réglages."] =
         "One minute to set it up. You can change everything later in Settings.",
@@ -58,6 +64,11 @@ ns.AddEnglish({
     ["Quelle spé joues-tu ?"] = "Which spec do you play?",
     ["Le jeu ne nous laisse pas lire tes talents. Les flèches vertes des Améliorations dépendent de ta spé."] =
         "The game doesn't let us read your talents. The green Upgrades arrows depend on your spec.",
+    ["Le jeu ne laisse pas WL Helper lire tes talents. Les flèches vertes des Améliorations dépendent de ta spé."] =
+        "The game doesn't let WL Helper read your talents. The green Upgrades arrows depend on your spec.",
+    ["Sans guilde pour l'instant : utile quand tu en rejoins une."] = "No guild for now: useful once you join one.",
+    ["Il prend, rend et partage tout seul les quêtes de la route."] = "It accepts, turns in and shares the route's quests by itself.",
+    ["Les Writs prêts se rendent tout seuls chez le PNJ."] = "Ready Writs are turned in by themselves at the NPC.",
     ["Pas encore de talents ? Choisis ce que tu comptes jouer."] = "No talents yet? Pick what you plan to play.",
     ["Clic : choisir cette spé"] = "Click: pick this spec",
     ["Je ne sais pas encore"] = "I don't know yet",
@@ -108,6 +119,9 @@ ns.AddEnglish({
     ["Pour tout retrouver"] = "To find it all again",
     ["Quelques bulles sur les vraies fenêtres te montrent où est chaque chose, en deux minutes."] = "A few bubbles on the real windows show you where everything is, in two minutes.",
     ["Tape /wlh bienvenue pour tout régler pas à pas, ou refaire la visite."] = "Type /wlh welcome to set everything up step by step, or take the tour again.",
+    ["Le bouton WL de la minimap ou /wlh ouvre l'Accueil."] = "The WL minimap button or /wlh opens Home.",
+    ["/wlh setup rouvre cet écran ; la page Bienvenue de la fenêtre WL Helper reprend chaque réglage pas à pas."] =
+        "/wlh setup opens this screen again; the Welcome page of the WL Helper window goes through every setting step by step.",
     ["Les réglages sont dans la fenêtre WL Helper, à gauche sous chaque activité. /wlh setup rouvre cet écran."] =
         "Settings are in the WL Helper window, on the left under each activity. /wlh setup opens this screen again.",
     ["Le bouton WL de la minimap ouvre l'Accueil."] = "The WL button on the minimap opens Home.",
@@ -248,7 +262,7 @@ local function ModuleCard(parent, def)
     c:EnableMouse(true)
     c:SetScript("OnEnter", function(self)
         Hover(self, true)
-        S.Tip(self, { self.def.title(), self.def.desc(), L("Clic : allumer ou éteindre") })
+        S.Tip(self, { self.def.title(), self:DescText(), L("Clic : allumer ou éteindre") })
     end)
     c:SetScript("OnLeave", function(self)
         if MouseStillIn(self) then return end   -- onto the switch: keep the hover and the tip
@@ -256,6 +270,15 @@ local function ModuleCard(parent, def)
     end)
     c.sw:AttachRow(c)
     KeepHoverOver(c.sw, c)
+    -- what the module does, what it does by itself, and for the guild modules a word when the
+    -- player has no guild yet
+    function c:DescText()
+        local d = self.def
+        local t = d.desc()
+        if d.note then t = t .. " " .. d.note() end
+        if d.guild and not (IsInGuild and IsInGuild()) then t = t .. " " .. L("Sans guilde pour l'instant : utile quand tu en rejoins une.") end
+        return t
+    end
     function c:Paint()
         local on = self.def.get() and true or false
         if self.iconFrame.tex.SetDesaturated then self.iconFrame.tex:SetDesaturated(not on) end
@@ -263,7 +286,7 @@ local function ModuleCard(parent, def)
     end
     function c:Fit(width)
         self.title:SetText(self.def.title())
-        self.desc:SetText(self.def.desc())
+        self.desc:SetText(self:DescText())
         local textX = 52
         local th = math.ceil(S.FitText(self.title, 2, width - textX - 12 - 40 - 8, self))
         self.title:ClearAllPoints(); self.title:SetPoint("TOPLEFT", textX, -12)
@@ -415,13 +438,16 @@ STEPS.hello = {
         local ok, n = pcall(UnitName, "player")
         if ok and type(n) == "string" and n ~= "" and not (root.IsSecret and root.IsSecret(n)) then name = n end
         f.head:SetText(name and string.format(L("Salut %s !"), name) or L("Salut !"))
-        f.value:SetText(L("WL Helper te guide dans tes quêtes de donjon et t'aide à monter ta Faveur du marchand, avec toute la guilde."))
+        -- "with the whole guild" only for a player who has one
+        local inGuild = IsInGuild and IsInGuild()
+        f.value:SetText(inGuild and L("WL Helper te guide dans tes quêtes de donjon et t'aide à monter ta Faveur du marchand, avec toute la guilde.")
+            or L("WL Helper te guide dans tes quêtes de donjon et t'aide à monter ta Faveur du marchand."))
         local words = {
             L("Les quêtes de tes donjons dans le bon ordre, avec une flèche GPS."),
-            L("Les Writs les moins chers et où les rendre."),
+            L("Les Writs (contrats des marchands) les moins chers et où les rendre."),
             L("Les événements de la guilde et les commandes aux artisans."),
         }
-        f.foot:SetText(L("Une minute pour tout régler. Tout se change ensuite dans les Réglages."))
+        f.foot:SetText(L("Quelques choix rapides, gardés au fur et à mesure. Tout se change ensuite dans la fenêtre WL Helper."))
         local BW = math.min(400, CW)
         local y = 8
         f.logo:ClearAllPoints(); f.logo:SetPoint("TOP", f, "TOP", 0, -y)
@@ -453,15 +479,17 @@ local function ModuleDefs()
     local function one(key) return function() return WP.ModuleOn(key) end, function(v) WP.SetModule(key, v) end end
     local defs = {
         { keys = { "dungeons" }, icon = ModIcon("dungeons", "INV_Misc_Map_01"), title = function() return L("Guide de quêtes") end,
-          desc = function() return L("Donjons, raids et quêtes de classe, avec la flèche GPS qui te guide.") end },
+          desc = function() return L("Donjons, raids et quêtes de classe, avec la flèche GPS qui te guide.") end,
+          note = function() return L("Il prend, rend et partage tout seul les quêtes de la route.") end },
         { keys = { "writs" }, icon = ModIcon("writs", "INV_Letter_15"), title = function() return L("Writs et Faveur") end,
-          desc = function() return L("Les Writs (contrats des marchands) les moins chers et les caisses de la Faveur du marchand.") end },
+          desc = function() return L("Les Writs (contrats des marchands) les moins chers et les caisses de la Faveur du marchand.") end,
+          note = function() return L("Les Writs prêts se rendent tout seuls chez le PNJ.") end },
         { keys = { "bags" }, icon = ModIcon("bags", "INV_Misc_Bag_08"), title = function() return L("Sacs") end,
           desc = function() return L("Une place libre en un clic, et les objets gris vendus chez le marchand.") end },
         { keys = { "orders" }, icon = ModIcon("orders", "Trade_BlackSmithing"), title = function() return L("Commandes") end,
-          desc = function() return L("Demande un objet aux artisans de la guilde, ou fabrique pour eux.") end },
+          desc = function() return L("Demande un objet aux artisans de la guilde, ou fabrique pour eux.") end, guild = true },
         { keys = { "guild", "events" }, icon = ModIcon("events", "INV_Misc_GroupNeedMore"), title = function() return L("Guilde et événements") end,
-          desc = function() return L("Les membres, le classement PvP, les événements prévus et qui cherche un groupe.") end },
+          desc = function() return L("Les membres, le classement PvP, les événements prévus et qui cherche un groupe.") end, guild = true },
         { keys = { "upgrades" }, icon = ModIcon("upgrades", { hd = "arrow_up", color = C.ok }), title = function() return L("Améliorations") end,
           desc = function() return L("Une flèche verte sur les objets meilleurs que les tiens.") end },
     }
@@ -534,7 +562,7 @@ STEPS.spec = {
         if type(lvl) == "number" and lvl < 10 then
             f.text:SetText(L("Pas encore de talents ? Choisis ce que tu comptes jouer."))
         else
-            f.text:SetText(L("Le jeu ne nous laisse pas lire tes talents. Les flèches vertes des Améliorations dépendent de ta spé."))
+            f.text:SetText(L("Le jeu ne laisse pas WL Helper lire tes talents. Les flèches vertes des Améliorations dépendent de ta spé."))
         end
         local y = 0
         f.title:ClearAllPoints(); f.title:SetPoint("TOPLEFT", 0, -y)
@@ -791,19 +819,23 @@ STEPS.ready = {
         y = y + 16
         f.head:ClearAllPoints(); f.head:SetPoint("TOPLEFT", 0, -y); f.head:SetSize(CW, 24)
         y = y + 24 + 8
+        -- two lines, one way in each: the minimap button or /wlh, and how to come back here
         local words = {
-            MinimapShown() and L("Le bouton WL de la minimap ouvre l'Accueil.")
+            MinimapShown() and L("Le bouton WL de la minimap ou /wlh ouvre l'Accueil.")
                 or L("Le bouton de la minimap est caché : remets-le dans Réglages > Général."),
-            L("Tape /wlh dans le chat pour ouvrir l'Accueil."),
-            L("Les réglages sont dans la fenêtre WL Helper, à gauche sous chaque activité. /wlh setup rouvre cet écran."),
-            L("Tape /wlh bienvenue pour tout régler pas à pas, ou refaire la visite."),
+            L("/wlh setup rouvre cet écran ; la page Bienvenue de la fenêtre WL Helper reprend chaque réglage pas à pas."),
         }
+        local nFinds = #words
         for i, ln in ipairs(f.finds) do
+            ln.icon:SetShown(i <= nFinds); ln.text:SetShown(i <= nFinds)
+        end
+        for i, ln in ipairs(f.finds) do
+            if i > nFinds then break end
             ln.text:SetText(words[i])
             local th = math.ceil(S.FitText(ln.text, 0, CW - 22, f))
             ln.icon:ClearAllPoints(); ln.icon:SetPoint("TOPLEFT", 0, -(y + 1))
             ln.text:ClearAllPoints(); ln.text:SetPoint("TOPLEFT", 22, -y)
-            y = y + math.max(14, th) + (i < #f.finds and 6 or 0)
+            y = y + math.max(14, th) + (i < nFinds and 6 or 0)
         end
         return y
     end,
@@ -984,6 +1016,12 @@ local function Build()
     win.backBtn = S.Button(win, L("Retour"), 0, 32, "secondary", Back)
     win.backBtn:SetIcon("chevron_left")
     win.backBtn:SetPoint("BOTTOMLEFT", 16, 12)
+    -- every button of the bar has a tooltip (the primary's follows its label)
+    local function PrimaryTip()
+        local last = win and win.stepKey == "ready"
+        return { win and win.primary and win.primary.label:GetText() or L("Continuer"),
+            last and L("Clic : fermer et garder tes choix") or L("Clic : étape suivante (tes choix sont déjà gardés)") }
+    end
     win.primary = S.Button(win, L("Commencer"), 120, 32, "primary", function()
         if win.stepKey == "ready" then
             Finish("finish")
@@ -991,7 +1029,7 @@ local function Build()
         else
             Next()
         end
-    end)
+    end, PrimaryTip)
     win.primary:SetPoint("BOTTOMRIGHT", -16, 12)
     win.dots = Dots(win)
     win.dots:SetPoint("BOTTOM", win, "BOTTOM", 0, 12)

@@ -2,6 +2,13 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.95", date = "2026-11-17", items = {
+    { s = "chg", fr = { "Première connexion plus calme", "Seul l'écran de bienvenue s'ouvre ; la carte de la tournée en ville, le rappel des Writs et la ligne « spé supposée » attendent qu'il soit fermé." }, en = { "Only the welcome opens at the first login.", "" } },
+    { s = "chg", fr = { "Donjon conseillé", "« À faire à ton niveau » met d'abord le donjon de ton côté, au milieu de ta tranche de niveau et le plus proche (ex. Gouffre de Ragefeu pour un Horde à Orgrimmar, plus La salle des Thanes sous Forgefer)." }, en = { "Picker suggests a dungeon that fits your faction, level and position.", "" } },
+    { s = "chg", fr = { "Une seule liste de commandes", "/wlh help et la fenêtre « Comment faire... ? » montrent les mêmes mots (donjons, choisir, Writs, sacs, commandes, guilde, groupes, reglages, idee, suivi, aide) ; /wlh help ouvre la fenêtre, /wlh help chat donne la liste dans le chat." }, en = { "One command list; /wlh help opens the window.", "" } },
+    { s = "chg", fr = { "Écran de bienvenue plus clair", "Ce que le guide et les Writs font tout seuls est écrit, « avec toute la guilde » seulement si tu en as une, les Writs expliqués." }, en = { "Clearer welcome texts.", "" } },
+    { s = "chg", fr = { "Visite guidée", "Le compte suit les bulles vraiment montrées." }, en = { "Tour count without gaps.", "" } },
+  } },
   { v = "1.0.0-beta.94", date = "2026-11-17", items = {
     { s = "fix", fr = { "Check-list du Temple englouti", "Les objectifs de la chaîne du Sceptre des Sables changeants (Tête du seigneur des couvées Lanistaire, Fragments de carapace silithide, quêtes de raid de niveau 60) ne s'affichent plus ; une quête que tu ne peux pas encore prendre n'ajoute plus d'objectif « à finir dehors »." }, en = { "Sunken Temple checklist no longer lists the level 60 raid chain.", "" } },
     { s = "fix", fr = { "Données de quêtes vérifiées", "" }, en = { "", "" } },
@@ -137,12 +144,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.81", date = "2026-11-16", items = {
     { s = "chg", fr = { "Liste des addons", "WL Helper Gear et les trois WL Helper Nav ont maintenant le logo WL Helper et un nom aligné (« WaR LegenD Helper - Gear », « - Nav »...), regroupés sous WL Helper quand le jeu le permet." }, en = { "Gear and Nav sub-addons now show the WL Helper logo and matching names in the addon list.", "" } },
-  } },
-  { v = "1.0.0-beta.80", date = "2026-11-16", items = {
-    { s = "add", fr = { "Badges BiS sur le butin", "Les récompenses de quête de la vue d'ensemble et le butin des boss affichent « BiS ★ » ou « 2e choix » quand Naowh classe l'objet pour ta spé." }, en = { "BiS / 2nd choice badges on quest rewards and boss loot, from Naowh.", "" } },
-    { s = "add", fr = { "BiS même sans liste remplie", "Si tu n'as jamais rempli ta liste BiS dans Naowh, WL Helper prend l'équipement que Naowh conseille pour ton niveau (« BiS niv. 40 » avant 60, son classement au 60). Ta propre liste passe toujours en premier." }, en = { "No Naowh list filled? Naowh's gear for your level is used (\"BiS lvl 40\"), its ranking at 60.", "" } },
-    { s = "add", fr = { "Statut d'artisan dans la minimap", "« Artisan : Disponible » dans le menu, un clic passe à Occupé ou Absent." }, en = { "Crafter status in the minimap menu, click to change it.", "" } },
-    { s = "add", fr = { "« Me prévenir quand quelqu'un sait le faire »", "Sur la page Demander : un message (et un son) quand un membre de la guilde apprend la recette." }, en = { "Get told when a guild member learns the recipe you asked for.", "" } },
-    { s = "add", fr = { "Alertes des commandes", "Dans Réglages › Général › Commandes : favori qui se connecte, recette surveillée apprise, son." }, en = { "Orders alerts in Settings.", "" } },
   } },
 }

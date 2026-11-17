@@ -606,7 +606,7 @@ Purpose: list every truncated FontString in the WL Helper frames that are shown 
 
 ### 7.1 Command
 
-- Words: `textes`, `texts`, `truncated` (all route to `ns.DebugTexts()`). Accents are already stripped by the slash handler. Listed in `/wlh help` under a "Debug" line in both languages.
+- Words: `textes`, `texts`, `truncated` (all route to `ns.DebugTexts()`). Accents are already stripped by the slash handler. Listed in `/wlh help chat` (the full list in the chat; `/wlh help` alone opens the How do I...? window and prints one line) under a "Debug" line in both languages.
 - Optional argument `all`: also report strings that wrap to their max lines exactly (near misses), marked "(limite)" / "(at limit)".
 
 ### 7.2 Which frames

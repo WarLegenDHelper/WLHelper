@@ -727,12 +727,20 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "macro" then WLDTDB.macro = (WLDTDB.macro == false); ns.Print(WLDTDB.macro and L.MACRO_ON or L.MACRO_OFF); ns.UpdateMacro()
   elseif cmd == "reset" then ns.ResetRoute()
   elseif cmd == "help" or cmd == "aide" or cmd == "?" then
-    ns.Print("WL Helper v" .. (ns.VERSION or "?"))
-    for line in L.HELP:gmatch("[^\n]+") do print("   " .. line) end
+    -- the window holds the list; one line in the chat. "/wlh help chat" prints the whole list
+    -- (and the debug line) for those who want it there.
+    local hp = ns.Writs and ns.Writs.WP and ns.Writs.WP.Help
     local WL = ns.Writs and ns.Writs.L
-    print("   " .. (WL and WL("Debug : /wlh textes liste les textes coupés dans les fenêtres ouvertes (ajoute « all » pour voir aussi ceux à la limite).")
-      or "Debug: /wlh texts lists the cut texts in the open windows (add \"all\" to also see those at the limit)."))
-    if ns.Writs and ns.Writs.WP and ns.Writs.WP.Help then ns.Writs.WP.Help.Toggle() end
+    if hp and hp.Toggle and arg ~= "chat" then
+      if not (_G.WLHelperHelp and _G.WLHelperHelp:IsShown()) then hp.Toggle() end
+      ns.Print(WL and WL("La liste des commandes est dans la fenêtre « Comment faire... ? ». Tape /wlh aide chat pour l'avoir ici.")
+        or "The command list is in the How do I...? window. Type /wlh help chat to get it here.")
+    else
+      ns.Print("WL Helper v" .. (ns.VERSION or "?"))
+      for line in L.HELP:gmatch("[^\n]+") do print("   " .. line) end
+      print("   " .. (WL and WL("Debug : /wlh textes liste les textes coupés dans les fenêtres ouvertes (ajoute « all » pour voir aussi ceux à la limite).")
+        or "Debug: /wlh texts lists the cut texts in the open windows (add \"all\" to also see those at the limit)."))
+    end
   else ns.Print(L.UNKNOWN_CMD:format(cmd)) end
 end
 

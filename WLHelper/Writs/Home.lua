@@ -481,7 +481,7 @@ end
 
 local function BuildSearch()
     win.search = S.Input(win.inner, CW, { search = true, label = L("Où veux-tu aller ?"),
-        placeholder = L("Ex. banque, HV, Mortemines, Forgefer"),
+        placeholder = WP.GoToExample and WP.GoToExample() or L("Ex. banque, HV, Mortemines, Forgefer"),
         onChange = function() SearchSoon() end,
         onEnter = SearchEnter })
     win.search:SetScript("OnEnter", function(self) S.Tip(self, { L("Aller à"), L("Entrée : aller au premier résultat") }) end)

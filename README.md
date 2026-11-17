@@ -85,7 +85,7 @@ Une seule commande, `/wlh` (aussi `/wl` si WaR LegenD RaidTool n'est pas install
 | `/wlh options` | Réglages |
 | `/wlh setup` | Écran de bienvenue : modules et clics |
 | `/wlh idea` | Proposer une idée ou signaler un bug |
-| `/wlh help` | Toutes les commandes |
+| `/wlh help` | Ouvre « Comment faire... ? » avec toutes les commandes (`/wlh help chat` : la liste dans le chat) |
 
 Bouton de la minimap : clic pour l'accueil, clic droit pour un menu vers chaque module.
 

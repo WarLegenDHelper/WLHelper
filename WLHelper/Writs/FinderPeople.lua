@@ -90,10 +90,13 @@ ns.AddEnglish({
     ["Messages, chuchotements et notes de Trouver un groupe."] = "Messages, whispers and ratings of Find a group.",
     ["Message pour demander à rejoindre"] = "Message to ask to join",
     ["Message d'invitation"] = "Invite message",
-    ["Remplacés à l'envoi : %class%, %level%, %role%, %talents%, %dungeon%, %quests%. Vide : la fenêtre de chuchotement s'ouvre à la place."] = "Replaced when sent: %class%, %level%, %role%, %talents%, %dungeon%, %quests%. Empty: the whisper box opens instead.",
     ["Remettre le message de départ"] = "Restore the default message",
     ["Envoyer le message tout seul"] = "Send the message by itself",
     ["Sinon, la fenêtre de chuchotement s'ouvre avec le nom, et tu écris toi-même."] = "Otherwise the whisper box opens with the name and you type yourself.",
+    ["Chuchoté à la personne quand tu cliques « Demander à rejoindre » ou « Inviter ». Sinon, la fenêtre de chuchotement s'ouvre avec le nom, et tu écris toi-même."] =
+        "Whispered to the person when you click Ask to join or Invite. Otherwise the whisper box opens with the name and you type yourself.",
+    ["Les mots entre deux % sont remplacés à l'envoi : %class% ta classe, %level% ton niveau, %role% ton rôle, %talents% tes talents, %dungeon% le donjon, %quests% tes quêtes. Vide : la fenêtre de chuchotement s'ouvre à la place."] =
+        "The words between two % are replaced when sent: %class% your class, %level% your level, %role% your role, %talents% your talents, %dungeon% the dungeon, %quests% your quests. Empty: the whisper box opens instead.",
     ["Garder les chuchotements dans Groupes"] = "Keep whispers in Groups",
     ["Gardés en mémoire jusqu'à la déconnexion, jamais écrits sur le disque."] = "Kept in memory until you log out, never written to disk.",
     ["Marquer la guilde et les amis"] = "Mark guild members and friends",
@@ -740,14 +743,14 @@ WP.GroupsPage = {
         local ask = TemplateBox(p, "ask", L("Message pour demander à rejoindre"))
         local inv = TemplateBox(p, "invite", L("Message d'invitation"))
         local help = S.Text(p, FS.meta, C.muted)
-        help:SetText(L("Remplacés à l'envoi : %class%, %level%, %role%, %talents%, %dungeon%, %quests%. Vide : la fenêtre de chuchotement s'ouvre à la place."))
+        help:SetText(L("Les mots entre deux % sont remplacés à l'envoi : %class% ta classe, %level% ton niveau, %role% ton rôle, %talents% tes talents, %dungeon% le donjon, %quests% tes quêtes. Vide : la fenêtre de chuchotement s'ouvre à la place."))
         help:SetJustifyH("LEFT")
         local card = S.SettingsCard(p)
         local function Row(label, desc, long, get, set)
             return card:AddRow({ label = label, desc = desc, long = long, control = "switch", get = get, set = set })
         end
         Row(L("Envoyer le message tout seul"), L("Sinon, tu écris toi-même le chuchotement."),
-            L("Sinon, la fenêtre de chuchotement s'ouvre avec le nom, et tu écris toi-même."),
+            L("Chuchoté à la personne quand tu cliques « Demander à rejoindre » ou « Inviter ». Sinon, la fenêtre de chuchotement s'ouvre avec le nom, et tu écris toi-même."),
             function() return F.AutoSend() end, function(v) if WLWritsCharDB then WLWritsCharDB.finderAutoSend = v and true or false end end)
         Row(L("Garder les chuchotements dans Groupes"), L("Jusqu'à la déconnexion, jamais sur disque."),
             L("Gardés en mémoire jusqu'à la déconnexion, jamais écrits sur le disque."),

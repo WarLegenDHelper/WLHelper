@@ -385,7 +385,17 @@ end
 
 local function Show(st, target)
     if not bubble then BuildBubble() end
-    local h = Fill(st, run.i, #run.list)
+    -- the count follows what is shown: a step skipped (its window did not open) leaves no gap,
+    -- "3 sur 17" then "4 sur 16"; the total is the steps shown plus those still ahead
+    run.seen = run.seen or {}
+    local pos, maxI = nil, 0
+    for k, j in ipairs(run.seen) do if j == run.i then pos = k end; if j > maxI then maxI = j end end
+    if not pos then
+        table.insert(run.seen, run.i); table.sort(run.seen)
+        for k, j in ipairs(run.seen) do if j == run.i then pos = k end end
+        if run.i > maxI then maxI = run.i end
+    end
+    local h = Fill(st, pos, #run.seen + math.max(0, #run.list - maxI))
     Place(target, h)
     run.target = target
     run.shownN = (run.shownN or 0) + 1

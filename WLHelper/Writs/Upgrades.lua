@@ -1101,6 +1101,8 @@ ev:SetScript("OnEvent", function(_, e, ...)
     if e == "PLAYER_LOGIN" then
         -- once per login: the spec is only a guess, say how to set it
         C_Timer.After(15, function()
+            -- not while the welcome is open or still to come: its spec step asks the same question
+            if WP.WelcomeActive and WP.WelcomeActive() then return end
             if W.SpecGuessed and W.SpecGuessed() and WP.ModuleOn and WP.ModuleOn("upgrades") then
                 WP.Print(string.format(L("Améliorations : ta spé n'a pas pu être lue dans tes talents, %s est supposée. Choisis-la dans WL Helper, Améliorations, Spé évaluée."), W.SpecName()))
             end
