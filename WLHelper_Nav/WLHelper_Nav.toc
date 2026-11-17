@@ -4,7 +4,7 @@
 ## Notes: WL Helper's walking router for the GPS: real paths round mountains and through gates (Polestar's router and maps, without Polestar). Loaded on demand.
 ## Notes-frFR: Routeur à pied du GPS de WL Helper : vrais chemins autour des montagnes et par les portes (routeur et cartes de Polestar, sans Polestar). Chargé à la demande.
 ## Author: WaR LegenD (router and maps from Polestar and Shortest Path Forever)
-## Version: 1.1.0
+## Version: 1.2.0
 ## Group: WLHelper
 ## LoadOnDemand: 1
 ## Dependencies: WLHelper
@@ -17,4 +17,5 @@ Routing\PathGrid.lua
 Routing\Path.lua
 Routing\PathJobs.lua
 Danger.lua
+TaxiGraph.lua
 API.lua

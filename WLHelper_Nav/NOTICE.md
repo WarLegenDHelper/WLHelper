@@ -94,3 +94,7 @@ GPL-3.0-or-later (`Danger.lua`: GPL-3.0-only, as the Polestar addon it comes
 from): see [`LICENSE`](LICENSE) (Polestar Nav's copy of the GNU General Public
 License v3, kept verbatim; its preamble names Polestar Nav's files). This licence applies to these three folders only;
 the rest of WL Helper keeps its own licence.
+
+## Flight network (2026-11-17)
+
+`TaxiGraph.lua` holds the WoW Forever flight network (flight masters and each direct hop with its time in seconds), generated from Shortest Path Forever's `Data/Taxi.lua` (GPL-3.0-or-later, by Cillian Berragan, https://github.com/cjber/shortest-path-forever), itself built from the client tables (build 1.60.1) and InFlight's measured durations (MIT License, Copyright (c) 2009-2024 TotalPackage, 2022 Deranjata, 2025-2026 LudiusMaximus).

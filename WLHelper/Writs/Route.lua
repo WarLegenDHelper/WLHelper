@@ -874,6 +874,109 @@ end
 
 local function FlyCost(d) return d * FLY_DETOUR / FLY + FLY_STOP end
 
+-- The real flight network (Writs/TaxiGraph.lua, from Shortest Path Forever): a flight from A to B
+-- goes hop by hop through flight masters you know, each hop with its measured time. Our taxi points
+-- are matched to the network by place (their ids come from the client's flight map and may differ).
+-- The network lives in the GPL sub-addon WLHelper_Nav (TaxiGraph.lua, global WLHelperNavTaxi): it
+-- is loaded on demand, out of combat; until then flights keep the straight-line guess.
+local taxiTried = false
+local function TaxiNet(part)
+    local t = rawget(_G, "WLHelperNavTaxi")
+    if not t and not taxiTried and not (InCombatLockdown and InCombatLockdown()) then
+        taxiTried = true
+        -- only an installed, loadable sub-addon is loaded (same check as Trail.lua's router)
+        local A = C_AddOns
+        local info = A and A.GetAddOnInfo or rawget(_G, "GetAddOnInfo")
+        local okI, name, loadable, reason
+        if type(info) == "function" then
+            local r = { pcall(info, "WLHelper_Nav") }
+            okI, name, loadable, reason = r[1], r[2], r[5], r[6]
+        end
+        local installed = okI and name ~= nil and reason ~= "MISSING" and (loadable or reason == "DEMAND_LOADED")
+        local load = (A and A.LoadAddOn) or rawget(_G, "LoadAddOn")
+        if installed and type(load) == "function" then pcall(load, "WLHelper_Nav") end
+        t = rawget(_G, "WLHelperNavTaxi")
+    end
+    return t and t[part]
+end
+local GRAPH_NEAR = 80                       -- yards between our point and the network's node
+local graphOf = setmetatable({}, { __mode = "k" })
+local function GraphNode(p)
+    local g = graphOf[p]
+    if g ~= nil then return g or nil end
+    g = false
+    local nodes = TaxiNet("nodes")
+    -- the client's own node id when the network knows it on the same continent
+    local own = nodes and p.nodeID and nodes[p.nodeID]
+    if own and own[1] == p.cont and p.wx then
+        local dx, dy = own[2] - p.wx, own[3] - p.wy
+        if dx * dx + dy * dy <= 300 * 300 then graphOf[p] = p.nodeID; return p.nodeID end
+    end
+    if nodes and p.cont and p.wx then
+        local best = GRAPH_NEAR * GRAPH_NEAR
+        for id, n in pairs(nodes) do
+            if n[1] == p.cont then
+                local dx, dy = n[2] - p.wx, n[3] - p.wy
+                local d2 = dx * dx + dy * dy
+                if d2 < best then best, g = d2, id end
+            end
+        end
+    end
+    graphOf[p] = g
+    return g or nil
+end
+GPS._GraphNode = GraphNode
+
+local flightKnown = {}                      -- [network id] = true: flight masters usable now
+local flightMemo = {}
+local function SetFlightKnown(points)
+    flightKnown, flightMemo = {}, {}
+    for _, p in ipairs(points) do
+        if p.kind == "taxi" then local g = GraphNode(p); if g then flightKnown[g] = true end end
+    end
+end
+GPS._SetFlightKnown = SetFlightKnown
+
+-- Seconds of flight from network node a to b through known masters, or nil when they are not linked.
+local function FlightSecs(a, b)
+    local key = a .. ">" .. b
+    local m = flightMemo[key]
+    if m ~= nil then return m or nil end
+    local hops = TaxiNet("hops") or {}
+    local dist, done = { [a] = 0 }, {}
+    while true do
+        local u, best = nil, math.huge
+        for id, d in pairs(dist) do if not done[id] and d < best then u, best = id, d end end
+        if not u then break end
+        if u == b then break end
+        done[u] = true
+        for v, t in pairs(hops[u] or {}) do
+            if (v == b or flightKnown[v]) and not done[v] then
+                local nd = best + t
+                if not dist[v] or nd < dist[v] then dist[v] = nd end
+            end
+        end
+    end
+    local r = dist[b]
+    flightMemo[key] = r or false
+    return r
+end
+GPS._FlightSecs = FlightSecs
+
+-- A flight between two taxi points: the network's time (plus the take-off), math.huge when the
+-- network says they are not linked through masters you know, else the old straight-line guess.
+local function FlyBetween(a, b, d)
+    local ga, gb = GraphNode(a), GraphNode(b)
+    if ga and gb and TaxiNet("hops") then
+        if ga == gb then return FLY_STOP end
+        local s = FlightSecs(ga, gb)
+        if s then return s + 10 end
+        return math.huge
+    end
+    return FlyCost(d or Dist(a, b))
+end
+GPS._FlyBetween = FlyBetween
+
 -- What the Hearthstone (or Astral Recall) may do now: the inn and how ("item" / spell id), or nil.
 local function HearthWay(dead, pol)
     if dead or (pol or HearthPolicy()) == "never" then return nil end
@@ -976,6 +1079,7 @@ local function Search(dests, firstOnly, exclude, pol)
     if inn and Excluded(exclude, inn) then inn = nil end
     if inn then Add(inn) end
 
+    SetFlightKnown(nodes)
     local n, speed = #nodes, RideSpeed()
     local sNow = ServerNow()
     local cost, prev, how, done = {}, {}, {}, {}
@@ -1000,7 +1104,7 @@ local function Search(dests, firstOnly, exclude, pol)
                     c, d = RideCost(a, b, speed)
                     kind = "ride"
                     if a.kind == "taxi" and b.kind == "taxi" then
-                        local f = FlyCost(d)
+                        local f = FlyBetween(a, b, d)
                         -- a supposed flight path: a sure way wins a near tie
                         if a.guess or b.guess then f = f + GUESS_COST + (far[u] and GUESS_FAR or 0) end
                         if f < c then c, kind = f, "fly" end
@@ -1129,7 +1233,7 @@ local function PlanCost(legs)
                 if from.cont ~= leg.to.cont then return nil end
                 total = total + RideCost(from, leg.to, speed)
             elseif k == "fly" then
-                total = total + FlyCost(Dist(from, leg.to))
+                total = total + FlyBetween(from, leg.to)
                 if (from.guess or leg.to.guess) then
                     -- a flight map opened since: the guess is over, a new plan
                     if not GPS.Unseen(leg.to.cont) then return nil end

@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.101", date = "2026-11-17", items = {
+    { s = "chg", fr = { "Vrai réseau de vols", "Le GPS connaît maintenant le réseau des maîtres de vol de Forever et la durée mesurée de chaque saut (données de Shortest Path Forever, sous GPL, dans le module WLHelper Nav). Un vol passe par les maîtres de vol que tu connais, avec son vrai temps, au lieu d'une ligne droite ; deux maîtres de vol non reliés ne sont plus proposés." }, en = { "Real flight network with measured times (from Shortest Path Forever, GPL, in WLHelper Nav).", "" } },
+  } },
   { v = "1.0.0-beta.100", date = "2026-11-17", items = {
     { s = "chg", fr = { "Route réordonnée selon ta position", "Quand tu arrives dans une nouvelle zone (à pied, après un vol ou un téléport), les étapes qui restent sont remises dans l'ordre depuis là où tu es, pour éviter les allers-retours. Pas pendant un vol ni dans un donjon, au plus une fois toutes les 30 s." }, en = { "Remaining steps are reordered from your position when you enter a new zone.", "" } },
   } },
@@ -108,10 +111,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Fausse étape « dans le donjon »", "Après avoir ramassé un objet devant l'entrée (tablette de Solution to Doom), le guide sautait à « Baelog » alors que tu étais dehors." }, en = { "Guide no longer jumps inside the dungeon after an item looted at the entrance.", "" } },
     { s = "fix", fr = { "Pointillés sur la carte du monde", "Ils s'affichent aussi avec OpenMap, et une carte n'est plus bloquée « sans points » pour la session." }, en = { "World map trail dots show with OpenMap.", "" } },
     { s = "fix", fr = { "Titre « Guide de quêtes » et « Partager 4 quêtes »", "Ne sont plus coupés en français." }, en = { "French titles no longer truncated.", "" } },
-  } },
-  { v = "1.0.0-beta.86", date = "2026-11-16", items = {
-    { s = "fix", fr = { "Points de la route vérifiés", "Contre LibForeverData, NaowhForever et Questie pour les 439 quêtes du guide : 6 points d'objectif déplacés vers le camp principal (Fledgling Chillwind, Burning Blade Summoner, Young Wavethrasher, Crag Coyote, Pathstrider, Cliff Breaker), Bath'rah the Windwatcher suit son chemin, et Nazeer Bloodpike porte son vrai nom." }, en = { "Route points checked against 3 sources for all 439 guide quests: 6 objective points moved to the main camp, one more patrolling NPC, one name fixed.", "" } },
-    { s = "chg", fr = { "Textes relus dans toute l'interface", "« Writ » toujours avec une majuscule, chemins des réglages écrits d'une seule façon (« Réglages > Général > Modules »), noms de fenêtres entre « », et deux renvois corrigés." }, en = { "French text proofread across the UI.", "" } },
-    { s = "chg", fr = { "Moins de travail en jeu", "Moins de calculs à chaque barre de nom et sur ta cible, la flèche crée moins de déchets mémoire, et les anciens prix de l'HV ne restent plus dans la sauvegarde." }, en = { "Less work in game", "Nameplates, arrow, saved AH prices." } },
   } },
 }

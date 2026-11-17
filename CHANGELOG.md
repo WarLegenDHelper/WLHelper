@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.101] — 2026-11-17
+
+### Modifié / Changed
+- **Vrai réseau de vols** : le GPS connaît maintenant le réseau des maîtres de vol de Forever et la durée mesurée de chaque saut (données de Shortest Path Forever, sous GPL, dans le module WLHelper Nav). Un vol passe par les maîtres de vol que tu connais, avec son vrai temps, au lieu d'une ligne droite ; deux maîtres de vol non reliés ne sont plus proposés.
+  *Real flight network with measured times (from Shortest Path Forever, GPL, in WLHelper Nav).*
+
 ## [1.0.0-beta.100] — 2026-11-17
 
 ### Modifié / Changed
