@@ -62,6 +62,12 @@ ns.AddEnglish({
         "Automatic: often before level 40, sometimes after (your spells count more). Often: its DPS counts in full. Sometimes: half. Never: hardly, a better wand stays a little better.",
     -- the short line under the percent (Shift: the numbers)
     ["Surtout : %s"] = "Mostly: %s",
+    ["Presque pareil (%s)"] = "About the same (%s)",
+    ["Seulement ~%d %s d'écart : garde celui que tu préfères."] = "Only ~%d %s apart: keep the one you like.",
+    ["de puissance des sorts"] = "spell power",
+    ["de soins"] = "healing",
+    ["de puissance d'attaque"] = "attack power",
+    ["d'endurance"] = "stamina",
     ["%s en plus"] = "more %s", ["moins de %s"] = "less %s", ["moins d'%s"] = "less %s",
     ["DPS de baguette"] = "wand DPS", ["force"] = "strength", ["agilité"] = "agility", ["endurance"] = "stamina",
     ["intelligence"] = "intellect", ["esprit"] = "spirit", ["puissance d'attaque"] = "attack power",
@@ -693,6 +699,54 @@ function WP.UpgradeExplain(link, short)
     return ExplainText(link, main, byNaowh, short)
 end
 WP.UpgradeExplainFormat = ExplainFormat
+-- A near tie: WL Helper Gear scores in the spec's main stat (spell power, healing, attack power,
+-- or Stamina for tanks), so score minus old is the gap in those points. A gap of a few points
+-- ("-14 %" for Rotgrip Mantle vs Netherfroth Shoulders = 4 spell power) reads "Presque pareil".
+-- -> points, the unit's words; nil when not a near tie or not judged by WL Helper Gear
+local NEAR = { sp = 5, heal = 8, ap = 10, sta = 5 }
+local NEAR_WORD = { sp = "de puissance des sorts", heal = "de soins", ap = "de puissance d'attaque", sta = "d'endurance" }
+local function NearTie(link)
+    local G = Gear()
+    if not (G and G.Weights and G.Compare) then return nil end
+    SyncGearSpec(G)
+    local ok, res = pcall(G.Compare, link)
+    if not ok or type(res) ~= "table" or res.empty or res.equipped or not res.pct
+        or type(res.score) ~= "number" or type(res.old) ~= "number" or res.old <= 0 then return nil end
+    if math.abs(res.pct) >= 25 then return nil end
+    local okW, wt = pcall(G.Weights)
+    if not okW or type(wt) ~= "table" or type(wt.stats) ~= "table" then return nil end
+    for _, k in ipairs({ "sp", "heal", "ap", "sta" }) do
+        if wt.stats[k] == 1 then
+            local pts = math.abs(res.score - res.old)
+            if pts <= NEAR[k] then return pts, L(NEAR_WORD[k]) end
+            return nil
+        end
+    end
+    return nil
+end
+WP.UpgradeNearTie = NearTie
+-- the percent's text and colour for a near tie ("Presque pareil (-14 %)", grey) and the line under
+-- it; unchanged and nil otherwise (v: the percent, WL Helper Gear judging)
+local function Near(link, v, text, col)
+    if type(v) ~= "number" or math.abs(math.floor(v + 0.5)) < 1 then return text, col end
+    local ok, pts, word = pcall(NearTie, link)
+    if not ok or not pts then return text, col end
+    return string.format(L("Presque pareil (%s)"), text), GREY,
+        string.format(L("Seulement ~%d %s d'écart : garde celui que tu préfères."), math.max(1, math.floor(pts + 0.5)), word)
+end
+-- WL Helper Gear's weights when it judges (Settings > Upgrades shows them): { { key, weight } },
+-- biggest first, and its Weights() result; nil when our own weights judge
+function WP.UpgradeGearWeights()
+    if not UseGF() then return nil end
+    local G = Gear()
+    if not (G and G.Weights) then return nil end
+    local ok, wt = pcall(G.Weights)
+    if not ok or type(wt) ~= "table" or type(wt.stats) ~= "table" then return nil end
+    local t = {}
+    for k, v in pairs(wt.stats) do if type(v) == "number" and v >= 0.005 then t[#t + 1] = { k, v } end end
+    table.sort(t, function(a, b) if a[2] ~= b[2] then return a[2] > b[2] end return a[1] < b[1] end)
+    return t, wt
+end
 -- under the percent shown (n, rounded): the short line for 3 % or more; Shift held: the numbers
 local SHORT_MIN = 3
 local function Shift() return IsShiftKeyDown and IsShiftKeyDown() and true or false end
@@ -745,9 +799,13 @@ local function MultiLines(tip, link)
         local text, col, isPct = VerdictText(v)
         -- Naowh writes this spec's percent itself: ours steps aside (worn: Naowh says nothing)
         if text and not (byNaowh and type(v) == "number" and NaowhTipShown(spec)) then
+            -- a gap of a few points of the main stat: "Presque pareil (-14 %)", in grey
+            local near
+            if i == 1 and isPct and not byNaowh and UseGF() then text, col, near = Near(link, v, text, col) end
             tip:AddDoubleLine(Tag(name, i > 1, byNaowh), text, T.fg[1], T.fg[2], T.fg[3], col[1], col[2], col[3])
             shown = true
             pct = pct or isPct
+            if near then tip:AddLine(near, GREY[1], GREY[2], GREY[3], true) end
             if i == 1 and isPct then ExplainLine(tip, link, spec, byNaowh, math.floor(v + 0.5)) end
         end
         -- the item you wear, or lighter armor: one line is enough
@@ -804,7 +862,10 @@ local function TooltipLine(tip, link)
             text, pct = Percent(v), true
             col = v > 0 and GREEN or (v < 0 and RED or GREY)
         else return end
+        local near
+        if pct then text, col, near = Near(link, v, text, col) end
         tip:AddDoubleLine(Tag(W.SpecNameFor(GFSpec())), text, T.fg[1], T.fg[2], T.fg[3], col[1], col[2], col[3])
+        if near then tip:AddLine(near, GREY[1], GREY[2], GREY[3], true) end
         if pct then ExplainLine(tip, link, main, false, math.floor(v + 0.5)); InsteadOf(tip, link) end
         return
     end

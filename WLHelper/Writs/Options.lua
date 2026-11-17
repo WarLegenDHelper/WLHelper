@@ -227,6 +227,15 @@ ns.AddEnglish({
     ["Masquer le bloc en double des infobulles"] = "Hide the duplicate tooltip block",
     ["Quand ton addon d'équipement affiche déjà le même pourcentage."] = "When your gear addon already shows the same percentage.",
     ["Poids utilisés : %s, niveaux %s"] = "Weights used: %s, levels %s",
+    ["Poids utilisés (WL Helper Gear) : %s, niveau %d"] = "Weights used (WL Helper Gear): %s, level %d",
+    ["Puissance des sorts"] = "Spell power", ["Dégâts des sorts (seuls)"] = "Spell damage only",
+    ["Score de critique"] = "Crit rating", ["Score de toucher"] = "Hit rating", ["Score de hâte"] = "Haste rating",
+    ["Score d'expertise"] = "Expertise rating", ["Score d'esquive"] = "Dodge rating", ["Score de parade"] = "Parry rating",
+    ["Score de blocage"] = "Block rating", ["Dégâts de feu"] = "Fire damage", ["Dégâts de givre"] = "Frost damage",
+    ["Dégâts d'ombre"] = "Shadow damage", ["Dégâts des arcanes"] = "Arcane damage", ["Dégâts de nature"] = "Nature damage",
+    ["Dégâts du sacré"] = "Holy damage", ["Pénétration des sorts"] = "Spell penetration",
+    ["Ces poids sont ceux de WL Helper Gear, qui juge tes objets : ta spé, ton niveau et ce que tu portes, en points de ta stat principale (puissance des sorts ; soins pour un soigneur, puissance d'attaque en physique, endurance pour un tank). Les plafonds sont comptés : le toucher ne vaut presque plus rien une fois le plafond atteint (5 % des sorts, 6 % en mêlée contre les monstres jusqu'à 2 niveaux au-dessus ; 17 % et 8 % en raid), la défense d'un tank jusqu'à son plafond."] =
+        "These are WL Helper Gear's weights, the ones that judge your items: your spec, your level and what you wear, in points of your main stat (spell power; healing for a healer, attack power for physical specs, Stamina for a tank). Caps are counted: hit is worth almost nothing once capped (5% spells, 6% melee against mobs up to 2 levels above; 17% and 8% in raids), a tank's defense up to its cap.",
     ["Dégâts des sorts"] = "Spell damage", ["Soins"] = "Healing", ["Intelligence"] = "Intellect", ["Esprit"] = "Spirit",
     ["Endurance"] = "Stamina", ["Force"] = "Strength", ["Agilité"] = "Agility", ["Puissance d'attaque"] = "Attack power",
     ["Puissance d'attaque à distance"] = "Ranged attack power", ["Critique (1 %)"] = "Crit (1%)",
@@ -1644,6 +1653,16 @@ local STAT_NAMES = {
     MP5 = "Mana toutes les 5 s", ARMOR = "Armure", DEF = "Défense", DODGE = "Esquive (1 %)", PARRY = "Parade (1 %)",
     BLOCK = "Blocage (1 %)", BLOCKV = "Valeur de blocage", DPS = "Dégâts par seconde de l'arme",
 }
+-- WL Helper Gear's stat keys (WLHelperGear.Weights().stats)
+local GEAR_STAT_NAMES = {
+    sp = "Puissance des sorts", heal = "Soins", sdmg = "Dégâts des sorts (seuls)", int = "Intelligence", spi = "Esprit",
+    sta = "Endurance", str = "Force", agi = "Agilité", ap = "Puissance d'attaque", rap = "Puissance d'attaque à distance",
+    crit = "Score de critique", hit = "Score de toucher", haste = "Score de hâte", exp = "Score d'expertise",
+    def = "Défense", dodge = "Score d'esquive", parry = "Score de parade", block = "Score de blocage",
+    bv = "Valeur de blocage", mp5 = "Mana toutes les 5 s", armor = "Armure", fire = "Dégâts de feu",
+    frost = "Dégâts de givre", shadow = "Dégâts d'ombre", arcane = "Dégâts des arcanes", nature = "Dégâts de nature",
+    holy = "Dégâts du sacré", spen = "Pénétration des sorts",
+}
 function BUILD.upgrades(p)
     local Wt = ns.WP.Weights
     if not Wt then return end
@@ -1730,17 +1749,27 @@ function BUILD.upgrades(p)
             C_Timer.After(0, function() RebuildPage("upgrades") end)
         end
     end }
-    Section(p, string.format(L("Poids utilisés : %s, niveaux %s"), Wt.SpecName(), label))
+    -- the weights that judge: WL Helper Gear's when it does, ours otherwise
+    local gearRows, gearWt
+    if ns.WP.UpgradeGearWeights then
+        local okG, r, w = pcall(ns.WP.UpgradeGearWeights)
+        if okG and r and #r > 0 then gearRows, gearWt = r, w end
+    end
+    if gearRows then
+        Section(p, string.format(L("Poids utilisés (WL Helper Gear) : %s, niveau %d"), Wt.SpecName(), gearWt.level or UnitLevel("player")))
+    else
+        Section(p, string.format(L("Poids utilisés : %s, niveaux %s"), Wt.SpecName(), label))
+    end
     -- the weights: one cell per stat (name at the left, weight at the right) in the compact grid
     -- (ns.GRID.toggles, 3 or 4 a line), a zebra per line
     local list = CreateFrame("Frame", nil, p)
     local lines = {}
-    for i, e in ipairs(Wt.Table()) do
+    for i, e in ipairs(gearRows or Wt.Table()) do
         local line = CreateFrame("Frame", nil, list)
         line.zebra = S.Solid(line, "BACKGROUND", T.zebraA); line.zebra:SetAllPoints()
         line.name = S.Text(line, F.label, T.text)
         line.name:SetJustifyH("LEFT")
-        line.name:SetText(L(STAT_NAMES[e[1]] or e[1]))
+        line.name:SetText(L((gearRows and GEAR_STAT_NAMES[e[1]]) or STAT_NAMES[e[1]] or e[1]))
         line.value = S.Text(line, F.label, T.fg)
         line.value:SetJustifyH("RIGHT")
         S.ClampLabel(line.value, nil, line)
@@ -1770,6 +1799,10 @@ function BUILD.upgrades(p)
         list:SetHeight(math.max(1, h))
         return h
     end, "list", 4)
+    if gearRows then
+        Note(p, L("Ces poids sont ceux de WL Helper Gear, qui juge tes objets : ta spé, ton niveau et ce que tu portes, en points de ta stat principale (puissance des sorts ; soins pour un soigneur, puissance d'attaque en physique, endurance pour un tank). Les plafonds sont comptés : le toucher ne vaut presque plus rien une fois le plafond atteint (5 % des sorts, 6 % en mêlée contre les monstres jusqu'à 2 niveaux au-dessus ; 17 % et 8 % en raid), la défense d'un tank jusqu'à son plafond."))
+        return
+    end
     Note(p, L("Ces poids sont ceux de WL Helper, par classe et par spé, ajustés à ta tranche de niveaux (1-20, 21-40, 41-59, 60). Les dégâts d'une école de magie comptent selon ta spé. Un objet que ta classe ne peut pas porter n'a pas de flèche."))
 end
 

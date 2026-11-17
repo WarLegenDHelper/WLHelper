@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.103] — 2026-11-17
+
+### Modifié / Changed
+- **« Presque pareil »** : quand deux objets ne diffèrent que de quelques points de ta stat principale (5 de puissance des sorts, 8 de soins, 10 de puissance d'attaque, 5 d'endurance pour un tank), l'infobulle dit « Presque pareil (-14 %) » en gris et « Seulement ~4 de puissance des sorts d'écart : garde celui que tu préfères », au lieu d'un pourcentage rouge qui fait peur.
+  *Near ties read "About the same (-14%)" with the gap in points of your main stat.*
+- **Réglages > Améliorations, les vrais poids** : quand WL Helper Gear juge tes objets, la page montre ses poids (ta spé, ton niveau, ce que tu portes, plafonds de toucher compris), pas les poids de secours de WL Helper.
+  *Settings show WL Helper Gear's weights when it judges.*
+
 ## [1.0.0-beta.102] — 2026-11-17
 
 ### Corrigé / Fixed

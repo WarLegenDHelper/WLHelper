@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.103", date = "2026-11-17", items = {
+    { s = "chg", fr = { "« Presque pareil »", "Quand deux objets ne diffèrent que de quelques points de ta stat principale (5 de puissance des sorts, 8 de soins, 10 de puissance d'attaque, 5 d'endurance pour un tank), l'infobulle dit « Presque pareil (-14 %) » en gris et « Seulement ~4 de puissance des sorts d'écart : garde celui que tu préfères », au lieu d'un pourcentage rouge qui fait peur." }, en = { "Near ties read \"About the same (-14%)\" with the gap in points of your main stat.", "" } },
+    { s = "chg", fr = { "Réglages > Améliorations, les vrais poids", "Quand WL Helper Gear juge tes objets, la page montre ses poids (ta spé, ton niveau, ce que tu portes, plafonds de toucher compris), pas les poids de secours de WL Helper." }, en = { "Settings show WL Helper Gear's weights when it judges.", "" } },
+  } },
   { v = "1.0.0-beta.102", date = "2026-11-17", items = {
     { s = "fix", fr = { "Bonus aux sorts mieux lus (WLHelper Gear)", "Sur un objet que la liste ne connaît pas (ou avec un suffixe), « Augmente les dégâts et les soins produits par les sorts » compte pour les dégâts et les soins, même sur un client français, au lieu de compter parfois comme des soins seulement." }, en = { "\"Damage and healing\" spell power is read as spell power for both, French client too.", "" } },
   } },
@@ -91,13 +95,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Quêtes de métier", "Elles sont de nouveau masquées pour les personnages qui n'ont pas le métier, avec le filtre « quêtes utiles »." }, en = { "Profession quests hidden again for characters without the profession.", "" } },
     { s = "fix", fr = { "Commandes", "Cliquer sur un objet dans les résultats ne provoque plus d'erreur, et Maj-clic sur un objet du sac le place de nouveau dans la recherche ou la demande." }, en = { "Orders", "Item clicks no longer error; Shift-click from bags works again." } },
     { s = "fix", fr = { "Commandes du chat", "WL Helper ne touche plus à la liste des commandes du jeu (risque d'action bloquée)." }, en = { "No more write to the game's slash command list.", "" } },
-  } },
-  { v = "1.0.0-beta.88", date = "2026-11-16", items = {
-    { s = "fix", fr = { "Guide dans le donjon", "La route n'est plus recalculée depuis ta position à chaque quête prise ou rendue à l'intérieur (elle te renvoyait parfois à une étape du dehors) ; elle attend ta sortie." }, en = { "The route no longer rebuilds from your position while you are inside a dungeon.", "" } },
-    { s = "fix", fr = { "Étapes de boss", "Une quête ajoutée à une étape de boss déjà cochée (boss tué ou passé) n'est plus cachée, et le guide ne saute plus au rendu avant d'avoir fait l'objectif." }, en = { "A quest line added to an already ticked boss step is no longer hidden.", "" } },
-    { s = "fix", fr = { "Rendus dans le donjon", "Un rendu ne passe plus avant ses propres objectifs (Ombrecroc, Gouffre de Ragefeu, Temple englouti, Salle des Thanes...)." }, en = { "Turn-ins inside a dungeon no longer come before their objectives.", "" } },
-    { s = "fix", fr = { "Avant d'entrer", "Le guide ne t'envoie plus dans le donjon tant qu'une étape faisable dehors reste ouverte (Scholomance, Brassenoire, Zul'Farrak, Kraal de Tranchebauge...), et un rendu prêt n'attend plus derrière une étape du donjon." }, en = { "No entering while doable outside steps are left.", "" } },
-    { s = "fix", fr = { "Quêtes de race", "Les quêtes réservées à une race ne sont plus proposées aux autres races." }, en = { "Race-restricted quests are no longer offered to other races.", "" } },
-    { s = "fix", fr = { "Groupe et HV", "La classe des membres du groupe est bien lue (couleurs, Groupe), la progression du scan de l'hôtel des ventes s'affiche, et le texte de ta recherche de groupe est retenu." }, en = { "Party member classes, AH scan progress and the saved group-finder text work again.", "" } },
   } },
 }
