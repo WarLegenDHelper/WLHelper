@@ -38,6 +38,7 @@ local STR = {
     SUM_FACT_LV = "Quête niv. %d",
     SUM_BAND_RED = "très dure", SUM_BAND_ORANGE = "dure", SUM_BAND_YELLOW = "à ton niveau", SUM_BAND_GREEN = "facile",
     SUM_BAND_GREY = "grise, peu d'XP",
+    SUM_GREY_OFF = "Décochée : quête grise facultative (peu d'XP)",
     SUM_BAND_RED_TT = "Très dure : 5 niveaux ou plus au-dessus de toi.",
     SUM_BAND_ORANGE_TT = "Dure : 3 ou 4 niveaux au-dessus de toi.",
     SUM_BAND_YELLOW_TT = "À ton niveau : de 2 niveaux sous toi à 2 au-dessus.",
@@ -126,6 +127,7 @@ local STR = {
     SUM_FACT_LV = "Level %d quest",
     SUM_BAND_RED = "very hard", SUM_BAND_ORANGE = "hard", SUM_BAND_YELLOW = "at your level", SUM_BAND_GREEN = "easy",
     SUM_BAND_GREY = "grey, little XP",
+    SUM_GREY_OFF = "Unticked: grey optional quest (little XP)",
     SUM_BAND_RED_TT = "Very hard: 5 or more levels above you.",
     SUM_BAND_ORANGE_TT = "Hard: 3 or 4 levels above you.",
     SUM_BAND_YELLOW_TT = "At your level: from 2 levels below you to 2 above.",
@@ -239,6 +241,8 @@ local MAX_REWARDS = 4            -- reward icons per row (the last one is "+N" w
 local RW_SIZE, RW_STEP = 32, 48   -- a reward icon, and icon + gap (the "+12 %" under it fits the gap)
 local RW_LABEL = 17               -- the line under an icon: arrow and gain
 local HIGH_GAP = 5              -- a chain more than 5 levels above the player is unticked by default
+local GREY_GAP = 8              -- a quest 8 levels or more under the player (Forever: half the XP or less) ...
+local GREY_SHARE = 0.5          -- ... that the dungeon does not need is unticked by default too
 local XPCOL = 88                -- the XP and money column at the right of a quest card
 
 local function SW()
@@ -1063,11 +1067,23 @@ local function Info(qid, dkey, ctx)
     end
   end
   local high = (st == "none") and (low ~= nil or maxL > ctx.lvl + HIGH_GAP) or false
+  -- grey and optional: 8 levels or more under you, half the XP or less (Forever's rule), and nothing
+  -- of the dungeon needs it (the guide's BeforeReason is false, asked for this dungeon alone: a
+  -- running route on other dungeons does not change the answer). Unticked by default.
+  local greyOpt = false
+  if st == "none" and not high and (xpDiff or 0) >= GREY_GAP and (xpBase or 0) > 0 and (xpGot or 0) > 0
+    and xpGot <= xpBase * GREY_SHARE and ns.GuideBeforeReason then
+    local saved = ns.route
+    ns.route = nil
+    local okB, r = pcall(ns.GuideBeforeReason, qid, dkey)
+    ns.route = saved
+    greyOpt = okB and r == false
+  end
   return {
     q = q, st = st, pre = pre, low = low, maxL = maxL, high = high, other = other,
     xp = xpGot, xpBase = xpBase, xpDiff = xpDiff, band = Band(q.l, ctx.lvl),
     money = QuestMoney(qid), chainN = pre.total + 1, chainXP = chainXP,
-    elite = IsElite(qid, q),
+    elite = IsElite(qid, q), greyOpt = greyOpt,
   }
 end
 
@@ -1091,7 +1107,7 @@ local function ApplyDefault(qid, inf)
   local pick = ns.OffPick()
   if pick[qid] then return false end
   if inf.st == "done" then return false end
-  local want = inf.high or nil
+  local want = (inf.high or inf.greyOpt) or nil
   if WLDTDB.off[qid] == want then return false end
   WLDTDB.off[qid] = want
   return true
@@ -1754,6 +1770,11 @@ local function FillRow(r, qid, dkey, inf, ctx, width)
     lockOut = not (okR and inR)
   end
   if not lockOut then lockTxt = nil end
+  -- a grey optional quest the default left out (never ticked by hand): a muted line says why, the
+  -- usual tick puts it back
+  if not lockTxt and not done and inf.greyOpt and off and not (WLDTDB.offPick and WLDTDB.offPick[qid]) then
+    lockTxt = L.SUM_GREY_OFF
+  end
   r.lockOut = lockOut and not off or nil
   off = off or lockOut
   r.qid, r.dkey, r.st, r.pre, r.low, r.inf = qid, dkey, st, pre, inf.low, inf

@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.96", date = "2026-11-17", items = {
+    { s = "add", fr = { "Donjon conseillé bien visible", "La première carte de « À faire à ton niveau » porte le badge « Conseillé pour toi » quand elle convient nettement mieux que la suivante ; son infobulle dit pourquoi (« De ton côté, à ton niveau, à ~12 min »)." }, en = { "A \"Suggested for you\" badge on the clear best dungeon at your level.", "" } },
+    { s = "chg", fr = { "Quêtes grises facultatives décochées", "Dans la vue d'ensemble, une quête grise pour toi (8 niveaux ou plus sous toi, la moitié de l'XP ou moins) dont le donjon n'a pas besoin est décochée d'office (« Décochée : quête grise facultative (peu d'XP) ») ; un clic la remet. Tes choix à la main restent tels quels." }, en = { "Grey optional quests start unticked; one click adds them back.", "" } },
+  } },
   { v = "1.0.0-beta.95", date = "2026-11-17", items = {
     { s = "chg", fr = { "Première connexion plus calme", "Seul l'écran de bienvenue s'ouvre ; la carte de la tournée en ville, le rappel des Writs et la ligne « spé supposée » attendent qu'il soit fermé." }, en = { "Only the welcome opens at the first login.", "" } },
     { s = "chg", fr = { "Donjon conseillé", "« À faire à ton niveau » met d'abord le donjon de ton côté, au milieu de ta tranche de niveau et le plus proche (ex. Gouffre de Ragefeu pour un Horde à Orgrimmar, plus La salle des Thanes sous Forgefer)." }, en = { "Picker suggests a dungeon that fits your faction, level and position.", "" } },
@@ -141,8 +145,5 @@ ns.WHATSNEW = {
     { s = "add", fr = { "Notes de boss pour tous les donjons", "Tactique et conseil, plus seulement les Mortemines, Ombrecroc et les Cavernes." }, en = { "Boss notes for every dungeon of the guide.", "" } },
     { s = "chg", fr = { "Butin des boss", "Un objet BiS pour ta spé apparaît même quand ce n'est pas une amélioration, en premier. Les badges sous les icônes sont plus courts (« BiS 40 », « 2e »)." }, en = { "BiS items show in boss loot even when not an upgrade; shorter badges under icons.", "" } },
     { s = "chg", fr = { "Avis de nouvelle version", "Il faut maintenant au moins 2 membres de la guilde avec la même version plus récente." }, en = { "The new-version notice needs at least 2 guild members reporting it.", "" } },
-  } },
-  { v = "1.0.0-beta.81", date = "2026-11-16", items = {
-    { s = "chg", fr = { "Liste des addons", "WL Helper Gear et les trois WL Helper Nav ont maintenant le logo WL Helper et un nom aligné (« WaR LegenD Helper - Gear », « - Nav »...), regroupés sous WL Helper quand le jeu le permet." }, en = { "Gear and Nav sub-addons now show the WL Helper logo and matching names in the addon list.", "" } },
   } },
 }

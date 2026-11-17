@@ -236,6 +236,23 @@ function ns.PickerFit(k)
   return score
 end
 
+-- "Conseillé pour toi": the first "at your level" card gets the badge only when its fit beats the
+-- second one's by FIT_MARGIN (about two levels, or 2000 yards of trip): two close fits get none.
+local FIT_MARGIN = 2
+-- The badge's one-line reason: "De ton côté, à ton niveau, à ~12 min" (the GPS's trip time when it
+-- finds one, else "close by").
+function ns.PickerAdvisedWhy(k)
+  local d = ns.D[k]
+  local e = d and d.e
+  local WP = ns.Writs and ns.Writs.WP
+  local GPS = WP and WP.GPS
+  if e and e.m and e.x and e.y and GPS and GPS.TripSummary then
+    local ok, _, _, mins = pcall(GPS.TripSummary, e.m, e.x, e.y)
+    if ok and type(mins) == "string" and mins ~= "" then return L.PICK_FIT_WHY:format(mins) end
+  end
+  return L.PICK_FIT_WHY0
+end
+
 local function LevelOK(d)
   local lv = UnitLevel("player")
   local lo, hi = d.lvl and d.lvl[1] or 1, d.lvl and d.lvl[2] or 60
@@ -397,6 +414,13 @@ local function MakeCard(parent)
   c.cicon = c:CreateTexture(nil, "OVERLAY"); c.cicon:SetSize(20, 20); c.cicon:SetPoint("TOPLEFT", 12, -42)
   c.bigIcon = c:CreateTexture(nil, "ARTWORK", nil, 1); c.bigIcon:SetSize(40, 40); c.bigIcon:SetPoint("CENTER", 0, -2); c.bigIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.bigIcon:Hide()
   c.dicon = c:CreateTexture(nil, "OVERLAY"); c.dicon:Hide()
+  -- "Conseillé pour toi": an accent pill over the picture, under the top band (no mouse: the card
+  -- stays the one click target; its tooltip says why)
+  c.fitBadge = S.Pill(c, L.PICK_FIT, T.accentSoft)
+  c.fitBadge.dark = c.fitBadge:CreateTexture(nil, "BACKGROUND", nil, -1); c.fitBadge.dark:SetAllPoints()
+  c.fitBadge.dark:SetColorTexture(0, 0, 0, 0.75)
+  c.fitBadge:SetFrameLevel((c:GetFrameLevel() or 1) + 2)
+  c.fitBadge:Hide()
   c:SetScript("OnClick", function(self, btn)
     if btn == "RightButton" then
       if ns.ShowOverview then ns.ShowOverview(self.dkey) else ns.OpenQuests(self.dkey) end
@@ -431,6 +455,9 @@ local function MakeCard(parent)
     local n, done = Counts(self.dkey)
     local lines = { ns.DName(self.dkey) }
     if Selected()[self.dkey] then table.insert(lines, { L.PICK_PICKED, T.accentSoft[1], T.accentSoft[2], T.accentSoft[3] }) end
+    if self.advised then
+      table.insert(lines, { ns.PickerAdvisedWhy(self.dkey), T.accentSoft[1], T.accentSoft[2], T.accentSoft[3] })
+    end
     for _, v in ipairs({ (GetLocale and GetLocale() == "frFR" and d.locf) or ns.T(d.loc) or "",
       ns.Plural(n, "PICK_QUESTS1", "PICK_QUESTS", n) .. "  ·  " .. ns.Plural(done, "PICK_DONE1", "PICK_DONE", done) }) do
       table.insert(lines, v)
@@ -566,9 +593,10 @@ local function Build()
 end
 
 -- Fills one card for dungeon `k` in section `sec` and returns the card height it needs.
-local function FillCard(c, k, sec)
+local function FillCard(c, k, sec, advised)
   local d = ns.D[k]
   c.section, c.dkey = sec, k
+  c.advised = advised or nil
   Art(c.art, d, c)
   c.dicon:Hide()
   if d.cq then SetClassIcon(c.cicon, (d.cq:match("^[^,]+"))) else c.cicon:Hide() end
@@ -591,6 +619,14 @@ local function FillCard(c, k, sec)
   local topH = math.max(36, math.ceil(nameY + nameH + 8))
   c.topBand:SetHeight(topH)
   c.cicon:ClearAllPoints(); c.cicon:SetPoint("TOPLEFT", 12, -(topH + 6))
+  -- the advised badge: under the top band, right of a class icon
+  local gap = d.cq and 32 or ART_GAP
+  if advised then
+    c.fitBadge:Set(L.PICK_FIT, T.accentSoft)
+    c.fitBadge:ClearAllPoints(); c.fitBadge:SetPoint("TOPLEFT", d.cq and (12 + 20 + 6) or 12, -(topH + 7))
+    c.fitBadge:Show()
+    gap = math.max(gap, 32)
+  else c.fitBadge:Hide() end
   -- the bottom band: level (and raid size / opening date), then the quests stat
   local later = sec == "later" or sec == "below"
   local dateTop = soon and n == 0   -- a coming raid without quests: its date takes the quests' place
@@ -623,7 +659,7 @@ local function FillCard(c, k, sec)
   -- later, below, no quest, coming soon: greyed; to do and done: the picture as it is
   c.art:SetDesaturated(later or sec == "noq" or sec == "upcoming")
   c.shade:SetColorTexture(0, 0, 0, (sec == "todo" or sec == "done" or sel) and 0.12 or 0.45)
-  return 1 + topH + (d.cq and 32 or ART_GAP) + bandH + 1
+  return 1 + topH + gap + bandH + 1
 end
 
 Render = function()
@@ -682,10 +718,17 @@ Render = function()
   for _, s in ipairs(SECS) do
     local keys = secs[s[1]]
     table.sort(keys, s[1] == "todo" and byFit or byLevel)
+    -- the first "at your level" card is advised when it clearly beats the second (FIT_MARGIN)
+    local advised
+    if s[1] == "todo" and not searching and tab ~= "raid" and #keys >= 2 then
+      local f1, f2 = fit[keys[1]] or ns.PickerFit(keys[1]), fit[keys[2]] or ns.PickerFit(keys[2])
+      if f1 < 1000 and f2 - f1 >= FIT_MARGIN then advised = keys[1] end
+    end
+    if s[1] == "todo" then p.advised = advised end
     for _, k in ipairs(keys) do
       i = i + 1
       local c = p.cards[i] or MakeCard(p.grid); p.cards[i] = c
-      need = math.max(need, FillCard(c, k, s[1]))
+      need = math.max(need, FillCard(c, k, s[1], k == advised))
     end
   end
   CH = math.ceil(need)

@@ -31,7 +31,7 @@ local S = {
     TITLE = "WL Helper",
     -- picker
     SEC_TODO = "À faire à ton niveau", SEC_LATER = "Plus tard", SEC_BELOW = "Sous ton niveau", SEC_UP = "Bientôt", BACK_HOME = "Accueil", SEC_DONE = "Terminés", SEC_NOQ = "Sans quête pour ta faction",
-    PICK_FINISHED = "Terminé", PICK_QN = "%d quêtes rendues sur %d", PICK_QN1 = "%d quête rendue sur %d", PICK_LV = "Conseillé niv. %d à %d", PICK_LV1 = "Conseillé niv. %d", PICK_PICKED = "Choisi", PICK_SIZE = "%d joueurs", PICK_OPENS = "ouvre le %s", PICK_DATE = "%d/%m/%Y", PICK_SOON = "Bientôt",
+    PICK_FINISHED = "Terminé", PICK_QN = "%d quêtes rendues sur %d", PICK_QN1 = "%d quête rendue sur %d", PICK_LV = "Conseillé niv. %d à %d", PICK_LV1 = "Conseillé niv. %d", PICK_PICKED = "Choisi", PICK_FIT = "Conseillé pour toi", PICK_FIT_WHY = "De ton côté, à ton niveau, à %s", PICK_FIT_WHY0 = "De ton côté, à ton niveau, tout près", PICK_SIZE = "%d joueurs", PICK_OPENS = "ouvre le %s", PICK_DATE = "%d/%m/%Y", PICK_SOON = "Bientôt",
     -- guide header and buttons
     DUNGEONS = "Guide de quêtes", GPS_ON = "Actif", HOME = "Accueil", SETTINGS = "Réglages du guide", GO = "Guider vers l'étape", BACK_CUR = "Revenir à l'étape en cours",
     NOPOINT_S = "Pas de point sur la carte", NEXT2 = "Étape suivante", MORE = "Actions", MORE_BTN = "Actions", PICK_FIRST = "Choisir un guide",
@@ -309,7 +309,7 @@ local S = {
     COLON = ": ", WRITS = "Writs and Favor", TT_HWRITS = "Writs and Merchant's Favor: the cheapest Writs, the shopping list and the GPS to the NPCs.", MM_TT4 = "Shift-click: open the Writs window",
     TITLE = "WL Helper",
     SEC_TODO = "At your level", SEC_LATER = "Later", SEC_BELOW = "Below your level", SEC_UP = "Coming soon", BACK_HOME = "Home", SEC_DONE = "Finished", SEC_NOQ = "No quest for your faction",
-    PICK_FINISHED = "Finished", PICK_QN = "%d of %d quests turned in", PICK_QN1 = "%d of %d quest turned in", PICK_LV = "Suggested level %d-%d", PICK_LV1 = "Suggested level %d", PICK_PICKED = "Picked", PICK_SIZE = "%d players", PICK_OPENS = "opens %s", PICK_DATE = "%b %d, %Y", PICK_SOON = "Coming soon",
+    PICK_FINISHED = "Finished", PICK_QN = "%d of %d quests turned in", PICK_QN1 = "%d of %d quest turned in", PICK_LV = "Suggested level %d-%d", PICK_LV1 = "Suggested level %d", PICK_PICKED = "Picked", PICK_FIT = "Suggested for you", PICK_FIT_WHY = "Your side, your level, %s away", PICK_FIT_WHY0 = "Your side, your level, close by", PICK_SIZE = "%d players", PICK_OPENS = "opens %s", PICK_DATE = "%b %d, %Y", PICK_SOON = "Coming soon",
     DUNGEONS = "Quest guide", GPS_ON = "On", HOME = "Home", SETTINGS = "Guide settings", GO = "Guide me to the step", BACK_CUR = "Back to the current step",
     NOPOINT_S = "No map point", NEXT2 = "Next step", MORE = "Actions", MORE_BTN = "Actions", PICK_FIRST = "Pick a guide",
     NOROUTE_T2 = "No dungeon picked",

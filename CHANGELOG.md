@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.96] — 2026-11-17
+
+### Ajouté / Added
+- **Donjon conseillé bien visible** : la première carte de « À faire à ton niveau » porte le badge « Conseillé pour toi » quand elle convient nettement mieux que la suivante ; son infobulle dit pourquoi (« De ton côté, à ton niveau, à ~12 min »).
+  *A "Suggested for you" badge on the clear best dungeon at your level.*
+
+### Modifié / Changed
+- **Quêtes grises facultatives décochées** : dans la vue d'ensemble, une quête grise pour toi (8 niveaux ou plus sous toi, la moitié de l'XP ou moins) dont le donjon n'a pas besoin est décochée d'office (« Décochée : quête grise facultative (peu d'XP) ») ; un clic la remet. Tes choix à la main restent tels quels.
+  *Grey optional quests start unticked; one click adds them back.*
+
 ## [1.0.0-beta.95] — 2026-11-17
 
 ### Modifié / Changed
