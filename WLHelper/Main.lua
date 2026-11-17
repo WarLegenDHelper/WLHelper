@@ -770,6 +770,7 @@ BINDING_NAME_WLDT_POINTS = ns.L.B_POINTS
 BINDING_NAME_WLDT_ARROW = ns.L.B_ARROW
 BINDING_NAME_WLDT_TARGET = ns.L.B_TARGET
 BINDING_NAME_WLDT_ITEM = ns.L.B_ITEM
+BINDING_NAME_WLDT_GROUPS = ns.L.B_GROUPS
 function WLDT_Binding(what)
   -- the key bound to WLDT_TARGET clicks WLDTTargetButton through an override binding; this runs
   -- only while the override waits for the end of combat
@@ -786,6 +787,12 @@ function WLDT_Binding(what)
       if ns.UpdateActionBar then ns.UpdateActionBar() end
       if not (ns.ItemBindingButton and ns.ItemBindingButton()) then ns.Print(L.ITEM_NONE) end
     end
+    return
+  end
+  -- the Groups window on "Trouver un groupe" (no guide needed)
+  if what == "groups" then
+    local WP = ns.Writs and ns.Writs.WP
+    if WP and WP.ToggleEvents then WP.ToggleEvents("find") end
     return
   end
   if not ns.frame then return end

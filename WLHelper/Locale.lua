@@ -194,7 +194,7 @@ local S = {
     -- key binding: target and mark
     B_TARGET = "Cibler le PNJ ou le monstre de l'étape",
     TARGET_LATER = "Le raccourci de ciblage sera prêt à la fin du combat.",
-    B_ITEM = "Utiliser l'objet de quête de l'étape",
+    B_ITEM = "Utiliser l'objet de quête de l'étape", B_GROUPS = "Ouvrir Trouver un groupe",
     ITEM_LATER = "Le raccourci de l'objet sera prêt à la fin du combat.",
     ITEM_NONE = "Pas d'objet de quête à utiliser à cette étape.",
     M_KEYS = "Raccourcis clavier",
@@ -469,7 +469,7 @@ local S = {
     -- key binding: target and mark
     B_TARGET = "Target the step's NPC or mob",
     TARGET_LATER = "The targeting key will be ready after combat.",
-    B_ITEM = "Use the step's quest item",
+    B_ITEM = "Use the step's quest item", B_GROUPS = "Open Find a group",
     ITEM_LATER = "The item key will be ready after combat.",
     ITEM_NONE = "No quest item to use at this step.",
     M_KEYS = "Key bindings",

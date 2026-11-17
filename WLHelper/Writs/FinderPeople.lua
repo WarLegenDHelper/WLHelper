@@ -301,6 +301,10 @@ function F.OnRoster(atLogin)
                 warned[n] = true
                 WP.Print(ChatLink(string.format(L("%s est dans ton groupe : tu l'as noté %s."), Short(n), F.RatingWord(1)),
                     L("Clique ici pour revoir ta note."), "players"))
+            elseif not lastNames[n] and not present[n] and not warned[n] and F.LeftCount and F.LeftCount(n) > 0 then
+                warned[n] = true
+                WP.Print(ChatLink(string.format(L("%s est dans ton groupe : a déjà quitté %d donjon(s) en cours avec toi."), Short(n), F.LeftCount(n)),
+                    L("Clique ici pour revoir ta note."), "players"))
             end
         end
     end

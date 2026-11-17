@@ -123,6 +123,11 @@ ns.AddEnglish({
     ["Nom masqué par le jeu en donjon."] = "Name hidden by the game in dungeons.",
     ["Noter ce joueur"] = "Rate this player",
     ["Effacer la note"] = "Clear rating",
+    ["A quitté un donjon en cours"] = "Left a dungeon mid-run",
+    ["A quitté un donjon en cours (déjà %d)"] = "Left a dungeon mid-run (%d so far)",
+    ["Retirer une marque de départ"] = "Remove one left-the-run mark",
+    ["A quitté %d donjon(s) en cours avec toi."] = "Left %d dungeon(s) mid-run with you.",
+    ["%s est dans ton groupe : a déjà quitté %d donjon(s) en cours avec toi."] = "%s is in your group: left %d dungeon(s) mid-run with you before.",
     ["Copier le nom"] = "Copy name",
     ["Ctrl+C pour copier, Échap pour fermer."] = "Ctrl+C to copy, Escape to close.",
     ["À éviter"] = "Avoid",
@@ -425,6 +430,32 @@ function F.CapRatings()
         return tostring(a) < tostring(b)
     end)
     for i = 1, #keys - F.MAX_RATINGS do t[keys[i]] = nil end
+end
+
+-- Left mid-dungeon: a mark the player sets by hand (right-click), counted per name. The game hides
+-- names inside instances, so who left cannot be told apart there: never guessed, only set.
+function F.LeftCount(name)
+    local key = F.NormName(name)
+    local t = key and F.DB().left
+    local rec = type(t) == "table" and t[key]
+    return type(rec) == "table" and math.floor(F.Num(rec.n, 0, 0, 99)) or 0
+end
+function F.MarkLeft(name, add)
+    local key = F.NormName(name)
+    if not key then return false end
+    local d = F.DB()
+    if type(d.left) ~= "table" then d.left = {} end
+    local n = F.LeftCount(name) + (add or 1)
+    if n <= 0 then d.left[key] = nil else d.left[key] = { n = n, t = Now() } end
+    -- 500 names at most, the oldest go first
+    local keys = {}
+    for k in pairs(d.left) do keys[#keys + 1] = k end
+    if #keys > 500 then
+        table.sort(keys, function(a, b) return (tonumber(d.left[a].t) or 0) < (tonumber(d.left[b].t) or 0) end)
+        for i = 1, #keys - 500 do d.left[keys[i]] = nil end
+    end
+    if F.OnRatingChanged then pcall(F.OnRatingChanged, key) end
+    return true
 end
 
 local RATING_WORD = { "À éviter", "Correct", "Super" }
@@ -945,6 +976,7 @@ function F.Mark(row)
         row.guild = IsGuild(row.leader)
         row.friend = not row.guild and IsFriend(row.leader)
         row.rating = F.RatingOf(row.leader)
+        row.left = F.LeftCount(row.leader)
     end
     -- own listing, friends, guild, 3 stars, everyone else, 1 star last
     if row.self then row.tier = 0
@@ -1695,6 +1727,10 @@ local function RateItems(rootDesc, name, guid)
         end
     end
     if cur then sub:CreateButton(L("Effacer la note"), function() F.SetRating(name, nil); F.Render() end) end
+    local n = F.LeftCount(name)
+    rootDesc:CreateButton(n > 0 and string.format(L("A quitté un donjon en cours (déjà %d)"), n) or L("A quitté un donjon en cours"),
+        function() F.MarkLeft(name, 1); F.Render() end)
+    if n > 0 then rootDesc:CreateButton(L("Retirer une marque de départ"), function() F.MarkLeft(name, -1); F.Render() end) end
 end
 -- menu for a name (rows of this tab, of Messages, of Recent players); row: a result row or nil
 function F.Menu(owner, name, row, guid)
@@ -1813,6 +1849,7 @@ local function ResultRow(parent)
         if row.playstyle then lines[#lines + 1] = F.PlaystyleWord(row.playstyle) end
         if row.comment then lines[#lines + 1] = row.comment end
         if row.rating then lines[#lines + 1] = string.format(L("Ta note : %s"), F.RatingWord(row.rating)) end
+        if (row.left or 0) > 0 then lines[#lines + 1] = { string.format(L("A quitté %d donjon(s) en cours avec toi."), row.left), C.warn[1], C.warn[2], C.warn[3] } end
         if self.act:IsShown() then
             for _, l in ipairs(ActionTip(row)) do lines[#lines + 1] = l end
             lines[#lines + 1] = L("Double-clic : la même chose")

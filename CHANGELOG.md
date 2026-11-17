@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.113] — 2026-11-17
+
+### Ajouté / Added
+- **Trouver un groupe, raccourci clavier** : « Ouvrir Trouver un groupe » dans Échap > Options > Raccourcis > AddOns > WL Helper.
+  *Find a group: a key binding.*
+- **Trouver un groupe, joueurs qui quittent** : clic droit sur un nom > « A quitté un donjon en cours ». La marque se cumule ; elle s'affiche dans la bulle du joueur dans les résultats, et une ligne dans le chat te prévient quand il rejoint ton groupe. Le jeu cache les noms en donjon, donc l'addon ne devine jamais qui est parti : c'est toi qui marques.
+  *Find a group: mark players who left a dungeon mid-run (by hand; names are hidden in instances).*
+
+### Corrigé / Fixed
+- **Prérequis par classe** (chaînes d'Anthion et de Lord Valthalak, Stratholme et Blackrock) : quand une quête demande « la version de ta classe » d'une autre (An Earnest Proposition, Just Compensation, Anthion's Parting Words), seule celle de ta classe compte. Avant, ces quêtes restaient fermées pour tout le monde. A Supernatural Device, In Search of Anthion et Bodley's Unfortunate Fate ont leurs prérequis de Wowhead Forever.
+  *Class-variant prerequisites: only your class's version counts (Anthion and Valthalak chains open again).*
+
 ## [1.0.0-beta.112] — 2026-11-17
 
 ### Modifié / Changed

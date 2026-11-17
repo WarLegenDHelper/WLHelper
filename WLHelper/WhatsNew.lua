@@ -2,6 +2,11 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.113", date = "2026-11-17", items = {
+    { s = "add", fr = { "Trouver un groupe, raccourci clavier", "« Ouvrir Trouver un groupe » dans Échap > Options > Raccourcis > AddOns > WL Helper." }, en = { "Find a group", "A key binding." } },
+    { s = "add", fr = { "Trouver un groupe, joueurs qui quittent", "Clic droit sur un nom > « A quitté un donjon en cours ». La marque se cumule ; elle s'affiche dans la bulle du joueur dans les résultats, et une ligne dans le chat te prévient quand il rejoint ton groupe. Le jeu cache les noms en donjon, donc l'addon ne devine jamais qui est parti : c'est toi qui marques." }, en = { "Find a group", "Mark players who left a dungeon mid-run (by hand; names are hidden in instances)." } },
+    { s = "fix", fr = { "Prérequis par classe", "Quand une quête demande « la version de ta classe » d'une autre (An Earnest Proposition, Just Compensation, Anthion's Parting Words), seule celle de ta classe compte. Avant, ces quêtes restaient fermées pour tout le monde. A Supernatural Device, In Search of Anthion et Bodley's Unfortunate Fate ont leurs prérequis de Wowhead Forever." }, en = { "Class-variant prerequisites", "Only your class's version counts (Anthion and Valthalak chains open again)." } },
+  } },
   { v = "1.0.0-beta.112", date = "2026-11-17", items = {
     { s = "chg", fr = { "Améliorations, « Presque pareil »", "Seulement sous 10 %. À partir de 10 %, le pourcentage reste affiché en vert ou en rouge (« +12 % » est une vraie amélioration), avec en dessous l'écart réel en points (« Écart réel : ~2 de puissance des sorts seulement. »)." }, en = { "Upgrades", "\"About the same\" only under 10 %; from 10 % the percent stays, with the real gap in points under it." } },
   } },
@@ -55,8 +60,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.99", date = "2026-11-17", items = {
     { s = "fix", fr = { "La flèche suit l'étape affichée", "« Étape suivante », les flèches ‹ › ou un clic dans la liste des étapes déplacent aussi le GPS ; « Revenir à l'étape en cours » le ramène." }, en = { "The arrow follows the step on screen.", "" } },
-  } },
-  { v = "1.0.0-beta.98", date = "2026-11-17", items = {
-    { s = "fix", fr = { "GPS dans un donjon", "Une étape dans l'instance n'envoie plus vers un point de la carte du dehors (le repère tombait sur un mur et la flèche disait « Tu y es · Maraudon ») ; sans point sur la carte du donjon, le grand bouton propose « Carte du donjon »." }, en = { "Inside a dungeon, the GPS no longer points at an outdoor spot.", "" } },
   } },
 }
