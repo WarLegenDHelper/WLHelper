@@ -273,6 +273,47 @@ function API.Score(x, level)
     return best, details
 end
 
+-- WL Helper change (1.4.x): hit toward the cap without the hit of what you wear in the slot.
+-- The character's hit counts the worn piece's hit: compared with it in, a piece with hit is
+-- judged near the cap and one without it far from it, and the same swap read +46 % one way
+-- and -1 % the other. Both pieces are now judged from the hit you have without either.
+-- Paired slots (rings, trinkets): the smaller of the two worn pieces' hit.
+local function WornHit(slot)
+    -- armour, jewellery and trinkets only (weapons: their sections map slots differently)
+    local inv = type(slot) == "number" and slot >= 1 and slot <= 12 and E.INV_SLOTS[slot]
+    if not inv or not GetInventoryItemLink then return 0, 0 end
+    local best
+    for _, s in ipairs(inv) do
+        local l = GetInventoryItemLink("player", s)
+        local m, sp = 0, 0
+        if type(l) == "string" then
+            local it = ReadItem(l)
+            if it then
+                local ok, p = pcall(E.Prepare, it, l)
+                it = ok and p or it
+                local st = it.st or {}
+                local base = st[E.STAT.hit] or 0
+                m = base + (st.melee and st.melee[E.STAT.hit] or 0)
+                sp = base + (st.spell and st.spell[E.STAT.hit] or 0)
+            end
+        end
+        if not best or m + sp < best[1] + best[2] then best = { m, sp } end
+    end
+    return (best and best[1] or 0) / 10, (best and best[2] or 0) / 10
+end
+local function WeightsWithout(cls, key, lvl, slot)
+    local m, sp = 0, 0
+    pcall(function() m, sp = WornHit(slot) end)
+    if (m <= 0 and sp <= 0) or not (E.SetHitOverride and E.OwnedHit) then return E.Weights(cls, key, lvl) end
+    local function cut(v, d) return math.max(0, v - d) end
+    local prev = E.GetHitOverride and E.GetHitOverride()
+    E.SetHitOverride({ melee = cut(E.OwnedHit("melee"), m), ranged = cut(E.OwnedHit("ranged"), m), spell = cut(E.OwnedHit("spell"), sp) })
+    local r = { pcall(E.Weights, cls, key, lvl) }
+    E.SetHitOverride(prev)
+    if not r[1] then error(r[2], 0) end
+    return unpack(r, 2)
+end
+
 function API.Compare(link, level)
     local cls = PlayerClass()
     if not cls then return nil, "noclass" end
@@ -280,7 +321,7 @@ function API.Compare(link, level)
     if not item then return nil, "unknown" end
     local lvl = PlayerLevel(level)
     local key = CurrentSpec(cls)
-    local mh, oh, rg, slowBonus, w, prefer = E.Weights(cls, key, lvl)
+    local mh, oh, rg, slowBonus, w, prefer = WeightsWithout(cls, key, lvl, item.slot)
     -- WL Helper change (v2): use effects from the tooltip, the link for suffix and set checks.
     local itemNotes
     item, itemNotes = E.Prepare(item, link)

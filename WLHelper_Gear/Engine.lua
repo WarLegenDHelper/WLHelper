@@ -2215,6 +2215,7 @@ ns.engine = {
     PlayerClassToken = function() ReadPlayer() return playerClassToken end,
     PlayerRace = function() ReadPlayer() return playerRace end,
     SetHitOverride = function(t) hitOverride = t end,
+    GetHitOverride = function() return hitOverride end,
     -- ClearCaches(false): talents only. ClearCaches("items"): items and enchants only.
     -- ClearCaches(true): everything.
     ClearCaches = function(all)

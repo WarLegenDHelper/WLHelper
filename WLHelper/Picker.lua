@@ -264,13 +264,28 @@ end
 -- picker shows the route's own choice; the first tick copies it, the copy is kept across a hide
 -- and dropped when a guide starts.
 local draft
-local function Selected() return draft or WLDTDB.sel or {} end
+local function Selected() return draft or {} end
 local function Draft()
-  if not draft then
-    draft = {}
-    for k, v in pairs(WLDTDB.sel or {}) do if v then draft[k] = true end end
-  end
+  if not draft then draft = {} end
   return draft
+end
+-- the running route's dungeons (shown "In progress" on their card, never ticked for it)
+local function Running(k) return ns.route and ns.route.sel and ns.route.sel[k] and true or false end
+-- one dungeon alone: its overview, where "Start the guide" replaces the running route
+local function OpenOne(k)
+  draft = nil
+  if ns.ShowSummary then
+    local left, top = p:GetLeft(), p:GetTop()
+    local sum = ns.ShowSummary({ k })
+    if sum then
+      p:Hide()
+      if left and top and sum.ClearAllPoints then sum:ClearAllPoints(); sum:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top) end
+      return
+    end
+  end
+  WLDTDB.sel = WLDTDB.sel or {}
+  wipe(WLDTDB.sel); WLDTDB.sel[k] = true
+  ns.StartGuide()
 end
 -- the draft's dungeons, in the picker's order
 local function DraftKeys()
@@ -279,6 +294,7 @@ local function DraftKeys()
   return out
 end
 function ns.PickerResetDraft() draft = nil end
+function ns.PickerSetDraft(t) draft = {}; for k, v in pairs(t or {}) do if v then draft[k] = true end end end
 local function SelCount() local n = 0; for _ in pairs(Selected()) do n = n + 1 end; return n end
 
 -- Quêtes de classe : une carte par quête (liées aux donjons), créées à la volée
@@ -398,6 +414,22 @@ local function MakeCard(parent)
   c.selBox:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1); c.selBox:Hide()
   c.selTick = c.body:CreateTexture(nil, "OVERLAY", nil, 2); c.selTick:SetSize(12, 12)
   ns.SetHDIcon(c.selTick, "check", T.fg); c.selTick:SetPoint("CENTER", c.selBox, "CENTER", 0, 0); c.selTick:Hide()
+  -- the box to tick to combine dungeons into one route: always there, empty when not ticked
+  c.chk = CreateFrame("Button", nil, c)
+  c.chk:SetSize(26, 26); c.chk:SetPoint("CENTER", c.selBox, "CENTER", 0, 0)
+  c.chk:SetFrameLevel((c:GetFrameLevel() or 1) + 3)
+  c.chk.box = c.chk:CreateTexture(nil, "OVERLAY", nil, 0); c.chk.box:SetSize(18, 18); c.chk.box:SetPoint("CENTER")
+  c.chk.box:SetColorTexture(0, 0, 0, 0.75)
+  c.chk.edge = ns.Outline(c.chk, T.fg, 1, "OVERLAY")
+  c.chk:SetScript("OnClick", function(self)
+    local k = c.dkey; if not k then return end
+    local d = Draft()
+    d[k] = not d[k] or nil
+    PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
+    Render()
+  end)
+  c.chk:SetScript("OnEnter", function(self) ns.ShowTip(self, { L.PICK_CHK, L.PICK_CHK_TT }) end)
+  c.chk:SetScript("OnLeave", ns.HideTip)
   -- text drawn over a picture keeps a shadow
   c.wlWorld = true
   -- the summary button at the card's top-right corner; the check of a finished dungeon left of
@@ -426,34 +458,16 @@ local function MakeCard(parent)
       if ns.ShowOverview then ns.ShowOverview(self.dkey) else ns.OpenQuests(self.dkey) end
       return
     end
-    local d = Draft()
-    d[self.dkey] = not d[self.dkey] or nil
-    PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
-    Render()
+    OpenOne(self.dkey)
   end)
-  -- double-click: this dungeon alone, through its summary (the route's first screen)
-  c:SetScript("OnDoubleClick", function(self)
-    draft = { [self.dkey] = true }
-    if ns.ShowSummary then
-      Render()
-      local left, top = p:GetLeft(), p:GetTop()
-      local sum = ns.ShowSummary({ self.dkey })
-      if sum then
-        p:Hide()
-        if left and top and sum.ClearAllPoints then sum:ClearAllPoints(); sum:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top) end
-      end
-    else
-      WLDTDB.sel = WLDTDB.sel or {}
-      wipe(WLDTDB.sel); WLDTDB.sel[self.dkey] = true
-      ns.StartGuide()
-    end
-  end)
+  -- a double-click is two clicks: the first already opened the overview
   c:SetScript("OnMouseDown", function(self) self.press:Show() end)
   c:SetScript("OnMouseUp", function(self) self.press:Hide() end)
   c:SetScript("OnEnter", function(self)
     local d = ns.D[self.dkey]
     local n, done = Counts(self.dkey)
     local lines = { ns.DName(self.dkey) }
+    if Running(self.dkey) then table.insert(lines, { L.PICK_RUNNING, T.ok[1], T.ok[2], T.ok[3] }) end
     if Selected()[self.dkey] then table.insert(lines, { L.PICK_PICKED, T.accentSoft[1], T.accentSoft[2], T.accentSoft[3] }) end
     if self.advised then
       table.insert(lines, { ns.PickerAdvisedWhy(self.dkey), T.accentSoft[1], T.accentSoft[2], T.accentSoft[3] })
@@ -467,7 +481,7 @@ local function MakeCard(parent)
     for _, k in ipairs(ns.KeyLines and ns.KeyLines(self.dkey) or {}) do table.insert(lines, k[1]) end
     table.insert(lines, L.PICK_CLICK)
     table.insert(lines, ns.ShowOverview and L.OV_RCLICK or L.PICK_RCLICK)
-    table.insert(lines, L.PICK_DCLICK)
+    table.insert(lines, L.PICK_CHK_TT)
     ns.ShowTip(self, lines)
   end)
   c:SetScript("OnLeave", ns.HideTip)
@@ -654,8 +668,9 @@ local function FillCard(c, k, sec, advised)
   -- picked: accent border, tint and the filled check badge
   local sel = Selected()[k] and true or false
   c.sel = sel
-  c.selEdge(T.accent, sel and 1 or 0)
+  c.selEdge(sel and T.accent or T.ok, (sel or Running(k)) and 1 or 0)
   c.selFill:SetShown(sel); c.selBox:SetShown(sel); c.selTick:SetShown(sel)
+  if c.chk then c.chk.box:SetShown(not sel); c.chk:Show() end
   -- later, below, no quest, coming soon: greyed; to do and done: the picture as it is
   c.art:SetDesaturated(later or sec == "noq" or sec == "upcoming")
   c.shade:SetColorTexture(0, 0, 0, (sec == "todo" or sec == "done" or sel) and 0.12 or 0.45)
@@ -784,7 +799,7 @@ Render = function()
   p.selText:SetText(nSel == 0 and L.PICK_SEL0 or ns.Plural(nSel, "PICK_SEL1", "PICK_SEL", nSel))
   -- no pin: this button opens the summary, it starts no GPS (the pin means GPS, icon audit G1)
   -- the count is already in the footer ("12 donjons choisis"): the button says what it does
-  p.go:SetText(L.PICK_GO)
+  p.go:SetText(nSel >= 2 and L.PICK_GO_N:format(nSel) or L.PICK_GO)
   p.go:SetEnabled(nSel > 0)
   p.none:SetEnabled(nSel > 0)
 end

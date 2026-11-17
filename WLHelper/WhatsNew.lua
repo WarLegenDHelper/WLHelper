@@ -2,6 +2,11 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.110", date = "2026-11-17", items = {
+    { s = "chg", fr = { "Choisir un guide", "Un clic sur une carte ouvre la vue d'ensemble de ce donjon, et « Lancer le guide » y remplace le guide en cours. Pour enchaîner plusieurs donjons en une seule route, coche la case de chaque carte puis « Combiner les N guides » en bas. Le guide en cours n'est plus coché d'office : sa carte a un contour vert et sa bulle dit « Guide en cours »." }, en = { "Pick a guide", "Click a card to open it alone; tick boxes to combine several." } },
+    { s = "fix", fr = { "Améliorations (WL Helper Gear), le toucher", "Le toucher de l'objet porté n'est plus compté deux fois. Avant, échanger deux colliers pouvait donner +46 % dans un sens et -1 % dans l'autre ; les deux pièces sont maintenant jugées depuis ton toucher sans l'une ni l'autre." }, en = { "Gear", "The worn piece's hit no longer skews the comparison (same swap, same verdict both ways)." } },
+    { s = "fix", fr = { "Prison d'Alcaz, « More Valuable Than Gold »", "Plus d'étape « Faire » dans le donjon ; le trésor de Mason se trouve sous le plancher de l'auberge de Moonbrook, l'étape « Rendre » y mène." }, en = { "Alcaz Prison", "No inside \"do\" step for Mason's treasure." } },
+  } },
   { v = "1.0.0-beta.109", date = "2026-11-17", items = {
     { s = "chg", fr = { "Guide, étapes dans le donjon", "Beaucoup moins de texte répété. Pour chaque quête, la place dans la suite (« Étape 5 sur 6 avant... »), la phrase d'objectif et la note ne s'affichent plus que sur sa première ligne de l'étape ; « À prendre » n'est plus répété sur ses lignes « Faire » et « Rendre » (la ligne « Accepter » le dit déjà). L'étape tient en bien moins de hauteur." }, en = { "Guide, dungeon steps", "Chain place, objective and note shown once per quest; no repeated \"To take\"." } },
   } },
@@ -49,12 +54,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.96", date = "2026-11-17", items = {
     { s = "add", fr = { "Donjon conseillé bien visible", "La première carte de « À faire à ton niveau » porte le badge « Conseillé pour toi » quand elle convient nettement mieux que la suivante ; son infobulle dit pourquoi (« De ton côté, à ton niveau, à ~12 min »)." }, en = { "A \"Suggested for you\" badge on the clear best dungeon at your level.", "" } },
     { s = "chg", fr = { "Quêtes grises facultatives décochées", "Dans la vue d'ensemble, une quête grise pour toi (8 niveaux ou plus sous toi, la moitié de l'XP ou moins) dont le donjon n'a pas besoin est décochée d'office (« Décochée : quête grise facultative (peu d'XP) ») ; un clic la remet. Tes choix à la main restent tels quels." }, en = { "Grey optional quests start unticked; one click adds them back.", "" } },
-  } },
-  { v = "1.0.0-beta.95", date = "2026-11-17", items = {
-    { s = "chg", fr = { "Première connexion plus calme", "Seul l'écran de bienvenue s'ouvre ; la carte de la tournée en ville, le rappel des Writs et la ligne « spé supposée » attendent qu'il soit fermé." }, en = { "Only the welcome opens at the first login.", "" } },
-    { s = "chg", fr = { "Donjon conseillé", "« À faire à ton niveau » met d'abord le donjon de ton côté, au milieu de ta tranche de niveau et le plus proche (ex. Gouffre de Ragefeu pour un Horde à Orgrimmar, plus La salle des Thanes sous Forgefer)." }, en = { "Picker suggests a dungeon that fits your faction, level and position.", "" } },
-    { s = "chg", fr = { "Une seule liste de commandes", "/wlh help et la fenêtre « Comment faire... ? » montrent les mêmes mots (donjons, choisir, Writs, sacs, commandes, guilde, groupes, reglages, idee, suivi, aide) ; /wlh help ouvre la fenêtre, /wlh help chat donne la liste dans le chat." }, en = { "One command list; /wlh help opens the window.", "" } },
-    { s = "chg", fr = { "Écran de bienvenue plus clair", "Ce que le guide et les Writs font tout seuls est écrit, « avec toute la guilde » seulement si tu en as une, les Writs expliqués." }, en = { "Clearer welcome texts.", "" } },
-    { s = "chg", fr = { "Visite guidée", "Le compte suit les bulles vraiment montrées." }, en = { "Tour count without gaps.", "" } },
   } },
 }

@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.110] — 2026-11-17
+
+### Modifié / Changed
+- **Choisir un guide** : un clic sur une carte ouvre la vue d'ensemble de ce donjon, et « Lancer le guide » y remplace le guide en cours. Pour enchaîner plusieurs donjons en une seule route, coche la case de chaque carte puis « Combiner les N guides » en bas. Le guide en cours n'est plus coché d'office : sa carte a un contour vert et sa bulle dit « Guide en cours ».
+  *Pick a guide: click a card to open it alone; tick boxes to combine several.*
+
+### Corrigé / Fixed
+- **Améliorations (WL Helper Gear), le toucher** : le toucher de l'objet porté n'est plus compté deux fois. Avant, échanger deux colliers pouvait donner +46 % dans un sens et -1 % dans l'autre ; les deux pièces sont maintenant jugées depuis ton toucher sans l'une ni l'autre.
+  *Gear: the worn piece's hit no longer skews the comparison (same swap, same verdict both ways).*
+- **Prison d'Alcaz, « More Valuable Than Gold »** : plus d'étape « Faire » dans le donjon ; le trésor de Mason se trouve sous le plancher de l'auberge de Moonbrook, l'étape « Rendre » y mène.
+  *Alcaz Prison: no inside "do" step for Mason's treasure.*
+
 ## [1.0.0-beta.109] — 2026-11-17
 
 ### Modifié / Changed

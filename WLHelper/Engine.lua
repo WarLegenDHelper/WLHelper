@@ -648,7 +648,7 @@ local function MakeNodes(sel, cls)
       -- given and turned in inside the dungeon (Belnistrasz's Oathstone): what it asks with no
       -- known place is done there too, never in a step outside between two visits
       inside = true; outer = false
-    elseif real == 0 and not inside and (isPre or q.noin) and q.oe and not ns.TalkQuest(q) then
+    elseif real == 0 and not inside and (isPre or q.noin) and q.oe and not ns.TalkQuest(q) and not q.ftask then
       -- nothing but the quest's text ("Acquire the Mana Sieve ... collect Ancient Mana Crystals"):
       -- one "do the objectives" step that ends when the game says the quest is complete
       real = 1
@@ -656,7 +656,9 @@ local function MakeNodes(sel, cls)
         noLoc = true, mapHint = q.s and not q.s.i and q.s.m or nil, d = home, pre = isPre, deps = { A } }))
     end
     -- quête de donjon sans objectif connu (quêtes Forever récentes) : objectifs dans le donjon
-    if not isPre and not q.noin and real == 0 and (q.o == nil or #q.o > 0 or q.ne) then inside = true; outer = false end
+    -- q.ftask: the turn-in is the task itself (Mason's treasure under a floorboard in Moonbrook):
+    -- nothing to do inside, no "do" step, only the turn-in where it lies
+    if not isPre and not q.noin and not q.ftask and real == 0 and (q.o == nil or #q.o > 0 or q.ne) then inside = true; outer = false end
     local C
     if inside then C = add({ kind = "c", q = qid, ins = inDg, outer = outer, d = inDg, pre = isPre, deps = { A } }) end
     -- o.after = k: this objective needs objective k first (the Amulet of Spirits before the Khans'
