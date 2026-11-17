@@ -1497,7 +1497,10 @@ end
 local PAD = 16
 local W, CW = 956, 924
 local WIDE = 900                -- from this list width a result's detail gets its own column
-local ROW_H, LINE_H = 36, 36
+local ROW_H, LINE_H = 48, 36
+-- a result row's right side (beta.119, after LFG Forever's look): 5 role slots of 22 px, the
+-- rating stars and the action button; the name and the detail keep what is left
+local SLOT, SLOT_GAP, RIGHT_W = 22, 4, 236
 local function Dims()
     local d = WP.EventsDims and WP.EventsDims()
     if d then W, CW = d.W, d.CW end
@@ -1796,26 +1799,26 @@ local function ResultRow(parent)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     r.bg = S.Solid(r, "BACKGROUND", C.cardFill); r.bg:SetAllPoints()
     r.hl = S.Solid(r, "BORDER", C.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
-    r.cls = r:CreateTexture(nil, "ARTWORK"); r.cls:SetSize(20, 20); r.cls:SetPoint("TOPLEFT", 8, -8)
-    r.name = S.Text(r, FS.label, C.fg); r.name:SetWordWrap(false); r.name:SetJustifyH("LEFT")
-    r.name:SetPoint("TOPLEFT", 36, -5)
+    r.cls = r:CreateTexture(nil, "ARTWORK"); r.cls:SetSize(26, 26); r.cls:SetPoint("LEFT", 10, 0)
+    r.name = S.Text(r, FS.heading, C.fg); r.name:SetWordWrap(false); r.name:SetJustifyH("LEFT")
+    r.name:SetPoint("TOPLEFT", 44, -7)
     r.pills = { S.Pill(r), S.Pill(r) }
-    r.detail = S.Text(r, FS.meta, C.muted); r.detail:SetWordWrap(false); r.detail:SetJustifyH("LEFT")
-    r.detail:SetPoint("TOPLEFT", 36, -(5 + FS.label + 3)); r.detail:SetWidth(CW - 36 - 196)
+    r.detail = S.Text(r, FS.label, C.text or C.muted); r.detail:SetWordWrap(false); r.detail:SetJustifyH("LEFT")
+    r.detail:SetPoint("TOPLEFT", 44, -(7 + FS.heading + 4)); r.detail:SetWidth(CW - 44 - RIGHT_W)
     S.ClampLabel(r.detail, nil, r)
     r.stars = {}
     for i = 1, 3 do
         local s = root.Icon(r, "star", 12, "ARTWORK", C.head)
-        s:SetPoint("RIGHT", r, "RIGHT", -148 + (i - 3) * 13, 0)
+        s:SetPoint("RIGHT", r, "RIGHT", -(44 + 5 * (SLOT + SLOT_GAP) + 10) + (i - 3) * 13, 0)
         r.stars[i] = s
     end
-    r.roleTex, r.roleCnt = {}, {}
-    for i, role in ipairs(ROLES) do
-        local t = RoleTex(r, role, 14)
-        t:SetPoint("TOPRIGHT", r, "TOPRIGHT", -112 + (i - 1) * 18 + 14, -6)
-        r.roleTex[i] = t
-        local c = S.Text(r, FS.foot, C.muted); c:SetPoint("TOP", t, "BOTTOM", 0, -1); c:SetWordWrap(false)
-        r.roleCnt[i] = c
+    -- 5 slots: a group's tank, healer and 3 damage places, filled (bright) or free (faint); a
+    -- player's offered roles, bright, in the last slots
+    r.slots = {}
+    for i = 1, 5 do
+        local t = RoleTex(r, "dps", SLOT)
+        t:SetPoint("RIGHT", r, "RIGHT", -44 - (5 - i) * (SLOT + SLOT_GAP), 0)
+        r.slots[i] = t
     end
     r.asked = root.Icon(r, "check", 14, "ARTWORK", C.ok)
     r.asked:SetPoint("RIGHT", r, "RIGHT", -40, 0)
@@ -1881,22 +1884,14 @@ local function ResultRow(parent)
         -- (45 % of the space left of the stars), else under the name
         local rw = CW
         self:SetWidth(rw)
-        local wide = rw >= WIDE
-        local detailX = 36 + math.floor((rw - 36 - 196) * 0.45)
-        self.wideCols = wide or nil
+        self.wideCols = nil
         self.name:ClearAllPoints(); self.detail:ClearAllPoints()
-        if wide then
-            self.name:SetPoint("LEFT", self, "TOPLEFT", 36, -math.floor(ROW_H / 2))
-            self.detail:SetPoint("LEFT", self, "TOPLEFT", detailX, -math.floor(ROW_H / 2))
-            self.detail:SetWidth(rw - 196 - detailX - 8)
-        else
-            self.name:SetPoint("TOPLEFT", 36, -5)
-            self.detail:SetPoint("TOPLEFT", 36, -(5 + FS.label + 3))
-            self.detail:SetWidth(rw - 36 - 196)
-        end
-        self.detailX = wide and detailX or 36
-        -- the name and its pills end before the detail column (wide) or the rating stars (x = -196)
-        local maxName = math.max(20, (wide and (detailX - 36 - 12) or (rw - 36 - 196)) - pillsW)
+        self.name:SetPoint("TOPLEFT", 44, -7)
+        self.detail:SetPoint("TOPLEFT", 44, -(7 + FS.heading + 4))
+        self.detail:SetWidth(rw - 44 - RIGHT_W)
+        self.detailX = 44
+        -- the name and its pills end before the rating stars and the role slots
+        local maxName = math.max(20, (rw - 44 - RIGHT_W) - pillsW)
         if row.leader then
             self.name:SetText(row.leader)
             local c = ClassColor(row.cls)
@@ -1939,18 +1934,28 @@ local function ResultRow(parent)
                 s:SetVertexColor(c[1], c[2], c[3]); s:Show()
             else s:Hide() end
         end
-        -- roles: a group's counts, a player's ticked roles
-        for i, role in ipairs(ROLES) do
-            local t, c = self.roleTex[i], self.roleCnt[i]
-            if row.kind == "player" then
-                local on = row.roles and row.roles[role]
-                t:SetAlpha((row.roles == nil or on) and 1 or 0.25)
-                c:Hide()
-            else
-                local n = row.counts and row.counts[role]
-                t:SetAlpha((n == nil or n > 0) and 1 or 0.25)
-                c:SetText(n and tostring(n) or ""); c:SetShown(n ~= nil)
+        -- roles: a group's 5 places (tank, healer, 3 damage), taken bright and free faint; a
+        -- player's offered roles, bright, in the last slots (none known: the 3 roles, faint)
+        local want = {}
+        if row.kind == "player" then
+            local offered = {}
+            for _, role in ipairs(ROLES) do
+                if row.roles == nil or row.roles[role] then offered[#offered + 1] = role end
             end
+            for i = 1, 5 do
+                local role = offered[i - (5 - #offered)]
+                want[i] = role and { role, row.roles == nil and 0.45 or 1 } or nil
+            end
+        else
+            local c = row.counts or {}
+            local function taken(n, k) return (tonumber(n) or 0) >= k end
+            want[1] = { "tank", taken(c.tank, 1) and 1 or 0.22 }
+            want[2] = { "heal", taken(c.heal, 1) and 1 or 0.22 }
+            for k = 1, 3 do want[2 + k] = { "dps", taken(c.dps, k) and 1 or 0.22 } end
+        end
+        for i, t in ipairs(self.slots) do
+            local w = want[i]
+            if w then S.RoleIcon(t, w[1]); t:SetAlpha(w[2]); t:Show() else t:Hide() end
         end
         self.asked:SetShown(row.guid ~= nil and F.asked[row.guid] == true and row.kind ~= "player")
         -- the one action, hidden when it cannot be done

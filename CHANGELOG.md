@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.119] — 2026-11-18
+
+### Modifié / Changed
+- **Trouver un groupe, résultats plus lisibles** : chaque ligne est plus haute, le nom plus grand, et les détails (niveau ou places, donjon, zone, depuis quand) juste en dessous dans une taille lisible, au lieu d'une petite colonne au milieu. Les rôles s'affichent en 5 grosses icônes : pour un groupe, une par place (tank, soigneur, 3 dégâts), allumée si elle est prise, pâle si elle est libre, comme dans LFG Forever ; pour un joueur, les rôles qu'il propose.
+  *Find a group: taller rows, bigger names, details under them, and 5 big role slots (taken bright, free faint).*
+
 ## [1.0.0-beta.118] — 2026-11-18
 
 ### Ajouté / Added

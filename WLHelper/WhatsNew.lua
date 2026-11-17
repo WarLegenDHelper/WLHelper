@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.119", date = "2026-11-18", items = {
+    { s = "chg", fr = { "Trouver un groupe, résultats plus lisibles", "Chaque ligne est plus haute, le nom plus grand, et les détails (niveau ou places, donjon, zone, depuis quand) juste en dessous dans une taille lisible, au lieu d'une petite colonne au milieu. Les rôles s'affichent en 5 grosses icônes : pour un groupe, une par place (tank, soigneur, 3 dégâts), allumée si elle est prise, pâle si elle est libre, comme dans LFG Forever ; pour un joueur, les rôles qu'il propose." }, en = { "Find a group", "Taller rows, bigger names, details under them, and 5 big role slots (taken bright, free faint)." } },
+  } },
   { v = "1.0.0-beta.118", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, repères de la carte", "Un repère posé sur la carte du monde lance le GPS de WL Helper jusque-là (flèche et chemin à pied), qu'il soit posé par toi (Ctrl-clic) ou par un autre addon qui pose le repère du jeu, comme les livres, coffres et rares de Naowh Forever (« Click for a waypoint »). Repère enlevé : le GPS s'arrête. Jamais les repères que WL Helper pose lui-même, rien en donjon. Réglages > GPS > « Suivre les repères de la carte » pour l'éteindre." }, en = { "GPS follows map pins (yours or another addon's, like Naowh's books); Settings > GPS to turn it off.", "" } },
   } },
@@ -56,9 +59,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.105", date = "2026-11-17", items = {
     { s = "add", fr = { "Relevés de quêtes en jeu", "Comme le Wowhead Client, WL Helper note ce que le jeu montre vraiment pour les quêtes du guide (qui la donne et où, qui la reprend, son niveau, l'XP reçue sans pénalité de niveau, et les prérequis listés que tu n'avais pas faits quand tu l'as prise). Ces relevés sont partagés avec la guilde et servent à corriger les données du guide. « /wlh diag quetes » montre ce qui diffère." }, en = { "In-game quest records (giver, turn-in, level, full XP, unneeded prerequisites), shared with the guild; /wlh diag quests.", "" } },
     { s = "fix", fr = { "Le Temple englouti (Alliance)", "3 650 XP, comme sur Wowhead Forever (pas 6 550, la valeur de la version Horde)." }, en = { "Alliance \"The Sunken Temple\"", "3,650 XP." } },
-  } },
-  { v = "1.0.0-beta.104", date = "2026-11-17", items = {
-    { s = "fix", fr = { "Temple englouti côté Alliance", "« Dans les profondeurs » et « Le secret du cercle » demandaient la quête Horde de Feralas (Docteur sorcier Uzer'i), donc l'Alliance ne les voyait jamais. Chaque faction a maintenant sa propre quête d'accroche : Uzer'i (Camp Mojache) pour la Horde, Angelas Moonbreeze (Forteresse de Pennelune, Feralas) pour l'Alliance." }, en = { "Sunken Temple", "Each faction gets its own lead-in quest." } },
-    { s = "add", fr = { "Quêtes Alliance manquantes", "Uldaman (Rechercher les composants à Uldaman et sa suite, Des Trésors à recouvrer, La Chambre secrète, la chaîne du collier de Talvash, La tablette de volonté), Maraudon (Fragments d'Ombréclat pour Theramore, Corruption de la terre et de la graine pour la Pointe de Nijel), Temple englouti (La brume du mal et ses deux étapes)." }, en = { "Missing Alliance quests in Uldaman, Maraudon and Sunken Temple.", "" } },
   } },
 }
