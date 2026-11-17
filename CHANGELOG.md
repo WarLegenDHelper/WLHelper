@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.105] — 2026-11-17
+
+### Ajouté / Added
+- **Relevés de quêtes en jeu** : comme le Wowhead Client, WL Helper note ce que le jeu montre vraiment pour les quêtes du guide (qui la donne et où, qui la reprend, son niveau, l'XP reçue sans pénalité de niveau, et les prérequis listés que tu n'avais pas faits quand tu l'as prise). Ces relevés sont partagés avec la guilde et servent à corriger les données du guide. « /wlh diag quetes » montre ce qui diffère.
+  *In-game quest records (giver, turn-in, level, full XP, unneeded prerequisites), shared with the guild; /wlh diag quests.*
+
+### Corrigé / Fixed
+- **Le Temple englouti (Alliance)** : 3 650 XP, comme sur Wowhead Forever (pas 6 550, la valeur de la version Horde).
+  *Alliance "The Sunken Temple": 3,650 XP.*
+
 ## [1.0.0-beta.104] — 2026-11-17
 
 ### Corrigé / Fixed
@@ -13,7 +23,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *Sunken Temple: each faction gets its own lead-in quest.*
 
 ### Ajouté / Added
-- **Quêtes Alliance manquantes** (vérifiées avec les données du jeu, Naowh et Wowhead) : Uldaman (Rechercher les composants à Uldaman et sa suite, Des Trésors à recouvrer, La Chambre secrète, la chaîne du collier de Talvash, La tablette de volonté), Maraudon (Fragments d'Ombréclat pour Theramore, Corruption de la terre et de la graine pour la Pointe de Nijel), Temple englouti (La brume du mal et ses deux étapes).
+- **Quêtes Alliance manquantes** (vérifiées avec les données du jeu et Naowh) : Uldaman (Rechercher les composants à Uldaman et sa suite, Des Trésors à recouvrer, La Chambre secrète, la chaîne du collier de Talvash, La tablette de volonté), Maraudon (Fragments d'Ombréclat pour Theramore, Corruption de la terre et de la graine pour la Pointe de Nijel), Temple englouti (La brume du mal et ses deux étapes).
   *Missing Alliance quests in Uldaman, Maraudon and Sunken Temple.*
 
 ## [1.0.0-beta.103] — 2026-11-17

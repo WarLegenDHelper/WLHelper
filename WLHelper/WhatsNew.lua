@@ -2,8 +2,12 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.105", date = "2026-11-17", items = {
+    { s = "add", fr = { "Relevés de quêtes en jeu", "Comme le Wowhead Client, WL Helper note ce que le jeu montre vraiment pour les quêtes du guide (qui la donne et où, qui la reprend, son niveau, l'XP reçue sans pénalité de niveau, et les prérequis listés que tu n'avais pas faits quand tu l'as prise). Ces relevés sont partagés avec la guilde et servent à corriger les données du guide. « /wlh diag quetes » montre ce qui diffère." }, en = { "In-game quest records (giver, turn-in, level, full XP, unneeded prerequisites), shared with the guild; /wlh diag quests.", "" } },
+    { s = "fix", fr = { "Le Temple englouti (Alliance)", "3 650 XP, comme sur Wowhead Forever (pas 6 550, la valeur de la version Horde)." }, en = { "Alliance \"The Sunken Temple\"", "3,650 XP." } },
+  } },
   { v = "1.0.0-beta.104", date = "2026-11-17", items = {
-    { s = "fix", fr = { "Temple englouti côté Alliance", "« Dans les profondeurs » et « Le secret du cercle » demandaient la quête Horde de Feralas (Docteur sorcier Uzer'i), donc l'Alliance ne les voyait jamais. Chaque faction a maintenant sa propre quête d'accroche : Uzer'i (Camp Mojache) pour la Horde, Angelas Brisebrume (Forteresse de Pennelune) pour l'Alliance." }, en = { "Sunken Temple", "Each faction gets its own lead-in quest." } },
+    { s = "fix", fr = { "Temple englouti côté Alliance", "« Dans les profondeurs » et « Le secret du cercle » demandaient la quête Horde de Feralas (Docteur sorcier Uzer'i), donc l'Alliance ne les voyait jamais. Chaque faction a maintenant sa propre quête d'accroche : Uzer'i (Camp Mojache) pour la Horde, Angelas Moonbreeze (Forteresse de Pennelune, Feralas) pour l'Alliance." }, en = { "Sunken Temple", "Each faction gets its own lead-in quest." } },
     { s = "add", fr = { "Quêtes Alliance manquantes", "Uldaman (Rechercher les composants à Uldaman et sa suite, Des Trésors à recouvrer, La Chambre secrète, la chaîne du collier de Talvash, La tablette de volonté), Maraudon (Fragments d'Ombréclat pour Theramore, Corruption de la terre et de la graine pour la Pointe de Nijel), Temple englouti (La brume du mal et ses deux étapes)." }, en = { "Missing Alliance quests in Uldaman, Maraudon and Sunken Temple.", "" } },
   } },
   { v = "1.0.0-beta.103", date = "2026-11-17", items = {
@@ -87,11 +91,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Accueil des Commandes", "La liste des artisans en ligne restait affichée par-dessus les tuiles en revenant à l'accueil." }, en = { "Orders home no longer shows the online list over the tiles.", "" } },
     { s = "fix", fr = { "Fenêtres hors de l'écran", "Une position enregistrée hors de l'écran est ramenée ; la barre de titre reste toujours visible." }, en = { "Windows saved off-screen are brought back.", "" } },
     { s = "fix", fr = { "Messages de guilde renforcés", "Un message mal formé ne peut plus casser les Commandes, l'Agenda ou l'Accueil (les données abîmées sont nettoyées) ; seul l'organisateur peut modifier ou annuler son événement ; on ne peut plus inventer d'étoiles ; un homonyme d'un autre royaume n'écrase plus les données d'un membre ; moins d'annonces et de rafraîchissements quand beaucoup de messages arrivent." }, en = { "Guild sync hardened against malformed messages, spoofing and floods.", "" } },
-  } },
-  { v = "1.0.0-beta.90", date = "2026-11-16", items = {
-    { s = "fix", fr = { "Sorts appris reconnus sur Forever", "Le GPS propose de nouveau tes sorts de voyage (téléports, Rappel astral), les recharges de métier sont suivies, et le tir automatique du chasseur est bien utilisé." }, en = { "Known spells detected on Forever", "Travel spells, profession cooldowns, hunter Auto Shot." } },
-    { s = "fix", fr = { "Clés de donjon", "La clé a son nom en jeu, son icône, et « possédée » quand elle est dans tes sacs." }, en = { "Dungeon keys show their name, icon and \"owned\" again.", "" } },
-    { s = "fix", fr = { "Butin des boss et récompenses", "Nom, lien et icône des objets s'affichent de nouveau ; les icônes des étapes « objet » aussi." }, en = { "Boss loot and reward items show name, link and icon again.", "" } },
-    { s = "fix", fr = { "Invitation en Alt-clic", "Ne peut plus provoquer d'erreur selon le réglage « action à l'appui »." }, en = { "Alt-click invite no longer errors.", "" } },
   } },
 }

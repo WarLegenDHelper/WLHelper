@@ -11,6 +11,7 @@
 --   altclick                 Writs/AltClick.lua  what Alt + click does for this character
 --   carte / map              Bosses.lua          the map of the dungeon you are in
 --   diag carte / diag map    Writs/Trail.lua     why the walking path shows (or not) on the world map
+--   diag quetes / diag quests Writs/QuestFacts   what the game showed for the guide's quests vs Data.lua
 --                                                (any other "diag" goes on to Diag.lua)
 -- Each tool checks its own module switch: nothing is decided twice here.
 local ADDON, root = ...
@@ -74,6 +75,10 @@ end)
 -- word on (plain "diag" is Diag.lua's)
 Route({ "diag" }, function(rest)
     local w = Word(rest:match("^(%S*)"))
+    if w == "quetes" or w == "quests" then
+        if WP.QuestFacts then Run(WP.QuestFacts.Diag) end
+        return
+    end
     if w ~= "carte" and w ~= "map" then return false end
     if WP.Trail and WP.Trail.DiagMap then Run(WP.Trail.DiagMap) end
 end)
@@ -104,7 +109,7 @@ hook:SetScript("OnEvent", function()
             if not top then return end
             SlashCmdList.WLDUNGEONTOOL = function(msg, ...)
                 local w, rest = (msg or ""):match("^%s*(%S*)%s*(%S*)")
-                if Word(w) == "diag" and (Word(rest) == "carte" or Word(rest) == "map") then
+                if Word(w) == "diag" and (Word(rest) == "carte" or Word(rest) == "map" or Word(rest) == "quetes" or Word(rest) == "quests") then
                     if WP.ToolCommand(msg) then return end
                 end
                 return top(msg, ...)
