@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.99] — 2026-11-17
+
+### Corrigé / Fixed
+- **La flèche suit l'étape affichée** : « Étape suivante », les flèches ‹ › ou un clic dans la liste des étapes déplacent aussi le GPS ; « Revenir à l'étape en cours » le ramène.
+  *The arrow follows the step on screen.*
+
 ## [1.0.0-beta.98] — 2026-11-17
 
 ### Corrigé / Fixed

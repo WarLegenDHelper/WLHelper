@@ -771,6 +771,14 @@ function ns.GoTo(i)
   f.view = math.max(1, math.min(RouteFinished() and FinIndex() or n, i))
   ScrollTop()
   if f.menu then f.menu:Hide() end
+  -- the arrow goes where the step on screen is (Refresh keeps it there until you go back)
+  if WLDTDB.autoWay and f.view <= n and ns.SetPoints then
+    local log = ns.LogEntries()
+    local pts = StepPoints(log, Steps()[f.view], false)
+    local sig = f.view .. ":" .. #pts
+    for _, p in ipairs(pts) do sig = sig .. p[2] .. p[3] end
+    if sig ~= f.sig then f.sig = sig; f.wpKey = nil; ns.SetPoints(pts, true) end
+  end
   Render()
 end
 
@@ -4220,8 +4228,11 @@ function ns.Refresh(silent)
   end
   f.wasFin = fin
   if WLDTDB.autoWay and not fin then
-    local pts = StepPoints(log, steps[auto], false)
-    local sig = auto .. ":" .. #pts
+    -- the GPS follows the step on screen: "Étape suivante" / a click in the list moves the arrow
+    -- too (the step in progress itself does not change)
+    local gi = (f.view and f.view >= 1 and f.view <= #steps) and f.view or auto
+    local pts = StepPoints(log, steps[gi], false)
+    local sig = gi .. ":" .. #pts
     for _, p in ipairs(pts) do sig = sig .. p[2] .. p[3] end
     if sig ~= f.sig then f.sig = sig; f.wpKey = nil; ns.SetPoints(pts, true) end
   end

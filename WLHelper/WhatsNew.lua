@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.99", date = "2026-11-17", items = {
+    { s = "fix", fr = { "La flèche suit l'étape affichée", "« Étape suivante », les flèches ‹ › ou un clic dans la liste des étapes déplacent aussi le GPS ; « Revenir à l'étape en cours » le ramène." }, en = { "The arrow follows the step on screen.", "" } },
+  } },
   { v = "1.0.0-beta.98", date = "2026-11-17", items = {
     { s = "fix", fr = { "GPS dans un donjon", "Une étape dans l'instance n'envoie plus vers un point de la carte du dehors (le repère tombait sur un mur et la flèche disait « Tu y es · Maraudon ») ; sans point sur la carte du donjon, le grand bouton propose « Carte du donjon »." }, en = { "Inside a dungeon, the GPS no longer points at an outdoor spot.", "" } },
   } },
@@ -123,22 +126,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Achats", "Un objet dont il manque des exemplaires n'est plus « Dans le sac » ; les quantités et prix ne comptent que ce qui manque." }, en = { "Shopping counts only what is missing.", "" } },
     { s = "fix", fr = { "Clés", "« personne en ligne ne l'a » ne dépend plus des filtres de la fenêtre Guilde ; un membre qui se connecte reçoit bien tes clés." }, en = { "Keys", "Online check ignores guild filters; newcomers get your keys." } },
     { s = "fix", fr = { "Nous écrire", "L'aide du formulaire « Un bug » dit ce qui est vraiment envoyé." }, en = { "Bug form hint is accurate.", "" } },
-  } },
-  { v = "1.0.0-beta.84", date = "2026-11-16", items = {
-    { s = "add", fr = { "Clic droit sur Commandes, Guilde ou Groupes", "À l'Accueil : ouvre directement leurs réglages. Nouvelle commande /wlh groupes." }, en = { "Right-click Orders, Guild or Groups on Home to open their settings; new /wlh groupes.", "" } },
-    { s = "add", fr = { "/way", "Le repère dans le monde (lieu, distance, temps) s'affiche aussi pour tes points /way." }, en = { "The world label also shows for /way points.", "" } },
-    { s = "add", fr = { "Commandes", "Si le client annule une commande que tu as acceptée, ou si un autre artisan la prend en même temps, une ligne dans le chat te prévient." }, en = { "Orders", "A chat line when an accepted order is cancelled or taken by someone else." } },
-    { s = "chg", fr = { "GPS", "L'étape du guide n'écrase plus ton /way, « Aller à... » ou une clé ; elle attend et revient quand ta destination est atteinte ou arrêtée. « Aller à... » vise le vrai lieu, avec le même chemin à pied que le guide. Fermer la flèche arrête la tournée en ville." }, en = { "The guide no longer overrides your /way or Go to; Go to aims at the real place; closing the arrow stops the city tour.", "" } },
-    { s = "chg", fr = { "GPS d'un objectif", "Le bouton GPS mène à la zone de quête du jeu (celle de la carte), et un objectif placé seulement par le jeu a aussi son bouton." }, en = { "Objective GPS goes to the game's quest area.", "" } },
-    { s = "chg", fr = { "Vue d'ensemble", "Cocher ou décocher une quête met la route à jour sans message dans le chat et garde l'étape que tu regardes." }, en = { "Ticking quests in the Overview updates the route quietly.", "" } },
-    { s = "chg", fr = { "Guide fermé", "Plus redessiné en arrière-plan, plus de son « Étape suivante » quand rien n'est affiché ; la flèche suit toujours." }, en = { "A closed guide no longer redraws or plays sounds in the background.", "" } },
-    { s = "chg", fr = { "Le module de groupes s'appelle « Groupes » partout.", "« Inviter les inscrits » n'invite que les inscrits en ligne et dit pourquoi une invitation ne part pas ; idem pour « Inviter » dans la liste de la guilde." }, en = { "\"Groups\" everywhere; invites explain why they did not go out.", "" } },
-    { s = "chg", fr = { "Classement PvP de la guilde", "L'addon n'envoie ses chiffres que quand ils changent." }, en = { "Guild PvP sync sends only on change.", "" } },
-    { s = "fix", fr = { "« Le jeu a bloqué SetRaidTarget() »", "WL Helper ne pose aucune marque ; ce message vient d'une macro d'un autre addon (RXPTargeting de RestedXP ajoute « /tm !7 »). Le message nomme maintenant la macro au lieu de demander de le signaler." }, en = { "The blocked raid-marker message now names the macro responsible (RestedXP's RXPTargeting).", "" } },
-    { s = "fix", fr = { "Recharges", "Les transmutations et l'Étoffe lunaire sont enregistrées à l'ouverture de la fenêtre de métier, même quand le jeu cache les temps." }, en = { "Transmute and Mooncloth cooldowns are recorded from the profession window.", "" } },
-    { s = "fix", fr = { "Writs", "Le calcul des trajets ne fige plus l'écran à l'HV ; une enveloppe sans son objet ouvre l'achat de l'objet ; les caisses sans prix connu ne comptent plus comme gratuites." }, en = { "Writs", "No freeze at the AH, unpriced crates no longer free." } },
-    { s = "fix", fr = { "Prix de revient", "L'interrupteur se rallume bien ; la ligne d'infobulle n'entraîne plus d'alerte « bloqué » en combat." }, en = { "Cost price switch turns back on; no blocked alert in combat.", "" } },
-    { s = "fix", fr = { "Récompense choisie toute seule", "Réessaie quand les objets ne sont pas encore chargés, puis le dit clairement." }, en = { "Auto reward waits for item data, then says so.", "" } },
-    { s = "fix", fr = { "Quoi de neuf", "S'affiche aussi après un combat et repart de ta dernière version ; dans l'aide, /wlh commun ouvre bien les quêtes en commun." }, en = { "What's new after combat; help link fixed.", "" } },
   } },
 }
