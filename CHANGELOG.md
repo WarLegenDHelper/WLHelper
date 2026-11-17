@@ -9,7 +9,7 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 ## [1.0.0-beta.104] — 2026-11-17
 
 ### Corrigé / Fixed
-- **Temple englouti côté Alliance** : « Dans les profondeurs » et « Le secret du cercle » demandaient la quête Horde de Feralas (Docteur sorcier Uzer'i), donc l'Alliance ne les voyait jamais. Chaque faction a maintenant sa propre quête d'accroche : Uzer'i (Camp Mojache) pour la Horde, Angelas Brisebrume (Forteresse de Pennelune) pour l'Alliance.
+- **Temple englouti côté Alliance** : « Dans les profondeurs » et « Le secret du cercle » demandaient la quête Horde de Feralas (Docteur sorcier Uzer'i), donc l'Alliance ne les voyait jamais. Chaque faction a maintenant sa propre quête d'accroche : Uzer'i (Camp Mojache) pour la Horde, Angelas Moonbreeze (Forteresse de Pennelune, Feralas) pour l'Alliance.
   *Sunken Temple: each faction gets its own lead-in quest.*
 
 ### Ajouté / Added
