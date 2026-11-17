@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.98", date = "2026-11-17", items = {
+    { s = "fix", fr = { "GPS dans un donjon", "Une étape dans l'instance n'envoie plus vers un point de la carte du dehors (le repère tombait sur un mur et la flèche disait « Tu y es · Maraudon ») ; sans point sur la carte du donjon, le grand bouton propose « Carte du donjon »." }, en = { "Inside a dungeon, the GPS no longer points at an outdoor spot.", "" } },
+  } },
   { v = "1.0.0-beta.97", date = "2026-11-17", items = {
     { s = "fix", fr = { "Quête qui commence avec un objet", "Si elle n'est pas dans ton journal, la carte dit quel objet l'ouvre (« utilise-le dans tes sacs ; si tu ne l'as pas, passe cette étape ») au lieu de « prends-la d'abord »." }, en = { "Item-started quests say which item opens them.", "" } },
     { s = "fix", fr = { "Quêtes grises facultatives", "Aussi laissées de côté quand la route est calculée sans ouvrir la vue d'ensemble." }, en = { "Grey optional quests stay out of every route.", "" } },
@@ -137,8 +140,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Prix de revient", "L'interrupteur se rallume bien ; la ligne d'infobulle n'entraîne plus d'alerte « bloqué » en combat." }, en = { "Cost price switch turns back on; no blocked alert in combat.", "" } },
     { s = "fix", fr = { "Récompense choisie toute seule", "Réessaie quand les objets ne sont pas encore chargés, puis le dit clairement." }, en = { "Auto reward waits for item data, then says so.", "" } },
     { s = "fix", fr = { "Quoi de neuf", "S'affiche aussi après un combat et repart de ta dernière version ; dans l'aide, /wlh commun ouvre bien les quêtes en commun." }, en = { "What's new after combat; help link fixed.", "" } },
-  } },
-  { v = "1.0.0-beta.83", date = "2026-11-16", items = {
-    { s = "chg", fr = { "GPS à pied à jour avec Polestar 0.4.0", "Départs corrigés sous les rues des villes (quartier des Nains de Hurlevent), des milliers de nouveaux passages entre étages sur les deux continents, nouveaux villages relais, et danger des Montagnes d'Alterac recalé (niveau 30)." }, en = { "Walking GPS updated to Polestar Nav 0.4.0", "Better city starts, many more floor links, Alterac danger floor." } },
   } },
 }

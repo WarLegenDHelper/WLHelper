@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.98] — 2026-11-17
+
+### Corrigé / Fixed
+- **GPS dans un donjon** : une étape dans l'instance n'envoie plus vers un point de la carte du dehors (le repère tombait sur un mur et la flèche disait « Tu y es · Maraudon ») ; sans point sur la carte du donjon, le grand bouton propose « Carte du donjon ».
+  *Inside a dungeon, the GPS no longer points at an outdoor spot.*
+
 ## [1.0.0-beta.97] — 2026-11-17
 
 ### Corrigé / Fixed

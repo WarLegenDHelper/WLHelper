@@ -548,6 +548,16 @@ local function StepPoints(log, st, all)
     local d = ns.D[st.ins]
     if d and d.e and d.e.m and not InInstanceOf(st.ins) then table.insert(pts, { d.e.m, d.e.x, d.e.y, ns.DName(st.ins) }) end
   end
+  -- inside the instance, a point on an outdoor map (the giver's spot outside, the entrance) means
+  -- nothing: the arrow said "Tu y es · Maraudon" and the game's pin sat on a wall. Keep only the
+  -- points on the map you stand on; with none, the big button offers the dungeon map instead.
+  if st.ins and InInstanceOf(st.ins) and #pts > 0 then
+    local here = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+    if issecretvalue and here ~= nil and issecretvalue(here) then here = nil end
+    local keep = {}
+    for _, p in ipairs(pts) do if here and p[1] == here then keep[#keep + 1] = p end end
+    pts = keep
+  end
   return pts
 end
 ns.StepPoints = StepPoints
