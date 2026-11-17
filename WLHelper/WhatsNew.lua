@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.117", date = "2026-11-18", items = {
+    { s = "fix", fr = { "Guide, étapes de boss", "Une étape de boss dont toutes les quêtes sont rendues compte comme faite, même si le guide n'a pas vu le boss mourir (tué avant un /reload ou une déconnexion). Avant, l'onglet « Dans le donjon » pouvait rester à 8 sur 9 alors que tout était fait (Prison d'Alcaz, Tidemistress Ca'zass)." }, en = { "Boss steps whose quests are all turned in count as done, even without a kill seen this session.", "" } },
+  } },
   { v = "1.0.0-beta.116", date = "2026-11-18", items = {
     { s = "add", fr = { "Meilleur pour toi", "Tape « /wlh bis » (ou « /wlh bis 60 » pour un autre niveau). Pour chaque emplacement, les 3 meilleures pièces que tu peux porter, classées par WL Helper Gear pour ta spé avec tes vraies stats, tes talents et tes plafonds de toucher ; le gain sur ce que tu portes, et d'où vient la pièce (donjon et boss, quête, métier, réputation ; les pièces PvP renvoient à « /wlh pvp »). Les raids sont laissés de côté tant qu'ils ne sont pas ouverts. La liste est calculée, pas recopiée d'un guide : Forever a changé beaucoup d'objets." }, en = { "Best for you (/wlh bis [level])", "The top 3 pieces per slot for your spec, computed by WL Helper Gear, with the gain and the source." } },
   } },
@@ -58,8 +61,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.103", date = "2026-11-17", items = {
     { s = "chg", fr = { "« Presque pareil »", "Quand deux objets ne diffèrent que de quelques points de ta stat principale (5 de puissance des sorts, 8 de soins, 10 de puissance d'attaque, 5 d'endurance pour un tank), l'infobulle dit « Presque pareil (-14 %) » en gris et « Seulement ~4 de puissance des sorts d'écart : garde celui que tu préfères », au lieu d'un pourcentage rouge qui fait peur." }, en = { "Near ties read \"About the same (-14%)\" with the gap in points of your main stat.", "" } },
     { s = "chg", fr = { "Réglages > Améliorations, les vrais poids", "Quand WL Helper Gear juge tes objets, la page montre ses poids (ta spé, ton niveau, ce que tu portes, plafonds de toucher compris), pas les poids de secours de WL Helper." }, en = { "Settings show WL Helper Gear's weights when it judges.", "" } },
-  } },
-  { v = "1.0.0-beta.102", date = "2026-11-17", items = {
-    { s = "fix", fr = { "Bonus aux sorts mieux lus (WLHelper Gear)", "Sur un objet que la liste ne connaît pas (ou avec un suffixe), « Augmente les dégâts et les soins produits par les sorts » compte pour les dégâts et les soins, même sur un client français, au lieu de compter parfois comme des soins seulement." }, en = { "\"Damage and healing\" spell power is read as spell power for both, French client too.", "" } },
   } },
 }

@@ -141,6 +141,15 @@ local function BossStepDone(log, i, st)
   end
   -- a run with no quest: a boss you went past is behind you too (no quest line waits there)
   if later and (st.run or ns.BossStepOptional(st, log)) then return true end
+  -- every quest of the step already turned in (the kill was in another session, or before a
+  -- /reload): nothing is left to do there, whatever the kill record says
+  if #st.acts > 0 and ns.IsDone then
+    local all = true
+    for _, n in ipairs(st.acts) do
+      if not (n.q and ns.IsDone(n.q)) then all = false; break end
+    end
+    if all then return true end
+  end
   return false
 end
 ns.BossStepDone = BossStepDone

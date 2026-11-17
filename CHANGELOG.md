@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.117] — 2026-11-18
+
+### Corrigé / Fixed
+- **Guide, étapes de boss** : une étape de boss dont toutes les quêtes sont rendues compte comme faite, même si le guide n'a pas vu le boss mourir (tué avant un /reload ou une déconnexion). Avant, l'onglet « Dans le donjon » pouvait rester à 8 sur 9 alors que tout était fait (Prison d'Alcaz, Tidemistress Ca'zass).
+  *Boss steps whose quests are all turned in count as done, even without a kill seen this session.*
+
 ## [1.0.0-beta.116] — 2026-11-18
 
 ### Ajouté / Added
