@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.102] — 2026-11-17
+
+### Corrigé / Fixed
+- **Bonus aux sorts mieux lus (WLHelper Gear)** : sur un objet que la liste ne connaît pas (ou avec un suffixe), « Augmente les dégâts et les soins produits par les sorts » compte pour les dégâts et les soins, même sur un client français, au lieu de compter parfois comme des soins seulement.
+  *"Damage and healing" spell power is read as spell power for both, French client too.*
+
 ## [1.0.0-beta.101] — 2026-11-17
 
 ### Modifié / Changed

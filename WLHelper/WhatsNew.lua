@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.102", date = "2026-11-17", items = {
+    { s = "fix", fr = { "Bonus aux sorts mieux lus (WLHelper Gear)", "Sur un objet que la liste ne connaît pas (ou avec un suffixe), « Augmente les dégâts et les soins produits par les sorts » compte pour les dégâts et les soins, même sur un client français, au lieu de compter parfois comme des soins seulement." }, en = { "\"Damage and healing\" spell power is read as spell power for both, French client too.", "" } },
+  } },
   { v = "1.0.0-beta.101", date = "2026-11-17", items = {
     { s = "chg", fr = { "Vrai réseau de vols", "Le GPS connaît maintenant le réseau des maîtres de vol de Forever et la durée mesurée de chaque saut (données de Shortest Path Forever, sous GPL, dans le module WLHelper Nav). Un vol passe par les maîtres de vol que tu connais, avec son vrai temps, au lieu d'une ligne droite ; deux maîtres de vol non reliés ne sont plus proposés." }, en = { "Real flight network with measured times (from Shortest Path Forever, GPL, in WLHelper Nav).", "" } },
   } },
@@ -96,20 +99,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Avant d'entrer", "Le guide ne t'envoie plus dans le donjon tant qu'une étape faisable dehors reste ouverte (Scholomance, Brassenoire, Zul'Farrak, Kraal de Tranchebauge...), et un rendu prêt n'attend plus derrière une étape du donjon." }, en = { "No entering while doable outside steps are left.", "" } },
     { s = "fix", fr = { "Quêtes de race", "Les quêtes réservées à une race ne sont plus proposées aux autres races." }, en = { "Race-restricted quests are no longer offered to other races.", "" } },
     { s = "fix", fr = { "Groupe et HV", "La classe des membres du groupe est bien lue (couleurs, Groupe), la progression du scan de l'hôtel des ventes s'affiche, et le texte de ta recherche de groupe est retenu." }, en = { "Party member classes, AH scan progress and the saved group-finder text work again.", "" } },
-  } },
-  { v = "1.0.0-beta.87", date = "2026-11-16", items = {
-    { s = "add", fr = { "Fenêtres plus larges et redimensionnables", "Taille proportionnelle à ton écran, poignée en bas à droite, taille retenue ; réglages en 2 ou 3 colonnes, listes en grilles, profil d'artisan des Commandes en 2 colonnes." }, en = { "Wider, resizable windows sized to your screen; settings and lists in columns.", "" } },
-    { s = "add", fr = { "Guide : onglets « Dehors · Dans le donjon · Après »", "Et mode consultation : reviens sur n'importe quelle étape, même faite, sans changer ton étape en cours ; « Voir où en est ... » pour un membre du groupe qui a WL Helper." }, en = { "Guide part tabs, browse any step, see where a group member is.", "" } },
-    { s = "add", fr = { "« Recommencer la route »", "Dans le menu Actions et la liste des étapes, confirmé par un second clic." }, en = { "Restart the route button.", "" } },
-    { s = "add", fr = { "Vue d'ensemble, onglet « Groupe »", "Quêtes × coéquipiers, même sans WL Helper chez eux ; la raison au survol (niveau trop bas, déjà faite, prérequis, ne se partage pas...), « 2/3 l'ont », bouton « Vérifier »." }, en = { "Overview Group tab", "Who has each quest and why not, even without WL Helper." } },
-    { s = "add", fr = { "Raccourcis dans les réglages", "Clique puis appuie sur une touche, conflit signalé, Effacer ; nouvelle touche « Utiliser l'objet de quête de l'étape »." }, en = { "Key bindings inside the settings, plus a quest item key.", "" } },
-    { s = "add", fr = { "Étapes avant le donjon", "« Élite » ou « Non élite », et pourquoi la faire avant (« la suite se fait dans le donjon ») ou « Facultatif »." }, en = { "Elite marks and why-before line on pre-dungeon steps.", "" } },
-    { s = "chg", fr = { "Route", "Une chaîne de prérequis faisable entre dans la route avant le donjon ; une chaîne trop haute ou trop longue est expliquée en gris dans la vue d'ensemble, et la cocher la remet. Les objectifs au même endroit se font en un seul passage (à Uldaman : collier, champignons, tablette, pierres et coffre dans l'excavation, avant d'entrer)." }, en = { "Prerequisite chains routed or explained; same-spot objectives in one pass.", "" } },
-    { s = "chg", fr = { "Flèche", "« Puis 690 m jusqu'à Dran Droffers » au lieu de « 690 m en monture » ; la carte du guide donne le même trajet (« Téléport : Orgrimmar, puis 690 m ») au lieu de « change de continent : zeppelin ou bateau »." }, en = { "Arrow says where the last walk goes; the guide card matches it.", "" } },
-    { s = "chg", fr = { "Check-list", "Le bouton devient « Fermer la check-list » quand elle est affichée, et elle liste ce qu'il reste à finir dehors avant d'entrer." }, en = { "Checklist button toggles; lists outside objectives left.", "" } },
-    { s = "chg", fr = { "Première ouverture du guide", "Au centre, liste des étapes fermée ; une position hors de l'écran est ramenée." }, en = { "Guide first opens centred with the step list closed.", "" } },
-    { s = "fix", fr = { "Fausse étape « dans le donjon »", "Après avoir ramassé un objet devant l'entrée (tablette de Solution to Doom), le guide sautait à « Baelog » alors que tu étais dehors." }, en = { "Guide no longer jumps inside the dungeon after an item looted at the entrance.", "" } },
-    { s = "fix", fr = { "Pointillés sur la carte du monde", "Ils s'affichent aussi avec OpenMap, et une carte n'est plus bloquée « sans points » pour la session." }, en = { "World map trail dots show with OpenMap.", "" } },
-    { s = "fix", fr = { "Titre « Guide de quêtes » et « Partager 4 quêtes »", "Ne sont plus coupés en français." }, en = { "French titles no longer truncated.", "" } },
   } },
 }

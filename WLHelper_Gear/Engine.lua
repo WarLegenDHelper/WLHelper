@@ -1452,6 +1452,10 @@ local function SpellStatsFromLines(lines)
         if opts.neutral or not IsUseLine(text) then   -- WL Helper change (v3)
         local n = t:match("damage and healing done by magical spells and effects by up to (%d+)")
             or t:match("^%+(%d+) spell power") or t:match("^%+(%d+) damage and healing")
+            -- WL Helper change: the French client's line, matched without accented letters
+            -- (lower() may change their bytes).
+            or t:match("et les soins produits par les sorts et effets magiques de (%d+)")
+            or t:match("^%+(%d+) %S+ la puissance des sorts")
         if n then both = both + tonumber(n) end
         n = t:match("healing done by up to (%d+)") or t:match("healing done by spells and effects by up to (%d+)")
             or t:match("^%+(%d+) healing")
@@ -1578,12 +1582,19 @@ local function LiveItem(id, link)
                g("ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT"), g("ITEM_MOD_NATURE_DAMAGE_DONE_SHORT"),
                g("ITEM_MOD_HOLY_DAMAGE_DONE_SHORT"), g("ITEM_MOD_SPELL_PENETRATION_SHORT") },
     }
-    if item.st[STAT.sp] + item.st[STAT.heal] + item.st[STAT.sdmg] == 0 then
+    -- WL Helper change: the stats API may report "damage and healing done by magical spells" as
+    -- healing only (Rotgrip Mantle: +13 counted as healing, so a frost mage saw -14 %). With no
+    -- plain spell power from the API, the tooltip is read too: a "damage and healing" line is
+    -- spell power for both, and only the rest stays healing.
+    local apiHeal, apiDmg = item.st[STAT.heal], item.st[STAT.sdmg]
+    if item.st[STAT.sp] == 0 then
         local ok, lines = pcall(TooltipLines, link)
         if ok and lines then
             -- WL Helper change: read inside pcall, like the tooltip itself.
             pcall(function()
                 local both, heal, dmg = SpellStatsFromLines(lines)
+                if both == 0 and heal == 0 and dmg == 0 then heal, dmg = apiHeal, apiDmg end
+                if both > 0 then heal = math.max(heal, apiHeal - both, 0); dmg = math.max(dmg, apiDmg - both, 0) end
                 item.st[STAT.sp], item.st[STAT.heal], item.st[STAT.sdmg] = both, heal, dmg
                 -- "of Fiery Wrath" and friends: one school only.
                 for _, text in ipairs(lines) do
