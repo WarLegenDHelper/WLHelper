@@ -6,8 +6,12 @@
 --   lvl  the quest's level (quest log)
 --   xp   { xp received (QUEST_TURNED_IN), your level then, the quest's level }: only a turn-in with no
 --        level penalty (the quest at most 5 levels under yours) gives the quest's full Forever XP
+--   ob   { [objective] = { { map, x, y, inside (1/0), n = times }, ... } }: where the counter went up
+--        (12 spots at most per objective; the first 3 are sent to the guild, "O|quest|obj|map|x|y|in")
+--   rw   { c = { item ids to choose from }, f = { item ids given } }: the rewards the window offered
 --   nopre { [id] = true }: a prerequisite Data.lua lists that you had NOT done when you took the quest
 --        (so the game does not need it)
+-- Also WLWritsDB.bossOrder[instance id] = the last 5 runs, the encounter ids in the order they died.
 -- Kept in WLWritsDB.qfacts[quest] (every character of the account), with n = how many times seen.
 -- Guild: each new fact is sent once (prefix WLHqf, "G|quest|kind|npc|map|x|y", "F|...", "X|quest|xp|
 -- level|quest level", "L|quest|level", "N|quest|prereq"); a guild mate's fact fills what we lack and
@@ -63,7 +67,8 @@ local function Here()
     if not m then return nil end
     local pos = C_Map.GetPlayerMapPosition and C_Map.GetPlayerMapPosition(m, "player")
     if not pos then return m end
-    local x, y = pos.GetXY and pos:GetXY()
+    local x, y
+    if pos.GetXY then x, y = pos:GetXY() else x, y = pos.x, pos.y end
     x, y = Num(x), Num(y)
     if not (x and y) then return m end
     return m, math.floor(x * 1000 + 0.5) / 10, math.floor(y * 1000 + 0.5) / 10
@@ -180,8 +185,124 @@ function QF.OnShare(msg)
         return fn(qid, tonumber(t[4]) or 0, kind, tonumber(t[5]), tonumber(t[6]), tonumber(t[7]), nil, true)
     elseif verb == "L" then return QF.NoteLevel(qid, tonumber(t[3]), true)
     elseif verb == "X" then return QF.NoteXP(qid, tonumber(t[3]), tonumber(t[4]), tonumber(t[5]), true)
-    elseif verb == "N" then return QF.NoteNoPrereq(qid, tonumber(t[3]), true) end
+    elseif verb == "N" then return QF.NoteNoPrereq(qid, tonumber(t[3]), true)
+    elseif verb == "O" then return QF.NoteObjective(qid, tonumber(t[3]), tonumber(t[4]), tonumber(t[5]), tonumber(t[6]), t[7] == "1", true) end
     return false
+end
+
+-- ---------------------------------------------------------------- objectives, rewards, bosses
+-- where an objective really moves on: each time a counter goes up (3/10 -> 4/10), the spot (map,
+-- x and y rounded to 1, inside an instance or not) is kept under ob[objective], 12 spots at most
+local OB_MAX, OB_SHARE = 12, 3
+local function InInstance()
+    local ok, inside = pcall(IsInInstance or function() return false end)
+    return ok and inside and true or false
+end
+function QF.NoteObjective(qid, i, m, x, y, ins, guild)
+    if not (Known(qid) and Num(i) and Num(m)) then return false end
+    local r = Row(qid)
+    r.ob = r.ob or {}
+    local list = r.ob[i]
+    if type(list) ~= "table" then list = {}; r.ob[i] = list end
+    x, y = Num(x) and math.floor(x + 0.5) or nil, Num(y) and math.floor(y + 0.5) or nil
+    for _, p in ipairs(list) do
+        if p[1] == m and p[2] == x and p[3] == y then p.n = (p.n or 1) + 1; return false end
+    end
+    if #list >= OB_MAX then return false end
+    list[#list + 1] = { m, x, y, ins and 1 or 0, n = 1, guild = guild or nil }
+    if not guild and #list <= OB_SHARE then
+        Share(string.format("O|%d|%d|%d|%s|%s|%d", qid, i, m, x or "", y or "", ins and 1 or 0))
+    end
+    return true
+end
+local counts = {}
+local function Counts(qid)
+    local Q = C_QuestLog
+    if not (Q and Q.GetQuestObjectives) then return nil end
+    local ok, objs = pcall(Q.GetQuestObjectives, qid)
+    if not (ok and type(objs) == "table") then return nil end
+    local out = {}
+    for i, o in ipairs(objs) do out[i] = type(o) == "table" and Num(o.numFulfilled) or nil end
+    return out
+end
+-- the guide's quests in your log (the log, about 20 lines, not the 527 guide quests)
+local function LogQuests()
+    local out = {}
+    if GetNumQuestLogEntries and GetQuestLogTitle then
+        for i = 1, Num(GetNumQuestLogEntries()) or 0 do
+            local id = Num(select(8, GetQuestLogTitle(i)))
+            if Known(id) then out[id] = true end
+        end
+    end
+    return out
+end
+local function ScanObjectives()
+    local inLog = LogQuests()
+    for qid in pairs(counts) do if not inLog[qid] then counts[qid] = nil end end
+    for qid in pairs(inLog) do
+        local c, last = Counts(qid), counts[qid]
+        if c and last then
+            for i, n in pairs(c) do
+                if last[i] and n > last[i] then
+                    local m, x, y = Here()
+                    if m then QF.NoteObjective(qid, i, m, x, y, InInstance()) end
+                end
+            end
+        end
+        counts[qid] = c
+    end
+end
+local scanning
+local function ObjectivesLater()
+    if scanning then return end
+    scanning = true
+    local after = C_Timer and C_Timer.After
+    if after then after(0.5, function() scanning = nil; pcall(ScanObjectives) end)
+    else scanning = nil; pcall(ScanObjectives) end
+end
+QF._ScanObjectives = ScanObjectives
+
+-- the rewards the quest window offers: c = to choose from, f = given anyway (item ids), kept once
+local function ItemId(link) return type(link) == "string" and not IsSecret(link) and tonumber(link:match("item:(%d+)")) or nil end
+local function NoteRewards(qid)
+    if not Known(qid) then return end
+    local r = Row(qid)
+    if r.rw then return end
+    local c, fx = {}, {}
+    for i = 1, Num(GetNumQuestChoices and GetNumQuestChoices()) or 0 do
+        local id = ItemId(GetQuestItemLink and GetQuestItemLink("choice", i)); if id then c[#c + 1] = id end
+    end
+    for i = 1, Num(GetNumQuestRewards and GetNumQuestRewards()) or 0 do
+        local id = ItemId(GetQuestItemLink and GetQuestItemLink("reward", i)); if id then fx[#fx + 1] = id end
+    end
+    if #c > 0 or #fx > 0 then r.rw = { c = c, f = fx } end
+end
+QF._NoteRewards = NoteRewards
+
+-- the bosses in the order they die: WLWritsDB.bossOrder[instance id] = the last 5 runs, each a list
+-- of encounter ids (a new run starts each time you enter a zone)
+local RUNS = 5
+local run
+local function InstanceId()
+    local ok, _, kind, _, _, _, _, _, id = pcall(GetInstanceInfo or function() end)
+    if ok and (kind == "party" or kind == "raid") then return Num(id) end
+end
+function QF.NewRun() run = nil end
+function QF.NoteBoss(enc)
+    enc = Num(enc)
+    local inst = InstanceId()
+    if not (enc and inst and type(WLWritsDB) == "table") then return false end
+    WLWritsDB.bossOrder = type(WLWritsDB.bossOrder) == "table" and WLWritsDB.bossOrder or {}
+    local runs = WLWritsDB.bossOrder[inst]
+    if type(runs) ~= "table" then runs = {}; WLWritsDB.bossOrder[inst] = runs end
+    if not run or run.inst ~= inst then
+        run = { inst = inst, list = {} }
+        table.insert(runs, 1, run.list)
+        while #runs > RUNS do table.remove(runs) end
+    end
+    for _, e in ipairs(run.list) do if e == enc then return false end end
+    run.list[#run.list + 1] = enc
+    return true
 end
 
 -- ---------------------------------------------------------------- events
@@ -193,6 +314,7 @@ local function OnDetail()
     if kind == "p" then return end                 -- shared by a group member: not the giver
     local m, x, y = Here()
     detail[qid] = { npc, kind, m, x, y, name }
+    NoteRewards(qid)
 end
 local function OnAccepted(qid)
     if not Known(qid) then return end
@@ -210,6 +332,7 @@ local function OnComplete()
     local npc, kind, name = Who("npc")
     local m, x, y = Here()
     complete[qid] = { npc, kind, m, x, y, name, QuestLevel(qid) }
+    NoteRewards(qid)
 end
 local function OnTurnedIn(qid, xp)
     if not Known(qid) then return end
@@ -221,15 +344,20 @@ end
 QF._OnDetail, QF._OnAccepted, QF._OnComplete, QF._OnTurnedIn = OnDetail, OnAccepted, OnComplete, OnTurnedIn
 
 local f = CreateFrame("Frame")
-for _, e in ipairs({ "QUEST_DETAIL", "QUEST_ACCEPTED", "QUEST_COMPLETE", "QUEST_TURNED_IN", "CHAT_MSG_ADDON" }) do
+for _, e in ipairs({ "QUEST_DETAIL", "QUEST_ACCEPTED", "QUEST_COMPLETE", "QUEST_TURNED_IN", "CHAT_MSG_ADDON",
+    "QUEST_LOG_UPDATE", "ENCOUNTER_END", "BOSS_KILL", "PLAYER_ENTERING_WORLD" }) do
     pcall(f.RegisterEvent, f, e)
 end
-f:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
+f:SetScript("OnEvent", function(_, event, a1, a2, a3, a4, a5)
     local ok = pcall(function()
         if event == "QUEST_DETAIL" then OnDetail()
         elseif event == "QUEST_ACCEPTED" then OnAccepted(Num(a2) or Num(a1))   -- classic: (index, id)
         elseif event == "QUEST_COMPLETE" then OnComplete()
         elseif event == "QUEST_TURNED_IN" then OnTurnedIn(Num(a1), a2)
+        elseif event == "QUEST_LOG_UPDATE" then ObjectivesLater()
+        elseif event == "ENCOUNTER_END" then if Num(a5) == 1 then QF.NoteBoss(a1) end
+        elseif event == "BOSS_KILL" then QF.NoteBoss(a1)
+        elseif event == "PLAYER_ENTERING_WORLD" then QF.NewRun()
         elseif event == "CHAT_MSG_ADDON" then
             if a1 == PREFIX and a3 == "GUILD" then
                 local me = UnitName and UnitName("player")

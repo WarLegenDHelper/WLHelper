@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.106] — 2026-11-17
+
+### Ajouté / Added
+- **Relevés en jeu, suite** : WL Helper note aussi où un objectif de quête du guide avance vraiment (l'endroit où le compteur monte, dedans ou dehors l'instance ; 12 endroits au plus par objectif), les récompenses que la fenêtre de quête propose, et l'ordre dans lequel les boss meurent dans chaque donjon (les 5 dernières sorties). Ça sert à corriger les points sur la carte et l'ordre des boss du guide.
+  *Records where objectives really progress, the quest rewards offered, and boss kill order per dungeon.*
+
 ## [1.0.0-beta.105] — 2026-11-17
 
 ### Ajouté / Added

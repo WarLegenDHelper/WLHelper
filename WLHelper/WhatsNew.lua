@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.106", date = "2026-11-17", items = {
+    { s = "add", fr = { "Relevés en jeu, suite", "WL Helper note aussi où un objectif de quête du guide avance vraiment (l'endroit où le compteur monte, dedans ou dehors l'instance ; 12 endroits au plus par objectif), les récompenses que la fenêtre de quête propose, et l'ordre dans lequel les boss meurent dans chaque donjon (les 5 dernières sorties). Ça sert à corriger les points sur la carte et l'ordre des boss du guide." }, en = { "Records where objectives really progress, the quest rewards offered, and boss kill order per dungeon.", "" } },
+  } },
   { v = "1.0.0-beta.105", date = "2026-11-17", items = {
     { s = "add", fr = { "Relevés de quêtes en jeu", "Comme le Wowhead Client, WL Helper note ce que le jeu montre vraiment pour les quêtes du guide (qui la donne et où, qui la reprend, son niveau, l'XP reçue sans pénalité de niveau, et les prérequis listés que tu n'avais pas faits quand tu l'as prise). Ces relevés sont partagés avec la guilde et servent à corriger les données du guide. « /wlh diag quetes » montre ce qui diffère." }, en = { "In-game quest records (giver, turn-in, level, full XP, unneeded prerequisites), shared with the guild; /wlh diag quests.", "" } },
     { s = "fix", fr = { "Le Temple englouti (Alliance)", "3 650 XP, comme sur Wowhead Forever (pas 6 550, la valeur de la version Horde)." }, en = { "Alliance \"The Sunken Temple\"", "3,650 XP." } },
@@ -79,17 +82,5 @@ ns.WHATSNEW = {
     { s = "add", fr = { "Facultatif ou requis", "Les étapes faites dehors d'une quête de donjon disent clairement « Facultatif : le donjon se fait sans · sur le chemin du portail » (ex. Fragments d'Ombréclat à Maraudon), « Requis pour « X » (dans le donjon) » quand une suite en dépend, ou « Requis : la clé pour entrer dans le donjon »." }, en = { "Outside steps say whether they are optional or required.", "" } },
     { s = "add", fr = { "Bouton « Passer »", "Sur les étapes facultatives : deux clics retirent la quête de la route (elle reste dans ton journal), à recocher dans la vue d'ensemble." }, en = { "Skip button for optional quests.", "" } },
     { s = "fix", fr = { "« Requis pour » faux", "Une quête n'est plus dite « dans le donjon » quand elle se fait dehors ou dans un autre donjon." }, en = { "Wrong \"required for\" labels fixed.", "" } },
-  } },
-  { v = "1.0.0-beta.91", date = "2026-11-16", items = {
-    { s = "add", fr = { "« Quoi de neuf » en grand", "Fenêtre large et redimensionnable (largeur et hauteur, taille retenue), versions à gauche avec un point sur celles pas encore vues, changements en cartes sur 2 ou 3 colonnes avec « Voir plus », résumé à la connexion, filtres Tout / Nouveau / Changé / Corrigé, et « Ne plus afficher à la connexion »." }, en = { "Wide, resizable What's new with a version list, card grid, filters.", "" } },
-    { s = "add", fr = { "Pierre de foyer", "Par défaut, la pierre de foyer et le Rappel astral ne sont utilisés que s'ils font gagner au moins 3 min (sinon le GPS prend par exemple le zeppelin d'Orgrimmar pour Grom'gol). La flèche et la carte du guide donnent la durée du trajet et un « Autre trajet » ; Alt-clic sur la flèche pour le prendre." }, en = { "Hearthstone policy (default", "Only if it saves 3 min), trip time and an alternative route." } },
-    { s = "add", fr = { "Commandes", "Survoler un objet affiche l'infobulle du jeu avec ses statistiques (Maj : comparaison), partout dans les Commandes." }, en = { "Item tooltips with stats everywhere in Orders.", "" } },
-    { s = "add", fr = { "/wlh diag carte", "Dit pourquoi le chemin s'affiche ou non sur la carte du monde." }, en = { "New map diagnostic command.", "" } },
-    { s = "chg", fr = { "GPS et Zygor", "Le choix Automatique / WL Helper / Zygor devient un seul interrupteur « Envoyer les destinations à la flèche de Zygor », visible seulement si Zygor est installé, désactivé par défaut." }, en = { "One Zygor switch, off by default.", "" } },
-    { s = "chg", fr = { "Liste des étapes", "Une croix pour la fermer, et le bouton « Étapes » devient « Fermer les étapes » quand elle est ouverte." }, en = { "Close button on the step list.", "" } },
-    { s = "fix", fr = { "Pointillés sur la carte du monde avec OpenMap", "Ils étaient dessinés sous la carte assemblée d'OpenMap ; ils passent maintenant au-dessus (chemin à pied et patrouilles)." }, en = { "World map path dots now draw above OpenMap's stitched map.", "" } },
-    { s = "fix", fr = { "Accueil des Commandes", "La liste des artisans en ligne restait affichée par-dessus les tuiles en revenant à l'accueil." }, en = { "Orders home no longer shows the online list over the tiles.", "" } },
-    { s = "fix", fr = { "Fenêtres hors de l'écran", "Une position enregistrée hors de l'écran est ramenée ; la barre de titre reste toujours visible." }, en = { "Windows saved off-screen are brought back.", "" } },
-    { s = "fix", fr = { "Messages de guilde renforcés", "Un message mal formé ne peut plus casser les Commandes, l'Agenda ou l'Accueil (les données abîmées sont nettoyées) ; seul l'organisateur peut modifier ou annuler son événement ; on ne peut plus inventer d'étoiles ; un homonyme d'un autre royaume n'écrase plus les données d'un membre ; moins d'annonces et de rafraîchissements quand beaucoup de messages arrivent." }, en = { "Guild sync hardened against malformed messages, spoofing and floods.", "" } },
   } },
 }
