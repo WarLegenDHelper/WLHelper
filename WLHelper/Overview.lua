@@ -864,6 +864,26 @@ local function XPFor(qid, plvl)
 end
 ns.QuestXPFor = XPFor
 
+-- Grey and optional: not taken, 8 levels or more under you, half the XP or less (Forever's rule),
+-- and nothing of the dungeon needs it (the guide's BeforeReason is false, asked for this dungeon
+-- alone: the running route is set aside, so the answer never depends on the route it shapes).
+-- One rule for the Overview's default untick and the engine's node choice (Engine.lua MakeNodes):
+-- such a quest stays out of the route unless the player ticked it by hand (WLDTDB.offPick).
+-- log: the quest log (ns.LogEntries) when the caller already has it.
+function ns.GreyOptional(qid, dkey, lvl, log)
+  if not (qid and ns.Q[qid] and ns.GuideBeforeReason) then return false end
+  if QState(log or ns.LogEntries(), qid) ~= "none" then return false end
+  local got, base, diff = XPFor(qid, lvl)
+  if not ((diff or 0) >= GREY_GAP and (base or 0) > 0 and (got or 0) > 0 and got <= base * GREY_SHARE) then
+    return false
+  end
+  local saved = ns.route
+  ns.route = nil
+  local okB, r = pcall(ns.GuideBeforeReason, qid, dkey)
+  ns.route = saved
+  return okB and r == false
+end
+
 -- the game's figures, as they show: the quest frame (offer, turn-in) and the quest log
 do
   local ev = CreateFrame and CreateFrame("Frame")
@@ -1067,18 +1087,8 @@ local function Info(qid, dkey, ctx)
     end
   end
   local high = (st == "none") and (low ~= nil or maxL > ctx.lvl + HIGH_GAP) or false
-  -- grey and optional: 8 levels or more under you, half the XP or less (Forever's rule), and nothing
-  -- of the dungeon needs it (the guide's BeforeReason is false, asked for this dungeon alone: a
-  -- running route on other dungeons does not change the answer). Unticked by default.
-  local greyOpt = false
-  if st == "none" and not high and (xpDiff or 0) >= GREY_GAP and (xpBase or 0) > 0 and (xpGot or 0) > 0
-    and xpGot <= xpBase * GREY_SHARE and ns.GuideBeforeReason then
-    local saved = ns.route
-    ns.route = nil
-    local okB, r = pcall(ns.GuideBeforeReason, qid, dkey)
-    ns.route = saved
-    greyOpt = okB and r == false
-  end
+  -- grey and optional (ns.GreyOptional, the engine's rule too). Unticked by default.
+  local greyOpt = not high and ns.GreyOptional(qid, dkey, ctx.lvl, log) or false
   return {
     q = q, st = st, pre = pre, low = low, maxL = maxL, high = high, other = other,
     xp = xpGot, xpBase = xpBase, xpDiff = xpDiff, band = Band(q.l, ctx.lvl),

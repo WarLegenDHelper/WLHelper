@@ -668,10 +668,22 @@ local function MakeNodes(sel, cls)
     else T = add({ kind = "t", q = qid, unknown = true, npc = q.ft, d = home, pre = isPre, deps = tdeps }) end
     return A, T
   end
+  -- a grey optional quest (ns.GreyOptional, Overview.lua) stays out unless ticked by hand
+  -- (offPick), as the Overview's default untick does, even when the Overview never showed the
+  -- dungeon (a slash command, a key card, a restart)
+  local pick = (ns.OffPick and ns.OffPick()) or (WLDTDB and WLDTDB.offPick) or {}
+  local log = ns.GreyOptional and ns.LogEntries() or nil
+  local function Grey(qid, dkey)
+    if pick[qid] or not ns.GreyOptional then return false end
+    local d = ns.D[dkey]
+    if d and (d.cq or d.raid) then return false end
+    return ns.GreyOptional(qid, dkey, lvl, log)
+  end
   for dkey in pairs(sel) do
     for _, qid in ipairs(ns.DungeonQuests(dkey, cls)) do
       local q = ns.Q[qid]
-      if not (WLDTDB.off and WLDTDB.off[qid]) and not q.extra and InRoute(qid, cls, lvl, dkey) then
+      if not (WLDTDB.off and WLDTDB.off[qid]) and not q.extra and InRoute(qid, cls, lvl, dkey)
+        and not Grey(qid, dkey) then
         local prevT
         local Tby = {}
         local chain = FullChain(qid, cls) or {}
