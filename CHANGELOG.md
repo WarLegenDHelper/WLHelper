@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.115] — 2026-11-18
+
+### Corrigé / Fixed
+- **XP des quêtes** : 128 quêtes affichaient l'XP de base, sans le bonus de Forever (souvent x1,75 à x2,7). Elles ont maintenant l'XP réelle, celle de Wowhead Forever, la même qu'en jeu (Blood Red Bandanas : 9 700 XP). Les totaux d'XP du guide et de la vue d'ensemble sont donc bien plus justes.
+  *Quest XP: 128 quests showed the base XP without Forever's bonus; they now show the real XP (Wowhead Forever, as in game).*
+- **Quêtes ajoutées** : An Ambassador of Evil (Alliance, Ironforge, avant The Lost Tablets of Will à Uldaman) et Elven Legends côté Alliance (Scholar Runethorn, Feathermoon) ; les librams de Hache-tripes s'ouvrent maintenant aussi à l'Alliance.
+  *Added An Ambassador of Evil and the Alliance Elven Legends (Dire Maul librams open to the Alliance).*
+
 ## [1.0.0-beta.114] — 2026-11-17
 
 ### Ajouté / Added

@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.115", date = "2026-11-18", items = {
+    { s = "fix", fr = { "XP des quêtes", "128 quêtes affichaient l'XP de base, sans le bonus de Forever (souvent x1,75 à x2,7). Elles ont maintenant l'XP réelle, celle de Wowhead Forever, la même qu'en jeu (Blood Red Bandanas : 9 700 XP). Les totaux d'XP du guide et de la vue d'ensemble sont donc bien plus justes." }, en = { "Quest XP", "128 quests showed the base XP without Forever's bonus; they now show the real XP (Wowhead Forever, as in game)." } },
+    { s = "fix", fr = { "Quêtes ajoutées", "An Ambassador of Evil (Alliance, Ironforge, avant The Lost Tablets of Will à Uldaman) et Elven Legends côté Alliance (Scholar Runethorn, Feathermoon) ; les librams de Hache-tripes s'ouvrent maintenant aussi à l'Alliance." }, en = { "Added An Ambassador of Evil and the Alliance Elven Legends (Dire Maul librams open to the Alliance).", "" } },
+  } },
   { v = "1.0.0-beta.114", date = "2026-11-17", items = {
     { s = "add", fr = { "Guide PvP", "Tape « /wlh pvp ». Pour ta classe, chaque pièce du set PvP bleu « Premier » (niveau d'objet 60, dès le niveau 55) avec son prix en honneur et en marques, ce qu'il te manque d'après ton honneur et tes marques, le total pour le set, et le champ de bataille à faire en premier (celui dont il te manque le plus de marques). Quand une classe a plusieurs sets (druide, chaman, prêtre, paladin), WL Helper Gear choisit le meilleur pour ta spé et nomme les autres. Puis la quête Field of Honor (Wizzik Dustfizz à Gadgetzan) et les sceaux « Emboldened » qui rendent une pièce épique plus tard. Prix lus sur Wowhead Forever (vendeur Lady Palanseer) : tête 9 000 honneur + 15 marques d'Alterac, torse 9 350 + 15 Arathi, jambes 9 000 + 15 Goulet, épaules 6 350 + 10 Arathi, mains 7 500 + 10 Goulet, pieds 7 500 + 10 Îles Darkspear, taille 6 000 + 10 Arathi, poignets 4 500 + 10 Goulet." }, en = { "PvP guide (/wlh pvp)", "The rare PvP set for your class, its Forever prices (Wowhead), what you still miss, which battleground first, Field of Honor." } },
   } },
@@ -57,8 +61,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.101", date = "2026-11-17", items = {
     { s = "chg", fr = { "Vrai réseau de vols", "Le GPS connaît maintenant le réseau des maîtres de vol de Forever et la durée mesurée de chaque saut (données de Shortest Path Forever, sous GPL, dans le module WLHelper Nav). Un vol passe par les maîtres de vol que tu connais, avec son vrai temps, au lieu d'une ligne droite ; deux maîtres de vol non reliés ne sont plus proposés." }, en = { "Real flight network with measured times (from Shortest Path Forever, GPL, in WLHelper Nav).", "" } },
-  } },
-  { v = "1.0.0-beta.100", date = "2026-11-17", items = {
-    { s = "chg", fr = { "Route réordonnée selon ta position", "Quand tu arrives dans une nouvelle zone (à pied, après un vol ou un téléport), les étapes qui restent sont remises dans l'ordre depuis là où tu es, pour éviter les allers-retours. Pas pendant un vol ni dans un donjon, au plus une fois toutes les 30 s." }, en = { "Remaining steps are reordered from your position when you enter a new zone.", "" } },
   } },
 }
