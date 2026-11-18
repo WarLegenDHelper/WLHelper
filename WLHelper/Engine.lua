@@ -2535,7 +2535,12 @@ end
 --  Drawn on the maps by Writs/Patrol.lua (Zones), for the current step's objectives.
 -- =====================================================================
 local AREA_MOVE, AREA_MARGIN = 30, 25
-local AREA_NEAR_SPAWN = 40   -- yards: in a camp this near a spawn, the GPS spot is you (AreaPick)
+-- yards: in a camp this near a spawn, the GPS spot is you (AreaPick). Mobs wander and the spawns of a
+-- wide camp are far apart (Spitelash Sirens, Azshara: the nearest spawn 100 yd away while you stand among
+-- them; report "you send me into the circle when I am in it already"). An area with a hole no mob
+-- reaches (the Sunken Temple's island in its pool, 1424) says its own: a.near.
+local AREA_NEAR_SPAWN = 120
+ns.AREA_NEAR_SPAWN = AREA_NEAR_SPAWN
 ns.AREA_MOVE, ns.AREA_MARGIN = AREA_MOVE, AREA_MARGIN
 
 -- The camps of an area: { { {x, y}, ... }, ... } (one hull or a list of hulls in the data).
@@ -2678,7 +2683,8 @@ function ns.AreaPick(a, here, prefer)
         if s[3] == k then
           any = true
           local d2 = (s[1] - here[2]) ^ 2 + (s[2] - here[3]) ^ 2
-          if d2 <= AREA_NEAR_SPAWN * AREA_NEAR_SPAWN then near = true end
+          local r = tonumber(a.near) or AREA_NEAR_SPAWN
+          if d2 <= r * r then near = true end
           if d2 <= 25 and (not ud or d2 < ud) then under, ud = s, d2 end
         end
       end

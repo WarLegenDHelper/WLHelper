@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.132", date = "2026-11-18", items = {
+    { s = "fix", fr = { "Guide, dans la zone c'est dans la zone", "Dans une zone de monstres aux apparitions espacées (les Sirènes Fouette-bile d'Azshara pour « Le corail des sirènes »), la flèche t'envoyait encore à l'apparition la plus proche, à 100 m, alors que tu étais au milieu. Dans la zone, la flèche dit maintenant que tu y es tant qu'une apparition est à moins de 120 m (avant : 40). Le bassin des larmes garde 40 m : son île au milieu n'a pas de monstre." }, en = { "Guide", "Inside a mob area, you are \"there\" within 120 yd of a spawn (was 40); the Pool of Tears' island keeps 40." } },
+  } },
   { v = "1.0.0-beta.131", date = "2026-11-18", items = {
     { s = "chg", fr = { "GPS, une seule flèche avec Shortest Path", "Avec « Avec la flèche de WL Helper », la flèche de Shortest Path et ses étapes dans le suivi des objectifs se coupent toutes seules (dans ses réglages). Tes réglages reviennent quand tu enlèves l'option ou que tu choisis un autre GPS. Plus rien à couper à la main." }, en = { "GPS", "Shortest Path's own arrow and journey tracker are turned off while our arrow shows its route, and given back after." } },
   } },
@@ -49,8 +52,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.118", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, repères de la carte", "Un repère posé sur la carte du monde lance le GPS de WL Helper jusque-là (flèche et chemin à pied), qu'il soit posé par toi (Ctrl-clic) ou par un autre addon qui pose le repère du jeu, comme les livres, coffres et rares de Naowh Forever (« Click for a waypoint »). Repère enlevé : le GPS s'arrête. Jamais les repères que WL Helper pose lui-même, rien en donjon. Réglages > GPS > « Suivre les repères de la carte » pour l'éteindre." }, en = { "GPS follows map pins (yours or another addon's, like Naowh's books); Settings > GPS to turn it off.", "" } },
-  } },
-  { v = "1.0.0-beta.117", date = "2026-11-18", items = {
-    { s = "fix", fr = { "Guide, étapes de boss", "Une étape de boss dont toutes les quêtes sont rendues compte comme faite, même si le guide n'a pas vu le boss mourir (tué avant un /reload ou une déconnexion). Avant, l'onglet « Dans le donjon » pouvait rester à 8 sur 9 alors que tout était fait (Prison d'Alcaz, Tidemistress Ca'zass)." }, en = { "Boss steps whose quests are all turned in count as done, even without a kill seen this session.", "" } },
   } },
 }
