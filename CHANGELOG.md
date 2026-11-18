@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.154] — 2026-11-18
+
+### Ajouté / Added
+- **Vue moderne, des liens toujours visibles** : sous la barre de progression, une rangée de petits liens **Guides · Vue d'ensemble · Boss · Carte · Partager**. Le choix d'un guide (avec ses cartes de donjons), la vue d'ensemble, le panneau des boss, la carte du donjon et le partage des quêtes sont à un clic, sans passer par le menu ni la fenêtre classique.
+  *Modern view: always-visible links under the progress bar: Guides (the dungeon picker), Overview, Bosses, Map, Share.*
+
 ## [1.0.0-beta.153] — 2026-11-18
 
 ### Modifié / Changed

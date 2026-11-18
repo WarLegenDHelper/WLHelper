@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.154", date = "2026-11-18", items = {
+    { s = "add", fr = { "Vue moderne, des liens toujours visibles", "Sous la barre de progression, une rangée de petits liens **Guides · Vue d'ensemble · Boss · Carte · Partager**. Le choix d'un guide (avec ses cartes de donjons), la vue d'ensemble, le panneau des boss, la carte du donjon et le partage des quêtes sont à un clic, sans passer par le menu ni la fenêtre classique." }, en = { "Modern view", "Always-visible links under the progress bar: Guides (the dungeon picker), Overview, Bosses, Map, Share." } },
+  } },
   { v = "1.0.0-beta.153", date = "2026-11-18", items = {
     { s = "chg", fr = { "La vue moderne se suffit à elle-même", "" }, en = { "", "" } },
     { s = "chg", fr = { "un clic gauche ne renvoie plus vers la fenêtre classique.", "Sur le titre, il ne fait rien (glisser pour déplacer). Sur une action de « Ensuite », il affiche son étape dans la vue moderne ;" }, en = { "", "" } },
@@ -110,8 +113,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.140", date = "2026-11-18", items = {
     { s = "fix", fr = { "Temple englouti, « L'Essence d'Eranikus »", "La quête était la toute première étape dans le donjon (« En chemin »), alors que l'objet qui la donne tombe sur l'Ombre d'Eranikus, l'avant-dernier boss. Elle se prend et se rend maintenant à l'étape de l'Ombre d'Eranikus (le Réceptacle d'essence est juste à côté)." }, en = { "Sunken Temple", "\"The Essence of Eranikus\" is taken and turned in at the Shade of Eranikus' step, no longer first inside." } },
-  } },
-  { v = "1.0.0-beta.139", date = "2026-11-18", items = {
-    { s = "fix", fr = { "La carte du donjon sur M", "Dans un donjon, la carte du Journal des donjons de Naowh (le plan avec les boss en portraits numérotés) s'affichait une fraction de seconde, puis la carte de la zone extérieure la remplaçait. Le Journal de Naowh retire sa carte dès que la carte du monde change de zone, et un autre addon (ou le jeu) la change juste après l'ouverture. WL Helper repose maintenant la carte de Naowh une fois, juste après ce changement : elle reste sur M. Rien n'est modifié dans Naowh ni dans OpenMap." }, en = { "M inside a dungeon", "Naowh's dungeon map no longer flashes away to the zone outside; WL Helper lays it again once after the map is turned." } },
   } },
 }

@@ -327,6 +327,33 @@ local function Rich(text)
 end
 TR._Rich = Rich
 
+-- the links under the bar: { label, action } for this model
+local function Links(m)
+  local dk = m and m.dk
+  local out = {
+    { L.TR_L_PICK, function() if ns.ShowPicker then ns.ShowPicker() end end },
+  }
+  if dk and ns.ShowOverview then out[#out + 1] = { L.TR_L_OVERVIEW, function() ns.ShowOverview(dk) end } end
+  if dk and ns.ToggleBosses then out[#out + 1] = { L.TR_L_BOSSES, function() ns.ToggleBosses(dk) end } end
+  if dk and ns.OpenDungeonMap then out[#out + 1] = { L.TR_L_MAP, function() ns.OpenDungeonMap(dk) end } end
+  if ns.ShareQuests then out[#out + 1] = { L.TR_L_SHARE, function() ns.ShareQuests() end } end
+  return out
+end
+local function LinkBtn(k)
+  local b = f.links[k]
+  if not b then
+    b = CreateFrame("Button", nil, f)
+    b:SetHeight(18)
+    b.text = ns.Text(b, F.meta, T.accentSoft)
+    b.text:SetPoint("LEFT", 0, 0); b.text:SetWordWrap(false)
+    b:SetScript("OnEnter", function(self) self.text:SetTextColor(T.fg[1], T.fg[2], T.fg[3]) end)
+    b:SetScript("OnLeave", function(self) local c = T.accentSoft; self.text:SetTextColor(c[1], c[2], c[3]) end)
+    b:SetScript("OnClick", function(self) if self.fn then pcall(self.fn) end; TR.Refresh() end)
+    f.links[k] = b
+  end
+  return b
+end
+
 -- row k of the steps list
 local function StepRow(k)
   local r = f.stepRows[k]
@@ -580,6 +607,9 @@ local function Build()
   f.prog = ns.Tex(f, "ARTWORK", T.divider); f.prog:SetHeight(4)
   f.progFill = ns.Tex(f, "OVERLAY", T.info); f.progFill:SetHeight(4)
   f.progText = ns.Text(f, F.meta, T.muted); f.progText:SetJustifyH("RIGHT")
+  -- always on screen under the bar, the ways out of the guide's step (report: "the dungeon picker
+  -- and the like must be found somehow from the modern view"): small text links
+  f.links = {}
   Place()
   f:Hide()
   return f
@@ -654,6 +684,7 @@ local function Draw(m)
     for _, fs in ipairs(f.info or {}) do fs:Hide() end
     if f.backBtn then f.backBtn:Hide() end
     if f.stepsToggle then f.stepsToggle:Hide() end
+    for _, b in ipairs(f.links or {}) do b:Hide() end
     for _, r in ipairs(f.stepRows or {}) do r:Hide() end
     f.cur:Hide(); f.travel:Hide(); f.travelIcon:Hide()
     f.card:Hide(); f.stepLabel:Hide(); f.thenLabel:Hide(); f.prog:Hide(); f.progFill:Hide(); f.progText:Hide()
@@ -812,6 +843,24 @@ local function Draw(m)
   f.progText:SetText((m.pct or 0) .. " %")
   f.progText:ClearAllPoints(); f.progText:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -y); f.progText:Show()
   y = y + 14
+  -- the links, on one line (two when they do not fit)
+  y = y + 6
+  local x, used = PAD, 0
+  for k, it in ipairs(Links(m)) do
+    local b = LinkBtn(k)
+    b.fn = it[2]
+    b.text:SetText(it[1])
+    if ns.Shadow then ns.Shadow(b.text, f.frameless) end
+    local okW, tw = pcall(b.text.GetStringWidth, b.text)
+    tw = (okW and type(tw) == "number" and not secret(tw)) and math.ceil(tw) or 60
+    if x + tw > W - PAD and x > PAD then x = PAD; y = y + 18 end
+    b:SetWidth(tw); b:ClearAllPoints(); b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -y)
+    b:Show()
+    x = x + tw + 14
+    used = k
+  end
+  for k = used + 1, #f.links do f.links[k]:Hide() end
+  y = y + 18
   f:SetHeight(y + 8)
 end
 
