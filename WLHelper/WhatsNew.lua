@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.126", date = "2026-11-18", items = {
+    { s = "chg", fr = { "GPS, moins de bateaux et de zeppelins à la chaîne", "Pour choisir le trajet, chaque bateau ou zeppelin compte 2 minutes de plus que son temps (l'écran de chargement, le quai à trouver, le départ raté), le deuxième 4 minutes, le troisième 6. Un vol de 10 minutes passe donc avant « bateau pour Ratchet, vol jusqu'à Orgrimmar, zeppelin pour Fossoyeuse » s'il ne fait pas gagner nettement plus. Les temps affichés restent les vrais. Exemple : d'Orgrimmar vers les Terres ingrates, l'autre trajet proposé était « zeppelin pour Fossoyeuse, puis zeppelin pour Grom'gol, puis vol » pour gagner 30 secondes ; c'est maintenant un seul zeppelin, puis le vol." }, en = { "GPS", "Each boat or zeppelin weighs 2 more minutes in the choice (the 2nd 4, the 3rd 6): no ship chains for a few minutes saved." } },
+    { s = "add", fr = { "GPS, la destination finale sur la flèche", "Tant que l'étape en cours est un vol, un bateau ou le chemin vers un quai, la flèche dit en haut, en doré, où tout ça mène : « Destination : Moulin-de-Tarren, Contreforts de Hautebrande ~12 min »." }, en = { "GPS", "The arrow tells the trip's final destination on top, with the time left." } },
+  } },
   { v = "1.0.0-beta.125", date = "2026-11-18", items = {
     { s = "add", fr = { "Trouver un groupe, le choix en cartes", "Le bouton « Donjons » ouvre une fenêtre de grandes cartes, comme le choix du guide : l'image de chaque donjon, son nom, ses niveaux, « Ta route » et « Tes quêtes : N » quand tu as ses quêtes. Clic sur une carte : cochée (bord rouge et coche), re-clic : décochée. Trois onglets : Donjons, Raids, Quêtes et zones. Un donjon absent de la recherche de groupe du jeu est grisé. En bas, combien sont choisis, « Effacer » et « Chercher »." }, en = { "Find a group", "Dungeons, raids and questing zones picked on big cards with the dungeons' pictures, like the guide's." } },
     { s = "add", fr = { "Trouver un groupe, les quêtes de groupe", "Une quête élite ou de groupe de ton journal (ex. Summoning Shadra dans les Hinterlands) ajoute la source « Tes quêtes de groupe » : elle cherche les groupes de sa zone dans la recherche de groupe du jeu, et « Copier le texte de l'annonce » donne « Quête : Summoning Shadra (The Hinterlands), on cherche du monde ». Dans l'onglet Quêtes et zones, la zone de ta quête le dit. L'annonce elle-même se crée dans la recherche de groupe du jeu : le jeu ne laisse pas un addon la créer." }, en = { "Find a group", "Your group quests (elite) as a source: their zone searched, the listing text ready." } },
@@ -51,14 +55,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.112", date = "2026-11-17", items = {
     { s = "chg", fr = { "Améliorations, « Presque pareil »", "Seulement sous 10 %. À partir de 10 %, le pourcentage reste affiché en vert ou en rouge (« +12 % » est une vraie amélioration), avec en dessous l'écart réel en points (« Écart réel : ~2 de puissance des sorts seulement. »)." }, en = { "Upgrades", "\"About the same\" only under 10 %; from 10 % the percent stays, with the real gap in points under it." } },
-  } },
-  { v = "1.0.0-beta.111", date = "2026-11-17", items = {
-    { s = "fix", fr = { "Quêtes du guide vérifiées sur Wowhead Forever", "Les 526 quêtes du guide ont été lues une à une sur Wowhead Forever et comparées à nos données. 82 corrections :" }, en = { "", "" } },
-    { s = "fix", fr = { "", "faction : 14 quêtes réservées à la Horde ou à l'Alliance étaient données pour les deux (ou l'inverse, comme Da Voodoo) ;" }, en = { "", "" } },
-    { s = "fix", fr = { "", "niveau et niveau requis : 17 quêtes (Ruines de Lordaeron, Horn of Xelthos, Blood Red Bandanas...) ;" }, en = { "", "" } },
-    { s = "fix", fr = { "", "partage en groupe : 36 quêtes ;" }, en = { "", "" } },
-    { s = "fix", fr = { "", "noms de Forever : The Great Ezra Grimm (au lieu de Fras Siabi), Pip Quickwit (au lieu de Finkle Einhorn), Velarok Windblade, Scarshield Infiltrator, The Eastern Kingdoms, Connery's Trunk ;" }, en = { "", "" } },
-    { s = "fix", fr = { "", "qui donne la quête : The Key to Scholomance (Apothecary Dithers), Heed My Call (Rau Cliffrunner, Freewind Post) ;" }, en = { "", "" } },
-    { s = "fix", fr = { "", "prérequis : The Stone Circle, Grark Lorkrub, Lord Banehollow." }, en = { "All 526 guide quests checked page by page on Wowhead Forever: 82 fixes (factions, levels, sharing, Forever names, givers, prerequisites).", "" } },
   } },
 }

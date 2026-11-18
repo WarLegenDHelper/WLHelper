@@ -282,7 +282,8 @@ local function Layout(self)
         if h < fs.size then h = fs.size + 2 end
         y = y + h
     end
-    line(self.what, 2, 0)
+    line(self.goal, 2, 0)
+    line(self.what, 2, 6)
     line(self.where, 2, 2)
     line(self.dist, 1, 4)
     line(self.route, 3, 6)
@@ -401,7 +402,7 @@ local function Draw(self, now, combat)
     local n = legs and #legs or 0
     local changed = false
     local function T(fs, t) if SetText(fs, t) then changed = true end end
-    local what, where, dist, route = "", "", "", ""
+    local what, where, dist, route, goal = "", "", "", "", ""
     local told             -- a leg already said on line 2 (the ride after a flight)
     local button = nil
     self.turn = false
@@ -544,6 +545,25 @@ local function Draw(self, now, combat)
         route = L("Vol supposé connu : ouvre la carte du maître de vol pour vérifier")
     end
 
+    -- the trip's end, on top while a leg on the way is told (a flight, a ship, a walk to a dock): you
+    -- always see where all this goes ("Destination : Moulin-de-Tarren, Contreforts de Hautebrande ~12 min")
+    if not now.arrived and now.dest and legs and n > 0 then
+        local last = legs[n]
+        local finalNow = n == 1 and leg and leg.kind == "ride"
+        if not finalNow then
+            local d = now.dest
+            local w = d.writ
+            local name = (w and w.npcName) or d.name or (last and last.to and last.to.name)
+            if name and name ~= "" then
+                local z = d.map and WP.ZoneName and WP.ZoneName(d.map)
+                if z and z ~= tostring(d.map) and z ~= "?" and z ~= name then name = name .. ", " .. z end
+                goal = S.Hex(C.gold) .. string.format(L("Destination : %s"), name) .. "|r"
+                local mins = GPS.TripMinutes and GPS.TripMinutes()
+                if mins then goal = goal .. S.Hex(C.muted) .. "  " .. mins .. "|r" end
+            end
+        end
+    end
+    if SetText(self.goal, goal) then changed = true end
     T(self.what, what)
     T(self.where, where)
     -- the distance and the itinerary's walks count down every tick: lay the HUD out again only when a
@@ -800,6 +820,7 @@ local function Build()
     arrow.icon:Hide()
 
     -- line 1 what to do, line 2 where, line 3 how far and how long, line 4 the whole way
+    arrow.goal = Line(arrow, S.F.label, C.gold, true, 2)
     arrow.what = Line(arrow, S.F.heading, C.fg, true, 2)
     arrow.where = Line(arrow, S.F.label, C.gold, false, 2)
     arrow.dist = Line(arrow, S.F.body, C.fg, true, 1)
@@ -934,7 +955,7 @@ end
 function GPS.Lock()
     demo = false
     if arrow then
-        for _, fs in ipairs({ arrow.what, arrow.where, arrow.dist, arrow.route }) do SetText(fs, "") end
+        for _, fs in ipairs({ arrow.goal, arrow.what, arrow.where, arrow.dist, arrow.route }) do SetText(fs, "") end
         arrow.visual = nil
     end
     if arrow and not GPS.Active() then arrow:Hide() end

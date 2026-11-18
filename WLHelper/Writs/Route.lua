@@ -28,6 +28,7 @@ WP.GPS = GPS
 ns.AddEnglish({
     ["Va au maître de vol de %s"] = "Go to the flight master at %s",
     ["Va au bateau pour %s"] = "Go to the boat to %s",
+    ["Destination : %s"] = "Destination: %s",
     ["Va au zeppelin pour %s"] = "Go to the zeppelin to %s",
     ["Rejoins %s"] = "Go to %s",
     ["Prends le vol pour %s"] = "Take the flight to %s",
@@ -225,6 +226,11 @@ local RUN, MOUNT = 7, 11.2         -- yards a second on foot and on a 60% mount
 local TERRAIN = 1.3                -- roads and hills: a ride is longer than the straight line
 local FLY, FLY_DETOUR, FLY_STOP = 30, 1.25, 20
 local LINK_TIME, TELEPORT_TIME = 150, 15   -- LINK_TIME: a zeppelin or boat whose timing is unknown (wait + ride)
+-- Choosing a way, a zeppelin or a boat counts more than its time: a loading screen, a dock to find in a
+-- city, a departure missed. The 1st one SHIP_HASSLE seconds more, the 2nd twice that, and so on (report:
+-- "a boat to Orgrimmar, then the zeppelin to Undercity, when a 10 min flight does it"). Only the choice:
+-- the times the GPS tells stay the real ones.
+local SHIP_HASSLE = 120
 local HEARTH_TIME = 25             -- 10 s cast, the loading screen, a few seconds to get going
 local NEAR = 15                    -- yards: a leg's end reached
 local REPLAN_EVERY = 8             -- seconds between two plans while guiding
@@ -1103,6 +1109,7 @@ local function Search(dests, firstOnly, exclude, pol)
     local sNow = ServerNow()
     local cost, prev, how, done = {}, {}, {}, {}
     local far = {}         -- [i]: reached by a cast or a ship (a guessed flight there could not be checked)
+    local pen, ships = {}, {}   -- [i]: the hassle counted on the way there (SHIP_HASSLE), its ships
     for i = 1, n do cost[i] = math.huge end
     cost[1] = 0
     local reached
@@ -1114,6 +1121,7 @@ local function Search(dests, firstOnly, exclude, pol)
         done[u] = true
         local a = nodes[u]
         local base = cost[u]
+        local real = base - (pen[u] or 0)
         for v = 1, n do
             if not done[v] then
                 local b = nodes[v]
@@ -1130,20 +1138,41 @@ local function Search(dests, firstOnly, exclude, pol)
                     end
                 end
                 if a.kind == "dock" and a.other == b and (a.start or not a.link.oneWay) then
-                    local lt = LinkCost(a, b, base, sNow)
+                    local lt = LinkCost(a, b, real, sNow)
                     if lt < c then c, kind = lt, "link" end
                 end
                 if u == 1 and b.kind == "port" and TELEPORT_TIME < c then c, kind = TELEPORT_TIME, "teleport" end
                 if u == 1 and b == inn and HEARTH_TIME < c then c, kind = HEARTH_TIME, "hearth" end
-                if kind and base + c < cost[v] then
-                    cost[v], prev[v], how[v] = base + c, u, kind
+                local extra = 0
+                if kind == "link" and a.link.mode ~= "flight" then extra = SHIP_HASSLE * ((ships[u] or 0) + 1) end
+                if kind and base + c + extra < cost[v] then
+                    cost[v], prev[v], how[v] = base + c + extra, u, kind
+                    pen[v] = (pen[u] or 0) + extra
+                    ships[v] = (ships[u] or 0) + (extra > 0 and 1 or 0)
                     far[v] = far[u] or kind == "link" or kind == "teleport" or kind == "hearth"
                 end
             end
         end
     end
+    for i = 1, n do if pen[i] and cost[i] < math.huge then cost[i] = cost[i] - pen[i] end end
     return nodes, cost, prev, how, reached, via
 end
+GPS._SHIP_HASSLE = SHIP_HASSLE
+
+-- The hassle of a plan's ships (Search's SHIP_HASSLE), the ship you are on already left out: the plan you
+-- follow and a new one are weighed with it as the search weighed them.
+local function Hassle(legs)
+    local h, k = 0, 0
+    for i, leg in ipairs(legs or {}) do
+        local l = leg.kind == "link" and leg.from and leg.from.link
+        if l and l.mode ~= "flight" and not (i == 1 and Aboard(leg)) then
+            k = k + 1
+            h = h + SHIP_HASSLE * k
+        end
+    end
+    return h
+end
+GPS._Hassle = Hassle
 
 -- Seconds to each of `dests` from where you stand (nil when unreachable), in one search.
 function GPS.CostsTo(dests)
@@ -1859,7 +1888,8 @@ function GPS.Replan()
         local function Stone(l) return l[1] and l[1].kind == "hearth" end
         local gainHeld = oldCost and Stone(legs) and not Stone(old)
             and ((choice and choice.pol) or HearthPolicy()) == "gain" and oldCost - eta < HEARTH_GAIN
-        if oldCost and (eta >= oldCost * (1 - SWITCH) or gainHeld) then legs, eta = old, oldCost end
+        local hNew, hOld = Hassle(legs), oldCost and Hassle(old) or 0
+        if oldCost and (eta + hNew >= (oldCost + hOld) * (1 - SWITCH) or gainHeld) then legs, eta = old, oldCost end
     end
     state.legs, state.eta, state.planFor = legs, eta, state.dest
     -- "step 2 of 4" keeps counting across plans: legs already done plus the legs left

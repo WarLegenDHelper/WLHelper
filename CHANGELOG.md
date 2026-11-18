@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.126] — 2026-11-18
+
+### Modifié / Changed
+- **GPS, moins de bateaux et de zeppelins à la chaîne** : pour choisir le trajet, chaque bateau ou zeppelin compte 2 minutes de plus que son temps (l'écran de chargement, le quai à trouver, le départ raté), le deuxième 4 minutes, le troisième 6. Un vol de 10 minutes passe donc avant « bateau pour Ratchet, vol jusqu'à Orgrimmar, zeppelin pour Fossoyeuse » s'il ne fait pas gagner nettement plus. Les temps affichés restent les vrais. Exemple : d'Orgrimmar vers les Terres ingrates, l'autre trajet proposé était « zeppelin pour Fossoyeuse, puis zeppelin pour Grom'gol, puis vol » pour gagner 30 secondes ; c'est maintenant un seul zeppelin, puis le vol.
+  *GPS: each boat or zeppelin weighs 2 more minutes in the choice (the 2nd 4, the 3rd 6): no ship chains for a few minutes saved.*
+
+### Ajouté / Added
+- **GPS, la destination finale sur la flèche** : tant que l'étape en cours est un vol, un bateau ou le chemin vers un quai, la flèche dit en haut, en doré, où tout ça mène : « Destination : Moulin-de-Tarren, Contreforts de Hautebrande ~12 min ».
+  *GPS: the arrow tells the trip's final destination on top, with the time left.*
+
 ## [1.0.0-beta.125] — 2026-11-18
 
 ### Ajouté / Added
