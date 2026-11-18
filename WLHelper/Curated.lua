@@ -612,8 +612,11 @@ ns.BOSS_NOTES = {
     ["Hazzas"] = { { "tank", "Dragon: face its breath away from the group.", "Dragon : tourne son souffle loin du groupe." } },
     ["Morphaz"] = { { "tank", "Dragon: face its breath away from the group.", "Dragon : tourne son souffle loin du groupe." } },
     ["Shade of Eranikus"] = { { "all", "Puts players to sleep and breathes acid: tank faces him away.", "Endort des joueurs et souffle de l'acide : le tank le tourne loin du groupe." } },
-    ["Avatar of Hakkar"] = { { "all", "Egg of Hakkar on the altar: kill the Nightmare Suppressors fast, use Hakkari Blood on the four flames.", "Egg of Hakkar sur l'autel : tue vite les Nightmare Suppressors, verse le Hakkari Blood sur les quatre flammes." },
-      { "all", "He mind-controls a player: crowd-control them.", "Il contrôle l'esprit d'un joueur : neutralise-le." } },
+    -- the Egg of Hakkar event (Wowhead Forever quest=3528 and its Forever comments; report: "there was
+    -- no guide for the egg, so we failed")
+    ["Avatar of Hakkar"] = { { "all", "First dismiss every pet and totem (on Forever the Avatar won't come otherwise), then use the Egg of Hakkar in the middle of the room.", "Rangez d'abord familiers et totems (sinon l'Avatar ne vient pas sur Forever), puis utilise l'Egg of Hakkar au milieu de la salle." },
+      { "all", "Kill the Hakkari Bloodkeepers for their Hakkari Blood, use it on the 4 Eternal Flames; put out the 4th once every mob is dead.", "Tue les Hakkari Bloodkeeper pour leur Hakkari Blood, verse-le sur les 4 Eternal Flame ; éteins la 4e quand tout est mort." },
+      { "all", "The Avatar comes: stay in the inner circle, he mind-controls a player. Dead, use the egg on him and bring it to Yeh'kinya.", "L'Avatar arrive : restez dans le cercle intérieur, il contrôle un joueur. Mort, utilise l'œuf sur lui (pour Yeh'kinya)." } },
   },
   BlackrockDepths = {
     ["High Interrogator Gerstahn"] = { { "all", "{Psychic Scream} fears the group: fight her away from other packs.", "Son {Cri psychique} apeure le groupe : combats-la loin des autres groupes." },

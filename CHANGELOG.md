@@ -6,6 +6,36 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.141] — 2026-11-18
+
+### Modifié / Changed
+- **La vue moderne, sans cadre comme Polestar** : le guide « compact » s'appelle maintenant la **vue moderne**. C'est le même guide, avec les mêmes étapes, affiché autrement. Le bouton « Compact » de la fenêtre devient « Moderne ».
+  - Par défaut, la vue n'a plus ni fond, ni bordure, ni carte : le texte est posé directement sur le jeu, avec une ombre pour rester lisible.
+  - Les couleurs marquent l'important : les noms en bleu, le lieu en saumon, les niveaux en doré, l'étape en orange, les barres d'objectifs en vert.
+  - Pour retrouver la carte sur fond sombre comme RestedXP, désactive « Vue moderne sans cadre » (Options > Donjons), ou tape `/wlh cadre`.
+  *The compact guide is now the "modern view", frameless by default like Polestar (names, places, levels and step in colour); "Frameless modern view" in Options, or /wlh cadre, brings the framed card back.*
+
+### Corrigé / Fixed
+- **Décocher « Flèche GPS » ne coupait pas la flèche** (signalé par Erril) : quand la flèche menait à ton cadavre par-dessus l'étape du guide, décocher Actions > Flèche GPS la laissait affichée. Elle s'arrête maintenant aussi.
+  *Unticking the GPS arrow also stops the arrow to your corpse.*
+- **Arrêter un guide** (signalé par Erril : « j'ai lancé Blackrock, je peux plus annuler ») : nouvel **Actions > Arrêter ce guide** (un second clic confirme), ou `/wlh stop`. Les donjons sont décochés, plus de route ni de flèche ; « Choisir un guide » en lance un autre.
+  *Actions > "Stop this guide" (or /wlh stop) ends the current route.*
+- **Temple englouti, l'œuf d'Hakkar** : la tactique de l'Avatar d'Hakkar dit maintenant tout l'événement, étape par étape. Vérifié sur Wowhead Forever (la quête 3528 et les commentaires des joueurs de Forever) :
+  - rangez familiers et totems avant de commencer, sinon l'Avatar ne vient pas sur Forever ;
+  - utilise l'Egg of Hakkar au milieu du Sanctum of the Fallen God ;
+  - tue les Hakkari Bloodkeeper et ramasse leur Hakkari Blood ;
+  - verse le sang sur les 4 Eternal Flame, et n'éteins la 4e qu'une fois tous les monstres morts ;
+  - restez dans le cercle intérieur, puis utilise l'œuf sur l'Avatar mort.
+
+  La quête « Le dieu Hakkar » le dit aussi.
+  *Sunken Temple: the Avatar of Hakkar's tactics tell the Egg of Hakkar event step by step, with Forever's pets-and-totems bug.*
+- **Itharius** (suite de « L'Essence d'Eranikus ») : il était placé sur une autre carte. Il est dans le Marais des Chagrins, en 13.6, 71.5 (Wowhead Forever).
+  *Itharius is in the Swamp of Sorrows (13.6, 71.5), not on another map.*
+- **Les quêtes qui commencent avec un objet** disent comment les prendre, sur leur ligne d'étape : « Commence avec l'objet « Serment... » : clic droit dessus dans tes sacs. »
+  *A quest that starts from an item says "right-click it in your bags" on its step row.*
+- **Deux réglages des améliorations ne se coupaient pas** : « Expliquer le pourcentage » et « Ignorer les armures plus légères » restaient toujours activés, quoi qu'on choisisse.
+  *Two upgrade settings ("Explain the percent", "Ignore lighter armor") could not be turned off.*
+
 ## [1.0.0-beta.140] — 2026-11-18
 
 ### Corrigé / Fixed

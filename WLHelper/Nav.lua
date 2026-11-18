@@ -90,7 +90,12 @@ function ns.ToggleArrow()
   WLDTDB.arrow = not (WLDTDB.arrow ~= false)
   if WLDTDB.arrow == false then
     local G = GPS()
-    if G then G.Stop("dungeon") end
+    if G then
+      G.Stop("dungeon")
+      -- a corpse run started over the guide's step (GPS.CorpseCheck): the arrow is off, it goes too
+      -- (its step was given back to nothing: Stop("dungeon") above dropped it)
+      if G.Source and G.Source() == "corpse" then G.Stop("corpse") end
+    end
   elseif ns.frame then
     ns.frame.sig = nil   -- the guide points its current step again
     ns.Refresh()

@@ -196,6 +196,9 @@ ns.AddEnglish({
     ["Flèche"] = "Arrow",
     ["Taille de la flèche"] = "Arrow size",
     ["Taille des fenêtres"] = "Window size",
+    ["Vue moderne sans cadre"] = "Frameless modern view",
+    ["Le texte posé sur le jeu, comme Polestar."] = "The text on the game, like Polestar.",
+    ["Sans fond ni bordure, le texte posé sur le jeu avec une ombre, comme Polestar. Coupé : la carte sur fond sombre, comme RestedXP."] = "No backdrop or border, the text on the game with a shadow, like Polestar. Off: the card on a dark backdrop, like RestedXP.",
     ["Taille de toutes les fenêtres"] = "Size of every window",
     ["Le guide, le suivi, les fenêtres du Comptoir, des groupes, de la guilde et des réglages. La flèche du GPS garde sa taille (page GPS). Aussi : /wlh taille 90, /wlh taille +, /wlh taille -."] = "The guide, the tracker, the Comptoir, groups, guild and settings windows. The GPS arrow keeps its own size (GPS page). Also: /wlh size 90, /wlh size +, /wlh size -.",
     ["Opacité du fond"] = "Background opacity",
@@ -1417,6 +1420,13 @@ function BUILD.dungeons(p)
         end,
         L("Une petite fenêtre, guide fermé."),
         L("Une petite fenêtre avec l'action à faire, quand la fenêtre du guide est fermée."))
+    SwitchRow(p, L("Vue moderne sans cadre"), function() return Guide().trackerFrameless ~= false end,
+        function(v)
+            local TR = _G.WLHelperTracker
+            if TR and TR.SetFrameless then TR.SetFrameless(v) elseif v then Guide().trackerFrameless = nil else Guide().trackerFrameless = false end
+        end,
+        L("Le texte posé sur le jeu, comme Polestar."),
+        L("Sans fond ni bordure, le texte posé sur le jeu avec une ombre, comme Polestar. Coupé : la carte sur fond sombre, comme RestedXP."))
     -- the route's quests taken, handed in and shared by themselves (Writs/GuideQuests.lua)
     local GQ = ns.WP and ns.WP.GuideQuests
     if GQ then
@@ -1784,7 +1794,7 @@ function BUILD.upgrades(p)
 
     -- the grey line under the percent: the stats behind it (strings in Upgrades.lua)
     SwitchRow(p, L("Expliquer le pourcentage"), function() return WLWritsDB.upgradeWhy ~= false end,
-        function(v) WLWritsDB.upgradeWhy = (not v) and false or nil; Refresh() end,
+        function(v) if v then WLWritsDB.upgradeWhy = nil else WLWritsDB.upgradeWhy = false end; Refresh() end,
         L("Pourquoi, en mots. Maj : les chiffres."),
         L("Sous le pourcentage, une ligne grise dit en mots ce qui le fait le plus : « Surtout : DPS de baguette en plus, moins de dégâts de givre ». Garde Maj enfoncée pour les chiffres : « +12,8 DPS baguette (+30 %) · -4 dégâts de givre (-5 %) »."))
 
@@ -1801,7 +1811,7 @@ function BUILD.upgrades(p)
     end
     SwitchRow(p, L("Ignorer les armures plus légères que la mienne (dès le niv. 40)"),
         function() return WLWritsDB.upgradeLighter ~= false end,
-        function(v) WLWritsDB.upgradeLighter = (not v) and false or nil; Refresh() end,
+        function(v) if v then WLWritsDB.upgradeLighter = nil else WLWritsDB.upgradeLighter = false end; Refresh() end,
         L("Ni % ni flèche sur une armure plus légère."),
         L("Dès le niveau 40 : chaman et chasseur sans cuir ni tissu, guerrier et paladin sans mailles, cuir ni tissu, druide et voleur sans tissu. L'infobulle dit « Armure plus légère que la tienne »."))
 

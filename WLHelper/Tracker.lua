@@ -460,6 +460,26 @@ local function Build()
   return f
 end
 
+-- Frameless, as Polestar draws its guide (report: "the frameless version, Polestar style"): no
+-- backdrop, no edge, no card; every line keeps a shadow to stay readable over the world. On by
+-- default (WLDTDB.trackerFrameless = false: the framed card, RestedXP's).
+function TR.Frameless() return not (WLDTDB and WLDTDB.trackerFrameless == false) end
+local function ApplyFrameless(on)
+  if f.frameless == on then return end
+  f.frameless = on
+  if f._bg then f._bg:SetShown(not on) end
+  for _, e in pairs(f._edges or {}) do if e and e.SetShown then e:SetShown(not on) end end
+  local texts = { f.head.title, f.head.meta, f.stepLabel, f.cur.text, f.cur.sub, f.thenLabel, f.progText, f.travel }
+  for _, b in ipairs(f.bars) do texts[#texts + 1] = b.label; texts[#texts + 1] = b.count end
+  for _, r in ipairs(f.nexts) do texts[#texts + 1] = r.text end
+  for _, fs in ipairs(texts) do if fs and ns.Shadow then ns.Shadow(fs, on) end end
+end
+function TR.SetFrameless(on)
+  if not WLDTDB then return end
+  if on == false then WLDTDB.trackerFrameless = false else WLDTDB.trackerFrameless = nil end
+  TR.Refresh()
+end
+
 local function Wanted()
   -- off unless asked for (/wlh suivi or Settings): the guide window and its "-" mini mode are the
   -- usual way; two small views of the same step confused players
@@ -473,6 +493,7 @@ end
 -- Draws the model; the tracker's height follows its content.
 local function Draw(m)
   local head = f.head
+  ApplyFrameless(TR.Frameless())
   local collapsed = WLDTDB.trackerCollapsed
   -- folded: the action to do now on the one line, so the folded tracker still says something
   -- useful ("Rendre « Powering the Pylons » · 1/9"); open: the chapter title
@@ -524,7 +545,8 @@ local function Draw(m)
   cur.text:SetText(text)
   local h = 4 + TextH(cur.text, F.title)
   if m.cur.sub then
-    cur.sub:SetText(m.cur.sub); cur.sub:Show()
+    -- the place in colour, as Polestar writes it
+    cur.sub:SetText(Hex(T.accentSoft) .. m.cur.sub .. "|r"); cur.sub:Show()
     Anchor(cur.sub, "TOPLEFT", cur, "TOPLEFT", PAD + ICON + GAP, -(h + 3))
     h = h + 3 + TextH(cur.sub, F.label)
   else cur.sub:Hide() end
@@ -568,7 +590,7 @@ local function Draw(m)
   f.card:ClearAllPoints()
   f.card:SetPoint("TOPLEFT", f, "TOPLEFT", PAD - 4, -cardTop)
   f.card:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(PAD - 4), -cardTop)
-  f.card:SetHeight(y - cardTop); f.card:Show()
+  f.card:SetHeight(y - cardTop); f.card:SetShown(not f.frameless)
   y = y + 8
   -- "Ensuite", then the next actions in plain text (Polestar's list)
   if #m.nexts > 0 then

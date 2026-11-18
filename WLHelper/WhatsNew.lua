@@ -2,6 +2,23 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.141", date = "2026-11-18", items = {
+    { s = "chg", fr = { "La vue moderne, sans cadre comme Polestar", "Le guide « compact » s'appelle maintenant la **vue moderne**. C'est le même guide, avec les mêmes étapes, affiché autrement. Le bouton « Compact » de la fenêtre devient « Moderne »." }, en = { "", "" } },
+    { s = "chg", fr = { "", "Par défaut, la vue n'a plus ni fond, ni bordure, ni carte : le texte est posé directement sur le jeu, avec une ombre pour rester lisible." }, en = { "", "" } },
+    { s = "chg", fr = { "", "Les couleurs marquent l'important : les noms en bleu, le lieu en saumon, les niveaux en doré, l'étape en orange, les barres d'objectifs en vert." }, en = { "", "" } },
+    { s = "chg", fr = { "", "Pour retrouver la carte sur fond sombre comme RestedXP, désactive « Vue moderne sans cadre » (Options > Donjons), ou tape /wlh cadre." }, en = { "The compact guide is now the \"modern view\", frameless by default like Polestar (names, places, levels and step in colour); \"Frameless modern view\" in Options, or /wlh cadre, brings the framed card back.", "" } },
+    { s = "fix", fr = { "Décocher « Flèche GPS » ne coupait pas la flèche", "Quand la flèche menait à ton cadavre par-dessus l'étape du guide, décocher Actions > Flèche GPS la laissait affichée. Elle s'arrête maintenant aussi." }, en = { "Unticking the GPS arrow also stops the arrow to your corpse.", "" } },
+    { s = "fix", fr = { "Arrêter un guide", "Nouvel **Actions > Arrêter ce guide** (un second clic confirme), ou /wlh stop. Les donjons sont décochés, plus de route ni de flèche ; « Choisir un guide » en lance un autre." }, en = { "Actions > \"Stop this guide\" (or /wlh stop) ends the current route.", "" } },
+    { s = "fix", fr = { "Temple englouti, l'œuf d'Hakkar", "La tactique de l'Avatar d'Hakkar dit maintenant tout l'événement, étape par étape. Vérifié sur Wowhead Forever (la quête 3528 et les commentaires des joueurs de Forever) :" }, en = { "", "" } },
+    { s = "fix", fr = { "", "rangez familiers et totems avant de commencer, sinon l'Avatar ne vient pas sur Forever ;" }, en = { "", "" } },
+    { s = "fix", fr = { "", "utilise l'Egg of Hakkar au milieu du Sanctum of the Fallen God ;" }, en = { "", "" } },
+    { s = "fix", fr = { "", "tue les Hakkari Bloodkeeper et ramasse leur Hakkari Blood ;" }, en = { "", "" } },
+    { s = "fix", fr = { "", "verse le sang sur les 4 Eternal Flame, et n'éteins la 4e qu'une fois tous les monstres morts ;" }, en = { "", "" } },
+    { s = "fix", fr = { "", "restez dans le cercle intérieur, puis utilise l'œuf sur l'Avatar mort. La quête « Le dieu Hakkar » le dit aussi." }, en = { "Sunken Temple", "The Avatar of Hakkar's tactics tell the Egg of Hakkar event step by step, with Forever's pets-and-totems bug." } },
+    { s = "fix", fr = { "Itharius", "Il était placé sur une autre carte. Il est dans le Marais des Chagrins, en 13.6, 71.5 (Wowhead Forever)." }, en = { "Itharius is in the Swamp of Sorrows (13.6, 71.5), not on another map.", "" } },
+    { s = "fix", fr = { "Les quêtes qui commencent avec un objet", "Disent comment les prendre, sur leur ligne d'étape : « Commence avec l'objet « Serment... » : clic droit dessus dans tes sacs. »" }, en = { "A quest that starts from an item says \"right-click it in your bags\" on its step row.", "" } },
+    { s = "fix", fr = { "Deux réglages des améliorations ne se coupaient pas", "« Expliquer le pourcentage » et « Ignorer les armures plus légères » restaient toujours activés, quoi qu'on choisisse." }, en = { "Two upgrade settings (\"Explain the percent\", \"Ignore lighter armor\") could not be turned off.", "" } },
+  } },
   { v = "1.0.0-beta.140", date = "2026-11-18", items = {
     { s = "fix", fr = { "Temple englouti, « L'Essence d'Eranikus »", "La quête était la toute première étape dans le donjon (« En chemin »), alors que l'objet qui la donne tombe sur l'Ombre d'Eranikus, l'avant-dernier boss. Elle se prend et se rend maintenant à l'étape de l'Ombre d'Eranikus (le Réceptacle d'essence est juste à côté)." }, en = { "Sunken Temple", "\"The Essence of Eranikus\" is taken and turned in at the Shade of Eranikus' step, no longer first inside." } },
   } },
@@ -49,9 +66,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.127", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, choisir entre Shortest Path et WL Helper", "Si Shortest Path est installé, une fenêtre demande une seule fois quel GPS suivre. « Shortest Path » : il prend tes destinations (son trajet sur la carte, ses vols, ses bateaux avec leurs départs, sa flèche) et notre flèche s'efface. « WL Helper » : notre GPS, comme avant. Le choix se change dans Options > GPS (« Envoyer les destinations à Shortest Path »), et le trajet en cours passe tout de suite à celui choisi." }, en = { "GPS", "With Shortest Path installed, asked once which GPS to follow; switching moves the trip under way at once." } },
-  } },
-  { v = "1.0.0-beta.126", date = "2026-11-18", items = {
-    { s = "chg", fr = { "GPS, moins de bateaux et de zeppelins à la chaîne", "Pour choisir le trajet, chaque bateau ou zeppelin compte 2 minutes de plus que son temps (l'écran de chargement, le quai à trouver, le départ raté), le deuxième 4 minutes, le troisième 6. Un vol de 10 minutes passe donc avant « bateau pour Ratchet, vol jusqu'à Orgrimmar, zeppelin pour Fossoyeuse » s'il ne fait pas gagner nettement plus. Les temps affichés restent les vrais. Exemple : d'Orgrimmar vers les Terres ingrates, l'autre trajet proposé était « zeppelin pour Fossoyeuse, puis zeppelin pour Grom'gol, puis vol » pour gagner 30 secondes ; c'est maintenant un seul zeppelin, puis le vol." }, en = { "GPS", "Each boat or zeppelin weighs 2 more minutes in the choice (the 2nd 4, the 3rd 6): no ship chains for a few minutes saved." } },
-    { s = "add", fr = { "GPS, la destination finale sur la flèche", "Tant que l'étape en cours est un vol, un bateau ou le chemin vers un quai, la flèche dit en haut, en doré, où tout ça mène : « Destination : Moulin-de-Tarren, Contreforts de Hautebrande ~12 min »." }, en = { "GPS", "The arrow tells the trip's final destination on top, with the time left." } },
   } },
 }

@@ -3000,6 +3000,28 @@ local function Build()
     local it = f.restartItem
     if it.armToken then it.armToken = nil; it.label:SetText(L.M_RESTART); it.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3]) end
   end)
+  -- "Stop this guide": the dungeons unpicked, the route and its arrow gone; a second click confirms
+  f.stopItem = Item(function(self)
+    if self.armToken then
+      self.armToken = nil; self.label:SetText(L.M_STOP); self.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3])
+      if ns.StopRoute then ns.StopRoute() end
+      return
+    end
+    local token = {}
+    self.armToken = token
+    self.label:SetText(L.RESTART_CONFIRM); self.label:SetTextColor(T.warn[1], T.warn[2], T.warn[3])
+    if C_Timer and C_Timer.After then
+      C_Timer.After(4, function()
+        if self.armToken == token then self.armToken = nil; self.label:SetText(L.M_STOP); self.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3]) end
+      end)
+    end
+    return "keep"
+  end, function() return { L.M_STOP, L.TT_STOP, L.STOP_CLICK } end)
+  f.stopItem.label:SetText(L.M_STOP)
+  menu:HookScript("OnHide", function()
+    local it = f.stopItem
+    if it.armToken then it.armToken = nil; it.label:SetText(L.M_STOP); it.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3]) end
+  end)
   f.arrowBtn = Item(function() ns.ToggleArrow(); Render() end, function() return { L.M_ARROW, L.TT_FARROW } end)
   -- the dungeon's bosses: the bosses and rares panel (Bosses.lua; its header opens the map and the
   -- installed dungeon journal), else, with no dungeon for it, the dungeon journal itself
@@ -4013,6 +4035,12 @@ RenderNow = function()
       if #tags > 0 then table.insert(parts, table.concat(tags, mt .. "  ·  |r")) end
       local tx = Hex(T.text)
       if not ok then
+        -- a quest that starts from an item (the Essence of Eranikus, an Oathstone): how to take it,
+        -- in words (report: "I looted the essence and don't understand where to accept the next quest")
+        if nd.kind == "a" and s == "none" and q.s and q.s.i == 1 and L.ROW_ITEM_START then
+          local it = q.si or q.s.n
+          if it then table.insert(parts, Hex(T.warn) .. L.ROW_ITEM_START:format((ns.LN and ns.LN("item", it)) or it) .. "|r") end
+        end
         if nd.kind == "a" and s == "none" then
           local pb = ns.PrereqProblem(nd.q)
           if pb then table.insert(parts, Hex(T.bad) .. L.BLOCKED:format(pb) .. "|r") end
@@ -4166,6 +4194,7 @@ RenderNow = function()
   f.done:SetEnabled(true)
   f.done.label:SetText(ManualHolds(log, st) and L.M_UNSKIP or L.M_SKIP)
   if not f.restartItem.armToken then f.restartItem.label:SetText(L.M_RESTART) end
+  if f.stopItem and not f.stopItem.armToken then f.stopItem.label:SetText(L.M_STOP) end
   local mi = 0
   for _, m in ipairs(ns.MemberSteps()) do
     local it = f.memberItems[mi + 1]

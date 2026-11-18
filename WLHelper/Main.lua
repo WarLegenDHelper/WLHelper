@@ -222,6 +222,19 @@ end
 
 -- "Start the route over" (/wlh reset, the guide's Actions menu and the foot of the step list):
 -- the steps ticked by hand and the saved order are forgotten, the route is built from the start
+-- Stops the guide: no dungeon picked, no route, no arrow; the guide's window says to pick a guide
+-- (report: Erril, "I started Blackrock, I can't cancel a route, it stays open").
+function ns.StopRoute()
+  WLDTDB.sel = WLDTDB.sel or {}
+  wipe(WLDTDB.sel)
+  WLDTDB.order = nil; WLDTDB.run = nil
+  if ns.PickerResetDraft then ns.PickerResetDraft() end
+  if ns.SetArrow then ns.SetArrow(nil) end
+  ns.Recalc()
+  if WLHelperTracker and WLHelperTracker.Refresh then WLHelperTracker.Refresh() end
+  ns.Print(L.ROUTE_STOPPED)
+end
+
 function ns.ResetRoute()
   WLDTDB.manual = {}; WLDTDB.order = nil
   ns.Recalc()
@@ -785,6 +798,11 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
     if arg ~= "+" and arg ~= "-" then v = tonumber((arg or ""):match("[%d%.]+")); if v and v > 3 then v = v / 100 end end
     local set = ns.SetWindowScale and ns.SetWindowScale(v or ns.WindowScale())
     if set then ns.Print(string.format(ns.Writs and ns.Writs.English and ns.Writs.English() and "Window size: %d %%  (/wlh size 90, /wlh size +, /wlh size -)" or "Taille des fenêtres : %d %%  (/wlh taille 90, /wlh taille +, /wlh taille -)", math.floor(set * 100 + 0.5))) end
+  elseif cmd == "stop" or cmd == "arreter" or cmd == "annuler" or cmd == "cancel" then
+    ns.StopRoute()
+  elseif cmd == "cadre" or cmd == "frame" or cmd == "frameless" then
+    -- the compact guide with or without its frame
+    if WLHelperTracker and WLHelperTracker.SetFrameless then WLHelperTracker.SetFrameless(not WLHelperTracker.Frameless()) end
   elseif cmd == "tracker" or cmd == "suivi" then
     if WLHelperTracker then WLHelperTracker.Toggle() end
   elseif cmd == "next" then ns.GoTo((ns.frame.view or 1) + 1)
