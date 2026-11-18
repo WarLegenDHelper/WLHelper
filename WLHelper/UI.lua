@@ -4319,6 +4319,11 @@ function ns.Refresh(silent)
   if WLDTDB.autoWay and not fin then
     -- the GPS follows the step on screen: "Étape suivante" / a click in the list moves the arrow
     -- too (the step in progress itself does not change)
+    -- the window closed and the modern view on screen: the GPS follows the modern view's step (its
+    -- arrows browse), not a step the window was left on (report: "it still sends me into the dungeon")
+    local TRk = WLHelperTracker
+    local trf = TRk and TRk.Frame and TRk.Frame()
+    if not shown and trf and trf:IsShown() then f.view = TRk.browse or auto end
     local gi = (f.view and f.view >= 1 and f.view <= #steps) and f.view or auto
     local pts = StepPoints(log, steps[gi], false)
     local sig = gi .. ":" .. #pts

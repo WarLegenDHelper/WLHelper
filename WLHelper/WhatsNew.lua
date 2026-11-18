@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.155", date = "2026-11-18", items = {
+    { s = "fix", fr = { "Le GPS suit la vue moderne", "La fenêtre classique fermée, la flèche GPS suivait encore l'étape où cette fenêtre était restée (par exemple une étape du donjon), au lieu de l'étape affichée dans la vue moderne. Elle suit maintenant la vue moderne, y compris quand on parcourt les étapes avec ‹ ›, avec la liste ou en cliquant une action." }, en = { "The GPS arrow follows the modern view's step (and its browsing), not a step the closed window was left on.", "" } },
+    { s = "fix", fr = { "Vue moderne, un texte plus propre", "Le lieu n'est plus écrit deux fois (seule la ligne avec la distance reste), les notes sans titre ont maintenant le titre « À savoir », et la ligne « Oathstone... » en trop sur « L'Essence d'Eranikus » a disparu." }, en = { "Modern view", "The place said once (with the distance), untitled notes under \"Good to know\", the stray Oathstone line gone." } },
+  } },
   { v = "1.0.0-beta.154", date = "2026-11-18", items = {
     { s = "add", fr = { "Vue moderne, des liens toujours visibles", "Sous la barre de progression, une rangée de petits liens **Guides · Vue d'ensemble · Boss · Carte · Partager**. Le choix d'un guide (avec ses cartes de donjons), la vue d'ensemble, le panneau des boss, la carte du donjon et le partage des quêtes sont à un clic, sans passer par le menu ni la fenêtre classique." }, en = { "Modern view", "Always-visible links under the progress bar: Guides (the dungeon picker), Overview, Bosses, Map, Share." } },
   } },
@@ -110,8 +114,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Itharius", "Il était placé sur une autre carte. Il est dans le Marais des Chagrins, en 13.6, 71.5 (Wowhead Forever)." }, en = { "Itharius is in the Swamp of Sorrows (13.6, 71.5), not on another map.", "" } },
     { s = "fix", fr = { "Les quêtes qui commencent avec un objet", "Disent comment les prendre, sur leur ligne d'étape : « Commence avec l'objet « Serment... » : clic droit dessus dans tes sacs. »" }, en = { "A quest that starts from an item says \"right-click it in your bags\" on its step row.", "" } },
     { s = "fix", fr = { "Deux réglages des améliorations ne se coupaient pas", "« Expliquer le pourcentage » et « Ignorer les armures plus légères » restaient toujours activés, quoi qu'on choisisse." }, en = { "Two upgrade settings (\"Explain the percent\", \"Ignore lighter armor\") could not be turned off.", "" } },
-  } },
-  { v = "1.0.0-beta.140", date = "2026-11-18", items = {
-    { s = "fix", fr = { "Temple englouti, « L'Essence d'Eranikus »", "La quête était la toute première étape dans le donjon (« En chemin »), alors que l'objet qui la donne tombe sur l'Ombre d'Eranikus, l'avant-dernier boss. Elle se prend et se rend maintenant à l'étape de l'Ombre d'Eranikus (le Réceptacle d'essence est juste à côté)." }, en = { "Sunken Temple", "\"The Essence of Eranikus\" is taken and turned in at the Shade of Eranikus' step, no longer first inside." } },
   } },
 }

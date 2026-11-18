@@ -366,7 +366,7 @@ local function StepRow(k)
     r.text:SetJustifyH("LEFT"); r.text:SetWordWrap(false)
     r:SetScript("OnClick", function(self)
       if not self.i then return end
-      if IsShiftKeyDown and IsShiftKeyDown() then TR.MarkDone(self.i) else TR.browse = self.i; TR.Refresh() end
+      if IsShiftKeyDown and IsShiftKeyDown() then TR.MarkDone(self.i) else TR.browse = self.i; if ns.Refresh then ns.Refresh() end; TR.Refresh() end
     end)
     f.stepRows[k] = r
   end
@@ -432,7 +432,7 @@ local function RowClick(self)
   local a = self.action
   if not (a and a.i) then return end
   -- the step shown here, in the modern view (the window only from the menu)
-  if IsShiftKeyDown and IsShiftKeyDown() then TR.MarkDone(a.i) else TR.browse = a.i; TR.Refresh() end
+  if IsShiftKeyDown and IsShiftKeyDown() then TR.MarkDone(a.i) else TR.browse = a.i; if ns.Refresh then ns.Refresh() end; TR.Refresh() end
 end
 
 local function SetActIcon(tex, kind, dim)
@@ -563,7 +563,7 @@ local function Build()
   f.backBtn = CreateFrame("Button", nil, f)
   f.backBtn:SetAllPoints(f.stepLabel)
   f.backBtn:SetFrameLevel(f:GetFrameLevel() + 4)
-  f.backBtn:SetScript("OnClick", function() TR.browse = nil; TR.Refresh() end)
+  f.backBtn:SetScript("OnClick", function() TR.browse = nil; if ns.Refresh then ns.Refresh() end; TR.Refresh() end)
   f.backBtn:Hide()
   f.cur = MakeRow(f, ICON, F.title, T.fg)
   f.cur:SetFrameLevel(f.card:GetFrameLevel() + 1)
@@ -711,7 +711,8 @@ local function Draw(m)
   if m.cur.count then text = text .. "  " .. Hex(T.muted) .. m.cur.count .. "|r" end
   cur.text:SetText(text)
   local h = 4 + TextH(cur.text, F.title)
-  if m.cur.sub then
+  -- the card's own place line (with the distance) replaces this one: never the place twice
+  if m.cur.sub and not (m.focus and m.focus.where) then
     -- the place in colour, as Polestar writes it
     cur.sub:SetText(Hex(T.accentSoft) .. m.cur.sub .. "|r"); cur.sub:Show()
     Anchor(cur.sub, "TOPLEFT", cur, "TOPLEFT", PAD + ICON + GAP, -(h + 3))
@@ -777,9 +778,9 @@ local function Draw(m)
     -- the other objectives, unless the bars above already count them
     if #(m.bars or {}) == 0 then for _, o in ipairs(M.objs or {}) do Put(o, F.label, T.text, 3) end end
     for _, b in ipairs(M.detBlocks or {}) do
-      if b.h then Put(b.h, F.meta, T.gold, 8, true) end
-      if b.list then Put(table.concat(b.list, "\n"), F.label, T.text, b.h and 2 or 6)
-      elseif b.body then Put(table.concat(b.body, "\n"), F.label, T.text, b.h and 2 or 6) end
+      Put(b.h or L.TR_NOTE, F.meta, T.gold, 8, true)
+      if b.list then Put(table.concat(b.list, "\n"), F.label, T.text, 2)
+      elseif b.body then Put(table.concat(b.body, "\n"), F.label, T.text, 2) end
     end
   end
   if m.tactic then Put(L.H_TACTIC, F.meta, T.gold, 8, true); Put(m.tactic, F.label, T.text, 2) end
@@ -883,6 +884,7 @@ function TR.Browse(delta)
   local m = f and f.model
   if not m then return end
   TR.browse = (m.idx or m.curIdx or 1) + delta
+  if ns.Refresh then ns.Refresh() end
   TR.Refresh()
 end
 

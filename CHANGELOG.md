@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.155] — 2026-11-18
+
+### Corrigé / Fixed
+- **Le GPS suit la vue moderne** : la fenêtre classique fermée, la flèche GPS suivait encore l'étape où cette fenêtre était restée (par exemple une étape du donjon), au lieu de l'étape affichée dans la vue moderne. Elle suit maintenant la vue moderne, y compris quand on parcourt les étapes avec ‹ ›, avec la liste ou en cliquant une action.
+  *The GPS arrow follows the modern view's step (and its browsing), not a step the closed window was left on.*
+- **Vue moderne, un texte plus propre** : le lieu n'est plus écrit deux fois (seule la ligne avec la distance reste), les notes sans titre ont maintenant le titre « À savoir », et la ligne « Oathstone... » en trop sur « L'Essence d'Eranikus » a disparu.
+  *Modern view: the place said once (with the distance), untitled notes under "Good to know", the stray Oathstone line gone.*
+
 ## [1.0.0-beta.154] — 2026-11-18
 
 ### Ajouté / Added
