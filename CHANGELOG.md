@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.139] — 2026-11-18
+
+### Corrigé / Fixed
+- **La carte du donjon sur M** : dans un donjon, la carte du Journal des donjons de Naowh (le plan avec les boss en portraits numérotés) s'affichait une fraction de seconde, puis la carte de la zone extérieure la remplaçait. Le Journal de Naowh retire sa carte dès que la carte du monde change de zone, et un autre addon (ou le jeu) la change juste après l'ouverture. WL Helper repose maintenant la carte de Naowh une fois, juste après ce changement : elle reste sur M. Rien n'est modifié dans Naowh ni dans OpenMap.
+  *M inside a dungeon: Naowh's dungeon map no longer flashes away to the zone outside; WL Helper lays it again once after the map is turned.*
+
 ## [1.0.0-beta.138] — 2026-11-18
 
 ### Modifié / Changed

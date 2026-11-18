@@ -671,6 +671,58 @@ function ns.BossLoot(dkey, en, npcIds)
   return out
 end
 
+-- ---------------------------------------------------------------- Naowh's dungeon map on M
+-- Inside a dungeon, Naowh's Dungeon Journal lays its map of it (each boss's numbered portrait) over the
+-- world map as M opens it, and takes it off as soon as the world map turns to another map. Another
+-- addon (or the game) turns it to the zone outside a moment after it opened: the map flashed, then the
+-- outside (report: "I want the standard map on M, without the bug"). Its map is laid again once, on the
+-- map it was turned to, within REOPEN_WINDOW seconds of the map opening. Naowh's own function, called
+-- as its panel calls it; nothing of it is changed or copied.
+do
+  local REOPEN_WINDOW = 1.0
+  local openedAt, relaid, lastDungeon = nil, false, nil
+  local function Journal()
+    local n = rawget(_G, "NaowhForever")
+    local J = type(n) == "table" and n.Journal
+    if type(J) == "table" and type(J.ShowMapOnWorldMap) == "function" then return J end
+  end
+  local function Inside()
+    if not IsInInstance then return false end
+    local ok, inside, kind = pcall(IsInInstance)
+    return ok and inside == true and (kind == "party" or kind == "raid")
+  end
+  local function Relay()
+    local J = Journal()
+    if not (J and lastDungeon and WorldMapFrame and WorldMapFrame:IsShown()) then return end
+    pcall(J.ShowMapOnWorldMap, lastDungeon)
+  end
+  local function MapChanged()
+    if relaid or not openedAt or GetTime() - openedAt > REOPEN_WINDOW then return end
+    if not (lastDungeon and Inside()) then return end
+    relaid = true
+    if C_Timer and C_Timer.After then C_Timer.After(0, Relay) else Relay() end
+  end
+  local hooked = false
+  function ns.HookNaowhMapOnM()
+    if hooked or not (WorldMapFrame and hooksecurefunc) then return false end
+    local J = Journal()
+    if not J then return false end
+    hooked = true
+    -- the dungeon its map was last laid with (nil: taken off)
+    hooksecurefunc(J, "ShowMapOnWorldMap", function(d) if d then lastDungeon = d end end)
+    WorldMapFrame:HookScript("OnShow", function() openedAt, relaid = GetTime(), false end)
+    if WorldMapFrame.OnMapChanged then hooksecurefunc(WorldMapFrame, "OnMapChanged", MapChanged) end
+    return true
+  end
+  local hf = CreateFrame("Frame")
+  pcall(hf.RegisterEvent, hf, "PLAYER_LOGIN")
+  hf:SetScript("OnEvent", function(self)
+    self:UnregisterAllEvents()
+    if C_Timer and C_Timer.After then C_Timer.After(2, function() pcall(ns.HookNaowhMapOnM) end) else pcall(ns.HookNaowhMapOnM) end
+  end)
+  ns._NaowhMapState = function() return openedAt, relaid, lastDungeon end
+end
+
 -- ---------------------------------------------------------------- what a dungeon has for your gear
 -- Which dungeon to farm (report: "a gearing guide, which dungeon to farm for my BiS"): every boss's
 -- loot of a dungeon (BOSS_LOOT), counted for you. bis: Naowh's BiS list ranks it 1 for your spec,

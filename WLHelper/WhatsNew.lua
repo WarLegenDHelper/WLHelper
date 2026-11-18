@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.139", date = "2026-11-18", items = {
+    { s = "fix", fr = { "La carte du donjon sur M", "Dans un donjon, la carte du Journal des donjons de Naowh (le plan avec les boss en portraits numérotés) s'affichait une fraction de seconde, puis la carte de la zone extérieure la remplaçait. Le Journal de Naowh retire sa carte dès que la carte du monde change de zone, et un autre addon (ou le jeu) la change juste après l'ouverture. WL Helper repose maintenant la carte de Naowh une fois, juste après ce changement : elle reste sur M. Rien n'est modifié dans Naowh ni dans OpenMap." }, en = { "M inside a dungeon", "Naowh's dungeon map no longer flashes away to the zone outside; WL Helper lays it again once after the map is turned." } },
+  } },
   { v = "1.0.0-beta.138", date = "2026-11-18", items = {
     { s = "chg", fr = { "La carte du donjon : celle de Naowh d'abord", "Le bouton de carte du panneau des boss et /wlh carte ouvrent maintenant la carte du Journal des donjons de Naowh (le plan avec chaque boss en portrait numéroté), dans sa propre fenêtre, avant celle d'OpenMap. Sur la carte du monde, sa version par-dessus disparaissait dès qu'OpenMap remettait la zone extérieure ; sa fenêtre à elle reste." }, en = { "The dungeon map button and /wlh carte open Naowh's dungeon map (numbered boss portraits) in its own window first, before OpenMap's.", "" } },
   } },
@@ -51,9 +54,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.125", date = "2026-11-18", items = {
     { s = "add", fr = { "Trouver un groupe, le choix en cartes", "Le bouton « Donjons » ouvre une fenêtre de grandes cartes, comme le choix du guide : l'image de chaque donjon, son nom, ses niveaux, « Ta route » et « Tes quêtes : N » quand tu as ses quêtes. Clic sur une carte : cochée (bord rouge et coche), re-clic : décochée. Trois onglets : Donjons, Raids, Quêtes et zones. Un donjon absent de la recherche de groupe du jeu est grisé. En bas, combien sont choisis, « Effacer » et « Chercher »." }, en = { "Find a group", "Dungeons, raids and questing zones picked on big cards with the dungeons' pictures, like the guide's." } },
     { s = "add", fr = { "Trouver un groupe, les quêtes de groupe", "Une quête élite ou de groupe de ton journal (ex. Summoning Shadra dans les Hinterlands) ajoute la source « Tes quêtes de groupe » : elle cherche les groupes de sa zone dans la recherche de groupe du jeu, et « Copier le texte de l'annonce » donne « Quête : Summoning Shadra (The Hinterlands), on cherche du monde ». Dans l'onglet Quêtes et zones, la zone de ta quête le dit. L'annonce elle-même se crée dans la recherche de groupe du jeu : le jeu ne laisse pas un addon la créer." }, en = { "Find a group", "Your group quests (elite) as a source: their zone searched, the listing text ready." } },
-  } },
-  { v = "1.0.0-beta.124", date = "2026-11-18", items = {
-    { s = "add", fr = { "GPS, les portails du mage", "Un portail que tu sais ouvrir (Orgrimmar, Fossoyeuse, Les Pitons-du-Tonnerre ; Hurlevent, Forgefer, Darnassus côté Alliance) compte comme une téléportation quand tu as une Rune des portails : ouvre-le et prends-le. La flèche le lance comme une téléportation." }, en = { "GPS", "A mage's own portals count as teleports when a Rune of Portals is in the bags." } },
-    { s = "add", fr = { "GPS, la rune qui manque", "Quand tu connais une téléportation ou un portail mais n'as pas la rune, le trajet s'en passe ; la carte du guide dit maintenant ce qu'elle ferait gagner (« Avec une Rune de téléportation : Téléport : Fossoyeuse (~8 min de moins) »). Avant, la téléportation disparaissait sans un mot." }, en = { "GPS", "When a missing rune leaves a teleport out, the card says how much time it would save." } },
   } },
 }
