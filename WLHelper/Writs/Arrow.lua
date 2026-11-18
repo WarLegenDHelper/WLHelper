@@ -450,7 +450,12 @@ local function Draw(self, now, combat)
         else what = CastWhat(kind, id, leg) end
         where = Place(leg.to and leg.to.name)
         -- Shortest Path's cast: what comes after, in its words
-        if now.spf then
+        if now.spf and now.spf.better and leg == now.spf.better.leg then
+            -- ours, faster than its route (a portal it does not know): how much
+            local m = GPS.Minutes(now.spf.better.save)
+            where = Place(leg.to and leg.to.name)
+            route = m and S.Hex(C.accentSoft) .. string.format(L("Plus rapide que le trajet de Shortest Path : %s de moins"), m) .. "|r" or ""
+        elseif now.spf then
             local sl = now.spf.legs
             if sl[2] then where = GPS.UpperFirst(string.format(L("puis %s"), sl[2].text)) end
             local rest = {}

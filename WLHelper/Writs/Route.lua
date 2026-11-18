@@ -29,6 +29,7 @@ ns.AddEnglish({
     ["Va au maître de vol de %s"] = "Go to the flight master at %s",
     ["Va au bateau pour %s"] = "Go to the boat to %s",
     ["Shortest Path calcule le trajet..."] = "Shortest Path is working out the route...",
+    ["Plus rapide que le trajet de Shortest Path : %s de moins"] = "Faster than Shortest Path's route: %s shorter",
     ["Ton cadavre"] = "Your corpse",
     ["Sanath Lim-yo : parle-lui, il te téléporte en haut de la tour"] = "Sanath Lim-yo: talk to him, he teleports you up the tower",
     ["Shortest Path est installé. Quel GPS veux-tu suivre ?\n\nShortest Path : son trajet sur la carte, les vols, les bateaux avec leurs départs, sa flèche.\nWL Helper : notre flèche et son trajet.\n\nTu peux changer plus tard : Options > GPS."] = "Shortest Path is installed. Which GPS do you want to follow?\n\nShortest Path: its route on the map, flights, boats with their departures, its arrow.\nWL Helper: our arrow and its route.\n\nYou can change it later: Options > GPS.",
@@ -2149,6 +2150,7 @@ function GPS.Restart()
     end
     state.zygor, state.spf, state.legs, state.spfView = nil, nil, nil, nil
     spfRead = nil
+    better, betterAt = nil, -1e9
     pcall(GPS.SPFQuietSync)
     Start(dest, source)
     state.suspended = susp
@@ -2305,6 +2307,24 @@ local function SPFCast(l)
     end
 end
 GPS._SPFCast = SPFCast
+-- Shortest Path knows a mage's teleports, not the portals you open yourself (Rune of Portals): when our
+-- own plan starts with a teleport or a portal that saves BETTER_GAIN seconds over its route, the arrow
+-- offers it with the cast button (report: "so no mage teleports with Shortest Path?"). Asked every
+-- BETTER_EVERY seconds; once cast, Shortest Path plans again from where you land.
+local BETTER_GAIN, BETTER_EVERY = 120, 5
+local better, betterAt = nil, -1e9
+local function SPFBetter(left, t)
+    if not left or not state.dest then return nil end
+    if t - betterAt < BETTER_EVERY then return better end
+    betterAt, better = t, nil
+    local ok, legs, eta = pcall(GPS.FindPath, { state.dest })
+    local l1 = ok and legs and legs[1]
+    if l1 and l1.kind == "teleport" and type(eta) == "number" and left - eta >= BETTER_GAIN then
+        better = { leg = l1, save = left - eta }
+    end
+    return better
+end
+GPS._SPFBetterReset = function() better, betterAt = nil, -1e9 end
 local function SPFNow()
     local map, mx, my = PlayerMapPos()
     local cont, px, py
@@ -2328,12 +2348,13 @@ local function SPFNow()
         end
         spfRead = { target = target, legs = legs, left = j and tonumber(j.secondsLeft) or nil, guided = target ~= nil,
             cast = SPFCast(legs[1]) }
+        if not spfRead.cast then spfRead.better = SPFBetter(spfRead.left, t) end
         spfAt = t
     end
     local dest = state.dest
     local target = spfRead.target or dest
     local dDest = DistFrom(cont, px, py, dest)
-    now.leg, now.legs, now.eta = spfRead.cast, nil, spfRead.left
+    now.leg, now.legs, now.eta = spfRead.cast or (spfRead.better and spfRead.better.leg), nil, spfRead.left
     now.target, now.dist = target, DistFrom(cont, px, py, target)
     now.dest, now.source = dest, state.source
     now.arrived = dDest ~= nil and dDest < NEAR
@@ -2437,7 +2458,7 @@ end
 
 -- The first leg when it is cast (a teleport, the Hearthstone, Astral Recall), else nil.
 function GPS.TeleportLeg()
-    if state.spfView then return spfRead and spfRead.cast or nil end
+    if state.spfView then return spfRead and (spfRead.cast or (spfRead.better and spfRead.better.leg)) or nil end
     local leg = state.legs and state.legs[1]
     return leg and (leg.kind == "teleport" or leg.kind == "hearth") and leg or nil
 end

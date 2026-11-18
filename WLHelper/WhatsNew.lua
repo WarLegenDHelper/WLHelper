@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.135", date = "2026-11-18", items = {
+    { s = "add", fr = { "GPS avec Shortest Path, tes portails de mage", "Shortest Path ne connaît pas les portails que tu ouvres toi-même (Rune des portails). Quand notre GPS trouve un trajet qui commence par ta téléportation ou ton portail et qui fait gagner au moins 2 minutes sur celui de Shortest Path, la flèche le propose avec le bouton pour le lancer et dit combien tu gagnes (« Plus rapide que le trajet de Shortest Path : ~25 min de moins »). Une fois arrivé, Shortest Path refait son trajet depuis là." }, en = { "GPS with Shortest Path's route", "A mage teleport or portal of ours that saves 2+ minutes is offered with its cast button." } },
+  } },
   { v = "1.0.0-beta.134", date = "2026-11-18", items = {
     { s = "fix", fr = { "GPS avec Shortest Path, le bouton de la pierre de foyer", "Quand le trajet de Shortest Path commence par ta pierre de foyer, Rappel astral ou une téléportation de mage, notre flèche affiche maintenant le bouton pour la lancer, comme sur notre propre trajet. La ligne d'en dessous dit la suite (« Puis Walk to Grom'gol... »). Shortest Path ne donne pas le sort par son API : WL Helper le reconnaît au texte de l'étape." }, en = { "GPS with Shortest Path's route", "The Hearthstone, Astral Recall or a mage teleport gets our cast button." } },
   } },
@@ -48,9 +51,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.121", date = "2026-11-18", items = {
     { s = "chg", fr = { "Guide, la route suit ta position", "Toutes les 5 secondes, si tu es à plus de 400 mètres de l'endroit d'où la route a été calculée, les étapes restantes sont remises dans l'ordre depuis là où tu es (toujours en respectant l'ordre obligatoire des quêtes, puis le chemin le plus court). Ça couvre la pierre de foyer, un portail, un bateau ou une longue course dans la même zone, qui ne déclenchaient rien. Pas en combat, pas en vol, pas en donjon ; pas à chaque pas, pour que la flèche ne saute pas d'une étape à l'autre." }, en = { "The guide re-orders the steps left from where you are once you are 400 yards from where the route was planned (hearthstone, portal, boat, long ride).", "" } },
-  } },
-  { v = "1.0.0-beta.120", date = "2026-11-18", items = {
-    { s = "fix", fr = { "Guide, après un vol", "Le guide remet les étapes dans l'ordre à l'atterrissage. Avant, une route calculée au départ (par exemple à Camp Mojache en Féralas, en prenant « The Sunken Temple ») restait telle quelle après le vol : arrivé à Gadgetzan, le GPS t'envoyait chez Larion à Un'Goro au lieu de te faire rendre la quête à Marvon, tout près." }, en = { "The guide re-orders its steps when a flight lands (a route planned in Feralas no longer sends you to Un'Goro past Marvon's turn-in).", "" } },
-    { s = "add", fr = { "Chaîne d'Anthion côté Alliance", "Les quêtes de Deliana à Forgefer (An Earnest Proposition, A Supernatural Device, Return to Deliana, Just Compensation, In Search of Anthion, Anthion's Parting Words, Bodley's Unfortunate Fate), une par classe dont le paladin, lues sur Wowhead Forever. La version Alliance demande 15 Winterspring Blood Sample (Frostsaber de Berceau-de-l'Hiver), pas le venin de Silithus. Les quêtes communes (The Challenge, Dead Man's Plea, les morceaux d'amulette de Valthalak) s'ouvrent maintenant aussi pour l'Alliance, avec la version de ta faction et de ta classe." }, en = { "The Alliance Anthion chain (Deliana, Ironforge), every class including paladin; the shared Valthalak quests now open for the Alliance.", "" } },
   } },
 }

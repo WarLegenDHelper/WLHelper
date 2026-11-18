@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.135] — 2026-11-18
+
+### Ajouté / Added
+- **GPS avec Shortest Path, tes portails de mage** : Shortest Path ne connaît pas les portails que tu ouvres toi-même (Rune des portails). Quand notre GPS trouve un trajet qui commence par ta téléportation ou ton portail et qui fait gagner au moins 2 minutes sur celui de Shortest Path, la flèche le propose avec le bouton pour le lancer et dit combien tu gagnes (« Plus rapide que le trajet de Shortest Path : ~25 min de moins »). Une fois arrivé, Shortest Path refait son trajet depuis là.
+  *GPS with Shortest Path's route: a mage teleport or portal of ours that saves 2+ minutes is offered with its cast button.*
+
 ## [1.0.0-beta.134] — 2026-11-18
 
 ### Corrigé / Fixed
