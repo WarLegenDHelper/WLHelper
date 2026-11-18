@@ -6,6 +6,22 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.147] — 2026-11-18
+
+### Ajouté / Added
+- **Les rapports emportent une « photo de l'état »** : en plus du message, de la version et de la position, chaque rapport envoyé avec « Nous écrire » (ou `/wlh bug`) emporte maintenant :
+  - l'action que le guide demande et le numéro de l'étape ;
+  - les donjons choisis ;
+  - les quêtes du journal, avec celles prêtes à rendre ;
+  - la destination du GPS et ce que dit la flèche ;
+  - la cible (nom et numéro de PNJ) ;
+  - les fenêtres WL Helper ouvertes ;
+  - la sous-zone ;
+  - les 3 dernières erreurs Lua.
+
+  De quoi comprendre le problème sans capture.
+  *Reports carry a snapshot of the state: the guide's action and step, picked dungeons, quest log, GPS destination and arrow text, target, open windows, subzone, the last 3 Lua errors.*
+
 ## [1.0.0-beta.146] — 2026-11-18
 
 ### Modifié / Changed

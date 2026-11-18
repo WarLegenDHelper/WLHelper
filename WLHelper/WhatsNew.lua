@@ -2,6 +2,17 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.147", date = "2026-11-18", items = {
+    { s = "add", fr = { "Les rapports emportent une « photo de l'état »", "En plus du message, de la version et de la position, chaque rapport envoyé avec « Nous écrire » (ou /wlh bug) emporte maintenant :" }, en = { "", "" } },
+    { s = "add", fr = { "", "l'action que le guide demande et le numéro de l'étape ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "les donjons choisis ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "les quêtes du journal, avec celles prêtes à rendre ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "la destination du GPS et ce que dit la flèche ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "la cible (nom et numéro de PNJ) ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "les fenêtres WL Helper ouvertes ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "la sous-zone ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "les 3 dernières erreurs Lua. De quoi comprendre le problème sans capture." }, en = { "Reports carry a snapshot of the state", "The guide's action and step, picked dungeons, quest log, GPS destination and arrow text, target, open windows, subzone, the last 3 Lua errors." } },
+  } },
   { v = "1.0.0-beta.146", date = "2026-11-18", items = {
     { s = "chg", fr = { "La vue moderne par défaut", "Lancer un guide ou ouvrir le guide affiche maintenant la vue moderne. Un clic sur son titre ouvre la fenêtre complète. Pour revenir à l'ancien comportement : Options > Donjons, « Vue moderne par défaut »." }, en = { "The modern view is the guide's default view; a click on its title opens the window (Options > Dungeons to turn it off).", "" } },
     { s = "add", fr = { "Vue moderne, étape précédente / suivante", "Des petites flèches ‹ › autour de « 33/42 » dans l'en-tête font défiler les étapes. Pendant qu'on regarde une autre étape, le libellé orange propose de revenir à l'étape en cours." }, en = { "Modern view", "‹ › arrows in the header browse the steps; a click on the label goes back to the current one." } },
@@ -83,8 +94,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.133", date = "2026-11-18", items = {
     { s = "add", fr = { "Taille des fenêtres", "Un seul réglage pour la taille de toutes les fenêtres de WL Helper (le guide, le suivi, le Comptoir, les groupes, la guilde, les réglages), de 60 % à 150 %. Dans Options > Général, sous la langue (« Taille de toutes les fenêtres »), ou en commande : /wlh taille 90, /wlh taille +, /wlh taille - (10 % de plus ou de moins). Chaque fenêtre garde son coin haut-gauche à sa place. En combat, le changement attend la fin du combat. La flèche du GPS garde son propre réglage (page GPS)." }, en = { "Window size", "One setting for every WL Helper window, 60 % to 150 % (Options > General, or /wlh size 90 / + / -)." } },
-  } },
-  { v = "1.0.0-beta.132", date = "2026-11-18", items = {
-    { s = "fix", fr = { "Guide, dans la zone c'est dans la zone", "Dans une zone de monstres aux apparitions espacées (les Sirènes Fouette-bile d'Azshara pour « Le corail des sirènes »), la flèche t'envoyait encore à l'apparition la plus proche, à 100 m, alors que tu étais au milieu. Dans la zone, la flèche dit maintenant que tu y es tant qu'une apparition est à moins de 120 m (avant : 40). Le bassin des larmes garde 40 m : son île au milieu n'a pas de monstre." }, en = { "Guide", "Inside a mob area, you are \"there\" within 120 yd of a spawn (was 40); the Pool of Tears' island keeps 40." } },
   } },
 }

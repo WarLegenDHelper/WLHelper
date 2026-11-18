@@ -78,7 +78,8 @@ local function Clean(v)
     v = tostring(v or "")
     return (v:gsub("[\30\31|\r\n]", " "))
 end
-local FIELDS = { "id", "at", "from", "kind", "text", "shot", "v", "loc", "zone", "m", "x", "y", "step", "dk", "lvl", "cls", "err" }
+local FIELDS = { "id", "at", "from", "kind", "text", "shot", "v", "loc", "zone", "sub", "m", "x", "y", "step", "dk", "lvl", "cls",
+    "act", "sel", "ql", "gps", "tgt", "win", "err", "errs" }
 local function Encode(rec)
     local parts = {}
     for _, k in ipairs(FIELDS) do
@@ -139,6 +140,76 @@ local function Context(rec)
         end
     end
     rec.err = LastError()
+    -- the state at that moment, what a screenshot would only half show (report: "without a screenshot
+    -- it will be hard to explain"): each piece in a pcall, each kept short
+    pcall(function()
+        local okS, sub = pcall(GetSubZoneText or function() end)
+        rec.sub = okS and Str(sub) or nil
+        -- the action the guide asks now, and the step out of how many
+        local TR = rawget(_G, "WLHelperTracker")
+        if TR and TR.Model then
+            local okM, md = pcall(TR.Model)
+            if okM and md and md.cur then
+                rec.act = ((md.cur.text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")):sub(1, 120) .. " [" .. tostring(md.idx) .. "/" .. tostring(md.stepTotal) .. "]"
+            end
+        end
+        -- the dungeons picked
+        if type(WLDTDB) == "table" and type(WLDTDB.sel) == "table" then
+            local sel = {}
+            for k in pairs(WLDTDB.sel) do sel[#sel + 1] = k end
+            table.sort(sel)
+            if #sel > 0 then rec.sel = table.concat(sel, ","):sub(1, 120) end
+        end
+        -- the quest log: ids (and "!" when ready to turn in)
+        if root.LogEntries then
+            local ids = {}
+            for id, e in pairs(root.LogEntries() or {}) do
+                if type(id) == "number" then ids[#ids + 1] = tostring(id) .. ((type(e) == "table" and e.complete) and "!" or "") end
+            end
+            table.sort(ids)
+            if #ids > 0 then rec.ql = table.concat(ids, ","):sub(1, 260) end
+        end
+        -- the GPS: where it leads and what the arrow says now
+        local G = WP.GPS
+        if G and G.Now then
+            local okN, now = pcall(G.Now)
+            if okN and now and now.dest then
+                local d = now.dest
+                local leg = now.leg and G.Describe and select(2, pcall(G.Describe, now.leg)) or nil
+                rec.gps = (tostring(d.name or "?") .. " @" .. tostring(d.map) .. " " .. tostring(d.x) .. "," .. tostring(d.y)
+                    .. " (" .. tostring(G.Source and G.Source() or "?") .. ")" .. (type(leg) == "string" and (" : " .. leg) or "")):sub(1, 160)
+            end
+        end
+        -- the target
+        local tn = Str(UnitName and UnitName("target"))
+        if tn then
+            local guid = Str(UnitGUID and UnitGUID("target"))
+            local npc = guid and guid:match("^%a+%-%d+%-%d+%-%d+%-%d+%-(%d+)")
+            rec.tgt = tn .. (npc and (" #" .. npc) or "")
+        end
+        -- WL Helper's windows on screen
+        local open = {}
+        for _, w in ipairs(root.windows or {}) do
+            local okV, vis = pcall(w.IsShown, w)
+            local okN2, nm = pcall(w.GetName, w)
+            if okV and vis and okN2 and Str(nm) then open[#open + 1] = nm end
+        end
+        if #open > 0 then rec.win = table.concat(open, ","):sub(1, 160) end
+        -- the last 3 Lua errors (BugGrabber)
+        local BG = rawget(_G, "BugGrabber")
+        if type(BG) == "table" and type(BG.GetDB) == "function" then
+            local okD, db = pcall(BG.GetDB)
+            if okD and type(db) == "table" and #db > 1 then
+                local list = {}
+                for i = #db, math.max(1, #db - 2), -1 do
+                    local e = db[i]
+                    local m2 = type(e) == "table" and Str(e.message)
+                    if m2 then list[#list + 1] = m2:sub(1, 150) end
+                end
+                if #list > 1 then rec.errs = table.concat(list, " || ") end
+            end
+        end
+    end)
     return rec
 end
 
