@@ -290,6 +290,7 @@ local function FullChain(qid, cls, out, seen, depth)
       -- a quest both factions do can list each faction's own lead-in under the same name (3446:
       -- "The Sunken Temple", 3380 for the Horde and 3445 for the Alliance; the game takes either):
       -- the other faction's one is skipped when this faction's twin is in the list too
+      -- (twins named apart, "Return to Mokvar" / "Return to Deliana", say so with tw = the other's id)
       -- the same goes for class variants (An Earnest Proposition, one per class: the game takes
       -- yours): another class's variant is skipped when yours is in the list too
       local otherSide = false
@@ -298,7 +299,7 @@ local function FullChain(qid, cls, out, seen, depth)
       if (foreign and (not q.fa or q.fa == "" or q.fa == "Both")) or otherCls then
         for _, tid in ipairs(q.p) do
           local tq = ns.Q[tid]
-          if tid ~= pid and tq and tq.n == pq.n and FactionOK(tq.fa) and ClassOK(tq.c, cls) and RaceOK(tq.race)
+          if tid ~= pid and tq and (tq.n == pq.n or tq.tw == pid or pq.tw == tid) and FactionOK(tq.fa) and ClassOK(tq.c, cls) and RaceOK(tq.race)
             and (otherCls or tq.fa ~= pq.fa) then otherSide = true break end
         end
       end

@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.120] — 2026-11-18
+
+### Corrigé / Fixed
+- **Guide, après un vol** : le guide remet les étapes dans l'ordre à l'atterrissage. Avant, une route calculée au départ (par exemple à Camp Mojache en Féralas, en prenant « The Sunken Temple ») restait telle quelle après le vol : arrivé à Gadgetzan, le GPS t'envoyait chez Larion à Un'Goro au lieu de te faire rendre la quête à Marvon, tout près.
+  *The guide re-orders its steps when a flight lands (a route planned in Feralas no longer sends you to Un'Goro past Marvon's turn-in).*
+
+### Ajouté / Added
+- **Chaîne d'Anthion côté Alliance** : les quêtes de Deliana à Forgefer (An Earnest Proposition, A Supernatural Device, Return to Deliana, Just Compensation, In Search of Anthion, Anthion's Parting Words, Bodley's Unfortunate Fate), une par classe dont le paladin, lues sur Wowhead Forever. La version Alliance demande 15 Winterspring Blood Sample (Frostsaber de Berceau-de-l'Hiver), pas le venin de Silithus. Les quêtes communes (The Challenge, Dead Man's Plea, les morceaux d'amulette de Valthalak) s'ouvrent maintenant aussi pour l'Alliance, avec la version de ta faction et de ta classe.
+  *The Alliance Anthion chain (Deliana, Ironforge), every class including paladin; the shared Valthalak quests now open for the Alliance.*
+
 ## [1.0.0-beta.119] — 2026-11-18
 
 ### Modifié / Changed

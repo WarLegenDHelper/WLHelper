@@ -231,7 +231,7 @@ end
 -- =====================================================================
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_LOGIN", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN", "PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE",
-  "PLAYER_LEVEL_UP", "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA" }) do pcall(ev.RegisterEvent, ev, e) end
+  "PLAYER_LEVEL_UP", "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA", "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED" }) do pcall(ev.RegisterEvent, ev, e) end
 pcall(ev.RegisterEvent, ev, "BAG_UPDATE_DELAYED")
 
 -- A loading screen (teleport, portal, instance, /reload) closes the game's special windows, the
@@ -458,6 +458,26 @@ ev:SetScript("OnEvent", function(_, e)
     -- a new zone (walked in, landed, teleported): the steps left are ordered again from where you
     -- are now, so the route does not send you back across the map. Not on a flight (zones pass by),
     -- not inside an instance (Replan waits there), at most every 30 s.
+    -- a flight: the zones it crosses are skipped above, and landing in the zone you flew to fires no
+    -- zone change (a route planned in Feralas still sent you to Un'Goro from Gadgetzan, past the
+    -- turn-in there): the landing orders the steps again, once
+    if e == "PLAYER_CONTROL_LOST" then
+      C_Timer.After(1, function() if UnitOnTaxi and UnitOnTaxi("player") then ns.flying = true end end)
+      return
+    elseif e == "PLAYER_CONTROL_GAINED" then
+      if ns.flying then
+        ns.flying = nil
+        if GuideOn() and ns.route then
+          ns.zoneReplanAt = GetTime()
+          C_Timer.After(2, function()
+            if UnitOnTaxi and UnitOnTaxi("player") then return end
+            local ok, ran = pcall(ns.Replan)
+            if not (ok and ran) then replanWanted = true end
+          end)
+        end
+      end
+      return
+    end
     if e == "ZONE_CHANGED_NEW_AREA" and GuideOn() and ns.route then
       local onTaxi = UnitOnTaxi and UnitOnTaxi("player")
       if not onTaxi and not (ns.zoneReplanAt and GetTime() - ns.zoneReplanAt < 30) then

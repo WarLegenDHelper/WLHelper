@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.120", date = "2026-11-18", items = {
+    { s = "fix", fr = { "Guide, après un vol", "Le guide remet les étapes dans l'ordre à l'atterrissage. Avant, une route calculée au départ (par exemple à Camp Mojache en Féralas, en prenant « The Sunken Temple ») restait telle quelle après le vol : arrivé à Gadgetzan, le GPS t'envoyait chez Larion à Un'Goro au lieu de te faire rendre la quête à Marvon, tout près." }, en = { "The guide re-orders its steps when a flight lands (a route planned in Feralas no longer sends you to Un'Goro past Marvon's turn-in).", "" } },
+    { s = "add", fr = { "Chaîne d'Anthion côté Alliance", "Les quêtes de Deliana à Forgefer (An Earnest Proposition, A Supernatural Device, Return to Deliana, Just Compensation, In Search of Anthion, Anthion's Parting Words, Bodley's Unfortunate Fate), une par classe dont le paladin, lues sur Wowhead Forever. La version Alliance demande 15 Winterspring Blood Sample (Frostsaber de Berceau-de-l'Hiver), pas le venin de Silithus. Les quêtes communes (The Challenge, Dead Man's Plea, les morceaux d'amulette de Valthalak) s'ouvrent maintenant aussi pour l'Alliance, avec la version de ta faction et de ta classe." }, en = { "The Alliance Anthion chain (Deliana, Ironforge), every class including paladin; the shared Valthalak quests now open for the Alliance.", "" } },
+  } },
   { v = "1.0.0-beta.119", date = "2026-11-18", items = {
     { s = "chg", fr = { "Trouver un groupe, résultats plus lisibles", "Chaque ligne est plus haute, le nom plus grand, et les détails (niveau ou places, donjon, zone, depuis quand) juste en dessous dans une taille lisible, au lieu d'une petite colonne au milieu. Les rôles s'affichent en 5 grosses icônes : pour un groupe, une par place (tank, soigneur, 3 dégâts), allumée si elle est prise, pâle si elle est libre, comme dans LFG Forever ; pour un joueur, les rôles qu'il propose." }, en = { "Find a group", "Taller rows, bigger names, details under them, and 5 big role slots (taken bright, free faint)." } },
   } },
@@ -55,9 +59,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.106", date = "2026-11-17", items = {
     { s = "add", fr = { "Relevés en jeu, suite", "WL Helper note aussi où un objectif de quête du guide avance vraiment (l'endroit où le compteur monte, dedans ou dehors l'instance ; 12 endroits au plus par objectif), les récompenses que la fenêtre de quête propose, et l'ordre dans lequel les boss meurent dans chaque donjon (les 5 dernières sorties). Ça sert à corriger les points sur la carte et l'ordre des boss du guide." }, en = { "Records where objectives really progress, the quest rewards offered, and boss kill order per dungeon.", "" } },
-  } },
-  { v = "1.0.0-beta.105", date = "2026-11-17", items = {
-    { s = "add", fr = { "Relevés de quêtes en jeu", "Comme le Wowhead Client, WL Helper note ce que le jeu montre vraiment pour les quêtes du guide (qui la donne et où, qui la reprend, son niveau, l'XP reçue sans pénalité de niveau, et les prérequis listés que tu n'avais pas faits quand tu l'as prise). Ces relevés sont partagés avec la guilde et servent à corriger les données du guide. « /wlh diag quetes » montre ce qui diffère." }, en = { "In-game quest records (giver, turn-in, level, full XP, unneeded prerequisites), shared with the guild; /wlh diag quests.", "" } },
-    { s = "fix", fr = { "Le Temple englouti (Alliance)", "3 650 XP, comme sur Wowhead Forever (pas 6 550, la valeur de la version Horde)." }, en = { "Alliance \"The Sunken Temple\"", "3,650 XP." } },
   } },
 }
