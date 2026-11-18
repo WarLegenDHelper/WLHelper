@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.131", date = "2026-11-18", items = {
+    { s = "chg", fr = { "GPS, une seule flèche avec Shortest Path", "Avec « Avec la flèche de WL Helper », la flèche de Shortest Path et ses étapes dans le suivi des objectifs se coupent toutes seules (dans ses réglages). Tes réglages reviennent quand tu enlèves l'option ou que tu choisis un autre GPS. Plus rien à couper à la main." }, en = { "GPS", "Shortest Path's own arrow and journey tracker are turned off while our arrow shows its route, and given back after." } },
+  } },
   { v = "1.0.0-beta.130", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, le trajet de Shortest Path avec notre flèche", "Avec « Envoyer les destinations à Shortest Path », la nouvelle option « Avec la flèche de WL Helper » (activée par défaut) garde notre flèche. Shortest Path calcule le trajet ; notre flèche vise son prochain point et dit son étape en cours, puis la suivante, les étapes d'après, la destination et le temps restant. Pour n'avoir que notre flèche, coupe celle de Shortest Path et son suivi de trajet dans ses propres réglages (Interface : la flèche ; Guidance : les étapes dans le suivi des objectifs). Option coupée : l'interface de Shortest Path, comme avant." }, en = { "GPS", "Shortest Path's route shown by WL Helper's arrow (new option, on by default)." } },
   } },
@@ -49,8 +52,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.117", date = "2026-11-18", items = {
     { s = "fix", fr = { "Guide, étapes de boss", "Une étape de boss dont toutes les quêtes sont rendues compte comme faite, même si le guide n'a pas vu le boss mourir (tué avant un /reload ou une déconnexion). Avant, l'onglet « Dans le donjon » pouvait rester à 8 sur 9 alors que tout était fait (Prison d'Alcaz, Tidemistress Ca'zass)." }, en = { "Boss steps whose quests are all turned in count as done, even without a kill seen this session.", "" } },
-  } },
-  { v = "1.0.0-beta.116", date = "2026-11-18", items = {
-    { s = "add", fr = { "Meilleur pour toi", "Tape « /wlh bis » (ou « /wlh bis 60 » pour un autre niveau). Pour chaque emplacement, les 3 meilleures pièces que tu peux porter, classées par WL Helper Gear pour ta spé avec tes vraies stats, tes talents et tes plafonds de toucher ; le gain sur ce que tu portes, et d'où vient la pièce (donjon et boss, quête, métier, réputation ; les pièces PvP renvoient à « /wlh pvp »). Les raids sont laissés de côté tant qu'ils ne sont pas ouverts. La liste est calculée, pas recopiée d'un guide : Forever a changé beaucoup d'objets." }, en = { "Best for you (/wlh bis [level])", "The top 3 pieces per slot for your spec, computed by WL Helper Gear, with the gain and the source." } },
   } },
 }

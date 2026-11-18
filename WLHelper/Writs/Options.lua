@@ -166,7 +166,7 @@ ns.AddEnglish({
     ["Son trajet sur la carte, les vols et les bateaux avec leur départ."] = "Its route on the map, flights and boats with their departures.",
     ["Avec la flèche de WL Helper"] = "With WL Helper's arrow",
     ["Le trajet de Shortest Path, affiché par notre flèche."] = "Shortest Path's route, shown by our arrow.",
-    ["Shortest Path calcule le trajet, la flèche de WL Helper le montre : où aller maintenant, les étapes suivantes, la destination et le temps restant. Coupe sa flèche et son suivi de trajet dans les réglages de Shortest Path (Interface : la flèche ; Guidance : les étapes dans le suivi des objectifs) pour n'avoir que la nôtre."] = "Shortest Path works out the route, WL Helper's arrow shows it: where to go now, the next legs, the destination and the time left. Turn its arrow and its journey tracker off in Shortest Path's settings (Interface: the arrow; Guidance: the steps in the objective tracker) to keep only ours.",
+    ["Shortest Path calcule le trajet, la flèche de WL Helper le montre : où aller maintenant, les étapes suivantes, la destination et le temps restant. Sa flèche et ses étapes dans le suivi des objectifs se coupent pendant ce temps, et reviennent quand tu enlèves l'option."] = "Shortest Path works out the route, WL Helper's arrow shows it: where to go now, the next legs, the destination and the time left. Its arrow and its steps in the objective tracker are turned off meanwhile, and come back when you turn the option off.",
     ["Shortest Path Forever calcule le trajet (chemins, vols, bateaux avec l'heure de départ, portails) et le montre sur la carte avec sa flèche. La flèche de WL Helper, son chemin et ses pointillés se cachent pendant ce temps. Les étapes du guide, les repères de la carte et /way passent par lui."] =
         "Shortest Path Forever works out the trip (paths, flights, boats with their departure times, portals) and shows it on the map with its arrow. WL Helper's arrow, path and dots hide meanwhile. The guide's steps, map pins and /way go through it.",
     ["Pour ceux qui préfèrent la flèche de Zygor."] = "For those who prefer Zygor's arrow.",
@@ -1525,9 +1525,9 @@ function BUILD.gps(p)
             function(v) SetProvider(v and "spf" or nil) end, L("Son trajet sur la carte, les vols et les bateaux avec leur départ."),
             L("Shortest Path Forever calcule le trajet (chemins, vols, bateaux avec l'heure de départ, portails) et le montre sur la carte avec sa flèche. La flèche de WL Helper, son chemin et ses pointillés se cachent pendant ce temps. Les étapes du guide, les repères de la carte et /way passent par lui."))
         SwitchRow(p, L("Avec la flèche de WL Helper"), function() return Gps().spfOurArrow ~= false end,
-            function(v) Gps().spfOurArrow = v and true or false; local G = ns.WP and ns.WP.GPS; if G and G.Restart then G.Restart() end; ApplyLook() end,
+            function(v) Gps().spfOurArrow = v and true or false; local G = ns.WP and ns.WP.GPS; if G and G.SPFQuietSync then pcall(G.SPFQuietSync) end; if G and G.Restart then G.Restart() end; ApplyLook() end,
             L("Le trajet de Shortest Path, affiché par notre flèche."),
-            L("Shortest Path calcule le trajet, la flèche de WL Helper le montre : où aller maintenant, les étapes suivantes, la destination et le temps restant. Coupe sa flèche et son suivi de trajet dans les réglages de Shortest Path (Interface : la flèche ; Guidance : les étapes dans le suivi des objectifs) pour n'avoir que la nôtre."))
+            L("Shortest Path calcule le trajet, la flèche de WL Helper le montre : où aller maintenant, les étapes suivantes, la destination et le temps restant. Sa flèche et ses étapes dans le suivi des objectifs se coupent pendant ce temps, et reviennent quand tu enlèves l'option."))
     end
     -- Zygor can finish loading after the window was built (or be gone): the page is rebuilt once
     -- when it shows and the row no longer matches
@@ -2884,7 +2884,7 @@ local function RegisterEllesmere()
                         toggle(L("Envoyer les destinations à Shortest Path"), function() return Gps().provider == "spf" end,
                             function(v) SetProvider(v and "spf" or nil) end)
                         toggle(L("Avec la flèche de WL Helper"), function() return Gps().spfOurArrow ~= false end,
-                            function(v) Gps().spfOurArrow = v and true or false; local G = ns.WP and ns.WP.GPS; if G and G.Restart then G.Restart() end; ApplyLook() end)
+                            function(v) Gps().spfOurArrow = v and true or false; local G = ns.WP and ns.WP.GPS; if G and G.SPFQuietSync then pcall(G.SPFQuietSync) end; if G and G.Restart then G.Restart() end; ApplyLook() end)
                     end
                     toggle(L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"))
                     toggle(L("Masquer la flèche en combat"), function() return Gps().hideCombat end, SetGps("hideCombat"))

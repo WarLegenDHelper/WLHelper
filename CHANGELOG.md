@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.131] — 2026-11-18
+
+### Modifié / Changed
+- **GPS, une seule flèche avec Shortest Path** : avec « Avec la flèche de WL Helper », la flèche de Shortest Path et ses étapes dans le suivi des objectifs se coupent toutes seules (dans ses réglages). Tes réglages reviennent quand tu enlèves l'option ou que tu choisis un autre GPS. Plus rien à couper à la main.
+  *GPS: Shortest Path's own arrow and journey tracker are turned off while our arrow shows its route, and given back after.*
+
 ## [1.0.0-beta.130] — 2026-11-18
 
 ### Ajouté / Added

@@ -1932,6 +1932,32 @@ local function SPF()
     if type(api) == "table" and api.Navigate and api.Cancel then return api end
 end
 GPS._SPF = SPF
+
+-- Its route under our arrow: Shortest Path's own arrow and journey tracker are turned off in its settings
+-- (ShortestPathForeverDB.arrow / .journeyTracker: its API cannot hide them), the player's values kept in
+-- gpsOpts.spfSaved and given back when that mode ends (report: "otherwise we get 2 arrows").
+local function SPFQuiet(on)
+    local db = rawget(_G, "ShortestPathForeverDB")
+    local w = WLWritsDB
+    if type(db) ~= "table" or type(w) ~= "table" then return end
+    w.gpsOpts = w.gpsOpts or {}
+    local o = w.gpsOpts
+    if on then
+        if not o.spfSaved then
+            o.spfSaved = { arrow = db.arrow == nil and "nil" or db.arrow, journeyTracker = db.journeyTracker == nil and "nil" or db.journeyTracker }
+        end
+        db.arrow, db.journeyTracker = false, false
+    elseif o.spfSaved then
+        local sv = o.spfSaved
+        if sv.arrow == "nil" then db.arrow = nil else db.arrow = sv.arrow end
+        if sv.journeyTracker == "nil" then db.journeyTracker = nil else db.journeyTracker = sv.journeyTracker end
+        o.spfSaved = nil
+    end
+end
+-- what the settings ask for now
+function GPS.SPFQuietSync()
+    SPFQuiet(Opt("provider") == "spf" and Opt("spfOurArrow", true) ~= false and SPF() ~= nil)
+end
 function GPS.UseSPF()
     return SPF() ~= nil and Opt("provider") == "spf"
 end
@@ -2061,6 +2087,7 @@ local function Start(dest, source)
     if not ticker then ticker = C_Timer.NewTicker(2, Tick) end
     if GPS.UseSPF() then
         local api = SPF()
+        pcall(GPS.SPFQuietSync)
         local ok, took = pcall(api.Navigate, SPF_OWNER, dest.map, dest.x / 100, dest.y / 100, dest.name)
         if ok and took then
             state.spf = true
@@ -2106,6 +2133,7 @@ function GPS.SetProvider(p)
     db.gpsOpts = db.gpsOpts or {}
     if db.gpsOpts.provider == p then return end
     db.gpsOpts.provider = p
+    pcall(GPS.SPFQuietSync)
     GPS.Restart()
 end
 -- The trip under way, guided again from the start (another provider, another look).
@@ -2121,6 +2149,7 @@ function GPS.Restart()
     end
     state.zygor, state.spf, state.legs, state.spfView = nil, nil, nil, nil
     spfRead = nil
+    pcall(GPS.SPFQuietSync)
     Start(dest, source)
     state.suspended = susp
 end
@@ -2657,6 +2686,7 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3)
     end
     if event == "PLAYER_LOGIN" then
         pcall(GPS.MigrateProvider)
+        pcall(GPS.SPFQuietSync)
         -- Shortest Path loads after us at times: asked a few seconds after the login
         if C_Timer and C_Timer.After then C_Timer.After(8, function() pcall(GPS.AskProvider) end) end
         -- A tour does not survive a reload: start it again from the button.
