@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.157] — 2026-11-18
+
+### Ajouté / Added
+- **Onglets WL Helper dans la fenêtre Recherche de groupe du jeu** : sous les onglets de droite (et sous celui de LFG Forever), deux onglets WL Helper. Le logo ouvre « Trouver un groupe », l'enclume ouvre « Commandes d'artisanat ». Un clic ferme la fenêtre du jeu (hors combat) et ouvre la nôtre. Ces onglets ne touchent à rien dans la fenêtre du jeu.
+  *Two WL Helper tabs on the game's Group Finder (under LFG Forever's): Find a group and Crafting orders.*
+
 ## [1.0.0-beta.156] — 2026-11-18
 
 ### Corrigé / Fixed

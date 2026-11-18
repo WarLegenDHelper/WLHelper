@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.157", date = "2026-11-18", items = {
+    { s = "add", fr = { "Onglets WL Helper dans la fenêtre Recherche de groupe du jeu", "Sous les onglets de droite (et sous celui de LFG Forever), deux onglets WL Helper. Le logo ouvre « Trouver un groupe », l'enclume ouvre « Commandes d'artisanat ». Un clic ferme la fenêtre du jeu (hors combat) et ouvre la nôtre. Ces onglets ne touchent à rien dans la fenêtre du jeu." }, en = { "Two WL Helper tabs on the game's Group Finder (under LFG Forever's): Find a group and Crafting orders.", "" } },
+  } },
   { v = "1.0.0-beta.156", date = "2026-11-18", items = {
     { s = "fix", fr = { "Vue moderne, guide terminé", "La vue disparaissait à la fin d'un guide et on ne pouvait plus choisir de guide. Elle affiche maintenant « Guide terminé ! » avec le lien « Choisir un guide » (et la flèche ‹ pour revoir la dernière étape). Sans aucun guide chargé : « Aucun guide en cours » avec le même lien." }, en = { "Modern view", "A finished guide (or none loaded) shows a card with \"Pick a guide\" instead of vanishing." } },
     { s = "fix", fr = { "Améliorations, bijoux", "Un bijou à +9 Endurance s'affichait « +125 % » face à Theka's Last Breath, parce que ce dernier ne vaut presque rien en stats (sa valeur est son effet « Utiliser : »). Face à un objet sans presque aucune stat, l'écart est donné en points (« Presque pareil », ou l'écart réel). La ligne « Remplace » nomme le bijou vraiment comparé, et une ligne rappelle que les effets « Utiliser : » ne sont pas comptés." }, en = { "Upgrades", "No huge percent next to an item with almost no stats; \"Replaces\" names the trinket really compared; a note that \"Use:\" effects are not counted." } },
@@ -93,14 +96,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.143", date = "2026-11-18", items = {
     { s = "chg", fr = { "« Nous écrire » : on écrit et on envoie dans la fenêtre", "Le bouton de la page d'accueil, « Nous écrire », ouvre une fenêtre avec : 1. le choix entre une idée, un bug ou une erreur de quête ; 2. une zone pour écrire ton message ; 3. un champ pour coller le lien d'une capture d'écran (mets-la sur Discord ou imgur, puis Ctrl+V : le jeu ne laisse pas un addon joindre une image) ; 4. le bouton **Envoyer**. Le message part par la guilde, avec ta position, ton étape du guide et ta version, sans compte. Le formulaire GitHub reste en dessous, pour ceux qui ont un compte." }, en = { "\"Write to us\" (home page) now has a message box, a screenshot-link field and a Send button: sent through the guild, no account; GitHub stays below.", "" } },
-  } },
-  { v = "1.0.0-beta.142", date = "2026-11-18", items = {
-    { s = "add", fr = { "Signaler un bug ou une idée depuis le jeu, sans compte", "Tape /wlh bug ou /wlh idee suivi de ton message (exemple : /wlh bug la flèche reste affichée quand je décoche). Le message part tout seul à l'équipe WL Helper par le canal de la guilde. Il emporte ce qu'il faut pour comprendre le problème :" }, en = { "", "" } },
-    { s = "add", fr = { "", "la version de l'addon et la langue du jeu ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "la zone et la position ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "l'étape du guide et le donjon ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "le niveau et la classe ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "la dernière erreur Lua gardée par BugGrabber. Si aucun responsable n'est connecté, le message est gardé et repart dès qu'il l'est. Pas de capture d'écran possible : un addon ne peut pas en joindre. /wlh bug seul ouvre toujours l'ancien formulaire GitHub." }, en = { "Report a bug or an idea from the game, no account", "/wlh bug or /wlh idea with your message; it goes through the guild with its context and waits until an officer is online." } },
-    { s = "add", fr = { "Côté responsable", "Le compte du maître de guilde reçoit les rapports automatiquement (ou /wlh rapports on sur un autre compte). /wlh rapports dit combien sont arrivés. Ils sont enregistrés dans les sauvegardes de l'addon, où l'auteur de WL Helper les lit." }, en = { "The guild master's account receives them (or /wlh reports on); /wlh reports counts them.", "" } },
   } },
 }
