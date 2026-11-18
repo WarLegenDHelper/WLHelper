@@ -4638,6 +4638,16 @@ end
 function ns.ToggleMain()
   if not f then return end
   if not f:IsShown() and GuideOff() then return end
+  -- the modern view by default: the guide opens in it when a route runs and it is not on screen
+  -- (shown already: the click asks for the window)
+  local TR = WLHelperTracker
+  local trf = TR and TR.Frame and TR.Frame()
+  if not f:IsShown() and WLDTDB.modernDefault ~= false and ns.route and TR and TR.Compact and not (trf and trf:IsShown()) then
+    WLDTDB.hidden = false
+    TR.Compact()
+    ns.Refresh()
+    return
+  end
   f:SetShown(not f:IsShown()); WLDTDB.hidden = not f:IsShown()
   if WLDTDB.hidden then ns.SetArrow(nil) else f.sig = nil; ns.Refresh() end
   if ns.UpdateActionBar then ns.UpdateActionBar() end

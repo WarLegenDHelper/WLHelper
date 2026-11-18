@@ -691,10 +691,17 @@ do
     local ok, inside, kind = pcall(IsInInstance)
     return ok and inside == true and (kind == "party" or kind == "raid")
   end
+  local function Fit()
+    local J = Journal()
+    if J and type(J.FitMapOnWorldMap) == "function" and WorldMapFrame and WorldMapFrame:IsShown() then pcall(J.FitMapOnWorldMap) end
+  end
   local function Relay()
     local J = Journal()
     if not (J and lastDungeon and WorldMapFrame and WorldMapFrame:IsShown()) then return end
     pcall(J.ShowMapOnWorldMap, lastDungeon)
+    -- the window may still be taking its size (L opens it with the quest log beside the map): the map
+    -- is fitted again once it has (report: "L shows the dungeon map tiny in the middle")
+    if C_Timer and C_Timer.After then C_Timer.After(0.1, Fit); C_Timer.After(0.4, Fit) end
   end
   local function MapChanged()
     if relaid or not openedAt or GetTime() - openedAt > REOPEN_WINDOW then return end

@@ -59,7 +59,13 @@ function TR.Action(n, st, log)
   local qn = n.q and ns.QName(n.q) or ""
   local a = { node = n, st = st }
   local o = n.oneObj or (n.kind == "o" and n.obj) or nil
-  if n.kind == "a" then a.kind, a.text, a.sub = "take", L.TR_TAKE:format(qn), Where(n)
+  if n.kind == "a" then
+    a.kind, a.text, a.sub = "take", L.TR_TAKE:format(qn), Where(n)
+    -- a quest that starts from an item: which one (report: "I did The Essence of Eranikus already",
+    -- the second quest of that name starts from the Oathstone in the bags)
+    local qq = ns.Q[n.q]
+    local it = qq and qq.s and qq.s.i == 1 and (qq.si or qq.s.n)
+    if it and L.TR_FROM_ITEM then a.text = a.text .. "  " .. Hex(T.muted) .. L.TR_FROM_ITEM:format((ns.LN and ns.LN("item", it)) or it) .. "|r" end
   elseif n.kind == "t" then a.kind, a.text, a.sub = "turn", L.TR_TURN:format(qn), Where(n)
   elseif n.kind == "h" then a.kind, a.text, a.sub = "have", L.TR_HAVE:format(qn), Where(n)
   elseif n.kind == "i" then
@@ -141,7 +147,13 @@ function TR.Model()
   local log = ns.LogEntries()
   local idx, st = ns.CurrentStepIndex(log)
   if not (idx and st) then return nil end
-  local m = { idx = idx, st = st }
+  -- the step browsed with the header's arrows (TR.browse), else the current one
+  local curIdx = idx
+  if TR.browse then
+    TR.browse = math.max(1, math.min(#steps, TR.browse))
+    if TR.browse == curIdx then TR.browse = nil else idx, st = TR.browse, steps[TR.browse] end
+  end
+  local m = { idx = idx, st = st, curIdx = curIdx, browsing = idx ~= curIdx }
   -- chapter: phase, dungeon, steps done in that phase
   local ph = ns.StepPhase and ns.StepPhase(st) or "before"
   local dk = ns.StepDungeon and ns.StepDungeon(st)
@@ -165,6 +177,8 @@ function TR.Model()
   local acts = TR.StepActions(idx, st, log)
   local cur, curPos
   for k, a in ipairs(acts) do if not a.done then cur, curPos = a, k break end end
+  -- a browsed step all done: its first line, as it was
+  if not cur and m.browsing and acts[1] then cur, curPos = acts[1], 1 end
   local ahead
   if not cur and #acts > 0 then
     -- every line of the step is done (it waits on something else): never a done line as the
@@ -395,17 +409,38 @@ local function Build()
   head:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0); head:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
   head:SetHeight(HEAD_H)
   head:RegisterForDrag("LeftButton")
-  head:RegisterForClicks("LeftButtonUp")
+  head:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   head:SetScript("OnDragStart", function() f:StartMoving() end)
   head:SetScript("OnDragStop", function() f:StopMovingOrSizing(); SavePos() end)
   head.title = ns.Text(head, F.title, T.fg)
   head.title:SetWidth(W - PAD * 2 - 24 - GAP)
   head.title:SetWordWrap(false)
   Anchor(head.title, "TOPLEFT", head, "TOPLEFT", PAD, -9)
-  -- the dungeon's levels (gold), the step and the percent (blue), at the right of the title
+  -- the dungeon's levels (gold), the step and the percent (blue), at the right of the title, between
+  -- the arrows that browse the steps (report: "previous / next step with small arrows"); then the
+  -- menu button and the fold button
+  local function SmallBtn(icon, tip, onClick)
+    local b = CreateFrame("Button", nil, f)
+    b:SetSize(20, 24)
+    b:SetFrameLevel(head:GetFrameLevel() + 2)
+    b.icon = b:CreateTexture(nil, "ARTWORK"); b.icon:SetSize(14, 14); b.icon:SetPoint("CENTER")
+    ns.SetHDIcon(b.icon, icon, T.muted)
+    b.hl = ns.Tex(b, "BACKGROUND", T.hoverFill); b.hl:SetAllPoints(); b.hl:Hide()
+    b:SetScript("OnEnter", function(self) self.hl:Show(); ns.SetHDIcon(self.icon, icon, T.fg); ns.ShowTip(self, type(tip) == "function" and tip() or tip) end)
+    b:SetScript("OnLeave", function(self) self.hl:Hide(); ns.SetHDIcon(self.icon, icon, self.off and T.faint or T.muted); if ns.HideTip then ns.HideTip() end end)
+    b:SetScript("OnClick", function(self, btn) if not self.off then onClick(self, btn) end end)
+    function b:SetOff(off) self.off = off; ns.SetHDIcon(self.icon, icon, off and T.faint or T.muted) end
+    return b
+  end
+  f.menuBtn = SmallBtn("gear", { L.TR_MENU, L.TR_MENU_TIP }, function(self) TR.ToggleMenu(self) end)
+  f.menuBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(PAD - 6 + 24), -2)
+  f.nextBtn = SmallBtn("chevron_right", { L.TR_NEXT }, function() TR.Browse(1) end)
+  f.nextBtn:SetPoint("TOPRIGHT", f.menuBtn, "TOPLEFT", -2, 0)
   head.meta = ns.Text(head, F.label, T.muted)
   head.meta:SetJustifyH("RIGHT"); head.meta:SetWordWrap(false)
-  head.meta:SetPoint("TOPRIGHT", head, "TOPRIGHT", -(PAD + 24), -11)
+  head.meta:SetPoint("RIGHT", f.nextBtn, "LEFT", -2, 0)
+  f.prevBtn = SmallBtn("chevron_left", { L.TR_PREV }, function() TR.Browse(-1) end)
+  f.prevBtn:SetPoint("RIGHT", head.meta, "LEFT", -2, 0)
   Feedback(head, { head.title })
   head:SetScript("OnEnter", function(self)
     self.hl:Show()
@@ -413,7 +448,10 @@ local function Build()
       WLDTDB.trackerCollapsed and L.TR_EXPAND or L.TR_COLLAPSE })
   end)
   head:SetScript("OnLeave", function(self) self.hl:Hide(); if ns.HideTip then ns.HideTip() end end)
-  head:SetScript("OnClick", function() TR.OpenGuide(f.model and f.model.idx) end)
+  head:SetScript("OnClick", function(self, btn)
+    if btn == "RightButton" then TR.ToggleMenu(self) return end
+    TR.OpenGuide(f.model and f.model.idx)
+  end)
   f.head = head
   -- the row-action size: 24 px hit area, 16 px icon; hover fill, press fill and a 1 px nudge
   local col = CreateFrame("Button", nil, f)
@@ -447,6 +485,11 @@ local function Build()
   f.card:SetFrameLevel(f:GetFrameLevel() + 1)
   f.stepLabel = ns.Text(f, F.meta, T.warn)
   f.stepLabel:SetWordWrap(false)
+  f.backBtn = CreateFrame("Button", nil, f)
+  f.backBtn:SetAllPoints(f.stepLabel)
+  f.backBtn:SetFrameLevel(f:GetFrameLevel() + 4)
+  f.backBtn:SetScript("OnClick", function() TR.browse = nil; TR.Refresh() end)
+  f.backBtn:Hide()
   f.cur = MakeRow(f, ICON, F.title, T.fg)
   f.cur:SetFrameLevel(f.card:GetFrameLevel() + 1)
   f.cur.sub = ns.Text(f.cur, F.label, T.muted)
@@ -542,7 +585,11 @@ local function Draw(m)
   head.meta:SetText(meta)
   local metaW = 0
   if meta ~= "" then local okW, mw = pcall(head.meta.GetStringWidth, head.meta); metaW = (okW and type(mw) == "number" and not secret(mw)) and mw or 90 end
-  head.title:SetWidth(math.max(80, W - PAD * 2 - 24 - GAP - metaW - (metaW > 0 and 8 or 0)))
+  head.title:SetWidth(math.max(80, W - PAD * 2 - 24 - 24 - 20 - 20 - GAP - metaW - (metaW > 0 and 8 or 0)))
+  -- the arrows: off at either end, hidden when folded
+  local nSteps = ns.route and ns.route.steps and #ns.route.steps or 0
+  f.prevBtn:SetShown(not collapsed); f.nextBtn:SetShown(not collapsed)
+  f.prevBtn:SetOff((m.stepN or 1) <= 1); f.nextBtn:SetOff((m.stepN or 1) >= nSteps)
   head.title:SetText(title)
   local headH = math.max(HEAD_H, TextH(head.title, F.title) + 18)
   head:SetHeight(headH)
@@ -550,6 +597,7 @@ local function Draw(m)
   local y = headH
   local function hideBody()
     for _, fs in ipairs(f.info or {}) do fs:Hide() end
+    if f.backBtn then f.backBtn:Hide() end
     f.cur:Hide(); f.travel:Hide(); f.travelIcon:Hide()
     f.card:Hide(); f.stepLabel:Hide(); f.thenLabel:Hide(); f.prog:Hide(); f.progFill:Hide(); f.progText:Hide()
     for _, b in ipairs(f.bars) do b:Hide() end
@@ -561,9 +609,12 @@ local function Draw(m)
   y = cardTop + CARD_PAD
   local lbl = string.format(L.TR_STEP or "ÉTAPE %d", m.stepN or 0)
   if m.phaseText then lbl = lbl .. "  ·  " .. m.phaseText end
-  f.stepLabel:SetText(string.upper(lbl))
+  lbl = string.upper(lbl)
+  if m.browsing then lbl = lbl .. "  " .. Hex(T.accentSoft) .. L.TR_BACK .. "|r" end
+  f.stepLabel:SetText(lbl)
   f.stepLabel:ClearAllPoints(); f.stepLabel:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + CARD_PAD - 4, -y)
   f.stepLabel:Show()
+  f.backBtn:SetShown(m.browsing and true or false)
   y = y + TextH(f.stepLabel, F.meta) + 2
   local cur = f.cur
   cur.action = m.cur
@@ -698,6 +749,82 @@ function TR.Refresh()
 end
 
 function TR.IsOn() return WLDTDB ~= nil and WLDTDB.tracker == true end
+
+-- the header's arrows: one step back or ahead (TR.browse), the current step again past it
+function TR.Browse(delta)
+  local m = f and f.model
+  if not m then return end
+  TR.browse = (m.idx or m.curIdx or 1) + delta
+  TR.Refresh()
+end
+
+-- the menu (the gear, or a right-click on the title): the guide window's actions here
+local menu
+local function MenuItems()
+  local m = f and f.model
+  local dk = m and m.dk
+  local items = {
+    { L.TR_M_WINDOW, function() TR.OpenGuide(m and m.idx) end },
+    { L.TR_M_GO, function() if WLDTDB.arrow == false then WLDTDB.arrow = true end; if ns.PlacePoints then ns.PlacePoints() end end },
+    { L.TR_M_DONE, function() if m then TR.MarkDone(m.idx) end end },
+    { L.TR_M_SHARE, function() if ns.ShareQuests then ns.ShareQuests() end end },
+  }
+  if dk and ns.ToggleBosses then items[#items + 1] = { L.TR_M_BOSSES, function() ns.ToggleBosses(dk) end } end
+  if dk and ns.OpenDungeonMap then items[#items + 1] = { L.TR_M_MAP, function() ns.OpenDungeonMap(dk) end } end
+  items[#items + 1] = { TR.Frameless() and L.TR_M_FRAMED or L.TR_M_FRAMELESS, function() TR.SetFrameless(not TR.Frameless()) end }
+  items[#items + 1] = { L.TR_M_OPTIONS, function()
+    local WP = ns.Writs and ns.Writs.WP
+    if WP and WP.OpenOptions then WP.OpenOptions("dungeons") end
+  end }
+  items[#items + 1] = { L.TR_M_STOP, function() if ns.StopRoute then ns.StopRoute() end end, confirm = true }
+  items[#items + 1] = { L.TR_M_HIDE, function() TR.SetShown(false) end }
+  return items
+end
+function TR.ToggleMenu(anchor)
+  if menu and menu:IsShown() then menu:Hide() return end
+  if not menu then
+    menu = CreateFrame("Frame", "WLDTTrackerMenu", UIParent)
+    menu:SetFrameStrata("DIALOG")
+    menu:SetClampedToScreen(true)
+    ns.Flat(menu, T.panel or T.bg, T.cardEdge)
+    menu.rows = {}
+    tinsert(UISpecialFrames, "WLDTTrackerMenu")
+  end
+  local items = MenuItems()
+  local w = 220
+  for k, it in ipairs(items) do
+    local r = menu.rows[k]
+    if not r then
+      r = CreateFrame("Button", nil, menu)
+      r:SetHeight(24)
+      r.hl = ns.Tex(r, "HIGHLIGHT", T.hoverFill); r.hl:SetAllPoints()
+      r.text = ns.Text(r, F.label, T.fg); r.text:SetPoint("LEFT", 10, 0); r.text:SetPoint("RIGHT", -10, 0)
+      r.text:SetJustifyH("LEFT"); r.text:SetWordWrap(false)
+      menu.rows[k] = r
+    end
+    r:ClearAllPoints(); r:SetPoint("TOPLEFT", 4, -4 - (k - 1) * 24); r:SetPoint("TOPRIGHT", -4, -4 - (k - 1) * 24)
+    r.text:SetText(it[1]); r.text:SetTextColor(T.fg[1], T.fg[2], T.fg[3])
+    r.armed = nil
+    r:SetScript("OnClick", function(self)
+      -- "Stop this guide": a second click confirms
+      if it.confirm and not self.armed then
+        self.armed = true
+        self.text:SetText(L.RESTART_CONFIRM); self.text:SetTextColor(T.warn[1], T.warn[2], T.warn[3])
+        return
+      end
+      menu:Hide()
+      pcall(it[2])
+      TR.Refresh()
+    end)
+    r:Show()
+  end
+  for k = #items + 1, #menu.rows do menu.rows[k]:Hide() end
+  menu:SetSize(w, 8 + #items * 24)
+  menu:ClearAllPoints()
+  menu:SetPoint("TOPRIGHT", anchor or f, "BOTTOMRIGHT", 0, -2)
+  menu:Show()
+end
+TR._Menu = function() return menu end
 
 -- The guide's "-": the window gives way to the tracker (open, not folded); a click on the tracker
 -- brings the whole guide back (TR.OpenGuide).

@@ -126,6 +126,12 @@ function ns.StartGuide(run)
   f:Show(); WLDTDB.hidden = false
   ns.Refresh(true)
   if ns.route then ns.Print(L.ROUTE_BUILT:format(#ns.route.steps, ns.route.label)) end
+  -- the modern view is the guide's default view (report: "it should be the default view"); the
+  -- window comes with a click on its title, Options > Dungeons turns this off
+  if ns.route and WLDTDB.modernDefault ~= false and WLHelperTracker and WLHelperTracker.Compact then
+    WLHelperTracker.browse = nil
+    WLHelperTracker.Compact()
+  end
 end
 
 -- The rest of the route planned again from where you stand when a quest changes state (objectives

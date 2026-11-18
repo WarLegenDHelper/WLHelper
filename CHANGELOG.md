@@ -6,6 +6,30 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.146] — 2026-11-18
+
+### Modifié / Changed
+- **La vue moderne par défaut** : lancer un guide ou ouvrir le guide affiche maintenant la vue moderne. Un clic sur son titre ouvre la fenêtre complète. Pour revenir à l'ancien comportement : Options > Donjons, « Vue moderne par défaut ».
+  *The modern view is the guide's default view; a click on its title opens the window (Options > Dungeons to turn it off).*
+
+### Ajouté / Added
+- **Vue moderne, étape précédente / suivante** : des petites flèches ‹ › autour de « 33/42 » dans l'en-tête font défiler les étapes. Pendant qu'on regarde une autre étape, le libellé orange propose de revenir à l'étape en cours.
+  *Modern view: ‹ › arrows in the header browse the steps; a click on the label goes back to the current one.*
+- **Vue moderne, le menu** : la roue dentée de l'en-tête, ou un clic droit sur le titre, ouvre un menu :
+  - ouvrir la fenêtre du guide, guider vers l'étape, marquer l'étape comme faite ;
+  - partager les quêtes avec le groupe ;
+  - boss et carte du donjon ;
+  - avec ou sans cadre, réglages du guide ;
+  - arrêter ce guide (second clic pour confirmer), masquer la vue moderne.
+
+  *Modern view: the gear (or a right-click on the title) opens a menu with the window's actions and settings.*
+
+### Corrigé / Fixed
+- **Une quête qui commence avec un objet dit lequel** : dans la vue moderne, « Prendre « The Essence of Eranikus » · objet « Oathstone of Ysera's Dragonflight » dans tes sacs ». Deux quêtes portent ce nom : la seconde commence avec ce serment.
+  *An item-started quest names its item in the modern view (two quests share the name "The Essence of Eranikus").*
+- **La touche L dans un donjon** : la carte du donjon de Naowh s'affichait toute petite au milieu, à côté du journal de quêtes. Elle se réajuste maintenant à la taille de la carte.
+  *L inside a dungeon: Naowh's dungeon map is fitted again once the window has its size.*
+
 ## [1.0.0-beta.145] — 2026-11-18
 
 ### Modifié / Changed

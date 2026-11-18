@@ -197,6 +197,9 @@ ns.AddEnglish({
     ["Taille de la flèche"] = "Arrow size",
     ["Taille des fenêtres"] = "Window size",
     ["Vue moderne sans cadre"] = "Frameless modern view",
+    ["Vue moderne par défaut"] = "Modern view by default",
+    ["Le guide s'ouvre dans la vue moderne."] = "The guide opens in the modern view.",
+    ["Lancer un guide ou ouvrir le guide affiche la vue moderne ; un clic sur son titre ouvre la fenêtre. Coupé : la fenêtre, comme avant."] = "Starting or opening the guide shows the modern view; a click on its title opens the window. Off: the window, as before.",
     ["Le texte posé sur le jeu, comme Polestar."] = "The text on the game, like Polestar.",
     ["Sans fond ni bordure, le texte posé sur le jeu avec une ombre, comme Polestar. Coupé : la carte sur fond sombre, comme RestedXP."] = "No backdrop or border, the text on the game with a shadow, like Polestar. Off: the card on a dark backdrop, like RestedXP.",
     ["Taille de toutes les fenêtres"] = "Size of every window",
@@ -1420,6 +1423,10 @@ function BUILD.dungeons(p)
         end,
         L("Une petite fenêtre, guide fermé."),
         L("Une petite fenêtre avec l'action à faire, quand la fenêtre du guide est fermée."))
+    SwitchRow(p, L("Vue moderne par défaut"), function() return Guide().modernDefault ~= false end,
+        function(v) if v then Guide().modernDefault = nil else Guide().modernDefault = false end end,
+        L("Le guide s'ouvre dans la vue moderne."),
+        L("Lancer un guide ou ouvrir le guide affiche la vue moderne ; un clic sur son titre ouvre la fenêtre. Coupé : la fenêtre, comme avant."))
     SwitchRow(p, L("Vue moderne sans cadre"), function() return Guide().trackerFrameless ~= false end,
         function(v)
             local TR = _G.WLHelperTracker
