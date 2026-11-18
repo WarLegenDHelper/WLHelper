@@ -375,7 +375,7 @@ local function Tasks()
           show = function()
               local route = root.GuideStatus and root.GuideStatus()
               if route and ModuleOn("dungeons") then
-                  ShowMe(function() if root.ShowGuide then root.ShowGuide() end end, function() return root.frame end,
+                  ShowMe(function() local o = root.ShowWindow or root.ShowGuide; if o then o() end end, function() return root.frame end,
                       { function() return root.frame and root.frame.go end, { GuideWord("GO") } })
               elseif ModuleOn("writs") then
                   ShowMe(function() WP.Open("writs"); if WP.ShowTab then WP.ShowTab("today") end end, Win("WLHelperComptoir"),

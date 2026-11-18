@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.160] — 2026-11-18
+
+### Corrigé / Fixed
+- **Les boutons du guide ouvrent la vue moderne** : « Mettre à jour le guide » et « Retour au guide » (résumé des donjons, clés), la page d'accueil, le hub, les réglages et la proposition à l'entrée d'un donjon ouvraient la fenêtre classique au lieu de la vue moderne. Ils ouvrent maintenant la vue moderne quand c'est la vue par défaut. La fenêtre classique s'ouvre seulement par l'entrée « Fenêtre » du menu de la vue moderne (et pendant la visite guidée, qui la montre).
+  *Guide buttons (update / back to the guide, home, hub, keys, settings, dungeon entry) open the modern view when it is the default; the window only from its menu.*
+
 ## [1.0.0-beta.159] — 2026-11-18
 
 ### Modifié / Changed

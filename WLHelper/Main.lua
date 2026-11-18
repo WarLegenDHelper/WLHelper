@@ -456,7 +456,7 @@ OnInstanceEntry = function()
     for _, k in ipairs(keys) do if ns.InstLeft(k) > 0 then table.insert(cands, k) end end
     if #cands == 1 then
       ns.instOffer = cands[1]
-      if not f:IsShown() then f:Show(); WLDTDB.hidden = false end
+      if not f:IsShown() then ns.ShowGuideView() end
       ns.Print(L.INST_CHAT:format(ns.DName(cands[1]), ns.InstLeft(cands[1])))
     elseif #cands > 1 then ns.instOffer = nil; ns.Print(L.INST_PICK) end
   end

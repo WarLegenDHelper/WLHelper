@@ -296,7 +296,8 @@ end
 --  Actions of the player on the tracker
 -- =====================================================================
 function TR.OpenGuide(i)
-  if ns.ShowGuide then ns.ShowGuide() end
+  -- the window itself (the menu's "window" entry): never back to this view
+  if ns.ShowWindow then ns.ShowWindow() elseif ns.ShowGuide then ns.ShowGuide() end
   if i and ns.GoTo and ns.frame and ns.frame:IsShown() then ns.GoTo(i) end
 end
 

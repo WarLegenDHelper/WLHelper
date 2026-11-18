@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.160", date = "2026-11-18", items = {
+    { s = "fix", fr = { "Les boutons du guide ouvrent la vue moderne", "« Mettre à jour le guide » et « Retour au guide » (résumé des donjons, clés), la page d'accueil, le hub, les réglages et la proposition à l'entrée d'un donjon ouvraient la fenêtre classique au lieu de la vue moderne. Ils ouvrent maintenant la vue moderne quand c'est la vue par défaut. La fenêtre classique s'ouvre seulement par l'entrée « Fenêtre » du menu de la vue moderne (et pendant la visite guidée, qui la montre)." }, en = { "Guide buttons (update / back to the guide, home, hub, keys, settings, dungeon entry) open the modern view when it is the default; the window only from its menu.", "" } },
+  } },
   { v = "1.0.0-beta.159", date = "2026-11-18", items = {
     { s = "chg", fr = { "Vue moderne, le nom de la quête en titre", "Sur une étape à objectif (« Ramasser : Magenta Fungus Cap 1/12 »), le grand titre répétait la barre d'objectif et le nom de la quête restait noyé dans une ligne grise. Le titre est maintenant le nom de la quête, en doré. La barre dit quoi faire et combien, et la ligne grise ne répète plus le nom de la quête." }, en = { "Modern view", "On an objective step the title is the quest's name; the bar says what to do and how many." } },
   } },
@@ -88,8 +91,5 @@ ns.WHATSNEW = {
     { s = "add", fr = { "", "arrêter ce guide (second clic pour confirmer), masquer la vue moderne." }, en = { "Modern view", "The gear (or a right-click on the title) opens a menu with the window's actions and settings." } },
     { s = "fix", fr = { "Une quête qui commence avec un objet dit lequel", "Dans la vue moderne, « Prendre « The Essence of Eranikus » · objet « Oathstone of Ysera's Dragonflight » dans tes sacs ». Deux quêtes portent ce nom : la seconde commence avec ce serment." }, en = { "An item-started quest names its item in the modern view (two quests share the name \"The Essence of Eranikus\").", "" } },
     { s = "fix", fr = { "La touche L dans un donjon", "La carte du donjon de Naowh s'affichait toute petite au milieu, à côté du journal de quêtes. Elle se réajuste maintenant à la taille de la carte." }, en = { "L inside a dungeon", "Naowh's dungeon map is fitted again once the window has its size." } },
-  } },
-  { v = "1.0.0-beta.145", date = "2026-11-18", items = {
-    { s = "chg", fr = { "Les rapports ne passent plus par toute la guilde", "Un message envoyé avec « Nous écrire » (ou /wlh bug) part maintenant en privé (chuchotement d'addon), uniquement vers le compte qui reçoit les rapports : celui qui s'est annoncé, sinon le maître de guilde s'il est connecté. L'accusé de réception revient aussi en privé. Le canal de guilde ne sert plus qu'à un petit « je suis là » du compte qui reçoit, à sa connexion puis toutes les 15 minutes. Si personne ne peut recevoir, le message est gardé et part dès que c'est possible." }, en = { "Reports go by addon whisper to the receiving account only (the one that announced itself, else the guild master online), acks too; the guild channel only carries the inbox's small \"I'm here\".", "" } },
   } },
 }

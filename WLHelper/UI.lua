@@ -4668,12 +4668,29 @@ function ns.GuideStatus()
   return label, cur, #steps, finished, StepTitle(steps[cur])
 end
 
--- Opens the guide (never closes it).
+local GuideOff
+-- Opens the guide (never closes it): the modern view when it is the default and a route runs
+-- (report: "lots of buttons like update guide send to the classic view instead of the modern one"),
+-- else the window. ns.ShowWindow: the window itself (the modern view's menu, the tour).
 function ns.ShowGuide()
-  if f and not f:IsShown() then ns.ToggleMain() end
+  if not f then return end
+  local TR = WLHelperTracker
+  if WLDTDB.modernDefault ~= false and ns.route and #(ns.route.steps or {}) > 0 and TR and TR.Compact then
+    if GuideOff() then return end
+    TR.Compact()
+    ns.Refresh()
+    return
+  end
+  if not f:IsShown() then ns.ToggleMain() end
+end
+function ns.ShowWindow()
+  if not f or f:IsShown() or GuideOff() then return end
+  f:Show(); WLDTDB.hidden = false
+  f.sig = nil; ns.Refresh()
+  if ns.UpdateActionBar then ns.UpdateActionBar() end
 end
 
-local function GuideOff()
+GuideOff = function()
   local WP = ns.Writs and ns.Writs.WP
   return WP and WP.ModuleOff and WP.ModuleOff("dungeons")
 end

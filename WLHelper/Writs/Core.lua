@@ -1300,7 +1300,9 @@ function WP.SetModule(key, on)
             if root.UpdateActionBar then root.UpdateActionBar() end
         elseif root.frame then
             -- back right away, as it was before
-            if WLDTDB and not WLDTDB.hidden then root.frame:Show() end
+            if WLDTDB and not WLDTDB.hidden then
+                if root.ShowGuideView then root.ShowGuideView() else root.frame:Show() end
+            end
             root.frame.sig = nil
             if root.Refresh then root.Refresh(true) end
             if root.UpdateActionBar then root.UpdateActionBar() end
