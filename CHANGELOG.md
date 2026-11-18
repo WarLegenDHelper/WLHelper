@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.121] — 2026-11-18
+
+### Modifié / Changed
+- **Guide, la route suit ta position** : toutes les 5 secondes, si tu es à plus de 400 mètres de l'endroit d'où la route a été calculée, les étapes restantes sont remises dans l'ordre depuis là où tu es (toujours en respectant l'ordre obligatoire des quêtes, puis le chemin le plus court). Ça couvre la pierre de foyer, un portail, un bateau ou une longue course dans la même zone, qui ne déclenchaient rien. Pas en combat, pas en vol, pas en donjon ; pas à chaque pas, pour que la flèche ne saute pas d'une étape à l'autre.
+  *The guide re-orders the steps left from where you are once you are 400 yards from where the route was planned (hearthstone, portal, boat, long ride).*
+
 ## [1.0.0-beta.120] — 2026-11-18
 
 ### Corrigé / Fixed

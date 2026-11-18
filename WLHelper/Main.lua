@@ -108,6 +108,8 @@ function ns.Assemble(recalc, order, byKey)
   local sel = {}
   for k, v in pairs(db.sel) do if v then sel[k] = true end end
   ns.route = { steps = steps, sel = sel, label = Label(sel) }
+  -- where it was planned from: DriftCheck plans again once you are far from there
+  ns.planPos = ns.PlayerWorld and (ns.PlayerWorld()) or nil
 end
 
 -- run: the picked dungeons to walk through with no quest (the summary's "Guide me through the
@@ -306,6 +308,30 @@ local function ReplanLater()
   if not (ok and ran) then replanWanted = true end
   return ok and ran
 end
+-- The route is planned from where you stand (BuildRoute: the hard order of the quests, then the
+-- shortest way). Quest changes, a new zone and a landing plan it again; DriftCheck covers the rest
+-- (a hearthstone or a long ride inside one zone, a boat, a portal): every few seconds, once you are
+-- DRIFT yards from where the route was planned, the steps left are ordered again from here. Not
+-- on every move: two close steps would swap back and forth under the arrow.
+local DRIFT = 400
+function ns.DriftCheck()
+  if not (ns.route and ns.planPos and ns.GuideOn and ns.GuideOn()) then return false end
+  if WLDTDB and WLDTDB.autoReplan == false then return false end
+  if UnitOnTaxi and UnitOnTaxi("player") then return false end
+  if InCombatLockdown and InCombatLockdown() then return false end
+  if GetInstanceInfo then
+    local kind = select(2, GetInstanceInfo())
+    if kind == "party" or kind == "raid" then return false end
+  end
+  local here = ns.PlayerWorld and (ns.PlayerWorld())
+  if not here then return false end
+  local a = ns.planPos
+  local far = a[1] ~= here[1] or ((a[2] - here[2]) ^ 2 + (a[3] - here[3]) ^ 2) > DRIFT * DRIFT
+  if not far then return false end
+  ns.planPos = here    -- once per drift, even when Replan has nothing to change
+  local ok, ran = pcall(ns.Replan)
+  return ok and ran or false
+end
 -- the dungeon guide can be switched off (Settings > General > Modules)
 local function GuideOn()
   local WP = ns.Writs and ns.Writs.WP
@@ -415,6 +441,9 @@ ev:SetScript("OnEvent", function(_, e)
   if e == "PLAYER_LOGIN" then
     DB()
     ns.BuildMain(); ns.BuildNav(); ns.ApplyLooks()
+    if C_Timer and C_Timer.NewTicker and not ns.driftTicker then
+      ns.driftTicker = C_Timer.NewTicker(5, function() pcall(ns.DriftCheck) end)
+    end
     C_Timer.After(2, function()
       ns.Assemble(false)
       local f = ns.frame

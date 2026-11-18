@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.121", date = "2026-11-18", items = {
+    { s = "chg", fr = { "Guide, la route suit ta position", "Toutes les 5 secondes, si tu es à plus de 400 mètres de l'endroit d'où la route a été calculée, les étapes restantes sont remises dans l'ordre depuis là où tu es (toujours en respectant l'ordre obligatoire des quêtes, puis le chemin le plus court). Ça couvre la pierre de foyer, un portail, un bateau ou une longue course dans la même zone, qui ne déclenchaient rien. Pas en combat, pas en vol, pas en donjon ; pas à chaque pas, pour que la flèche ne saute pas d'une étape à l'autre." }, en = { "The guide re-orders the steps left from where you are once you are 400 yards from where the route was planned (hearthstone, portal, boat, long ride).", "" } },
+  } },
   { v = "1.0.0-beta.120", date = "2026-11-18", items = {
     { s = "fix", fr = { "Guide, après un vol", "Le guide remet les étapes dans l'ordre à l'atterrissage. Avant, une route calculée au départ (par exemple à Camp Mojache en Féralas, en prenant « The Sunken Temple ») restait telle quelle après le vol : arrivé à Gadgetzan, le GPS t'envoyait chez Larion à Un'Goro au lieu de te faire rendre la quête à Marvon, tout près." }, en = { "The guide re-orders its steps when a flight lands (a route planned in Feralas no longer sends you to Un'Goro past Marvon's turn-in).", "" } },
     { s = "add", fr = { "Chaîne d'Anthion côté Alliance", "Les quêtes de Deliana à Forgefer (An Earnest Proposition, A Supernatural Device, Return to Deliana, Just Compensation, In Search of Anthion, Anthion's Parting Words, Bodley's Unfortunate Fate), une par classe dont le paladin, lues sur Wowhead Forever. La version Alliance demande 15 Winterspring Blood Sample (Frostsaber de Berceau-de-l'Hiver), pas le venin de Silithus. Les quêtes communes (The Challenge, Dead Man's Plea, les morceaux d'amulette de Valthalak) s'ouvrent maintenant aussi pour l'Alliance, avec la version de ta faction et de ta classe." }, en = { "The Alliance Anthion chain (Deliana, Ironforge), every class including paladin; the shared Valthalak quests now open for the Alliance.", "" } },
@@ -56,8 +59,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.107", date = "2026-11-17", items = {
     { s = "add", fr = { "Trouver un groupe, langues", "Deux boutons « Toutes » et « Aucune » au-dessus des langues dans les filtres, pour voir les groupes de toutes les langues d'un clic (celles que le jeu impose restent cochées)." }, en = { "Group finder", "\"All\" / \"None\" for the languages." } },
-  } },
-  { v = "1.0.0-beta.106", date = "2026-11-17", items = {
-    { s = "add", fr = { "Relevés en jeu, suite", "WL Helper note aussi où un objectif de quête du guide avance vraiment (l'endroit où le compteur monte, dedans ou dehors l'instance ; 12 endroits au plus par objectif), les récompenses que la fenêtre de quête propose, et l'ordre dans lequel les boss meurent dans chaque donjon (les 5 dernières sorties). Ça sert à corriger les points sur la carte et l'ordre des boss du guide." }, en = { "Records where objectives really progress, the quest rewards offered, and boss kill order per dungeon.", "" } },
   } },
 }
