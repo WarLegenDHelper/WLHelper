@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.140] — 2026-11-18
+
+### Corrigé / Fixed
+- **Temple englouti, « L'Essence d'Eranikus »** : la quête était la toute première étape dans le donjon (« En chemin »), alors que l'objet qui la donne tombe sur l'Ombre d'Eranikus, l'avant-dernier boss. Elle se prend et se rend maintenant à l'étape de l'Ombre d'Eranikus (le Réceptacle d'essence est juste à côté).
+  *Sunken Temple: "The Essence of Eranikus" is taken and turned in at the Shade of Eranikus' step, no longer first inside.*
+
 ## [1.0.0-beta.139] — 2026-11-18
 
 ### Corrigé / Fixed

@@ -412,6 +412,10 @@ ns.GROUP_OBJ = {   -- objectif ramassé un peu partout (pas sur un boss)
 ns.GROUP_QUEST = { -- toute la quête se fait au même boss
   [7066] = "Princess Theradras",   -- l'esprit de Zaetar apparaît après Theradras
   [3447] = "Atal'alarion",         -- le cercle de statues qui invoque Atal'alarion (étage du haut)
+  -- l'Essence d'Eranikus tombe sur l'Ombre d'Eranikus (avant-dernier boss) et se rend au réceptacle
+  -- juste à côté : prise et rendue là, pas « en chemin » au début du donjon (report : « la première
+  -- quête de ton guide mais le dernier boss du donjon »)
+  [3373] = "Shade of Eranikus",
 }
 -- « En chemin, fais aussi » (T-92) : une ligne du donjon qui ne se fait sur aucun boss mais sur le
 -- chemin d'un boss (entre le boss d'avant et lui). Clé = objectif ou id de quête ; valeur =
