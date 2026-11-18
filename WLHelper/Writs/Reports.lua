@@ -7,7 +7,10 @@
 -- or one turned on with "/wlh rapports on". It stores every report in WLWritsDB.reports.inbox (the
 -- account's saved variables, on disk at logout or /reload, where the addon's author reads them) and
 -- answers "A|id": the sender marks it delivered. An inbox says hello as it logs in and every 15
--- minutes ("H"); whoever has undelivered reports sends them again then. Nothing leaves the guild.
+-- minutes ("H", the only message on the guild channel); whoever has undelivered reports sends them
+-- then. Reports and acks go by addon whisper to the inbox alone, never to the whole guild (report:
+-- "it must go to me only, not spam the network"): to the inbox that said hello, else the guild
+-- master when the roster shows them online. Nothing leaves the guild.
 --   "R|id|i|n|chunk"  a report's i-th chunk of n (id: sender key and time)
 --   "A|id"            delivered
 --   "H"               an inbox is here
@@ -150,32 +153,60 @@ local function Pump()
     if #queue == 0 then sending = false; return end
     sending = true
     local m = table.remove(queue, 1)
-    Raw(m)
+    Raw(m[1], m[2], m[3])
     if C_Timer and C_Timer.After then C_Timer.After(SEND_GAP, Pump) else Pump() end
 end
-local function Queue(msg)
-    queue[#queue + 1] = msg
+local function Queue(msg, channel, target)
+    queue[#queue + 1] = { msg, channel or "GUILD", target }
     if not sending then Pump() end
 end
 R._Queue = function() return queue end
 
-local function SendReport(rec)
-    if not (IsInGuild and IsInGuild()) then return false end
+-- the guild's members online: { [name or name-realm] = true }, and the guild master's name if online
+local function Online()
+    local on, gm = {}, nil
+    local count = GetNumGuildMembers and select(1, GetNumGuildMembers()) or 0
+    count = Num(count) or 0
+    for i = 1, count do
+        local ok, name, _, rankIndex, _, _, _, _, _, online = pcall(GetGuildRosterInfo, i)
+        name = ok and Str(name)
+        if name and online then
+            on[name] = true
+            on[name:match("^([^%-]+)") or name] = true
+            if rankIndex == 0 then gm = name end
+        end
+    end
+    return on, gm
+end
+function R.Target()
+    local d = DB()
+    if not (d and IsInGuild and IsInGuild()) then return nil end
+    local on, gm = Online()
+    local box = Str(d.inboxName)
+    if box and on[box] then return box end
+    return gm
+end
+
+local function SendReport(rec, target)
+    target = target or R.Target()
+    if not target then return false end
     local line = Encode(rec)
     local n = math.max(1, math.ceil(#line / CHUNK))
     for i = 1, n do
-        Queue("R|" .. rec.id .. "|" .. i .. "|" .. n .. "|" .. line:sub((i - 1) * CHUNK + 1, i * CHUNK))
+        Queue("R|" .. rec.id .. "|" .. i .. "|" .. n .. "|" .. line:sub((i - 1) * CHUNK + 1, i * CHUNK), "WHISPER", target)
     end
     return true
 end
 
 -- every report not delivered yet, again (an inbox said hello)
-function R.SendPending()
+function R.SendPending(target)
     local d = DB()
     if not d then return 0 end
+    target = target or R.Target()
+    if not target then return 0 end
     local n = 0
     for _, rec in pairs(d.out) do
-        if not rec.delivered then SendReport(rec); n = n + 1 end
+        if not rec.delivered then SendReport(rec, target); n = n + 1 end
     end
     return n
 end
@@ -207,7 +238,12 @@ function R.OnMessage(msg, sender)
     local d = DB()
     if not d then return end
     local kind = msg:sub(1, 1)
-    if kind == "H" then R.SendPending(); return end
+    -- an inbox is here: remembered, and what waits goes to it, by whisper
+    if kind == "H" then
+        if Str(sender) then d.inboxName = sender end
+        R.SendPending(sender)
+        return
+    end
     if kind == "A" then
         local id = msg:match("^A|(.+)$")
         local rec = id and d.out[id]
@@ -221,7 +257,7 @@ function R.OnMessage(msg, sender)
     local id, i, n, chunk = msg:match("^R|([^|]+)|(%d+)|(%d+)|(.*)$")
     i, n = tonumber(i), tonumber(n)
     if not (id and i and n and n >= 1 and n <= 20 and i >= 1 and i <= n) then return end
-    if d.inbox[id] then Queue("A|" .. id); return end
+    if d.inbox[id] then Queue("A|" .. id, "WHISPER", sender); return end
     local p = parts[id]
     if not p or p.n ~= n then p = { n = n, got = 0 }; parts[id] = p end
     if not p[i] then p[i] = chunk; p.got = p.got + 1 end
@@ -233,7 +269,7 @@ function R.OnMessage(msg, sender)
     rec.got = (time and time()) or 0
     rec.via = Str(sender)
     d.inbox[id] = rec
-    Queue("A|" .. id)
+    Queue("A|" .. id, "WHISPER", sender)
     WP.Print(string.format(L("Rapport reçu de %s : %s"), tostring(rec.from or sender or "?"), tostring(rec.text or ""):sub(1, 80)))
 end
 
@@ -257,11 +293,15 @@ end
 local f = CreateFrame("Frame")
 pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
 pcall(f.RegisterEvent, f, "CHAT_MSG_ADDON")
+pcall(f.RegisterEvent, f, "GUILD_ROSTER_UPDATE")
 local helloTicker
+local rosterTry = -1e9   -- the last time the roster was looked at for a guild master online
 f:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
     if event == "PLAYER_LOGIN" then
         local Register = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
         if Register then pcall(Register, PREFIX) end
+        -- the roster, asked once: who is online (the guild master receives the reports)
+        if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster) elseif GuildRoster then pcall(GuildRoster) end
         if C_Timer and C_Timer.After then
             C_Timer.After(20, function()
                 if R.IsInbox() then
@@ -270,6 +310,16 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
                 end
             end)
         end
+    elseif event == "GUILD_ROSTER_UPDATE" then
+        -- undelivered reports and the guild master online: sent, at most once every 10 minutes
+        local now = GetTime and GetTime() or 0
+        if now - rosterTry < 600 then return end
+        local d = DB()
+        local any = false
+        for _, rec in pairs(d and d.out or {}) do if not rec.delivered then any = true; break end end
+        if not any or R.IsInbox() then return end
+        rosterTry = now
+        R.SendPending()
     elseif event == "CHAT_MSG_ADDON" and a1 == PREFIX then
         -- our own messages come back too: an inbox ignores its own reports (kept at once), a sender
         -- its own "H" (it has nothing to send to itself)

@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.145] — 2026-11-18
+
+### Modifié / Changed
+- **Les rapports ne passent plus par toute la guilde** : un message envoyé avec « Nous écrire » (ou `/wlh bug`) part maintenant en privé (chuchotement d'addon), uniquement vers le compte qui reçoit les rapports : celui qui s'est annoncé, sinon le maître de guilde s'il est connecté. L'accusé de réception revient aussi en privé. Le canal de guilde ne sert plus qu'à un petit « je suis là » du compte qui reçoit, à sa connexion puis toutes les 15 minutes. Si personne ne peut recevoir, le message est gardé et part dès que c'est possible.
+  *Reports go by addon whisper to the receiving account only (the one that announced itself, else the guild master online), acks too; the guild channel only carries the inbox's small "I'm here".*
+
 ## [1.0.0-beta.144] — 2026-11-18
 
 ### Modifié / Changed
