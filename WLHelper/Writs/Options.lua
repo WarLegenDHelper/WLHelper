@@ -411,6 +411,13 @@ end
 
 local function SetComfort(key) return function(v) Comfort()[key] = v; RefreshWrits() end end
 local function SetGps(key) return function(v) Gps()[key] = v; ApplyLook() end end
+-- which GPS guides: the trip under way follows at once (GPS.SetProvider)
+local function SetProvider(v)
+    local G = ns.WP and ns.WP.GPS
+    if G and G.SetProvider then G.SetProvider(v) else Gps().provider = v end
+    Gps().spfAsked = true
+    ApplyLook()
+end
 
 -- "1,5" in French, "1.5" in English
 local function Decimal(v)
@@ -1512,7 +1519,7 @@ function BUILD.gps(p)
     end
     if SPFPresent() then
         SwitchRow(p, L("Envoyer les destinations à Shortest Path"), function() return Gps().provider == "spf" end,
-            function(v) SetGps("provider")(v and "spf" or nil) end, L("Son trajet sur la carte, les vols et les bateaux avec leur départ."),
+            function(v) SetProvider(v and "spf" or nil) end, L("Son trajet sur la carte, les vols et les bateaux avec leur départ."),
             L("Shortest Path Forever calcule le trajet (chemins, vols, bateaux avec l'heure de départ, portails) et le montre sur la carte avec sa flèche. La flèche de WL Helper, son chemin et ses pointillés se cachent pendant ce temps. Les étapes du guide, les repères de la carte et /way passent par lui."))
     end
     -- Zygor can finish loading after the window was built (or be gone): the page is rebuilt once
@@ -2868,7 +2875,7 @@ local function RegisterEllesmere()
                     end
                     if SPFPresent() then
                         toggle(L("Envoyer les destinations à Shortest Path"), function() return Gps().provider == "spf" end,
-                            function(v) SetGps("provider")(v and "spf" or nil) end)
+                            function(v) SetProvider(v and "spf" or nil) end)
                     end
                     toggle(L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"))
                     toggle(L("Masquer la flèche en combat"), function() return Gps().hideCombat end, SetGps("hideCombat"))

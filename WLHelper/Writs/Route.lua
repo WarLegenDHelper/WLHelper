@@ -28,6 +28,7 @@ WP.GPS = GPS
 ns.AddEnglish({
     ["Va au maître de vol de %s"] = "Go to the flight master at %s",
     ["Va au bateau pour %s"] = "Go to the boat to %s",
+    ["Shortest Path est installé. Quel GPS veux-tu suivre ?\n\nShortest Path : son trajet sur la carte, les vols, les bateaux avec leurs départs, sa flèche.\nWL Helper : notre flèche et son trajet.\n\nTu peux changer plus tard : Options > GPS."] = "Shortest Path is installed. Which GPS do you want to follow?\n\nShortest Path: its route on the map, flights, boats with their departures, its arrow.\nWL Helper: our arrow and its route.\n\nYou can change it later: Options > GPS.",
     ["Destination : %s"] = "Destination: %s",
     ["Va au zeppelin pour %s"] = "Go to the zeppelin to %s",
     ["Rejoins %s"] = "Go to %s",
@@ -1994,6 +1995,52 @@ local function Start(dest, source)
     if GPS.Show then GPS.Show() end
 end
 
+-- Which GPS guides: nil (ours), "spf" (Shortest Path), "zygor". The trip under way goes to the one
+-- chosen at once (report: "for those who have Shortest Path, turn ours off and use its own, or the other
+-- way round, as they choose").
+function GPS.SetProvider(p)
+    local db = WLWritsDB
+    if type(db) ~= "table" then return end
+    db.gpsOpts = db.gpsOpts or {}
+    if db.gpsOpts.provider == p then return end
+    db.gpsOpts.provider = p
+    local dest, source, susp = state.dest, state.source, state.suspended
+    if not dest then return end
+    if state.spf then
+        local api = SPF()
+        if api then pcall(api.Cancel, SPF_OWNER) end
+    elseif state.zygor then
+        local Z = Zygor()
+        if Z and Z.Pointer.ClearWaypoints then pcall(Z.Pointer.ClearWaypoints, Z.Pointer, "manual") end
+    end
+    state.zygor, state.spf, state.legs = nil, nil, nil
+    Start(dest, source)
+    state.suspended = susp
+end
+
+-- Shortest Path installed and nothing chosen yet: asked once which GPS guides (gpsOpts.spfAsked). The
+-- settings' GPS page changes it later.
+local SPF_POPUP = "WLHELPER_GPS_PROVIDER"
+function GPS.AskProvider()
+    local db = WLWritsDB
+    if type(db) ~= "table" or not SPF() then return false end
+    db.gpsOpts = db.gpsOpts or {}
+    local o = db.gpsOpts
+    if o.spfAsked or o.provider ~= nil then return false end
+    if InCombatLockdown and InCombatLockdown() then return false end
+    if not (StaticPopupDialogs and StaticPopup_Show) then return false end
+    StaticPopupDialogs[SPF_POPUP] = {
+        text = L("Shortest Path est installé. Quel GPS veux-tu suivre ?\n\nShortest Path : son trajet sur la carte, les vols, les bateaux avec leurs départs, sa flèche.\nWL Helper : notre flèche et son trajet.\n\nTu peux changer plus tard : Options > GPS."),
+        button1 = "Shortest Path",
+        button2 = "WL Helper",
+        OnAccept = function() o.spfAsked = true; GPS.SetProvider("spf") end,
+        OnCancel = function(_, _, why) if why ~= "override" then o.spfAsked = true end end,
+        timeout = 0, whileDead = true, hideOnEscape = false, preferredIndex = 3,
+    }
+    StaticPopup_Show(SPF_POPUP)
+    return true
+end
+
 -- Guides you to a writ's turn-in spot (the Comptoir).
 function GPS.Go(w)
     if not (w and w.map) then
@@ -2455,6 +2502,8 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3)
     end
     if event == "PLAYER_LOGIN" then
         pcall(GPS.MigrateProvider)
+        -- Shortest Path loads after us at times: asked a few seconds after the login
+        if C_Timer and C_Timer.After then C_Timer.After(8, function() pcall(GPS.AskProvider) end) end
         -- A tour does not survive a reload: start it again from the button.
         if WLWritsCharDB then WLWritsCharDB.gps = false end
     elseif event == "TAXIMAP_OPENED" then

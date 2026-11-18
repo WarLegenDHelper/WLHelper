@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.127] — 2026-11-18
+
+### Ajouté / Added
+- **GPS, choisir entre Shortest Path et WL Helper** : si Shortest Path est installé, une fenêtre demande une seule fois quel GPS suivre. « Shortest Path » : il prend tes destinations (son trajet sur la carte, ses vols, ses bateaux avec leurs départs, sa flèche) et notre flèche s'efface. « WL Helper » : notre GPS, comme avant. Le choix se change dans Options > GPS (« Envoyer les destinations à Shortest Path »), et le trajet en cours passe tout de suite à celui choisi.
+  *GPS: with Shortest Path installed, asked once which GPS to follow; switching moves the trip under way at once.*
+
 ## [1.0.0-beta.126] — 2026-11-18
 
 ### Modifié / Changed
