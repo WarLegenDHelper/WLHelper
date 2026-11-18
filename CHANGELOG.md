@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.125] — 2026-11-18
+
+### Ajouté / Added
+- **Trouver un groupe, le choix en cartes** : le bouton « Donjons » ouvre une fenêtre de grandes cartes, comme le choix du guide : l'image de chaque donjon, son nom, ses niveaux, « Ta route » et « Tes quêtes : N » quand tu as ses quêtes. Clic sur une carte : cochée (bord rouge et coche), re-clic : décochée. Trois onglets : Donjons, Raids, Quêtes et zones. Un donjon absent de la recherche de groupe du jeu est grisé. En bas, combien sont choisis, « Effacer » et « Chercher ».
+  *Find a group: dungeons, raids and questing zones picked on big cards with the dungeons' pictures, like the guide's.*
+- **Trouver un groupe, les quêtes de groupe** : une quête élite ou de groupe de ton journal (ex. Summoning Shadra dans les Hinterlands) ajoute la source « Tes quêtes de groupe » : elle cherche les groupes de sa zone dans la recherche de groupe du jeu, et « Copier le texte de l'annonce » donne « Quête : Summoning Shadra (The Hinterlands), on cherche du monde ». Dans l'onglet Quêtes et zones, la zone de ta quête le dit. L'annonce elle-même se crée dans la recherche de groupe du jeu : le jeu ne laisse pas un addon la créer.
+  *Find a group: your group quests (elite) as a source: their zone searched, the listing text ready.*
+
 ## [1.0.0-beta.124] — 2026-11-18
 
 ### Ajouté / Added

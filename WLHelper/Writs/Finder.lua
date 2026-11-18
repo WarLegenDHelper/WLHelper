@@ -45,6 +45,8 @@ ns.AddEnglish({
     ["Tout ce qui est à mon niveau"] = "Everything at my level",
     ["Mon annonce"] = "My listing",
     ["Choisir dans la liste"] = "Pick from the list",
+    ["1 choix"] = "1 picked",
+    ["%d choix"] = "%d picked",
     ["Donjons"] = "Dungeons",
     ["1 donjon"] = "1 dungeon",
     ["%d donjons"] = "%d dungeons",
@@ -659,6 +661,23 @@ function F.Sources()
     if #route > 0 then out[#out + 1] = { key = "route", label = string.format(L("Ta route : %s"), NamesOf(route)), keys = route, short = NamesOf(route, true) } end
     local quests = QuestKeys()
     if #quests > 0 then out[#out + 1] = { key = "quests", label = L("Tes quêtes de donjon"), keys = quests } end
+    -- the group quests of the log (elite, group) whose zone the game's finder lists (FinderPick.lua)
+    if F.GroupQuests and F.ZoneActivity then
+        local okG, gq = pcall(F.GroupQuests)
+        local zones, names, seen = {}, {}, {}
+        for _, q in ipairs(okG and gq or {}) do
+            local okZ, a = pcall(F.ZoneActivity, q.zone)
+            if okZ and a then
+                if not seen[a.id] then seen[a.id] = true; zones[#zones + 1] = a.id end
+                names[#names + 1] = q.title
+            end
+        end
+        if #zones > 0 then
+            table.sort(zones)
+            out[#out + 1] = { key = "gquests", label = string.format(L("Tes quêtes de groupe : %s"), table.concat(names, ", ")),
+                zones = zones, quests = names }
+        end
+    end
     local e, ekeys = NextEvent()
     if e then out[#out + 1] = { key = "event", label = string.format(L("Événement : %s"), e.title or "?"), keys = ekeys, event = e } end
     out[#out + 1] = { key = "pick", label = L("Choisir dans la liste") }
@@ -673,6 +692,7 @@ end
 local function Sig(def)
     local t = {}
     for _, k in ipairs(def and def.keys or {}) do t[#t + 1] = k end
+    for _, id in ipairs(def and def.zones or {}) do t[#t + 1] = "z" .. id end
     return (def and def.key or "") .. ":" .. table.concat(t, ",")
 end
 function F.Source()
@@ -694,6 +714,15 @@ function F.Prefill()
     local s = F.source and SourceDef(F.source)
     F.srcSig = Sig(s)
     for _, k in ipairs(s and s.keys or {}) do F.sel[k] = true end
+    -- the zones ticked on the cards: a group quests source ticks its own, another source none
+    F.selZone = {}
+    for _, id in ipairs(s and s.zones or {}) do F.selZone[id] = true end
+end
+-- another source, the choice kept (the cards of FinderPick.lua: a tick made under "my listing" or
+-- "pick from the list" searches that choice under "everything at my level")
+function F.SwitchKeepChoice(key)
+    F.source = key
+    F.srcSig = Sig(SourceDef(key))
 end
 function F.SetSource(key, user)
     F.source = key
@@ -745,12 +774,17 @@ function F.Plan()
     elseif src == "pick" then
         for id in pairs(F.selActs or {}) do if map.acts[id] then ids[#ids + 1] = id end end
         table.sort(ids)
-    elseif src ~= "level" then
+    else
         local seen = {}
         for _, k in ipairs(F.SourceKeys()) do
             for _, id in ipairs(F.ActivityFor(k)) do if not seen[id] then seen[id] = true; ids[#ids + 1] = id end end
         end
         if #ids == 0 and #F.SourceKeys() > 0 then return nil, "unmatched" end
+        -- the questing zones ticked on the cards (FinderPick.lua)
+        local zs = {}
+        for id in pairs(F.selZone or {}) do if map.acts[id] and not seen[id] then seen[id] = true; zs[#zs + 1] = id end end
+        table.sort(zs)
+        for _, id in ipairs(zs) do ids[#ids + 1] = id end
     end
     local plans, byCat = {}, {}
     if #ids == 0 then
@@ -1345,6 +1379,12 @@ end
 
 -- the text of my listing (phase 3, "Copier le texte de l'annonce"): the route's quests
 function F.ListingText()
+    local s = SourceDef(F.Source())
+    if s and s.quests and #s.quests > 0 then
+        local map = F.BuildMap()
+        local z = s.zones and s.zones[1] and map.acts[s.zones[1]]
+        return Cut(string.format(L("Quête : %s (%s), on cherche du monde"), table.concat(s.quests, ", "), z and z.name or "?"), 120)
+    end
     local q = F.QuestsText(nil, 2)
     if q == "" then return DungeonText(nil) end
     return Cut(string.format(L("Quêtes : %s"), q), 120)
@@ -2335,6 +2375,12 @@ local function DungeonLabel()
         return n == 1 and L("1 activité") or string.format(L("%d activités"), n)
     end
     n = #F.SourceKeys()
+    local z = 0
+    for _ in pairs(F.selZone or {}) do z = z + 1 end
+    if z > 0 then
+        local total = n + z
+        return total == 1 and L("1 choix") or string.format(L("%d choix"), total)
+    end
     if n == 0 then return L("Donjons") end
     return n == 1 and L("1 donjon") or string.format(L("%d donjons"), n)
 end
@@ -2373,6 +2419,13 @@ local function Build(page, win)
     ui.src:HookScript("OnLeave", function() S.HideTip() end)
     ui.dg = S.Button(page, L("Donjons"), 180, 28, "secondary", function(self)
         if plist and plist:IsShown() and plist.anchor == self then plist:Hide(); return end
+        -- the cards (FinderPick.lua: pictures, levels, your quests); "pick" keeps its list of
+        -- every activity of the game's finder
+        if F.OpenPicker and F.Source() ~= "pick" then
+            local w = F.PickerWindow and F.PickerWindow()
+            if w and w:IsShown() then w:Hide() else F.OpenPicker() end
+            return
+        end
         OpenList(self, DungeonItems, 260)
     end, { L("Donjons"), L("Clic : choisir les donjons à chercher") })
     ui.dg.arrow = ui.dg.content:CreateTexture(nil, "ARTWORK")
