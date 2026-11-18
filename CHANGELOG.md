@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.124] — 2026-11-18
+
+### Ajouté / Added
+- **GPS, les portails du mage** : un portail que tu sais ouvrir (Orgrimmar, Fossoyeuse, Les Pitons-du-Tonnerre ; Hurlevent, Forgefer, Darnassus côté Alliance) compte comme une téléportation quand tu as une Rune des portails : ouvre-le et prends-le. La flèche le lance comme une téléportation.
+  *GPS: a mage's own portals count as teleports when a Rune of Portals is in the bags.*
+- **GPS, la rune qui manque** : quand tu connais une téléportation ou un portail mais n'as pas la rune, le trajet s'en passe ; la carte du guide dit maintenant ce qu'elle ferait gagner (« Avec une Rune de téléportation : Téléport : Fossoyeuse (~8 min de moins) »). Avant, la téléportation disparaissait sans un mot.
+  *GPS: when a missing rune leaves a teleport out, the card says how much time it would save.*
+
 ## [1.0.0-beta.123] — 2026-11-18
 
 ### Ajouté / Added

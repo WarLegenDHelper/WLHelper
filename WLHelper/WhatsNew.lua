@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.124", date = "2026-11-18", items = {
+    { s = "add", fr = { "GPS, les portails du mage", "Un portail que tu sais ouvrir (Orgrimmar, Fossoyeuse, Les Pitons-du-Tonnerre ; Hurlevent, Forgefer, Darnassus côté Alliance) compte comme une téléportation quand tu as une Rune des portails : ouvre-le et prends-le. La flèche le lance comme une téléportation." }, en = { "GPS", "A mage's own portals count as teleports when a Rune of Portals is in the bags." } },
+    { s = "add", fr = { "GPS, la rune qui manque", "Quand tu connais une téléportation ou un portail mais n'as pas la rune, le trajet s'en passe ; la carte du guide dit maintenant ce qu'elle ferait gagner (« Avec une Rune de téléportation : Téléport : Fossoyeuse (~8 min de moins) »). Avant, la téléportation disparaissait sans un mot." }, en = { "GPS", "When a missing rune leaves a teleport out, the card says how much time it would save." } },
+  } },
   { v = "1.0.0-beta.123", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, envoyer les destinations à Shortest Path", "Si Shortest Path Forever est installé, Réglages > GPS > « Envoyer les destinations à Shortest Path ». Les étapes du guide, les repères de la carte (livres de Naowh, Ctrl-clic) et /way passent alors par lui : son trajet tracé sur la carte, les vols, les bateaux et zeppelins avec le compte à rebours du départ, les portails, et sa flèche. La flèche de WL Helper et son chemin se cachent pendant ce temps. Éteint par défaut ; si Shortest Path ne peut pas prendre le point (encore en chargement), le GPS de WL Helper guide." }, en = { "GPS", "Send destinations to Shortest Path Forever (its map route, flights, boats with departure timers), Settings > GPS." } },
   } },
@@ -57,8 +61,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "Choisir un guide", "Un clic sur une carte ouvre la vue d'ensemble de ce donjon, et « Lancer le guide » y remplace le guide en cours. Pour enchaîner plusieurs donjons en une seule route, coche la case de chaque carte puis « Combiner les N guides » en bas. Le guide en cours n'est plus coché d'office : sa carte a un contour vert et sa bulle dit « Guide en cours »." }, en = { "Pick a guide", "Click a card to open it alone; tick boxes to combine several." } },
     { s = "fix", fr = { "Améliorations (WL Helper Gear), le toucher", "Le toucher de l'objet porté n'est plus compté deux fois. Avant, échanger deux colliers pouvait donner +46 % dans un sens et -1 % dans l'autre ; les deux pièces sont maintenant jugées depuis ton toucher sans l'une ni l'autre." }, en = { "Gear", "The worn piece's hit no longer skews the comparison (same swap, same verdict both ways)." } },
     { s = "fix", fr = { "Prison d'Alcaz, « More Valuable Than Gold »", "Plus d'étape « Faire » dans le donjon ; le trésor de Mason se trouve sous le plancher de l'auberge de Moonbrook, l'étape « Rendre » y mène." }, en = { "Alcaz Prison", "No inside \"do\" step for Mason's treasure." } },
-  } },
-  { v = "1.0.0-beta.109", date = "2026-11-17", items = {
-    { s = "chg", fr = { "Guide, étapes dans le donjon", "Beaucoup moins de texte répété. Pour chaque quête, la place dans la suite (« Étape 5 sur 6 avant... »), la phrase d'objectif et la note ne s'affichent plus que sur sa première ligne de l'étape ; « À prendre » n'est plus répété sur ses lignes « Faire » et « Rendre » (la ligne « Accepter » le dit déjà). L'étape tient en bien moins de hauteur." }, en = { "Guide, dungeon steps", "Chain place, objective and note shown once per quest; no repeated \"To take\"." } },
   } },
 }

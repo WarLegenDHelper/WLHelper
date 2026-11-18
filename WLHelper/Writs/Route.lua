@@ -69,6 +69,12 @@ ns.AddEnglish({
     ["%s sur place"] = "%s on arrival",
     -- GPS.TripSummary: "Téléport : Orgrimmar, puis 690 m"
     ["Téléport : %s"] = "Teleport: %s",
+    ["Avec une Rune de téléportation : Téléport : %s (%s de moins)."] = "With a Rune of Teleportation: Teleport: %s (%s shorter).",
+    ["Avec une Rune des portails : Portail : %s (%s de moins)."] = "With a Rune of Portals: Portal: %s (%s shorter).",
+    ["Portail : %s (ouvre-le et prends-le)"] = "Portal: %s (open it and step in)",
+    ["Puis le portail : %s"] = "Then the portal: %s",
+    ["portail pour %s"] = "portal to %s",
+    ["Portail : %s"] = "Portal: %s",
     ["Vol jusqu'à %s"] = "Flight to %s",
     ["Bateau pour %s"] = "Boat to %s",
     ["Zeppelin pour %s"] = "Zeppelin to %s",
@@ -124,17 +130,27 @@ local LINKS = {
     { wa = { 1, 7795.5, -2400.5 }, wb = { 1, 8640.5, 841.0 }, mode = "flight", side = "Alliance", class = "DRUID", oneWay = true,
       nameA = "Moonglade", nameB = "Rut'theran Village" },
 }
--- Teleports: spell, where it lands; a mage's need a Rune of Teleportation.
+-- Teleports: spell, where it lands; rune: the reagent it needs (a mage's Rune of Teleportation).
+-- A mage's portals (level 40-50) land in the same place and take a Rune of Portals: one you open and
+-- step into yourself is a teleport for the GPS (report: "no teleport rune, but I can open a portal").
+local RUNE, PORTAL_RUNE = 17031, 17032
 local TELEPORTS = {
-    { spell = 3567, map = 1454, x = 38.57, y = 85.95, side = "Horde", name = "Orgrimmar", rune = true },
-    { spell = 3563, map = 1458, x = 84.65, y = 16.32, side = "Horde", name = "Undercity", rune = true },
-    { spell = 3566, map = 1456, x = 22.35, y = 16.52, side = "Horde", name = "Thunder Bluff", rune = true },
-    { spell = 3561, map = 1453, x = 38.01, y = 80.84, side = "Alliance", name = "Stormwind", rune = true },
-    { spell = 3562, map = 1455, x = 25.52, y = 8.41, side = "Alliance", name = "Ironforge", rune = true },
-    { spell = 3565, map = 1457, x = 40.13, y = 81.83, side = "Alliance", name = "Darnassus", rune = true },
+    { spell = 3567, map = 1454, x = 38.57, y = 85.95, side = "Horde", name = "Orgrimmar", rune = RUNE },
+    { spell = 3563, map = 1458, x = 84.65, y = 16.32, side = "Horde", name = "Undercity", rune = RUNE },
+    { spell = 3566, map = 1456, x = 22.35, y = 16.52, side = "Horde", name = "Thunder Bluff", rune = RUNE },
+    { spell = 3561, map = 1453, x = 38.01, y = 80.84, side = "Alliance", name = "Stormwind", rune = RUNE },
+    { spell = 3562, map = 1455, x = 25.52, y = 8.41, side = "Alliance", name = "Ironforge", rune = RUNE },
+    { spell = 3565, map = 1457, x = 40.13, y = 81.83, side = "Alliance", name = "Darnassus", rune = RUNE },
+    { spell = 11417, map = 1454, x = 38.57, y = 85.95, side = "Horde", name = "Orgrimmar", rune = PORTAL_RUNE, portal = true },
+    { spell = 11418, map = 1458, x = 84.65, y = 16.32, side = "Horde", name = "Undercity", rune = PORTAL_RUNE, portal = true },
+    { spell = 11420, map = 1456, x = 22.35, y = 16.52, side = "Horde", name = "Thunder Bluff", rune = PORTAL_RUNE, portal = true },
+    { spell = 10059, map = 1453, x = 38.01, y = 80.84, side = "Alliance", name = "Stormwind", rune = PORTAL_RUNE, portal = true },
+    { spell = 11416, map = 1455, x = 25.52, y = 8.41, side = "Alliance", name = "Ironforge", rune = PORTAL_RUNE, portal = true },
+    { spell = 11419, map = 1457, x = 40.13, y = 81.83, side = "Alliance", name = "Darnassus", rune = PORTAL_RUNE, portal = true },
     { spell = 18960, map = 1450, x = 56.26, y = 32.46, name = "Moonglade" },
 }
-local RUNE = 17031
+-- GPS.RuneHint: the trip priced as if a Rune of Teleportation were in the bags
+local runeFree = false
 -- The Hearthstone (item, and the spell it casts) and a shaman's Astral Recall: both to your inn.
 local HEARTH_ITEM, HEARTH_SPELL, ASTRAL_RECALL = 6948, 8690, 556
 local HEARTH_COOLDOWN = 3600       -- seconds: the Hearthstone's cooldown, when the client hides it
@@ -337,7 +353,7 @@ local function BuildFixed()
     end
     for _, t in ipairs(TELEPORTS) do
         if not t.side or t.side == side then
-            local p = Point(t.map, t.x, t.y, { kind = "port", name = t.name, spell = t.spell, rune = t.rune })
+            local p = Point(t.map, t.x, t.y, { kind = "port", name = t.name, spell = t.spell, rune = t.rune, portal = t.portal })
             if p then fixed.ports[#fixed.ports + 1] = p end
         end
     end
@@ -1073,9 +1089,8 @@ local function Search(dests, firstOnly, exclude, pol)
     end
     for _, p in ipairs(fixed.docks) do Add(p) end
     if Opt("teleports", true) and not dead and not originOverride then
-        local hasRune = BagCount(RUNE) > 0
         for _, p in ipairs(fixed.ports) do
-            if (not p.rune or hasRune) and SpellReady(p.spell) then Add(p) end
+            if (not p.rune or runeFree or BagCount(p.rune) > 0) and SpellReady(p.spell) then Add(p) end
         end
     end
     local inn, via
@@ -1231,7 +1246,7 @@ local function PlanCost(legs)
             if at.cont == leg.to.cont and Dist(at, leg.to) < CAST_NEAR then return nil end
             if k == "teleport" then
                 if not (Opt("teleports", true) and SpellReady(leg.to.spell)) then return nil end
-                if leg.to.rune and BagCount(RUNE) <= 0 then return nil end
+                if leg.to.rune and BagCount(leg.to.rune) <= 0 then return nil end
                 total = total + TELEPORT_TIME
             else
                 local inn = HearthWay(dead)
@@ -1429,7 +1444,7 @@ function GPS.Describe(leg, full)
         if mode == "flight" then return string.format(L("Prends le vol pour %s"), P(to.name)) end
         return string.format(mode == "boat" and L("Prends le bateau pour %s") or L("Prends le zeppelin pour %s"), P(to.name))
     elseif leg.kind == "teleport" then
-        return string.format(L("Téléportation : %s"), P(to.name))
+        return string.format(to.portal and L("Portail : %s (ouvre-le et prends-le)") or L("Téléportation : %s"), P(to.name))
     elseif leg.kind == "hearth" then
         return string.format(leg.item and L("Pierre de foyer : %s") or L("Rappel astral : %s"), P(to.name))
     end
@@ -1456,7 +1471,7 @@ function GPS.DescribeNext(leg)
         if mode == "flight" then return string.format(L("Puis le vol pour %s"), P(to.name)) end
         return string.format(mode == "boat" and L("Puis le bateau pour %s") or L("Puis le zeppelin pour %s"), P(to.name))
     elseif leg.kind == "teleport" then
-        return string.format(L("Puis la téléportation : %s"), P(to.name))
+        return string.format(to.portal and L("Puis le portail : %s") or L("Puis la téléportation : %s"), P(to.name))
     elseif leg.kind == "hearth" then
         return string.format(leg.item and L("Puis la pierre de foyer : %s") or L("Puis le rappel astral : %s"), P(to.name))
     end
@@ -1533,7 +1548,7 @@ function GPS.Itinerary(legs)
                 item = { kind = "zeppelin", text = string.format(L("zeppelin pour %s"), P) }
             end
         elseif leg.kind == "teleport" then
-            item = { kind = "teleport", text = string.format(L("téléportation à %s"), P) }
+            item = { kind = "teleport", text = string.format(leg.to and leg.to.portal and L("portail pour %s") or L("téléportation à %s"), P) }
         elseif leg.kind == "hearth" then
             item = { kind = "hearth", text = leg.item and L("Pierre de foyer") or L("Rappel astral") }
         end
@@ -1625,8 +1640,49 @@ local function TripPlan(dest, x, y, name)
     return c.legs, c.minutes, c.alt
 end
 
+-- A mage who knows a teleport but has no Rune of Teleportation: the teleport is left out of every
+-- trip, without a word (report: "why not Teleport: Undercity, I'm a mage"). When a rune would save at
+-- least RUNE_GAIN seconds, the card says so: "With a Rune of Teleportation: Teleport: Undercity
+-- (~8 min shorter)". nil otherwise (a rune in the bags, no teleport known, no real gain).
+local RUNE_GAIN = 60
+local runeCache = {}
+function GPS.RuneHint(dest, x, y, name)
+    if not Opt("teleports", true) then return nil end
+    if not fixed then BuildFixed() end
+    local any = false
+    for _, port in ipairs(fixed.ports) do
+        if port.rune and BagCount(port.rune) <= 0 and SpellReady(port.spell) then any = true; break end
+    end
+    if not any then return nil end
+    local p
+    if type(dest) == "table" and dest.cont and dest.wx and dest.wy then p = dest
+    elseif type(dest) == "number" and type(x) == "number" and type(y) == "number" then
+        p = Point(dest, x, y, { kind = "dest", name = name })
+    end
+    if not p then return nil end
+    local key = tostring(p.cont) .. ":" .. math.floor(p.wx + 0.5) .. ":" .. math.floor(p.wy + 0.5)
+    local c = runeCache[key]
+    if c and Clock() - c.at < REPLAN_EVERY then return c.text end
+    local ok, _, eta = pcall(GPS.FindPath, { p })
+    runeFree = true
+    local ok2, legs2, eta2 = pcall(GPS.FindPath, { p })
+    runeFree = false
+    local text
+    if ok and ok2 and type(eta) == "number" and type(eta2) == "number" and type(legs2) == "table"
+        and legs2[1] and legs2[1].kind == "teleport" and eta - eta2 >= RUNE_GAIN then
+        local to = legs2[1].to or {}
+        text = string.format(to.portal and L("Avec une Rune des portails : Portail : %s (%s de moins).")
+            or L("Avec une Rune de téléportation : Téléport : %s (%s de moins)."),
+            GPS.ShortPlace(to.name) or "?", GPS.Minutes(eta - eta2) or "?")
+    end
+    runeCache[key] = { at = Clock(), text = text }
+    return text
+end
+
 function GPS.TripSummary(dest, x, y, name)
     local legs, minutes, alt = TripPlan(dest, x, y, name)
+    local okR, rune = pcall(GPS.RuneHint, dest, x, y, name)
+    if okR and rune then alt = alt and (alt .. " " .. rune) or rune end
     if type(legs) ~= "table" or #legs == 0 then return nil end
     local parts, last = {}, nil
     for _, it in ipairs(GPS.Itinerary(legs)) do
@@ -1635,7 +1691,7 @@ function GPS.TripSummary(dest, x, y, name)
         local first = #parts == 0
         local part
         if it.kind == "teleport" then
-            part = string.format(L("Téléport : %s"), P)
+            part = string.format(to.portal and L("Portail : %s") or L("Téléport : %s"), P)
         elseif it.kind == "hearth" then
             part = string.format(it.leg.item and L("Pierre de foyer : %s") or L("Rappel astral : %s"), P)
         elseif it.kind == "fly" then
