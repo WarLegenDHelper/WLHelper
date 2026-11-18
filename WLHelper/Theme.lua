@@ -858,7 +858,7 @@ function ns.Cols(w, minW, gap, maxCols, minPx)
   local n = Clamp(math.floor((w + gap) / (minW + gap)), 1, maxCols)
   local function ColW(k) return math.floor((w - (k - 1) * gap) / k) end
   if minPx then
-    local sc = ns.UIScale()
+    local sc = ns.UIScale() * (ns.WindowScale and ns.WindowScale() or 1)
     while n > 1 and ColW(n) * sc < minPx do n = n - 1 end
   end
   local colW = math.max(0, ColW(n))
@@ -1230,11 +1230,64 @@ end
 --  Window registry (filled by S.Window; read by /wlh textes)
 -- =====================================================================
 ns.windows = ns.windows or {}
+-- The size of every WL Helper window, one setting (report: "+ or - for the ratio of all the windows,
+-- 100 %, 90 % and so on"): WLDTDB.uiScale, 60 % to 150 %. The GPS arrow keeps its own size.
+local SCALE_MIN, SCALE_MAX = 0.6, 1.5
+ns.WIN_SCALE_MIN, ns.WIN_SCALE_MAX = SCALE_MIN, SCALE_MAX
+function ns.WindowScale()
+  local v = WLDTDB and tonumber(WLDTDB.uiScale)
+  if not v then return 1 end
+  return math.max(SCALE_MIN, math.min(SCALE_MAX, v))
+end
+-- a new size: the window keeps its top-left corner where it is on screen (and its saved place follows)
+local function Rescale(f, s)
+  local old = f:GetScale()
+  if type(old) ~= "number" or math.abs(old - s) < 0.001 then return end
+  local l, t = f:GetLeft(), f:GetTop()
+  f:SetScale(s)
+  if type(l) == "number" and type(t) == "number" and not secret(l) and not secret(t) then
+    local x, y = l * old / s, t * old / s
+    f:ClearAllPoints(); f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
+    if type(f.wlDb) == "table" and f.wlPosKey then f.wlDb[f.wlPosKey] = { "TOPLEFT", "BOTTOMLEFT", x, y } end
+  end
+end
+local scaleWait
+function ns.ScaleWindows()
+  -- a window holding a secure button cannot change size in combat: after the fight
+  if InCombatLockdown and InCombatLockdown() then
+    if not scaleWait then
+      scaleWait = CreateFrame("Frame")
+      scaleWait:SetScript("OnEvent", function(self) self:UnregisterAllEvents(); ns.ScaleWindows() end)
+    end
+    scaleWait:RegisterEvent("PLAYER_REGEN_ENABLED")
+    return false
+  end
+  local v = ns.WindowScale()
+  for _, f in ipairs(ns.windows) do pcall(Rescale, f, v) end
+  return true
+end
+-- v: a fraction (0.9), or "+" / "-" (10 % more or less). -> the size set
+function ns.SetWindowScale(v)
+  WLDTDB = WLDTDB or {}
+  local cur = ns.WindowScale()
+  if v == "+" then v = cur + 0.1 elseif v == "-" then v = cur - 0.1 end
+  v = tonumber(v)
+  if not v then return cur end
+  v = math.floor(v * 20 + 0.5) / 20
+  v = math.max(SCALE_MIN, math.min(SCALE_MAX, v))
+  if math.abs(v - 1) < 0.001 then WLDTDB.uiScale = nil else WLDTDB.uiScale = v end
+  ns.ScaleWindows()
+  return v
+end
+
 function ns.RegisterWindow(f)
   if not f then return end
   f.wlOwned = true
   for _, w in ipairs(ns.windows) do if w == f then return end end
   table.insert(ns.windows, f)
+  -- born at the size chosen (its saved place was saved at that size)
+  local v = ns.WindowScale()
+  if math.abs(v - 1) > 0.001 and not (InCombatLockdown and InCombatLockdown()) then pcall(f.SetScale, f, v) end
 end
 
 -- ns.FitWindow(f, contentH): sizes any window to its content (design system 3.2). Windows built

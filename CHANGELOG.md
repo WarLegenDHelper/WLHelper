@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.133] — 2026-11-18
+
+### Ajouté / Added
+- **Taille des fenêtres** : un seul réglage pour la taille de toutes les fenêtres de WL Helper (le guide, le suivi, le Comptoir, les groupes, la guilde, les réglages), de 60 % à 150 %. Dans Options > Général, sous la langue (« Taille de toutes les fenêtres »), ou en commande : `/wlh taille 90`, `/wlh taille +`, `/wlh taille -` (10 % de plus ou de moins). Chaque fenêtre garde son coin haut-gauche à sa place. En combat, le changement attend la fin du combat. La flèche du GPS garde son propre réglage (page GPS).
+  *Window size: one setting for every WL Helper window, 60 % to 150 % (Options > General, or /wlh size 90 / + / -).*
+
 ## [1.0.0-beta.132] — 2026-11-18
 
 ### Corrigé / Fixed

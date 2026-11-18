@@ -335,6 +335,7 @@ local function Build()
   if f then return f end
   f = CreateFrame("Frame", "WLDTTracker", UIParent)
   f.wlOwned = true
+  if ns.RegisterWindow then ns.RegisterWindow(f) end
   f:SetSize(W, HEAD_H)
   f:SetFrameStrata("MEDIUM")
   f:SetClampedToScreen(true)

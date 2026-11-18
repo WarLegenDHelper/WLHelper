@@ -195,6 +195,9 @@ ns.AddEnglish({
     ["Sinon en mètres et en kilomètres."] = "Otherwise in meters and kilometers.",
     ["Flèche"] = "Arrow",
     ["Taille de la flèche"] = "Arrow size",
+    ["Taille des fenêtres"] = "Window size",
+    ["Taille de toutes les fenêtres"] = "Size of every window",
+    ["Le guide, le suivi, les fenêtres du Comptoir, des groupes, de la guilde et des réglages. La flèche du GPS garde sa taille (page GPS). Aussi : /wlh taille 90, /wlh taille +, /wlh taille -."] = "The guide, the tracker, the Comptoir, groups, guild and settings windows. The GPS arrow keeps its own size (GPS page). Also: /wlh size 90, /wlh size +, /wlh size -.",
     ["Opacité du fond"] = "Background opacity",
     ["%d %%"] = "%d%%",
     ["Masquer en combat"] = "Hide in combat",
@@ -911,6 +914,7 @@ local function ModuleTiles(p)
     return holder
 end
 
+local scalePending
 function BUILD.general(p)
     Section(p, L("Modules"))
     ModuleTiles(p)
@@ -967,6 +971,32 @@ function BUILD.general(p)
         -- Rebuild once the click has finished: this very control belongs to the old pages.
         C_Timer.After(0, function() if Rebuild then Rebuild() end end)
     end, true)
+    -- every window's size (the GPS arrow keeps its own): a row of the same card, no section of its own
+    do
+        local row = Row(p, L("Taille de toutes les fenêtres"), nil,
+            L("Le guide, le suivi, les fenêtres du Comptoir, des groupes, de la guilde et des réglages. La flèche du GPS garde sa taille (page GPS). Aussi : /wlh taille 90, /wlh taille +, /wlh taille -."), { wide = true })
+        local holder = CreateFrame("Frame", nil, row)
+        holder:SetSize(160 + 12 + 48, 20)
+        local function Get() return math.floor(((root.WindowScale and root.WindowScale()) or 1) * 100 + 0.5) end
+        local sl = S.Slider(holder, math.floor((root.WIN_SCALE_MIN or 0.6) * 100 + 0.5), math.floor((root.WIN_SCALE_MAX or 1.5) * 100 + 0.5), 5,
+            Get,
+            function(v)
+                -- applied once the slider rests: the settings window itself changes size under the mouse
+                scalePending = v / 100
+                if C_Timer and C_Timer.After then
+                    C_Timer.After(0.4, function()
+                        if scalePending and root.SetWindowScale then root.SetWindowScale(scalePending) end
+                        scalePending = nil
+                    end)
+                elseif root.SetWindowScale then root.SetWindowScale(v / 100) end
+            end,
+            function(v) return string.format(L("%d %%"), v) end, 160)
+        sl:SetPoint("LEFT")
+        sl.value:SetJustifyH("RIGHT")
+        function holder:Sync() sl:SetValue(Get()) end
+        holder.slider = sl
+        Place(p, row, holder)
+    end
 
     -- the font: the game's own (sure to show everywhere) or EllesmereUI's when it is installed
     if root.IsLoaded and root.IsLoaded("EllesmereUI") then

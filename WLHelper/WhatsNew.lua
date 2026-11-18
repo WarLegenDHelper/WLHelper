@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.133", date = "2026-11-18", items = {
+    { s = "add", fr = { "Taille des fenêtres", "Un seul réglage pour la taille de toutes les fenêtres de WL Helper (le guide, le suivi, le Comptoir, les groupes, la guilde, les réglages), de 60 % à 150 %. Dans Options > Général, sous la langue (« Taille de toutes les fenêtres »), ou en commande : /wlh taille 90, /wlh taille +, /wlh taille - (10 % de plus ou de moins). Chaque fenêtre garde son coin haut-gauche à sa place. En combat, le changement attend la fin du combat. La flèche du GPS garde son propre réglage (page GPS)." }, en = { "Window size", "One setting for every WL Helper window, 60 % to 150 % (Options > General, or /wlh size 90 / + / -)." } },
+  } },
   { v = "1.0.0-beta.132", date = "2026-11-18", items = {
     { s = "fix", fr = { "Guide, dans la zone c'est dans la zone", "Dans une zone de monstres aux apparitions espacées (les Sirènes Fouette-bile d'Azshara pour « Le corail des sirènes »), la flèche t'envoyait encore à l'apparition la plus proche, à 100 m, alors que tu étais au milieu. Dans la zone, la flèche dit maintenant que tu y es tant qu'une apparition est à moins de 120 m (avant : 40). Le bassin des larmes garde 40 m : son île au milieu n'a pas de monstre." }, en = { "Guide", "Inside a mob area, you are \"there\" within 120 yd of a spawn (was 40); the Pool of Tears' island keeps 40." } },
   } },
@@ -49,8 +52,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.119", date = "2026-11-18", items = {
     { s = "chg", fr = { "Trouver un groupe, résultats plus lisibles", "Chaque ligne est plus haute, le nom plus grand, et les détails (niveau ou places, donjon, zone, depuis quand) juste en dessous dans une taille lisible, au lieu d'une petite colonne au milieu. Les rôles s'affichent en 5 grosses icônes : pour un groupe, une par place (tank, soigneur, 3 dégâts), allumée si elle est prise, pâle si elle est libre, comme dans LFG Forever ; pour un joueur, les rôles qu'il propose." }, en = { "Find a group", "Taller rows, bigger names, details under them, and 5 big role slots (taken bright, free faint)." } },
-  } },
-  { v = "1.0.0-beta.118", date = "2026-11-18", items = {
-    { s = "add", fr = { "GPS, repères de la carte", "Un repère posé sur la carte du monde lance le GPS de WL Helper jusque-là (flèche et chemin à pied), qu'il soit posé par toi (Ctrl-clic) ou par un autre addon qui pose le repère du jeu, comme les livres, coffres et rares de Naowh Forever (« Click for a waypoint »). Repère enlevé : le GPS s'arrête. Jamais les repères que WL Helper pose lui-même, rien en donjon. Réglages > GPS > « Suivre les repères de la carte » pour l'éteindre." }, en = { "GPS follows map pins (yours or another addon's, like Naowh's books); Settings > GPS to turn it off.", "" } },
   } },
 }

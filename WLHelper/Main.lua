@@ -777,6 +777,12 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "idee" or cmd == "idea" or cmd == "bug" then if WP and WP.Feedback then WP.Feedback(cmd == "bug" and "bug" or "idea") end
   elseif cmd == "textes" or cmd == "texts" or cmd == "truncated" then ns.DebugTexts(arg)
   elseif cmd == "share" then ns.ShareQuests()
+  elseif cmd == "taille" or cmd == "scale" or cmd == "size" then
+    -- "/wlh taille 90", "/wlh taille +", "/wlh taille -"
+    local v = arg
+    if arg ~= "+" and arg ~= "-" then v = tonumber((arg or ""):match("[%d%.]+")); if v and v > 3 then v = v / 100 end end
+    local set = ns.SetWindowScale and ns.SetWindowScale(v or ns.WindowScale())
+    if set then ns.Print(string.format(ns.Writs and ns.Writs.English and ns.Writs.English() and "Window size: %d %%  (/wlh size 90, /wlh size +, /wlh size -)" or "Taille des fenêtres : %d %%  (/wlh taille 90, /wlh taille +, /wlh taille -)", math.floor(set * 100 + 0.5))) end
   elseif cmd == "tracker" or cmd == "suivi" then
     if WLHelperTracker then WLHelperTracker.Toggle() end
   elseif cmd == "next" then ns.GoTo((ns.frame.view or 1) + 1)
