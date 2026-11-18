@@ -1917,9 +1917,9 @@ do
     local out = {}
     local d = ns.D and ns.D[dkey]
     if not d then return out end
-    if OpenMapOn(d) then
-      out[#out + 1] = { kind = "openmap", label = "OpenMap", combat = false, open = function() return OpenWorld(nil) end }
-    end
+    -- Naowh's map first, in its own window: the most detail (each boss's portrait and number), and
+    -- the world map's own overlay of it closes as soon as another addon turns the world map (OpenMap)
+    -- (report: "that is the map I want, OpenMap's lacks too much detail")
     local nm = NaowhMap(dkey)
     if nm then
       out[#out + 1] = { kind = "naowh", label = "Naowh Forever", open = function()
@@ -1934,6 +1934,9 @@ do
         if not (frame and frame.IsShown and frame:IsShown()) and type(toggle) == "function" then pcall(toggle) end
         return (pcall(fm.FDJ.OpenDungeonMap, fm.name))
       end }
+    end
+    if OpenMapOn(d) then
+      out[#out + 1] = { kind = "openmap", label = "OpenMap", combat = false, open = function() return OpenWorld(nil) end }
     end
     local here = InsideOf(d) and ClientMapHere()
     if here then

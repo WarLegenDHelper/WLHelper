@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.138", date = "2026-11-18", items = {
+    { s = "chg", fr = { "La carte du donjon : celle de Naowh d'abord", "Le bouton de carte du panneau des boss et /wlh carte ouvrent maintenant la carte du Journal des donjons de Naowh (le plan avec chaque boss en portrait numéroté), dans sa propre fenêtre, avant celle d'OpenMap. Sur la carte du monde, sa version par-dessus disparaissait dès qu'OpenMap remettait la zone extérieure ; sa fenêtre à elle reste." }, en = { "The dungeon map button and /wlh carte open Naowh's dungeon map (numbered boss portraits) in its own window first, before OpenMap's.", "" } },
+  } },
   { v = "1.0.0-beta.137", date = "2026-11-18", items = {
     { s = "chg", fr = { "Le guide compact, refait comme RestedXP et Polestar", "Le petit suivi n'était qu'une boîte grise de trois lignes. Il montre maintenant :" }, en = { "", "" } },
     { s = "chg", fr = { "", "en haut, le nom du donjon, ses niveaux en doré, l'étape (8/43) et le pourcentage du guide ;" }, en = { "", "" } },
@@ -52,8 +55,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.124", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, les portails du mage", "Un portail que tu sais ouvrir (Orgrimmar, Fossoyeuse, Les Pitons-du-Tonnerre ; Hurlevent, Forgefer, Darnassus côté Alliance) compte comme une téléportation quand tu as une Rune des portails : ouvre-le et prends-le. La flèche le lance comme une téléportation." }, en = { "GPS", "A mage's own portals count as teleports when a Rune of Portals is in the bags." } },
     { s = "add", fr = { "GPS, la rune qui manque", "Quand tu connais une téléportation ou un portail mais n'as pas la rune, le trajet s'en passe ; la carte du guide dit maintenant ce qu'elle ferait gagner (« Avec une Rune de téléportation : Téléport : Fossoyeuse (~8 min de moins) »). Avant, la téléportation disparaissait sans un mot." }, en = { "GPS", "When a missing rune leaves a teleport out, the card says how much time it would save." } },
-  } },
-  { v = "1.0.0-beta.123", date = "2026-11-18", items = {
-    { s = "add", fr = { "GPS, envoyer les destinations à Shortest Path", "Si Shortest Path Forever est installé, Réglages > GPS > « Envoyer les destinations à Shortest Path ». Les étapes du guide, les repères de la carte (livres de Naowh, Ctrl-clic) et /way passent alors par lui : son trajet tracé sur la carte, les vols, les bateaux et zeppelins avec le compte à rebours du départ, les portails, et sa flèche. La flèche de WL Helper et son chemin se cachent pendant ce temps. Éteint par défaut ; si Shortest Path ne peut pas prendre le point (encore en chargement), le GPS de WL Helper guide." }, en = { "GPS", "Send destinations to Shortest Path Forever (its map route, flights, boats with departure timers), Settings > GPS." } },
   } },
 }

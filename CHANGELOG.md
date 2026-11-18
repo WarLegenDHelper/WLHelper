@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.138] — 2026-11-18
+
+### Modifié / Changed
+- **La carte du donjon : celle de Naowh d'abord** : le bouton de carte du panneau des boss et `/wlh carte` ouvrent maintenant la carte du Journal des donjons de Naowh (le plan avec chaque boss en portrait numéroté), dans sa propre fenêtre, avant celle d'OpenMap. Sur la carte du monde, sa version par-dessus disparaissait dès qu'OpenMap remettait la zone extérieure ; sa fenêtre à elle reste.
+  *The dungeon map button and /wlh carte open Naowh's dungeon map (numbered boss portraits) in its own window first, before OpenMap's.*
+
 ## [1.0.0-beta.137] — 2026-11-18
 
 ### Modifié / Changed
