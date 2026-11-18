@@ -28,6 +28,7 @@ WP.GPS = GPS
 ns.AddEnglish({
     ["Va au maître de vol de %s"] = "Go to the flight master at %s",
     ["Va au bateau pour %s"] = "Go to the boat to %s",
+    ["Sanath Lim-yo : parle-lui, il te téléporte en haut de la tour"] = "Sanath Lim-yo: talk to him, he teleports you up the tower",
     ["Shortest Path est installé. Quel GPS veux-tu suivre ?\n\nShortest Path : son trajet sur la carte, les vols, les bateaux avec leurs départs, sa flèche.\nWL Helper : notre flèche et son trajet.\n\nTu peux changer plus tard : Options > GPS."] = "Shortest Path is installed. Which GPS do you want to follow?\n\nShortest Path: its route on the map, flights, boats with their departures, its arrow.\nWL Helper: our arrow and its route.\n\nYou can change it later: Options > GPS.",
     ["Destination : %s"] = "Destination: %s",
     ["Va au zeppelin pour %s"] = "Go to the zeppelin to %s",
@@ -1947,16 +1948,61 @@ function ReplanSoon(delay)
     C_Timer.After(delay or 0.5, function() replanQueued = false; GPS.Replan() end)
 end
 
+-- Places no path leads to: someone at the foot takes you up (report: Archmage Xylem's tower in
+-- Azshara, the arrow walked into the cliffs). A destination within `r` yards of `at` is guided to `via`
+-- first, unless you stand within NEAR_DOOR yards of it already (taken up).
+local DOORS = {
+    { at = { 1447, 29.2, 40.2 }, r = 60, via = { 1447, 28.1, 50.1 }, name = "Sanath Lim-yo",
+      note = "Sanath Lim-yo : parle-lui, il te téléporte en haut de la tour" },
+}
+local NEAR_DOOR = 80
+local function Door(dest)
+    if not dest or dest.door then return nil end
+    for _, d in ipairs(DOORS) do
+        if dest.map == d.at[1] then
+            local top = Point(d.at[1], d.at[2], d.at[3], { kind = "dest" })
+            if top and dest.cont == top.cont and Dist(dest, top) <= d.r then
+                local cont, px, py = PlayerWorld()
+                local here = cont and { cont = cont, wx = px, wy = py }
+                if not (here and here.cont == top.cont and Dist(here, top) <= NEAR_DOOR) then
+                    local via = Point(d.via[1], d.via[2], d.via[3], { kind = "dest", name = L(d.note), door = dest })
+                    if via then return via, top end
+                end
+            end
+        end
+    end
+end
+GPS._Door = Door
+
 -- The replan clock runs only while guiding.
 local ticker
 local function Tick()
+    -- taken up the tower: the place itself now
+    local d = state.dest
+    if d and d.door then
+        local cont, px, py = PlayerWorld()
+        if cont and cont == d.door.cont and Dist({ cont = cont, wx = px, wy = py }, d.door) <= NEAR_DOOR then
+            local src, top = state.source, d.door
+            top.door = true          -- reached: no door again
+            state.dest = nil
+            GPS._Start(top, src)
+            top.door = nil
+            return
+        end
+    end
     if state.dest and not state.zygor and not (UnitOnTaxi and UnitOnTaxi("player"))
         and GetTime() - (state.plannedAt or 0) >= REPLAN_EVERY then
         GPS.Replan()
     end
 end
+GPS._DoorTick = function() return Tick() end
 
 local function Start(dest, source)
+    -- a place no path leads to: who takes you there first
+    if dest and not dest.door then
+        local via = Door(dest)
+        if via then dest = via end
+    end
     -- a place the player chose (a Comptoir detour, /way, "Aller à", a key) keeps the dungeon guide's
     -- point, given back when it ends
     if source ~= "dungeon" and state.source == "dungeon" and state.dest then
@@ -1994,6 +2040,7 @@ local function Start(dest, source)
     GPS.Replan()
     if GPS.Show then GPS.Show() end
 end
+GPS._Start = function(dest, source) return Start(dest, source) end
 
 -- Which GPS guides: nil (ours), "spf" (Shortest Path), "zygor". The trip under way goes to the one
 -- chosen at once (report: "for those who have Shortest Path, turn ours off and use its own, or the other
@@ -2077,7 +2124,8 @@ GPS._Waiting = Waiting
 function GPS.GoPoint(map, x, y, label, source)
     if Waiting(map, x, y, label, source) then return end
     local d = state.dest
-    if d and d.map == map and d.x == x and d.y == y and state.source == source then return end
+    local asked = d and type(d.door) == "table" and d.door or d
+    if asked and asked.map == map and asked.x == x and asked.y == y and state.source == source then return end
     -- Shortest Path guides: a point that moved a little (an area's spot that follows you) is not a
     -- new journey for it (each Navigate plans its trip again)
     if state.spf and d and d.map == map and state.source == source and math.abs(d.x - x) < 1 and math.abs(d.y - y) < 1 then return end

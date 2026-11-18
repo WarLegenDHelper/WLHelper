@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.128", date = "2026-11-18", items = {
+    { s = "fix", fr = { "GPS, la tour de l'archimage Xylem (Azshara)", "Aucun chemin ne monte en haut de sa tour, et la flèche partait dans les falaises. Elle t'envoie maintenant à Sanath Lim-yo, au pied de la tour (28.1, 50.1) : parle-lui, il te téléporte en haut. Une fois en haut, la flèche passe à Xylem. Les étapes des quêtes de mage de Xylem le disent aussi." }, en = { "GPS", "Archmage Xylem's tower has no path up: the arrow goes to Sanath Lim-yo at its foot, who teleports you up." } },
+  } },
   { v = "1.0.0-beta.127", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, choisir entre Shortest Path et WL Helper", "Si Shortest Path est installé, une fenêtre demande une seule fois quel GPS suivre. « Shortest Path » : il prend tes destinations (son trajet sur la carte, ses vols, ses bateaux avec leurs départs, sa flèche) et notre flèche s'efface. « WL Helper » : notre GPS, comme avant. Le choix se change dans Options > GPS (« Envoyer les destinations à Shortest Path »), et le trajet en cours passe tout de suite à celui choisi." }, en = { "GPS", "With Shortest Path installed, asked once which GPS to follow; switching moves the trip under way at once." } },
   } },
@@ -50,10 +53,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.114", date = "2026-11-17", items = {
     { s = "add", fr = { "Guide PvP", "Tape « /wlh pvp ». Pour ta classe, chaque pièce du set PvP bleu « Premier » (niveau d'objet 60, dès le niveau 55) avec son prix en honneur et en marques, ce qu'il te manque d'après ton honneur et tes marques, le total pour le set, et le champ de bataille à faire en premier (celui dont il te manque le plus de marques). Quand une classe a plusieurs sets (druide, chaman, prêtre, paladin), WL Helper Gear choisit le meilleur pour ta spé et nomme les autres. Puis la quête Field of Honor (Wizzik Dustfizz à Gadgetzan) et les sceaux « Emboldened » qui rendent une pièce épique plus tard. Prix lus sur Wowhead Forever (vendeur Lady Palanseer) : tête 9 000 honneur + 15 marques d'Alterac, torse 9 350 + 15 Arathi, jambes 9 000 + 15 Goulet, épaules 6 350 + 10 Arathi, mains 7 500 + 10 Goulet, pieds 7 500 + 10 Îles Darkspear, taille 6 000 + 10 Arathi, poignets 4 500 + 10 Goulet." }, en = { "PvP guide (/wlh pvp)", "The rare PvP set for your class, its Forever prices (Wowhead), what you still miss, which battleground first, Field of Honor." } },
-  } },
-  { v = "1.0.0-beta.113", date = "2026-11-17", items = {
-    { s = "add", fr = { "Trouver un groupe, raccourci clavier", "« Ouvrir Trouver un groupe » dans Échap > Options > Raccourcis > AddOns > WL Helper." }, en = { "Find a group", "A key binding." } },
-    { s = "add", fr = { "Trouver un groupe, joueurs qui quittent", "Clic droit sur un nom > « A quitté un donjon en cours ». La marque se cumule ; elle s'affiche dans la bulle du joueur dans les résultats, et une ligne dans le chat te prévient quand il rejoint ton groupe. Le jeu cache les noms en donjon, donc l'addon ne devine jamais qui est parti : c'est toi qui marques." }, en = { "Find a group", "Mark players who left a dungeon mid-run (by hand; names are hidden in instances)." } },
-    { s = "fix", fr = { "Prérequis par classe", "Quand une quête demande « la version de ta classe » d'une autre (An Earnest Proposition, Just Compensation, Anthion's Parting Words), seule celle de ta classe compte. Avant, ces quêtes restaient fermées pour tout le monde. A Supernatural Device, In Search of Anthion et Bodley's Unfortunate Fate ont leurs prérequis de Wowhead Forever." }, en = { "Class-variant prerequisites", "Only your class's version counts (Anthion and Valthalak chains open again)." } },
   } },
 }

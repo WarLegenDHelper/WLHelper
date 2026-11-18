@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.128] — 2026-11-18
+
+### Corrigé / Fixed
+- **GPS, la tour de l'archimage Xylem (Azshara)** : aucun chemin ne monte en haut de sa tour, et la flèche partait dans les falaises. Elle t'envoie maintenant à Sanath Lim-yo, au pied de la tour (28.1, 50.1) : parle-lui, il te téléporte en haut. Une fois en haut, la flèche passe à Xylem. Les étapes des quêtes de mage de Xylem le disent aussi.
+  *GPS: Archmage Xylem's tower has no path up: the arrow goes to Sanath Lim-yo at its foot, who teleports you up.*
+
 ## [1.0.0-beta.127] — 2026-11-18
 
 ### Ajouté / Added
