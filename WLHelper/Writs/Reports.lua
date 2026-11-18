@@ -28,6 +28,8 @@ ns.AddEnglish({
     ["Boîte de réception des rapports : %s"] = "Report inbox: %s",
     ["activée"] = "on",
     ["coupée"] = "off",
+    ["niveau %d"] = "level %d", ["étape du guide : "] = "guide step: ", ["%d quêtes du journal"] = "%d quests in the log",
+    ["destination du GPS"] = "the GPS destination", ["ta cible : "] = "your target: ", ["la dernière erreur Lua"] = "the last Lua error",
     ["Rapports des joueurs"] = "Players' reports",
     ["Aucun rapport reçu pour l'instant. Ils arrivent ici quand un joueur utilise « Nous écrire »."] = "No report yet. They come here when a player uses \"Write to us\".",
     ["Bug"] = "Bug", ["Idée"] = "Idea", ["Erreur de quête"] = "Quest data error", ["Erreur Lua"] = "Lua error",
@@ -218,6 +220,21 @@ local function Context(rec)
         end
     end)
     return rec
+end
+
+-- What a report would carry now, in words, for the form ("What goes with your message")
+function R.Preview()
+    local rec = Context({})
+    local parts = {}
+    parts[#parts + 1] = "WL Helper " .. tostring(rec.v or "?")
+    if rec.zone then parts[#parts + 1] = rec.zone .. ((rec.x and rec.y) and string.format(" (%.1f, %.1f)", rec.x, rec.y) or "") end
+    if rec.lvl then parts[#parts + 1] = string.format(L("niveau %d"), rec.lvl) .. (rec.cls and (" " .. rec.cls:lower()) or "") end
+    if rec.act then parts[#parts + 1] = L("étape du guide : ") .. rec.act end
+    if rec.ql then local n = select(2, rec.ql:gsub(",", ",")) + 1; parts[#parts + 1] = string.format(L("%d quêtes du journal"), n) end
+    if rec.gps then parts[#parts + 1] = L("destination du GPS") end
+    if rec.tgt then parts[#parts + 1] = L("ta cible : ") .. rec.tgt end
+    if rec.err then parts[#parts + 1] = L("la dernière erreur Lua") end
+    return table.concat(parts, "  ·  ")
 end
 
 -- ---------------------------------------------------------------- the channel

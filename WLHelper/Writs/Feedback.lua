@@ -26,6 +26,9 @@ ns.AddEnglish({
     ["Gardé : il partira dès qu'un responsable de la guilde sera connecté."] = "Kept: it will go as soon as a guild officer is online.",
     ["Tu n'es pas dans une guilde : utilise le formulaire GitHub plus bas."] = "You are not in a guild: use the GitHub form below.",
     ["Avec un compte GitHub (facultatif)"] = "With a GitHub account (optional)",
+    ["Ce qui part avec ton message"] = "What goes with your message",
+    ["Envoyé, merci ! L'équipe WL Helper l'a reçu."] = "Sent, thanks! The WL Helper team got it.",
+    ["Merci ! Ton message est gardé : il part dès qu'un responsable de la guilde est connecté."] = "Thanks! Your message is kept: it goes as soon as a guild officer is online.",
     ["Plus simple, sans compte : tape /wlh bug ou /wlh idee suivi de ton message, il part directement à l'équipe par la guilde."] =
         "Simpler, no account: type /wlh bug or /wlh idea followed by your message, it goes straight to the team through the guild.",
     -- the buttons of the options' About page open this window on a form
@@ -151,20 +154,40 @@ local function Layout()
     -- 2. the message
     y = y + win.step2m:Place(y) + 8
     win.msg:ClearAllPoints(); win.msg:SetPoint("TOPLEFT", x, -y); win.msg:SetPoint("RIGHT", win, "RIGHT", -16, 0)
-    win.msg:SetHeight(96)
-    y = y + 96 + 16
+    win.msg:SetHeight(110)
+    y = y + 110 + 4
+    -- the count of letters, right under the box, on its right
+    win.count:ClearAllPoints(); win.count:SetPoint("TOPRIGHT", win, "TOPRIGHT", -16, -y)
+    y = y + 14 + 12
     -- 3. a screenshot's link, then Send
     y = y + win.step3s:Place(y) + 8
     win.shot:ClearAllPoints(); win.shot:SetPoint("TOPLEFT", x, -y); win.shot:SetPoint("RIGHT", win, "RIGHT", -16, 0)
     y = y + 28 + 12
+    -- what goes with the message, said before Send (nothing hidden from the player)
+    win.ctxHead:ClearAllPoints(); win.ctxHead:SetPoint("TOPLEFT", x, -y)
+    y = y + 16
+    win.ctx:ClearAllPoints(); win.ctx:SetPoint("TOPLEFT", x, -y)
+    y = y + math.ceil(S.FitText(win.ctx, 4, CW - TEXT_X, win)) + 14
     win.send:ClearAllPoints(); win.send:SetPoint("TOPLEFT", x, -y)
     y = y + 32
+    if win.banner:IsShown() then
+        y = y + 10
+        win.banner:ClearAllPoints(); win.banner:SetPoint("TOPLEFT", x, -y); win.banner:SetPoint("RIGHT", win, "RIGHT", -16, 0)
+        y = y + (win.banner:GetHeight() or 40)
+    end
     if (win.status:GetText() or "") ~= "" then
         y = y + 6
         win.status:ClearAllPoints(); win.status:SetPoint("TOPLEFT", x, -y)
         y = y + math.ceil(S.FitText(win.status, 2, CW - TEXT_X, win))
     end
     y = y + 20
+    -- the GitHub form, folded behind a ghost button
+    win.ghToggle:ClearAllPoints(); win.ghToggle:SetPoint("TOPLEFT", 16, -y)
+    y = y + 28
+    local gh = win.ghOpen and true or false
+    for _, r in ipairs({ win.ghHead, win.box, win.step2.dot, win.step2.num, win.step2.text, win.step3.dot, win.step3.num, win.step3.text }) do r:SetShown(gh) end
+    if not gh then win.copied:Hide(); win.copiedIcon:Hide(); win:FitHeight(y - top); return end
+    y = y + 6
     win.ghHead:ClearAllPoints(); win.ghHead:SetPoint("TOPLEFT", 16, -y)
     y = y + 20
     -- 4. the link, selected, ready for Ctrl+C
@@ -228,7 +251,15 @@ local function Build()
     msg.placeholder = S.Text(msg, F.label, C.faint)
     msg.placeholder:SetPoint("TOPLEFT", 8, -6)
     msg.placeholder:SetText(L("Ce qui se passe, où, et ce que tu attendais."))
-    msg:SetScript("OnTextChanged", function(self) self.placeholder:SetShown((self:GetText() or "") == "") end)
+    msg:SetScript("OnTextChanged", function(self)
+        local t = self:GetText() or ""
+        self.placeholder:SetShown(t == "")
+        if win.count then
+            win.count:SetText(string.format("%d / 500", #t))
+            local c = #t >= 480 and C.warn or C.muted
+            win.count:SetTextColor(c[1], c[2], c[3])
+        end
+    end)
     msg:SetScript("OnEditFocusGained", function() msgEdge(C.accent) end)
     msg:SetScript("OnEditFocusLost", function() msgEdge(C.line) end)
     msg:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
@@ -246,11 +277,25 @@ local function Build()
         if rec then
             win.msg:SetText(""); win.shot:SetText(""); win.msg:ClearFocus(); win.shot:ClearFocus()
             if win.shot.Paint then win.shot.Paint() end
-            win.status:SetText(rec.delivered and L("Envoyé, merci ! Ta position, ton étape du guide et ta version partent avec.")
-                or L("Gardé : il partira dès qu'un responsable de la guilde sera connecté."))
-            win.status:SetTextColor(C.ok[1], C.ok[2], C.ok[3])
+            win.status:SetText("")
+            local said = rec.delivered and L("Envoyé, merci ! L'équipe WL Helper l'a reçu.")
+                or L("Merci ! Ton message est gardé : il part dès qu'un responsable de la guilde est connecté.")
+            if win.banner.SetText then win.banner:SetText(said) elseif win.banner.text then win.banner.text:SetText(said) end
+            win.banner:Show()
             Layout()
         end
+    end)
+    win.count = S.Text(win, F.meta, C.muted)
+    win.count:SetJustifyH("RIGHT"); win.count:SetText("0 / 500")
+    win.ctxHead = S.Text(win, F.meta, C.muted, true)
+    win.ctxHead:SetText(string.upper(L("Ce qui part avec ton message")))
+    win.ctx = S.Text(win, F.meta, C.muted)
+    win.ctx:SetJustifyH("LEFT"); win.ctx:SetJustifyV("TOP"); win.ctx:SetWordWrap(true)
+    win.banner = S.Banner(win, "ok", "")
+    win.banner:Hide()
+    win.ghToggle = S.Button(win, L("Avec un compte GitHub (facultatif)"), 0, 24, "ghost", function()
+        win.ghOpen = not win.ghOpen
+        Layout()
     end)
     win.status = S.Text(win, F.meta, C.ok)
     win.status:SetJustifyH("LEFT"); win.status:SetWordWrap(true)
@@ -312,6 +357,8 @@ function WP.Feedback(kind)
     win.box:SetText(win.link)
     win.box:SetCursorPosition(0)   -- the start of the link shows, not its tail
     win.status:SetText("")
+    win.banner:Hide()
+    win.ctx:SetText(WP.Reports and WP.Reports.Preview and WP.Reports.Preview() or "")
     -- the message first: the box ready to type in
     win.msg:SetFocus()
     Layout()

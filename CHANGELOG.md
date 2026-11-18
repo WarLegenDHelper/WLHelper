@@ -6,6 +6,21 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.151] — 2026-11-18
+
+### Modifié / Changed
+- **L'écran « Nous écrire », plus clair** :
+  - un compteur de caractères sous le message (500 au plus) ;
+  - un encadré « Ce qui part avec ton message » qui montre ce que le rapport emporte (version, zone et position, niveau, étape du guide, nombre de quêtes, cible, dernière erreur) ;
+  - un bandeau vert une fois le message envoyé (ou gardé si aucun responsable n'est connecté) ;
+  - la partie GitHub repliée derrière un bouton, pour ceux qui ont un compte.
+
+  *"Write to us" screen: a letter counter, "What goes with your message", a green banner once sent, the GitHub part folded.*
+
+### Ajouté / Added
+- **Journal des vérifications de boss** : dans un donjon, WL Helper note ses 80 dernières vérifications de boss (cible, survol, plaques de nom, début et fin de rencontre) : nom, numéro de PNJ, boss reconnu ou non, mort ou non, décision. Ça sert à comprendre pourquoi un boss tué apparaît encore vivant (signalé : Ogom the Wretched au Temple englouti). En attendant, un clic droit sur son icône dans le panneau des boss le marque tué.
+  *A log of the boss kill checks inside dungeons (WLWritsDB.bossLog), to see why a killed boss shows alive.*
+
 ## [1.0.0-beta.150] — 2026-11-18
 
 ### Corrigé / Fixed

@@ -2890,6 +2890,18 @@ local function GuideAfterKill()
   if C_Timer and C_Timer.After then C_Timer.After(0.3, go) else go() end
 end
 
+-- A log of the kill checks inside a dungeon (report: "I killed Ogom the Wretched, it shows not
+-- killed"): the last 80 in WLWritsDB.bossLog, { time, event, unit, name, npc id, boss found, dead,
+-- outcome }, read from the saved variables to see why a death was not counted.
+function ns.BossLog(ev, unit, nm, id, found, dead, out)
+  local db = WLWritsDB
+  if type(db) ~= "table" then return end
+  local log = type(db.bossLog) == "table" and db.bossLog or {}
+  db.bossLog = log
+  log[#log + 1] = { t = (time and time()) or 0, ev = ev, u = unit, n = nm, id = id, f = found, d = dead, o = out }
+  while #log > 80 do table.remove(log, 1) end
+end
+
 local function MarkKilled(name, id, enc, en)
   if not CurrentInstance() then return end
   NewVisitCheck()
@@ -3011,7 +3023,15 @@ local function TargetCheck(unit)
     if (nm and (r.name == nm or r.en == nm)) then rec = r end
     if id then for _, x in ipairs(r.ids or {}) do if x == id then rec = r end end end
   end
-  if not rec then return end
+  if not rec then
+    -- a dead elite that is none of the list's bosses: logged (a boss whose name or NPC id the list lacks)
+    local okD0, d0 = pcall(UnitIsDead or function() return false end, unit)
+    local okC0, cl = pcall(UnitClassification or function() return nil end, unit)
+    if okD0 and bool(d0) == true and okC0 and (cl == "elite" or cl == "rareelite" or cl == "worldboss") then
+      ns.BossLog("target", unit, nm, id, false, true, "not a boss of the list")
+    end
+    return
+  end
   LiveFace(unit, rec)
   LearnUnit(unit, id)
   -- learn its creature type for the painted icon
@@ -3030,7 +3050,10 @@ local function TargetCheck(unit)
     local k = Kills()
     -- already counted: nothing to do (a dead boss under the mouse fires this often)
     if CurrentInstance() == k.iid and k.names[rec.en] then return end
+    ns.BossLog("target", unit, nm, id, rec.en, true, "mark")
     MarkKilled(rec.name, id, nil, rec.en)
+  else
+    ns.BossLog("target", unit, nm, id, rec.en, okD and tostring(dead) or "err", "unknown dead")
   end
 end
 ns.BossTargetCheck = TargetCheck
@@ -3091,6 +3114,7 @@ local function KillCheck(unit)
   if not dead then return end
   local k = Kills()
   if CurrentInstance() == k.iid and ((id and k.ids[id]) or k.names[rec.en]) then return end
+  ns.BossLog("health", unit, rec.en, id, rec.en, true, "mark")
   MarkKilled(rec.name, id, nil, rec.en)
 end
 ns.BossKillCheck = KillCheck
@@ -3211,6 +3235,7 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
       k.encNpc = k.encNpc or {}
       local ids = {}
       for b = 1, 5 do local id = NpcIdOf("boss" .. b); if id then ids[#ids + 1] = id end end
+      ns.BossLog("encounter_start", nil, str(a2), enc, table.concat(ids, ","), nil, nil)
       if #ids > 0 then k.encNpc[enc] = ids end
     end
   elseif e == "PLAYER_REGEN_DISABLED" then
@@ -3231,6 +3256,7 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
     end
   elseif e == "ENCOUNTER_END" then
     -- encounterID, encounterName, difficultyID, groupSize, success
+    ns.BossLog("encounter_end", nil, str(a2), num(a1), nil, num(a5), CurrentInstance() and "inside" or "outside")
     if num(a5) == 1 then
       local enc = num(a1)
       local k = Kills()

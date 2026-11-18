@@ -2,6 +2,14 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.151", date = "2026-11-18", items = {
+    { s = "chg", fr = { "L'écran « Nous écrire », plus clair", "" }, en = { "", "" } },
+    { s = "chg", fr = { "", "un compteur de caractères sous le message (500 au plus) ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "un encadré « Ce qui part avec ton message » qui montre ce que le rapport emporte (version, zone et position, niveau, étape du guide, nombre de quêtes, cible, dernière erreur) ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "un bandeau vert une fois le message envoyé (ou gardé si aucun responsable n'est connecté) ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "la partie GitHub repliée derrière un bouton, pour ceux qui ont un compte." }, en = { "\"Write to us\" screen", "A letter counter, \"What goes with your message\", a green banner once sent, the GitHub part folded." } },
+    { s = "add", fr = { "Journal des vérifications de boss", "Dans un donjon, WL Helper note ses 80 dernières vérifications de boss (cible, survol, plaques de nom, début et fin de rencontre) : nom, numéro de PNJ, boss reconnu ou non, mort ou non, décision. Ça sert à comprendre pourquoi un boss tué apparaît encore vivant (signalé : Ogom the Wretched au Temple englouti). En attendant, un clic droit sur son icône dans le panneau des boss le marque tué." }, en = { "A log of the boss kill checks inside dungeons (WLWritsDB.bossLog), to see why a killed boss shows alive.", "" } },
+  } },
   { v = "1.0.0-beta.150", date = "2026-11-18", items = {
     { s = "fix", fr = { "Gros freeze en ouvrant la carte (M) ou le journal (L) avec OpenMap", "OpenMap envoie son signal « la vue a bougé » à chaque image pendant son animation d'ouverture, et WL Helper redessinait à chaque fois tous ses tracés sur la carte (zones de monstres, chemins, points). Il redessine maintenant au plus 5 fois par seconde, plus une dernière fois quand la vue s'arrête. Les temps passés sont notés dans les sauvegardes, pour mesurer s'il reste un freeze." }, en = { "Big freeze on M / L with OpenMap", "Its view signal comes every frame while it glides; WL Helper's map lines are now redrawn 5 times a second at most (and once when it stops)." } },
     { s = "fix", fr = { "Chaque /reload remettait la fenêtre classique", "Le guide revient maintenant dans la vue moderne (quand c'est la vue par défaut) après un /reload, un écran de chargement ou l'entrée dans un donjon. Passer en vue moderne ne compte plus comme « guide fermé », ce qui pouvait aussi couper la flèche GPS. « Masquer la vue moderne » ferme vraiment le guide." }, en = { "A /reload now brings the modern view back; switching to it no longer counts as closing the guide (which could stop the GPS arrow).", "" } },
@@ -102,8 +110,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "", "« ENSUITE » et les 3 actions suivantes en texte normal ;" }, en = { "", "" } },
     { s = "chg", fr = { "", "la barre de progression du guide en bas, avec le pourcentage." }, en = { "The compact guide redone after RestedXP and Polestar", "Header with levels, step and percent; the step's card with its orange label, coloured names and green objective bars; \"Then\" and the next 3 actions; the guide's progress bar." } },
     { s = "chg", fr = { "Un vrai bouton « Compact »", "À la place du « − » dans la fenêtre du guide : il passe au guide compact. Un clic sur le titre du guide compact ramène la grande fenêtre." }, en = { "A labelled \"Compact\" button replaces the guide window's \"−\".", "" } },
-  } },
-  { v = "1.0.0-beta.136", date = "2026-11-18", items = {
-    { s = "add", fr = { "Quel donjon farmer pour ton équipement", "Chaque donjon compte ce que son butin a pour toi. D'abord les objets de ta liste BiS de Naowh (1er et 2e choix), puis les améliorations d'au moins 5 % selon WL Helper (cap de toucher, défense, montée de niveau). Les objets que tu as déjà (portés, sacs, banque) et ceux à plus de 4 niveaux au-dessus de toi ne comptent pas. Ça s'affiche en doré sur les cartes du choix de donjon du guide (« 3 BiS pour toi · 2 améliorations ») et sur celles de Trouver un groupe (« Ta route · 3 BiS »). /wlh farm donne dans le chat les 5 meilleurs donjons à ton niveau. Le décompte se refait quand ton équipement, tes sacs, ton niveau ou ta liste Naowh changent." }, en = { "Which dungeon to farm", "Each dungeon counts your Naowh BiS picks and WL Helper's upgrades of 5 % or more in its loot; shown on the dungeon cards, and /wlh farm lists the best 5." } },
   } },
 }
