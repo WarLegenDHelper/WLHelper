@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.159", date = "2026-11-18", items = {
+    { s = "chg", fr = { "Vue moderne, le nom de la quête en titre", "Sur une étape à objectif (« Ramasser : Magenta Fungus Cap 1/12 »), le grand titre répétait la barre d'objectif et le nom de la quête restait noyé dans une ligne grise. Le titre est maintenant le nom de la quête, en doré. La barre dit quoi faire et combien, et la ligne grise ne répète plus le nom de la quête." }, en = { "Modern view", "On an objective step the title is the quest's name; the bar says what to do and how many." } },
+  } },
   { v = "1.0.0-beta.158", date = "2026-11-18", items = {
     { s = "chg", fr = { "Trouver un groupe, plus clair", "Sur une fenêtre assez large, les filtres ne sont plus cachés dans une fenêtre qui s'ouvre par-dessus. Ils restent visibles dans une colonne à droite de la liste, comme dans LFG Forever, avec des titres de section en couleur (classes, niveau, langues, style de jeu, places libres). L'icône filtre masque ou réaffiche cette colonne. Sur une fenêtre étroite, rien ne change." }, en = { "Find a group", "On a wide window the filters stay visible in a column right of the list; the filter icon hides or shows it." } },
   } },
@@ -88,13 +91,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.145", date = "2026-11-18", items = {
     { s = "chg", fr = { "Les rapports ne passent plus par toute la guilde", "Un message envoyé avec « Nous écrire » (ou /wlh bug) part maintenant en privé (chuchotement d'addon), uniquement vers le compte qui reçoit les rapports : celui qui s'est annoncé, sinon le maître de guilde s'il est connecté. L'accusé de réception revient aussi en privé. Le canal de guilde ne sert plus qu'à un petit « je suis là » du compte qui reçoit, à sa connexion puis toutes les 15 minutes. Si personne ne peut recevoir, le message est gardé et part dès que c'est possible." }, en = { "Reports go by addon whisper to the receiving account only (the one that announced itself, else the guild master online), acks too; the guild channel only carries the inbox's small \"I'm here\".", "" } },
-  } },
-  { v = "1.0.0-beta.144", date = "2026-11-18", items = {
-    { s = "chg", fr = { "La vue moderne garde toutes les infos du guide", "Elle ne montrait que l'action en cours et ses objectifs. Elle reprend maintenant tout ce que dit la carte de la fenêtre du guide, en dessous de l'action :" }, en = { "", "" } },
-    { s = "chg", fr = { "", "où aller et à quelle distance ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "pourquoi maintenant (prérequis, « requise pour... », optionnelle) ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "ce qui tombe, et les autres objectifs de la quête ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "ce que la quête demandera, la récompense, nos notes et le texte du jeu ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "sur un boss, sa tactique et le butin pour toi. C'est la même information que dans la fenêtre, avec la présentation moderne (sans cadre par défaut)." }, en = { "The modern view now shows everything the guide window's card says: where and how far, why now, drops, other objectives, what the quest asks, reward, notes, the game's text, and on a boss its tactics and loot for you.", "" } },
   } },
 }

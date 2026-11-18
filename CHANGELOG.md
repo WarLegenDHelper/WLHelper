@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.159] — 2026-11-18
+
+### Modifié / Changed
+- **Vue moderne, le nom de la quête en titre** : sur une étape à objectif (« Ramasser : Magenta Fungus Cap 1/12 »), le grand titre répétait la barre d'objectif et le nom de la quête restait noyé dans une ligne grise. Le titre est maintenant le nom de la quête, en doré. La barre dit quoi faire et combien, et la ligne grise ne répète plus le nom de la quête.
+  *Modern view: on an objective step the title is the quest's name; the bar says what to do and how many.*
+
 ## [1.0.0-beta.158] — 2026-11-18
 
 ### Modifié / Changed

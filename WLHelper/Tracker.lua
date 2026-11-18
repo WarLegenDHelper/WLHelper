@@ -235,6 +235,16 @@ function TR.Model()
     local have, need = Count(log, cur.node.q, cur.obj)
     if have and need and need > 1 then cur.count = have .. "/" .. need end
   end
+  -- an objective with its bar: the bar says what to do and how many ("Loot: Magenta Fungus Cap
+  -- 1/12"), the title says the quest (report: "we can't see the quest's name well, it should be the
+  -- most important thing since there is already an objective bar")
+  if cur.obj and cur.node and cur.node.q and m.bars[1] and m.bars[1].o == cur.obj then
+    local qn = ns.QName(cur.node.q)
+    if type(qn) == "string" and qn ~= "" then
+      m.qTitle = qn
+      m.bars[1].label = cur.text
+    end
+  end
   -- everything the guide window's card says about this action (report: "Polestar keeps the same
   -- level of information as our other view, only nicer"): where and how far, why now, the drops,
   -- the other objectives, the details (what it asks, the reward, our notes, the game's text); on a
@@ -727,12 +737,16 @@ local function Draw(m)
   local cur = f.cur
   cur.action = m.cur
   SetActIcon(cur.icon, m.cur.kind, false)
-  local text = Rich(m.cur.text or "")
-  if m.cur.count then text = text .. "  " .. Hex(T.muted) .. m.cur.count .. "|r" end
+  local text
+  if m.qTitle then text = Hex(T.gold) .. m.qTitle .. "|r"
+  else
+    text = Rich(m.cur.text or "")
+    if m.cur.count then text = text .. "  " .. Hex(T.muted) .. m.cur.count .. "|r" end
+  end
   cur.text:SetText(text)
   local h = 4 + TextH(cur.text, F.title)
   -- the card's own place line (with the distance) replaces this one: never the place twice
-  if m.cur.sub and not (m.focus and m.focus.where) then
+  if m.cur.sub and not (m.focus and m.focus.where) and not (m.qTitle and m.cur.sub == m.qTitle) then
     -- the place in colour, as Polestar writes it
     cur.sub:SetText(Hex(T.accentSoft) .. m.cur.sub .. "|r"); cur.sub:Show()
     Anchor(cur.sub, "TOPLEFT", cur, "TOPLEFT", PAD + ICON + GAP, -(h + 3))
@@ -793,7 +807,21 @@ local function Draw(m)
   if M then
     if M.lead and M.lead ~= m.cur.sub then Put(M.lead, F.label, T.muted, 2) end
     if M.where then Put(M.where, F.label, T.accentSoft, 2) end
-    for _, w in ipairs(M.why or {}) do Put(w, F.label, T.muted, 3) end
+    for k, w in ipairs(M.why or {}) do
+      if k == 1 and m.qTitle and type(w) == "string" then
+        local function Plain(str, a, b)
+          local i, j = str:find(a, 1, true)
+          if i then return str:sub(1, i - 1) .. b .. str:sub(j + 1) end
+          return str
+        end
+        w = Plain(w, L.CARD_WHY_MAIN:format(m.qTitle), L.CARD_WHY_MAIN_S)
+        w = Plain(w, L.CARD_WHY_MAIN:format(m.qTitle):gsub("^%l", string.upper), L.CARD_WHY_MAIN_S)
+        local q1 = L.CARD_WHY_Q:format(m.qTitle)
+        w = Plain(w, q1, ""); w = Plain(w, (q1:gsub("^%l", string.upper)), "")
+        w = w:gsub("^(|c%x%x%x%x%x%x%x%x)%s*·%s*", "%1"):gsub("^%s*·%s*", "")
+      end
+      if not (type(w) == "string" and w:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):match("^%s*$")) then Put(w, F.label, T.muted, 3) end
+    end
     if M.drops then Put(M.drops, F.label, T.text, 4) end
     -- the other objectives, unless the bars above already count them
     if #(m.bars or {}) == 0 then for _, o in ipairs(M.objs or {}) do Put(o, F.label, T.text, 3) end end
