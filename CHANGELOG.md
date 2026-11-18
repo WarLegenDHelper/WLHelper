@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.143] — 2026-11-18
+
+### Modifié / Changed
+- **« Nous écrire » : on écrit et on envoie dans la fenêtre** : le bouton de la page d'accueil, « Nous écrire », ouvre une fenêtre avec :
+  1. le choix entre une idée, un bug ou une erreur de quête ;
+  2. une zone pour écrire ton message ;
+  3. un champ pour coller le lien d'une capture d'écran (mets-la sur Discord ou imgur, puis Ctrl+V : le jeu ne laisse pas un addon joindre une image) ;
+  4. le bouton **Envoyer**.
+
+  Le message part par la guilde, avec ta position, ton étape du guide et ta version, sans compte. Le formulaire GitHub reste en dessous, pour ceux qui ont un compte.
+  *"Write to us" (home page) now has a message box, a screenshot-link field and a Send button: sent through the guild, no account; GitHub stays below.*
+
 ## [1.0.0-beta.142] — 2026-11-18
 
 ### Ajouté / Added

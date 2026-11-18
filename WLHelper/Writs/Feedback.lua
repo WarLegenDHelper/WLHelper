@@ -13,6 +13,19 @@ local F = S.F
 
 ns.AddEnglish({
     ["Une idée, un bug ?"] = "An idea, a bug?",
+    ["Écris-nous ici : ton message part tout seul à l'équipe WL Helper, par la guilde. Aucun compte à créer."] =
+        "Write to us here: your message goes straight to the WL Helper team, through the guild. No account to make.",
+    ["Ton message"] = "Your message",
+    ["Ce qui se passe, où, et ce que tu attendais."] = "What happens, where, and what you expected.",
+    ["Une capture d'écran ? Mets-la sur Discord ou imgur, puis colle son lien ici (facultatif)."] =
+        "A screenshot? Put it on Discord or imgur, then paste its link here (optional).",
+    ["Lien de la capture (Ctrl+V)"] = "Screenshot link (Ctrl+V)",
+    ["Envoyer"] = "Send",
+    ["Écris d'abord ton message."] = "Write your message first.",
+    ["Envoyé, merci ! Ta position, ton étape du guide et ta version partent avec."] = "Sent, thanks! Your position, guide step and version go with it.",
+    ["Gardé : il partira dès qu'un responsable de la guilde sera connecté."] = "Kept: it will go as soon as a guild officer is online.",
+    ["Tu n'es pas dans une guilde : utilise le formulaire GitHub plus bas."] = "You are not in a guild: use the GitHub form below.",
+    ["Avec un compte GitHub (facultatif)"] = "With a GitHub account (optional)",
     ["Plus simple, sans compte : tape /wlh bug ou /wlh idee suivi de ton message, il part directement à l'équipe par la guilde."] =
         "Simpler, no account: type /wlh bug or /wlh idea followed by your message, it goes straight to the team through the guild.",
     -- the buttons of the options' About page open this window on a form
@@ -134,7 +147,26 @@ local function Layout()
     y = y + 28 + 4
     win.hint:ClearAllPoints(); win.hint:SetPoint("TOPLEFT", x, -y)
     y = y + math.ceil(S.FitText(win.hint, 2, CW - TEXT_X, win)) + 16
-    -- 2. the link, selected, ready for Ctrl+C
+    -- 2. the message
+    y = y + win.step2m:Place(y) + 8
+    win.msg:ClearAllPoints(); win.msg:SetPoint("TOPLEFT", x, -y); win.msg:SetPoint("RIGHT", win, "RIGHT", -16, 0)
+    win.msg:SetHeight(96)
+    y = y + 96 + 16
+    -- 3. a screenshot's link, then Send
+    y = y + win.step3s:Place(y) + 8
+    win.shot:ClearAllPoints(); win.shot:SetPoint("TOPLEFT", x, -y); win.shot:SetPoint("RIGHT", win, "RIGHT", -16, 0)
+    y = y + 28 + 12
+    win.send:ClearAllPoints(); win.send:SetPoint("TOPLEFT", x, -y)
+    y = y + 32
+    if (win.status:GetText() or "") ~= "" then
+        y = y + 6
+        win.status:ClearAllPoints(); win.status:SetPoint("TOPLEFT", x, -y)
+        y = y + math.ceil(S.FitText(win.status, 2, CW - TEXT_X, win))
+    end
+    y = y + 20
+    win.ghHead:ClearAllPoints(); win.ghHead:SetPoint("TOPLEFT", 16, -y)
+    y = y + 20
+    -- 4. the link, selected, ready for Ctrl+C
     y = y + win.step2:Place(y) + 8
     win.box:ClearAllPoints(); win.box:SetPoint("TOPLEFT", x, -y); win.box:SetPoint("RIGHT", win, "RIGHT", -16, 0)
     y = y + 28
@@ -146,7 +178,7 @@ local function Layout()
         y = y + 14
     end
     y = y + 16
-    -- 3. into the browser
+    -- 5. into the browser
     y = y + win.step3:Place(y)
     win:FitHeight(y - top)
 end
@@ -165,7 +197,7 @@ local function Build()
     win.OnResize = function() Layout() end
     win.intro = S.Text(win, F.body, C.text)
     win.intro:SetJustifyH("LEFT"); win.intro:SetJustifyV("TOP"); win.intro:SetWordWrap(true)
-    win.intro:SetText(L("Le jeu ne laisse pas les addons aller sur internet : tu nous écris depuis ton navigateur, en trois étapes."))
+    win.intro:SetText(L("Écris-nous ici : ton message part tout seul à l'équipe WL Helper, par la guilde. Aucun compte à créer."))
 
     -- 1. what to send: a segmented choice, and one sentence on what that form is for
     win.step1 = Step(win, 1, L("Choisis ce que tu veux nous dire."))
@@ -175,8 +207,56 @@ local function Build()
     win.hint = S.Text(win, F.meta, C.muted)
     win.hint:SetJustifyH("LEFT"); win.hint:SetJustifyV("TOP")
 
-    -- 2. the link: an input that always holds the link, selected on every click
-    win.step2 = Step(win, 2, L("Copie le lien : il est déjà sélectionné, fais Ctrl+C."))
+    -- 2. the message, written here (report: "/wlh bug is too much trouble, a button and a screenshot")
+    win.step2m = Step(win, 2, L("Ton message"))
+    local msg = CreateFrame("EditBox", nil, win)
+    msg.wlOwned = true
+    msg:SetMultiLine(true)
+    msg:SetAutoFocus(false)
+    msg:SetMaxLetters(500)
+    do
+        local p2 = S.Text(win, F.label, C.fg)
+        local fnt, sz, fl = p2:GetFont()
+        p2:Hide()
+        if fnt then msg:SetFont(fnt, sz or 12, fl or "") else msg:SetFontObject(ChatFontNormal) end
+    end
+    msg:SetTextColor(C.fg[1], C.fg[2], C.fg[3])
+    msg:SetTextInsets(8, 8, 6, 6)
+    S.Solid(msg, "BACKGROUND", C.panel):SetAllPoints()
+    local msgEdge = S.Border(msg, C.line)
+    msg.placeholder = S.Text(msg, F.label, C.faint)
+    msg.placeholder:SetPoint("TOPLEFT", 8, -6)
+    msg.placeholder:SetText(L("Ce qui se passe, où, et ce que tu attendais."))
+    msg:SetScript("OnTextChanged", function(self) self.placeholder:SetShown((self:GetText() or "") == "") end)
+    msg:SetScript("OnEditFocusGained", function() msgEdge(C.accent) end)
+    msg:SetScript("OnEditFocusLost", function() msgEdge(C.line) end)
+    msg:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    msg:SetScript("OnMouseDown", function(self) self:SetFocus() end)
+    win.msg = msg
+    -- 3. a screenshot, by its link (the game lets no addon attach or send an image)
+    win.step3s = Step(win, 3, L("Une capture d'écran ? Mets-la sur Discord ou imgur, puis colle son lien ici (facultatif)."))
+    win.shot = S.Input(win, 300, { placeholder = L("Lien de la capture (Ctrl+V)") })
+    win.send = S.Button(win, L("Envoyer"), 0, 32, "primary", function()
+        local text = win.msg:GetText() or ""
+        if not text:find("%S") then win.status:SetText(L("Écris d'abord ton message.")); win.status:SetTextColor(C.warn[1], C.warn[2], C.warn[3]); Layout(); return end
+        if not (IsInGuild and IsInGuild()) then win.status:SetText(L("Tu n'es pas dans une guilde : utilise le formulaire GitHub plus bas.")); win.status:SetTextColor(C.warn[1], C.warn[2], C.warn[3]); Layout(); return end
+        local kind = win.kind == "data" and "quest" or win.kind
+        local rec = WP.Reports and WP.Reports.New(kind, text, win.shot:GetText())
+        if rec then
+            win.msg:SetText(""); win.shot:SetText(""); win.msg:ClearFocus(); win.shot:ClearFocus()
+            if win.shot.Paint then win.shot.Paint() end
+            win.status:SetText(rec.delivered and L("Envoyé, merci ! Ta position, ton étape du guide et ta version partent avec.")
+                or L("Gardé : il partira dès qu'un responsable de la guilde sera connecté."))
+            win.status:SetTextColor(C.ok[1], C.ok[2], C.ok[3])
+            Layout()
+        end
+    end)
+    win.status = S.Text(win, F.meta, C.ok)
+    win.status:SetJustifyH("LEFT"); win.status:SetWordWrap(true)
+    -- the GitHub form, as before, under its own heading
+    win.ghHead = S.Text(win, F.label, C.muted, true)
+    win.ghHead:SetText(L("Avec un compte GitHub (facultatif)"))
+    win.step2 = Step(win, 4, L("Copie le lien : il est déjà sélectionné, fais Ctrl+C."))
     local eb = CreateFrame("EditBox", nil, win)
     eb.wlOwned = true
     eb:SetHeight(28)
@@ -209,7 +289,7 @@ local function Build()
     ShowCopied(false)
 
     -- 3. into the browser
-    win.step3 = Step(win, 3, L("Colle-le dans ton navigateur : le formulaire s'ouvre déjà rempli avec ta version. Il te faut un compte GitHub, c'est gratuit."))
+    win.step3 = Step(win, 5, L("Colle-le dans ton navigateur : le formulaire s'ouvre déjà rempli avec ta version. Il te faut un compte GitHub, c'est gratuit."))
 
     win:SetScript("OnShow", function()
         Layout()
@@ -220,7 +300,6 @@ end
 -- Opens the window on a form ("idea" by default) with its link selected, ready for Ctrl+C.
 function WP.Feedback(kind)
     -- the simpler way, no account: written here, sent through the guild (Writs/Reports.lua)
-    if WP.Reports then WP.Print(L("Plus simple, sans compte : tape /wlh bug ou /wlh idee suivi de ton message, il part directement à l'équipe par la guilde.")) end
     if not win then Build() end
     kind = FORMS[kind] and kind or "idea"
     win.link = Link(kind)
@@ -231,7 +310,8 @@ function WP.Feedback(kind)
     win:Show()
     win.box:SetText(win.link)
     win.box:SetCursorPosition(0)   -- the start of the link shows, not its tail
-    win.box:SetFocus()
-    win.box:HighlightText()
+    win.status:SetText("")
+    -- the message first: the box ready to type in
+    win.msg:SetFocus()
     Layout()
 end

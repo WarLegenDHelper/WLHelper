@@ -75,7 +75,7 @@ local function Clean(v)
     v = tostring(v or "")
     return (v:gsub("[\30\31|\r\n]", " "))
 end
-local FIELDS = { "id", "at", "from", "kind", "text", "v", "loc", "zone", "m", "x", "y", "step", "dk", "lvl", "cls", "err" }
+local FIELDS = { "id", "at", "from", "kind", "text", "shot", "v", "loc", "zone", "m", "x", "y", "step", "dk", "lvl", "cls", "err" }
 local function Encode(rec)
     local parts = {}
     for _, k in ipairs(FIELDS) do
@@ -180,14 +180,18 @@ function R.SendPending()
     return n
 end
 
--- "/wlh bug <text>", "/wlh idee <text>"
-function R.New(kind, text)
+-- "/wlh bug <text>", "/wlh idee <text>", the form's Send. kind: "bug" | "idea" | "quest"; shot: the
+-- link of a screenshot the player put online (Discord, imgur...), or nil. -> the report, or nil
+local KINDS = { bug = true, idea = true, quest = true }
+function R.New(kind, text, shot)
     text = Str(text and (text:gsub("^%s+", ""):gsub("%s+$", "")))
     if not text then WP.Print(L("Écris ton message après la commande : /wlh bug la flèche reste affichée quand...")); return nil end
     local d = DB()
     if not d then return nil end
     local now = (time and time()) or 0
-    local rec = Context({ id = MeKey() .. ":" .. now, at = now, from = MeKey(), kind = kind == "idea" and "idea" or "bug", text = text:sub(1, MAX_TEXT) })
+    shot = Str(shot and (shot:gsub("^%s+", ""):gsub("%s+$", "")))
+    local rec = Context({ id = MeKey() .. ":" .. now, at = now, from = MeKey(), kind = KINDS[kind] and kind or "bug",
+        text = text:sub(1, MAX_TEXT), shot = shot and shot:sub(1, 200) or nil })
     d.out[rec.id] = rec
     -- an inbox on this very account (the guild master writing): kept at once
     if R.IsInbox() then d.inbox[rec.id] = rec; rec.delivered = true; WP.Print(L("Merci ! Ton rapport est parti à l'équipe WL Helper (par la guilde).")); return rec end

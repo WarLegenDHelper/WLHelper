@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.143", date = "2026-11-18", items = {
+    { s = "chg", fr = { "« Nous écrire » : on écrit et on envoie dans la fenêtre", "Le bouton de la page d'accueil, « Nous écrire », ouvre une fenêtre avec : 1. le choix entre une idée, un bug ou une erreur de quête ; 2. une zone pour écrire ton message ; 3. un champ pour coller le lien d'une capture d'écran (mets-la sur Discord ou imgur, puis Ctrl+V : le jeu ne laisse pas un addon joindre une image) ; 4. le bouton **Envoyer**. Le message part par la guilde, avec ta position, ton étape du guide et ta version, sans compte. Le formulaire GitHub reste en dessous, pour ceux qui ont un compte." }, en = { "\"Write to us\" (home page) now has a message box, a screenshot-link field and a Send button: sent through the guild, no account; GitHub stays below.", "" } },
+  } },
   { v = "1.0.0-beta.142", date = "2026-11-18", items = {
     { s = "add", fr = { "Signaler un bug ou une idée depuis le jeu, sans compte", "Tape /wlh bug ou /wlh idee suivi de ton message (exemple : /wlh bug la flèche reste affichée quand je décoche). Le message part tout seul à l'équipe WL Helper par le canal de la guilde. Il emporte ce qu'il faut pour comprendre le problème :" }, en = { "", "" } },
     { s = "add", fr = { "", "la version de l'addon et la langue du jeu ;" }, en = { "", "" } },
@@ -69,8 +72,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.129", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, retour au cadavre", "Mort et libéré (fantôme), la flèche t'emmène à ton cadavre (« Ton cadavre »). Une fois ressuscité, elle reprend l'étape du guide ou le trajet que tu suivais. Ça marche aussi après un /reload en fantôme." }, en = { "GPS", "As a ghost, the arrow takes you to your corpse, then back to the step or trip you followed." } },
-  } },
-  { v = "1.0.0-beta.128", date = "2026-11-18", items = {
-    { s = "fix", fr = { "GPS, la tour de l'archimage Xylem (Azshara)", "Aucun chemin ne monte en haut de sa tour, et la flèche partait dans les falaises. Elle t'envoie maintenant à Sanath Lim-yo, au pied de la tour (28.1, 50.1) : parle-lui, il te téléporte en haut. Une fois en haut, la flèche passe à Xylem. Les étapes des quêtes de mage de Xylem le disent aussi." }, en = { "GPS", "Archmage Xylem's tower has no path up: the arrow goes to Sanath Lim-yo at its foot, who teleports you up." } },
   } },
 }
