@@ -596,7 +596,10 @@ local function Caster(level, race, cls, o)
     w.hit = pct * HitValue(level, true, hitHave) / 10
     w.haste = pct * (o.haste or 0.8) / 10
     w.spi = (o.spi or 0.1) * (race == "Human" and 1.1 or 1)
+    -- WL Helper change (beta.156): 1 mana per 5 s is ~24 mana over a 2-minute fight, more than the
+    -- 15 of 1 Intellect: worth 1.6 times Intellect's mana (it was a flat 0.25, under Intellect)
     w.mp5 = o.mp5 or 0.25
+    if not o.mp5 and not opts.neutral then w.mp5 = math.max(0.25, manaVal * 1.6) end
     w.sta = LevelingSta(level, o.sta or 0.15, 0.4)
     -- Spell penetration matters against raid bosses; leveling mobs barely resist.
     w.spen = o.spen or (level >= 58 and 0.3 or 0.05)

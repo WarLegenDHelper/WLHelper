@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.156] — 2026-11-18
+
+### Corrigé / Fixed
+- **Vue moderne, guide terminé** : la vue disparaissait à la fin d'un guide et on ne pouvait plus choisir de guide. Elle affiche maintenant « Guide terminé ! » avec le lien « Choisir un guide » (et la flèche ‹ pour revoir la dernière étape). Sans aucun guide chargé : « Aucun guide en cours » avec le même lien.
+  *Modern view: a finished guide (or none loaded) shows a card with "Pick a guide" instead of vanishing.*
+- **Améliorations, bijoux** : un bijou à +9 Endurance s'affichait « +125 % » face à Theka's Last Breath, parce que ce dernier ne vaut presque rien en stats (sa valeur est son effet « Utiliser : »). Face à un objet sans presque aucune stat, l'écart est donné en points (« Presque pareil », ou l'écart réel). La ligne « Remplace » nomme le bijou vraiment comparé, et une ligne rappelle que les effets « Utiliser : » ne sont pas comptés.
+  *Upgrades: no huge percent next to an item with almost no stats; "Replaces" names the trinket really compared; a note that "Use:" effects are not counted.*
+- **Régénération de mana** : pour les lanceurs de sorts (mage, démoniste, prêtre ombre...), 1 mana toutes les 5 s valait moins que 1 Intelligence, alors qu'elle rend plus de mana sur un combat. Elle vaut maintenant environ 1,6 fois le mana de l'Intelligence.
+  *Mana per 5 s for casters is worth about 1.6 times Intellect's mana (it was below Intellect).*
+
 ## [1.0.0-beta.155] — 2026-11-18
 
 ### Corrigé / Fixed

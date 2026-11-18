@@ -158,10 +158,17 @@ end
 -- (nil when there is no route or the route is done).
 function TR.Model()
   local steps = ns.route and ns.route.steps
-  if not (steps and #steps > 0 and ns.CurrentStepIndex) then return nil end
+  -- no guide, or every step done: a card that says so with the way to the next guide, never an
+  -- empty screen (report: "I finished a guide in the modern view and the guide picker is gone")
+  if not (steps and #steps > 0 and ns.CurrentStepIndex) then
+    return { finished = true, none = true, title = L.TR_NONE_T, stepN = 1, stepTotal = nil }
+  end
   local log = ns.LogEntries()
   local idx, st = ns.CurrentStepIndex(log)
-  if not (idx and st) then return nil end
+  if not (idx and st) then
+    if not TR.browse then return { finished = true, idx = #steps + 1, stepN = #steps + 1, pct = 100, title = L.TR_DONE_T } end
+    idx, st = #steps + 1, nil                     -- past the end: the step browsed back to below
+  end
   -- the step browsed with the header's arrows (TR.browse), else the current one
   local curIdx = idx
   if TR.browse then
@@ -331,7 +338,7 @@ TR._Rich = Rich
 local function Links(m)
   local dk = m and m.dk
   local out = {
-    { L.TR_L_PICK, function() if ns.ShowPicker then ns.ShowPicker() end end },
+    { (m and m.finished) and L.TR_M_PICK or L.TR_L_PICK, function() if ns.ShowPicker then ns.ShowPicker() end end },
   }
   if dk and ns.ShowOverview then out[#out + 1] = { L.TR_L_OVERVIEW, function() ns.ShowOverview(dk) end } end
   if dk and ns.ToggleBosses then out[#out + 1] = { L.TR_L_BOSSES, function() ns.ToggleBosses(dk) end } end
@@ -642,9 +649,11 @@ local function Wanted()
   if ns.GuideOn and not ns.GuideOn() then return false end
   -- one view at a time: the small tracker while you play, the big guide window when you open it
   if ns.frame and ns.frame:IsShown() then return false end
-  return ns.route ~= nil and ns.route.steps ~= nil and #ns.route.steps > 0
+  -- no guide loaded: still on, to offer the guide picker (TR.Model's "finished" card)
+  return true
 end
 
+local PlaceLinks
 -- Draws the model; the tracker's height follows its content.
 local function Draw(m)
   local head = f.head
@@ -692,6 +701,17 @@ local function Draw(m)
     for _, r in ipairs(f.nexts) do r:Hide() end
   end
   if collapsed then hideBody(); f:SetHeight(y) return end
+  -- the guide is over (or none is loaded): a line, then the links (the guide picker first)
+  if m.finished then
+    hideBody()
+    f.stepLabel:SetText(m.none and L.TR_NONE_SUB or L.TR_DONE_SUB)
+    if ns.Shadow then ns.Shadow(f.stepLabel, f.frameless) end
+    f.stepLabel:ClearAllPoints(); f.stepLabel:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -(y + 8)); f.stepLabel:SetWidth(W - PAD * 2)
+    f.stepLabel:Show()
+    y = y + 8 + TextH(f.stepLabel, F.meta) + 8
+    f:SetHeight(PlaceLinks(m, y) + 8)
+    return
+  end
   -- the current step's card: "ÉTAPE 8 · AVANT LE DONJON" in orange, then the action
   local cardTop = y + 4
   y = cardTop + CARD_PAD
@@ -844,7 +864,11 @@ local function Draw(m)
   f.progText:SetText((m.pct or 0) .. " %")
   f.progText:ClearAllPoints(); f.progText:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -y); f.progText:Show()
   y = y + 14
-  -- the links, on one line (two when they do not fit)
+  f:SetHeight(PlaceLinks(m, y) + 8)
+end
+
+-- the links, on one line (two when they do not fit), from y; -> the y under them
+PlaceLinks = function(m, y)
   y = y + 6
   local x, used = PAD, 0
   for k, it in ipairs(Links(m)) do
@@ -861,8 +885,7 @@ local function Draw(m)
     used = k
   end
   for k = used + 1, #f.links do f.links[k]:Hide() end
-  y = y + 18
-  f:SetHeight(y + 8)
+  return y + 18
 end
 
 function TR.Refresh()

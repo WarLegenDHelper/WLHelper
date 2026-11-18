@@ -65,6 +65,9 @@ ns.AddEnglish({
     ["Presque pareil (%s)"] = "About the same (%s)",
     ["Seulement ~%d %s d'écart : garde celui que tu préfères."] = "Only ~%d %s apart: keep the one you like.",
     ["Écart réel : ~%d %s seulement."] = "Real gap: only ~%d %s.",
+    ["Presque pareil"] = "About the same",
+    ["Écart réel : ~%d %s (l'objet remplacé n'a presque pas de stats)."] = "Real gap: ~%d %s (the item replaced has almost no stats).",
+    ["Bijou : les effets « Utiliser : » ne sont pas comptés, seulement les stats."] = "Trinket: \"Use:\" effects are not counted, only the stats.",
     ["de puissance des sorts"] = "spell power",
     ["de soins"] = "healing",
     ["de puissance d'attaque"] = "attack power",
@@ -534,7 +537,16 @@ local function InsteadOf(tip, link)
     local equipLoc = select(9, ((C_Item and C_Item.GetItemInfo) or GetItemInfo)(link))
     local slots = equipLoc and W.SLOTS[equipLoc]
     if not slots then return end
-    local slot = (#slots == 1 and slots[1]) or select(2, W.Gain(link))
+    local slot = (#slots == 1 and slots[1]) or nil
+    if not slot and UseGF() then
+        local G = Gear()
+        if G then
+            SyncGearSpec(G)
+            local ok, res = pcall(G.Compare, link)
+            if ok and type(res) == "table" and type(res.slot) == "number" then slot = res.slot end
+        end
+    end
+    slot = slot or select(2, W.Gain(link))
     if not slot then return end
     local list = { slot }
     if equipLoc == "INVTYPE_2HWEAPON" and GetInventoryItemLink("player", 17) then list[#list + 1] = 17 end
@@ -544,6 +556,10 @@ local function InsteadOf(tip, link)
         if cur and tex then
             tip:AddLine(L("Remplace") .. " |T" .. tex .. ":14:14:0:-1:64:64:5:59:5:59|t " .. cur, GREY[1], GREY[2], GREY[3])
         end
+    end
+    -- a trinket is mostly its effect, which the percent does not see
+    if equipLoc == "INVTYPE_TRINKET" then
+        tip:AddLine(L("Bijou : les effets « Utiliser : » ne sont pas comptés, seulement les stats."), GREY[1], GREY[2], GREY[3], true)
     end
 end
 
@@ -715,12 +731,17 @@ local function NearTie(link)
     local ok, res = pcall(G.Compare, link)
     if not ok or type(res) ~= "table" or res.empty or res.equipped or not res.pct
         or type(res.score) ~= "number" or type(res.old) ~= "number" or res.old <= 0 then return nil end
-    if math.abs(res.pct) >= 25 then return nil end
     local okW, wt = pcall(G.Weights)
     if not okW or type(wt) ~= "table" or type(wt.stats) ~= "table" then return nil end
     for _, k in ipairs({ "sp", "heal", "ap", "sta" }) do
         if wt.stats[k] == 1 then
             local pts = math.abs(res.score - res.old)
+            -- the worn item is worth a few points only (a trinket whose worth is its "Use:"
+            -- effect: Theka's Last Breath, 6 mana per 5 s): any gap is a huge percent, so the
+            -- points say it (report: "+125 % with no stat at all")
+            local small = res.old < NEAR[k] * 1.5
+            if small then return pts, L(NEAR_WORD[k]), true, k end
+            if math.abs(res.pct) >= 25 then return nil end
             if pts <= NEAR[k] then return pts, L(NEAR_WORD[k]) end
             return nil
         end
@@ -732,8 +753,17 @@ WP.UpgradeNearTie = NearTie
 -- it; unchanged and nil otherwise (v: the percent, WL Helper Gear judging)
 local function Near(link, v, text, col)
     if type(v) ~= "number" or math.abs(math.floor(v + 0.5)) < 1 then return text, col end
-    local ok, pts, word = pcall(NearTie, link)
+    local ok, pts, word, small, key = pcall(NearTie, link)
     if not ok or not pts then return text, col end
+    local n = math.max(1, math.floor(pts + 0.5))
+    if small then
+        -- next to an item with almost no stats a percent means nothing: a few points are a tie,
+        -- more stay a gain or a loss with the points under it
+        if pts <= (NEAR[key] or 5) then
+            return L("Presque pareil"), GREY, string.format(L("Seulement ~%d %s d'écart : garde celui que tu préfères."), n, word)
+        end
+        return text, col, string.format(L("Écart réel : ~%d %s (l'objet remplacé n'a presque pas de stats)."), n, word)
+    end
     -- 10 % and more stays a gain or a loss in its colour (a +12 % belt is an upgrade, even when its
     -- 2 spell power are few): the grey line under it says how small the gap really is
     if math.abs(v) >= 10 then
