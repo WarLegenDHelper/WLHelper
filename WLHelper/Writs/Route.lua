@@ -2280,6 +2280,31 @@ end
 -- Shortest Path's route under our arrow (provider "spf", spfOurArrow): where its guidance points now (the
 -- next bend, flight master or dock), its legs' own words and the time left. Read 5 times a second at most.
 local spfRead, spfAt = nil, -1
+-- A cast leg of Shortest Path's route, by its words (its API gives no spell or item): the Hearthstone,
+-- Astral Recall or a teleport we know; our cast button then shows as on our own route (report: "it
+-- does not offer my Hearthstone with Shortest Path's GPS, no button").
+local NOT_CAST = { walk = true, flight = true, boat = true, zeppelin = true, both = true, time = true }
+local function SPFCast(l)
+    if type(l) ~= "table" or type(l.text) ~= "string" or NOT_CAST[l.mode or ""] then return nil end
+    local low = l.text:lower()
+    local function Has(n) return type(n) == "string" and n ~= "" and not IsSecret(n) and low:find(n:lower(), 1, true) ~= nil end
+    local function SpellName(id)
+        local n = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(id)
+        if not n and GetSpellInfo then n = GetSpellInfo(id) end
+        return n
+    end
+    local stone = (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(HEARTH_ITEM)) or (GetItemInfo and GetItemInfo(HEARTH_ITEM))
+    if Has(stone) or Has("Hearthstone") or Has("pierre de foyer") then
+        return { kind = "hearth", item = HEARTH_ITEM, to = { name = "" }, spf = true }
+    end
+    if Has(SpellName(ASTRAL_RECALL)) then return { kind = "hearth", spell = ASTRAL_RECALL, to = { name = "" }, spf = true } end
+    for _, t in ipairs(TELEPORTS) do
+        if Has(SpellName(t.spell)) then
+            return { kind = "teleport", to = { spell = t.spell, name = t.name, portal = t.portal, rune = t.rune }, spf = true }
+        end
+    end
+end
+GPS._SPFCast = SPFCast
 local function SPFNow()
     local map, mx, my = PlayerMapPos()
     local cont, px, py
@@ -2301,13 +2326,14 @@ local function SPFNow()
                 legs[#legs + 1] = { mode = l.mode, text = l.text, seconds = l.seconds }
             end
         end
-        spfRead = { target = target, legs = legs, left = j and tonumber(j.secondsLeft) or nil, guided = target ~= nil }
+        spfRead = { target = target, legs = legs, left = j and tonumber(j.secondsLeft) or nil, guided = target ~= nil,
+            cast = SPFCast(legs[1]) }
         spfAt = t
     end
     local dest = state.dest
     local target = spfRead.target or dest
     local dDest = DistFrom(cont, px, py, dest)
-    now.leg, now.legs, now.eta = nil, nil, spfRead.left
+    now.leg, now.legs, now.eta = spfRead.cast, nil, spfRead.left
     now.target, now.dist = target, DistFrom(cont, px, py, target)
     now.dest, now.source = dest, state.source
     now.arrived = dDest ~= nil and dDest < NEAR
@@ -2411,6 +2437,7 @@ end
 
 -- The first leg when it is cast (a teleport, the Hearthstone, Astral Recall), else nil.
 function GPS.TeleportLeg()
+    if state.spfView then return spfRead and spfRead.cast or nil end
     local leg = state.legs and state.legs[1]
     return leg and (leg.kind == "teleport" or leg.kind == "hearth") and leg or nil
 end

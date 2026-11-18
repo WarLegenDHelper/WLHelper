@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.134] — 2026-11-18
+
+### Corrigé / Fixed
+- **GPS avec Shortest Path, le bouton de la pierre de foyer** : quand le trajet de Shortest Path commence par ta pierre de foyer, Rappel astral ou une téléportation de mage, notre flèche affiche maintenant le bouton pour la lancer, comme sur notre propre trajet. La ligne d'en dessous dit la suite (« Puis Walk to Grom'gol... »). Shortest Path ne donne pas le sort par son API : WL Helper le reconnaît au texte de l'étape.
+  *GPS with Shortest Path's route: the Hearthstone, Astral Recall or a mage teleport gets our cast button.*
+
 ## [1.0.0-beta.133] — 2026-11-18
 
 ### Ajouté / Added

@@ -426,7 +426,7 @@ local function Draw(self, now, combat)
         local w = now.dest and now.dest.writ
         where = w and w.npcName and string.format(L("Parle à %s"), w.npcName) or (now.dest and now.dest.name) or ""
         route = (w and w.item and WP.ItemName(w.item, w.itemName)) or (w and w.itemName) or ""
-    elseif now.spf then
+    elseif now.spf and not (castLeg and kind) then
         -- Shortest Path's route under our arrow: its legs in its own words, the arrow on its next point
         if SetVisual(self, "arrow") then changed = true end
         self.turn = true
@@ -449,6 +449,14 @@ local function Draw(self, now, combat)
         elseif castNote and Clock() < castNoteUntil then what = castNote
         else what = CastWhat(kind, id, leg) end
         where = Place(leg.to and leg.to.name)
+        -- Shortest Path's cast: what comes after, in its words
+        if now.spf then
+            local sl = now.spf.legs
+            if sl[2] then where = GPS.UpperFirst(string.format(L("puis %s"), sl[2].text)) end
+            local rest = {}
+            for i = 3, math.min(#sl, 5) do rest[#rest + 1] = sl[i].text end
+            route = table.concat(rest, GPS.SEP or " > ")
+        end
         if combat then dist = S.Hex(C.warn) .. L("La téléportation attend la fin du combat.") .. "|r" end
     elseif leg and leg.kind == "fly" then
         if SetVisual(self, "painted", FlyIcon()) then changed = true end
