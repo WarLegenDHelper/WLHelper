@@ -290,6 +290,9 @@ local function Sections(tab)
         if route and nq > 0 then badge = L("Ta route") .. "  ·  " .. string.format(L("Tes quêtes : %d"), nq)
         elseif route then badge = L("Ta route")
         elseif nq > 0 then badge = string.format(L("Tes quêtes : %d"), nq) end
+        -- what it has for your gear: after the route and the quests ("Ta route · 3 BiS")
+        local gtxt = root.DungeonGearText and root.DungeonGearText(k, true)
+        if gtxt then badge = badge and (badge .. "  ·  " .. gtxt) or gtxt end
         if not matched then badge, bcol = L("Pas dans la recherche de groupe du jeu"), C.muted end
         local it = {
             name = e[2], lvl = Levels(e[3], e[4]), badge = badge, badgeColor = bcol,

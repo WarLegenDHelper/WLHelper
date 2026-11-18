@@ -777,6 +777,8 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "idee" or cmd == "idea" or cmd == "bug" then if WP and WP.Feedback then WP.Feedback(cmd == "bug" and "bug" or "idea") end
   elseif cmd == "textes" or cmd == "texts" or cmd == "truncated" then ns.DebugTexts(arg)
   elseif cmd == "share" then ns.ShareQuests()
+  elseif cmd == "farm" or cmd == "stuff" or cmd == "gear" or cmd == "equipement" then
+    if ns.GearPlanPrint then ns.GearPlanPrint() end
   elseif cmd == "taille" or cmd == "scale" or cmd == "size" then
     -- "/wlh taille 90", "/wlh taille +", "/wlh taille -"
     local v = arg

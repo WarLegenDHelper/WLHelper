@@ -662,6 +662,9 @@ local function FillCard(c, k, sec, advised)
   else
     st:Body(dateTop and (L.PICK_SOON .. " · " .. date(L.PICK_DATE, d.up)) or L.PICK_NOQ, later and T.muted or T.text)
   end
+  -- what it has for your gear (Naowh's BiS, WL Helper's upgrades): one gold line
+  local gtxt = ns.DungeonGearText and ns.DungeonGearText(k)
+  if gtxt then st:Body(gtxt, T.gold) end
   local bandH = BAND_PAD + st:End() + BAND_PAD
   c.body:SetHeight(bandH)
   c.bandH, c.topH = bandH, topH

@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.136] — 2026-11-18
+
+### Ajouté / Added
+- **Quel donjon farmer pour ton équipement** : chaque donjon compte ce que son butin a pour toi. D'abord les objets de ta liste BiS de Naowh (1er et 2e choix), puis les améliorations d'au moins 5 % selon WL Helper (cap de toucher, défense, montée de niveau). Les objets que tu as déjà (portés, sacs, banque) et ceux à plus de 4 niveaux au-dessus de toi ne comptent pas. Ça s'affiche en doré sur les cartes du choix de donjon du guide (« 3 BiS pour toi · 2 améliorations ») et sur celles de Trouver un groupe (« Ta route · 3 BiS »). `/wlh farm` donne dans le chat les 5 meilleurs donjons à ton niveau. Le décompte se refait quand ton équipement, tes sacs, ton niveau ou ta liste Naowh changent.
+  *Which dungeon to farm: each dungeon counts your Naowh BiS picks and WL Helper's upgrades of 5 % or more in its loot; shown on the dungeon cards, and /wlh farm lists the best 5.*
+
 ## [1.0.0-beta.135] — 2026-11-18
 
 ### Ajouté / Added

@@ -671,6 +671,109 @@ function ns.BossLoot(dkey, en, npcIds)
   return out
 end
 
+-- ---------------------------------------------------------------- what a dungeon has for your gear
+-- Which dungeon to farm (report: "a gearing guide, which dungeon to farm for my BiS"): every boss's
+-- loot of a dungeon (BOSS_LOOT), counted for you. bis: Naowh's BiS list ranks it 1 for your spec,
+-- alt: its 2nd pick (ns.BisBadge, Naowh read live, nothing copied); up: not on its list, but WL
+-- Helper's own gear check (hit and defense caps, leveling) calls it an upgrade of GEAR_MIN % or more.
+-- Owned items (worn, bags, bank) and items you are GEAR_LEVELS levels or more from wearing do not
+-- count. -> { bis, alt, up, total } (total: bis + alt + up). Kept until your gear, bags, level or
+-- Naowh's list change; an item not loaded yet leaves the count open (asked again next time).
+do
+local GEAR_MIN, GEAR_LEVELS = 5, 4
+local gearCache = {}
+local function GearReset() wipe(gearCache) end
+ns.DungeonGearReset = GearReset
+do
+  local gf = CreateFrame("Frame")
+  for _, e in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "PLAYER_LEVEL_UP", "PLAYER_SPECIALIZATION_CHANGED", "CHARACTER_POINTS_CHANGED" }) do
+    pcall(gf.RegisterEvent, gf, e)
+  end
+  gf:SetScript("OnEvent", GearReset)
+end
+local naowhHooked = false
+function ns.DungeonGear(k)
+  if not naowhHooked then
+    local WP = ns.Writs and ns.Writs.WP
+    local NB = WP and WP.NaowhBiS
+    if NB and NB.OnChange then naowhHooked = true; pcall(NB.OnChange, GearReset) end
+  end
+  local c = gearCache[k]
+  if c then return c end
+  local r = { bis = 0, alt = 0, up = 0, total = 0 }
+  local loot = ns.BOSS_LOOT and ns.BOSS_LOOT[k]
+  if type(loot) ~= "table" then gearCache[k] = r; return r end
+  local WP = ns.Writs and ns.Writs.WP
+  local lv = (UnitLevel and UnitLevel("player")) or 1
+  local open, seen = false, {}
+  for _, ids in pairs(loot) do
+    for _, id in ipairs(type(ids) == "table" and ids or {}) do
+      if not seen[id] then
+        seen[id] = true
+        if not (ns.OwnsItem and ns.OwnsItem(id)) then
+          local okI, _, link, _, _, minLv, _, _, _, equipLoc = pcall(ns.ItemInfo, id)
+          if not (okI and link) then
+            open = true
+            if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
+          elseif type(equipLoc) == "string" and equipLoc ~= "" and not (type(minLv) == "number" and minLv > lv + GEAR_LEVELS) then
+            local rk
+            if ns.BisBadge then local okB, x = pcall(ns.BisBadge, link); if okB then rk = x end end
+            if rk == 1 then r.bis = r.bis + 1
+            elseif rk == 2 then r.alt = r.alt + 1
+            elseif WP and WP.UpgradeCheck then
+              local okU, u = pcall(WP.UpgradeCheck, link)
+              if okU and type(u) == "table" and u.up and (u.n or 0) >= GEAR_MIN then r.up = r.up + 1 end
+            end
+          end
+        end
+      end
+    end
+  end
+  r.total = r.bis + r.alt + r.up
+  if not open then gearCache[k] = r end
+  return r
+end
+-- "3 BiS pour toi · 2 améliorations", or nil when there is nothing for you
+function ns.DungeonGearText(k, short)
+  local g = ns.DungeonGear(k)
+  if not g or g.total == 0 then return nil end
+  local parts = {}
+  local nb = g.bis + g.alt
+  if nb > 0 then parts[#parts + 1] = ns.Plural(nb, short and "GEAR_BIS1_S" or "GEAR_BIS1", short and "GEAR_BIS_S" or "GEAR_BIS", nb) end
+  if g.up > 0 then parts[#parts + 1] = ns.Plural(g.up, "GEAR_UP1", "GEAR_UP", g.up) end
+  return table.concat(parts, "  ·  ")
+end
+-- The dungeons to farm for your gear, best first: { { key, gear }, ... } (n at most; BiS first, then
+-- every upgrade; dungeons far above your level left out)
+function ns.GearPlan(n)
+  local out = {}
+  local lv = (UnitLevel and UnitLevel("player")) or 1
+  for _, k in ipairs(ns.ORDER or {}) do
+    local d = ns.D[k]
+    if d and not d.raid and d.lvl and (d.lvl[1] or 1) <= lv + GEAR_LEVELS then
+      local g = ns.DungeonGear(k)
+      if g.total > 0 then out[#out + 1] = { key = k, gear = g } end
+    end
+  end
+  table.sort(out, function(a, b)
+    local ab, bb = a.gear.bis * 3 + a.gear.alt * 2 + a.gear.up, b.gear.bis * 3 + b.gear.alt * 2 + b.gear.up
+    if ab ~= bb then return ab > bb end
+    return a.key < b.key
+  end)
+  if n then for i = #out, n + 1, -1 do out[i] = nil end end
+  return out
+end
+-- /wlh farm: the plan in the chat
+function ns.GearPlanPrint()
+  local plan = ns.GearPlan(5)
+  if #plan == 0 then ns.Print(L.GEAR_NONE); return end
+  ns.Print(L.GEAR_HEAD)
+  for i, e in ipairs(plan) do
+    ns.Print(string.format("%d. %s : %s", i, ns.DName(e.key), ns.DungeonGearText(e.key) or ""))
+  end
+end
+end
+
 -- ---------------------------------------------------------------- the dungeon you are in
 local function DungeonHere()
   if not ns.InstanceKeys then return nil end
