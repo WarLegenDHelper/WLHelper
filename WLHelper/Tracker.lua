@@ -848,7 +848,14 @@ function TR.Compact()
   local first = WLDTDB.tracker ~= true
   WLDTDB.tracker = true
   WLDTDB.trackerCollapsed = nil
-  if ns.frame and ns.frame:IsShown() then ns.frame:Hide() end
+  -- the window gives way, but the guide stays open (its arrow too): not a "closed" hide
+  if ns.frame and ns.frame:IsShown() then
+    local q = ns.quietHide
+    ns.quietHide = true
+    ns.frame:Hide()
+    ns.quietHide = q
+  end
+  WLDTDB.hidden = false
   TR.Refresh()
   if first and L.TR_COMPACT then ns.Print(L.TR_COMPACT) end
 end
@@ -856,6 +863,11 @@ end
 function TR.SetShown(on)
   if not WLDTDB then return end
   WLDTDB.tracker = on and true or false
+  -- hidden from its menu: the guide is closed, as with the window's close button (its arrow too)
+  if not on and not (ns.frame and ns.frame:IsShown()) then
+    WLDTDB.hidden = true
+    if ns.SetArrow then ns.SetArrow(nil) end
+  end
   TR.Refresh()
 end
 

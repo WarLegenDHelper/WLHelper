@@ -1163,7 +1163,10 @@ local function HookOpenMap()
     if type(O) ~= "table" or type(O.RegisterCallback) ~= "function" then return end
     openMapHooked = true
     local function redraw() pcall(Trail.RefreshMap) end
-    pcall(O.RegisterCallback, "WLHelperTrail", "OpenMap_ViewChanged", redraw)
+    -- its view signal comes every frame while it glides: 5 redraws a second at most, the last one
+    -- once it stops (root.Throttle; report: "M and L freeze the game with OpenMap")
+    local view = root.Throttle and root.Throttle(redraw, 0.2, "trailOpenMap") or redraw
+    pcall(O.RegisterCallback, "WLHelperTrail", "OpenMap_ViewChanged", view)
     pcall(O.RegisterCallback, "WLHelperTrail", "OpenMap_StitchedChanged", redraw)
 end
 local hooked = false

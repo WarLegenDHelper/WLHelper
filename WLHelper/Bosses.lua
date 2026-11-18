@@ -679,8 +679,9 @@ end
 -- map it was turned to, within REOPEN_WINDOW seconds of the map opening. Naowh's own function, called
 -- as its panel calls it; nothing of it is changed or copied.
 do
-  local REOPEN_WINDOW = 1.0
-  local openedAt, relaid, lastDungeon = nil, false, nil
+  -- OpenMap (its dungeon maps off) turns the map outside more than once while it opens
+  local REOPEN_WINDOW, REOPEN_MAX = 2.5, 3
+  local openedAt, relaid, lastDungeon = nil, 0, nil
   local function Journal()
     local n = rawget(_G, "NaowhForever")
     local J = type(n) == "table" and n.Journal
@@ -698,15 +699,16 @@ do
   local function Relay()
     local J = Journal()
     if not (J and lastDungeon and WorldMapFrame and WorldMapFrame:IsShown()) then return end
-    pcall(J.ShowMapOnWorldMap, lastDungeon)
+    if ns.PerfRun then ns.PerfRun("naowhRelay", function() pcall(J.ShowMapOnWorldMap, lastDungeon) end)
+    else pcall(J.ShowMapOnWorldMap, lastDungeon) end
     -- the window may still be taking its size (L opens it with the quest log beside the map): the map
     -- is fitted again once it has (report: "L shows the dungeon map tiny in the middle")
     if C_Timer and C_Timer.After then C_Timer.After(0.1, Fit); C_Timer.After(0.4, Fit) end
   end
   local function MapChanged()
-    if relaid or not openedAt or GetTime() - openedAt > REOPEN_WINDOW then return end
+    if relaid >= REOPEN_MAX or not openedAt or GetTime() - openedAt > REOPEN_WINDOW then return end
     if not (lastDungeon and Inside()) then return end
-    relaid = true
+    relaid = relaid + 1
     if C_Timer and C_Timer.After then C_Timer.After(0, Relay) else Relay() end
   end
   local hooked = false
@@ -717,7 +719,15 @@ do
     hooked = true
     -- the dungeon its map was last laid with (nil: taken off)
     hooksecurefunc(J, "ShowMapOnWorldMap", function(d) if d then lastDungeon = d end end)
-    WorldMapFrame:HookScript("OnShow", function() openedAt, relaid = GetTime(), false end)
+    WorldMapFrame:HookScript("OnShow", function()
+      openedAt, relaid = GetTime(), 0
+      -- how long the opening froze, all addons together: from here to the next frame (WLWritsDB.perf.mapOpen)
+      local clock = debugprofilestop
+      if clock and C_Timer and C_Timer.After and ns.PerfNote then
+        local t0 = clock()
+        C_Timer.After(0, function() ns.PerfNote("mapOpen", clock() - t0) end)
+      end
+    end)
     if WorldMapFrame.OnMapChanged then hooksecurefunc(WorldMapFrame, "OnMapChanged", MapChanged) end
     return true
   end

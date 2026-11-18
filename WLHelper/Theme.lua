@@ -1280,6 +1280,48 @@ function ns.SetWindowScale(v)
   return v
 end
 
+-- ns.PerfRun(tag, fn, ...): runs fn and keeps how long it took in WLWritsDB.perf[tag] ({ n, total,
+-- max, last } in ms, debugprofilestop), so a freeze can be read from the saved variables (report: "M
+-- and L freeze the game"). ns.PerfNote(tag, ms) keeps a time measured elsewhere.
+function ns.PerfNote(tag, dt)
+  local db = WLWritsDB
+  if type(db) ~= "table" or type(dt) ~= "number" then return end
+  db.perf = type(db.perf) == "table" and db.perf or {}
+  local p = db.perf[tag]
+  if type(p) ~= "table" then p = { n = 0, total = 0, max = 0 }; db.perf[tag] = p end
+  p.n = p.n + 1; p.total = p.total + dt; p.last = math.floor(dt * 10 + 0.5) / 10
+  if dt > p.max then p.max = math.floor(dt * 10 + 0.5) / 10 end
+end
+-- ns.Throttle(fn, gap, tag) -> a function that runs fn at most once every `gap` seconds: the first
+-- call at once, the calls in between folded into one more run when the gap is over (OpenMap's view
+-- signal comes every frame while it glides; WL Helper redrew its map lines each time: a freeze on M
+-- and L with OpenMap on). tag: timed in WLWritsDB.perf.
+function ns.Throttle(fn, gap, tag)
+  local last, waiting = -1e9, false
+  local function run()
+    last = (GetTime and GetTime()) or 0
+    if tag and ns.PerfRun then ns.PerfRun(tag, function() pcall(fn) end) else pcall(fn) end
+  end
+  return function()
+    local now = (GetTime and GetTime()) or 0
+    if now - last >= gap then run(); return end
+    if waiting then return end
+    waiting = true
+    if C_Timer and C_Timer.After then
+      C_Timer.After(math.max(0.01, gap - (now - last)), function() waiting = false; run() end)
+    else waiting = false; run() end
+  end
+end
+
+function ns.PerfRun(tag, fn, ...)
+  local clock = debugprofilestop
+  if not clock then return fn(...) end
+  local t0 = clock()
+  local a, b = fn(...)
+  ns.PerfNote(tag, clock() - t0)
+  return a, b
+end
+
 function ns.RegisterWindow(f)
   if not f then return end
   f.wlOwned = true

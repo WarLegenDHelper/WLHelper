@@ -2,6 +2,11 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.150", date = "2026-11-18", items = {
+    { s = "fix", fr = { "Gros freeze en ouvrant la carte (M) ou le journal (L) avec OpenMap", "OpenMap envoie son signal « la vue a bougé » à chaque image pendant son animation d'ouverture, et WL Helper redessinait à chaque fois tous ses tracés sur la carte (zones de monstres, chemins, points). Il redessine maintenant au plus 5 fois par seconde, plus une dernière fois quand la vue s'arrête. Les temps passés sont notés dans les sauvegardes, pour mesurer s'il reste un freeze." }, en = { "Big freeze on M / L with OpenMap", "Its view signal comes every frame while it glides; WL Helper's map lines are now redrawn 5 times a second at most (and once when it stops)." } },
+    { s = "fix", fr = { "Chaque /reload remettait la fenêtre classique", "Le guide revient maintenant dans la vue moderne (quand c'est la vue par défaut) après un /reload, un écran de chargement ou l'entrée dans un donjon. Passer en vue moderne ne compte plus comme « guide fermé », ce qui pouvait aussi couper la flèche GPS. « Masquer la vue moderne » ferme vraiment le guide." }, en = { "A /reload now brings the modern view back; switching to it no longer counts as closing the guide (which could stop the GPS arrow).", "" } },
+    { s = "fix", fr = { "La carte du donjon de Naowh avec OpenMap", "OpenMap remet la carte extérieure parfois plusieurs fois pendant l'ouverture. La carte de Naowh est maintenant remise jusqu'à 3 fois dans les 2,5 secondes qui suivent." }, en = { "Naowh's dungeon map is laid again up to 3 times within 2.5 s of the map opening (OpenMap turns it outside more than once).", "" } },
+  } },
   { v = "1.0.0-beta.149", date = "2026-11-18", items = {
     { s = "add", fr = { "Accueil, un groupe « Retours »", "" }, en = { "", "" } },
     { s = "add", fr = { "« Nous écrire »", ", pour tous : « Un bug, une idée, une suggestion : sans compte ». Le choix du formulaire devient « Une idée ou suggestion »." }, en = { "", "" } },
@@ -100,8 +105,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.136", date = "2026-11-18", items = {
     { s = "add", fr = { "Quel donjon farmer pour ton équipement", "Chaque donjon compte ce que son butin a pour toi. D'abord les objets de ta liste BiS de Naowh (1er et 2e choix), puis les améliorations d'au moins 5 % selon WL Helper (cap de toucher, défense, montée de niveau). Les objets que tu as déjà (portés, sacs, banque) et ceux à plus de 4 niveaux au-dessus de toi ne comptent pas. Ça s'affiche en doré sur les cartes du choix de donjon du guide (« 3 BiS pour toi · 2 améliorations ») et sur celles de Trouver un groupe (« Ta route · 3 BiS »). /wlh farm donne dans le chat les 5 meilleurs donjons à ton niveau. Le décompte se refait quand ton équipement, tes sacs, ton niveau ou ta liste Naowh changent." }, en = { "Which dungeon to farm", "Each dungeon counts your Naowh BiS picks and WL Helper's upgrades of 5 % or more in its loot; shown on the dungeon cards, and /wlh farm lists the best 5." } },
-  } },
-  { v = "1.0.0-beta.135", date = "2026-11-18", items = {
-    { s = "add", fr = { "GPS avec Shortest Path, tes portails de mage", "Shortest Path ne connaît pas les portails que tu ouvres toi-même (Rune des portails). Quand notre GPS trouve un trajet qui commence par ta téléportation ou ton portail et qui fait gagner au moins 2 minutes sur celui de Shortest Path, la flèche le propose avec le bouton pour le lancer et dit combien tu gagnes (« Plus rapide que le trajet de Shortest Path : ~25 min de moins »). Une fois arrivé, Shortest Path refait son trajet depuis là." }, en = { "GPS with Shortest Path's route", "A mage teleport or portal of ours that saves 2+ minutes is offered with its cast button." } },
   } },
 }

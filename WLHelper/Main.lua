@@ -241,6 +241,19 @@ function ns.StopRoute()
   ns.Print(L.ROUTE_STOPPED)
 end
 
+-- The guide comes back on screen (a /reload, a loading screen, a dungeon entered): the modern view
+-- when it is the default (report: "every reload puts me back on the classic view"), else the window.
+function ns.ShowGuideView()
+  local f = ns.frame
+  local TR = WLHelperTracker
+  if WLDTDB.modernDefault ~= false and ns.route and #(ns.route.steps or {}) > 0 and TR and TR.Compact then
+    TR.Compact()
+  elseif f and not f:IsShown() then
+    f:Show()
+  end
+  WLDTDB.hidden = false
+end
+
 function ns.ResetRoute()
   WLDTDB.manual = {}; WLDTDB.order = nil
   ns.Recalc()
@@ -312,7 +325,7 @@ loading:SetScript("OnEvent", function(_, e)
     C_Timer.After(0.5, function()
       ns.quietHide = nil
       if wasOpen and ns.frame and not ns.frame:IsShown() and WLDTDB and (not ns.GuideOn or ns.GuideOn()) then
-        ns.frame:Show(); WLDTDB.hidden = false
+        ns.ShowGuideView()
         if ns.Refresh then ns.Refresh() end
       end
     end)
@@ -431,7 +444,7 @@ OnInstanceEntry = function()
   if inRoute then
     ns.instOffer = nil
     ns.instIn = inRoute
-    if not f:IsShown() then f:Show(); WLDTDB.hidden = false end
+    if not f:IsShown() then ns.ShowGuideView() end
     ns.Refresh(true)
     local log = ns.LogEntries()
     for i, st in ipairs(ns.route.steps) do
@@ -469,7 +482,7 @@ ev:SetScript("OnEvent", function(_, e)
       if WLDTDB.view then f.view = WLDTDB.view end
       -- at login or /reload the guide comes back only if it was open when you left
       if GuideOn() then
-        if WLDTDB.hidden == false and ns.route and #ns.route.steps > 0 then f:Show() end
+        if WLDTDB.hidden == false and ns.route and #ns.route.steps > 0 then ns.ShowGuideView() end
         ns.Refresh(true)
         if not f:IsShown() then ns.AfterRefresh() end
       end

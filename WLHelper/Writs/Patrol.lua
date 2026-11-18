@@ -667,7 +667,10 @@ local function HookOpenMap()
     if type(O) ~= "table" or type(O.RegisterCallback) ~= "function" then return end
     openMapHooked = true
     local function again() pcall(Patrol.RefreshMap); local Z = Patrol.Zones; if Z then pcall(Z.RefreshMap) end end
-    pcall(O.RegisterCallback, "WLHelperPatrol", "OpenMap_ViewChanged", again)
+    -- its view signal comes every frame while it glides: 5 redraws a second at most, the last one
+    -- once it stops (root.Throttle; report: "M and L freeze the game with OpenMap")
+    local view = root.Throttle and root.Throttle(again, 0.2, "patrolOpenMap") or again
+    pcall(O.RegisterCallback, "WLHelperPatrol", "OpenMap_ViewChanged", view)
     pcall(O.RegisterCallback, "WLHelperPatrol", "OpenMap_StitchedChanged", again)
 end
 

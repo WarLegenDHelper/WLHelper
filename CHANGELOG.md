@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.150] — 2026-11-18
+
+### Corrigé / Fixed
+- **Gros freeze en ouvrant la carte (M) ou le journal (L) avec OpenMap** : OpenMap envoie son signal « la vue a bougé » à chaque image pendant son animation d'ouverture, et WL Helper redessinait à chaque fois tous ses tracés sur la carte (zones de monstres, chemins, points). Il redessine maintenant au plus 5 fois par seconde, plus une dernière fois quand la vue s'arrête. Les temps passés sont notés dans les sauvegardes, pour mesurer s'il reste un freeze.
+  *Big freeze on M / L with OpenMap: its view signal comes every frame while it glides; WL Helper's map lines are now redrawn 5 times a second at most (and once when it stops).*
+- **Chaque /reload remettait la fenêtre classique** : le guide revient maintenant dans la vue moderne (quand c'est la vue par défaut) après un /reload, un écran de chargement ou l'entrée dans un donjon. Passer en vue moderne ne compte plus comme « guide fermé », ce qui pouvait aussi couper la flèche GPS. « Masquer la vue moderne » ferme vraiment le guide.
+  *A /reload now brings the modern view back; switching to it no longer counts as closing the guide (which could stop the GPS arrow).*
+- **La carte du donjon de Naowh avec OpenMap** : OpenMap remet la carte extérieure parfois plusieurs fois pendant l'ouverture. La carte de Naowh est maintenant remise jusqu'à 3 fois dans les 2,5 secondes qui suivent.
+  *Naowh's dungeon map is laid again up to 3 times within 2.5 s of the map opening (OpenMap turns it outside more than once).*
+
 ## [1.0.0-beta.149] — 2026-11-18
 
 ### Ajouté / Added
