@@ -111,6 +111,17 @@ ns.AddEnglish({
     ["Tu n'es pas dans une guilde"] = "You are not in a guild",
     ["Clic : ouvrir la guilde"] = "Click: open the guild",
     ["Aucun événement prévu"] = "No events planned",
+    ["Retours"] = "Feedback",
+    ["Nous écrire"] = "Write to us",
+    ["Un bug, une idée, une suggestion : sans compte"] = "A bug, an idea, a suggestion: no account",
+    ["Clic : écrire à l'équipe WL Helper"] = "Click: write to the WL Helper team",
+    ["Rapports des joueurs"] = "Players' reports",
+    ["Aucun rapport reçu"] = "No report received",
+    ["1 rapport reçu"] = "1 report received",
+    ["%d rapports reçus"] = "%d reports received",
+    ["1 nouveau"] = "1 new",
+    ["%d nouveaux"] = "%d new",
+    ["Clic : lire les rapports"] = "Click: read the reports",
     ["1 joueur cherche un groupe"] = "1 player looking for a group",
     ["%d joueurs cherchent un groupe"] = "%d players looking for a group",
     ["1 événement à venir"] = "1 upcoming event",
@@ -1027,6 +1038,20 @@ local function Refresh()
             lineColor = C.muted,
             line2 = lfgLine or (nEvents > 0 and N(nEvents, "1 événement à venir", "%d événements à venir") or nil),
             hint = L("Clic : ouvrir Groupes") })
+    end
+
+    -- feedback: a bug, an idea, a suggestion, and the reports received (the account that gets them)
+    Put("feedback", "Show2", { title = L("Nous écrire"), line1 = L("Un bug, une idée, une suggestion : sans compte"),
+        lineColor = C.muted, hint = L("Clic : écrire à l'équipe WL Helper") })
+    if WP.Reports and WP.Reports.Counts then
+        local okC, nIn, nNew = pcall(WP.Reports.Counts)
+        if okC then
+            Put("reports", "Show2", { title = L("Rapports des joueurs"),
+                line1 = (nIn or 0) == 0 and L("Aucun rapport reçu") or N(nIn, "1 rapport reçu", "%d rapports reçus"),
+                lineColor = (nNew or 0) > 0 and C.warn or C.muted,
+                line2 = (nNew or 0) > 0 and N(nNew, "1 nouveau", "%d nouveaux") or nil,
+                hint = L("Clic : lire les rapports") })
+        end
     end
 
     -- upgrades: how many bag items are better than what you wear, for which spec

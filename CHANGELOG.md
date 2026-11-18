@@ -6,6 +6,19 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.149] — 2026-11-18
+
+### Ajouté / Added
+- **Accueil, un groupe « Retours »** :
+  - **« Nous écrire »**, pour tous : « Un bug, une idée, une suggestion : sans compte ». Le choix du formulaire devient « Une idée ou suggestion ».
+  - **« Rapports des joueurs »**, seulement sur le compte qui reçoit les rapports : combien en sont arrivés, et les nouveaux en orange. Le clic ouvre la liste dans le jeu, du plus récent au plus ancien : le type (bug, idée, erreur de quête, erreur Lua), l'auteur, la date, la zone, le message, le lien de la capture, l'étape du guide et la pile d'appels des erreurs. `/wlh rapports` l'ouvre aussi.
+
+  *Home gets a "Feedback" group: "Write to us" for everyone, and "Players' reports" (count, new ones, the list in the game) on the account that receives them.*
+
+### Corrigé / Fixed
+- **Vue moderne, une quête qui commence avec un objet que tu n'as pas** : l'Oathstone of Ysera's Dragonflight (après « L'Essence d'Eranikus ») restait proposé dans « Ensuite » même sans l'objet dans les sacs. Il n'apparaît plus tant que l'objet n'y est pas.
+  *Modern view: a quest that starts from an item you do not have is no longer offered as a next action.*
+
 ## [1.0.0-beta.148] — 2026-11-18
 
 ### Ajouté / Added

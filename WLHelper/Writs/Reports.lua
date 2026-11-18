@@ -28,6 +28,10 @@ ns.AddEnglish({
     ["Boîte de réception des rapports : %s"] = "Report inbox: %s",
     ["activée"] = "on",
     ["coupée"] = "off",
+    ["Rapports des joueurs"] = "Players' reports",
+    ["Aucun rapport reçu pour l'instant. Ils arrivent ici quand un joueur utilise « Nous écrire »."] = "No report yet. They come here when a player uses \"Write to us\".",
+    ["Bug"] = "Bug", ["Idée"] = "Idea", ["Erreur de quête"] = "Quest data error", ["Erreur Lua"] = "Lua error",
+    ["nouveau"] = "new", ["Capture : "] = "Screenshot: ", ["Étape : "] = "Step: ",
     ["Envoi automatique des erreurs de WL Helper : %s"] = "Automatic sending of WL Helper's errors: %s",
     ["activé"] = "on",
     ["coupé"] = "off",
@@ -402,6 +406,76 @@ function R.HookErrors()
     end, R)
 end
 
+-- ---------------------------------------------------------------- the inbox, in the game
+-- -> received, not read yet
+function R.Counts()
+    local d = DB()
+    if not d then return 0, 0 end
+    local n, new = 0, 0
+    for _, rec in pairs(d.inbox) do
+        n = n + 1
+        if not rec.read then new = new + 1 end
+    end
+    return n, new
+end
+-- the reports, newest first
+function R.List()
+    local d = DB()
+    local out = {}
+    for _, rec in pairs(d and d.inbox or {}) do out[#out + 1] = rec end
+    table.sort(out, function(a, b) return (tonumber(a.at) or 0) > (tonumber(b.at) or 0) end)
+    return out
+end
+local KIND_LABEL = { bug = "Bug", idea = "Idée", quest = "Erreur de quête", error = "Erreur Lua" }
+local KIND_COLOR = { bug = "warn", idea = "info", quest = "gold", error = "bad" }
+local inboxWin
+function R.ShowInbox()
+    local S, C, F = ns.S, ns.S.C, ns.S.F
+    if not inboxWin then
+        inboxWin = S.Window("WLHelperReports", (root.WinSize and root.WinSize("panel")) or 614, 520, L("Rapports des joueurs"), nil, WLWritsDB, "reportsPos",
+            { header = 44, minH = 240, size = "panel" })
+        inboxWin.list = S.ScrollArea(inboxWin)
+        inboxWin.rows = {}
+        inboxWin.empty = S.Text(inboxWin, F.body, C.muted)
+        inboxWin.empty:SetText(L("Aucun rapport reçu pour l'instant. Ils arrivent ici quand un joueur utilise « Nous écrire »."))
+    end
+    local w = inboxWin
+    local top = w:ContentTop() + 8
+    w.list:ClearAllPoints(); w.list:SetPoint("TOPLEFT", 16, -top); w.list:SetPoint("BOTTOMRIGHT", -16, 16)
+    local width = math.max(300, (w:GetWidth() or 614) - 40)
+    w.list.child:SetWidth(width)
+    local list = R.List()
+    w.empty:ClearAllPoints(); w.empty:SetPoint("TOPLEFT", 16, -top); w.empty:SetWidth(width)
+    w.empty:SetShown(#list == 0)
+    local y = 0
+    for i, rec in ipairs(list) do
+        local r = w.rows[i]
+        if not r then
+            r = S.Text(w.list.child, F.label, C.text)
+            r:SetJustifyH("LEFT"); r:SetJustifyV("TOP"); r:SetWordWrap(true)
+            w.rows[i] = r
+        end
+        r:SetWidth(width)
+        local col = C[KIND_COLOR[rec.kind] or "fg"] or C.fg
+        local when = (date and tonumber(rec.at)) and date("%d/%m %H:%M", tonumber(rec.at)) or ""
+        local head = (S.Hex and S.Hex(col) or "") .. L(KIND_LABEL[rec.kind] or "Bug") .. "|r  " .. tostring(rec.from or "?") .. "  ·  " .. when
+            .. ((rec.zone and ("  ·  " .. rec.zone)) or "") .. ((not rec.read) and ("  " .. (S.Hex and S.Hex(C.warn) or "") .. L("nouveau") .. "|r") or "")
+        local lines = { head, tostring(rec.text or "") }
+        if rec.shot then lines[#lines + 1] = L("Capture : ") .. rec.shot end
+        if rec.act then lines[#lines + 1] = (S.Hex and S.Hex(C.muted) or "") .. L("Étape : ") .. rec.act .. "|r" end
+        if rec.stack then lines[#lines + 1] = (S.Hex and S.Hex(C.muted) or "") .. rec.stack .. "|r" end
+        r:SetText(table.concat(lines, "\n"))
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y)
+        r:Show()
+        local okH, h = pcall(r.GetStringHeight, r)
+        y = y + ((okH and type(h) == "number") and h or 40) + 14
+        rec.read = true
+    end
+    for i = #list + 1, #w.rows do w.rows[i]:Hide() end
+    w.list:SetContentHeight(y)
+    w:Show()
+end
+
 -- /wlh rapports [on|off|erreurs on|erreurs off]
 function R.Command(arg)
     local d = DB()
@@ -418,6 +492,7 @@ function R.Command(arg)
         if arg == "on" then Queue("H") end
         return
     end
+    if arg == "" or arg == nil then pcall(R.ShowInbox) end
     local nIn, nOut = 0, 0
     for _ in pairs(d.inbox) do nIn = nIn + 1 end
     for _, rec in pairs(d.out) do if not rec.delivered then nOut = nOut + 1 end end

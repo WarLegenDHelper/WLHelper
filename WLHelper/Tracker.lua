@@ -131,6 +131,21 @@ function TR.StepActions(i, st, log)
   return out
 end
 
+-- A quest to take that starts from an item you do not have (the Oathstone of Ysera's Dragonflight
+-- after the Essence of Eranikus): nothing to do here, so it is not offered as a next action (report:
+-- "I put the essence in the font, then nothing")
+local function MissingStartItem(a)
+  if not (a and a.kind == "take" and a.node and a.node.q) then return false end
+  local q = ns.Q[a.node.q]
+  local sid = q and q.s and q.s.i == 1 and q.sid
+  if not sid then return false end
+  local count = (C_Item and C_Item.GetItemCount) or GetItemCount
+  if not count then return false end
+  local ok, n = pcall(count, sid, true)
+  return ok and type(n) == "number" and n == 0
+end
+TR._MissingStartItem = MissingStartItem
+
 -- Live count of an objective: have, need, finished (nil when the game does not show one).
 local function Count(log, qid, o)
   if not (ns.ObjCount and qid and o) then return nil end
@@ -232,14 +247,14 @@ function TR.Model()
   m.nexts = {}
   for k = curPos + 1, #acts do
     if #m.nexts >= MAX_NEXT then break end
-    if not acts[k].done then m.nexts[#m.nexts + 1] = acts[k] end
+    if not acts[k].done and not MissingStartItem(acts[k]) then m.nexts[#m.nexts + 1] = acts[k] end
   end
   local j = idx + 1
   while #m.nexts < MAX_NEXT and j <= #steps do
     if not ns.IsStepDone(log, j) then
       for _, a in ipairs(TR.StepActions(j, steps[j], log)) do
         if #m.nexts >= MAX_NEXT then break end
-        if not a.done and not (ahead and a.node == ahead and a.text == cur.text) then m.nexts[#m.nexts + 1] = a end
+        if not a.done and not MissingStartItem(a) and not (ahead and a.node == ahead and a.text == cur.text) then m.nexts[#m.nexts + 1] = a end
       end
     end
     j = j + 1

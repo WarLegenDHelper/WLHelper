@@ -35,6 +35,7 @@ ns.AddEnglish({
         "The game does not let addons go online: you write to us from your browser, in three steps.",
     ["Choisis ce que tu veux nous dire."] = "Pick what you want to tell us.",
     ["Une idée"] = "An idea",
+    ["Une idée ou suggestion"] = "An idea or suggestion",
     ["Un bug"] = "A bug",
     ["Une erreur de quête"] = "Wrong quest data",
     ["Une quête, un PNJ ou une position qui ne correspond pas au jeu."] = "A quest, an NPC or a position that does not match the game.",
@@ -50,7 +51,7 @@ ns.AddEnglish({
 
 local REPO = "https://github.com/WarLegenDHelper/WLHelper/issues/new"
 local FORMS = {
-    idea = { template = "idea.yml", label = "Une idée", hint = "Ce qui te manque ou ce qui pourrait être plus simple." },
+    idea = { template = "idea.yml", label = "Une idée ou suggestion", hint = "Ce qui te manque ou ce qui pourrait être plus simple." },
     bug  = { template = "bug.yml",  label = "Un bug", hint = "Ce qui ne marche pas. Le formulaire reçoit ta version et la dernière action bloquée par le jeu." },
     data = { template = "data.yml", label = "Une erreur de quête", hint = "Une quête, un PNJ ou une position qui ne correspond pas au jeu." },
 }

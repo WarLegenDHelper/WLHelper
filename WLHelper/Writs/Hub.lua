@@ -23,6 +23,9 @@ WP.HUB_GROUPS = {
     { key = "travel", label = "Déplacements" },
     { key = "items", label = "Objets et métiers" },
     { key = "guild", label = "Guilde et groupes" },
+    -- a bug, an idea, a suggestion, sent from here (report: "I see nothing here for the players' bug
+    -- reports"); the reports received, on the account that gets them
+    { key = "feedback", label = "Retours" },
 }
 
 local function OpenGuide()
@@ -90,6 +93,12 @@ WP.HUB = {
     { key = "events", group = "guild", label = "Groupes", icon = "events", module = "events",
       available = function() return Has("ToggleEvents") end,
       open = function() if WP.ToggleEvents then WP.ToggleEvents() end end, settings = "groups" },
+    { key = "feedback", group = "feedback", label = "Nous écrire", icon = { hd = "mail" },
+      available = function() return Has("Feedback") end,
+      open = function() if WP.Feedback then WP.Feedback("bug") end end, settings = "about" },
+    { key = "reports", group = "feedback", label = "Rapports des joueurs", icon = { hd = "warning" },
+      available = function() return Has("Reports", "IsInbox") and WP.Reports.IsInbox() end,
+      open = function() if WP.Reports and WP.Reports.ShowInbox then WP.Reports.ShowInbox() end end, settings = "about" },
 }
 
 -- WP.HubEntries(group) -> the entries of that activity whose files are loaded, in the list's order

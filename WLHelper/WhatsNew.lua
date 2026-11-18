@@ -2,6 +2,12 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.149", date = "2026-11-18", items = {
+    { s = "add", fr = { "Accueil, un groupe « Retours »", "" }, en = { "", "" } },
+    { s = "add", fr = { "« Nous écrire »", ", pour tous : « Un bug, une idée, une suggestion : sans compte ». Le choix du formulaire devient « Une idée ou suggestion »." }, en = { "", "" } },
+    { s = "add", fr = { "« Rapports des joueurs »", ", seulement sur le compte qui reçoit les rapports : combien en sont arrivés, et les nouveaux en orange. Le clic ouvre la liste dans le jeu, du plus récent au plus ancien : le type (bug, idée, erreur de quête, erreur Lua), l'auteur, la date, la zone, le message, le lien de la capture, l'étape du guide et la pile d'appels des erreurs. /wlh rapports l'ouvre aussi." }, en = { "Home gets a \"Feedback\" group", "\"Write to us\" for everyone, and \"Players' reports\" (count, new ones, the list in the game) on the account that receives them." } },
+    { s = "fix", fr = { "Vue moderne, une quête qui commence avec un objet que tu n'as pas", "L'Oathstone of Ysera's Dragonflight (après « L'Essence d'Eranikus ») restait proposé dans « Ensuite » même sans l'objet dans les sacs. Il n'apparaît plus tant que l'objet n'y est pas." }, en = { "Modern view", "A quest that starts from an item you do not have is no longer offered as a next action." } },
+  } },
   { v = "1.0.0-beta.148", date = "2026-11-18", items = {
     { s = "add", fr = { "Les erreurs de WL Helper partent toutes seules", "Quand BugSack/BugGrabber attrape une erreur Lua de WL Helper chez un joueur, elle est envoyée automatiquement et en silence au compte qui reçoit les rapports. Le rapport contient le message de l'erreur, son nombre de répétitions, le début de la pile d'appels, et la même photo de l'état que les autres rapports. Les garde-fous :" }, en = { "", "" } },
     { s = "add", fr = { "", "seules les erreurs de WL Helper partent, jamais celles des autres addons ;" }, en = { "", "" } },
@@ -97,8 +103,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.135", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS avec Shortest Path, tes portails de mage", "Shortest Path ne connaît pas les portails que tu ouvres toi-même (Rune des portails). Quand notre GPS trouve un trajet qui commence par ta téléportation ou ton portail et qui fait gagner au moins 2 minutes sur celui de Shortest Path, la flèche le propose avec le bouton pour le lancer et dit combien tu gagnes (« Plus rapide que le trajet de Shortest Path : ~25 min de moins »). Une fois arrivé, Shortest Path refait son trajet depuis là." }, en = { "GPS with Shortest Path's route", "A mage teleport or portal of ours that saves 2+ minutes is offered with its cast button." } },
-  } },
-  { v = "1.0.0-beta.134", date = "2026-11-18", items = {
-    { s = "fix", fr = { "GPS avec Shortest Path, le bouton de la pierre de foyer", "Quand le trajet de Shortest Path commence par ta pierre de foyer, Rappel astral ou une téléportation de mage, notre flèche affiche maintenant le bouton pour la lancer, comme sur notre propre trajet. La ligne d'en dessous dit la suite (« Puis Walk to Grom'gol... »). Shortest Path ne donne pas le sort par son API : WL Helper le reconnaît au texte de l'étape." }, en = { "GPS with Shortest Path's route", "The Hearthstone, Astral Recall or a mage teleport gets our cast button." } },
   } },
 }
