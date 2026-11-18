@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.153] — 2026-11-18
+
+### Modifié / Changed
+- **La vue moderne se suffit à elle-même** :
+  - **un clic gauche ne renvoie plus vers la fenêtre classique.** Sur le titre, il ne fait rien (glisser pour déplacer). Sur une action de « Ensuite », il affiche son étape dans la vue moderne ;
+  - **toutes les étapes, dans la vue** : « ▸ Toutes les étapes » déplie la liste des étapes autour de celle affichée (faites ✓, en cours ▶). Un clic en affiche une, Maj-clic la marque faite ;
+  - **le menu** (roue dentée ou clic droit sur le titre) ajoute « Choisir un guide » et « Vue d'ensemble du donjon ». La fenêtre classique ne s'ouvre plus que depuis ce menu.
+
+  *The modern view stands on its own: left-clicks stay in it (a next action shows its step here), "All the steps" lists the route's steps inside it, and its menu has "Pick a guide" and the dungeon overview; the classic window only opens from the menu.*
+
 ## [1.0.0-beta.152] — 2026-11-18
 
 ### Modifié / Changed

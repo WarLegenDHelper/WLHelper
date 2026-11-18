@@ -241,6 +241,19 @@ function TR.Model()
     if ns.BossTacticText then local okT, t = pcall(ns.BossTacticText, bst); if okT and type(t) == "string" then m.tactic = t end end
     if ns.BossLootText then local okL, t = pcall(ns.BossLootText, bst); if okL and type(t) == "string" then m.loot = t end end
   end
+  -- the route's steps around the one shown, when the list is open (WLDTDB.trackerSteps): every
+  -- step's title, done or not, a click shows it here
+  if WLDTDB.trackerSteps then
+    m.stepList = {}
+    local from = math.max(1, idx - 4)
+    local to = math.min(#steps, from + 11)
+    from = math.max(1, to - 11)
+    for i = from, to do
+      local okT, title = pcall(ns.StepTitle, steps[i])
+      m.stepList[#m.stepList + 1] = { i = i, title = okT and title or tostring(i), done = ns.IsStepDone(log, i) and true or false,
+        cur = (i == curIdx), view = (i == idx) }
+    end
+  end
   -- travel hint (long trip, other continent) on the current step
   if st.travel == "TRAVEL_FAR" or st.travel == "TRAVEL_CONT" then m.travel = L[st.travel] end
   -- the next actions: the rest of this step, then the steps after it
@@ -314,6 +327,25 @@ local function Rich(text)
 end
 TR._Rich = Rich
 
+-- row k of the steps list
+local function StepRow(k)
+  local r = f.stepRows[k]
+  if not r then
+    r = CreateFrame("Button", nil, f)
+    r:SetHeight(20)
+    r.hl = ns.Tex(r, "HIGHLIGHT", T.hoverFill); r.hl:SetAllPoints()
+    r.text = ns.Text(r, F.label, T.text)
+    r.text:SetPoint("LEFT", 4, 0); r.text:SetPoint("RIGHT", -4, 0)
+    r.text:SetJustifyH("LEFT"); r.text:SetWordWrap(false)
+    r:SetScript("OnClick", function(self)
+      if not self.i then return end
+      if IsShiftKeyDown and IsShiftKeyDown() then TR.MarkDone(self.i) else TR.browse = self.i; TR.Refresh() end
+    end)
+    f.stepRows[k] = r
+  end
+  return r
+end
+
 local function TextH(fs, size)
   local ok, h = pcall(fs.GetStringHeight, fs)
   if not ok or type(h) ~= "number" or secret(h) or h <= 0 then h = size + 2 end
@@ -372,7 +404,8 @@ end
 local function RowClick(self)
   local a = self.action
   if not (a and a.i) then return end
-  if IsShiftKeyDown and IsShiftKeyDown() then TR.MarkDone(a.i) else TR.OpenGuide(a.i) end
+  -- the step shown here, in the modern view (the window only from the menu)
+  if IsShiftKeyDown and IsShiftKeyDown() then TR.MarkDone(a.i) else TR.browse = a.i; TR.Refresh() end
 end
 
 local function SetActIcon(tex, kind, dim)
@@ -465,7 +498,7 @@ local function Build()
   head:SetScript("OnLeave", function(self) self.hl:Hide(); if ns.HideTip then ns.HideTip() end end)
   head:SetScript("OnClick", function(self, btn)
     if btn == "RightButton" then TR.ToggleMenu(self) return end
-    TR.OpenGuide(f.model and f.model.idx)
+    -- a left-click on the title: nothing but the drag (the window is in the menu)
   end)
   f.head = head
   -- the row-action size: 24 px hit area, 16 px icon; hover fill, press fill and a 1 px nudge
@@ -536,6 +569,13 @@ local function Build()
     local r = MakeRow(f, NEXT_ICON, F.body, T.text)
     f.nexts[k] = r
   end
+  -- the steps list: a toggle line, then up to 12 rows (made as needed)
+  f.stepsToggle = CreateFrame("Button", nil, f)
+  f.stepsToggle:SetHeight(20)
+  f.stepsToggle.text = ns.Text(f.stepsToggle, F.meta, T.muted)
+  f.stepsToggle.text:SetPoint("LEFT", 0, 0)
+  f.stepsToggle:SetScript("OnClick", function() WLDTDB.trackerSteps = not WLDTDB.trackerSteps or nil; TR.Refresh() end)
+  f.stepRows = {}
   -- the guide's progress, at the bottom (Polestar's bar and percent)
   f.prog = ns.Tex(f, "ARTWORK", T.divider); f.prog:SetHeight(4)
   f.progFill = ns.Tex(f, "OVERLAY", T.info); f.progFill:SetHeight(4)
@@ -613,6 +653,8 @@ local function Draw(m)
   local function hideBody()
     for _, fs in ipairs(f.info or {}) do fs:Hide() end
     if f.backBtn then f.backBtn:Hide() end
+    if f.stepsToggle then f.stepsToggle:Hide() end
+    for _, r in ipairs(f.stepRows or {}) do r:Hide() end
     f.cur:Hide(); f.travel:Hide(); f.travelIcon:Hide()
     f.card:Hide(); f.stepLabel:Hide(); f.thenLabel:Hide(); f.prog:Hide(); f.progFill:Hide(); f.progText:Hide()
     for _, b in ipairs(f.bars) do b:Hide() end
@@ -738,6 +780,28 @@ local function Draw(m)
       y = y + rh
     else r:Hide(); r.action = nil end
   end
+  -- the steps list (its toggle always; its rows when open)
+  y = y + 6
+  local open = WLDTDB.trackerSteps and m.stepList
+  f.stepsToggle.text:SetText(string.upper(open and L.TR_STEPS_HIDE or L.TR_STEPS_SHOW))
+  if ns.Shadow then ns.Shadow(f.stepsToggle.text, f.frameless) end
+  f.stepsToggle:ClearAllPoints(); f.stepsToggle:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -y); f.stepsToggle:SetWidth(W - PAD * 2)
+  f.stepsToggle:Show()
+  y = y + 20
+  local nRows = 0
+  for k, e in ipairs(open and m.stepList or {}) do
+    nRows = k
+    local r = StepRow(k)
+    r.i = e.i
+    local mark = e.done and (Hex(T.ok) .. "✓|r ") or (e.cur and (Hex(T.warn) .. "▶|r ") or (Hex(T.muted) .. "•|r "))
+    local col = e.view and Hex(T.fg) or (e.done and Hex(T.muted) or Hex(T.text))
+    r.text:SetText(mark .. Hex(T.muted) .. e.i .. "|r  " .. col .. Rich(tostring(e.title)) .. "|r")
+    if ns.Shadow then ns.Shadow(r.text, f.frameless) end
+    r:ClearAllPoints(); r:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -y); r:SetWidth(W - PAD * 2)
+    r:Show()
+    y = y + 20
+  end
+  for k = nRows + 1, #f.stepRows do f.stepRows[k]:Hide() end
   -- the guide's progress
   y = y + 8
   local frac = math.min(1, math.max(0, (m.pct or 0) / 100))
@@ -779,6 +843,7 @@ local function MenuItems()
   local m = f and f.model
   local dk = m and m.dk
   local items = {
+    { L.TR_M_PICK, function() if ns.ShowPicker then ns.ShowPicker() end end },
     { L.TR_M_WINDOW, function() TR.OpenGuide(m and m.idx) end },
     { L.TR_M_GO, function() if WLDTDB.arrow == false then WLDTDB.arrow = true end; if ns.PlacePoints then ns.PlacePoints() end end },
     { L.TR_M_DONE, function() if m then TR.MarkDone(m.idx) end end },
@@ -788,6 +853,7 @@ local function MenuItems()
   if bst and ns.AnnounceTactics then items[#items + 1] = { L.TR_M_TACTICS, function() ns.AnnounceTactics(bst) end } end
   if dk and ns.ToggleBosses then items[#items + 1] = { L.TR_M_BOSSES, function() ns.ToggleBosses(dk) end } end
   if dk and ns.OpenDungeonMap then items[#items + 1] = { L.TR_M_MAP, function() ns.OpenDungeonMap(dk) end } end
+  if dk and ns.ShowOverview then items[#items + 1] = { L.TR_M_OVERVIEW, function() ns.ShowOverview(dk) end } end
   items[#items + 1] = { TR.Frameless() and L.TR_M_FRAMED or L.TR_M_FRAMELESS, function() TR.SetFrameless(not TR.Frameless()) end }
   items[#items + 1] = { L.TR_M_OPTIONS, function()
     local WP = ns.Writs and ns.Writs.WP

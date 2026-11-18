@@ -2,6 +2,12 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.153", date = "2026-11-18", items = {
+    { s = "chg", fr = { "La vue moderne se suffit à elle-même", "" }, en = { "", "" } },
+    { s = "chg", fr = { "un clic gauche ne renvoie plus vers la fenêtre classique.", "Sur le titre, il ne fait rien (glisser pour déplacer). Sur une action de « Ensuite », il affiche son étape dans la vue moderne ;" }, en = { "", "" } },
+    { s = "chg", fr = { "toutes les étapes, dans la vue", "« ▸ Toutes les étapes » déplie la liste des étapes autour de celle affichée (faites ✓, en cours ▶). Un clic en affiche une, Maj-clic la marque faite ;" }, en = { "", "" } },
+    { s = "chg", fr = { "le menu", "Ajoute « Choisir un guide » et « Vue d'ensemble du donjon ». La fenêtre classique ne s'ouvre plus que depuis ce menu." }, en = { "The modern view stands on its own", "Left-clicks stay in it (a next action shows its step here), \"All the steps\" lists the route's steps inside it, and its menu has \"Pick a guide\" and the dungeon overview; the classic window only opens from the menu." } },
+  } },
   { v = "1.0.0-beta.152", date = "2026-11-18", items = {
     { s = "chg", fr = { "Deux raccourcis clavier au lieu de neuf", "WL Helper ne propose plus que les deux qui servent en jeu, **Cibler** (la cible de l'étape) et **Utiliser l'objet de quête** (celui de l'étape). Ce sont les deux premiers boutons de la barre « Target and items ». Les 7 autres sont retirés : ouvrir le guide, choisir un guide, étape suivante, étape précédente, poser les points, flèche, groupes. Ils doublaient les boutons du guide et les commandes /wlh. Une touche que tu leur avais donnée est simplement libérée." }, en = { "Two key bindings instead of nine", "The step's target and its quest item; the other seven doubled the guide's buttons and /wlh." } },
     { s = "add", fr = { "Annoncer la tactique au groupe", "Sur une étape de boss, Actions > « Annoncer la tactique au groupe » (ou le menu de la vue moderne, ou /wlh tactique) envoie la tactique dans le chat du groupe, du raid ou de l'instance. Seul, elle s'affiche pour toi." }, en = { "Tell the group the tactics", "The boss step's tactics to the party / raid / instance chat (Actions menu, modern view menu, /wlh tactics)." } },
@@ -107,8 +113,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.139", date = "2026-11-18", items = {
     { s = "fix", fr = { "La carte du donjon sur M", "Dans un donjon, la carte du Journal des donjons de Naowh (le plan avec les boss en portraits numérotés) s'affichait une fraction de seconde, puis la carte de la zone extérieure la remplaçait. Le Journal de Naowh retire sa carte dès que la carte du monde change de zone, et un autre addon (ou le jeu) la change juste après l'ouverture. WL Helper repose maintenant la carte de Naowh une fois, juste après ce changement : elle reste sur M. Rien n'est modifié dans Naowh ni dans OpenMap." }, en = { "M inside a dungeon", "Naowh's dungeon map no longer flashes away to the zone outside; WL Helper lays it again once after the map is turned." } },
-  } },
-  { v = "1.0.0-beta.138", date = "2026-11-18", items = {
-    { s = "chg", fr = { "La carte du donjon : celle de Naowh d'abord", "Le bouton de carte du panneau des boss et /wlh carte ouvrent maintenant la carte du Journal des donjons de Naowh (le plan avec chaque boss en portrait numéroté), dans sa propre fenêtre, avant celle d'OpenMap. Sur la carte du monde, sa version par-dessus disparaissait dès qu'OpenMap remettait la zone extérieure ; sa fenêtre à elle reste." }, en = { "The dungeon map button and /wlh carte open Naowh's dungeon map (numbered boss portraits) in its own window first, before OpenMap's.", "" } },
   } },
 }
