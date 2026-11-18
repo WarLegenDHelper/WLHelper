@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.123] — 2026-11-18
+
+### Ajouté / Added
+- **GPS, envoyer les destinations à Shortest Path** : si Shortest Path Forever est installé, Réglages > GPS > « Envoyer les destinations à Shortest Path ». Les étapes du guide, les repères de la carte (livres de Naowh, Ctrl-clic) et /way passent alors par lui : son trajet tracé sur la carte, les vols, les bateaux et zeppelins avec le compte à rebours du départ, les portails, et sa flèche. La flèche de WL Helper et son chemin se cachent pendant ce temps. Éteint par défaut ; si Shortest Path ne peut pas prendre le point (encore en chargement), le GPS de WL Helper guide.
+  *GPS: send destinations to Shortest Path Forever (its map route, flights, boats with departure timers), Settings > GPS.*
+
 ## [1.0.0-beta.122] — 2026-11-18
 
 ### Modifié / Changed

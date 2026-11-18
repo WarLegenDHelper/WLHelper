@@ -1830,11 +1830,26 @@ function GPS.UseZygor()
     return Opt("provider") == "zygor"
 end
 
+-- Shortest Path Forever, when the player turned on "Send destinations to Shortest Path" (provider
+-- "spf"): its journey (its route on the map, flights, boats with their live departures, its arrow)
+-- takes our point through its public API (ShortestPathForever.API.Navigate, owner "WLHelper");
+-- our arrow, path and dots step aside, as for Zygor (state.zygor: an outside arrow guides).
+local SPF_OWNER = "WLHelper"
+local function SPF()
+    local s = rawget(_G, "ShortestPathForever")
+    local api = type(s) == "table" and s.API
+    if type(api) == "table" and api.Navigate and api.Cancel then return api end
+end
+GPS._SPF = SPF
+function GPS.UseSPF()
+    return SPF() ~= nil and Opt("provider") == "spf"
+end
+
 -- beta.74: the 3-way choice ("auto" | "wl" | "zygor") is one switch; "auto" and "wl" both meant
 -- our GPS since beta.73, so they become nil (off). Only "zygor" is kept.
 function GPS.MigrateProvider()
     local o = WLWritsDB and WLWritsDB.gpsOpts
-    if type(o) == "table" and o.provider ~= nil and o.provider ~= "zygor" then o.provider = nil end
+    if type(o) == "table" and o.provider ~= nil and o.provider ~= "zygor" and o.provider ~= "spf" then o.provider = nil end
 end
 
 -- Several events in a row (a loading screen fires a few) make one plan.
@@ -1862,9 +1877,20 @@ local function Start(dest, source)
     elseif source == "dungeon" then
         state.suspended = nil
     end
-    state.dest, state.source, state.doneLegs, state.zygor = dest, source, 0, nil
+    state.dest, state.source, state.doneLegs, state.zygor, state.spf = dest, source, 0, nil, nil
     state.choice, state.alt = nil, nil
     if not ticker then ticker = C_Timer.NewTicker(2, Tick) end
+    if GPS.UseSPF() then
+        local api = SPF()
+        local ok, took = pcall(api.Navigate, SPF_OWNER, dest.map, dest.x / 100, dest.y / 100, dest.name)
+        if ok and took then
+            state.zygor, state.spf = true, true
+            if GPS.Hide then GPS.Hide() end
+            Changed()
+            return
+        end
+        -- Shortest Path could not take it (still loading, no position yet): our own GPS guides
+    end
     if GPS.UseZygor() then
         local Z = Zygor()
         local ok = pcall(Z.Pointer.SetWaypoint, Z.Pointer, dest.map, dest.x / 100, dest.y / 100, {
@@ -1919,6 +1945,9 @@ function GPS.GoPoint(map, x, y, label, source)
     if Waiting(map, x, y, label, source) then return end
     local d = state.dest
     if d and d.map == map and d.x == x and d.y == y and state.source == source then return end
+    -- Shortest Path guides: a point that moved a little (an area's spot that follows you) is not a
+    -- new journey for it (each Navigate plans its trip again)
+    if state.spf and d and d.map == map and state.source == source and math.abs(d.x - x) < 1 and math.abs(d.y - y) < 1 then return end
     local dest = Point(map, x, y, { kind = "dest", name = label })
     if not dest then GPS.Stop(source); return end
     Start(dest, source)
@@ -1932,7 +1961,10 @@ function GPS.Stop(source)
         return
     end
     local resume = state.source ~= "dungeon" and state.suspended
-    if state.zygor then
+    if state.spf then
+        local api = SPF()
+        if api then pcall(api.Cancel, SPF_OWNER) end
+    elseif state.zygor then
         local Z = Zygor()
         if Z and Z.Pointer.ClearWaypoints then pcall(Z.Pointer.ClearWaypoints, Z.Pointer, "manual") end
     end
@@ -1945,7 +1977,7 @@ function GPS.Stop(source)
         end
     end
     state.pin = nil
-    state.dest, state.source, state.legs, state.eta, state.zygor, state.suspended = nil, nil, nil, nil, nil, nil
+    state.dest, state.source, state.legs, state.eta, state.zygor, state.suspended, state.spf = nil, nil, nil, nil, nil, nil, nil
     state.choice, state.alt = nil, nil
     -- the walking path and its dots go with it
     if WP.Trail and WP.Trail.Clear then WP.Trail.Clear() end

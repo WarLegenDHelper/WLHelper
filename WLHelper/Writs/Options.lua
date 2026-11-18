@@ -162,6 +162,10 @@ ns.AddEnglish({
     -- GPS
     ["Itinéraire"] = "Route",
     ["Envoyer les destinations à la flèche de Zygor"] = "Send destinations to Zygor's arrow",
+    ["Envoyer les destinations à Shortest Path"] = "Send destinations to Shortest Path",
+    ["Son trajet sur la carte, les vols et les bateaux avec leur départ."] = "Its route on the map, flights and boats with their departures.",
+    ["Shortest Path Forever calcule le trajet (chemins, vols, bateaux avec l'heure de départ, portails) et le montre sur la carte avec sa flèche. La flèche de WL Helper, son chemin et ses pointillés se cachent pendant ce temps. Les étapes du guide, les repères de la carte et /way passent par lui."] =
+        "Shortest Path Forever works out the trip (paths, flights, boats with their departure times, portals) and shows it on the map with its arrow. WL Helper's arrow, path and dots hide meanwhile. The guide's steps, map pins and /way go through it.",
     ["Pour ceux qui préfèrent la flèche de Zygor."] = "For those who prefer Zygor's arrow.",
     ["Zygor calcule le trajet et le montre avec sa flèche. La flèche de WL Helper, son chemin et ses pointillés se cachent pendant ce temps."] =
         "Zygor plans the trip and shows it with its arrow. WL Helper's arrow, path and dots step aside meanwhile.",
@@ -372,6 +376,12 @@ local function Comfort() local db = Writs(); db.comfort = db.comfort or {}; retu
 local function Guide() WLDTDB = WLDTDB or {}; return WLDTDB end
 
 local function ZygorPresent() return (ZGV and ZGV.Pointer) and true or false end
+local function SPFPresent()
+    local s = rawget(_G, "ShortestPathForever")
+    return (type(s) == "table" and type(s.API) == "table" and s.API.Navigate) and true or false
+end
+-- what the GPS page was built with: Zygor and Shortest Path can finish loading after it
+local function Providers() return (ZygorPresent() and "z" or "") .. (SPFPresent() and "s" or "") end
 local function secret(v) return root.IsSecret and root.IsSecret(v) end
 local function num(v) return type(v) == "number" and not secret(v) and v or nil end
 
@@ -477,7 +487,7 @@ end
 -- Words people type for things the labels say differently.
 local KEYWORDS = {
     arrow = "fleche pointeur", fleche = "arrow pointeur", flight = "vol taxi", vol = "flight taxi",
-    teleport = "teleportation portail mage", zygor = "guide pointeur fleche itineraire", tooltip = "infobulle",
+    teleport = "teleportation portail mage", zygor = "guide pointeur fleche itineraire", shortest = "itineraire bateau vol trajet", tooltip = "infobulle",
     raccourci = "touche keybind binding bind", touche = "raccourci keybind binding", keybind = "raccourci touche binding",
     infobulle = "tooltip", writ = "enveloppe comptoir", minimap = "carte bouton", langue = "language english francais",
     language = "langue", sac = "bags clean nettoyeur", bags = "sacs nettoyeur", reglage = "settings options",
@@ -1491,18 +1501,25 @@ end
 
 function BUILD.gps(p)
     -- Zygor's arrow (provider "zygor", nil = ours): a row only for players who have Zygor
-    local zygorBuilt = ZygorPresent()
-    if zygorBuilt then
-        Section(p, L("Itinéraire"))
+    -- Shortest Path Forever (provider "spf"): the same, through its public API. One outside arrow at
+    -- a time: turning one on turns the other off.
+    local zygorBuilt = Providers()
+    if zygorBuilt ~= "" then Section(p, L("Itinéraire")) end
+    if ZygorPresent() then
         SwitchRow(p, L("Envoyer les destinations à la flèche de Zygor"), function() return Gps().provider == "zygor" end,
             function(v) SetGps("provider")(v and "zygor" or nil) end, L("Pour ceux qui préfèrent la flèche de Zygor."),
             L("Zygor calcule le trajet et le montre avec sa flèche. La flèche de WL Helper, son chemin et ses pointillés se cachent pendant ce temps."))
+    end
+    if SPFPresent() then
+        SwitchRow(p, L("Envoyer les destinations à Shortest Path"), function() return Gps().provider == "spf" end,
+            function(v) SetGps("provider")(v and "spf" or nil) end, L("Son trajet sur la carte, les vols et les bateaux avec leur départ."),
+            L("Shortest Path Forever calcule le trajet (chemins, vols, bateaux avec l'heure de départ, portails) et le montre sur la carte avec sa flèche. La flèche de WL Helper, son chemin et ses pointillés se cachent pendant ce temps. Les étapes du guide, les repères de la carte et /way passent par lui."))
     end
     -- Zygor can finish loading after the window was built (or be gone): the page is rebuilt once
     -- when it shows and the row no longer matches
     local rebuilding = false
     p.controls[#p.controls + 1] = { Sync = function()
-        if rebuilding or ZygorPresent() == zygorBuilt then return end
+        if rebuilding or Providers() == zygorBuilt then return end
         rebuilding = true
         if C_Timer and C_Timer.After and ns.WP.RebuildHubPage then
             C_Timer.After(0, function() ns.WP.RebuildHubPage("gps") end)
@@ -2848,6 +2865,10 @@ local function RegisterEllesmere()
                     if ZygorPresent() then
                         toggle(L("Envoyer les destinations à la flèche de Zygor"), function() return Gps().provider == "zygor" end,
                             function(v) SetGps("provider")(v and "zygor" or nil) end)
+                    end
+                    if SPFPresent() then
+                        toggle(L("Envoyer les destinations à Shortest Path"), function() return Gps().provider == "spf" end,
+                            function(v) SetGps("provider")(v and "spf" or nil) end)
                     end
                     toggle(L("Utiliser mes téléportations"), function() return Gps().teleports end, SetGps("teleports"))
                     toggle(L("Masquer la flèche en combat"), function() return Gps().hideCombat end, SetGps("hideCombat"))

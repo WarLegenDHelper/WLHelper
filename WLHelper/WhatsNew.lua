@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.123", date = "2026-11-18", items = {
+    { s = "add", fr = { "GPS, envoyer les destinations à Shortest Path", "Si Shortest Path Forever est installé, Réglages > GPS > « Envoyer les destinations à Shortest Path ». Les étapes du guide, les repères de la carte (livres de Naowh, Ctrl-clic) et /way passent alors par lui : son trajet tracé sur la carte, les vols, les bateaux et zeppelins avec le compte à rebours du départ, les portails, et sa flèche. La flèche de WL Helper et son chemin se cachent pendant ce temps. Éteint par défaut ; si Shortest Path ne peut pas prendre le point (encore en chargement), le GPS de WL Helper guide." }, en = { "GPS", "Send destinations to Shortest Path Forever (its map route, flights, boats with departure timers), Settings > GPS." } },
+  } },
   { v = "1.0.0-beta.122", date = "2026-11-18", items = {
     { s = "chg", fr = { "Petit suivi lisible", "Le bouton « − » du guide passe au petit suivi (l'action en cours, ses objectifs avec leur barre, les deux actions suivantes) à la place de la ligne unique d'avant. Textes plus grands (action en 14, objectifs en 13) et cadre un peu plus large. Clic sur le suivi : le guide complet revient." }, en = { "The guide's \"−\" switches to the small tracker (bigger text, objective bars); click it to get the whole guide back.", "" } },
     { s = "fix", fr = { "Classement PvP de la guilde, les doublons", "Chaque membre n'apparaît plus qu'une fois. Sur Forever, un personnage a un nom de famille (« Alandir Sheeplover ») : les anciennes copies le gardaient sous le prénom seul, les nouvelles sous le prénom et le nom, et ta propre ligne restait sous ton prénom. Les deux sont fusionnées (les chiffres les plus récents gardés) ; deux membres du même prénom restent séparés." }, en = { "Guild PvP ranking", "No more members listed twice (Forever surnames)." } },
@@ -57,9 +60,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.109", date = "2026-11-17", items = {
     { s = "chg", fr = { "Guide, étapes dans le donjon", "Beaucoup moins de texte répété. Pour chaque quête, la place dans la suite (« Étape 5 sur 6 avant... »), la phrase d'objectif et la note ne s'affichent plus que sur sa première ligne de l'étape ; « À prendre » n'est plus répété sur ses lignes « Faire » et « Rendre » (la ligne « Accepter » le dit déjà). L'étape tient en bien moins de hauteur." }, en = { "Guide, dungeon steps", "Chain place, objective and note shown once per quest; no repeated \"To take\"." } },
-  } },
-  { v = "1.0.0-beta.108", date = "2026-11-17", items = {
-    { s = "fix", fr = { "Aperçu du donjon, bulle d'une récompense", "L'amélioration n'apparaît plus deux fois avec deux pourcentages différents. La ligne « WL Helper » de l'objet suffit ; quand la quête est d'un niveau plus haut que toi, une ligne dit le gain à ce niveau (« Au niveau 53 (celui de la quête) : +51 % »), le chiffre affiché sous l'icône." }, en = { "Dungeon overview", "The reward tooltip no longer repeats the upgrade with two different percents." } },
-    { s = "fix", fr = { "Items of Power (Mage, quête 1948)", "Demande la quête 1951, comme sur Wowhead Forever." }, en = { "Quest 1948 now needs 1951, as on Wowhead Forever.", "" } },
   } },
 }
