@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.130", date = "2026-11-18", items = {
+    { s = "add", fr = { "GPS, le trajet de Shortest Path avec notre flèche", "Avec « Envoyer les destinations à Shortest Path », la nouvelle option « Avec la flèche de WL Helper » (activée par défaut) garde notre flèche. Shortest Path calcule le trajet ; notre flèche vise son prochain point et dit son étape en cours, puis la suivante, les étapes d'après, la destination et le temps restant. Pour n'avoir que notre flèche, coupe celle de Shortest Path et son suivi de trajet dans ses propres réglages (Interface : la flèche ; Guidance : les étapes dans le suivi des objectifs). Option coupée : l'interface de Shortest Path, comme avant." }, en = { "GPS", "Shortest Path's route shown by WL Helper's arrow (new option, on by default)." } },
+  } },
   { v = "1.0.0-beta.129", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, retour au cadavre", "Mort et libéré (fantôme), la flèche t'emmène à ton cadavre (« Ton cadavre »). Une fois ressuscité, elle reprend l'étape du guide ou le trajet que tu suivais. Ça marche aussi après un /reload en fantôme." }, en = { "GPS", "As a ghost, the arrow takes you to your corpse, then back to the step or trip you followed." } },
   } },
@@ -49,9 +52,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.116", date = "2026-11-18", items = {
     { s = "add", fr = { "Meilleur pour toi", "Tape « /wlh bis » (ou « /wlh bis 60 » pour un autre niveau). Pour chaque emplacement, les 3 meilleures pièces que tu peux porter, classées par WL Helper Gear pour ta spé avec tes vraies stats, tes talents et tes plafonds de toucher ; le gain sur ce que tu portes, et d'où vient la pièce (donjon et boss, quête, métier, réputation ; les pièces PvP renvoient à « /wlh pvp »). Les raids sont laissés de côté tant qu'ils ne sont pas ouverts. La liste est calculée, pas recopiée d'un guide : Forever a changé beaucoup d'objets." }, en = { "Best for you (/wlh bis [level])", "The top 3 pieces per slot for your spec, computed by WL Helper Gear, with the gain and the source." } },
-  } },
-  { v = "1.0.0-beta.115", date = "2026-11-18", items = {
-    { s = "fix", fr = { "XP des quêtes", "128 quêtes affichaient l'XP de base, sans le bonus de Forever (souvent x1,75 à x2,7). Elles ont maintenant l'XP réelle, celle de Wowhead Forever, la même qu'en jeu (Blood Red Bandanas : 9 700 XP). Les totaux d'XP du guide et de la vue d'ensemble sont donc bien plus justes." }, en = { "Quest XP", "128 quests showed the base XP without Forever's bonus; they now show the real XP (Wowhead Forever, as in game)." } },
-    { s = "fix", fr = { "Quêtes ajoutées", "An Ambassador of Evil (Alliance, Ironforge, avant The Lost Tablets of Will à Uldaman) et Elven Legends côté Alliance (Scholar Runethorn, Feathermoon) ; les librams de Hache-tripes s'ouvrent maintenant aussi à l'Alliance." }, en = { "Added An Ambassador of Evil and the Alliance Elven Legends (Dire Maul librams open to the Alliance).", "" } },
   } },
 }

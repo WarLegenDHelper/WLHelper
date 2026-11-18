@@ -28,6 +28,7 @@ WP.GPS = GPS
 ns.AddEnglish({
     ["Va au maître de vol de %s"] = "Go to the flight master at %s",
     ["Va au bateau pour %s"] = "Go to the boat to %s",
+    ["Shortest Path calcule le trajet..."] = "Shortest Path is working out the route...",
     ["Ton cadavre"] = "Your corpse",
     ["Sanath Lim-yo : parle-lui, il te téléporte en haut de la tour"] = "Sanath Lim-yo: talk to him, he teleports you up the tower",
     ["Shortest Path est installé. Quel GPS veux-tu suivre ?\n\nShortest Path : son trajet sur la carte, les vols, les bateaux avec leurs départs, sa flèche.\nWL Helper : notre flèche et son trajet.\n\nTu peux changer plus tard : Options > GPS."] = "Shortest Path is installed. Which GPS do you want to follow?\n\nShortest Path: its route on the map, flights, boats with their departures, its arrow.\nWL Helper: our arrow and its route.\n\nYou can change it later: Options > GPS.",
@@ -1827,6 +1828,7 @@ end
 
 -- The trip the arrow follows, its time now: "~4 min" (nil when unknown).
 function GPS.TripMinutes()
+    if state.spfView then return spfRead and spfRead.left and GPS.Minutes(spfRead.left) or nil end
     if not state.dest or state.zygor or type(state.legs) ~= "table" then return nil end
     local ok, c = pcall(PlanCost, state.legs)
     return GPS.Minutes(ok and c or state.eta)
@@ -1870,7 +1872,7 @@ end
 -- where you stand now, with every walk the router measured): two ways of about the same time do not
 -- swap back and forth. A plan that can no longer be followed (a teleport gone on cooldown) is replaced.
 function GPS.Replan()
-    if not state.dest or state.zygor then return end
+    if not state.dest or state.zygor or state.spfView then return end
     if UnitOnTaxi and UnitOnTaxi("player") then return end
     -- on a zeppelin or boat of the plan: it holds until you land (a plan from mid-air is no plan)
     if state.legs and Aboard(state.legs[1]) then state.plannedAt = GetTime(); return end
@@ -2054,15 +2056,25 @@ local function Start(dest, source)
         state.suspended = nil
     end
     state.dest, state.source, state.doneLegs, state.zygor, state.spf = dest, source, 0, nil, nil
+    state.spfView = nil
     state.choice, state.alt = nil, nil
     if not ticker then ticker = C_Timer.NewTicker(2, Tick) end
     if GPS.UseSPF() then
         local api = SPF()
         local ok, took = pcall(api.Navigate, SPF_OWNER, dest.map, dest.x / 100, dest.y / 100, dest.name)
         if ok and took then
-            state.zygor, state.spf = true, true
-            if GPS.Hide then GPS.Hide() end
-            Changed()
+            state.spf = true
+            if Opt("spfOurArrow", true) then
+                -- its route, our arrow: the arrow reads Shortest Path's guidance (GPS.Now), plans nothing
+                state.spfView = true
+                state.legs, state.eta = nil, nil
+                Changed()
+                if GPS.Show then GPS.Show() end
+            else
+                state.zygor = true
+                if GPS.Hide then GPS.Hide() end
+                Changed()
+            end
             return
         end
         -- Shortest Path could not take it (still loading, no position yet): our own GPS guides
@@ -2094,6 +2106,10 @@ function GPS.SetProvider(p)
     db.gpsOpts = db.gpsOpts or {}
     if db.gpsOpts.provider == p then return end
     db.gpsOpts.provider = p
+    GPS.Restart()
+end
+-- The trip under way, guided again from the start (another provider, another look).
+function GPS.Restart()
     local dest, source, susp = state.dest, state.source, state.suspended
     if not dest then return end
     if state.spf then
@@ -2103,7 +2119,8 @@ function GPS.SetProvider(p)
         local Z = Zygor()
         if Z and Z.Pointer.ClearWaypoints then pcall(Z.Pointer.ClearWaypoints, Z.Pointer, "manual") end
     end
-    state.zygor, state.spf, state.legs = nil, nil, nil
+    state.zygor, state.spf, state.legs, state.spfView = nil, nil, nil, nil
+    spfRead = nil
     Start(dest, source)
     state.suspended = susp
 end
@@ -2202,6 +2219,7 @@ function GPS.Stop(source)
     end
     state.pin = nil
     state.dest, state.source, state.legs, state.eta, state.zygor, state.suspended, state.spf = nil, nil, nil, nil, nil, nil, nil
+    state.spfView = nil
     state.choice, state.alt = nil, nil
     -- the walking path and its dots go with it
     if WP.Trail and WP.Trail.Clear then WP.Trail.Clear() end
@@ -2230,8 +2248,51 @@ local function DistFrom(cont, px, py, p)
         return math.sqrt(dx * dx + dy * dy)
     end
 end
+-- Shortest Path's route under our arrow (provider "spf", spfOurArrow): where its guidance points now (the
+-- next bend, flight master or dock), its legs' own words and the time left. Read 5 times a second at most.
+local spfRead, spfAt = nil, -1
+local function SPFNow()
+    local map, mx, my = PlayerMapPos()
+    local cont, px, py
+    if map then cont, px, py = World(map, mx, my) end
+    local t = GetTime()
+    if not spfRead or t - spfAt > 0.2 then
+        local api = SPF()
+        local g, j
+        if api and api.Guidance then local ok, v = pcall(api.Guidance); if ok and type(v) == "table" then g = v end end
+        if api and api.Journey then local ok, v = pcall(api.Journey); if ok and type(v) == "table" then j = v end end
+        local target
+        local p = g and g.point
+        if type(p) == "table" and p.map and p.x and p.y then
+            target = Point(p.map, p.x * 100, p.y * 100, { kind = "spf" })
+        end
+        local legs = {}
+        for _, l in ipairs(j and type(j.legs) == "table" and j.legs or {}) do
+            if type(l) == "table" and type(l.text) == "string" and l.text ~= "" then
+                legs[#legs + 1] = { mode = l.mode, text = l.text, seconds = l.seconds }
+            end
+        end
+        spfRead = { target = target, legs = legs, left = j and tonumber(j.secondsLeft) or nil, guided = target ~= nil }
+        spfAt = t
+    end
+    local dest = state.dest
+    local target = spfRead.target or dest
+    local dDest = DistFrom(cont, px, py, dest)
+    now.leg, now.legs, now.eta = nil, nil, spfRead.left
+    now.target, now.dist = target, DistFrom(cont, px, py, target)
+    now.dest, now.source = dest, state.source
+    now.arrived = dDest ~= nil and dDest < NEAR
+    now.map, now.cont, now.px, now.py = map, cont, px, py
+    now.trail, now.straight = nil, now.dist
+    now.spf = spfRead
+    return now
+end
+GPS._SPFRead = function() spfRead = nil end
+
 function GPS.Now()
     if not state.dest or state.zygor then return nil end
+    if state.spfView then return SPFNow() end
+    now.spf = nil
     local map, mx, my = PlayerMapPos()
     local cont, px, py
     if map then cont, px, py = World(map, mx, my) end

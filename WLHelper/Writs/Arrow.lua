@@ -426,6 +426,17 @@ local function Draw(self, now, combat)
         local w = now.dest and now.dest.writ
         where = w and w.npcName and string.format(L("Parle à %s"), w.npcName) or (now.dest and now.dest.name) or ""
         route = (w and w.item and WP.ItemName(w.item, w.itemName)) or (w and w.itemName) or ""
+    elseif now.spf then
+        -- Shortest Path's route under our arrow: its legs in its own words, the arrow on its next point
+        if SetVisual(self, "arrow") then changed = true end
+        self.turn = true
+        local sl = now.spf.legs
+        what = sl[1] and sl[1].text or L("Shortest Path calcule le trajet...")
+        if sl[2] then where = GPS.UpperFirst(string.format(L("puis %s"), sl[2].text)) end
+        dist = now.dist and DistLine(now.dist) or (S.Hex(C.muted) .. L("Autre continent") .. "|r")
+        local rest = {}
+        for i = 3, math.min(#sl, 5) do rest[#rest + 1] = sl[i].text end
+        route = table.concat(rest, GPS.SEP or " > ")
     elseif not now.map and IsInInstance and IsInInstance() then
         -- inside a dungeon there is no map position: the place alone
         if SetVisual(self, "painted", ICON_DUNGEON) then changed = true end
@@ -547,7 +558,14 @@ local function Draw(self, now, combat)
 
     -- the trip's end, on top while a leg on the way is told (a flight, a ship, a walk to a dock): you
     -- always see where all this goes ("Destination : Moulin-de-Tarren, Contreforts de Hautebrande ~12 min")
-    if not now.arrived and now.dest and legs and n > 0 then
+    if now.spf then
+        local d = now.dest
+        if not now.arrived and d and d.name and #now.spf.legs > 1 then
+            goal = S.Hex(C.gold) .. string.format(L("Destination : %s"), d.name) .. "|r"
+            local mins = now.spf.left and GPS.Minutes(now.spf.left)
+            if mins then goal = goal .. S.Hex(C.muted) .. "  " .. mins .. "|r" end
+        end
+    elseif not now.arrived and now.dest and legs and n > 0 then
         local last = legs[n]
         local finalNow = n == 1 and leg and leg.kind == "ride"
         if not finalNow then

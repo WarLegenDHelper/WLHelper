@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.130] — 2026-11-18
+
+### Ajouté / Added
+- **GPS, le trajet de Shortest Path avec notre flèche** : avec « Envoyer les destinations à Shortest Path », la nouvelle option « Avec la flèche de WL Helper » (activée par défaut) garde notre flèche. Shortest Path calcule le trajet ; notre flèche vise son prochain point et dit son étape en cours, puis la suivante, les étapes d'après, la destination et le temps restant. Pour n'avoir que notre flèche, coupe celle de Shortest Path et son suivi de trajet dans ses propres réglages (Interface : la flèche ; Guidance : les étapes dans le suivi des objectifs). Option coupée : l'interface de Shortest Path, comme avant.
+  *GPS: Shortest Path's route shown by WL Helper's arrow (new option, on by default).*
+
 ## [1.0.0-beta.129] — 2026-11-18
 
 ### Ajouté / Added
