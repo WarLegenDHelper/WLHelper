@@ -383,6 +383,9 @@ local function CheckMain(link)
             return NO
         end
         local r = (up and (n or 0) >= (WLWritsDB.upgradeMin or 1)) and { up = true, text = text, n = n } or NO
+        -- what the tooltip calls "about the same" is no upgrade: no arrow, no "+43%" on the bag icon
+        -- (report: Guardian Talisman next to Theka's Last Breath, "why do I still see +43%")
+        if r ~= NO and (n or 0) < 1000 and WP.UpgradeIsTie and WP.UpgradeIsTie(link, n) then r = NO end
         cache[link] = r
         return r
     end
@@ -749,6 +752,14 @@ local function NearTie(link)
     return nil
 end
 WP.UpgradeNearTie = NearTie
+-- true when the tooltip says "Presque pareil" for this percent (the bag icons follow it)
+function WP.UpgradeIsTie(link, v)
+    if type(v) ~= "number" then return false end
+    local ok, pts, _, small, key = pcall(NearTie, link)
+    if not ok or not pts then return false end
+    if small then return pts <= (NEAR[key] or 5) end
+    return math.abs(v) < 10
+end
 -- the percent's text and colour for a near tie ("Presque pareil (-14 %)", grey) and the line under
 -- it; unchanged and nil otherwise (v: the percent, WL Helper Gear judging)
 local function Near(link, v, text, col)

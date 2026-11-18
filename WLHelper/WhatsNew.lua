@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.161", date = "2026-11-18", items = {
+    { s = "fix", fr = { "Améliorations, icônes des sacs", "Un objet que le tooltip dit « Presque pareil » gardait la flèche verte et un « +43 % » sur son icône dans les sacs (Guardian Talisman face à Theka's Last Breath). Les icônes suivent maintenant le tooltip : ni flèche ni pourcentage pour un objet presque pareil." }, en = { "Bag icons follow the tooltip", "No arrow and no percent on an item that is \"about the same\"." } },
+  } },
   { v = "1.0.0-beta.160", date = "2026-11-18", items = {
     { s = "fix", fr = { "Les boutons du guide ouvrent la vue moderne", "« Mettre à jour le guide » et « Retour au guide » (résumé des donjons, clés), la page d'accueil, le hub, les réglages et la proposition à l'entrée d'un donjon ouvraient la fenêtre classique au lieu de la vue moderne. Ils ouvrent maintenant la vue moderne quand c'est la vue par défaut. La fenêtre classique s'ouvre seulement par l'entrée « Fenêtre » du menu de la vue moderne (et pendant la visite guidée, qui la montre)." }, en = { "Guide buttons (update / back to the guide, home, hub, keys, settings, dungeon entry) open the modern view when it is the default; the window only from its menu.", "" } },
   } },
@@ -79,17 +82,5 @@ ns.WHATSNEW = {
     { s = "add", fr = { "", "les fenêtres WL Helper ouvertes ;" }, en = { "", "" } },
     { s = "add", fr = { "", "la sous-zone ;" }, en = { "", "" } },
     { s = "add", fr = { "", "les 3 dernières erreurs Lua. De quoi comprendre le problème sans capture." }, en = { "Reports carry a snapshot of the state", "The guide's action and step, picked dungeons, quest log, GPS destination and arrow text, target, open windows, subzone, the last 3 Lua errors." } },
-  } },
-  { v = "1.0.0-beta.146", date = "2026-11-18", items = {
-    { s = "chg", fr = { "La vue moderne par défaut", "Lancer un guide ou ouvrir le guide affiche maintenant la vue moderne. Un clic sur son titre ouvre la fenêtre complète. Pour revenir à l'ancien comportement : Options > Donjons, « Vue moderne par défaut »." }, en = { "The modern view is the guide's default view; a click on its title opens the window (Options > Dungeons to turn it off).", "" } },
-    { s = "add", fr = { "Vue moderne, étape précédente / suivante", "Des petites flèches ‹ › autour de « 33/42 » dans l'en-tête font défiler les étapes. Pendant qu'on regarde une autre étape, le libellé orange propose de revenir à l'étape en cours." }, en = { "Modern view", "‹ › arrows in the header browse the steps; a click on the label goes back to the current one." } },
-    { s = "add", fr = { "Vue moderne, le menu", "La roue dentée de l'en-tête, ou un clic droit sur le titre, ouvre un menu :" }, en = { "", "" } },
-    { s = "add", fr = { "", "ouvrir la fenêtre du guide, guider vers l'étape, marquer l'étape comme faite ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "partager les quêtes avec le groupe ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "boss et carte du donjon ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "avec ou sans cadre, réglages du guide ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "arrêter ce guide (second clic pour confirmer), masquer la vue moderne." }, en = { "Modern view", "The gear (or a right-click on the title) opens a menu with the window's actions and settings." } },
-    { s = "fix", fr = { "Une quête qui commence avec un objet dit lequel", "Dans la vue moderne, « Prendre « The Essence of Eranikus » · objet « Oathstone of Ysera's Dragonflight » dans tes sacs ». Deux quêtes portent ce nom : la seconde commence avec ce serment." }, en = { "An item-started quest names its item in the modern view (two quests share the name \"The Essence of Eranikus\").", "" } },
-    { s = "fix", fr = { "La touche L dans un donjon", "La carte du donjon de Naowh s'affichait toute petite au milieu, à côté du journal de quêtes. Elle se réajuste maintenant à la taille de la carte." }, en = { "L inside a dungeon", "Naowh's dungeon map is fitted again once the window has its size." } },
   } },
 }

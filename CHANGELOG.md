@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.161] — 2026-11-18
+
+### Corrigé / Fixed
+- **Améliorations, icônes des sacs** : un objet que le tooltip dit « Presque pareil » gardait la flèche verte et un « +43 % » sur son icône dans les sacs (Guardian Talisman face à Theka's Last Breath). Les icônes suivent maintenant le tooltip : ni flèche ni pourcentage pour un objet presque pareil.
+  *Bag icons follow the tooltip: no arrow and no percent on an item that is "about the same".*
+
 ## [1.0.0-beta.160] — 2026-11-18
 
 ### Corrigé / Fixed
