@@ -6,6 +6,19 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.144] — 2026-11-18
+
+### Modifié / Changed
+- **La vue moderne garde toutes les infos du guide** : elle ne montrait que l'action en cours et ses objectifs. Elle reprend maintenant tout ce que dit la carte de la fenêtre du guide, en dessous de l'action :
+  - où aller et à quelle distance ;
+  - pourquoi maintenant (prérequis, « requise pour... », optionnelle) ;
+  - ce qui tombe, et les autres objectifs de la quête ;
+  - ce que la quête demandera, la récompense, nos notes et le texte du jeu ;
+  - sur un boss, sa tactique et le butin pour toi.
+
+  C'est la même information que dans la fenêtre, avec la présentation moderne (sans cadre par défaut).
+  *The modern view now shows everything the guide window's card says: where and how far, why now, drops, other objectives, what the quest asks, reward, notes, the game's text, and on a boss its tactics and loot for you.*
+
 ## [1.0.0-beta.143] — 2026-11-18
 
 ### Modifié / Changed

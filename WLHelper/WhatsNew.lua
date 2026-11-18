@@ -2,6 +2,14 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.144", date = "2026-11-18", items = {
+    { s = "chg", fr = { "La vue moderne garde toutes les infos du guide", "Elle ne montrait que l'action en cours et ses objectifs. Elle reprend maintenant tout ce que dit la carte de la fenêtre du guide, en dessous de l'action :" }, en = { "", "" } },
+    { s = "chg", fr = { "", "où aller et à quelle distance ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "pourquoi maintenant (prérequis, « requise pour... », optionnelle) ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "ce qui tombe, et les autres objectifs de la quête ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "ce que la quête demandera, la récompense, nos notes et le texte du jeu ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "sur un boss, sa tactique et le butin pour toi. C'est la même information que dans la fenêtre, avec la présentation moderne (sans cadre par défaut)." }, en = { "The modern view now shows everything the guide window's card says: where and how far, why now, drops, other objectives, what the quest asks, reward, notes, the game's text, and on a boss its tactics and loot for you.", "" } },
+  } },
   { v = "1.0.0-beta.143", date = "2026-11-18", items = {
     { s = "chg", fr = { "« Nous écrire » : on écrit et on envoie dans la fenêtre", "Le bouton de la page d'accueil, « Nous écrire », ouvre une fenêtre avec : 1. le choix entre une idée, un bug ou une erreur de quête ; 2. une zone pour écrire ton message ; 3. un champ pour coller le lien d'une capture d'écran (mets-la sur Discord ou imgur, puis Ctrl+V : le jeu ne laisse pas un addon joindre une image) ; 4. le bouton **Envoyer**. Le message part par la guilde, avec ta position, ton étape du guide et ta version, sans compte. Le formulaire GitHub reste en dessous, pour ceux qui ont un compte." }, en = { "\"Write to us\" (home page) now has a message box, a screenshot-link field and a Send button: sent through the guild, no account; GitHub stays below.", "" } },
   } },
@@ -69,8 +77,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.130", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, le trajet de Shortest Path avec notre flèche", "Avec « Envoyer les destinations à Shortest Path », la nouvelle option « Avec la flèche de WL Helper » (activée par défaut) garde notre flèche. Shortest Path calcule le trajet ; notre flèche vise son prochain point et dit son étape en cours, puis la suivante, les étapes d'après, la destination et le temps restant. Pour n'avoir que notre flèche, coupe celle de Shortest Path et son suivi de trajet dans ses propres réglages (Interface : la flèche ; Guidance : les étapes dans le suivi des objectifs). Option coupée : l'interface de Shortest Path, comme avant." }, en = { "GPS", "Shortest Path's route shown by WL Helper's arrow (new option, on by default)." } },
-  } },
-  { v = "1.0.0-beta.129", date = "2026-11-18", items = {
-    { s = "add", fr = { "GPS, retour au cadavre", "Mort et libéré (fantôme), la flèche t'emmène à ton cadavre (« Ton cadavre »). Une fois ressuscité, elle reprend l'étape du guide ou le trajet que tu suivais. Ça marche aussi après un /reload en fantôme." }, en = { "GPS", "As a ghost, the arrow takes you to your corpse, then back to the step or trip you followed." } },
   } },
 }

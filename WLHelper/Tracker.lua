@@ -199,6 +199,19 @@ function TR.Model()
     local have, need = Count(log, cur.node.q, cur.obj)
     if have and need and need > 1 then cur.count = have .. "/" .. need end
   end
+  -- everything the guide window's card says about this action (report: "Polestar keeps the same
+  -- level of information as our other view, only nicer"): where and how far, why now, the drops,
+  -- the other objectives, the details (what it asks, the reward, our notes, the game's text); on a
+  -- boss, its tactics and the loot for you. The window's own model (ns.FocusModel), nothing redone.
+  if cur.node and ns.FocusModel then
+    local okF, M = pcall(ns.FocusModel, cur.node, log, dk, cur.st or st)
+    if okF and type(M) == "table" then m.focus = M end
+  end
+  local bst = (cur.st and cur.st.bossStep) and cur.st or (st.bossStep and st or nil)
+  if bst then
+    if ns.BossTacticText then local okT, t = pcall(ns.BossTacticText, bst); if okT and type(t) == "string" then m.tactic = t end end
+    if ns.BossLootText then local okL, t = pcall(ns.BossLootText, bst); if okL and type(t) == "string" then m.loot = t end end
+  end
   -- travel hint (long trip, other continent) on the current step
   if st.travel == "TRAVEL_FAR" or st.travel == "TRAVEL_CONT" then m.travel = L[st.travel] end
   -- the next actions: the rest of this step, then the steps after it
@@ -248,6 +261,18 @@ end
 --  Frame
 -- =====================================================================
 local f
+
+-- line k of the card's information (made the first time it is needed)
+local function InfoLine(k)
+  local fs = f.info[k]
+  if not fs then
+    fs = ns.Text(f, F.label, T.text)
+    fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP"); fs:SetWordWrap(true)
+    fs:SetWidth(TEXT_W)
+    f.info[k] = fs
+  end
+  return fs
+end
 
 -- the action's names in colour: what is quoted (« Name », "Name") or what follows "Verb: "
 local function Rich(text)
@@ -444,6 +469,8 @@ local function Build()
     b.fill = ns.Tex(b, "OVERLAY", T.text); b.fill:SetHeight(BAR_H)
     f.bars[k] = b
   end
+  -- the card's other lines (where, why, drops, objectives, details, tactics, loot): made as needed
+  f.info = {}
   f.thenLabel = ns.Text(f, F.meta, T.muted)
   f.thenLabel:SetText(L.TR_THEN or "Ensuite")
   f.nexts = {}
@@ -522,6 +549,7 @@ local function Draw(m)
   ns.SetHDIcon(f.col.icon, collapsed and "chevron_down" or "chevron_up", T.muted)
   local y = headH
   local function hideBody()
+    for _, fs in ipairs(f.info or {}) do fs:Hide() end
     f.cur:Hide(); f.travel:Hide(); f.travelIcon:Hide()
     f.card:Hide(); f.stepLabel:Hide(); f.thenLabel:Hide(); f.prog:Hide(); f.progFill:Hide(); f.progText:Hide()
     for _, b in ipairs(f.bars) do b:Hide() end
@@ -585,6 +613,39 @@ local function Draw(m)
       y = y + bh + 6
     else b:Hide() end
   end
+  -- the rest of the guide card's information, inside the card
+  local nInfo = 0
+  local function Put(text, size, color, gap, heading)
+    if type(text) ~= "string" or text == "" then return end
+    nInfo = nInfo + 1
+    local fs = InfoLine(nInfo)
+    if fs._size ~= size then fs._size = size; if ns.SetFont then ns.SetFont(fs) end end
+    local c = color or T.text
+    fs:SetTextColor(c[1], c[2], c[3])
+    fs:SetText(heading and string.upper(text) or text)
+    if ns.Shadow then ns.Shadow(fs, f.frameless) end
+    y = y + (gap or 4)
+    fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + ICON + GAP, -y)
+    fs:Show()
+    y = y + TextH(fs, size)
+  end
+  local M = m.focus
+  if M then
+    if M.lead and M.lead ~= m.cur.sub then Put(M.lead, F.label, T.muted, 2) end
+    if M.where then Put(M.where, F.label, T.accentSoft, 2) end
+    for _, w in ipairs(M.why or {}) do Put(w, F.label, T.muted, 3) end
+    if M.drops then Put(M.drops, F.label, T.text, 4) end
+    -- the other objectives, unless the bars above already count them
+    if #(m.bars or {}) == 0 then for _, o in ipairs(M.objs or {}) do Put(o, F.label, T.text, 3) end end
+    for _, b in ipairs(M.detBlocks or {}) do
+      if b.h then Put(b.h, F.meta, T.gold, 8, true) end
+      if b.list then Put(table.concat(b.list, "\n"), F.label, T.text, b.h and 2 or 6)
+      elseif b.body then Put(table.concat(b.body, "\n"), F.label, T.text, b.h and 2 or 6) end
+    end
+  end
+  if m.tactic then Put(L.H_TACTIC, F.meta, T.gold, 8, true); Put(m.tactic, F.label, T.text, 2) end
+  if m.loot then Put(L.H_LOOT, F.meta, T.gold, 8, true); Put(m.loot, F.label, T.text, 2) end
+  for k = nInfo + 1, #f.info do f.info[k]:Hide() end
   -- the card closes under the step's last line
   y = y + CARD_PAD - 6
   f.card:ClearAllPoints()
