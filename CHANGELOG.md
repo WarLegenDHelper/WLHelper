@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.162] — 2026-11-19
+
+### Corrigé / Fixed
+- **Uldaman (Horde), la chaîne du collier** : la route faisait tout le donjon avant d'envoyer à Kargath traduire le journal, puis demandait « Trouver les Gemmes et la Source d'énergie ». Or ses gemmes tombent dans le donjon (Grimlok, Archaedas, une urne, une cache) : il fallait le refaire en entier. Maintenant, juste après les Restes d'un paladin (au début du donjon), la route te fait ressortir à Kargath voir Jarkal, puis revenir faire tout le donjon avec la quête des gemmes. Une note sur ces étapes l'explique : l'instance reste comme tu l'as laissée si tu reviens dans la demi-heure environ.
+  *Uldaman (Horde) necklace chain: out to Kargath right after the Remains of a Paladin, back in for the rest, so the gems quest is done in the same run.*
+
 ## [1.0.0-beta.161] — 2026-11-18
 
 ### Corrigé / Fixed

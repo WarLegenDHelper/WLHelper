@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.162", date = "2026-11-19", items = {
+    { s = "fix", fr = { "Uldaman (Horde), la chaîne du collier", "La route faisait tout le donjon avant d'envoyer à Kargath traduire le journal, puis demandait « Trouver les Gemmes et la Source d'énergie ». Or ses gemmes tombent dans le donjon (Grimlok, Archaedas, une urne, une cache) : il fallait le refaire en entier. Maintenant, juste après les Restes d'un paladin (au début du donjon), la route te fait ressortir à Kargath voir Jarkal, puis revenir faire tout le donjon avec la quête des gemmes. Une note sur ces étapes l'explique : l'instance reste comme tu l'as laissée si tu reviens dans la demi-heure environ." }, en = { "Uldaman (Horde) necklace chain", "Out to Kargath right after the Remains of a Paladin, back in for the rest, so the gems quest is done in the same run." } },
+  } },
   { v = "1.0.0-beta.161", date = "2026-11-18", items = {
     { s = "fix", fr = { "Améliorations, icônes des sacs", "Un objet que le tooltip dit « Presque pareil » gardait la flèche verte et un « +43 % » sur son icône dans les sacs (Guardian Talisman face à Theka's Last Breath). Les icônes suivent maintenant le tooltip : ni flèche ni pourcentage pour un objet presque pareil." }, en = { "Bag icons follow the tooltip", "No arrow and no percent on an item that is \"about the same\"." } },
   } },
@@ -71,16 +74,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Deux boutons qui ne faisaient pas ce qu'ils disaient", "" }, en = { "", "" } },
     { s = "fix", fr = { "Trouver un groupe", "Recliquer sur la note qu'on avait donnée à un joueur ne l'effaçait pas ;" }, en = { "", "" } },
     { s = "fix", fr = { "Commandes", "« Commander à nouveau » sur une commande refusée la renvoyait au même artisan au lieu de la proposer à toute la guilde." }, en = { "Two buttons fixed", "Clearing a player's rating by clicking it again, and re-ordering a declined order to the whole guild." } },
-  } },
-  { v = "1.0.0-beta.147", date = "2026-11-18", items = {
-    { s = "add", fr = { "Les rapports emportent une « photo de l'état »", "En plus du message, de la version et de la position, chaque rapport envoyé avec « Nous écrire » (ou /wlh bug) emporte maintenant :" }, en = { "", "" } },
-    { s = "add", fr = { "", "l'action que le guide demande et le numéro de l'étape ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "les donjons choisis ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "les quêtes du journal, avec celles prêtes à rendre ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "la destination du GPS et ce que dit la flèche ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "la cible (nom et numéro de PNJ) ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "les fenêtres WL Helper ouvertes ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "la sous-zone ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "les 3 dernières erreurs Lua. De quoi comprendre le problème sans capture." }, en = { "Reports carry a snapshot of the state", "The guide's action and step, picked dungeons, quest log, GPS destination and arrow text, target, open windows, subzone, the last 3 Lua errors." } },
   } },
 }

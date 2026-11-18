@@ -17,6 +17,10 @@ ns.TR["The Hinterlands trolls around Jintha'Alor are level 45-50: bring a friend
 local NOTES = {
   [3520] = { "In Feralas, kill a Vale Screecher or Rogue Vale Screecher, use Yeh'kinya's Bramble on its corpse, then talk to the spirit that appears. Repeat 3 times.",
              "À Feralas, tue un Vale Screecher ou Rogue Vale Screecher, utilise Yeh'kinya's Bramble sur le cadavre, puis parle à l'esprit qui apparaît. À faire 3 fois." },
+  [2284] = { "The Remains of a Paladin lie early in Uldaman, before the big hall. Right after, leave the dungeon: Jarkal Mossmeld in Kargath translates the journal and gives \"Find the Gems and Power Source\", whose gems drop inside (Grimlok, Archaedas, an urn, a cache). The instance stays as you left it if you come back within about 30 minutes.",
+             "Les Restes d'un paladin sont au début d'Uldaman, avant la grande salle. Juste après, ressors du donjon : Jarkal Mossmeld, à Kargath, traduit le journal et donne « Trouver les Gemmes et la Source d'énergie », dont les gemmes sont dans le donjon (Grimlok, Archaedas, une urne, une cache). L'instance reste comme tu l'as laissée si tu reviens dans la demi-heure environ." },
+  [2318] = { "Leave Uldaman now, before the rest of the dungeon: Kargath is close. Jarkal's next quest needs gems from Grimlok and Archaedas; killed before you have it, they do not drop.",
+             "Ressors d'Uldaman maintenant, avant la suite du donjon : Kargath est tout près. La quête suivante de Jarkal demande des gemmes de Grimlok et d'Archaedas ; tués avant de l'avoir, ils ne les donnent pas." },
   [2933] = { "The Venom Bottle is an object lying in the Witherbark troll camps of the Hinterlands: right-click it to get the quest.",
              "La Venom Bottle est un objet posé dans les camps des trolls Witherbark des Hinterlands : clic droit dessus pour obtenir la quête." },
 }
@@ -44,6 +48,27 @@ function ns.Extras(nodes, byKey, add, sel, cls)
     extra = ns.lang == "fr" and "Monte au sommet de Jintha'Alor et utilise le Sacred Mallet sur l'autel." or "Climb to the top of Jintha'Alor and use the Sacred Mallet on the altar." })
   i2.deps = { i1 }
   if hasG and byKey["c:2770"] then table.insert(byKey["c:2770"].deps, i2) end
+end
+
+-- Uldaman (Horde), la chaîne du collier : le journal se trouve sur les Restes d'un paladin, au début
+-- du donjon (Wowhead Forever, commentaire de quête 2284 : « avant la grande salle »), Jarkal le
+-- traduit à Kargath et donne « Trouver les Gemmes et la Source d'énergie », dont les gemmes viennent
+-- de Grimlok, d'Archaedas, d'une urne et d'une cache du donjon. Fait après le donjon, il faut tout
+-- refaire (signalement : « je viens de finir le donjon, faut le faire une 2e fois ? ») : le reste du
+-- donjon attend donc l'aller-retour à Kargath (l'instance reste comme on l'a laissée).
+local extras = ns.Extras
+ns.Extras = function(nodes, byKey, add, sel, cls)
+  if extras then extras(nodes, byKey, add, sel, cls) end
+  local gems, remains, journal = byKey["a:2339"], byKey["t:2284"], byKey["a:2318"]
+  if not (gems and remains and byKey["c:2339"]) then return end
+  for _, n in ipairs(nodes) do
+    if n.ins == "Uldaman" and n ~= remains and n ~= journal and n ~= gems then
+      n.deps = n.deps or {}
+      table.insert(n.deps, gems)
+      n.midOut = true
+    end
+  end
+  remains.exitTip = true
 end
 
 -- Nom affiché pour les pseudo-étapes
