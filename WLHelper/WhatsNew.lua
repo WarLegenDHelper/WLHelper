@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.129", date = "2026-11-18", items = {
+    { s = "add", fr = { "GPS, retour au cadavre", "Mort et libéré (fantôme), la flèche t'emmène à ton cadavre (« Ton cadavre »). Une fois ressuscité, elle reprend l'étape du guide ou le trajet que tu suivais. Ça marche aussi après un /reload en fantôme." }, en = { "GPS", "As a ghost, the arrow takes you to your corpse, then back to the step or trip you followed." } },
+  } },
   { v = "1.0.0-beta.128", date = "2026-11-18", items = {
     { s = "fix", fr = { "GPS, la tour de l'archimage Xylem (Azshara)", "Aucun chemin ne monte en haut de sa tour, et la flèche partait dans les falaises. Elle t'envoie maintenant à Sanath Lim-yo, au pied de la tour (28.1, 50.1) : parle-lui, il te téléporte en haut. Une fois en haut, la flèche passe à Xylem. Les étapes des quêtes de mage de Xylem le disent aussi." }, en = { "GPS", "Archmage Xylem's tower has no path up: the arrow goes to Sanath Lim-yo at its foot, who teleports you up." } },
   } },
@@ -50,8 +53,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.115", date = "2026-11-18", items = {
     { s = "fix", fr = { "XP des quêtes", "128 quêtes affichaient l'XP de base, sans le bonus de Forever (souvent x1,75 à x2,7). Elles ont maintenant l'XP réelle, celle de Wowhead Forever, la même qu'en jeu (Blood Red Bandanas : 9 700 XP). Les totaux d'XP du guide et de la vue d'ensemble sont donc bien plus justes." }, en = { "Quest XP", "128 quests showed the base XP without Forever's bonus; they now show the real XP (Wowhead Forever, as in game)." } },
     { s = "fix", fr = { "Quêtes ajoutées", "An Ambassador of Evil (Alliance, Ironforge, avant The Lost Tablets of Will à Uldaman) et Elven Legends côté Alliance (Scholar Runethorn, Feathermoon) ; les librams de Hache-tripes s'ouvrent maintenant aussi à l'Alliance." }, en = { "Added An Ambassador of Evil and the Alliance Elven Legends (Dire Maul librams open to the Alliance).", "" } },
-  } },
-  { v = "1.0.0-beta.114", date = "2026-11-17", items = {
-    { s = "add", fr = { "Guide PvP", "Tape « /wlh pvp ». Pour ta classe, chaque pièce du set PvP bleu « Premier » (niveau d'objet 60, dès le niveau 55) avec son prix en honneur et en marques, ce qu'il te manque d'après ton honneur et tes marques, le total pour le set, et le champ de bataille à faire en premier (celui dont il te manque le plus de marques). Quand une classe a plusieurs sets (druide, chaman, prêtre, paladin), WL Helper Gear choisit le meilleur pour ta spé et nomme les autres. Puis la quête Field of Honor (Wizzik Dustfizz à Gadgetzan) et les sceaux « Emboldened » qui rendent une pièce épique plus tard. Prix lus sur Wowhead Forever (vendeur Lady Palanseer) : tête 9 000 honneur + 15 marques d'Alterac, torse 9 350 + 15 Arathi, jambes 9 000 + 15 Goulet, épaules 6 350 + 10 Arathi, mains 7 500 + 10 Goulet, pieds 7 500 + 10 Îles Darkspear, taille 6 000 + 10 Arathi, poignets 4 500 + 10 Goulet." }, en = { "PvP guide (/wlh pvp)", "The rare PvP set for your class, its Forever prices (Wowhead), what you still miss, which battleground first, Field of Honor." } },
   } },
 }

@@ -28,6 +28,7 @@ WP.GPS = GPS
 ns.AddEnglish({
     ["Va au maître de vol de %s"] = "Go to the flight master at %s",
     ["Va au bateau pour %s"] = "Go to the boat to %s",
+    ["Ton cadavre"] = "Your corpse",
     ["Sanath Lim-yo : parle-lui, il te téléporte en haut de la tour"] = "Sanath Lim-yo: talk to him, he teleports you up the tower",
     ["Shortest Path est installé. Quel GPS veux-tu suivre ?\n\nShortest Path : son trajet sur la carte, les vols, les bateaux avec leurs départs, sa flèche.\nWL Helper : notre flèche et son trajet.\n\nTu peux changer plus tard : Options > GPS."] = "Shortest Path is installed. Which GPS do you want to follow?\n\nShortest Path: its route on the map, flights, boats with their departures, its arrow.\nWL Helper: our arrow and its route.\n\nYou can change it later: Options > GPS.",
     ["Destination : %s"] = "Destination: %s",
@@ -1974,9 +1975,51 @@ local function Door(dest)
 end
 GPS._Door = Door
 
+-- Dead and released: the arrow takes you back to your corpse, then gives the trip back (report: "I am
+-- dead, our GPS does not send me to my corpse, Shortest Path does"). Only while the GPS guides something.
+local corpseFrom          -- the trip the corpse run stepped in front of: { dest, source }
+local function CorpsePos()
+    local D = C_DeathInfo
+    if not (D and D.GetCorpseMapPosition and C_Map and C_Map.GetBestMapForUnit) then return nil end
+    local map = C_Map.GetBestMapForUnit("player")
+    local tries = 0
+    while map and tries < 4 do
+        local ok, v = pcall(D.GetCorpseMapPosition, map)
+        if ok and v and v.GetXY then
+            local x, y = v:GetXY()
+            if x and y and (x > 0 or y > 0) then return map, x * 100, y * 100 end
+        end
+        local info = C_Map.GetMapInfo and C_Map.GetMapInfo(map)
+        map = info and info.parentMapID
+        if map == 0 then map = nil end
+        tries = tries + 1
+    end
+end
+function GPS.CorpseCheck()
+    local ghost = UnitIsGhost and UnitIsGhost("player")
+    if ghost then
+        if state.source == "corpse" then return end
+        if not state.dest then return end           -- nothing guided: nothing to give back
+        local map, x, y = CorpsePos()
+        if not map then return end
+        local dest = Point(map, x, y, { kind = "dest", name = L("Ton cadavre") })
+        if not dest then return end
+        -- the dungeon guide's point waits by itself (state.suspended); another trip is kept here
+        corpseFrom = state.source ~= "dungeon" and { dest = state.dest, source = state.source } or nil
+        GPS._Start(dest, "corpse")
+    elseif state.source == "corpse" then
+        local back = corpseFrom
+        corpseFrom = nil
+        GPS.Stop("corpse")
+        if back and not state.dest then GPS._Start(back.dest, back.source) end
+    end
+end
+
 -- The replan clock runs only while guiding.
 local ticker
 local function Tick()
+    -- a /reload as a ghost fires no event: the replan clock looks too
+    if UnitIsGhost and (UnitIsGhost("player") or state.source == "corpse") then pcall(GPS.CorpseCheck) end
     -- taken up the tower: the place itself now
     local d = state.dest
     if d and d.door then
@@ -2456,6 +2499,9 @@ pcall(f.RegisterEvent, f, "LOADING_SCREEN_DISABLED")
 pcall(f.RegisterEvent, f, "CONFIRM_BINDER")
 pcall(f.RegisterUnitEvent or f.RegisterEvent, f, "UNIT_SPELLCAST_SUCCEEDED", "player")
 pcall(f.RegisterEvent, f, "PLAYER_REGEN_ENABLED")
+pcall(f.RegisterEvent, f, "PLAYER_ALIVE")
+pcall(f.RegisterEvent, f, "PLAYER_UNGHOST")
+pcall(f.RegisterEvent, f, "PLAYER_DEAD")
 
 -- Where you stand, as a world point with no secret in it.
 local function Here()
@@ -2554,6 +2600,9 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3)
         if C_Timer and C_Timer.After then C_Timer.After(8, function() pcall(GPS.AskProvider) end) end
         -- A tour does not survive a reload: start it again from the button.
         if WLWritsCharDB then WLWritsCharDB.gps = false end
+    elseif event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" or event == "PLAYER_DEAD" then
+        -- released (ghost), back to life: the corpse run starts or ends (the position comes a moment later)
+        if C_Timer and C_Timer.After then C_Timer.After(1, function() pcall(GPS.CorpseCheck) end) else pcall(GPS.CorpseCheck) end
     elseif event == "TAXIMAP_OPENED" then
         RecordTaxi()
         GPS.Replan()

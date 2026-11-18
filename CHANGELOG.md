@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.129] — 2026-11-18
+
+### Ajouté / Added
+- **GPS, retour au cadavre** : mort et libéré (fantôme), la flèche t'emmène à ton cadavre (« Ton cadavre »). Une fois ressuscité, elle reprend l'étape du guide ou le trajet que tu suivais. Ça marche aussi après un /reload en fantôme.
+  *GPS: as a ghost, the arrow takes you to your corpse, then back to the step or trip you followed.*
+
 ## [1.0.0-beta.128] — 2026-11-18
 
 ### Corrigé / Fixed
