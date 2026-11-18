@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.158] — 2026-11-18
+
+### Modifié / Changed
+- **Trouver un groupe, plus clair** : sur une fenêtre assez large, les filtres ne sont plus cachés dans une fenêtre qui s'ouvre par-dessus. Ils restent visibles dans une colonne à droite de la liste, comme dans LFG Forever, avec des titres de section en couleur (classes, niveau, langues, style de jeu, places libres). L'icône filtre masque ou réaffiche cette colonne. Sur une fenêtre étroite, rien ne change.
+  *Find a group: on a wide window the filters stay visible in a column right of the list; the filter icon hides or shows it.*
+
 ## [1.0.0-beta.157] — 2026-11-18
 
 ### Ajouté / Added

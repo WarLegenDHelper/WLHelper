@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.158", date = "2026-11-18", items = {
+    { s = "chg", fr = { "Trouver un groupe, plus clair", "Sur une fenêtre assez large, les filtres ne sont plus cachés dans une fenêtre qui s'ouvre par-dessus. Ils restent visibles dans une colonne à droite de la liste, comme dans LFG Forever, avec des titres de section en couleur (classes, niveau, langues, style de jeu, places libres). L'icône filtre masque ou réaffiche cette colonne. Sur une fenêtre étroite, rien ne change." }, en = { "Find a group", "On a wide window the filters stay visible in a column right of the list; the filter icon hides or shows it." } },
+  } },
   { v = "1.0.0-beta.157", date = "2026-11-18", items = {
     { s = "add", fr = { "Onglets WL Helper dans la fenêtre Recherche de groupe du jeu", "Sous les onglets de droite (et sous celui de LFG Forever), deux onglets WL Helper. Le logo ouvre « Trouver un groupe », l'enclume ouvre « Commandes d'artisanat ». Un clic ferme la fenêtre du jeu (hors combat) et ouvre la nôtre. Ces onglets ne touchent à rien dans la fenêtre du jeu." }, en = { "Two WL Helper tabs on the game's Group Finder (under LFG Forever's): Find a group and Crafting orders.", "" } },
   } },
@@ -93,8 +96,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "", "ce qui tombe, et les autres objectifs de la quête ;" }, en = { "", "" } },
     { s = "chg", fr = { "", "ce que la quête demandera, la récompense, nos notes et le texte du jeu ;" }, en = { "", "" } },
     { s = "chg", fr = { "", "sur un boss, sa tactique et le butin pour toi. C'est la même information que dans la fenêtre, avec la présentation moderne (sans cadre par défaut)." }, en = { "The modern view now shows everything the guide window's card says: where and how far, why now, drops, other objectives, what the quest asks, reward, notes, the game's text, and on a boss its tactics and loot for you.", "" } },
-  } },
-  { v = "1.0.0-beta.143", date = "2026-11-18", items = {
-    { s = "chg", fr = { "« Nous écrire » : on écrit et on envoie dans la fenêtre", "Le bouton de la page d'accueil, « Nous écrire », ouvre une fenêtre avec : 1. le choix entre une idée, un bug ou une erreur de quête ; 2. une zone pour écrire ton message ; 3. un champ pour coller le lien d'une capture d'écran (mets-la sur Discord ou imgur, puis Ctrl+V : le jeu ne laisse pas un addon joindre une image) ; 4. le bouton **Envoyer**. Le message part par la guilde, avec ta position, ton étape du guide et ta version, sans compte. Le formulaire GitHub reste en dessous, pour ceux qui ont un compte." }, en = { "\"Write to us\" (home page) now has a message box, a screenshot-link field and a Send button: sent through the guild, no account; GitHub stays below.", "" } },
   } },
 }

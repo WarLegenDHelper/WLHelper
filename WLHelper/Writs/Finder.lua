@@ -32,6 +32,8 @@ local F = {}
 WP.Finder = F
 
 ns.AddEnglish({
+    ["Clic : afficher la colonne des filtres"] = "Click: show the filters column",
+    ["Clic : masquer la colonne des filtres"] = "Click: hide the filters column",
     -- the tab, the top bar
     ["Trouver un groupe"] = "Find a group",
     ["Chercher"] = "Search",
@@ -2119,12 +2121,33 @@ end
 
 -- ---------------------------------------------------------------- the filter popover
 local fpop
+-- the filters: a column on the right of the list when the window is wide enough (LFG Forever's
+-- layout, report: "their view is really clear, ours not yet"), else a popover under the filter icon
+local DOCK_W, DOCK_GAP, DOCK_MIN = 300, 16, 760
+-- (the window's full content width: CW is the list's width between two renders when docked)
+local function FullCW() return ui.fullCW or CW end
+local function Docked() return FullCW() >= DOCK_MIN and not F.DB().dockOff end
+F.Docked = Docked
+function F.ListW() if Docked() then return FullCW() - DOCK_W - DOCK_GAP end return FullCW() end
 local function BuildFilters()
     local P = 12
-    fpop = Popup("WLHelperFinderFilters", 300, ui.win)
+    local docked = Docked()
+    if docked then
+        ui.fdock = S.ScrollArea(ui.page)
+        fpop = ui.fdock.child
+        fpop:SetWidth(DOCK_W)
+        ui.fdockBg = S.Solid(ui.fdock, "BACKGROUND", C.cardFill); ui.fdockBg:SetAllPoints()
+        fpop.docked = true
+    else
+        fpop = Popup("WLHelperFinderFilters", 300, ui.win)
+    end
     fpop.owner = nil
     local items = {}
-    local function Label(text) local t = S.Text(fpop, FS.meta, C.muted); t:SetText(text); return t end
+    -- docked: the section titles in the headings' colour, like the list's sections
+    local function Label(text)
+        local t = docked and S.Text(fpop, FS.label, C.head or C.accent) or S.Text(fpop, FS.meta, C.muted)
+        t:SetText(text); return t
+    end
     local function Changed() F.SaveFilters(); F.Render(); if fpop.Layout then fpop:Layout() end end
     -- classes: 3 rows of 3
     fpop.classLabel = Label(L("Classes"))
@@ -2260,11 +2283,23 @@ local function BuildFilters()
         Place(self.presets, P, y); self.reset:ClearAllPoints(); self.reset:SetPoint("LEFT", self.presets, "RIGHT", 8, 0)
         y = y + 28 + P
         self:SetHeight(y)
+        if self.docked and ui.fdock then ui.fdock:SetContentHeight(y) end
+        self.fullH = y
     end
     return fpop
 end
 local function ToggleFilters()
-    if not fpop then BuildFilters() end
+    -- a wide window: the icon shows or hides the filters' column
+    if FullCW() >= DOCK_MIN then
+        F.DB().dockOff = (not F.DB().dockOff) or nil
+        if fpop and not fpop.docked then fpop:Hide() end
+        F.Render()
+        return
+    end
+    if not fpop or fpop.docked then
+        if ui.fdock then ui.fdock:Hide() end
+        BuildFilters()
+    end
     if fpop:IsShown() then fpop:Hide(); return end
     fpop.anchor = ui.filter
     fpop:ClearAllPoints()
@@ -2447,6 +2482,9 @@ local function Build(page, win)
     ui.go:SetIcon("search")
     ui.filter = S.IconButton(page, "filter", 28, function()
         local t = { L("Filtres"), L("Clic : classes, niveau, langues, style de jeu") }
+        if F.Docked and (ui.fullCW or CW) >= 760 then
+            t = { L("Filtres"), F.DB().dockOff and L("Clic : afficher la colonne des filtres") or L("Clic : masquer la colonne des filtres") }
+        end
         if F.FiltersDiffer() then t[#t + 1] = { L("Des filtres sont actifs."), C.accentSoft[1], C.accentSoft[2], C.accentSoft[3] } end
         return t
     end, function() ToggleFilters() end)
@@ -2549,7 +2587,9 @@ function Render()
     if not page:IsShown() then F.dirty = true; return end
     F.dirty = false
     local win = ui.win
+    ui.fullCW = nil
     Dims()
+    ui.fullCW = CW
     -- top bar
     local y = 12
     ui.src:Update(); Place(ui.src, PAD, y)
@@ -2582,6 +2622,14 @@ function Render()
     ui.roles:ClearAllPoints(); ui.roles:SetPoint("LEFT", ui.kind, "RIGHT", 12, 0)
     if (ui.text:GetText() or "") ~= (F.Filters().text or "") and not ui.text.focused then ui.text:SetText(F.Filters().text or "") end
     y = y + 28 + 12
+    -- the filters' column (wide window): the list is narrower, its rows follow CW
+    local docked = Docked()
+    if docked and not (fpop and fpop.docked) then
+        if fpop and fpop:IsShown() then fpop:Hide() end
+        BuildFilters()
+    end
+    if ui.fdock then ui.fdock:SetShown(docked) end
+    if docked then CW = F.ListW() end
     -- banner
     ui.banAct:Hide(); ui.banInfo:Hide()
     local bk, bt, relaunch = BannerState()
@@ -2693,9 +2741,21 @@ function Render()
     ui.sa:ClearAllPoints()
     ui.sa:SetPoint("TOPLEFT", page, "TOPLEFT", PAD, -top)
     ui.sa:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -PAD, footH + 4)
+    local need = cy
+    if docked then
+        -- the list's right edge first: its scroll child takes the list's width
+        ui.sa:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -(PAD + DOCK_W + DOCK_GAP), footH + 4)
+        ui.fdock:ClearAllPoints()
+        ui.fdock:SetPoint("TOPRIGHT", page, "TOPRIGHT", -PAD, -top)
+        ui.fdock:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -PAD, footH + 4)
+        ui.fdock:SetWidth(DOCK_W)
+        fpop:Layout()
+        need = math.max(cy, math.min(fpop.fullH or 0, 560))
+    end
     ui.content:SetWidth(CW)
     ui.sa:SetContentHeight(cy)
-    if win and win.FitHeight then win:FitHeight(top + cy + 4 + footH - 24) end
+    ui.content:SetWidth(CW)
+    if win and win.FitHeight then win:FitHeight(top + need + 4 + footH - 24) end
 end
 -- an error while drawing is kept, and reported once per session to the error handler (BugGrabber)
 F.Render = function()
