@@ -586,7 +586,7 @@ local function Stars(parent, size, onPick, getName)
             S.Tip(self, { word, (h.rating == i) and L("Clic : effacer la note") or string.format(L("Clic : noter %d sur 3 (%s)"), i, word) })
         end)
         b:SetScript("OnLeave", function() Paint(nil); S.HideTip() end)
-        b:SetScript("OnClick", function() onPick(h, h.rating == i and nil or i) end)
+        b:SetScript("OnClick", function() local v = i; if h.rating == i then v = nil end; onPick(h, v) end)
         h.b[i] = b
     end
     function h:Set(r) self.rating = r; Paint(nil) end

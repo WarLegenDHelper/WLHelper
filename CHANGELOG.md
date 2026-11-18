@@ -6,6 +6,23 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.148] — 2026-11-18
+
+### Ajouté / Added
+- **Les erreurs de WL Helper partent toutes seules** : quand BugSack/BugGrabber attrape une erreur Lua de WL Helper chez un joueur, elle est envoyée automatiquement et en silence au compte qui reçoit les rapports. Le rapport contient le message de l'erreur, son nombre de répétitions, le début de la pile d'appels, et la même photo de l'état que les autres rapports. Les garde-fous :
+  - seules les erreurs de WL Helper partent, jamais celles des autres addons ;
+  - chaque erreur part une seule fois par version, 5 au plus par session ;
+  - `/wlh rapports erreurs off` coupe l'envoi.
+
+  *WL Helper's Lua errors caught by BugGrabber go to the report inbox by themselves, silently; never other addons' errors; once per version, 5 per session at most; /wlh reports errors off to stop.*
+
+### Corrigé / Fixed
+- **Deux boutons qui ne faisaient pas ce qu'ils disaient** (trouvés par un nouveau test qui vérifie tout le code) :
+  - **Trouver un groupe** : recliquer sur la note qu'on avait donnée à un joueur ne l'effaçait pas ;
+  - **Commandes** : « Commander à nouveau » sur une commande refusée la renvoyait au même artisan au lieu de la proposer à toute la guilde.
+
+  *Two buttons fixed: clearing a player's rating by clicking it again, and re-ordering a declined order to the whole guild.*
+
 ## [1.0.0-beta.147] — 2026-11-18
 
 ### Ajouté / Added

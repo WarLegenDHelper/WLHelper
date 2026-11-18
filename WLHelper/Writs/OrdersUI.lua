@@ -4479,7 +4479,7 @@ local function PaintOrder(c, o, side, width)
     elseif side == "mine" and (o.status == "cancelled" or o.status == "expired" or o.status == "declined") then
         SetButton(c.b1, L("Commander à nouveau"), "refresh")
         c.t1 = { L("Commander à nouveau"), o.status == "declined" and L("Clic : la proposer à toute la guilde") or L("Clic : refaire la même commande") }
-        c.a1 = function() Reorder(o, o.status == "declined" and nil or o.to) end
+        c.a1 = function() local to = o.to; if o.status == "declined" then to = nil end; Reorder(o, to) end
     end
     -- messages: between the customer and the crafter, once someone took the order
     local other = (me == o.from) and o.by or o.from

@@ -28,6 +28,9 @@ ns.AddEnglish({
     ["Boîte de réception des rapports : %s"] = "Report inbox: %s",
     ["activée"] = "on",
     ["coupée"] = "off",
+    ["Envoi automatique des erreurs de WL Helper : %s"] = "Automatic sending of WL Helper's errors: %s",
+    ["activé"] = "on",
+    ["coupé"] = "off",
 })
 
 local PREFIX = "WLHbug"
@@ -79,7 +82,7 @@ local function Clean(v)
     return (v:gsub("[\30\31|\r\n]", " "))
 end
 local FIELDS = { "id", "at", "from", "kind", "text", "shot", "v", "loc", "zone", "sub", "m", "x", "y", "step", "dk", "lvl", "cls",
-    "act", "sel", "ql", "gps", "tgt", "win", "err", "errs" }
+    "act", "sel", "ql", "gps", "tgt", "win", "err", "errs", "stack" }
 local function Encode(rec)
     local parts = {}
     for _, k in ipairs(FIELDS) do
@@ -284,21 +287,28 @@ end
 
 -- "/wlh bug <text>", "/wlh idee <text>", the form's Send. kind: "bug" | "idea" | "quest"; shot: the
 -- link of a screenshot the player put online (Discord, imgur...), or nil. -> the report, or nil
-local KINDS = { bug = true, idea = true, quest = true }
-function R.New(kind, text, shot)
+local KINDS = { bug = true, idea = true, quest = true, error = true }
+local seq = 0
+function R.New(kind, text, shot, quiet, extra)
     text = Str(text and (text:gsub("^%s+", ""):gsub("%s+$", "")))
     if not text then WP.Print(L("Écris ton message après la commande : /wlh bug la flèche reste affichée quand...")); return nil end
     local d = DB()
     if not d then return nil end
     local now = (time and time()) or 0
     shot = Str(shot and (shot:gsub("^%s+", ""):gsub("%s+$", "")))
-    local rec = Context({ id = MeKey() .. ":" .. now, at = now, from = MeKey(), kind = KINDS[kind] and kind or "bug",
+    seq = seq + 1
+    local rec = Context({ id = MeKey() .. ":" .. now .. ":" .. seq, at = now, from = MeKey(), kind = KINDS[kind] and kind or "bug",
         text = text:sub(1, MAX_TEXT), shot = shot and shot:sub(1, 200) or nil })
+    for k, v in pairs(extra or {}) do rec[k] = v end
     d.out[rec.id] = rec
     -- an inbox on this very account (the guild master writing): kept at once
-    if R.IsInbox() then d.inbox[rec.id] = rec; rec.delivered = true; WP.Print(L("Merci ! Ton rapport est parti à l'équipe WL Helper (par la guilde).")); return rec end
+    if R.IsInbox() then
+        d.inbox[rec.id] = rec; rec.delivered = true
+        if not quiet then WP.Print(L("Merci ! Ton rapport est parti à l'équipe WL Helper (par la guilde).")) end
+        return rec
+    end
     SendReport(rec)
-    WP.Print(L("Ton rapport est gardé : il partira dès qu'un responsable de la guilde sera connecté."))
+    if not quiet then WP.Print(L("Ton rapport est gardé : il partira dès qu'un responsable de la guilde sera connecté.")) end
     return rec
 end
 
@@ -320,7 +330,7 @@ function R.OnMessage(msg, sender)
         local rec = id and d.out[id]
         if rec and not rec.delivered then
             rec.delivered = true
-            WP.Print(L("Merci ! Ton rapport est parti à l'équipe WL Helper (par la guilde)."))
+            if rec.kind ~= "error" then WP.Print(L("Merci ! Ton rapport est parti à l'équipe WL Helper (par la guilde).")) end
         end
         return
     end
@@ -344,10 +354,64 @@ function R.OnMessage(msg, sender)
     WP.Print(string.format(L("Rapport reçu de %s : %s"), tostring(rec.from or sender or "?"), tostring(rec.text or ""):sub(1, 80)))
 end
 
--- /wlh rapports [on|off]
+-- ---------------------------------------------------------------- WL Helper's Lua errors, by themselves
+-- BugGrabber (BugSack's) catches every Lua error; one of WL Helper's (its message or stack names
+-- WLHelper) goes as a report of kind "error", silently (report: "if BugSack catches bugs at the
+-- players', it must send them to me"). Other addons' errors are never sent. Each error once per
+-- addon version (WLWritsDB.reports.sentErr), 5 at most a session; "/wlh rapports erreurs off" stops it.
+local ERR_PER_SESSION = 5
+local errSent = 0
+function R.AutoErrorsOn()
+    local d = DB()
+    return d ~= nil and d.autoErr ~= false
+end
+function R.OnError(err)
+    if type(err) ~= "table" or not R.AutoErrorsOn() or errSent >= ERR_PER_SESSION then return nil end
+    local msg = Str(err.message)
+    if not msg then return nil end
+    local stack = Str(err.stack) or ""
+    if not (msg:find("WLHelper", 1, true) or stack:find("WLHelper", 1, true)) then return nil end
+    local d = DB()
+    d.sentErr = type(d.sentErr) == "table" and d.sentErr or {}
+    local key = tostring(root.VERSION or "?") .. "|" .. msg:sub(1, 160)
+    if d.sentErr[key] then return nil end
+    d.sentErr[key] = true
+    errSent = errSent + 1
+    -- the stack's first lines that name an addon file, short
+    local lines = {}
+    for ln in stack:gmatch("[^\n]+") do
+        if #lines >= 5 then break end
+        lines[#lines + 1] = (ln:gsub("^%s+", ""):gsub("Interface/AddOns/", ""):gsub("Interface\\AddOns\\", "")):sub(1, 110)
+    end
+    return R.New("error", msg:sub(1, 300) .. ((Num(err.counter) and err.counter > 1) and (" (x" .. err.counter .. ")") or ""), nil, true,
+        { stack = table.concat(lines, " | ") })
+end
+local errHooked = false
+function R.HookErrors()
+    if errHooked then return end
+    local ER = rawget(_G, "EventRegistry")
+    local BG = rawget(_G, "BugGrabber")
+    if not (type(ER) == "table" and ER.RegisterCallback and type(BG) == "table" and BG.GetErrorByID) then return end
+    errHooked = true
+    ER:RegisterCallback("BugGrabber.BugGrabbed", function(_, id)
+        local ok, err = pcall(BG.GetErrorByID, BG, id)
+        if ok and err then
+            -- out of the error's own call stack: a moment later
+            if C_Timer and C_Timer.After then C_Timer.After(1, function() pcall(R.OnError, err) end) else pcall(R.OnError, err) end
+        end
+    end, R)
+end
+
+-- /wlh rapports [on|off|erreurs on|erreurs off]
 function R.Command(arg)
     local d = DB()
     if not d then return end
+    local e = arg and arg:match("^erreurs? (%a+)$") or (arg and arg:match("^errors? (%a+)$"))
+    if e == "on" or e == "off" then
+        if e == "off" then d.autoErr = false else d.autoErr = nil end
+        WP.Print(string.format(L("Envoi automatique des erreurs de WL Helper : %s"), e == "on" and L("activé") or L("coupé")))
+        return
+    end
     if arg == "on" or arg == "off" then
         R.SetInbox(arg == "on")
         WP.Print(string.format(L("Boîte de réception des rapports : %s"), arg == "on" and L("activée") or L("coupée")))
@@ -371,6 +435,7 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
     if event == "PLAYER_LOGIN" then
         local Register = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
         if Register then pcall(Register, PREFIX) end
+        pcall(R.HookErrors)
         -- the roster, asked once: who is online (the guild master receives the reports)
         if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster) elseif GuildRoster then pcall(GuildRoster) end
         if C_Timer and C_Timer.After then

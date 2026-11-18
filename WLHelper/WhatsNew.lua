@@ -2,6 +2,15 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.148", date = "2026-11-18", items = {
+    { s = "add", fr = { "Les erreurs de WL Helper partent toutes seules", "Quand BugSack/BugGrabber attrape une erreur Lua de WL Helper chez un joueur, elle est envoyée automatiquement et en silence au compte qui reçoit les rapports. Le rapport contient le message de l'erreur, son nombre de répétitions, le début de la pile d'appels, et la même photo de l'état que les autres rapports. Les garde-fous :" }, en = { "", "" } },
+    { s = "add", fr = { "", "seules les erreurs de WL Helper partent, jamais celles des autres addons ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "chaque erreur part une seule fois par version, 5 au plus par session ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "/wlh rapports erreurs off coupe l'envoi." }, en = { "WL Helper's Lua errors caught by BugGrabber go to the report inbox by themselves, silently; never other addons' errors; once per version, 5 per session at most; /wlh reports errors off to stop.", "" } },
+    { s = "fix", fr = { "Deux boutons qui ne faisaient pas ce qu'ils disaient", "" }, en = { "", "" } },
+    { s = "fix", fr = { "Trouver un groupe", "Recliquer sur la note qu'on avait donnée à un joueur ne l'effaçait pas ;" }, en = { "", "" } },
+    { s = "fix", fr = { "Commandes", "« Commander à nouveau » sur une commande refusée la renvoyait au même artisan au lieu de la proposer à toute la guilde." }, en = { "Two buttons fixed", "Clearing a player's rating by clicking it again, and re-ordering a declined order to the whole guild." } },
+  } },
   { v = "1.0.0-beta.147", date = "2026-11-18", items = {
     { s = "add", fr = { "Les rapports emportent une « photo de l'état »", "En plus du message, de la version et de la position, chaque rapport envoyé avec « Nous écrire » (ou /wlh bug) emporte maintenant :" }, en = { "", "" } },
     { s = "add", fr = { "", "l'action que le guide demande et le numéro de l'étape ;" }, en = { "", "" } },
@@ -91,8 +100,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.134", date = "2026-11-18", items = {
     { s = "fix", fr = { "GPS avec Shortest Path, le bouton de la pierre de foyer", "Quand le trajet de Shortest Path commence par ta pierre de foyer, Rappel astral ou une téléportation de mage, notre flèche affiche maintenant le bouton pour la lancer, comme sur notre propre trajet. La ligne d'en dessous dit la suite (« Puis Walk to Grom'gol... »). Shortest Path ne donne pas le sort par son API : WL Helper le reconnaît au texte de l'étape." }, en = { "GPS with Shortest Path's route", "The Hearthstone, Astral Recall or a mage teleport gets our cast button." } },
-  } },
-  { v = "1.0.0-beta.133", date = "2026-11-18", items = {
-    { s = "add", fr = { "Taille des fenêtres", "Un seul réglage pour la taille de toutes les fenêtres de WL Helper (le guide, le suivi, le Comptoir, les groupes, la guilde, les réglages), de 60 % à 150 %. Dans Options > Général, sous la langue (« Taille de toutes les fenêtres »), ou en commande : /wlh taille 90, /wlh taille +, /wlh taille - (10 % de plus ou de moins). Chaque fenêtre garde son coin haut-gauche à sa place. En combat, le changement attend la fin du combat. La flèche du GPS garde son propre réglage (page GPS)." }, en = { "Window size", "One setting for every WL Helper window, 60 % to 150 % (Options > General, or /wlh size 90 / + / -)." } },
   } },
 }
