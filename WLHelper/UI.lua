@@ -218,11 +218,14 @@ function ns.BossTacticText(st)
   local bo = ns.BossOrder and ns.BossOrder(st.ins)
   local B = bo and bo.list and bo.list[st.bossIdx]
   if B and B.en == st.bossEn and B.tip then tip = B.tip end
+  local head
   if type(tip) == "string" and tip ~= "" and not (issecretvalue and issecretvalue(tip)) then
-    return Hex(T.text) .. Sentences(tip, 3) .. "|r"
+    head = Hex(T.text) .. Sentences(tip, 3) .. "|r"
   end
+  -- our own notes too, after the journal's tip: the counters it does not give (the Shade of
+  -- Eranikus' sleep: "we get killed by the sleep all the time")
   local notes = ns.BOSS_NOTES and ns.BOSS_NOTES[st.ins] and ns.BOSS_NOTES[st.ins][st.bossEn]
-  if not notes then return nil end
+  if not notes then return head end
   local ROLE = { tank = L.ROLE_TANK, heal = L.ROLE_HEAL, all = L.ROLE_ALL }
   local lines = {}
   for k, ln in ipairs(notes) do
@@ -231,9 +234,38 @@ function ns.BossTacticText(st)
     txt = txt:gsub("{([^}]+)}", function(a) return Hex(T.warn) .. a .. "|r" .. Hex(T.text) end)
     lines[#lines + 1] = Hex(T.muted) .. (ROLE[ln[1]] or L.ROLE_ALL) .. "|r  " .. Hex(T.text) .. txt .. "|r"
   end
-  return #lines > 0 and table.concat(lines, "\n") or nil
+  if #lines == 0 then return head end
+  return (head and (head .. "\n") or "") .. table.concat(lines, "\n")
 end
 local ARROW_UP = "|TInterface\\AddOns\\WLHelper\\Media\\Icons\\arrow_up:14:14:0:-1:128:128:0:128:0:128:76:208:122|t"
+-- The boss's tactics said to the group (report: "the tactics should go to the chat"): the party,
+-- raid or instance channel, plain text, "[WL] Boss : ..." then one message per line, 250 letters
+-- at most each; alone: printed for you only. -> true when sent
+function ns.AnnounceTactics(st)
+  local text = st and ns.BossTacticText and ns.BossTacticText(st)
+  if type(text) ~= "string" or text == "" then ns.Print(L.TAC_NONE); return false end
+  text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", "")
+  local boss = ns.BossStepName and ns.BossStepName(st) or "?"
+  local channel
+  if IsInRaid and IsInRaid() then channel = "RAID"
+  elseif IsInGroup and LE_PARTY_CATEGORY_INSTANCE and IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then channel = "INSTANCE_CHAT"
+  elseif IsInGroup and IsInGroup() then channel = "PARTY" end
+  local first = true
+  for line in (text .. "\n"):gmatch("(.-)\n") do
+    line = line:gsub("^%s+", ""):gsub("%s+$", "")
+    if line ~= "" then
+      local msg = (first and ("[WL] " .. boss .. " : ") or "") .. line
+      first = false
+      while #msg > 0 do
+        local part = msg:sub(1, 250)
+        msg = msg:sub(251)
+        if channel and SendChatMessage then pcall(SendChatMessage, part, channel) else ns.Print(part) end
+      end
+    end
+  end
+  return channel ~= nil
+end
+
 -- Naowh Forever's BiS list (WP.NaowhBiS) for an item and the player's current spec: rank 1 (BiS)
 -- or 2 (second choice), its short badge ("BiS" + star / "2e choix") and colour, and a shorter
 -- form for the label under a 48 px icon ("BiS" / "2e" / "BiS 40"). nil when Naowh is absent or
@@ -3022,6 +3054,12 @@ local function Build()
     local it = f.stopItem
     if it.armToken then it.armToken = nil; it.label:SetText(L.M_STOP); it.label:SetTextColor(T.fg[1], T.fg[2], T.fg[3]) end
   end)
+  -- the boss's tactics to the group's chat
+  f.tacItem = Item(function()
+    local st = Steps()[f.view or 0]
+    if st and ns.AnnounceTactics then ns.AnnounceTactics(st) end
+  end, function() return { L.M_TACTICS } end)
+  f.tacItem.label:SetText(L.M_TACTICS)
   f.arrowBtn = Item(function() ns.ToggleArrow(); Render() end, function() return { L.M_ARROW, L.TT_FARROW } end)
   -- the dungeon's bosses: the bosses and rares panel (Bosses.lua; its header opens the map and the
   -- installed dungeon journal), else, with no dungeon for it, the dungeon journal itself

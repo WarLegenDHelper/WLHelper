@@ -784,6 +784,8 @@ local function MenuItems()
     { L.TR_M_DONE, function() if m then TR.MarkDone(m.idx) end end },
     { L.TR_M_SHARE, function() if ns.ShareQuests then ns.ShareQuests() end end },
   }
+  local bst = m and m.st and m.st.bossStep and m.st
+  if bst and ns.AnnounceTactics then items[#items + 1] = { L.TR_M_TACTICS, function() ns.AnnounceTactics(bst) end } end
   if dk and ns.ToggleBosses then items[#items + 1] = { L.TR_M_BOSSES, function() ns.ToggleBosses(dk) end } end
   if dk and ns.OpenDungeonMap then items[#items + 1] = { L.TR_M_MAP, function() ns.OpenDungeonMap(dk) end } end
   items[#items + 1] = { TR.Frameless() and L.TR_M_FRAMED or L.TR_M_FRAMELESS, function() TR.SetFrameless(not TR.Frameless()) end }

@@ -823,6 +823,12 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
     if arg ~= "+" and arg ~= "-" then v = tonumber((arg or ""):match("[%d%.]+")); if v and v > 3 then v = v / 100 end end
     local set = ns.SetWindowScale and ns.SetWindowScale(v or ns.WindowScale())
     if set then ns.Print(string.format(ns.Writs and ns.Writs.English and ns.Writs.English() and "Window size: %d %%  (/wlh size 90, /wlh size +, /wlh size -)" or "Taille des fenêtres : %d %%  (/wlh taille 90, /wlh taille +, /wlh taille -)", math.floor(set * 100 + 0.5))) end
+  elseif cmd == "tactique" or cmd == "tactic" or cmd == "tactics" or cmd == "tac" then
+    -- the tactics of the boss step on screen (or the current one) to the group's chat
+    local steps = ns.route and ns.route.steps or {}
+    local st = steps[(ns.frame and ns.frame.view) or 0]
+    if not (st and st.bossStep) and ns.CurrentStepIndex then local _, s2 = ns.CurrentStepIndex(ns.LogEntries()); st = s2 end
+    if ns.AnnounceTactics then ns.AnnounceTactics(st) end
   elseif cmd == "stop" or cmd == "arreter" or cmd == "annuler" or cmd == "cancel" then
     ns.StopRoute()
   elseif cmd == "cadre" or cmd == "frame" or cmd == "frameless" then
@@ -862,15 +868,8 @@ end
 --  Raccourcis clavier (Échap > Options > Raccourcis > AddOns > WLDT)
 -- =====================================================================
 BINDING_HEADER_WLDT = "|cffce1918WL|r Helper"
-BINDING_NAME_WLDT_TOGGLE = ns.L.B_TOGGLE
-BINDING_NAME_WLDT_PICK = ns.L.B_PICK
-BINDING_NAME_WLDT_NEXT = ns.L.B_NEXTSTEP
-BINDING_NAME_WLDT_PREV = ns.L.B_PREV
-BINDING_NAME_WLDT_POINTS = ns.L.B_POINTS
-BINDING_NAME_WLDT_ARROW = ns.L.B_ARROW
 BINDING_NAME_WLDT_TARGET = ns.L.B_TARGET
 BINDING_NAME_WLDT_ITEM = ns.L.B_ITEM
-BINDING_NAME_WLDT_GROUPS = ns.L.B_GROUPS
 function WLDT_Binding(what)
   -- the key bound to WLDT_TARGET clicks WLDTTargetButton through an override binding; this runs
   -- only while the override waits for the end of combat

@@ -1064,7 +1064,7 @@ end
 -- action uses is offered on the row's line first, a second click within 5 s takes it. A new key
 -- replaces the action's old ones. Bindings are protected: out of combat only (the buttons are
 -- disabled in combat). The rows re-read the keys on UPDATE_BINDINGS while the page shows.
-local BINDINGS = { "WLDT_TOGGLE", "WLDT_PICK", "WLDT_NEXT", "WLDT_PREV", "WLDT_POINTS", "WLDT_ARROW", "WLDT_TARGET", "WLDT_ITEM" }
+local BINDINGS = { "WLDT_TARGET", "WLDT_ITEM" }   -- the two that count in play (beta.152)
 ns.KEY_BINDINGS = BINDINGS
 local MODKEYS = { LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true, LALT = true, RALT = true,
     LMETA = true, RMETA = true, SHIFT = true, CTRL = true, ALT = true, META = true }

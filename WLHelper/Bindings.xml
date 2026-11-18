@@ -1,11 +1,6 @@
 <Bindings>
-  <Binding name="WLDT_TOGGLE" header="WLDT" category="ADDONS">WLDT_Binding("toggle")</Binding>
-  <Binding name="WLDT_PICK" category="ADDONS">WLDT_Binding("pick")</Binding>
-  <Binding name="WLDT_NEXT" category="ADDONS">WLDT_Binding("next")</Binding>
-  <Binding name="WLDT_PREV" category="ADDONS">WLDT_Binding("prev")</Binding>
-  <Binding name="WLDT_POINTS" category="ADDONS">WLDT_Binding("points")</Binding>
-  <Binding name="WLDT_ARROW" category="ADDONS">WLDT_Binding("arrow")</Binding>
-  <Binding name="WLDT_TARGET" category="ADDONS">WLDT_Binding("target")</Binding>
+  <!-- two keys only (report: "too many useless binds, only target counts"): the step's target, and its
+       quest item (the "Target and items" bar's first buttons); the rest is on the guide's buttons and /wlh -->
+  <Binding name="WLDT_TARGET" header="WLDT" category="ADDONS">WLDT_Binding("target")</Binding>
   <Binding name="WLDT_ITEM" category="ADDONS">WLDT_Binding("item")</Binding>
-  <Binding name="WLDT_GROUPS" category="ADDONS">WLDT_Binding("groups")</Binding>
 </Bindings>

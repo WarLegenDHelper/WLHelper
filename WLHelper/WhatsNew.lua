@@ -2,6 +2,15 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.152", date = "2026-11-18", items = {
+    { s = "chg", fr = { "Deux raccourcis clavier au lieu de neuf", "WL Helper ne propose plus que les deux qui servent en jeu, **Cibler** (la cible de l'étape) et **Utiliser l'objet de quête** (celui de l'étape). Ce sont les deux premiers boutons de la barre « Target and items ». Les 7 autres sont retirés : ouvrir le guide, choisir un guide, étape suivante, étape précédente, poser les points, flèche, groupes. Ils doublaient les boutons du guide et les commandes /wlh. Une touche que tu leur avais donnée est simplement libérée." }, en = { "Two key bindings instead of nine", "The step's target and its quest item; the other seven doubled the guide's buttons and /wlh." } },
+    { s = "add", fr = { "Annoncer la tactique au groupe", "Sur une étape de boss, Actions > « Annoncer la tactique au groupe » (ou le menu de la vue moderne, ou /wlh tactique) envoie la tactique dans le chat du groupe, du raid ou de l'instance. Seul, elle s'affiche pour toi." }, en = { "Tell the group the tactics", "The boss step's tactics to the party / raid / instance chat (Actions menu, modern view menu, /wlh tactics)." } },
+    { s = "add", fr = { "Ombre d'Eranikus, le sommeil", "La tactique dit maintenant comment contrer son Sommeil profond, d'après le jeu de base (rien sur Wowhead Forever pour ce boss) :" }, en = { "", "" } },
+    { s = "add", fr = { "", "le Totem de séisme du chaman réveille (il retire le sommeil), un mort-vivant s'en sort avec Volonté des Réprouvés ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "le tank le tourne dos au groupe (Souffle acide) ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "garder une potion ou un temps de recharge pour le réveil. Nos notes s'affichent désormais après la phrase du journal de Naowh au lieu d'être cachées par elle." }, en = { "Shade of Eranikus", "Counters to his Deep Slumber (Tremor Totem, Will of the Forsaken); our notes now show after Naowh's tip." } },
+    { s = "fix", fr = { "La suite de « L'Essence d'Eranikus »", "L'Oathstone of Ysera's Dragonflight se récupère en parlant à **Itharius** (grotte au sud-ouest du Marais des Chagrins) avec la Chained Essence dans les sacs, d'après les commentaires Classic et TBC de Wowhead (aucun commentaire Forever). Le guide envoie maintenant à Itharius pour prendre la quête, et prévient : il faut lui donner le bijou, et la chaîne s'arrête juste après, à Winterspring." }, en = { "The Essence of Eranikus follow-up", "The Oathstone comes from talking to Itharius with the Chained Essence; the guide now sends you there (you give him the trinket)." } },
+  } },
   { v = "1.0.0-beta.151", date = "2026-11-18", items = {
     { s = "chg", fr = { "L'écran « Nous écrire », plus clair", "" }, en = { "", "" } },
     { s = "chg", fr = { "", "un compteur de caractères sous le message (500 au plus) ;" }, en = { "", "" } },
@@ -101,14 +110,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.138", date = "2026-11-18", items = {
     { s = "chg", fr = { "La carte du donjon : celle de Naowh d'abord", "Le bouton de carte du panneau des boss et /wlh carte ouvrent maintenant la carte du Journal des donjons de Naowh (le plan avec chaque boss en portrait numéroté), dans sa propre fenêtre, avant celle d'OpenMap. Sur la carte du monde, sa version par-dessus disparaissait dès qu'OpenMap remettait la zone extérieure ; sa fenêtre à elle reste." }, en = { "The dungeon map button and /wlh carte open Naowh's dungeon map (numbered boss portraits) in its own window first, before OpenMap's.", "" } },
-  } },
-  { v = "1.0.0-beta.137", date = "2026-11-18", items = {
-    { s = "chg", fr = { "Le guide compact, refait comme RestedXP et Polestar", "Le petit suivi n'était qu'une boîte grise de trois lignes. Il montre maintenant :" }, en = { "", "" } },
-    { s = "chg", fr = { "", "en haut, le nom du donjon, ses niveaux en doré, l'étape (8/43) et le pourcentage du guide ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "l'étape en cours dans une carte, avec « ÉTAPE 8 · AVANT LE DONJON » en orange et l'action en gros (16 px), ses noms en couleur ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "chaque objectif avec son compteur et une barre verte ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "« ENSUITE » et les 3 actions suivantes en texte normal ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "la barre de progression du guide en bas, avec le pourcentage." }, en = { "The compact guide redone after RestedXP and Polestar", "Header with levels, step and percent; the step's card with its orange label, coloured names and green objective bars; \"Then\" and the next 3 actions; the guide's progress bar." } },
-    { s = "chg", fr = { "Un vrai bouton « Compact »", "À la place du « − » dans la fenêtre du guide : il passe au guide compact. Un clic sur le titre du guide compact ramène la grande fenêtre." }, en = { "A labelled \"Compact\" button replaces the guide window's \"−\".", "" } },
   } },
 }

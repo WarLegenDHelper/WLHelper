@@ -611,7 +611,9 @@ ns.BOSS_NOTES = {
     ["Weaver"] = { { "tank", "Dragon: face its breath away from the group.", "Dragon : tourne son souffle loin du groupe." } },
     ["Hazzas"] = { { "tank", "Dragon: face its breath away from the group.", "Dragon : tourne son souffle loin du groupe." } },
     ["Morphaz"] = { { "tank", "Dragon: face its breath away from the group.", "Dragon : tourne son souffle loin du groupe." } },
-    ["Shade of Eranikus"] = { { "all", "Puts players to sleep and breathes acid: tank faces him away.", "Endort des joueurs et souffle de l'acide : le tank le tourne loin du groupe." } },
+    ["Shade of Eranikus"] = { { "all", "{Deep Slumber} sleeps the group: a Shaman's Tremor Totem wakes them (it removes Sleep), an Undead breaks it with Will of the Forsaken.", "Son {Sommeil profond} endort le groupe : le Totem de séisme du chaman réveille (il retire le sommeil), un mort-vivant s'en sort avec Volonté des Réprouvés." },
+      { "tank", "Turn him away from the group: his {Acid Breath} hits everyone in front of him.", "Tourne-le dos au groupe : son {Souffle acide} touche tout ce qui est devant lui." },
+      { "heal", "Keep a cooldown or a potion for the sleep: the group wakes up low on health.", "Garde un temps de recharge ou une potion pour après le sommeil : le groupe se réveille bas en vie." } },
     -- the Egg of Hakkar event (Wowhead Forever quest=3528 and its Forever comments; report: "there was
     -- no guide for the egg, so we failed")
     ["Avatar of Hakkar"] = { { "all", "First dismiss every pet and totem (on Forever the Avatar won't come otherwise), then use the Egg of Hakkar in the middle of the room.", "Rangez d'abord familiers et totems (sinon l'Avatar ne vient pas sur Forever), puis utilise l'Egg of Hakkar au milieu de la salle." },

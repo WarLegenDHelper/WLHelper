@@ -6,6 +6,27 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.152] — 2026-11-18
+
+### Modifié / Changed
+- **Deux raccourcis clavier au lieu de neuf** : WL Helper ne propose plus que les deux qui servent en jeu, **Cibler** (la cible de l'étape) et **Utiliser l'objet de quête** (celui de l'étape). Ce sont les deux premiers boutons de la barre « Target and items ». Les 7 autres sont retirés : ouvrir le guide, choisir un guide, étape suivante, étape précédente, poser les points, flèche, groupes. Ils doublaient les boutons du guide et les commandes `/wlh`. Une touche que tu leur avais donnée est simplement libérée.
+  *Two key bindings instead of nine: the step's target and its quest item; the other seven doubled the guide's buttons and /wlh.*
+
+### Ajouté / Added
+- **Annoncer la tactique au groupe** : sur une étape de boss, Actions > « Annoncer la tactique au groupe » (ou le menu de la vue moderne, ou `/wlh tactique`) envoie la tactique dans le chat du groupe, du raid ou de l'instance. Seul, elle s'affiche pour toi.
+  *Tell the group the tactics: the boss step's tactics to the party / raid / instance chat (Actions menu, modern view menu, /wlh tactics).*
+- **Ombre d'Eranikus, le sommeil** : la tactique dit maintenant comment contrer son Sommeil profond, d'après le jeu de base (rien sur Wowhead Forever pour ce boss) :
+  - le Totem de séisme du chaman réveille (il retire le sommeil), un mort-vivant s'en sort avec Volonté des Réprouvés ;
+  - le tank le tourne dos au groupe (Souffle acide) ;
+  - garder une potion ou un temps de recharge pour le réveil.
+
+  Nos notes s'affichent désormais après la phrase du journal de Naowh au lieu d'être cachées par elle.
+  *Shade of Eranikus: counters to his Deep Slumber (Tremor Totem, Will of the Forsaken); our notes now show after Naowh's tip.*
+
+### Corrigé / Fixed
+- **La suite de « L'Essence d'Eranikus »** : l'Oathstone of Ysera's Dragonflight se récupère en parlant à **Itharius** (grotte au sud-ouest du Marais des Chagrins) avec la Chained Essence dans les sacs, d'après les commentaires Classic et TBC de Wowhead (aucun commentaire Forever). Le guide envoie maintenant à Itharius pour prendre la quête, et prévient : il faut lui donner le bijou, et la chaîne s'arrête juste après, à Winterspring.
+  *The Essence of Eranikus follow-up: the Oathstone comes from talking to Itharius with the Chained Essence; the guide now sends you there (you give him the trinket).*
+
 ## [1.0.0-beta.151] — 2026-11-18
 
 ### Modifié / Changed

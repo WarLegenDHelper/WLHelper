@@ -304,6 +304,7 @@ local S = {
     TT_OUT_L = "hors du donjon", TT_IN_L = "dans le donjon", TT_XPMONEY = "%s XP  ·  %s",
     DUNGEONS_BTN = "Choisir un guide", TT_LINE_CLICK = "Clic : guider vers ce point",
     -- guide navigation (T-84, T-85, T-86): start over, the check-list button, the parts tabs, looking around
+    TAC_NONE = "Pas de tactique pour cette étape.", M_TACTICS = "Annoncer la tactique au groupe", TR_M_TACTICS = "Annoncer la tactique au groupe",
     M_STOP = "Arrêter ce guide", TT_STOP = "Décoche les donjons choisis : plus de route, plus de flèche. « Choisir un guide » en lance un autre (comme /wlh stop).",
     STOP_CLICK = "Clic : arrêter (un second clic confirme)", ROUTE_STOPPED = "Guide arrêté. « Choisir un guide » pour en lancer un autre.",
     M_RESTART = "Recommencer la route", RESTART_CONFIRM = "Clique encore pour confirmer",
@@ -590,6 +591,7 @@ local S = {
     TT_OUT_L = "outside the dungeon", TT_IN_L = "inside the dungeon", TT_XPMONEY = "%s XP  ·  %s",
     DUNGEONS_BTN = "Pick a guide", TT_LINE_CLICK = "Click: guide me to this point",
     -- guide navigation (T-84, T-85, T-86): start over, the checklist button, the parts tabs, looking around
+    TAC_NONE = "No tactics for this step.", M_TACTICS = "Tell the group the tactics", TR_M_TACTICS = "Tell the group the tactics",
     M_STOP = "Stop this guide", TT_STOP = "Unpicks the dungeons: no route, no arrow. \"Pick a guide\" starts another one (like /wlh stop).",
     STOP_CLICK = "Click: stop (a second click confirms)", ROUTE_STOPPED = "Guide stopped. \"Pick a guide\" to start another one.",
     M_RESTART = "Start the route over", RESTART_CONFIRM = "Click again to confirm",
