@@ -6,6 +6,21 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.142] — 2026-11-18
+
+### Ajouté / Added
+- **Signaler un bug ou une idée depuis le jeu, sans compte** : tape `/wlh bug` ou `/wlh idee` suivi de ton message (exemple : `/wlh bug la flèche reste affichée quand je décoche`). Le message part tout seul à l'équipe WL Helper par le canal de la guilde. Il emporte ce qu'il faut pour comprendre le problème :
+  - la version de l'addon et la langue du jeu ;
+  - la zone et la position ;
+  - l'étape du guide et le donjon ;
+  - le niveau et la classe ;
+  - la dernière erreur Lua gardée par BugGrabber.
+
+  Si aucun responsable n'est connecté, le message est gardé et repart dès qu'il l'est. Pas de capture d'écran possible : un addon ne peut pas en joindre. `/wlh bug` seul ouvre toujours l'ancien formulaire GitHub.
+  *Report a bug or an idea from the game, no account: /wlh bug or /wlh idea with your message; it goes through the guild with its context and waits until an officer is online.*
+- **Côté responsable** : le compte du maître de guilde reçoit les rapports automatiquement (ou `/wlh rapports on` sur un autre compte). `/wlh rapports` dit combien sont arrivés. Ils sont enregistrés dans les sauvegardes de l'addon, où l'auteur de WL Helper les lit.
+  *The guild master's account receives them (or /wlh reports on); /wlh reports counts them.*
+
 ## [1.0.0-beta.141] — 2026-11-18
 
 ### Modifié / Changed

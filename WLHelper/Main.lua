@@ -769,6 +769,8 @@ do
 end
 SlashCmdList.WLDUNGEONTOOL = function(msg)
   if not ns.frame then return end
+  -- the words as typed (a report's text keeps its case and accents)
+  local rawArg = (msg or ""):match("^%s*%S+%s+(.-)%s*$")
   -- « réglages », « idée » typed with accents: accents out before lower(), which may touch UTF-8 bytes
   msg = (msg or ""):gsub("é", "e"):gsub("É", "e"):gsub("è", "e"):gsub("È", "e")
   msg = msg:lower():gsub("^%s+", ""):gsub("%s+$", "")
@@ -787,6 +789,10 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "gps" then if WP and WP.StopOrStartGPS then WP.StopOrStartGPS() end
   elseif cmd == "reglages" or cmd == "options" or cmd == "settings" or cmd == "opt" then if WP and WP.ShowOptionsPage then WP.ShowOptionsPage() end
   elseif cmd == "bienvenue" or cmd == "welcome" or cmd == "setup" then if WP and WP.ShowWelcome then WP.ShowWelcome() end
+  elseif (cmd == "idee" or cmd == "idea" or cmd == "bug") and rawArg and rawArg ~= "" and WP and WP.Reports then
+    -- "/wlh bug <text>": sent in the game, through the guild, no account (Writs/Reports.lua)
+    WP.Reports.New(cmd == "bug" and "bug" or "idea", rawArg)
+  elseif cmd == "rapports" or cmd == "reports" then if WP and WP.Reports then WP.Reports.Command(arg) end
   elseif cmd == "idee" or cmd == "idea" or cmd == "bug" then if WP and WP.Feedback then WP.Feedback(cmd == "bug" and "bug" or "idea") end
   elseif cmd == "textes" or cmd == "texts" or cmd == "truncated" then ns.DebugTexts(arg)
   elseif cmd == "share" then ns.ShareQuests()

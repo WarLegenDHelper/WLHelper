@@ -13,6 +13,8 @@ local F = S.F
 
 ns.AddEnglish({
     ["Une idée, un bug ?"] = "An idea, a bug?",
+    ["Plus simple, sans compte : tape /wlh bug ou /wlh idee suivi de ton message, il part directement à l'équipe par la guilde."] =
+        "Simpler, no account: type /wlh bug or /wlh idea followed by your message, it goes straight to the team through the guild.",
     -- the buttons of the options' About page open this window on a form
     ["Proposer une idée"] = "Suggest an idea",
     ["Signaler un bug"] = "Report a bug",
@@ -217,6 +219,8 @@ end
 
 -- Opens the window on a form ("idea" by default) with its link selected, ready for Ctrl+C.
 function WP.Feedback(kind)
+    -- the simpler way, no account: written here, sent through the guild (Writs/Reports.lua)
+    if WP.Reports then WP.Print(L("Plus simple, sans compte : tape /wlh bug ou /wlh idee suivi de ton message, il part directement à l'équipe par la guilde.")) end
     if not win then Build() end
     kind = FORMS[kind] and kind or "idea"
     win.link = Link(kind)

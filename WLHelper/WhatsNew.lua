@@ -2,6 +2,15 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.142", date = "2026-11-18", items = {
+    { s = "add", fr = { "Signaler un bug ou une idée depuis le jeu, sans compte", "Tape /wlh bug ou /wlh idee suivi de ton message (exemple : /wlh bug la flèche reste affichée quand je décoche). Le message part tout seul à l'équipe WL Helper par le canal de la guilde. Il emporte ce qu'il faut pour comprendre le problème :" }, en = { "", "" } },
+    { s = "add", fr = { "", "la version de l'addon et la langue du jeu ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "la zone et la position ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "l'étape du guide et le donjon ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "le niveau et la classe ;" }, en = { "", "" } },
+    { s = "add", fr = { "", "la dernière erreur Lua gardée par BugGrabber. Si aucun responsable n'est connecté, le message est gardé et repart dès qu'il l'est. Pas de capture d'écran possible : un addon ne peut pas en joindre. /wlh bug seul ouvre toujours l'ancien formulaire GitHub." }, en = { "Report a bug or an idea from the game, no account", "/wlh bug or /wlh idea with your message; it goes through the guild with its context and waits until an officer is online." } },
+    { s = "add", fr = { "Côté responsable", "Le compte du maître de guilde reçoit les rapports automatiquement (ou /wlh rapports on sur un autre compte). /wlh rapports dit combien sont arrivés. Ils sont enregistrés dans les sauvegardes de l'addon, où l'auteur de WL Helper les lit." }, en = { "The guild master's account receives them (or /wlh reports on); /wlh reports counts them.", "" } },
+  } },
   { v = "1.0.0-beta.141", date = "2026-11-18", items = {
     { s = "chg", fr = { "La vue moderne, sans cadre comme Polestar", "Le guide « compact » s'appelle maintenant la **vue moderne**. C'est le même guide, avec les mêmes étapes, affiché autrement. Le bouton « Compact » de la fenêtre devient « Moderne »." }, en = { "", "" } },
     { s = "chg", fr = { "", "Par défaut, la vue n'a plus ni fond, ni bordure, ni carte : le texte est posé directement sur le jeu, avec une ombre pour rester lisible." }, en = { "", "" } },
@@ -63,8 +72,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.128", date = "2026-11-18", items = {
     { s = "fix", fr = { "GPS, la tour de l'archimage Xylem (Azshara)", "Aucun chemin ne monte en haut de sa tour, et la flèche partait dans les falaises. Elle t'envoie maintenant à Sanath Lim-yo, au pied de la tour (28.1, 50.1) : parle-lui, il te téléporte en haut. Une fois en haut, la flèche passe à Xylem. Les étapes des quêtes de mage de Xylem le disent aussi." }, en = { "GPS", "Archmage Xylem's tower has no path up: the arrow goes to Sanath Lim-yo at its foot, who teleports you up." } },
-  } },
-  { v = "1.0.0-beta.127", date = "2026-11-18", items = {
-    { s = "add", fr = { "GPS, choisir entre Shortest Path et WL Helper", "Si Shortest Path est installé, une fenêtre demande une seule fois quel GPS suivre. « Shortest Path » : il prend tes destinations (son trajet sur la carte, ses vols, ses bateaux avec leurs départs, sa flèche) et notre flèche s'efface. « WL Helper » : notre GPS, comme avant. Le choix se change dans Options > GPS (« Envoyer les destinations à Shortest Path »), et le trajet en cours passe tout de suite à celui choisi." }, en = { "GPS", "With Shortest Path installed, asked once which GPS to follow; switching moves the trip under way at once." } },
   } },
 }
