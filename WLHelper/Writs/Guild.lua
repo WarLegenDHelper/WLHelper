@@ -193,6 +193,19 @@ local function Me() return (UnitName("player")) end
 local function Short(n) return n and (n:gsub("[%- ].*$", "")) end
 -- the board's key for a name: alone for my realm, "Name-Realm" for another (nil: unreadable)
 local function Key(n) if root.SenderKey then return root.SenderKey(n) end return n and Short(n) end
+-- My key on the board. On Forever a character has a surname ("Alandir Sheeplover", the second
+-- return of UnitNameUnmodified, as LFG Forever reads it) and the guild's messages name the sender
+-- "Alandir-Sheeplover": my entry goes under that same key, so my own message coming back is not a
+-- second me in the ranking. The first name alone when there is no surname.
+local function MeKey()
+    local me = Me()
+    if UnitNameUnmodified then
+        local ok, first, sur = pcall(UnitNameUnmodified, "player")
+        local function ok2(v) return type(v) == "string" and v ~= "" and not (issecretvalue and issecretvalue(v)) end
+        if ok and ok2(first) and ok2(sur) then return Key(first .. "-" .. sur:gsub("%s", "")) or me end
+    end
+    return me
+end
 -- The week follows the server's weekly reset (like the game's weekly kill counter), not the calendar.
 -- The key is the date the current week started: the same on every client, the reset is server-wide.
 local function Week()
@@ -278,6 +291,31 @@ local function Board()
         local cur = short and b[short]
         if short and type(e) == "table" and (not cur or (e.t or 0) > (cur.t or 0)) then b[short] = e end
         b[name] = nil
+    end
+    -- older copies kept a member under the first name alone ("Hodor"), newer ones under the first
+    -- name and the surname ("Hodor-Dequ"): the bare name goes into the one full key of that first
+    -- name, the newest numbers kept (two members of the same first name: it cannot tell, it stays).
+    -- My own bare name goes into my key.
+    local full = {}
+    for name in pairs(b) do
+        local first = name:match("^([^%-]+)%-.+$")
+        if first then full[first] = (full[first] == nil) and name or false end
+    end
+    local me, mk = Me(), MeKey()
+    if me and mk and mk ~= me then full[me] = mk end
+    for first, into in pairs(full) do
+        local bare = b[first]
+        if into and type(bare) == "table" then
+            local cur = b[into]
+            if type(cur) ~= "table" then b[into] = bare
+            else
+                local newer, older = cur, bare
+                if (bare.t or 0) > (cur.t or 0) then newer, older = bare, cur end
+                newer.q, newer.kd = newer.q or older.q, newer.kd or older.kd
+                b[into] = newer
+            end
+            b[first] = nil
+        end
     end
     return b
 end
@@ -490,7 +528,7 @@ local function OwnEntry()
     local spec = WP.Weights and WP.Weights.Spec and WP.Weights.Spec()
     local specKey = spec and spec[1] or ""
     local e = OwnExtra({ wk = Week(), w = week, sk = Season(), s = season, hk = hk, kb = p.kb, week = p.week, lvl = lvl, ver = ver, spec = specKey, t = time() })
-    Board()[Me()] = e
+    Board()[MeKey()] = e
     return e
 end
 -- Messages stay under 255 bytes: "Q" carries the places of one period (the ones that do not fit go
@@ -1583,7 +1621,7 @@ local function RenderPvP()
     -- (the unit named once: "VH" is the unit of the list below), my battlegrounds over the selected
     -- period in words, the last season's podium. A tile with nothing to say is left out.
     ui.mine:SetText(string.format(L("Tes victoires honorables (VH) : %s cette semaine, %s cette saison, %s au total."), Thousands(w), Thousands(s), Thousands(hk)))
-    local mine = Board()[Me()]
+    local mine = Board()[MeKey()]
     local _, myKd = PeriodData(mine or {}, mode, mode == "week" and Week() or mode == "season" and Season() or nil)
     if myKd and (myKd[KD_M] or 0) > 0 then
         local body = Blows(myKd[KD_KB] or 0) .. ", " .. Deaths(myKd[KD_D] or 0)
@@ -1619,7 +1657,7 @@ local function RenderPvP()
     y = y + g:End()
     y = y + 12
     local top = y
-    local me = Me()
+    local me = MeKey()
     local listH = 0
     for i, e in ipairs(list) do
         local r = ui.rank.Get(i)
@@ -1910,6 +1948,6 @@ ev:SetScript("OnEvent", function(self, e, prefix, msg, channel, sender)
     elseif prefix == PREFIX and channel == "GUILD" and type(msg) == "string" and sender then
         -- my realm's members by name, another realm's as "Name-Realm"; a secret or odd name: dropped
         local who = Key(sender)
-        if who and who ~= Me() and not Secret(msg) then OnMessage(msg, who) end
+        if who and who ~= Me() and who ~= MeKey() and not Secret(msg) then OnMessage(msg, who) end
     end
 end)

@@ -7,8 +7,8 @@ local ADDON, ns = ...
 local L, T, F = ns.L, ns.Tok, ns.F
 
 -- 300: a compact overlay, the one width outside the window set (docs/DESIGN.md 3.1)
-local W, PAD, ICON, GAP = 300, 12, 16, 8        -- width, inner pad, action icon, icon-to-text
-local NEXT_H, NEXT_ICON, BAR_H = 20, 12, 4      -- next-action line, its icon, objective bar
+local W, PAD, ICON, GAP = 320, 12, 18, 8        -- width, inner pad, action icon, icon-to-text
+local NEXT_H, NEXT_ICON, BAR_H = 22, 14, 5      -- next-action line, its icon, objective bar
 local HEAD_H, MAX_BARS, MAX_NEXT = 28, 3, 2
 local TEXT_W = W - PAD * 2 - ICON - GAP
 
@@ -348,7 +348,7 @@ local function Build()
   head:RegisterForClicks("LeftButtonUp")
   head:SetScript("OnDragStart", function() f:StartMoving() end)
   head:SetScript("OnDragStop", function() f:StopMovingOrSizing(); SavePos() end)
-  head.title = ns.Text(head, F.label, T.fg)
+  head.title = ns.Text(head, F.body, T.fg)
   head.title:SetWidth(W - PAD * 2 - 24 - GAP)
   Anchor(head.title, "TOPLEFT", head, "TOPLEFT", PAD, -8)
   Feedback(head, { head.title })
@@ -385,11 +385,13 @@ local function Build()
   col:SetScript("OnClick", function() TR.Collapse(not WLDTDB.trackerCollapsed) end)
   f.col = col
   -- body
-  f.cur = MakeRow(f, ICON, F.body, T.fg)
-  f.cur.sub = ns.Text(f.cur, F.meta, T.muted)
+  -- sizes after RestedXP's card (players found the 11-12 px lines hard to read): the action 14,
+  -- its place, the objectives and the next actions 12-13
+  f.cur = MakeRow(f, ICON, F.heading, T.fg)
+  f.cur.sub = ns.Text(f.cur, F.label, T.muted)
   f.cur.sub:SetWidth(TEXT_W)
   table.insert(f.cur.content, f.cur.sub)
-  f.travel = ns.Text(f, F.meta, T.muted)
+  f.travel = ns.Text(f, F.label, T.muted)
   f.travel:SetWidth(TEXT_W)
   f.travelIcon = f:CreateTexture(nil, "ARTWORK"); f.travelIcon:SetSize(NEXT_ICON, NEXT_ICON)
   ns.SetHDIcon(f.travelIcon, ns.ARROW, T.muted)
@@ -397,9 +399,9 @@ local function Build()
   for k = 1, MAX_BARS do
     local b = CreateFrame("Frame", nil, f)
     b:SetSize(TEXT_W, 18)
-    b.label = ns.Text(b, F.meta, T.muted); b.label:SetWidth(TEXT_W - 56)
+    b.label = ns.Text(b, F.body, T.text); b.label:SetWidth(TEXT_W - 56)
     b.label:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
-    b.count = ns.Text(b, F.meta, T.fg); b.count:SetWidth(52); b.count:SetJustifyH("RIGHT"); b.count:SetWordWrap(false)
+    b.count = ns.Text(b, F.body, T.fg); b.count:SetWidth(52); b.count:SetJustifyH("RIGHT"); b.count:SetWordWrap(false)
     b.count:SetPoint("TOPRIGHT", b, "TOPRIGHT", 0, 0)
     b.track = ns.Tex(b, "ARTWORK", T.divider); b.track:SetHeight(BAR_H)
     b.fill = ns.Tex(b, "OVERLAY", T.text); b.fill:SetHeight(BAR_H)
@@ -407,7 +409,7 @@ local function Build()
   end
   f.nexts = {}
   for k = 1, MAX_NEXT do
-    local r = MakeRow(f, NEXT_ICON, F.meta, T.muted)
+    local r = MakeRow(f, NEXT_ICON, F.label, T.muted)
     f.nexts[k] = r
   end
   Place()
@@ -437,7 +439,7 @@ local function Draw(m)
     title = m.cur.text .. (prog and ("  " .. Hex(T.muted) .. prog .. "|r") or "")
   end
   head.title:SetText(title)
-  local headH = math.max(HEAD_H, TextH(head.title, F.label) + 16)
+  local headH = math.max(HEAD_H, TextH(head.title, F.body) + 16)
   head:SetHeight(headH)
   ns.SetHDIcon(f.col.icon, collapsed and "chevron_down" or "chevron_up", T.muted)
   local y = headH
@@ -454,11 +456,11 @@ local function Draw(m)
   local text = m.cur.text or ""
   if m.cur.count then text = text .. "  " .. Hex(T.muted) .. m.cur.count .. "|r" end
   cur.text:SetText(text)
-  local h = 4 + TextH(cur.text, F.body)
+  local h = 4 + TextH(cur.text, F.heading)
   if m.cur.sub then
     cur.sub:SetText(m.cur.sub); cur.sub:Show()
     Anchor(cur.sub, "TOPLEFT", cur, "TOPLEFT", PAD + ICON + GAP, -(h + 3))
-    h = h + 3 + TextH(cur.sub, F.meta)
+    h = h + 3 + TextH(cur.sub, F.label)
   else cur.sub:Hide() end
   h = h + 6
   cur:ClearAllPoints(); cur:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y); cur:SetHeight(h); cur:Show()
@@ -468,7 +470,7 @@ local function Draw(m)
     f.travel:SetText(m.travel); f.travel:Show(); f.travelIcon:Show()
     f.travelIcon:ClearAllPoints(); f.travelIcon:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + (ICON - NEXT_ICON) / 2, -(y + 1))
     f.travel:ClearAllPoints(); f.travel:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + ICON + GAP, -y)
-    y = y + TextH(f.travel, F.meta) + 4
+    y = y + TextH(f.travel, F.label) + 4
   else f.travel:Hide(); f.travelIcon:Hide() end
   -- objective bars
   for k, b in ipairs(f.bars) do
@@ -478,7 +480,7 @@ local function Draw(m)
       b.count:SetText(d.have .. "/" .. d.need)
       local c = d.fin and T.ok or T.fg
       b.count:SetTextColor(c[1], c[2], c[3])
-      local lh = math.max(TextH(b.label, F.meta), F.meta + 2)
+      local lh = math.max(TextH(b.label, F.body), F.body + 2)
       b.track:ClearAllPoints(); b.track:SetPoint("TOPLEFT", b, "TOPLEFT", 0, -(lh + 3)); b.track:SetWidth(TEXT_W)
       local frac = (d.need > 0) and math.min(1, math.max(0, d.have / d.need)) or 0
       b.fill:ClearAllPoints(); b.fill:SetPoint("TOPLEFT", b.track, "TOPLEFT", 0, 0)
@@ -500,7 +502,7 @@ local function Draw(m)
       r.action = a
       SetActIcon(r.icon, a.kind, true)
       r.text:SetText(a.text or "")
-      local rh = math.max(NEXT_H, TextH(r.text, F.meta) + 8)
+      local rh = math.max(NEXT_H, TextH(r.text, F.label) + 8)
       r:SetHeight(rh)
       r:ClearAllPoints(); r:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y)
       r:Show()
@@ -523,6 +525,18 @@ function TR.Refresh()
 end
 
 function TR.IsOn() return WLDTDB ~= nil and WLDTDB.tracker == true end
+
+-- The guide's "-": the window gives way to the tracker (open, not folded); a click on the tracker
+-- brings the whole guide back (TR.OpenGuide).
+function TR.Compact()
+  if not WLDTDB then return end
+  local first = WLDTDB.tracker ~= true
+  WLDTDB.tracker = true
+  WLDTDB.trackerCollapsed = nil
+  if ns.frame and ns.frame:IsShown() then ns.frame:Hide() end
+  TR.Refresh()
+  if first and L.TR_COMPACT then ns.Print(L.TR_COMPACT) end
+end
 
 function TR.SetShown(on)
   if not WLDTDB then return end

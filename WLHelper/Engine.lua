@@ -502,6 +502,28 @@ local function Dist(a, b)
   return math.sqrt((a[2] - b[2]) ^ 2 + (a[3] - b[3]) ^ 2)
 end
 
+-- The real way there, in yards of walking: the GPS's search (Writs/Route.lua, GPS.CostsFrom: roads,
+-- flight paths, boats) gives seconds, times the speed it priced them at. The route orders its steps
+-- by this, as Shortest Path does, and not by the straight line: from Feralas, Un'Goro is near on the
+-- map and far on foot; a flight makes a far town near. Close by, the straight line is the way.
+-- Only for a step more than TRAVEL_FAR yards away or on another continent; on the same continent
+-- the real trip only lowers the cost (a flight, a boat), it never raises it. nil when the GPS cannot say
+-- (not loaded, a map it cannot read): the straight line then.
+local TRAVEL_FAR = 1000
+function ns.TravelYards(from, list)
+  -- off until the order is planned zone by zone: picked step by step, a cheap flight elsewhere
+  -- left a zone with work still to do there (writ/route_bounce_test). WLDTDB.travelOrder = true: on.
+  if not (WLDTDB and WLDTDB.travelOrder == true) then return nil end
+  local WP = ns.Writs and ns.Writs.WP
+  local G = WP and WP.GPS
+  if not (G and G.CostsFrom and from and list and #list > 0) then return nil end
+  local ok, secs, speed = pcall(G.CostsFrom, from, list)
+  if not (ok and type(secs) == "table" and type(speed) == "number" and speed > 0) then return nil end
+  local out = {}
+  for i = 1, #list do if secs[i] then out[i] = secs[i] * speed end end
+  return out
+end
+
 -- =====================================================================
 --  Nœuds de la route
 -- =====================================================================
@@ -1153,13 +1175,38 @@ function ns.BuildRoute(sel, startPos, startMap)
         end
       end
     end
+    -- the far ones priced by the real way (TravelYards), in one search from here
+    local road = {}
+    if pos then
+      local far, pts = {}, {}
+      for _, n in ipairs(ready) do
+        if not n.unknown and not (n.ins and inDungeon == n.ins) then
+          local np = NodePos(n)
+          if np and (np[1] ~= pos[1] or Dist(pos, np) > TRAVEL_FAR) then far[#far + 1] = n; pts[#pts + 1] = np end
+        end
+      end
+      if #far > 0 then
+        local y = ns.TravelYards(pos, pts)
+        -- same continent: a flight or a boat may make it nearer, never farther (the walk's own
+        -- detours stay out: the straight line keeps the spots and the check-lists as they were);
+        -- another continent: the real trip instead of a flat 6000
+        if y then
+          for i, n in ipairs(far) do
+            if y[i] then
+              local np = pts[i]
+              road[n] = (np[1] ~= pos[1]) and y[i] or math.min(y[i], Dist(pos, np))
+            end
+          end
+        end
+      end
+    end
     for _, n in ipairs(ready) do
       local cost
       if n.unknown then cost = 0
       elseif n.ins and inDungeon == n.ins then cost = 0
       else
         local np = NodePos(n)
-        cost = (np and pos) and Dist(pos, np) or 50
+        cost = road[n] or ((np and pos) and Dist(pos, np)) or 50
         if n.ins then
           cost = cost + 400   -- on ne rentre dans un donjon qu'une fois tout pris autour
           -- outside work this dungeon still has (outLeft): its door waits, the zone around it too
@@ -2488,6 +2535,7 @@ end
 --  Drawn on the maps by Writs/Patrol.lua (Zones), for the current step's objectives.
 -- =====================================================================
 local AREA_MOVE, AREA_MARGIN = 30, 25
+local AREA_NEAR_SPAWN = 40   -- yards: in a camp this near a spawn, the GPS spot is you (AreaPick)
 ns.AREA_MOVE, ns.AREA_MARGIN = AREA_MOVE, AREA_MARGIN
 
 -- The camps of an area: { { {x, y}, ... }, ... } (one hull or a list of hulls in the data).
@@ -2506,9 +2554,32 @@ function ns.AreaOf(n)
   return nil
 end
 
+local areaWorld = setmetatable({}, { __mode = "k" })
+-- A world position back to percent on map m (ns.World is linear in x and y on one map): nil when
+-- the map cannot be read.
+local mapBasis = {}
+function ns.WorldToMap(m, w)
+  if not (m and type(w) == "table" and w[2] and w[3]) then return nil end
+  local B = mapBasis[m]
+  if B == nil then
+    local o, ex, ey = ns.World(m, 0, 0), ns.World(m, 100, 0), ns.World(m, 0, 100)
+    if o and ex and ey and o[1] == ex[1] and o[1] == ey[1] then
+      local a11, a21 = (ex[2] - o[2]) / 100, (ex[3] - o[3]) / 100
+      local a12, a22 = (ey[2] - o[2]) / 100, (ey[3] - o[3]) / 100
+      local det = a11 * a22 - a12 * a21
+      B = math.abs(det) > 1e-9 and { o = o, a11 = a11, a12 = a12, a21 = a21, a22 = a22, det = det } or false
+    else B = false end
+    mapBasis[m] = B
+  end
+  if not B or w[1] ~= B.o[1] then return nil end
+  local dx, dy = w[2] - B.o[2], w[3] - B.o[3]
+  local x = (B.a22 * dx - B.a12 * dy) / B.det
+  local y = (B.a11 * dy - B.a21 * dx) / B.det
+  return x, y
+end
+
 -- The area in world yards: { cont, polys = { { {wx, wy}, ... }, ... }, sp = { {wx, wy, camp, x, y}, ... } }.
 -- A map not readable yet is asked again later (nothing kept); camps on two continents: no area.
-local areaWorld = setmetatable({}, { __mode = "k" })
 local function AreaWorld(a)
   local w = areaWorld[a]
   if w ~= nil then return w or nil end
@@ -2595,6 +2666,30 @@ function ns.AreaPick(a, here, prefer)
   if not (w and type(here) == "table" and here[1] == w.cont) then return nil end
   local campD = {}
   for k, poly in ipairs(w.polys) do campD[k] = PolyDist(poly, here[2], here[3]) end
+  -- standing in a camp, its edge (spawns on the outline, or a corner) is only a walk out of it
+  -- (report: "I am in the zone, why send me out"): the spot is where you stand, the arrow says you
+  -- are there; the mobs are around you
+  -- (with spawns listed, only near one of them: the outline is their hull, it can cover an island
+  -- with no mob, writ/zones_test 1424)
+  for k, d in ipairs(campD) do
+    if d <= 0.5 then
+      local near, any, under, ud = false, false, nil, nil
+      for _, s in ipairs(w.sp) do
+        if s[3] == k then
+          any = true
+          local d2 = (s[1] - here[2]) ^ 2 + (s[2] - here[3]) ^ 2
+          if d2 <= AREA_NEAR_SPAWN * AREA_NEAR_SPAWN then near = true end
+          if d2 <= 25 and (not ud or d2 < ud) then under, ud = s, d2 end
+        end
+      end
+      -- a spawn under your feet (5 yards): that spawn, as it is written
+      if under then return a.m, under[4], under[5], k, true end
+      if near or not any then
+        local mx, my = ns.WorldToMap(a.m, here)
+        if mx then return a.m, mx, my, k, true end
+      end
+    end
+  end
   if prefer and campD[prefer] then campD[prefer] = math.max(0, campD[prefer] - AREA_MOVE) end
   local best, bc, bd
   for _, s in ipairs(w.sp) do
@@ -2606,6 +2701,7 @@ function ns.AreaPick(a, here, prefer)
   -- no spawn listed: the nearest corner of the nearest camp
   local polys, bk = ns.AreaPolys(a), nil
   for k in ipairs(w.polys) do if not bk or campD[k] < campD[bk] then bk = k end end
+
   local poly, wp = bk and polys[bk], bk and w.polys[bk]
   if not (poly and wp) then return nil end
   local bi
@@ -2626,14 +2722,15 @@ function ns.AreaFollow(a, here)
     here = ok and type(h) == "table" and h or nil
   end
   local c = follow[a]
-  if c and (not here or (c.here[1] == here[1] and Dist(c.here, here) <= AREA_MOVE)) then return c.m, c.x, c.y end
-  if not here then return nil end
-  local m, x, y, camp = ns.AreaPick(a, here, c and c.camp)
+  if c and not c.inside and (not here or (c.here[1] == here[1] and Dist(c.here, here) <= AREA_MOVE)) then return c.m, c.x, c.y end
+  if not here then return c and c.m, c and c.x, c and c.y end
+  local m, x, y, camp, inside = ns.AreaPick(a, here, c and c.camp)
   if not m then
     if c then return c.m, c.x, c.y end
     return nil
   end
-  follow[a] = { here = { here[1], here[2], here[3] }, m = m, x = x, y = y, camp = camp }
+  -- in the camp the spot is you: asked again on every look, never kept behind you
+  follow[a] = { here = { here[1], here[2], here[3] }, m = m, x = x, y = y, camp = camp, inside = inside }
   return m, x, y
 end
 function ns.AreaFollowReset() for k in pairs(follow) do follow[k] = nil end end

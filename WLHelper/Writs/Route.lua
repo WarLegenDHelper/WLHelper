@@ -1038,8 +1038,11 @@ local function Excluded(exclude, p)
     return exclude ~= nil and (exclude[p] or exclude[NodeKey(p)]) and true or false
 end
 
+local originOverride   -- GPS.CostsFrom: a search from another point than where you stand
 local function Search(dests, firstOnly, exclude, pol)
-    local cont, px, py = PlayerWorld()
+    local cont, px, py
+    if originOverride then cont, px, py = originOverride[1], originOverride[2], originOverride[3]
+    else cont, px, py = PlayerWorld() end
     if not cont or not dests or #dests == 0 then return nil end
     if not fixed then BuildFixed() end
     -- a ghost runs to its corpse: no flight, no teleport
@@ -1069,13 +1072,14 @@ local function Search(dests, firstOnly, exclude, pol)
         end
     end
     for _, p in ipairs(fixed.docks) do Add(p) end
-    if Opt("teleports", true) and not dead then
+    if Opt("teleports", true) and not dead and not originOverride then
         local hasRune = BagCount(RUNE) > 0
         for _, p in ipairs(fixed.ports) do
             if (not p.rune or hasRune) and SpellReady(p.spell) then Add(p) end
         end
     end
-    local inn, via = HearthWay(dead, pol)
+    local inn, via
+    if not originOverride then inn, via = HearthWay(dead, pol) end
     if inn and Excluded(exclude, inn) then inn = nil end
     if inn then Add(inn) end
 
@@ -1143,6 +1147,26 @@ function GPS.CostsTo(dests)
         end
     end
     return out
+end
+
+-- Seconds from a world point `w` ({ continent, north, west }, Engine's ns.World) to each of the
+-- world points `dests` (nil when unreachable), and the speed they were priced at (yards a second):
+-- the dungeon guide orders its steps by this (walks, flight paths, boats), not by the straight line.
+-- No Hearthstone and no teleport from a point you are not at yet.
+function GPS.CostsFrom(w, dests)
+    if type(w) ~= "table" or not w[1] or type(dests) ~= "table" or #dests == 0 then return nil end
+    local pts = {}
+    for i, d in ipairs(dests) do pts[i] = WorldPoint(d, { kind = "dest" }) end
+    originOverride = w
+    local ok, _, cost = pcall(Search, pts, false, nil, "never")
+    originOverride = nil
+    if not (ok and cost) then return nil end
+    local out = {}
+    for i = 1, #pts do
+        local c = cost[i + 1]
+        if c and c < math.huge then out[i] = c end
+    end
+    return out, RideSpeed()
 end
 
 -- Fastest way from where you stand to the nearest of `dests` (Points). Returns the legs

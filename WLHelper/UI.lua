@@ -2650,10 +2650,13 @@ local function Build()
     function() f:Hide(); WLDTDB.hidden = true; ns.SetArrow(nil); if ns.UpdateActionBar then ns.UpdateActionBar() end end)
   close:SetPoint("TOPRIGHT", -8, -8)
   f.closeBtn = close
-  f.miniBtn = IconBtn(h, "minus", function()
-    if f.mini then return { L.TT_HMAX, L.TT_HMAX_CLICK } end
-    return { L.TT_HMIN, L.TT_HMIN_CLICK }
-  end, function() f.mini = not f.mini; WLDTDB.mini = f.mini; Render() end)
+  -- "-": the small tracker (Tracker.lua, the step, its objective bars and what comes next) in place
+  -- of the window; a click on the tracker brings the whole guide back. It replaced the one-line
+  -- collapsed window, too wide for what it said and hard to read.
+  f.miniBtn = IconBtn(h, "minus", { L.TT_HMIN, L.TT_HMIN_CLICK }, function()
+    if ns.Tracker and ns.Tracker.Compact then ns.Tracker.Compact()
+    else f.mini = not f.mini; WLDTDB.mini = f.mini; Render() end
+  end)
   f.miniBtn:SetPoint("RIGHT", close, "LEFT", -4, 0)
   f.gearBtn = IconBtn(h, "gear", { L.SETTINGS, L.TT_SETTINGS }, function()
     local WP = ns.Writs and ns.Writs.WP
@@ -3068,7 +3071,9 @@ local function Build()
   ns.ClampLabel(f.miniText, nil, f.miniRow)
   BuildList()
   f:SetScript("OnShow", function() ns.Refresh() end)
-  f.mini = WLDTDB.mini
+  -- the old one-line mode: its players get the small tracker
+  if WLDTDB.mini then WLDTDB.mini = nil; WLDTDB.tracker = true end
+  f.mini = false
   f.list:SetShown(WLDTDB.list == true)
   -- a new frame is visible: closed at first; Main.lua reopens it at login if it was open before.
   -- Every way of opening or closing it (close, Escape, /wlh, home, minimap) is remembered here,

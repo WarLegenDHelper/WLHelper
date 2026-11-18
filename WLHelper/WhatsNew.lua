@@ -2,6 +2,11 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.122", date = "2026-11-18", items = {
+    { s = "chg", fr = { "Petit suivi lisible", "Le bouton « − » du guide passe au petit suivi (l'action en cours, ses objectifs avec leur barre, les deux actions suivantes) à la place de la ligne unique d'avant. Textes plus grands (action en 14, objectifs en 13) et cadre un peu plus large. Clic sur le suivi : le guide complet revient." }, en = { "The guide's \"−\" switches to the small tracker (bigger text, objective bars); click it to get the whole guide back.", "" } },
+    { s = "fix", fr = { "Classement PvP de la guilde, les doublons", "Chaque membre n'apparaît plus qu'une fois. Sur Forever, un personnage a un nom de famille (« Alandir Sheeplover ») : les anciennes copies le gardaient sous le prénom seul, les nouvelles sous le prénom et le nom, et ta propre ligne restait sous ton prénom. Les deux sont fusionnées (les chiffres les plus récents gardés) ; deux membres du même prénom restent séparés." }, en = { "Guild PvP ranking", "No more members listed twice (Forever surnames)." } },
+    { s = "fix", fr = { "GPS, dans la zone d'un objectif", "Quand tu es déjà dans la zone pointillée, près des mobs (moins de 40 mètres), la flèche ne t'envoie plus au bord de la zone : le point, c'est toi, et il te suit. Loin de tout mob (une île au milieu de la zone) ou hors de la zone, elle t'emmène au mob le plus proche, comme avant." }, en = { "GPS", "Inside an objective's area, the arrow no longer sends you to its edge." } },
+  } },
   { v = "1.0.0-beta.121", date = "2026-11-18", items = {
     { s = "chg", fr = { "Guide, la route suit ta position", "Toutes les 5 secondes, si tu es à plus de 400 mètres de l'endroit d'où la route a été calculée, les étapes restantes sont remises dans l'ordre depuis là où tu es (toujours en respectant l'ordre obligatoire des quêtes, puis le chemin le plus court). Ça couvre la pierre de foyer, un portail, un bateau ou une longue course dans la même zone, qui ne déclenchaient rien. Pas en combat, pas en vol, pas en donjon ; pas à chaque pas, pour que la flèche ne saute pas d'une étape à l'autre." }, en = { "The guide re-orders the steps left from where you are once you are 400 yards from where the route was planned (hearthstone, portal, boat, long ride).", "" } },
   } },
@@ -56,8 +61,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.108", date = "2026-11-17", items = {
     { s = "fix", fr = { "Aperçu du donjon, bulle d'une récompense", "L'amélioration n'apparaît plus deux fois avec deux pourcentages différents. La ligne « WL Helper » de l'objet suffit ; quand la quête est d'un niveau plus haut que toi, une ligne dit le gain à ce niveau (« Au niveau 53 (celui de la quête) : +51 % »), le chiffre affiché sous l'icône." }, en = { "Dungeon overview", "The reward tooltip no longer repeats the upgrade with two different percents." } },
     { s = "fix", fr = { "Items of Power (Mage, quête 1948)", "Demande la quête 1951, comme sur Wowhead Forever." }, en = { "Quest 1948 now needs 1951, as on Wowhead Forever.", "" } },
-  } },
-  { v = "1.0.0-beta.107", date = "2026-11-17", items = {
-    { s = "add", fr = { "Trouver un groupe, langues", "Deux boutons « Toutes » et « Aucune » au-dessus des langues dans les filtres, pour voir les groupes de toutes les langues d'un clic (celles que le jeu impose restent cochées)." }, en = { "Group finder", "\"All\" / \"None\" for the languages." } },
   } },
 }

@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.122] — 2026-11-18
+
+### Modifié / Changed
+- **Petit suivi lisible** : le bouton « − » du guide passe au petit suivi (l'action en cours, ses objectifs avec leur barre, les deux actions suivantes) à la place de la ligne unique d'avant. Textes plus grands (action en 14, objectifs en 13) et cadre un peu plus large. Clic sur le suivi : le guide complet revient.
+  *The guide's "−" switches to the small tracker (bigger text, objective bars); click it to get the whole guide back.*
+
+### Corrigé / Fixed
+- **Classement PvP de la guilde, les doublons** : chaque membre n'apparaît plus qu'une fois. Sur Forever, un personnage a un nom de famille (« Alandir Sheeplover ») : les anciennes copies le gardaient sous le prénom seul, les nouvelles sous le prénom et le nom, et ta propre ligne restait sous ton prénom. Les deux sont fusionnées (les chiffres les plus récents gardés) ; deux membres du même prénom restent séparés.
+  *Guild PvP ranking: no more members listed twice (Forever surnames).*
+- **GPS, dans la zone d'un objectif** : quand tu es déjà dans la zone pointillée, près des mobs (moins de 40 mètres), la flèche ne t'envoie plus au bord de la zone : le point, c'est toi, et il te suit. Loin de tout mob (une île au milieu de la zone) ou hors de la zone, elle t'emmène au mob le plus proche, comme avant.
+  *GPS: inside an objective's area, the arrow no longer sends you to its edge.*
+
 ## [1.0.0-beta.121] — 2026-11-18
 
 ### Modifié / Changed
