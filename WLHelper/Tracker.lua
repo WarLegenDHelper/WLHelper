@@ -7,9 +7,14 @@ local ADDON, ns = ...
 local L, T, F = ns.L, ns.Tok, ns.F
 
 -- 300: a compact overlay, the one width outside the window set (docs/DESIGN.md 3.1)
-local W, PAD, ICON, GAP = 320, 12, 18, 8        -- width, inner pad, action icon, icon-to-text
-local NEXT_H, NEXT_ICON, BAR_H = 22, 14, 5      -- next-action line, its icon, objective bar
-local HEAD_H, MAX_BARS, MAX_NEXT = 28, 3, 2
+-- v2 after RestedXP's and Polestar's step cards (report: "nothing like RestedXP"): a header with
+-- the dungeon, its levels, the step and the percent; the current step in a card ("ÉTAPE 8 · AVANT LE
+-- DONJON", the action in 16 px with its names in colour, each objective with its count and a green
+-- bar); "Ensuite" and the next 3 actions in plain text; the guide's progress bar at the bottom.
+local W, PAD, ICON, GAP = 340, 12, 18, 8        -- width, inner pad, action icon, icon-to-text
+local NEXT_H, NEXT_ICON, BAR_H = 24, 16, 3      -- next-action line, its icon, objective bar
+local HEAD_H, MAX_BARS, MAX_NEXT = 34, 4, 3
+local CARD_PAD = 10                              -- inside the current step's card
 local TEXT_W = W - PAD * 2 - ICON - GAP
 
 local TR = {}
@@ -148,6 +153,14 @@ function TR.Model()
     m.title = L[key .. "_S"]
   end
   m.phase, m.dk = ph, dk
+  m.phaseText = L["PH_" .. ph:upper() .. "_S"]
+  m.name = dk and ns.D[dk] and ns.DName(dk) or nil
+  local d = dk and ns.D[dk]
+  if d and d.lvl and d.lvl[1] then m.lvl = (d.lvl[2] and d.lvl[2] ~= d.lvl[1]) and (d.lvl[1] .. "-" .. d.lvl[2]) or tostring(d.lvl[1]) end
+  m.stepN, m.stepTotal = idx, #steps
+  local nDone = 0
+  for j = 1, #steps do if ns.IsStepDone(log, j) then nDone = nDone + 1 end end
+  m.pct = math.floor(nDone * 100 / math.max(1, #steps) + 0.5)
   -- the current action: the first one not done in the step (the gate: entering)
   local acts = TR.StepActions(idx, st, log)
   local cur, curPos
@@ -235,6 +248,17 @@ end
 --  Frame
 -- =====================================================================
 local f
+
+-- the action's names in colour: what is quoted (« Name », "Name") or what follows "Verb: "
+local function Rich(text)
+  if type(text) ~= "string" or text == "" then return text end
+  local NAME = Hex(T.info)
+  local out, n = text:gsub("«(.-)»", function(x) return "«" .. NAME .. x .. "|r»" end)
+  if n == 0 then out, n = text:gsub('"(.-)"', function(x) return '"' .. NAME .. x .. '|r"' end) end
+  if n == 0 then out, n = text:gsub("^(.-:%s+)(.+)$", function(a, b) return a .. NAME .. b .. "|r" end) end
+  return out
+end
+TR._Rich = Rich
 
 local function TextH(fs, size)
   local ok, h = pcall(fs.GetStringHeight, fs)
@@ -349,9 +373,14 @@ local function Build()
   head:RegisterForClicks("LeftButtonUp")
   head:SetScript("OnDragStart", function() f:StartMoving() end)
   head:SetScript("OnDragStop", function() f:StopMovingOrSizing(); SavePos() end)
-  head.title = ns.Text(head, F.body, T.fg)
+  head.title = ns.Text(head, F.title, T.fg)
   head.title:SetWidth(W - PAD * 2 - 24 - GAP)
-  Anchor(head.title, "TOPLEFT", head, "TOPLEFT", PAD, -8)
+  head.title:SetWordWrap(false)
+  Anchor(head.title, "TOPLEFT", head, "TOPLEFT", PAD, -9)
+  -- the dungeon's levels (gold), the step and the percent (blue), at the right of the title
+  head.meta = ns.Text(head, F.label, T.muted)
+  head.meta:SetJustifyH("RIGHT"); head.meta:SetWordWrap(false)
+  head.meta:SetPoint("TOPRIGHT", head, "TOPRIGHT", -(PAD + 24), -11)
   Feedback(head, { head.title })
   head:SetScript("OnEnter", function(self)
     self.hl:Show()
@@ -386,9 +415,15 @@ local function Build()
   col:SetScript("OnClick", function() TR.Collapse(not WLDTDB.trackerCollapsed) end)
   f.col = col
   -- body
-  -- sizes after RestedXP's card (players found the 11-12 px lines hard to read): the action 14,
-  -- its place, the objectives and the next actions 12-13
-  f.cur = MakeRow(f, ICON, F.heading, T.fg)
+  -- the current step's card: a lighter fill and a 1 px edge, as RestedXP's
+  f.card = CreateFrame("Frame", nil, f)
+  f.card.fill = ns.Tex(f.card, "BACKGROUND", { 1, 1, 1, 0.06 }); f.card.fill:SetAllPoints()
+  if ns.Outline then pcall(ns.Outline, f.card, { 1, 1, 1, 0.10 }) end
+  f.card:SetFrameLevel(f:GetFrameLevel() + 1)
+  f.stepLabel = ns.Text(f, F.meta, T.warn)
+  f.stepLabel:SetWordWrap(false)
+  f.cur = MakeRow(f, ICON, F.title, T.fg)
+  f.cur:SetFrameLevel(f.card:GetFrameLevel() + 1)
   f.cur.sub = ns.Text(f.cur, F.label, T.muted)
   f.cur.sub:SetWidth(TEXT_W)
   table.insert(f.cur.content, f.cur.sub)
@@ -400,6 +435,7 @@ local function Build()
   for k = 1, MAX_BARS do
     local b = CreateFrame("Frame", nil, f)
     b:SetSize(TEXT_W, 18)
+    b:SetFrameLevel(f.card:GetFrameLevel() + 1)
     b.label = ns.Text(b, F.body, T.text); b.label:SetWidth(TEXT_W - 56)
     b.label:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
     b.count = ns.Text(b, F.body, T.fg); b.count:SetWidth(52); b.count:SetJustifyH("RIGHT"); b.count:SetWordWrap(false)
@@ -408,11 +444,17 @@ local function Build()
     b.fill = ns.Tex(b, "OVERLAY", T.text); b.fill:SetHeight(BAR_H)
     f.bars[k] = b
   end
+  f.thenLabel = ns.Text(f, F.meta, T.muted)
+  f.thenLabel:SetText(L.TR_THEN or "Ensuite")
   f.nexts = {}
   for k = 1, MAX_NEXT do
-    local r = MakeRow(f, NEXT_ICON, F.label, T.muted)
+    local r = MakeRow(f, NEXT_ICON, F.body, T.text)
     f.nexts[k] = r
   end
+  -- the guide's progress, at the bottom (Polestar's bar and percent)
+  f.prog = ns.Tex(f, "ARTWORK", T.divider); f.prog:SetHeight(4)
+  f.progFill = ns.Tex(f, "OVERLAY", T.info); f.progFill:SetHeight(4)
+  f.progText = ns.Text(f, F.meta, T.muted); f.progText:SetJustifyH("RIGHT")
   Place()
   f:Hide()
   return f
@@ -439,25 +481,48 @@ local function Draw(m)
     local prog = (m.title or ""):match("(%d+/%d+)%s*$")
     title = m.cur.text .. (prog and ("  " .. Hex(T.muted) .. prog .. "|r") or "")
   end
+  -- open: the dungeon's name (else the phase), its levels, the step and the percent on the right
+  local meta = ""
+  if not collapsed then
+    title = m.name or m.phaseText or title
+    local parts = {}
+    if m.lvl then parts[#parts + 1] = Hex(T.gold) .. m.lvl .. "|r" end
+    if m.stepN and m.stepTotal then parts[#parts + 1] = Hex(T.text) .. m.stepN .. "/" .. m.stepTotal .. "|r" end
+    if m.pct then parts[#parts + 1] = Hex(T.info) .. m.pct .. " %|r" end
+    meta = table.concat(parts, "  ")
+  end
+  head.meta:SetText(meta)
+  local metaW = 0
+  if meta ~= "" then local okW, mw = pcall(head.meta.GetStringWidth, head.meta); metaW = (okW and type(mw) == "number" and not secret(mw)) and mw or 90 end
+  head.title:SetWidth(math.max(80, W - PAD * 2 - 24 - GAP - metaW - (metaW > 0 and 8 or 0)))
   head.title:SetText(title)
-  local headH = math.max(HEAD_H, TextH(head.title, F.body) + 16)
+  local headH = math.max(HEAD_H, TextH(head.title, F.title) + 18)
   head:SetHeight(headH)
   ns.SetHDIcon(f.col.icon, collapsed and "chevron_down" or "chevron_up", T.muted)
   local y = headH
   local function hideBody()
     f.cur:Hide(); f.travel:Hide(); f.travelIcon:Hide()
+    f.card:Hide(); f.stepLabel:Hide(); f.thenLabel:Hide(); f.prog:Hide(); f.progFill:Hide(); f.progText:Hide()
     for _, b in ipairs(f.bars) do b:Hide() end
     for _, r in ipairs(f.nexts) do r:Hide() end
   end
   if collapsed then hideBody(); f:SetHeight(y) return end
-  -- current action
+  -- the current step's card: "ÉTAPE 8 · AVANT LE DONJON" in orange, then the action
+  local cardTop = y + 4
+  y = cardTop + CARD_PAD
+  local lbl = string.format(L.TR_STEP or "ÉTAPE %d", m.stepN or 0)
+  if m.phaseText then lbl = lbl .. "  ·  " .. m.phaseText end
+  f.stepLabel:SetText(string.upper(lbl))
+  f.stepLabel:ClearAllPoints(); f.stepLabel:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + CARD_PAD - 4, -y)
+  f.stepLabel:Show()
+  y = y + TextH(f.stepLabel, F.meta) + 2
   local cur = f.cur
   cur.action = m.cur
   SetActIcon(cur.icon, m.cur.kind, false)
-  local text = m.cur.text or ""
+  local text = Rich(m.cur.text or "")
   if m.cur.count then text = text .. "  " .. Hex(T.muted) .. m.cur.count .. "|r" end
   cur.text:SetText(text)
-  local h = 4 + TextH(cur.text, F.heading)
+  local h = 4 + TextH(cur.text, F.title)
   if m.cur.sub then
     cur.sub:SetText(m.cur.sub); cur.sub:Show()
     Anchor(cur.sub, "TOPLEFT", cur, "TOPLEFT", PAD + ICON + GAP, -(h + 3))
@@ -481,13 +546,16 @@ local function Draw(m)
       b.count:SetText(d.have .. "/" .. d.need)
       local c = d.fin and T.ok or T.fg
       b.count:SetTextColor(c[1], c[2], c[3])
+      local lc = d.fin and T.muted or T.fg
+      b.label:SetTextColor(lc[1], lc[2], lc[3])
       local lh = math.max(TextH(b.label, F.body), F.body + 2)
       b.track:ClearAllPoints(); b.track:SetPoint("TOPLEFT", b, "TOPLEFT", 0, -(lh + 3)); b.track:SetWidth(TEXT_W)
       local frac = (d.need > 0) and math.min(1, math.max(0, d.have / d.need)) or 0
       b.fill:ClearAllPoints(); b.fill:SetPoint("TOPLEFT", b.track, "TOPLEFT", 0, 0)
       b.fill:SetWidth(math.max(1, TEXT_W * frac)); b.fill:SetShown(frac > 0)
-      local fc = d.fin and T.ok or T.text
-      b.fill:SetColorTexture(fc[1], fc[2], fc[3], 1)
+      -- green as it fills (RestedXP's line under each objective)
+      local fc = T.ok
+      b.fill:SetColorTexture(fc[1], fc[2], fc[3], d.fin and 1 or 0.85)
       local bh = lh + 3 + BAR_H
       b:SetHeight(bh)
       b:ClearAllPoints(); b:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + ICON + GAP, -y)
@@ -495,22 +563,43 @@ local function Draw(m)
       y = y + bh + 6
     else b:Hide() end
   end
-  -- next actions, dimmed
-  if #m.nexts > 0 then y = y + 2 end
+  -- the card closes under the step's last line
+  y = y + CARD_PAD - 6
+  f.card:ClearAllPoints()
+  f.card:SetPoint("TOPLEFT", f, "TOPLEFT", PAD - 4, -cardTop)
+  f.card:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(PAD - 4), -cardTop)
+  f.card:SetHeight(y - cardTop); f.card:Show()
+  y = y + 8
+  -- "Ensuite", then the next actions in plain text (Polestar's list)
+  if #m.nexts > 0 then
+    f.thenLabel:SetText(string.upper(L.TR_THEN or "Ensuite"))
+    f.thenLabel:ClearAllPoints(); f.thenLabel:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -y); f.thenLabel:Show()
+    y = y + TextH(f.thenLabel, F.meta) + 2
+  else f.thenLabel:Hide() end
   for k, r in ipairs(f.nexts) do
     local a = m.nexts[k]
     if a then
       r.action = a
-      SetActIcon(r.icon, a.kind, true)
-      r.text:SetText(a.text or "")
-      local rh = math.max(NEXT_H, TextH(r.text, F.label) + 8)
+      SetActIcon(r.icon, a.kind, false)
+      r.text:SetText(Rich(a.text or ""))
+      local rh = math.max(NEXT_H, TextH(r.text, F.body) + 8)
       r:SetHeight(rh)
       r:ClearAllPoints(); r:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y)
       r:Show()
       y = y + rh
     else r:Hide(); r.action = nil end
   end
-  f:SetHeight(y + 6)
+  -- the guide's progress
+  y = y + 8
+  local frac = math.min(1, math.max(0, (m.pct or 0) / 100))
+  local barW = W - PAD * 2 - 44
+  f.prog:ClearAllPoints(); f.prog:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -(y + 5)); f.prog:SetWidth(barW); f.prog:Show()
+  f.progFill:ClearAllPoints(); f.progFill:SetPoint("TOPLEFT", f.prog, "TOPLEFT", 0, 0)
+  f.progFill:SetWidth(math.max(1, barW * frac)); f.progFill:SetShown(frac > 0)
+  f.progText:SetText((m.pct or 0) .. " %")
+  f.progText:ClearAllPoints(); f.progText:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -y); f.progText:Show()
+  y = y + 14
+  f:SetHeight(y + 8)
 end
 
 function TR.Refresh()

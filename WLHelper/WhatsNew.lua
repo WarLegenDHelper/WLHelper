@@ -2,6 +2,15 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.137", date = "2026-11-18", items = {
+    { s = "chg", fr = { "Le guide compact, refait comme RestedXP et Polestar", "Le petit suivi n'était qu'une boîte grise de trois lignes. Il montre maintenant :" }, en = { "", "" } },
+    { s = "chg", fr = { "", "en haut, le nom du donjon, ses niveaux en doré, l'étape (8/43) et le pourcentage du guide ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "l'étape en cours dans une carte, avec « ÉTAPE 8 · AVANT LE DONJON » en orange et l'action en gros (16 px), ses noms en couleur ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "chaque objectif avec son compteur et une barre verte ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "« ENSUITE » et les 3 actions suivantes en texte normal ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "la barre de progression du guide en bas, avec le pourcentage." }, en = { "The compact guide redone after RestedXP and Polestar", "Header with levels, step and percent; the step's card with its orange label, coloured names and green objective bars; \"Then\" and the next 3 actions; the guide's progress bar." } },
+    { s = "chg", fr = { "Un vrai bouton « Compact »", "À la place du « − » dans la fenêtre du guide : il passe au guide compact. Un clic sur le titre du guide compact ramène la grande fenêtre." }, en = { "A labelled \"Compact\" button replaces the guide window's \"−\".", "" } },
+  } },
   { v = "1.0.0-beta.136", date = "2026-11-18", items = {
     { s = "add", fr = { "Quel donjon farmer pour ton équipement", "Chaque donjon compte ce que son butin a pour toi. D'abord les objets de ta liste BiS de Naowh (1er et 2e choix), puis les améliorations d'au moins 5 % selon WL Helper (cap de toucher, défense, montée de niveau). Les objets que tu as déjà (portés, sacs, banque) et ceux à plus de 4 niveaux au-dessus de toi ne comptent pas. Ça s'affiche en doré sur les cartes du choix de donjon du guide (« 3 BiS pour toi · 2 améliorations ») et sur celles de Trouver un groupe (« Ta route · 3 BiS »). /wlh farm donne dans le chat les 5 meilleurs donjons à ton niveau. Le décompte se refait quand ton équipement, tes sacs, ton niveau ou ta liste Naowh changent." }, en = { "Which dungeon to farm", "Each dungeon counts your Naowh BiS picks and WL Helper's upgrades of 5 % or more in its loot; shown on the dungeon cards, and /wlh farm lists the best 5." } },
   } },
@@ -46,10 +55,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.123", date = "2026-11-18", items = {
     { s = "add", fr = { "GPS, envoyer les destinations à Shortest Path", "Si Shortest Path Forever est installé, Réglages > GPS > « Envoyer les destinations à Shortest Path ». Les étapes du guide, les repères de la carte (livres de Naowh, Ctrl-clic) et /way passent alors par lui : son trajet tracé sur la carte, les vols, les bateaux et zeppelins avec le compte à rebours du départ, les portails, et sa flèche. La flèche de WL Helper et son chemin se cachent pendant ce temps. Éteint par défaut ; si Shortest Path ne peut pas prendre le point (encore en chargement), le GPS de WL Helper guide." }, en = { "GPS", "Send destinations to Shortest Path Forever (its map route, flights, boats with departure timers), Settings > GPS." } },
-  } },
-  { v = "1.0.0-beta.122", date = "2026-11-18", items = {
-    { s = "chg", fr = { "Petit suivi lisible", "Le bouton « − » du guide passe au petit suivi (l'action en cours, ses objectifs avec leur barre, les deux actions suivantes) à la place de la ligne unique d'avant. Textes plus grands (action en 14, objectifs en 13) et cadre un peu plus large. Clic sur le suivi : le guide complet revient." }, en = { "The guide's \"−\" switches to the small tracker (bigger text, objective bars); click it to get the whole guide back.", "" } },
-    { s = "fix", fr = { "Classement PvP de la guilde, les doublons", "Chaque membre n'apparaît plus qu'une fois. Sur Forever, un personnage a un nom de famille (« Alandir Sheeplover ») : les anciennes copies le gardaient sous le prénom seul, les nouvelles sous le prénom et le nom, et ta propre ligne restait sous ton prénom. Les deux sont fusionnées (les chiffres les plus récents gardés) ; deux membres du même prénom restent séparés." }, en = { "Guild PvP ranking", "No more members listed twice (Forever surnames)." } },
-    { s = "fix", fr = { "GPS, dans la zone d'un objectif", "Quand tu es déjà dans la zone pointillée, près des mobs (moins de 40 mètres), la flèche ne t'envoie plus au bord de la zone : le point, c'est toi, et il te suit. Loin de tout mob (une île au milieu de la zone) ou hors de la zone, elle t'emmène au mob le plus proche, comme avant." }, en = { "GPS", "Inside an objective's area, the arrow no longer sends you to its edge." } },
   } },
 }

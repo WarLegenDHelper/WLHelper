@@ -6,6 +6,19 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.137] — 2026-11-18
+
+### Modifié / Changed
+- **Le guide compact, refait comme RestedXP et Polestar** : le petit suivi n'était qu'une boîte grise de trois lignes. Il montre maintenant :
+  - en haut, le nom du donjon, ses niveaux en doré, l'étape (8/43) et le pourcentage du guide ;
+  - l'étape en cours dans une carte, avec « ÉTAPE 8 · AVANT LE DONJON » en orange et l'action en gros (16 px), ses noms en couleur ;
+  - chaque objectif avec son compteur et une barre verte ;
+  - « ENSUITE » et les 3 actions suivantes en texte normal ;
+  - la barre de progression du guide en bas, avec le pourcentage.
+  *The compact guide redone after RestedXP and Polestar: header with levels, step and percent; the step's card with its orange label, coloured names and green objective bars; "Then" and the next 3 actions; the guide's progress bar.*
+- **Un vrai bouton « Compact »** à la place du « − » dans la fenêtre du guide : il passe au guide compact. Un clic sur le titre du guide compact ramène la grande fenêtre.
+  *A labelled "Compact" button replaces the guide window's "−".*
+
 ## [1.0.0-beta.136] — 2026-11-18
 
 ### Ajouté / Added

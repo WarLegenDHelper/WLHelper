@@ -2653,10 +2653,12 @@ local function Build()
   -- "-": the small tracker (Tracker.lua, the step, its objective bars and what comes next) in place
   -- of the window; a click on the tracker brings the whole guide back. It replaced the one-line
   -- collapsed window, too wide for what it said and hard to read.
-  f.miniBtn = IconBtn(h, "minus", { L.TT_HMIN, L.TT_HMIN_CLICK }, function()
+  -- a word, not "-": nobody guessed that the minus turned the guide into the RestedXP-like card
+  -- (report: "not intuitive")
+  f.miniBtn = LabelBtn(h, L.COMPACT_BTN, 24, "secondary", function()
     if ns.Tracker and ns.Tracker.Compact then ns.Tracker.Compact()
     else f.mini = not f.mini; WLDTDB.mini = f.mini; Render() end
-  end)
+  end, { L.TT_HMIN, L.TT_HMIN_CLICK })
   f.miniBtn:SetPoint("RIGHT", close, "LEFT", -4, 0)
   f.gearBtn = IconBtn(h, "gear", { L.SETTINGS, L.TT_SETTINGS }, function()
     local WP = ns.Writs and ns.Writs.WP
@@ -3440,8 +3442,10 @@ end
 local function HeaderNeed()
   local h = f.header
   local w = 6 + 28 + 6 + (ns.TextWidth(h.title, L.DUNGEONS) or 0) + 8
+  -- the gear, "Compact" and the close button are always there (counted even before the first show)
+  local always = { [f.gearBtn] = true, [f.miniBtn] = true, [f.closeBtn] = true }
   for _, b in ipairs({ f.ovBtn, f.pickBtn, f.gearBtn, f.miniBtn, f.closeBtn }) do
-    if b and b:IsShown() then w = w + (num(b:GetWidth()) or 0) + 6 end
+    if b and (always[b] or b:IsShown()) then w = w + (num(b:GetWidth()) or 0) + 6 end
   end
   return math.ceil(w + 8)
 end
@@ -3503,7 +3507,7 @@ RenderNow = function()
   f.pickBtn:SetShown(anyRoute)
   if f.ovBtn then f.ovBtn:SetShown(anyRoute and GuideDungeon() ~= nil) end
   h.sub:SetText(sub); f.LayoutTitle(sub ~= "")
-  if f.miniBtn.SetIcon then f.miniBtn:SetIcon(f.mini and "plus" or "minus") end
+  -- (a labelled button now: no icon to swap)
   -- the player's width, or wider when the title or the footer needs it (never above the max)
   NAV.FitWidth()
   f:SetWidth(W)
