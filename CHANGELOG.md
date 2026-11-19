@@ -6,6 +6,21 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.163] — 2026-11-19
+
+### Ajouté / Added
+- **Vue moderne, un bouton pour fermer** : une croix en haut à droite ferme le guide. Il reste fermé après un rechargement. Le bouton de la minicarte, `/wlh` ou un bouton du guide le rouvre.
+  *Modern view: a close button; the guide stays closed until reopened.*
+
+### Corrigé / Fixed
+- **Moins de retours à la fenêtre classique** :
+  - Le bouton de la minicarte et `/wlh guide` ouvraient la fenêtre classique quand la vue moderne était déjà affichée. Ils ferment maintenant la vue moderne, et un second clic la rouvre.
+  - Les raccourcis « étape suivante / précédente » font défiler la vue moderne.
+  - Lancer un guide n'affiche plus la fenêtre classique un instant.
+  *The minimap button and /wlh guide close the modern view instead of opening the window; next/previous step keys browse the modern view; starting a guide no longer flashes the window.*
+- **Allers-retours courts dans un donjon** : quand une quête se prend dehors, près de l'entrée, après une étape faite dans le donjon, et que ses objectifs sont de nouveau dans le donjon, la route fait l'aller-retour juste après cette étape et garde le reste du donjon pour après. Avant, il fallait refaire le donjon. Cela concerne par exemple Scholomance (Eva Sarkhoff, devant la porte) et les œufs de la Rookery au Pic Rochenoire supérieur (Tinkee Steamboil). Si le PNJ est loin, une capitale par exemple, la route ne change pas.
+  *Short in-and-out trips: a quest taken just outside a dungeon after a step inside, with objectives back inside, is fetched right after that step (Scholomance's Eva Sarkhoff, Upper Blackrock Spire's eggs).*
+
 ## [1.0.0-beta.162] — 2026-11-19
 
 ### Corrigé / Fixed

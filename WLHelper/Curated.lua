@@ -50,25 +50,77 @@ function ns.Extras(nodes, byKey, add, sel, cls)
   if hasG and byKey["c:2770"] then table.insert(byKey["c:2770"].deps, i2) end
 end
 
--- Uldaman (Horde), la chaîne du collier : le journal se trouve sur les Restes d'un paladin, au début
--- du donjon (Wowhead Forever, commentaire de quête 2284 : « avant la grande salle »), Jarkal le
--- traduit à Kargath et donne « Trouver les Gemmes et la Source d'énergie », dont les gemmes viennent
--- de Grimlok, d'Archaedas, d'une urne et d'une cache du donjon. Fait après le donjon, il faut tout
--- refaire (signalement : « je viens de finir le donjon, faut le faire une 2e fois ? ») : le reste du
--- donjon attend donc l'aller-retour à Kargath (l'instance reste comme on l'a laissée).
+-- Une quête qu'on prend dehors, près de l'entrée, après une étape faite dans le donjon, et dont les
+-- objectifs sont de nouveau dans le donjon (Uldaman, Horde : le journal sur les Restes d'un paladin,
+-- Jarkal à Kargath, puis les gemmes de Grimlok et d'Archaedas). Faite après le donjon, il faut tout
+-- refaire (signalement : « je viens de finir le donjon, faut le faire une 2e fois ? »). Le reste du
+-- donjon attend donc l'aller-retour, quand il est court (PNJ à moins de NEAR_OUT mètres de l'entrée) ;
+-- l'instance reste comme on l'a laissée. Un PNJ loin (une capitale) : la route ne change pas.
+local NEAR_OUT = 1500
+local function NodeInside(n, dk) return n.ins == dk and not (n.kind == "c" and n.outer) end
+local function Ancestors(n, acc)
+  acc = acc or {}
+  for _, p in ipairs(n.deps or {}) do
+    if not acc[p] then acc[p] = true; Ancestors(p, acc) end
+  end
+  return acc
+end
+local function NearEntrance(n, dk)
+  local d = ns.D[dk]
+  local e, loc = d and d.e, n.loc
+  if not (e and loc and loc.m and ns.World) then return false end
+  local a, b = ns.World(e.m, e.x, e.y), ns.World(loc.m, loc.x, loc.y)
+  if not (a and b) or a[1] ~= b[1] then return false end
+  return math.sqrt((a[2] - b[2]) ^ 2 + (a[3] - b[3]) ^ 2) <= NEAR_OUT
+end
+-- the gates of a dungeon: the accept nodes of such quests
+function ns.ReentryGates(nodes, byKey, dk)
+  local gates = {}
+  for _, n in ipairs(nodes) do
+    if n.kind == "a" and n.q and not n.ins and (byKey["c:" .. n.q] or byKey["o:" .. n.q .. ":1"]) then
+      local objIn = false
+      for _, m in ipairs(nodes) do
+        if m.q == n.q and (m.kind == "c" or m.kind == "o") and NodeInside(m, dk) then objIn = true break end
+      end
+      if objIn then
+        local anc = Ancestors(n)
+        local inside, ok = false, NearEntrance(n, dk)
+        for p in pairs(anc) do
+          if NodeInside(p, dk) then inside = true end
+        end
+        -- every place visited outside after the inside step is near the entrance too
+        if inside and ok then
+          for p in pairs(anc) do
+            if not p.ins and p.loc then
+              local fromInside = false
+              for pp in pairs(Ancestors(p)) do if NodeInside(pp, dk) then fromInside = true break end end
+              if fromInside and not NearEntrance(p, dk) then ok = false break end
+            end
+          end
+          if ok then gates[#gates + 1] = n end
+        end
+      end
+    end
+  end
+  return gates
+end
 local extras = ns.Extras
 ns.Extras = function(nodes, byKey, add, sel, cls)
   if extras then extras(nodes, byKey, add, sel, cls) end
-  local gems, remains, journal = byKey["a:2339"], byKey["t:2284"], byKey["a:2318"]
-  if not (gems and remains and byKey["c:2339"]) then return end
-  for _, n in ipairs(nodes) do
-    if n.ins == "Uldaman" and n ~= remains and n ~= journal and n ~= gems then
-      n.deps = n.deps or {}
-      table.insert(n.deps, gems)
-      n.midOut = true
+  for dk in pairs(sel or {}) do
+    local gates = ns.ReentryGates(nodes, byKey, dk)
+    if #gates > 0 then
+      local free = {}
+      for _, g in ipairs(gates) do free[g] = true; for p in pairs(Ancestors(g)) do free[p] = true end end
+      for _, n in ipairs(nodes) do
+        if NodeInside(n, dk) and not free[n] then
+          n.deps = n.deps or {}
+          for _, g in ipairs(gates) do table.insert(n.deps, g) end
+          n.midOut = true
+        end
+      end
     end
   end
-  remains.exitTip = true
 end
 
 -- Nom affiché pour les pseudo-étapes

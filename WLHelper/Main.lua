@@ -123,7 +123,10 @@ function ns.StartGuide(run)
   ns.HidePicker()
   local f = ns.frame
   f.auto, f.view, f.sig = nil, nil, nil
-  f:Show(); WLDTDB.hidden = false
+  -- the modern view by default: the window does not flash up before it
+  local modern = ns.route and WLDTDB.modernDefault ~= false and WLHelperTracker and WLHelperTracker.Compact
+  if not modern then f:Show() end
+  WLDTDB.hidden = false
   ns.Refresh(true)
   if ns.route then ns.Print(L.ROUTE_BUILT:format(#ns.route.steps, ns.route.label)) end
   -- the modern view is the guide's default view (report: "it should be the default view"); the
@@ -243,6 +246,13 @@ end
 
 -- The guide comes back on screen (a /reload, a loading screen, a dungeon entered): the modern view
 -- when it is the default (report: "every reload puts me back on the classic view"), else the window.
+-- the modern view is on screen (the keys' next / previous step browse it)
+function ns.TrackerShown()
+  local TR = WLHelperTracker
+  local t = TR and TR.Frame and TR.Frame()
+  return t ~= nil and t:IsShown() == true and not (ns.frame and ns.frame:IsShown())
+end
+
 function ns.ShowGuideView()
   local f = ns.frame
   local TR = WLHelperTracker
@@ -836,6 +846,7 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
     if WLHelperTracker and WLHelperTracker.SetFrameless then WLHelperTracker.SetFrameless(not WLHelperTracker.Frameless()) end
   elseif cmd == "tracker" or cmd == "suivi" then
     if WLHelperTracker then WLHelperTracker.Toggle() end
+  elseif (cmd == "next" or cmd == "prev") and ns.TrackerShown and ns.TrackerShown() then WLHelperTracker.Browse(cmd == "next" and 1 or -1)
   elseif cmd == "next" then ns.GoTo((ns.frame.view or 1) + 1)
   elseif cmd == "prev" then ns.GoTo((ns.frame.view or 1) - 1)
   elseif cmd == "list" then ns.frame.list:SetShown(not ns.frame.list:IsShown()); WLDTDB.list = ns.frame.list:IsShown(); ns.Render()
@@ -897,6 +908,7 @@ function WLDT_Binding(what)
   if not ns.frame then return end
   if what == "toggle" then ns.ToggleMain()
   elseif what == "pick" then ns.TogglePicker()
+  elseif (what == "next" or what == "prev") and ns.TrackerShown and ns.TrackerShown() then WLHelperTracker.Browse(what == "next" and 1 or -1)
   elseif what == "next" then ns.GoTo((ns.frame.view or 1) + 1)
   elseif what == "prev" then ns.GoTo((ns.frame.view or 1) - 1)
   elseif what == "points" then ns.PlacePoints()

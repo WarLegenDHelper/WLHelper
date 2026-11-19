@@ -4702,7 +4702,9 @@ function ns.ToggleMain()
   -- (shown already: the click asks for the window)
   local TR = WLHelperTracker
   local trf = TR and TR.Frame and TR.Frame()
-  if not f:IsShown() and WLDTDB.modernDefault ~= false and ns.route and TR and TR.Compact and not (trf and trf:IsShown()) then
+  if not f:IsShown() and WLDTDB.modernDefault ~= false and ns.route and TR and TR.Compact then
+    -- the modern view on screen: the toggle closes it (the window is in its menu); else it opens it
+    if trf and trf:IsShown() and TR.Close then TR.Close(); return end
     WLDTDB.hidden = false
     TR.Compact()
     ns.Refresh()

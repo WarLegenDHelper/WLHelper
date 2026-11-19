@@ -2,6 +2,14 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.163", date = "2026-11-19", items = {
+    { s = "add", fr = { "Vue moderne, un bouton pour fermer", "Une croix en haut à droite ferme le guide. Il reste fermé après un rechargement. Le bouton de la minicarte, /wlh ou un bouton du guide le rouvre." }, en = { "Modern view", "A close button; the guide stays closed until reopened." } },
+    { s = "fix", fr = { "Moins de retours à la fenêtre classique", "" }, en = { "", "" } },
+    { s = "fix", fr = { "", "Le bouton de la minicarte et /wlh guide ouvraient la fenêtre classique quand la vue moderne était déjà affichée. Ils ferment maintenant la vue moderne, et un second clic la rouvre." }, en = { "", "" } },
+    { s = "fix", fr = { "", "Les raccourcis « étape suivante / précédente » font défiler la vue moderne." }, en = { "", "" } },
+    { s = "fix", fr = { "", "Lancer un guide n'affiche plus la fenêtre classique un instant." }, en = { "The minimap button and /wlh guide close the modern view instead of opening the window; next/previous step keys browse the modern view; starting a guide no longer flashes the window.", "" } },
+    { s = "fix", fr = { "Allers-retours courts dans un donjon", "Quand une quête se prend dehors, près de l'entrée, après une étape faite dans le donjon, et que ses objectifs sont de nouveau dans le donjon, la route fait l'aller-retour juste après cette étape et garde le reste du donjon pour après. Avant, il fallait refaire le donjon. Cela concerne par exemple Scholomance (Eva Sarkhoff, devant la porte) et les œufs de la Rookery au Pic Rochenoire supérieur (Tinkee Steamboil). Si le PNJ est loin, une capitale par exemple, la route ne change pas." }, en = { "Short in-and-out trips", "A quest taken just outside a dungeon after a step inside, with objectives back inside, is fetched right after that step (Scholomance's Eva Sarkhoff, Upper Blackrock Spire's eggs)." } },
+  } },
   { v = "1.0.0-beta.162", date = "2026-11-19", items = {
     { s = "fix", fr = { "Uldaman (Horde), la chaîne du collier", "La route faisait tout le donjon avant d'envoyer à Kargath traduire le journal, puis demandait « Trouver les Gemmes et la Source d'énergie ». Or ses gemmes tombent dans le donjon (Grimlok, Archaedas, une urne, une cache) : il fallait le refaire en entier. Maintenant, juste après les Restes d'un paladin (au début du donjon), la route te fait ressortir à Kargath voir Jarkal, puis revenir faire tout le donjon avec la quête des gemmes. Une note sur ces étapes l'explique : l'instance reste comme tu l'as laissée si tu reviens dans la demi-heure environ." }, en = { "Uldaman (Horde) necklace chain", "Out to Kargath right after the Remains of a Paladin, back in for the rest, so the gems quest is done in the same run." } },
   } },
@@ -65,14 +73,5 @@ ns.WHATSNEW = {
     { s = "add", fr = { "« Nous écrire »", ", pour tous : « Un bug, une idée, une suggestion : sans compte ». Le choix du formulaire devient « Une idée ou suggestion »." }, en = { "", "" } },
     { s = "add", fr = { "« Rapports des joueurs »", ", seulement sur le compte qui reçoit les rapports : combien en sont arrivés, et les nouveaux en orange. Le clic ouvre la liste dans le jeu, du plus récent au plus ancien : le type (bug, idée, erreur de quête, erreur Lua), l'auteur, la date, la zone, le message, le lien de la capture, l'étape du guide et la pile d'appels des erreurs. /wlh rapports l'ouvre aussi." }, en = { "Home gets a \"Feedback\" group", "\"Write to us\" for everyone, and \"Players' reports\" (count, new ones, the list in the game) on the account that receives them." } },
     { s = "fix", fr = { "Vue moderne, une quête qui commence avec un objet que tu n'as pas", "L'Oathstone of Ysera's Dragonflight (après « L'Essence d'Eranikus ») restait proposé dans « Ensuite » même sans l'objet dans les sacs. Il n'apparaît plus tant que l'objet n'y est pas." }, en = { "Modern view", "A quest that starts from an item you do not have is no longer offered as a next action." } },
-  } },
-  { v = "1.0.0-beta.148", date = "2026-11-18", items = {
-    { s = "add", fr = { "Les erreurs de WL Helper partent toutes seules", "Quand BugSack/BugGrabber attrape une erreur Lua de WL Helper chez un joueur, elle est envoyée automatiquement et en silence au compte qui reçoit les rapports. Le rapport contient le message de l'erreur, son nombre de répétitions, le début de la pile d'appels, et la même photo de l'état que les autres rapports. Les garde-fous :" }, en = { "", "" } },
-    { s = "add", fr = { "", "seules les erreurs de WL Helper partent, jamais celles des autres addons ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "chaque erreur part une seule fois par version, 5 au plus par session ;" }, en = { "", "" } },
-    { s = "add", fr = { "", "/wlh rapports erreurs off coupe l'envoi." }, en = { "WL Helper's Lua errors caught by BugGrabber go to the report inbox by themselves, silently; never other addons' errors; once per version, 5 per session at most; /wlh reports errors off to stop.", "" } },
-    { s = "fix", fr = { "Deux boutons qui ne faisaient pas ce qu'ils disaient", "" }, en = { "", "" } },
-    { s = "fix", fr = { "Trouver un groupe", "Recliquer sur la note qu'on avait donnée à un joueur ne l'effaçait pas ;" }, en = { "", "" } },
-    { s = "fix", fr = { "Commandes", "« Commander à nouveau » sur une commande refusée la renvoyait au même artisan au lieu de la proposer à toute la guilde." }, en = { "Two buttons fixed", "Clearing a player's rating by clicking it again, and re-ordering a declined order to the whole guild." } },
   } },
 }

@@ -526,7 +526,7 @@ local function Build()
     return b
   end
   f.menuBtn = SmallBtn("gear", { L.TR_MENU, L.TR_MENU_TIP }, function(self) TR.ToggleMenu(self) end)
-  f.menuBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(PAD - 6 + 24), -2)
+  f.menuBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(PAD - 6 + 24 + 22), -2)
   f.nextBtn = SmallBtn("chevron_right", { L.TR_NEXT }, function() TR.Browse(1) end)
   f.nextBtn:SetPoint("TOPRIGHT", f.menuBtn, "TOPLEFT", -2, 0)
   head.meta = ns.Text(head, F.label, T.muted)
@@ -549,7 +549,7 @@ local function Build()
   -- the row-action size: 24 px hit area, 16 px icon; hover fill, press fill and a 1 px nudge
   local col = CreateFrame("Button", nil, f)
   col:SetSize(24, 24)
-  col:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD + 6, -2)
+  col:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD + 6 - 22, -2)
   col:SetFrameLevel(head:GetFrameLevel() + 2)
   col.icon = col:CreateTexture(nil, "ARTWORK"); col.icon:SetSize(16, 16); col.icon:SetPoint("CENTER")
   col.hl = ns.Tex(col, "BACKGROUND", T.hoverFill); col.hl:SetAllPoints(); col.hl:Hide()
@@ -570,6 +570,10 @@ local function Build()
   end)
   col:SetScript("OnClick", function() TR.Collapse(not WLDTDB.trackerCollapsed) end)
   f.col = col
+  -- close (report: "the modern view has no button to close it"): the guide hides, as the window's
+  -- close does; the minimap button, /wlh or a guide button bring it back
+  f.closeBtn = SmallBtn("close", { L.TR_CLOSE or CLOSE or "Close", L.TR_CLOSE_TIP }, function() TR.Close() end)
+  f.closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD + 6, -2)
   -- body
   -- the current step's card: a lighter fill and a 1 px edge, as RestedXP's
   f.card = CreateFrame("Frame", nil, f)
@@ -657,6 +661,7 @@ local function Wanted()
   -- off unless asked for (/wlh suivi or Settings): the guide window and its "-" mini mode are the
   -- usual way; two small views of the same step confused players
   if not WLDTDB or WLDTDB.tracker ~= true then return false end
+  if WLDTDB.trackerClosed then return false end
   if ns.GuideOn and not ns.GuideOn() then return false end
   -- one view at a time: the small tracker while you play, the big guide window when you open it
   if ns.frame and ns.frame:IsShown() then return false end
@@ -690,10 +695,11 @@ local function Draw(m)
   head.meta:SetText(meta)
   local metaW = 0
   if meta ~= "" then local okW, mw = pcall(head.meta.GetStringWidth, head.meta); metaW = (okW and type(mw) == "number" and not secret(mw)) and mw or 90 end
-  head.title:SetWidth(math.max(80, W - PAD * 2 - 24 - 24 - 20 - 20 - GAP - metaW - (metaW > 0 and 8 or 0)))
+  head.title:SetWidth(math.max(80, W - PAD * 2 - 24 - 22 - 24 - 20 - 20 - GAP - metaW - (metaW > 0 and 8 or 0)))
   -- the arrows: off at either end, hidden when folded
   local nSteps = ns.route and ns.route.steps and #ns.route.steps or 0
   f.prevBtn:SetShown(not collapsed); f.nextBtn:SetShown(not collapsed)
+  f.closeBtn:Show(); f.menuBtn:Show()
   f.prevBtn:SetOff((m.stepN or 1) <= 1); f.nextBtn:SetOff((m.stepN or 1) >= nSteps)
   head.title:SetText(title)
   local headH = math.max(HEAD_H, TextH(head.title, F.title) + 18)
@@ -1014,9 +1020,21 @@ TR._Menu = function() return menu end
 
 -- The guide's "-": the window gives way to the tracker (open, not folded); a click on the tracker
 -- brings the whole guide back (TR.OpenGuide).
+function TR.Close()
+  if not WLDTDB then return end
+  WLDTDB.trackerClosed = true
+  WLDTDB.hidden = true          -- a reload or a loading screen does not bring it back
+  if f then f:Hide() end
+  if TR.menuFrame and TR.menuFrame.Hide then TR.menuFrame:Hide() end
+  if ns.SetArrow then ns.SetArrow(nil) end
+  if ns.UpdateActionBar then ns.UpdateActionBar() end
+end
+function TR.IsClosed() return WLDTDB ~= nil and WLDTDB.trackerClosed == true end
+
 function TR.Compact()
   if not WLDTDB then return end
   local first = WLDTDB.tracker ~= true
+  WLDTDB.trackerClosed = nil
   WLDTDB.tracker = true
   WLDTDB.trackerCollapsed = nil
   -- the window gives way, but the guide stays open (its arrow too): not a "closed" hide

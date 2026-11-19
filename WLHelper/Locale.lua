@@ -183,7 +183,7 @@ local S = {
     -- tracker (Tracker.lua): phase chapters, one action per line, its tooltips
     PH_BEFORE = "Avant le donjon : %s · %d sur %d", PH_INSIDE = "Dans le donjon : %s · %d sur %d", PH_AFTER = "Après le donjon : %s · %d sur %d",
     PH_BEFORE_S = "Avant le donjon", PH_INSIDE_S = "Dans le donjon", PH_AFTER_S = "Après le donjon",
-    TR_WHAT = "Suivi du guide : l'action à faire maintenant", TR_TITLE = "Suivi du guide", TR_DONE_T = "Guide terminé !", TR_DONE_SUB = "Bravo ! Choisis la suite :", TR_NONE_T = "Aucun guide en cours", TR_NONE_SUB = "Choisis un guide pour commencer :",
+    TR_WHAT = "Suivi du guide : l'action à faire maintenant", TR_TITLE = "Suivi du guide", TR_CLOSE = "Fermer", TR_CLOSE_TIP = "Clic : fermer le guide (le bouton de la minicarte ou /wlh le rouvre)", TR_DONE_T = "Guide terminé !", TR_DONE_SUB = "Bravo ! Choisis la suite :", TR_NONE_T = "Aucun guide en cours", TR_NONE_SUB = "Choisis un guide pour commencer :",
     TR_STEP = "Étape %d", TR_THEN = "Ensuite", TR_NOTE = "À savoir",
     TR_FROM_ITEM = "· objet « %s » dans tes sacs", TR_PREV = "Étape précédente", TR_NEXT = "Étape suivante",
     TR_BACK = "· revenir à l'étape en cours", TR_MENU = "Menu", TR_MENU_TIP = "Clic : actions et réglages (aussi clic droit sur le titre)",
@@ -476,7 +476,7 @@ local S = {
     -- tracker (Tracker.lua): phase chapters, one action per line, its tooltips
     PH_BEFORE = "Before the dungeon: %s · %d of %d", PH_INSIDE = "In the dungeon: %s · %d of %d", PH_AFTER = "After the dungeon: %s · %d of %d",
     PH_BEFORE_S = "Before the dungeon", PH_INSIDE_S = "In the dungeon", PH_AFTER_S = "After the dungeon",
-    TR_WHAT = "Guide tracker: what to do now", TR_TITLE = "Guide tracker", TR_DONE_T = "Guide finished!", TR_DONE_SUB = "Well done! Pick what comes next:", TR_NONE_T = "No guide running", TR_NONE_SUB = "Pick a guide to start:",
+    TR_WHAT = "Guide tracker: what to do now", TR_TITLE = "Guide tracker", TR_CLOSE = "Close", TR_CLOSE_TIP = "Click: close the guide (the minimap button or /wlh opens it again)", TR_DONE_T = "Guide finished!", TR_DONE_SUB = "Well done! Pick what comes next:", TR_NONE_T = "No guide running", TR_NONE_SUB = "Pick a guide to start:",
     TR_TAKE = "Accept \"%s\"", TR_TURN = "Turn in \"%s\"", TR_DO = "Do \"%s\"", TR_HAVE = "Have \"%s\" in your log",
     TR_STEP = "Step %d", TR_THEN = "Then", TR_NOTE = "Good to know", TR_FROM_ITEM = "· item \"%s\" in your bags", TR_PREV = "Previous step", TR_NEXT = "Next step",
     TR_BACK = "· back to the current step", TR_MENU = "Menu", TR_MENU_TIP = "Click: actions and settings (also right-click the title)",
