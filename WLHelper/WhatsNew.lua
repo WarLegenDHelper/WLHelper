@@ -2,6 +2,14 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.176", date = "2026-11-20", items = {
+    { s = "fix", fr = { "Objectifs placés au mauvais endroit", "Vérification de tous les objectifs de donjon que les données plaçaient dehors, après « Le dernier élément ». 5 quêtes envoyaient au mauvais endroit :" }, en = { "", "" } },
+    { s = "fix", fr = { "Ordre du chef de guerre", "Les documents importants de Rochenoire étaient placés dans les Carmines. Ils sont dans le Pic Rochenoire inférieur." }, en = { "", "" } },
+    { s = "fix", fr = { "Sceau d'ascension (UBRS)", "Le sceau forgé était placé à Mille Pointes. Il s'obtient dans Rochenoire." }, en = { "", "" } },
+    { s = "fix", fr = { "Gnomeregan", "L'objet incrusté de crasse tombe des « Caverndeep », qui sont dans le donjon." }, en = { "", "" } },
+    { s = "fix", fr = { "Brassenoire", "Les saphirs d'Aku'Mai sont dans le donjon." }, en = { "", "" } },
+    { s = "fix", fr = { "Libram (Hache-Tripes)", "Le diamant noir parfait n'a plus de point fixe dans la vallée d'Alterac. Il s'achète à l'hôtel des ventes ou tombe en donjon. Les autres objectifs « dehors » sont justes : Uldaman, Maraudon, Razorfen et les Cavernes des lamentations ont de vraies zones à l'extérieur du donjon." }, en = { "Five dungeon objectives were placed outside or in the wrong zone; fixed.", "" } },
+  } },
   { v = "1.0.0-beta.175", date = "2026-11-20", items = {
     { s = "fix", fr = { "Le dernier élément (BRD)", "L'objectif envoyait dans la Gorge des Vents brûlants, sur « Scald », où il n'y a rien pour cette quête. Les Essences des éléments tombent des élémentaires et des golems dans les Profondeurs de Rochenoire : l'étape est maintenant dans le donjon." }, en = { "The Last Element", "The Essences drop inside Blackrock Depths, no more trip to Searing Gorge." } },
     { s = "fix", fr = { "Guide BRD qui envoyait à Stratholme", "« Le défi » (set de donjon 0.5, niveau 58, qui passe par Stratholme) ne fait plus partie du guide des Profondeurs de Rochenoire." }, en = { "The BRD guide no longer includes The Challenge (Dungeon Set 0.5) and its trip to Stratholme.", "" } },
@@ -98,8 +106,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.162", date = "2026-11-19", items = {
     { s = "fix", fr = { "Uldaman (Horde), la chaîne du collier", "La route faisait tout le donjon avant d'envoyer à Kargath traduire le journal, puis demandait « Trouver les Gemmes et la Source d'énergie ». Or ses gemmes tombent dans le donjon (Grimlok, Archaedas, une urne, une cache) : il fallait le refaire en entier. Maintenant, juste après les Restes d'un paladin (au début du donjon), la route te fait ressortir à Kargath voir Jarkal, puis revenir faire tout le donjon avec la quête des gemmes. Une note sur ces étapes l'explique : l'instance reste comme tu l'as laissée si tu reviens dans la demi-heure environ." }, en = { "Uldaman (Horde) necklace chain", "Out to Kargath right after the Remains of a Paladin, back in for the rest, so the gems quest is done in the same run." } },
-  } },
-  { v = "1.0.0-beta.161", date = "2026-11-18", items = {
-    { s = "fix", fr = { "Améliorations, icônes des sacs", "Un objet que le tooltip dit « Presque pareil » gardait la flèche verte et un « +43 % » sur son icône dans les sacs (Guardian Talisman face à Theka's Last Breath). Les icônes suivent maintenant le tooltip : ni flèche ni pourcentage pour un objet presque pareil." }, en = { "Bag icons follow the tooltip", "No arrow and no percent on an item that is \"about the same\"." } },
   } },
 }

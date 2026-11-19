@@ -6,6 +6,19 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.176] — 2026-11-20
+
+### Corrigé / Fixed
+- **Objectifs placés au mauvais endroit** : vérification de tous les objectifs de donjon que les données plaçaient dehors, après « Le dernier élément ». 5 quêtes envoyaient au mauvais endroit :
+  - **Ordre du chef de guerre** (chaîne d'Onyxia) : les documents importants de Rochenoire étaient placés dans les Carmines. Ils sont dans le Pic Rochenoire inférieur.
+  - **Sceau d'ascension (UBRS)** : le sceau forgé était placé à Mille Pointes. Il s'obtient dans Rochenoire.
+  - **Gnomeregan** : l'objet incrusté de crasse tombe des « Caverndeep », qui sont dans le donjon.
+  - **Brassenoire** : les saphirs d'Aku'Mai sont dans le donjon.
+  - **Libram (Hache-Tripes)** : le diamant noir parfait n'a plus de point fixe dans la vallée d'Alterac. Il s'achète à l'hôtel des ventes ou tombe en donjon.
+
+  Les autres objectifs « dehors » sont justes : Uldaman, Maraudon, Razorfen et les Cavernes des lamentations ont de vraies zones à l'extérieur du donjon.
+  *Five dungeon objectives were placed outside or in the wrong zone; fixed.*
+
 ## [1.0.0-beta.175] — 2026-11-20
 
 ### Corrigé / Fixed

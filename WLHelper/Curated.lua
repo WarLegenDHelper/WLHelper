@@ -59,6 +59,25 @@ do
   for i = #(d and d.q or {}), 1, -1 do if d.q[i] == 9015 then table.remove(d.q, i) end end
 end
 
+-- Objectives the data placed outside although they are done inside the dungeon (audit after "The
+-- Last Element"): Warlord's Command's documents (in Redridge!), the Forged Seal of Ascension, the
+-- Gnomeregan Caverndeep mobs, the Sapphires of Aku'Mai. The Pristine Black Diamond has no spot (the
+-- Auction House or dungeon drops), not Alterac Valley.
+do
+  local INSIDE = { [4903] = "Important Blackrock Documents",
+    [4743] = "Forged Seal of Ascension", [2951] = "Grime-Encrusted Object", [6563] = "Sapphire of Aku'Mai" }
+  for id, name in pairs(INSIDE) do
+    for _, o in ipairs(ns.Q[id] and ns.Q[id].o or {}) do
+      if o.n == name then o.ins, o.outer, o.w = true, nil, nil end
+    end
+  end
+  for _, id in ipairs({ 7483, 7484, 7485 }) do
+    for _, o in ipairs(ns.Q[id] and ns.Q[id].o or {}) do
+      if o.n == "Pristine Black Diamond" then o.w, o.ns, o.t, o.src = nil, true, nil, nil end
+    end
+  end
+end
+
 -- The Spectral Chalice needs Mining 230 (Smelt Dark Iron): a miner below it is not offered the quest
 if ns.Q[4083] then ns.Q[4083].profLv = 230 end
 
