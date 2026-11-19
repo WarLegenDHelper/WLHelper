@@ -2,6 +2,13 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.169", date = "2026-11-19", items = {
+    { s = "chg", fr = { "Meilleur équipement, le BiS de Naowh en tête", "Si la BiS List de Naowh est installée, la première pièce de chaque emplacement des onglets Pré-BiS 60 et BiS 60 est celle de Naowh, marquée « BiS Naowh (simulé) ». C'est ton propre choix si tu as rempli « My BiS » chez Naowh, sinon son classement simulé (MythicSim). Le classement calculé de WL Helper Gear passe dessous, comme autre choix. Rien n'est copié : la liste est lue en direct dans l'addon de Naowh." }, en = { "Best gear", "With Naowh's BiS List installed, its simulated BiS comes first in each slot, ours under it." } },
+    { s = "chg", fr = { "Onglet PvP 60", "Chaque pièce dit ce qu'elle coûte. Pour le set d'honneur, c'est l'honneur et les marques (« 9 000 honneur + 15 marques Vallée d'Alterac »). Pour les pièces de rang, c'est le rang PvP requis (« Rang PvP 13 (Warlord) requis »). L'intro précise que le gain est calculé avec des poids PvE et ne compte pas l'endurance." }, en = { "PvP tab", "Honor and marks, or the PvP rank needed, for each piece." } },
+    { s = "chg", fr = { "Champs de bataille, bonus du jour bien visible", "En haut de la fenêtre, une bannière sur toute la largeur donne le nom du champ de bataille en bonus en grand et en doré, avec une étoile, une ligne qui explique, et « Y aller » vers son maître de guerre. Sans bonus, une ligne discrète. La pastille reste sur la carte." }, en = { "Battlegrounds", "Today's bonus is now a full-width banner with the battleground's name, a short line and a \"Go there\" button." } },
+    { s = "chg", fr = { "Fenêtre large", "Le tableau passe en colonnes (pièce, gain, provenance) au lieu d'une longue ligne étirée." }, en = { "Wide window", "The table uses columns." } },
+    { s = "fix", fr = { "Onglet PvP 60", "Plus de pièces de rang de l'autre faction (Field Marshal, Knight-Captain... pour un Horde, et inversement)." }, en = { "PvP tab", "No rank pieces of the other faction." } },
+  } },
   { v = "1.0.0-beta.168", date = "2026-11-19", items = {
     { s = "chg", fr = { "Champs de bataille, fenêtre refaite pour être lisible", "" }, en = { "", "" } },
     { s = "chg", fr = { "", "Elle s'ouvre depuis l'accueil et le hub (ligne « Champs de bataille », dans Guilde et groupes), en plus de /wlh pvp." }, en = { "", "" } },
@@ -73,8 +80,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.155", date = "2026-11-18", items = {
     { s = "fix", fr = { "Le GPS suit la vue moderne", "La fenêtre classique fermée, la flèche GPS suivait encore l'étape où cette fenêtre était restée (par exemple une étape du donjon), au lieu de l'étape affichée dans la vue moderne. Elle suit maintenant la vue moderne, y compris quand on parcourt les étapes avec ‹ ›, avec la liste ou en cliquant une action." }, en = { "The GPS arrow follows the modern view's step (and its browsing), not a step the closed window was left on.", "" } },
     { s = "fix", fr = { "Vue moderne, un texte plus propre", "Le lieu n'est plus écrit deux fois (seule la ligne avec la distance reste), les notes sans titre ont maintenant le titre « À savoir », et la ligne « Oathstone... » en trop sur « L'Essence d'Eranikus » a disparu." }, en = { "Modern view", "The place said once (with the distance), untitled notes under \"Good to know\", the stray Oathstone line gone." } },
-  } },
-  { v = "1.0.0-beta.154", date = "2026-11-18", items = {
-    { s = "add", fr = { "Vue moderne, des liens toujours visibles", "Sous la barre de progression, une rangée de petits liens **Guides · Vue d'ensemble · Boss · Carte · Partager**. Le choix d'un guide (avec ses cartes de donjons), la vue d'ensemble, le panneau des boss, la carte du donjon et le partage des quêtes sont à un clic, sans passer par le menu ni la fenêtre classique." }, en = { "Modern view", "Always-visible links under the progress bar: Guides (the dungeon picker), Overview, Bosses, Map, Share." } },
   } },
 }

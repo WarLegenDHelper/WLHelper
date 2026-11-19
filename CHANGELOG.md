@@ -6,6 +6,22 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.169] — 2026-11-19
+
+### Modifié / Changed
+- **Meilleur équipement, le BiS de Naowh en tête** : si la BiS List de Naowh est installée, la première pièce de chaque emplacement des onglets Pré-BiS 60 et BiS 60 est celle de Naowh, marquée « BiS Naowh (simulé) ». C'est ton propre choix si tu as rempli « My BiS » chez Naowh, sinon son classement simulé (MythicSim). Le classement calculé de WL Helper Gear passe dessous, comme autre choix. Rien n'est copié : la liste est lue en direct dans l'addon de Naowh.
+  *Best gear: with Naowh's BiS List installed, its simulated BiS comes first in each slot, ours under it.*
+- **Onglet PvP 60** : chaque pièce dit ce qu'elle coûte. Pour le set d'honneur, c'est l'honneur et les marques (« 9 000 honneur + 15 marques Vallée d'Alterac »). Pour les pièces de rang, c'est le rang PvP requis (« Rang PvP 13 (Warlord) requis »). L'intro précise que le gain est calculé avec des poids PvE et ne compte pas l'endurance.
+  *PvP tab: honor and marks, or the PvP rank needed, for each piece.*
+- **Champs de bataille, bonus du jour bien visible** : en haut de la fenêtre, une bannière sur toute la largeur donne le nom du champ de bataille en bonus en grand et en doré, avec une étoile, une ligne qui explique, et « Y aller » vers son maître de guerre. Sans bonus, une ligne discrète. La pastille reste sur la carte.
+  *Battlegrounds: today's bonus is now a full-width banner with the battleground's name, a short line and a "Go there" button.*
+- **Fenêtre large** : le tableau passe en colonnes (pièce, gain, provenance) au lieu d'une longue ligne étirée.
+  *Wide window: the table uses columns.*
+
+### Corrigé / Fixed
+- **Onglet PvP 60** : plus de pièces de rang de l'autre faction (Field Marshal, Knight-Captain... pour un Horde, et inversement).
+  *PvP tab: no rank pieces of the other faction.*
+
 ## [1.0.0-beta.168] — 2026-11-19
 
 ### Modifié / Changed

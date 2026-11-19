@@ -307,6 +307,42 @@ function NB.Source(item, spec)
     return r[2], r[3]
 end
 
+-- Naowh's level 60 picks for one of its slots (1 head ... 18 ranged), best first, for the spec the
+-- player's active Naowh list shows: his own pick for that slot first (his "My BiS" list), then
+-- Naowh's simulated ranking (MythicSim, wowsrc). { ids }, the Naowh spec key; nil when Naowh's BiS
+-- List is not there or not on. Read live, nothing of it is copied.
+function NB.SlotPicks(slot)
+    if not NB.Available() then return nil end
+    local B = BiS()
+    local okI, info = pcall(ListInfo, nil)
+    local nkey = okI and info and info[2]
+    if not nkey then return nil end
+    local out, seen = {}, {}
+    local function Add(id)
+        id = tonumber(id)
+        if id and not seen[id] then seen[id] = true; out[#out + 1] = id end
+    end
+    local okL, list = pcall(B.Lists.List)
+    if okL and type(list) == "table" then
+        local okP, slots = pcall(B.Lists.PicksOn, list.id, nkey)
+        if okP and type(slots) == "table" then Add(slots[slot]) end
+    end
+    local R = B.Rankings
+    if type(R.Ranking) == "function" then
+        local okR, ranking = pcall(R.Ranking, nkey, slot)
+        if okR and type(ranking) == "table" then for _, id in ipairs(ranking) do Add(id) end end
+    end
+    return out, nkey
+end
+
+-- Naowh's source line for an item ("Highlord Omokk · Lower Blackrock Spire", "Tailoring · Crafted"), or nil
+function NB.ItemSource(id)
+    local n = N()
+    if not (n and type(n.BiSSource) == "function") then return nil end
+    local ok, s = pcall(n.BiSSource, id)
+    return ok and type(s) == "string" and s or nil
+end
+
 -- "BiS", "2e choix", "3e choix"; with a bracket below 60 (a "level" rank 1): "BiS niv. 40"
 function NB.Label(rank, bracket)
     if rank == 1 and type(bracket) == "number" and bracket < TOP then return string.format(L("BiS niv. %d"), bracket) end

@@ -55,6 +55,23 @@ end
 -- mode: nil / "now" (raids left out), "pre" (raids and PvP left out: the pre-raid set), "bis"
 -- (raids in), "pvp" (only PvP pieces: honor ranks and battleground reputations)
 local function IsPvP(src) return type(src) == "string" and src:find("^PvP") ~= nil end
+local function Thousands(n)
+    local s = tostring(math.floor(n))
+    local sep = (GetLocale and GetLocale() == "frFR") and " " or ","
+    return (s:reverse():gsub("(%d%d%d)", "%1" .. sep):reverse():gsub("^" .. (sep == "," and "," or " "), ""))
+end
+function Best.PvPCost(id, name)
+    local P = WP.PvP
+    for _, r in ipairs(P and P.ITEMS or {}) do
+        if r[1] == id then
+            local mark = P.MARKS and P.MARKS[r[5]]
+            return string.format(L("%s honneur + %d marques %s"), Thousands(r[4]), r[6], mark and L(mark) or "?")
+        end
+    end
+    local title, _, rank = Best.Title(name)
+    if rank then return string.format(L("Rang PvP %d (%s) requis"), rank, title) end
+    return nil
+end
 -- pieces of the other side (its battleground reputations, its vendors), and pieces of raids and
 -- world bosses the data does not file as raid loot: left out of the lists that should not have them
 local SIDE = {
@@ -67,10 +84,31 @@ local function Has(src, list)
     for _, p in ipairs(list) do if src:find(p) then return true end end
     return false
 end
-function Best.Keep(src, mode, faction)
+-- the PvP rank titles in item names ("Premier Warlord's Magus Cowl"): side and rank needed
+local TITLES = {
+    Scout = { "Horde", 1 }, Grunt = { "Horde", 2 }, ["Senior Sergeant"] = { "Horde", 4 }, ["First Sergeant"] = { "Horde", 5 },
+    ["Stone Guard"] = { "Horde", 6 }, ["Blood Guard"] = { "Horde", 7 }, Legionnaire = { "Horde", 8 }, Centurion = { "Horde", 9 },
+    Champion = { "Horde", 10 }, ["Lieutenant General"] = { "Horde", 11 }, General = { "Horde", 12 }, Warlord = { "Horde", 13 },
+    ["High Warlord"] = { "Horde", 14 },
+    Private = { "Alliance", 1 }, Corporal = { "Alliance", 2 }, ["Master Sergeant"] = { "Alliance", 4 }, ["Sergeant Major"] = { "Alliance", 5 },
+    Knight = { "Alliance", 6 }, ["Knight-Lieutenant"] = { "Alliance", 7 }, ["Knight-Captain"] = { "Alliance", 8 },
+    ["Knight-Champion"] = { "Alliance", 9 }, ["Lieutenant Commander"] = { "Alliance", 10 }, Commander = { "Alliance", 11 },
+    Marshal = { "Alliance", 12 }, ["Field Marshal"] = { "Alliance", 13 }, ["Grand Marshal"] = { "Alliance", 14 },
+    Sergeant = { nil, 3 },
+}
+function Best.Title(name)
+    if type(name) ~= "string" then return nil end
+    local title = name:gsub("^Premier ", ""):match("^(.-)'s ")
+    local r = title and TITLES[title]
+    if r then return title, r[1], r[2] end
+    return nil
+end
+function Best.Keep(src, mode, faction, name)
     src = type(src) == "string" and src or ""
     local other = faction == "Horde" and SIDE.Alliance or faction == "Alliance" and SIDE.Horde or nil
     if other and Has(src, other) then return false end
+    local _, side = Best.Title(name)
+    if faction and side and side ~= faction then return false end
     if mode ~= "bis" and Has(src, RAIDLIKE) then return false end
     if mode == "pvp" then return IsPvP(src) end
     if mode == "pre" and IsPvP(src) then return false end
@@ -91,7 +129,7 @@ function Best.Rows(level, top, mode)
         if ok and type(list) == "table" then
             local keep, seen = {}, {}
             for _, it in ipairs(list) do
-                if #keep < top and not seen[it.id] and Best.Keep(it.source, mode, faction) then
+                if #keep < top and not seen[it.id] and Best.Keep(it.source, mode, faction, it.name) then
                     seen[it.id] = true; keep[#keep + 1] = it
                 end
             end
@@ -101,6 +139,7 @@ function Best.Rows(level, top, mode)
             local rows = {}
             for _, it in ipairs(list) do
                 local r = { id = it.id, name = it.name, source = Best.Source(it.source), raw = it.source, quality = it.quality }
+                if IsPvP(it.source) then r.source = Best.PvPCost(it.id, it.name) or r.source end
                 if G.Compare then
                     local okC, c = pcall(G.Compare, it.id, level)
                     if okC and type(c) == "table" then
@@ -200,6 +239,15 @@ ns.AddEnglish({
     ["Ouvrir le guide"] = "Open the guide",
     ["Clic : ouvrir le guide de ce donjon"] = "Click: open this dungeon's guide",
     ["Maj-clic : le lien dans la discussion"] = "Shift-click: its link in the chat",
+    ["BiS Naowh (simulé)"] = "Naowh BiS (simulated)",
+    ["En tête de ligne : le BiS de Naowh (simulations MythicSim) ; en dessous, le classement de WL Helper Gear pour tes stats."] =
+        "First in each line: Naowh's BiS (MythicSim simulations); under it, WL Helper Gear's ranking for your stats.",
+    ["Classement de WL Helper Gear pour ta spé et tes stats (poids de stats, pas de simulation). Installe la BiS List de Naowh pour avoir son BiS simulé en tête."] =
+        "WL Helper Gear's ranking for your spec and stats (stat weights, no simulation). Install Naowh's BiS List to get its simulated BiS first.",
+    ["Poids PvE : le gain ne compte pas l'endurance, qui fait l'essentiel d'une pièce PvP."] =
+        "PvE weights: the gain leaves out stamina, which is most of what a PvP piece gives.",
+    ["%s honneur + %d marques %s"] = "%s honor + %d %s marks",
+    ["Rang PvP %d (%s) requis"] = "PvP rank %d (%s) needed",
     ["Clic : voir les autres choix"] = "Click: see the other picks",
     ["WL Helper Gear n'est pas chargé"] = "WL Helper Gear is not loaded",
     ["Active-le dans Échap > AddOns : c'est lui qui classe les pièces pour ta spé."] =
@@ -348,6 +396,85 @@ local function NextPlaces(slots)
     return out
 end
 
+-- ---------------------------------------------------------------- Naowh's simulated BiS
+-- When Naowh Forever's BiS List is on, the pre-BiS and BiS tabs put its pick first in each slot
+-- (the player's own "My BiS" pick, else its level 60 simulated ranking), read live through
+-- WP.NaowhBiS: our computed pick stays under it as another choice. Its source line is turned into
+-- ours ("Highlord Omokk · Lower Blackrock Spire" -> "Drop: Highlord Omokk (Lower Blackrock Spire)").
+local NSLOT = { Head = { 1 }, Neck = { 2 }, Shoulder = { 3 }, Back = { 15 }, Chest = { 5 }, Wrist = { 9 }, Hands = { 10 },
+    Waist = { 6 }, Legs = { 7 }, Feet = { 8 }, Ring = { 11, 12 }, Trinket = { 13, 14 }, ["Off Hand"] = { 17 }, Shield = { 17 },
+    Ranged = { 18 } }
+function Best.FromNaowh(src)
+    if type(src) ~= "string" or src == "" then return "" end
+    local a, b = src:match("^(.-) · (.+)$")
+    if not a then return src end
+    if b == "Crafted" then return "Crafted: " .. a end
+    if b:find("^Quest") then
+        local side = b:match("(%(%a+%))$")
+        return "Quest: " .. a .. (side and (" " .. side) or "")
+    end
+    if b == "PvP Rank" then return "PvP: " .. a end
+    if b:find("Reputation") then return "Reputation vendor: " .. a end
+    return "Drop: " .. a .. " (" .. b .. ")"
+end
+local function Equip(id)
+    local f = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    if not f then return nil end
+    local ok, _, _, _, loc = pcall(f, id)
+    return ok and Plain(loc) or nil
+end
+local function NaowhRow(id, level, G)
+    local name = Info(id)
+    local raw = Best.FromNaowh(WP.NaowhBiS.ItemSource(id) or "")
+    local r = { id = id, name = name or tostring(id), source = Best.Source(raw), raw = raw, naowh = true }
+    if G and G.Compare then
+        local ok, c = pcall(G.Compare, id, level)
+        if ok and type(c) == "table" then r.pct, r.worn, r.empty = tonumber(c.pct), c.equipped == true, c.empty == true end
+    end
+    return r
+end
+function Best.NaowhOverlay(list, mode, level)
+    local NB = WP.NaowhBiS
+    if not (list and NB and NB.SlotPicks and (mode == "pre" or mode == "bis")) then return false end
+    local G = _G.WLHelperGear
+    local faction = UnitFactionGroup and Plain((UnitFactionGroup("player"))) or nil
+    local function Pick(slot, skip)
+        local ids = NB.SlotPicks(slot)
+        for _, id in ipairs(ids or {}) do
+            if not skip[id] and Best.Keep(Best.FromNaowh(NB.ItemSource(id) or ""), mode, faction) then return id end
+        end
+    end
+    local used = false
+    local function Put(sec, ids)
+        local picked, seen = {}, {}
+        for _, id in ipairs(ids) do if id and not seen[id] then seen[id] = true; picked[#picked + 1] = NaowhRow(id, level, G) end end
+        if #picked == 0 then return end
+        for _, r in ipairs(sec.rows) do if not seen[r.id] then picked[#picked + 1] = r end end
+        sec.rows = picked
+        used = true
+    end
+    local mainSec = {}
+    for _, sec in ipairs(list) do
+        if sec.key == "Two-Hand" or sec.key == "Main Hand" then mainSec[sec.key] = sec end
+        local slots = NSLOT[sec.key]
+        if slots then
+            local skip, ids = {}, {}
+            for _, s in ipairs(slots) do
+                local id = Pick(s, skip)
+                if id then skip[id] = true; ids[#ids + 1] = id end
+            end
+            Put(sec, ids)
+        end
+    end
+    -- the weapon (Naowh's slot 16) goes to the two-hand line or the main hand line, by what it is
+    local id = Pick(16, {})
+    local loc = id and Equip(id)
+    local sec
+    if loc == "INVTYPE_2HWEAPON" then sec = mainSec["Two-Hand"] elseif loc then sec = mainSec["Main Hand"] end
+    if sec then Put(sec, { id }) end
+    return used
+end
+
 local function PlaceTitle(e)
     if e.kind == "dungeon" then return e.dkey and root.DName and root.DName(e.dkey) or e.place end
     if e.kind == "quest" then return string.format(L("Quête : %s"), e.place) end
@@ -423,17 +550,32 @@ local function PaintRow(r, W, it, slotLabel, state, nAlts, alt)
     r.gain:SetWidth(84); r.gain:ClearAllPoints(); r.gain:SetPoint("RIGHT", -right, 0)
     right = right + 84 + 12
     local textW = math.max(60, W - x - right)
+    -- a wide table: the name column stops at 42 %, the gain sits right after it, the source in its own column
+    local wide = W >= 760
+    local nameW, srcX, srcW = textW, x, textW
+    if wide then
+        nameW = math.floor((W - x - right) * 0.42)
+        r.gain:SetWidth(64); r.gain:SetJustifyH("RIGHT"); r.gain:ClearAllPoints(); r.gain:SetPoint("LEFT", x + nameW + 8, 0)
+        srcX = x + nameW + 8 + 64 + 24
+        srcW = math.max(60, W - srcX - right + 84 + 12)
+    end
     local name, _, minLevel = Info(it.id)
     r.name:SetText(name or tostring(it.name or it.id))
     local qc = S.QualityColor(it.id) or C.fg
     r.name:SetTextColor(qc[1], qc[2], qc[3])
-    r.name:SetWidth(textW); r.name:ClearAllPoints(); r.name:SetPoint("TOPLEFT", x, alt and -4 or -6)
+    r.name:SetWidth(nameW); r.name:ClearAllPoints()
+    if wide then r.name:SetPoint("LEFT", x, 0) else r.name:SetPoint("TOPLEFT", x, alt and -4 or -6) end
     local src = it.source or ""
+    if it.naowh and not alt then
+        local g = C.gold
+        src = string.format("|cff%02x%02x%02x%s|r", g[1] * 255, g[2] * 255, g[3] * 255, L("BiS Naowh (simulé)")) .. (src ~= "" and ("  ·  " .. src) or "")
+    end
     if minLevel and minLevel > MyLevel() then
         local lv = "|cff" .. string.format("%02x%02x%02x", C.bad[1] * 255, C.bad[2] * 255, C.bad[3] * 255) .. string.format(L("Niv. %d"), minLevel) .. "|r"
         src = src ~= "" and (src .. "  ·  " .. lv) or lv
     end
-    r.src:SetText(src); r.src:SetWidth(textW); r.src:ClearAllPoints(); r.src:SetPoint("TOPLEFT", x, alt and -18 or -22)
+    r.src:SetText(src); r.src:SetWidth(srcW); r.src:ClearAllPoints()
+    if wide then r.src:SetPoint("LEFT", srcX, 0) else r.src:SetPoint("TOPLEFT", x, alt and -18 or -22) end
     r:SetWidth(W)
 end
 
@@ -484,9 +626,11 @@ local function Fill()
     if not win then return end
     local lvl = LevelOf(mode)
     local spec = SpecName()
-    win.sub:SetText(spec and string.format(L("Ta spé : %s"), spec) or "")
-    win.intro:SetText(mode == "now" and string.format(L("Les meilleures pièces à ton niveau (%d), raids exclus."), lvl) or L(INTRO[mode]))
+    win.specText = spec and string.format(L("Ta spé : %s"), spec) or nil
+    local introBase = mode == "now" and string.format(L("Les meilleures pièces à ton niveau (%d), raids exclus."), lvl) or L(INTRO[mode])
     local list, pending = Best.Rows(lvl, 4, mode)
+    local okN, naowh = pcall(Best.NaowhOverlay, list, mode, lvl)
+    win.naowh = okN and naowh or false
     local slots = Slots(list)
     local W = math.floor((win:GetWidth() or 760) - 2 * INSET - 8)
     local child = win.list.child
@@ -584,6 +728,11 @@ local function Fill()
     else
         win.empty:Set("filter", L("Rien dans ce filtre"), L("Change de filtre pour voir les autres emplacements."))
     end
+    -- where the first pick of each line comes from
+    local srcLine = win.naowh and L("En tête de ligne : le BiS de Naowh (simulations MythicSim) ; en dessous, le classement de WL Helper Gear pour tes stats.")
+        or L("Classement de WL Helper Gear pour ta spé et tes stats (poids de stats, pas de simulation). Installe la BiS List de Naowh pour avoir son BiS simulé en tête.")
+    if mode == "pvp" then srcLine = L("Poids PvE : le gain ne compte pas l'endurance, qui fait l'essentiel d'une pièce PvP.") end
+    win.introText = introBase .. "\n" .. srcLine
     win.empty:SetShown(shown == 0)
     win.pending:SetShown(pending == true)
     win.listH = y
@@ -622,10 +771,8 @@ local function Build()
         y = y + S.F.title + 4
         win.countSub:ClearAllPoints(); win.countSub:SetPoint("TOPLEFT", INSET, -y)
         y = y + S.F.label + 10
-        local line = {}
-        if win.sub:GetText() ~= "" then line[#line + 1] = win.sub:GetText() end
         win.sub:Hide()
-        win.intro:SetText((#line > 0 and (line[1] .. "  ·  ") or "") .. (win.intro:GetText() or ""))
+        win.intro:SetText((win.specText and (win.specText .. "  ·  ") or "") .. (win.introText or ""))
         win.intro:ClearAllPoints(); win.intro:SetPoint("TOPLEFT", INSET, -y)
         y = y + S.FitText(win.intro, 0, W, win) + 8
         if win.pending:IsShown() then

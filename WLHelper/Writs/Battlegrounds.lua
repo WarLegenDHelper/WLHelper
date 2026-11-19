@@ -390,6 +390,10 @@ end
 
 ns.AddEnglish({
     ["Clic : ouvrir les champs de bataille"] = "Click: open the battlegrounds",
+    ["Journée spéciale aujourd'hui dans le calendrier du jeu : c'est le champ de bataille à faire."] =
+        "A special day today in the game's calendar: this is the battleground to play.",
+    ["Journée spéciale demain dans le calendrier du jeu."] = "A special day tomorrow in the game's calendar.",
+    ["Journée spéciale dans %d jours dans le calendrier du jeu."] = "A special day in %d days in the game's calendar.",
     ["Bonus aujourd'hui : %s"] = "Bonus today: %s",
     ["Réputation, maîtres de guerre et ton set PvP"] = "Reputation, battlemasters and your PvP set",
     ["Set PvP"] = "PvP set",
@@ -412,6 +416,14 @@ ns.AddEnglish({
     ["Marques"] = "Marks",
     ["Gain"] = "Gain",
     ["Pièce"] = "Piece",
+    ["Endurance"] = "Stamina",
+    ["DPS PvE"] = "PvE DPS",
+    ["%+d end."] = "%+d sta.",
+    ["Endurance et DPS PvE"] = "Stamina and PvE DPS",
+    ["Endurance : ce que la pièce apporte de plus (ou de moins) que celle que tu portes. C'est sa vraie force en PvP."] =
+        "Stamina: how much more (or less) the piece gives than the one you wear. It is its real strength in PvP.",
+    ["DPS PvE : l'écart calculé par WL Helper Gear avec tes poids de donjon. Une pièce PvP y perd souvent : c'est normal, elle est faite pour l'endurance."] =
+        "PvE DPS: the difference WL Helper Gear works out with your dungeon weights. A PvP piece often loses there: that's normal, it is built for stamina.",
     ["Emplacement"] = "Slot",
     ["À toi"] = "Yours",
     ["Tout ton set est à toi."] = "Your whole set is yours.",
@@ -536,14 +548,51 @@ local win
 local INSET, PAD = 16, 12
 local CARD_GRID = { minW = 300, gap = 12, rowGap = 12, maxCols = 2, minPx = 200, equal = true }
 local mode = "bg"
-local SLOT_W, ICON, ROW_H, HON_W, MARK_W, GAIN_W = 92, 20, 40, 84, 150, 64
+local SLOT_W, ICON, ROW_H, HON_W, MARK_W, STAM_W, GAIN_W = 92, 20, 40, 84, 150, 72, 72
 
 local function Tip(owner, lines) S.Tip(owner, lines) end
+-- an item's name and link from the game's cache; when it is not cached yet the game is asked to
+-- load it (GET_ITEM_INFO_RECEIVED redraws) and ItemName falls back on our data (PvP.NAMES), never a number
 local function Info(id)
-    if not GetItemInfo then return nil end
-    local ok, name, link = pcall(GetItemInfo, id)
-    if not ok then return nil end
-    return Plain(name), Plain(link)
+    local name, link
+    if GetItemInfo then
+        local ok, n, l = pcall(GetItemInfo, id)
+        if ok then name, link = Plain(n), Plain(l) end
+    end
+    if type(name) ~= "string" then
+        name = nil
+        if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
+    end
+    return name, link
+end
+local function ItemName(id)
+    return Info(id) or (WP.PvP and WP.PvP.NAMES and WP.PvP.NAMES[id]) or "?"
+end
+BG.ItemName = ItemName
+-- the stamina of an item (by id or link), nil when the game cannot tell yet
+local function Stamina(item)
+    local link = item
+    if type(item) == "number" then
+        local _, l = Info(item)
+        link = l
+    end
+    if type(link) ~= "string" then return nil end
+    local f = (C_Item and C_Item.GetItemStats) or GetItemStats
+    if not f then return nil end
+    local ok, t = pcall(f, link)
+    if not ok or type(t) ~= "table" then return nil end
+    return tonumber(Plain(t.ITEM_MOD_STAMINA_SHORT)) or 0
+end
+-- the piece's stamina minus the one worn in its slot (PvP.lua's slot numbers are inventory slots)
+function BG.StaminaDiff(id, slot)
+    local mine = Stamina(id)
+    if not mine then return nil end
+    local worn
+    if GetInventoryItemLink then
+        local ok, l = pcall(GetInventoryItemLink, "player", slot)
+        if ok then worn = Plain(l) end
+    end
+    return mine - ((worn and Stamina(worn)) or 0)
 end
 local function Paint(fs, c) if c then fs:SetTextColor(c[1], c[2], c[3]) end end
 
@@ -646,16 +695,23 @@ local function BgCard(parent, key)
     return c
 end
 
--- the week's line: calendar icon, one sentence; where it comes from in the tooltip
+-- The week's banner, full width. A bonus today or soon: a 32 px icon, the battleground's name as the
+-- title (20, gold), a muted line under it, and "Y aller" to its battlemaster at the right. No bonus
+-- found: one quiet line. Where it comes from is in the tooltip; a click opens the game's calendar.
 local function WeekCard(parent)
     local c = CreateFrame("Button", nil, parent)
     c.wlOwned = true
-    S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
-    S.Border(c, C.cardEdge)
-    c.icon = c:CreateTexture(nil, "ARTWORK"); c.icon:SetSize(16, 16); c.icon:SetPoint("LEFT", PAD, 0)
-    S.HDIcon(c.icon, "calendar", C.gold)
-    c.text = S.Text(c, F.body, C.fg); c.text:SetWordWrap(false); c.text:SetJustifyH("LEFT")
-    c.text:SetPoint("LEFT", PAD + 16 + 8, 0)
+    c.bg = S.Solid(c, "BACKGROUND", C.cardFill); c.bg:SetAllPoints()
+    c.glow = S.Solid(c, "BORDER", { C.gold[1], C.gold[2], C.gold[3], 0.08 }); c.glow:SetAllPoints()
+    c.edge = S.Border(c, C.cardEdge)
+    c.iconBox = CreateFrame("Frame", nil, c); c.iconBox:SetSize(40, 40)
+    c.icon = c.iconBox:CreateTexture(nil, "ARTWORK"); c.icon:SetSize(28, 28); c.icon:SetPoint("CENTER")
+    c.title = S.Text(c, F.hero, C.gold); c.title:SetWordWrap(false); c.title:SetJustifyH("LEFT")
+    c.sub = S.Text(c, F.label, C.muted); c.sub:SetJustifyH("LEFT")
+    c.line = S.Text(c, F.body, C.text); c.line:SetWordWrap(false); c.line:SetJustifyH("LEFT")
+    c.go = S.Button(c, L("Y aller"), 0, 28, "secondary", function()
+        if c.key then BG.GoMaster(c.key) end
+    end, { L("Y aller"), L("Clic : la flèche du GPS t'emmène au maître de guerre") })
     c:SetScript("OnEnter", function(self)
         Tip(self, { L("Calendrier du jeu"),
             L("Lu dans le calendrier du jeu (l'icône en haut à droite de la minicarte). Forever ne publie pas de rotation fixe."),
@@ -667,11 +723,44 @@ local function WeekCard(parent)
         if ToggleCalendar then pcall(ToggleCalendar) end
     end)
     function c:Fit(w)
-        self.text:SetText(win and win.weekText or (BG.WeekText()))
-        self.text:SetWidth(w - (PAD + 24) - PAD)
-        S.ClampLabel(self.text, nil, self)
-        self:SetHeight(40)
-        return 40
+        local found = win and win.bonus
+        self.key = found and found.key or nil
+        if found then
+            local name = L(BG.BY[found.key].name)
+            self.glow:Show()
+            self.icon:SetSize(28, 28)
+            S.HDIcon(self.icon, "star", C.gold)
+            self.iconBox:ClearAllPoints(); self.iconBox:SetPoint("LEFT", PAD, 0); self.iconBox:Show()
+            self.title:SetText(name)
+            self.shownTitle = name
+            self.sub:SetText(found.days == 0 and L("Journée spéciale aujourd'hui dans le calendrier du jeu : c'est le champ de bataille à faire.")
+                or found.days == 1 and L("Journée spéciale demain dans le calendrier du jeu.")
+                or string.format(L("Journée spéciale dans %d jours dans le calendrier du jeu."), found.days))
+            local goW = (self.go:GetWidth() or 90)
+            self.go:ClearAllPoints(); self.go:SetPoint("RIGHT", -PAD, 0); self.go:Show()
+            local x = PAD + 40 + 12
+            local tw = math.max(80, w - x - goW - 2 * PAD)
+            self.title:ClearAllPoints(); self.title:SetPoint("TOPLEFT", x, -PAD); self.title:SetWidth(tw); self.title:Show()
+            S.ClampLabel(self.title, nil, self)
+            self.sub:ClearAllPoints(); self.sub:SetPoint("TOPLEFT", x, -(PAD + 24 + 2))
+            local sh = math.ceil(S.FitText(self.sub, 2, tw, self))
+            self.sub:Show(); self.line:Hide()
+            local h = math.max(64, PAD + 24 + 2 + sh + PAD)
+            self.h = h
+            self:SetHeight(h)
+            return h
+        end
+        self.glow:Hide(); self.go:Hide(); self.title:Hide(); self.sub:Hide()
+        self.shownTitle, self.h = nil, 44
+        S.HDIcon(self.icon, "calendar", C.muted)
+        self.iconBox:ClearAllPoints(); self.iconBox:SetPoint("LEFT", PAD - 8, 0); self.iconBox:Show()
+        self.icon:SetSize(16, 16)
+        self.line:SetText(win and win.weekText or (BG.WeekText()))
+        self.line:ClearAllPoints(); self.line:SetPoint("LEFT", PAD + 32, 0); self.line:SetWidth(w - PAD - 32 - PAD)
+        S.ClampLabel(self.line, nil, self)
+        self.line:Show()
+        self:SetHeight(44)
+        return 44
     end
     return c
 end
@@ -691,6 +780,7 @@ local function MakeRow(parent)
     r.honor = S.Text(r, F.label, C.fg); r.honor:SetJustifyH("RIGHT"); r.honor:SetWordWrap(false)
     r.marks = S.Text(r, F.label, C.fg); r.marks:SetJustifyH("RIGHT"); r.marks:SetWordWrap(false)
     r.gain = S.Text(r, F.label, C.ok); r.gain:SetJustifyH("RIGHT"); r.gain:SetWordWrap(false)
+    r.stam = S.Text(r, F.label, C.ok); r.stam:SetJustifyH("RIGHT"); r.stam:SetWordWrap(false)
     r:SetScript("OnEnter", function(self)
         self.hl:Show()
         if not self.itemID then return end
@@ -715,11 +805,19 @@ end
 local function MakeHead(parent)
     local r = CreateFrame("Frame", nil, parent)
     r.wlOwned = true
-    for _, k in ipairs({ "slot", "name", "honor", "marks", "gain" }) do
+    for _, k in ipairs({ "slot", "name", "honor", "marks", "stam", "gain" }) do
         r[k] = S.Text(r, F.meta, C.muted); r[k]:SetWordWrap(false)
     end
     r.slot:SetJustifyH("LEFT"); r.name:SetJustifyH("LEFT")
-    r.honor:SetJustifyH("RIGHT"); r.marks:SetJustifyH("RIGHT"); r.gain:SetJustifyH("RIGHT")
+    r.honor:SetJustifyH("RIGHT"); r.marks:SetJustifyH("RIGHT"); r.stam:SetJustifyH("RIGHT"); r.gain:SetJustifyH("RIGHT")
+    -- what the two last columns measure, in the header row's tooltip
+    r:EnableMouse(true)
+    r:SetScript("OnEnter", function(self)
+        Tip(self, { L("Endurance et DPS PvE"),
+            L("Endurance : ce que la pièce apporte de plus (ou de moins) que celle que tu portes. C'est sa vraie force en PvP."),
+            L("DPS PvE : l'écart calculé par WL Helper Gear avec tes poids de donjon. Une pièce PvP y perd souvent : c'est normal, elle est faite pour l'endurance.") })
+    end)
+    r:SetScript("OnLeave", S.HideTip)
     return r
 end
 
@@ -729,6 +827,7 @@ local function Columns(r, W)
     x = x + SLOT_W
     local right = 8
     r.gain:ClearAllPoints(); r.gain:SetPoint("RIGHT", -right, 0); r.gain:SetWidth(GAIN_W); right = right + GAIN_W + 12
+    r.stam:ClearAllPoints(); r.stam:SetPoint("RIGHT", -right, 0); r.stam:SetWidth(STAM_W); right = right + STAM_W + 12
     r.marks:ClearAllPoints(); r.marks:SetPoint("RIGHT", -right, 0); r.marks:SetWidth(MARK_W); right = right + MARK_W + 12
     r.honor:ClearAllPoints(); r.honor:SetPoint("RIGHT", -right, 0); r.honor:SetWidth(HON_W); right = right + HON_W + 12
     return x, math.max(60, W - x - right)
@@ -741,8 +840,7 @@ local function PaintRow(r, W, row, d)
     r.slot:SetText(L(row.word))
     r.icon:ClearAllPoints(); r.icon:SetPoint("LEFT", x, 0)
     S.Painted(r.icon, S.ItemIcon(row.id))
-    local name = Info(row.id)
-    r.name:SetText(name or ("#" .. row.id))
+    r.name:SetText(ItemName(row.id))
     Paint(r.name, S.QualityColor(row.id) or C.fg)
     r.name:ClearAllPoints(); r.name:SetPoint("LEFT", x + ICON + 8, 0); r.name:SetWidth(nameW - ICON - 8)
     r.honor:SetText(Int(row.honor))
@@ -750,16 +848,21 @@ local function PaintRow(r, W, row, d)
     if row.owned then
         Paint(r.honor, C.muted); Paint(r.marks, C.muted)
         r.gain:SetText(L("À toi")); Paint(r.gain, C.ok)
+        r.stam:SetText("")
     else
+        local st = BG.StaminaDiff(row.id, row.slot)
+        if st then
+            r.stam:SetText(string.format(L("%+d end."), st)); Paint(r.stam, st > 0 and C.ok or st < 0 and C.warn or C.muted)
+        else r.stam:SetText("") end
         Paint(r.honor, d.honor >= row.honor and C.ok or C.fg)
         Paint(r.marks, (d.have[row.mark] or 0) >= row.marks and C.ok or C.fg)
         if row.pct then
             local p = math.floor(row.pct + 0.5)
-            r.gain:SetText(string.format("%+d %%", p)); Paint(r.gain, p > 0 and C.ok or C.muted)
+            r.gain:SetText(string.format("%+d %%", p)); Paint(r.gain, C.muted)
         else r.gain:SetText("") end
     end
     local alts = {}
-    for _, o in ipairs(row.others or {}) do alts[#alts + 1] = Info(o) or ("#" .. o) end
+    for _, o in ipairs(row.others or {}) do alts[#alts + 1] = ItemName(o) end
     r.alts = #alts > 0 and string.format(L("Autres choix : %s"), table.concat(alts, ", ")) or nil
 end
 
@@ -882,7 +985,7 @@ local function FillSet(W, y)
     th:ClearAllPoints(); th:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -y); th:SetSize(W, 18); th:Show()
     Columns(th, W)
     th.slot:SetText(L("Emplacement")); th.name:SetText(L("Pièce")); th.honor:SetText(L("Honneur"))
-    th.marks:SetText(L("Marques")); th.gain:SetText(L("Gain"))
+    th.marks:SetText(L("Marques")); th.stam:SetText(L("Endurance")); th.gain:SetText(L("DPS PvE"))
     th.name:ClearAllPoints(); th.name:SetPoint("LEFT", 8 + SLOT_W, 0)
     y = y + 18 + 4
     for _, row in ipairs(d.rows) do
@@ -977,10 +1080,19 @@ function BG.Mode() return mode end
 
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "UPDATE_BATTLEFIELD_STATUS",
-    "UPDATE_BATTLEFIELD_SCORE", "PVP_MATCH_COMPLETE", "CALENDAR_UPDATE_EVENT_LIST", "UPDATE_FACTION" }) do
+    "UPDATE_BATTLEFIELD_SCORE", "PVP_MATCH_COMPLETE", "CALENDAR_UPDATE_EVENT_LIST", "UPDATE_FACTION", "GET_ITEM_INFO_RECEIVED" }) do
     pcall(ev.RegisterEvent, ev, e)
 end
 ev:SetScript("OnEvent", function(_, e)
+    if e == "GET_ITEM_INFO_RECEIVED" then
+        -- names and stats arrive one item at a time: one redraw a moment after the first one
+        if win and win:IsShown() and mode == "set" and not BG._redraw then
+            BG._redraw = true
+            local function go() BG._redraw = nil; if win:IsShown() then Fill() end end
+            if C_Timer and C_Timer.After then C_Timer.After(0.2, go) else go() end
+        end
+        return
+    end
     if e == "CALENDAR_UPDATE_EVENT_LIST" or e == "UPDATE_FACTION" then
         if win and win:IsShown() then Fill() end
         return
