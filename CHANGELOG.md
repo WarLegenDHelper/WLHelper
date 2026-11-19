@@ -6,6 +6,25 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.166] — 2026-11-19
+
+### Ajouté / Added
+- **Meilleur équipement** : une vraie fenêtre (`/wlh bis`, ou « Meilleur équipement » dans le hub) avec quatre onglets : « Pour ton niveau », « Pré-BiS 60 » (hors raid et hors PvP : donjons, quêtes, métiers, réputations), « BiS 60 (raids) » et « PvP 60 » (rangs d'honneur, réputations des champs de bataille). Pour chaque emplacement, les 3 meilleures pièces pour ta spé, avec leur provenance et le gain par rapport à ce que tu portes. Maj-clic pour mettre le lien dans la discussion. `/wlh bis chat` écrit toujours la liste dans la discussion.
+  *Best gear window: for your level, pre-BiS 60, BiS 60 with raids, and PvP 60, per slot with source and gain.*
+- **Guide PvP : une fenêtre « Champs de bataille »** (`/wlh pvp` ou `/wlh bg`). Une carte par champ de bataille : Goulet des Chanteguerres, Bassin d'Arathi, Vallée d'Alterac et Îles Darkspear.
+  - **Réputation** : ton rang avec la faction du champ de bataille (Warsong Outriders / Silverwing Sentinels, Defilers / League of Arathor, Frostwolf / Stormpike, Darkspear Raiders / Theramore Expeditionary Force) et les points qui restent jusqu'à Exalté.
+  - **Parties restantes** : le nombre de victoires ou de défaites qu'il faut encore. WL Helper mesure la réputation gagnée à chacune de tes parties (les 10 dernières par champ de bataille) et le dit dans le chat. Avant ta première partie, le Goulet et Arathi donnent un ordre de grandeur de Classic, pas encore confirmé sur Forever. Alterac et les Îles Darkspear attendent une partie mesurée.
+  - **Maître de guerre** : le plus proche de ton côté (Orgrimmar, Undercity, Thunder Bluff ; Hurlevent, Forgefer, Darnassus et Dalaran côté Alliance), avec un bouton « Y aller » pour le GPS. Positions tirées des données du client et recoupées avec Wowhead Forever. À vérifier en jeu : le maître d'Arathi de Thunder Bluff, que les données placent loin du Hunter Rise.
+  - **Bonus de la semaine** : lu dans le calendrier du jeu, pour aujourd'hui et les 7 prochains jours. Forever ne publie pas de rotation fixe, donc rien n'est deviné.
+  - Le set PvP (prix, ce qui te manque) est en bas de la fenêtre. `/wlh pvp chat` l'écrit toujours dans le chat.
+  *PvP guide: a Battlegrounds window with each battleground's reputation, points to Exalted, the games left (measured on your own games), the nearest battlemaster with a GPS button, and the bonus battleground read from the game's calendar.*
+
+### Corrigé / Fixed
+- **GPS après une téléportation de mage** : après une téléportation, un portail ou un écran de chargement, le trajet est recalculé depuis l'endroit où tu arrives. Avec Shortest Path, la destination lui est renvoyée. Avant, le guide pouvait encore t'envoyer prendre le zeppelin depuis Orgrimmar.
+  *GPS: the trip is planned again after a teleport, a portal or a loading screen.*
+- **Scarlet Diversions** : l'étape « brûler la tente et planter la bannière » manquait, donc le guide envoyait directement rendre la quête. Elle a maintenant sa flèche vers le camp écarlate, entre le champ de Felstone et les Larmes de Dalson, et une note pour la Flame in a Bottle.
+  *Scarlet Diversions: the objective step and its spot are back before the turn-in.*
+
 ## [1.0.0-beta.165] — 2026-11-19
 
 ### Modifié / Changed

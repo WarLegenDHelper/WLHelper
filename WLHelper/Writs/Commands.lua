@@ -46,8 +46,14 @@ end)
 Route({ "bis", "meilleur", "best" }, function(rest)
     if WP.Best then Run(WP.Best.Show, rest) end
 end)
-Route({ "pvp", "jcj" }, function()
-    if WP.PvP then Run(WP.PvP.Show) end
+-- the PvP guide: the battlegrounds window (Writs/Battlegrounds.lua, the set inside it);
+-- "/wlh pvp chat" prints the set in the chat as before
+Route({ "pvp", "jcj", "bg", "champs", "cdb", "battlegrounds" }, function(rest)
+    if Word(rest or "") == "chat" or not (WP.BG and WP.BG.Toggle) then
+        if WP.PvP then Run(WP.PvP.Show) end
+        return
+    end
+    Run(WP.BG.Toggle)
 end)
 Route({ "way" }, function(rest)
     if WP.Way then Run(WP.Way.Command, rest) end

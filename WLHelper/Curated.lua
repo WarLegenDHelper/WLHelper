@@ -31,6 +31,23 @@ end
 local zf = ns.D.ZulFarrak
 if zf then table.insert(zf.q, MALLET) end
 
+-- Scarlet Diversions: the objective had no spot, so the route went straight to the turn-in. The
+-- Scarlet camp is between Felstone Field and Dalson's Tears (Wowhead, quest text); the Flame in a
+-- Bottle comes from the box of incendiaries beside Derrington.
+do
+  local q = ns.Q[5096]
+  if q then
+    q.o = { { k = "event", n = "Burn the command tent, plant the Scourge Banner", c = 1, ins = false, unk = false,
+      w = { m = 1420, x = 40.7, y = 52.2, n = "Scarlet Crusade camp" } } }
+    if not q.ne then
+      q.ne = "Take a Flame in a Bottle from the box of incendiaries next to Derrington, then go to the Scarlet camp between Felstone Field and Dalson's Tears: use the flame on the command tent and plant the Scourge Banner beside it."
+      ns.TR[q.ne] = "Prends une Flame in a Bottle dans la caisse d'incendiaires à côté de Derrington, puis va au camp écarlate entre le champ de Felstone et les Larmes de Dalson : utilise la flamme sur la tente de commandement et plante la Scourge Banner à côté."
+    end
+    ns.TR["Burn the command tent, plant the Scourge Banner"] = "Brûle la tente de commandement, plante la bannière du Fléau"
+    ns.TR["Scarlet Crusade camp"] = "Camp de la Croisade écarlate"
+  end
+end
+
 -- Blackrock Depths: the Kargath quests whose work is in the Depths (the Dark Iron guards and
 -- officials, Overmaster Pyron at the door) count as the
 -- dungeon's own quests, as in Naowh's journal, instead of lead-ins done before.

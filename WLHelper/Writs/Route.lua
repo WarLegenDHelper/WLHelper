@@ -2695,8 +2695,37 @@ function GPS._OnLanded()
     WLWritsCharDB.hearthSpot = { bind = name, cont = cont, wx = wx, wy = wy }
 end
 
+-- After a jump (a mage's teleport or portal, a loading screen): the plans made from where you stood
+-- are dropped and the trip is planned again from where you land; a route handed to Shortest Path is
+-- sent again (report: "I'm a mage, I teleported to Undercity, it still sent me back to Orgrimmar for
+-- the zeppelin").
+local portSpell
+local function AfterJump()
+    tripCache, tripCount = {}, 0
+    for k in pairs(runeCache) do runeCache[k] = nil end
+    if not state.dest or state.zygor and not state.spf then return end
+    state.choice = nil
+    if state.spf then
+        pcall(GPS._Start, state.dest, state.source)
+    else
+        state.plannedAt = 0
+        pcall(GPS.Replan)
+    end
+end
+GPS._AfterJump = AfterJump
 local function OnCast(spell)
     if type(spell) ~= "number" or IsSecret(spell) then return end
+    if not portSpell then
+        portSpell = {}
+        for _, port in ipairs(TELEPORTS) do portSpell[port.spell] = true end
+    end
+    if portSpell[spell] then
+        if C_Timer and C_Timer.After then
+            C_Timer.After(3, function() pcall(AfterJump) end)
+            C_Timer.After(10, function() pcall(AfterJump) end)   -- a long loading screen: once more
+        end
+        return
+    end
     if spell ~= HEARTH_SPELL and spell ~= ASTRAL_RECALL then return end
     if spell == HEARTH_SPELL and WLWritsCharDB then WLWritsCharDB.hearthUsed = time and time() or nil end
     landing = Clock()
@@ -2724,6 +2753,10 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3)
     end
     if event == "LOADING_SCREEN_DISABLED" and landing then
         if C_Timer and C_Timer.After then C_Timer.After(1, function() pcall(GPS._OnLanded) end) end
+    end
+    -- any loading screen moved you (a portal, a summon, an instance door): plan from where you are
+    if event == "LOADING_SCREEN_DISABLED" and state.dest and C_Timer and C_Timer.After then
+        C_Timer.After(1.5, function() pcall(AfterJump) end)
     end
     if event == "PLAYER_LOGIN" or event == "ZONE_CHANGED_NEW_AREA" then
         -- the flight paths you know, read anywhere (T-89); again every 5 minutes
