@@ -2,6 +2,13 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.164", date = "2026-11-19", items = {
+    { s = "add", fr = { "Guides de quêtes hors donjon", "Un nouvel onglet « Quêtes » dans le choix de guide. Chaque carte suit une chaîne de quêtes dans le monde, de la première quête à la récompense. Elle se combine avec des donjons dans une seule route." }, en = { "", "" } },
+    { s = "add", fr = { "Sac 16 places : Sac en peau de démon", ". La longue chaîne du Héros déchu de la Horde (marais des Chagrins, Terres foudroyées, Azshara, Strangleronce). Les élites de la fin demandent un groupe." }, en = { "", "" } },
+    { s = "add", fr = { "Sac 16 places : Red Bag", ". L'ancienne chaîne de Season of Discovery, ouverte à toutes les classes : le robot sur la plage de Tanaris, la traversée à la nage, Nami à Long-Guet, puis le sac dans les steppes Ardentes." }, en = { "", "" } },
+    { s = "add", fr = { "Sac 18 places : Sacoche de la poste d'Hyjal", ". Trois quêtes de courrier entre le sommet du mont Hyjal et Long-Guet." }, en = { "", "" } },
+    { s = "add", fr = { "Attracteur élémentaire", ". La quête Unstable Magic du Cercle terrestre (Horde, Mulgore ; Alliance, Alterac), avec les meilleurs coins pour les 10 granules d'après Wowhead. Sources : Wowhead WoW Forever (pages des quêtes, articles sur les sacs), positions de NaowhForever, noms français du client." }, en = { "Quest guides outside dungeons", "A new \"Quests\" tab in the guide picker, with the Demon Hide Sack and Red Bag (16 slots), the Hyjal Postal Satchel (18 slots) and the Elemental Attractor chains." } },
+  } },
   { v = "1.0.0-beta.163", date = "2026-11-19", items = {
     { s = "add", fr = { "Vue moderne, un bouton pour fermer", "Une croix en haut à droite ferme le guide. Il reste fermé après un rechargement. Le bouton de la minicarte, /wlh ou un bouton du guide le rouvre." }, en = { "Modern view", "A close button; the guide stays closed until reopened." } },
     { s = "fix", fr = { "Moins de retours à la fenêtre classique", "" }, en = { "", "" } },
@@ -67,11 +74,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Gros freeze en ouvrant la carte (M) ou le journal (L) avec OpenMap", "OpenMap envoie son signal « la vue a bougé » à chaque image pendant son animation d'ouverture, et WL Helper redessinait à chaque fois tous ses tracés sur la carte (zones de monstres, chemins, points). Il redessine maintenant au plus 5 fois par seconde, plus une dernière fois quand la vue s'arrête. Les temps passés sont notés dans les sauvegardes, pour mesurer s'il reste un freeze." }, en = { "Big freeze on M / L with OpenMap", "Its view signal comes every frame while it glides; WL Helper's map lines are now redrawn 5 times a second at most (and once when it stops)." } },
     { s = "fix", fr = { "Chaque /reload remettait la fenêtre classique", "Le guide revient maintenant dans la vue moderne (quand c'est la vue par défaut) après un /reload, un écran de chargement ou l'entrée dans un donjon. Passer en vue moderne ne compte plus comme « guide fermé », ce qui pouvait aussi couper la flèche GPS. « Masquer la vue moderne » ferme vraiment le guide." }, en = { "A /reload now brings the modern view back; switching to it no longer counts as closing the guide (which could stop the GPS arrow).", "" } },
     { s = "fix", fr = { "La carte du donjon de Naowh avec OpenMap", "OpenMap remet la carte extérieure parfois plusieurs fois pendant l'ouverture. La carte de Naowh est maintenant remise jusqu'à 3 fois dans les 2,5 secondes qui suivent." }, en = { "Naowh's dungeon map is laid again up to 3 times within 2.5 s of the map opening (OpenMap turns it outside more than once).", "" } },
-  } },
-  { v = "1.0.0-beta.149", date = "2026-11-18", items = {
-    { s = "add", fr = { "Accueil, un groupe « Retours »", "" }, en = { "", "" } },
-    { s = "add", fr = { "« Nous écrire »", ", pour tous : « Un bug, une idée, une suggestion : sans compte ». Le choix du formulaire devient « Une idée ou suggestion »." }, en = { "", "" } },
-    { s = "add", fr = { "« Rapports des joueurs »", ", seulement sur le compte qui reçoit les rapports : combien en sont arrivés, et les nouveaux en orange. Le clic ouvre la liste dans le jeu, du plus récent au plus ancien : le type (bug, idée, erreur de quête, erreur Lua), l'auteur, la date, la zone, le message, le lien de la capture, l'étape du guide et la pile d'appels des erreurs. /wlh rapports l'ouvre aussi." }, en = { "Home gets a \"Feedback\" group", "\"Write to us\" for everyone, and \"Players' reports\" (count, new ones, the list in the game) on the account that receives them." } },
-    { s = "fix", fr = { "Vue moderne, une quête qui commence avec un objet que tu n'as pas", "L'Oathstone of Ysera's Dragonflight (après « L'Essence d'Eranikus ») restait proposé dans « Ensuite » même sans l'objet dans les sacs. Il n'apparaît plus tant que l'objet n'y est pas." }, en = { "Modern view", "A quest that starts from an item you do not have is no longer offered as a next action." } },
   } },
 }

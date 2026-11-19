@@ -6,6 +6,17 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.164] — 2026-11-19
+
+### Ajouté / Added
+- **Guides de quêtes hors donjon** : un nouvel onglet « Quêtes » dans le choix de guide. Chaque carte suit une chaîne de quêtes dans le monde, de la première quête à la récompense. Elle se combine avec des donjons dans une seule route.
+  - **Sac 16 places : Sac en peau de démon**. La longue chaîne du Héros déchu de la Horde (marais des Chagrins, Terres foudroyées, Azshara, Strangleronce). Les élites de la fin demandent un groupe.
+  - **Sac 16 places : Red Bag**. L'ancienne chaîne de Season of Discovery, ouverte à toutes les classes : le robot sur la plage de Tanaris, la traversée à la nage, Nami à Long-Guet, puis le sac dans les steppes Ardentes.
+  - **Sac 18 places : Sacoche de la poste d'Hyjal**. Trois quêtes de courrier entre le sommet du mont Hyjal et Long-Guet.
+  - **Attracteur élémentaire**. La quête Unstable Magic du Cercle terrestre (Horde, Mulgore ; Alliance, Alterac), avec les meilleurs coins pour les 10 granules d'après Wowhead.
+  Sources : Wowhead WoW Forever (pages des quêtes, articles sur les sacs), positions de NaowhForever, noms français du client.
+  *Quest guides outside dungeons: a new "Quests" tab in the guide picker, with the Demon Hide Sack and Red Bag (16 slots), the Hyjal Postal Satchel (18 slots) and the Elemental Attractor chains.*
+
 ## [1.0.0-beta.163] — 2026-11-19
 
 ### Ajouté / Added

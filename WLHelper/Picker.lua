@@ -317,12 +317,13 @@ function ns.EnsureClassCards()
 end
 
 local function ClassMatch(d)
+  if d.qg then return true end   -- a quest guide card (QuestGuides.lua): for every class
   local _, me = UnitClass("player")
   for tok in (d.cq or ""):gmatch("[^,]+") do if tok == me then return true end end
   return false
 end
 
-local function TabOf(d) return d.cq and "cls" or d.raid and "raid" or "dg" end
+local function TabOf(d) return d.qg and "qg" or d.cq and "cls" or d.raid and "raid" or "dg" end
 local function CurTab() return WLDTDB.tab or "dg" end
 
 -- Search: lower case, accents dropped, so "zul farrak", "Mossmeld" or "geme" all find something.
@@ -536,7 +537,7 @@ local function Build()
   close:SetPoint("TOPRIGHT", -8, -8)
 
   -- tabs (dungeons, raids, class quests) with the level filter at the right of the same bar
-  p.tabBar = S.Tabs(p, { { "dg", L.TAB_DG }, { "raid", L.TAB_RAID }, { "cls", L.TAB_CLS } },
+  p.tabBar = S.Tabs(p, { { "dg", L.TAB_DG }, { "raid", L.TAB_RAID }, { "cls", L.TAB_CLS }, { "qg", L.TAB_QG } },
     function() return CurTab() end,
     function(k) WLDTDB.tab = k; if p.sa then p.sa:ScrollTo(0, true) end; Render() end)
   p.tabBar:SetPoint("TOPLEFT", 0, -(HEADER + 1)); p.tabBar:SetPoint("TOPRIGHT", 0, -(HEADER + 1))
@@ -613,7 +614,8 @@ local function FillCard(c, k, sec, advised)
   c.advised = advised or nil
   Art(c.art, d, c)
   c.dicon:Hide()
-  if d.cq then SetClassIcon(c.cicon, (d.cq:match("^[^,]+"))) else c.cicon:Hide() end
+  local clsCard = d.cq and not d.qg
+  if clsCard then SetClassIcon(c.cicon, (d.cq:match("^[^,]+"))) else c.cicon:Hide() end
   local soon = d.up and time() < d.up
   local n, done = Counts(k)
   local finished = n > 0 and done >= n
@@ -634,10 +636,10 @@ local function FillCard(c, k, sec, advised)
   c.topBand:SetHeight(topH)
   c.cicon:ClearAllPoints(); c.cicon:SetPoint("TOPLEFT", 12, -(topH + 6))
   -- the advised badge: under the top band, right of a class icon
-  local gap = d.cq and 32 or ART_GAP
+  local gap = clsCard and 32 or ART_GAP
   if advised then
     c.fitBadge:Set(L.PICK_FIT, T.accentSoft)
-    c.fitBadge:ClearAllPoints(); c.fitBadge:SetPoint("TOPLEFT", d.cq and (12 + 20 + 6) or 12, -(topH + 7))
+    c.fitBadge:ClearAllPoints(); c.fitBadge:SetPoint("TOPLEFT", clsCard and (12 + 20 + 6) or 12, -(topH + 7))
     c.fitBadge:Show()
     gap = math.max(gap, 32)
   else c.fitBadge:Hide() end
@@ -715,7 +717,7 @@ Render = function()
   for _, c in ipairs(p.cards or {}) do c:SetWidth(CW) end
   local contentW = PW - 2 * PAD
   if searching then p.hint:SetText(L.PICK_HINT_SEARCH:format(p.query))
-  else p.hint:SetText(tab == "cls" and L.PICK_HINT_CLS or tab == "raid" and L.PICK_HINT_RAID or L.PICK_HINT) end
+  else p.hint:SetText(tab == "cls" and L.PICK_HINT_CLS or tab == "qg" and L.PICK_HINT_QG or tab == "raid" and L.PICK_HINT_RAID or L.PICK_HINT) end
   local hintH = ns.FitText(p.hint, 0, contentW, p)
   local top = HEADER + 1 + 32 + 12 + hintH + 12
   local function byLevel(a, b)
@@ -782,7 +784,8 @@ Render = function()
   for j = i + 1, #p.cards do p.cards[j]:Hide() end
   if #list == 0 then
     local eh = searching and p.empty:Set(L.PICK_EMPTY_SEARCH_T:format(p.query), L.PICK_EMPTY_SEARCH)
-      or (tab == "cls") and p.empty:Set(L.PICK_EMPTY_CLS_T, L.PICK_EMPTY_CLS) or p.empty:Set(L.PICK_EMPTY_T, L.PICK_EMPTY)
+      or (tab == "cls") and p.empty:Set(L.PICK_EMPTY_CLS_T, L.PICK_EMPTY_CLS)
+      or (tab == "qg") and p.empty:Set(L.PICK_EMPTY_QG_T, L.PICK_EMPTY_QG) or p.empty:Set(L.PICK_EMPTY_T, L.PICK_EMPTY)
     p.empty:Show()
     y = 24 + eh + 24
   else p.empty:Hide() end
