@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.167] — 2026-11-19
+
+### Modifié / Changed
+- **Meilleur équipement, refait en tableau** : une ligne par emplacement, groupée en Armure, Bijoux et Armes, avec deux lignes pour les anneaux et les bijoux. Chaque ligne donne ton BiS, le gain par rapport à ce que tu portes, sa provenance (boss · donjon, métier, quête, marchand) et le niveau requis en rouge s'il est au-dessus du tien. « N choix › » déplie les remplaçants. L'infobulle est celle de l'objet, et Maj-clic met son lien dans la discussion.
+  - En haut : combien de BiS tu portes (« 1/16 portés »), une barre par emplacement, et les filtres Tout / À obtenir / Dans les sacs.
+  - **À faire ensuite** : les 3 endroits qui te donnent le plus de pièces manquantes (donjon, métier, marchand), avec les boss concernés. Clic : ouvre le guide du donjon.
+  *Best gear, as a table per slot with gain, source and level; worn count, filters, and "Next": where the most missing pieces come from.*
+
+### Corrigé / Fixed
+- **Meilleur équipement** : plus de pièces de l'autre faction (réputations et marchands Alliance pour un Horde, et inversement), plus de pièces de raid ou de boss de monde (Quatre Cavaliers, Taerar...) dans le pré-BiS, plus de doublons.
+  *Best gear: no pieces of the other faction, no raid or world boss pieces in the pre-BiS, no duplicates.*
+
 ## [1.0.0-beta.166] — 2026-11-19
 
 ### Ajouté / Added
