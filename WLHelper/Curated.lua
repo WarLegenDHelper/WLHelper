@@ -44,6 +44,21 @@ do
   end
 end
 
+-- The Last Element: the Essence of the Elements drops inside Blackrock Depths (its elementals and
+-- golems); the data put the objective outside, on "Scald" in Searing Gorge (report: "it sent me
+-- there, there is nothing for this quest"). The Challenge (Dungeon Set 0.5, level 58, through
+-- Stratholme and more) is no Blackrock Depths quest for the guide: it took the route to Stratholme.
+for _, id in ipairs({ 7201, 3911 }) do
+  local q = ns.Q[id]
+  for _, o in ipairs(q and q.o or {}) do
+    if o.n == "Essence of the Elements" then o.ins, o.outer, o.w = true, nil, nil end
+  end
+end
+do
+  local d = ns.D.BlackrockDepths
+  for i = #(d and d.q or {}), 1, -1 do if d.q[i] == 9015 then table.remove(d.q, i) end end
+end
+
 -- The Spectral Chalice needs Mining 230 (Smelt Dark Iron): a miner below it is not offered the quest
 if ns.Q[4083] then ns.Q[4083].profLv = 230 end
 

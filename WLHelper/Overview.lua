@@ -2695,7 +2695,8 @@ Render = function()
       else
         nTodo = nTodo + 1
         todo[#todo + 1] = { qid = qid, inf = inf }
-        if not todoSeen[qid] then todoSeen[qid] = true; todoAll[#todoAll + 1] = qid end
+        -- "Tout cocher" leaves the quests too high for you as they are (their chain goes 5+ levels above)
+        if not todoSeen[qid] and not inf.high then todoSeen[qid] = true; todoAll[#todoAll + 1] = qid end
       end
       if not IsOff(qid) and inf.st ~= "done" then
         sel[#sel + 1] = { qid = qid, dkey = dkey, st = inf.st }

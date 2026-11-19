@@ -2,6 +2,11 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.175", date = "2026-11-20", items = {
+    { s = "fix", fr = { "Le dernier élément (BRD)", "L'objectif envoyait dans la Gorge des Vents brûlants, sur « Scald », où il n'y a rien pour cette quête. Les Essences des éléments tombent des élémentaires et des golems dans les Profondeurs de Rochenoire : l'étape est maintenant dans le donjon." }, en = { "The Last Element", "The Essences drop inside Blackrock Depths, no more trip to Searing Gorge." } },
+    { s = "fix", fr = { "Guide BRD qui envoyait à Stratholme", "« Le défi » (set de donjon 0.5, niveau 58, qui passe par Stratholme) ne fait plus partie du guide des Profondeurs de Rochenoire." }, en = { "The BRD guide no longer includes The Challenge (Dungeon Set 0.5) and its trip to Stratholme.", "" } },
+    { s = "fix", fr = { "Tout cocher", "Le bouton ne coche plus les quêtes trop hautes pour toi, celles dont la chaîne monte 5 niveaux ou plus au-dessus du tien." }, en = { "Tick all leaves out the quests too high for you.", "" } },
+  } },
   { v = "1.0.0-beta.174", date = "2026-11-20", items = {
     { s = "add", fr = { "Vue d'ensemble, Tout cocher / Tout décocher", "Un bouton en bas coche ou décoche d'un coup toutes les quêtes à faire. La route suit en une seule fois." }, en = { "Overview", "A \"Tick all / Untick all\" button." } },
     { s = "chg", fr = { "Choix de guide, un clic sur l'image choisit le donjon", "Cliquer sur la carte choisit le donjon, ou le retire. Le bouton en bas ouvre ensuite la vue d'ensemble des donjons choisis. « Vue d'ensemble », en haut de la carte, montre les quêtes d'un donjon, et le clic droit aussi. « + Ajouter » marche toujours." }, en = { "Guide picker", "Clicking a card picks the dungeon; \"Overview\" at the top shows its quests." } },
@@ -96,8 +101,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.161", date = "2026-11-18", items = {
     { s = "fix", fr = { "Améliorations, icônes des sacs", "Un objet que le tooltip dit « Presque pareil » gardait la flèche verte et un « +43 % » sur son icône dans les sacs (Guardian Talisman face à Theka's Last Breath). Les icônes suivent maintenant le tooltip : ni flèche ni pourcentage pour un objet presque pareil." }, en = { "Bag icons follow the tooltip", "No arrow and no percent on an item that is \"about the same\"." } },
-  } },
-  { v = "1.0.0-beta.160", date = "2026-11-18", items = {
-    { s = "fix", fr = { "Les boutons du guide ouvrent la vue moderne", "« Mettre à jour le guide » et « Retour au guide » (résumé des donjons, clés), la page d'accueil, le hub, les réglages et la proposition à l'entrée d'un donjon ouvraient la fenêtre classique au lieu de la vue moderne. Ils ouvrent maintenant la vue moderne quand c'est la vue par défaut. La fenêtre classique s'ouvre seulement par l'entrée « Fenêtre » du menu de la vue moderne (et pendant la visite guidée, qui la montre)." }, en = { "Guide buttons (update / back to the guide, home, hub, keys, settings, dungeon entry) open the modern view when it is the default; the window only from its menu.", "" } },
   } },
 }

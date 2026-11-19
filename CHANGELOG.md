@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.175] — 2026-11-20
+
+### Corrigé / Fixed
+- **Le dernier élément (BRD)** : l'objectif envoyait dans la Gorge des Vents brûlants, sur « Scald », où il n'y a rien pour cette quête. Les Essences des éléments tombent des élémentaires et des golems dans les Profondeurs de Rochenoire : l'étape est maintenant dans le donjon.
+  *The Last Element: the Essences drop inside Blackrock Depths, no more trip to Searing Gorge.*
+- **Guide BRD qui envoyait à Stratholme** : « Le défi » (set de donjon 0.5, niveau 58, qui passe par Stratholme) ne fait plus partie du guide des Profondeurs de Rochenoire.
+  *The BRD guide no longer includes The Challenge (Dungeon Set 0.5) and its trip to Stratholme.*
+- **Tout cocher** : le bouton ne coche plus les quêtes trop hautes pour toi, celles dont la chaîne monte 5 niveaux ou plus au-dessus du tien.
+  *Tick all leaves out the quests too high for you.*
+
 ## [1.0.0-beta.174] — 2026-11-20
 
 ### Ajouté / Added
