@@ -6,6 +6,29 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.172] — 2026-11-19
+
+### Ajouté / Added
+- **Noms des PNJ en français** : 639 noms de PNJ et de monstres du guide s'affichent avec leur vrai nom français, celui du jeu (« Chef de guerre Goretooth » au lieu de « Warlord Goretooth »). Sur un client français, le bouton et la touche « Cibler » utilisent aussi le nom français : `/targetexact` ne trouvait pas les PNJ avec le nom anglais.
+  *French NPC names in the guide, and French names for targeting on a French client.*
+- **Vue moderne, bouton Cibler** : la barre d'actions (cibler le PNJ ou le monstre, utiliser l'objet de quête) s'affiche aussi au-dessus de la vue moderne quand la grande fenêtre est fermée.
+  *Modern view: the target and quest item bar now shows above it too.*
+
+### Modifié / Changed
+- **Vue moderne, menu rangé** : le menu (roue dentée) est groupé en Étape, Ce donjon, Guides et Affichage. « Arrêter ce guide » est à part, en rouge.
+  *Modern view: the menu is grouped; "Stop this guide" stands apart.*
+- **Textes d'étape plus clairs** :
+  - le nom du PNJ ressort en blanc ;
+  - « à ton niveau » devient « difficulté normale » ;
+  - la ligne « partie 1 sur 1 de la suite » disparaît : elle ne disait rien.
+  *Clearer step texts: the NPC stands out, "normal difficulty", no "part 1 of 1".*
+
+### Corrigé / Fixed
+- **Vue moderne, étape passée** : quand tu regardes une autre étape que l'étape en cours, un bandeau orange « ÉTAPE PASSÉE » ou « ÉTAPE À VENIR » le dit. Une action déjà faite y est marquée « Déjà fait : ». Une étape regardée puis laissée de côté revient toute seule à l'étape en cours au bout de 2 minutes. Avant, on pouvait suivre une étape passée sans s'en rendre compte, et aller reprendre une quête déjà dans son journal.
+  *Modern view: a past or coming step is clearly marked, done actions say so, and it goes back to the current step after 2 minutes.*
+- **Héritage Sombrefer (BRD)** : le guide dit enfin que Franclorn Forgewright est un fantôme. Il faut être mort pour le voir et lui parler, dans la salle du Mont Rochenoire sur le chemin de BRD et du Cœur du Magma.
+  *Dark Iron Legacy: Franclorn is a ghost, you must be dead to talk to him.*
+
 ## [1.0.0-beta.171] — 2026-11-19
 
 ### Modifié / Changed

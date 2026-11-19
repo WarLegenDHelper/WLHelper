@@ -188,11 +188,11 @@ local S = {
     TR_WHAT = "Suivi du guide : l'action à faire maintenant", TR_TITLE = "Suivi du guide", TR_CLOSE = "Fermer", TR_CLOSE_TIP = "Clic : fermer le guide (le bouton de la minicarte ou /wlh le rouvre)", TR_DONE_T = "Guide terminé !", TR_DONE_SUB = "Bravo ! Choisis la suite :", TR_NONE_T = "Aucun guide en cours", TR_NONE_SUB = "Choisis un guide pour commencer :",
     TR_STEP = "Étape %d", TR_THEN = "Ensuite", TR_NOTE = "À savoir",
     TR_FROM_ITEM = "· objet « %s » dans tes sacs", TR_PREV = "Étape précédente", TR_NEXT = "Étape suivante",
-    TR_BACK = "· revenir à l'étape en cours", TR_MENU = "Menu", TR_MENU_TIP = "Clic : actions et réglages (aussi clic droit sur le titre)",
+    TR_BACK = "· revenir à l'étape en cours", TR_PAST = "ÉTAPE PASSÉE", TR_AHEAD = "ÉTAPE À VENIR", TR_ALREADY = "Déjà fait :", TR_MENU = "Menu", TR_MENU_TIP = "Clic : actions et réglages (aussi clic droit sur le titre)",
     TR_M_WINDOW = "Ouvrir la fenêtre du guide", TR_M_GO = "Guider vers l'étape", TR_M_DONE = "Marquer l'étape comme faite",
     TR_M_SHARE = "Partager les quêtes avec le groupe", TR_M_BOSSES = "Boss du donjon", TR_M_MAP = "Carte du donjon",
     TR_M_FRAMED = "Avec cadre", TR_M_FRAMELESS = "Sans cadre", TR_M_OPTIONS = "Réglages du guide",
-    TR_M_STOP = "Arrêter ce guide", TR_M_HIDE = "Masquer la vue moderne",
+    TR_M_STOP = "Arrêter ce guide", TR_M_HIDE = "Masquer la vue moderne", TR_G_STEP = "ÉTAPE", TR_G_DUNGEON = "CE DONJON", TR_G_GUIDES = "GUIDES", TR_G_VIEW = "AFFICHAGE",
     TR_TAKE = "Prendre « %s »", TR_TURN = "Rendre « %s »", TR_DO = "Faire « %s »", TR_HAVE = "Avoir « %s » dans ton journal",
     TR_KILL = "Tuer : %s", TR_LOOT = "Récupérer : %s", TR_USE = "Utiliser : %s", TR_TALK = "Parler à %s", TR_GO = "Aller à : %s", TR_OBJ = "Objectif : %s",
     TR_ITEM = "Obtenir : %s", TR_ENTER = "Entrer dans %s", TR_BOSS = "Boss : %s",
@@ -483,11 +483,11 @@ local S = {
     TR_WHAT = "Guide tracker: what to do now", TR_TITLE = "Guide tracker", TR_CLOSE = "Close", TR_CLOSE_TIP = "Click: close the guide (the minimap button or /wlh opens it again)", TR_DONE_T = "Guide finished!", TR_DONE_SUB = "Well done! Pick what comes next:", TR_NONE_T = "No guide running", TR_NONE_SUB = "Pick a guide to start:",
     TR_TAKE = "Accept \"%s\"", TR_TURN = "Turn in \"%s\"", TR_DO = "Do \"%s\"", TR_HAVE = "Have \"%s\" in your log",
     TR_STEP = "Step %d", TR_THEN = "Then", TR_NOTE = "Good to know", TR_FROM_ITEM = "· item \"%s\" in your bags", TR_PREV = "Previous step", TR_NEXT = "Next step",
-    TR_BACK = "· back to the current step", TR_MENU = "Menu", TR_MENU_TIP = "Click: actions and settings (also right-click the title)",
+    TR_BACK = "· back to the current step", TR_PAST = "PAST STEP", TR_AHEAD = "COMING STEP", TR_ALREADY = "Already done:", TR_MENU = "Menu", TR_MENU_TIP = "Click: actions and settings (also right-click the title)",
     TR_M_WINDOW = "Open the guide window", TR_M_GO = "Guide me to the step", TR_M_DONE = "Mark the step as done",
     TR_M_SHARE = "Share the quests with the group", TR_M_BOSSES = "Dungeon bosses", TR_M_MAP = "Dungeon map",
     TR_M_FRAMED = "With a frame", TR_M_FRAMELESS = "Frameless", TR_M_OPTIONS = "Guide settings",
-    TR_M_STOP = "Stop this guide", TR_M_HIDE = "Hide the modern view", TR_KILL = "Kill: %s", TR_LOOT = "Loot: %s", TR_USE = "Use: %s", TR_TALK = "Talk to %s", TR_GO = "Go to: %s", TR_OBJ = "Objective: %s",
+    TR_M_STOP = "Stop this guide", TR_M_HIDE = "Hide the modern view", TR_G_STEP = "STEP", TR_G_DUNGEON = "THIS DUNGEON", TR_G_GUIDES = "GUIDES", TR_G_VIEW = "DISPLAY", TR_KILL = "Kill: %s", TR_LOOT = "Loot: %s", TR_USE = "Use: %s", TR_TALK = "Talk to %s", TR_GO = "Go to: %s", TR_OBJ = "Objective: %s",
     TR_ITEM = "Get %s", TR_ENTER = "Enter %s", TR_BOSS = "Boss: %s",
     TR_MISSING1 = "%d quest to take before going in", TR_MISSING = "%d quests to take before going in",
     TR_TIP_CLICK = "Click: next step · Right-click: previous step", TR_STEPS_SHOW = "▸ All the steps", TR_STEPS_HIDE = "▾ Hide the steps",
@@ -645,7 +645,20 @@ end
 -- Texte de données dans la langue choisie (l'anglais est la source).
 function ns.T(en)
   if not en then return nil end
-  if ns.lang == "fr" then return ns.TR[en] or en end
+  if ns.lang == "fr" then return ns.TR[en] or (ns.NPCFR and ns.NPCFR[en]) or en end
+  return en
+end
+-- an NPC's name as the guide shows it (French in French: the game's own name, NpcNames_frFR.lua)
+function ns.NpcName(en)
+  if type(en) ~= "string" then return en end
+  if ns.lang == "fr" and ns.NPCFR then return ns.NPCFR[en] or en end
+  return en
+end
+-- an NPC's name as the game client knows it, for /targetexact (a French client: the French name,
+-- whatever language the addon speaks)
+function ns.ClientNpcName(en)
+  if type(en) ~= "string" then return en end
+  if GetLocale and GetLocale() == "frFR" and ns.NPCFR then return ns.NPCFR[en] or en end
   return en
 end
 

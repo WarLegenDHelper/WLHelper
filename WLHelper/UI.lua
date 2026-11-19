@@ -625,6 +625,8 @@ function ns.GuideChainText(nd, row)
   if not (lead and nd.ci and nd.cn) then return nil end
   local ln = ns.QName(lead)
   local t
+  -- "part 1 of 1 of X" says nothing (report: unclear): the "needed for X" line already does
+  if ln == ns.QName(nd.q) and nd.cn <= 1 and #nd.forQ <= 1 then return nil end
   if ln == ns.QName(nd.q) then t = (row and L.CH_PART or L.CARD_PART):format(nd.ci, nd.cn, ln)
   else t = (row and L.CH_BEFORE or L.CARD_CHAIN):format(nd.ci, nd.cn, ln) end
   local more = #nd.forQ - 1
@@ -1418,7 +1420,7 @@ local OBJ_ICON = { kill = "sword", loot = "bag", use = "hammer", talk = "user", 
 local CHECK_T = "|TInterface\\AddOns\\WLHelper\\Media\\Icons\\check:14:14:0:-1|t "
 
 local function NodeName(nd) return nd.label or ns.QName(nd.q) end
-local function NpcShort(nd) return nd.npc and (nd.npc:gsub(",.*$", "")) or nil end
+local function NpcShort(nd) return nd.npc and ns.NpcName((nd.npc:gsub(",.*$", ""))) or nil end
 
 -- the first letter up or down (a part that starts a line, or follows another one); é/É too
 local function Cap(s)
@@ -2097,7 +2099,8 @@ local function FocusModel(card, nd, log, dkey, st)
   local src = ArrowSource(nd)
   local place = {}
   local npc = NpcShort(nd)
-  if npc and kind ~= "c" and kind ~= "o" then place[#place + 1] = npc end
+  -- the NPC stands out (report: "the NPC's name is not shown enough"): the main text colour
+  if npc and kind ~= "c" and kind ~= "o" then place[#place + 1] = Hex(T.fg) .. npc .. "|r" end
   if m then
     local zn = ZoneName(m)
     if zn ~= "" then place[#place + 1] = zn end
@@ -4527,7 +4530,8 @@ function ns.UpdateActionBar()
   local steps = Steps()
   local st = steps[f.view or 0]
   local acts, seen = {}, {}
-  if st and f:IsShown() and not f.mini then
+  local trOn = _G.WLDTTracker and _G.WLDTTracker:IsShown()
+  if st and ((f:IsShown() and not f.mini) or trOn) then
     local log = ns.LogEntries()
     local count = (C_Item and C_Item.GetItemCount) or GetItemCount
     local view = ns.StepView(st, log)
@@ -4618,7 +4622,7 @@ function ns.UpdateActionBar()
         b.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark"); b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
       else
         local m = { "/cleartarget" }
-        for _, nm in ipairs(a.names) do table.insert(m, "/targetexact " .. nm) end
+        for _, nm in ipairs(a.names) do table.insert(m, "/targetexact " .. ns.ClientNpcName(nm)) end
         table.insert(m, ns.MarkLine(8))
         b:SetAttribute("type", "macro"); b:SetAttribute("macrotext", table.concat(m, "\n")); b:SetAttribute("item", nil)
         TargetIcon(b.icon, a)
@@ -4630,10 +4634,17 @@ function ns.UpdateActionBar()
       b:Hide()
     end
   end
-  if #acts > 0 and f:IsShown() and f:GetLeft() then
+  -- above the guide window, or above the modern view when the window is closed (report: "the
+  -- modern view has no target button")
+  local host = (f:IsShown() and f:GetLeft()) and f or nil
+  local tr = _G.WLDTTracker
+  if not host and tr and tr:IsShown() and tr:GetLeft() then host = tr end
+  if #acts > 0 and host then
     abar:SetSize(labelW + math.min(#acts, AB_N) * (AB_S + 4), AB_S)
     abar:ClearAllPoints()
-    abar:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", f:GetLeft(), f:GetTop() + 4)
+    -- both frames may have their own size (scale): the bar sits on the host's top-left corner
+    abar:SetPoint("BOTTOMLEFT", host, "TOPLEFT", 0, 4)
+    abar:SetScale(host:GetScale() or 1)
     abar:Show()
   else abar:Hide(); abItemBtn = nil end
   ns.RefreshActionKeys()

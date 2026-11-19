@@ -4,6 +4,7 @@
 -- Clic : ouvre le guide sur l'étape. Maj-clic : marque l'étape comme faite.
 -- Public: WLHelperTracker.Refresh(), .Toggle(), .SetShown(on), .IsOn(), .Collapse(on), .Model().
 local ADDON, ns = ...
+local BROWSE_TTL = 120   -- seconds: a browsed step left alone gives way to the current one
 local L, T, F = ns.L, ns.Tok, ns.F
 
 -- 300: a compact overlay, the one width outside the window set (docs/DESIGN.md 3.1)
@@ -171,6 +172,11 @@ function TR.Model()
   end
   -- the step browsed with the header's arrows (TR.browse), else the current one
   local curIdx = idx
+  -- a step browsed and left there: back to the current one after BROWSE_TTL seconds (report: "it
+  -- showed an old step, I went back for a quest I already had")
+  local now = GetTime and GetTime() or 0
+  if TR.browse ~= TR.lastBrowse then TR.lastBrowse, TR.browseAt = TR.browse, now end
+  if TR.browse and TR.browseAt and now - TR.browseAt > BROWSE_TTL then TR.browse, TR.lastBrowse = nil, nil end
   if TR.browse then
     TR.browse = math.max(1, math.min(#steps, TR.browse))
     if TR.browse == curIdx then TR.browse = nil else idx, st = TR.browse, steps[TR.browse] end
@@ -494,6 +500,10 @@ local function Build()
   f = CreateFrame("Frame", "WLDTTracker", UIParent)
   f.wlOwned = true
   if ns.RegisterWindow then ns.RegisterWindow(f, "guide") end
+  -- the guide's action bar (target, quest item) sits above the modern view when the window is closed
+  local function Bar() if ns.UpdateActionBar then pcall(ns.UpdateActionBar) end end
+  f:HookScript("OnShow", function() if C_Timer and C_Timer.After then C_Timer.After(0, Bar) else Bar() end end)
+  f:HookScript("OnHide", function() if C_Timer and C_Timer.After then C_Timer.After(0, Bar) else Bar() end end)
   f:SetSize(W, HEAD_H)
   f:SetFrameStrata("MEDIUM")
   f:SetClampedToScreen(true)
@@ -737,7 +747,10 @@ local function Draw(m)
   local lbl = string.format(L.TR_STEP or "ÉTAPE %d", m.stepN or 0)
   if m.phaseText then lbl = lbl .. "  ·  " .. m.phaseText end
   lbl = string.upper(lbl)
-  if m.browsing then lbl = lbl .. "  " .. Hex(T.accentSoft) .. L.TR_BACK .. "|r" end
+  if m.browsing then
+    local past = m.curIdx and m.idx < m.curIdx
+    lbl = Hex(T.warn) .. (past and L.TR_PAST or L.TR_AHEAD) .. "|r  " .. lbl .. "  " .. Hex(T.accentSoft) .. L.TR_BACK .. "|r"
+  end
   f.stepLabel:SetText(lbl)
   f.stepLabel:ClearAllPoints(); f.stepLabel:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + CARD_PAD - 4, -y)
   f.stepLabel:Show()
@@ -752,6 +765,7 @@ local function Draw(m)
     text = Rich(m.cur.text or "")
     if m.cur.count then text = text .. "  " .. Hex(T.muted) .. m.cur.count .. "|r" end
   end
+  if m.browsing and m.cur.done then text = Hex(T.ok) .. L.TR_ALREADY .. "|r  " .. Hex(T.muted) .. (m.qTitle or Rich(m.cur.text or "")) .. "|r" end
   cur.text:SetText(text)
   local h = 4 + TextH(cur.text, F.title)
   -- the card's own place line (with the distance) replaces this one: never the place twice
@@ -953,25 +967,27 @@ local menu
 local function MenuItems()
   local m = f and f.model
   local dk = m and m.dk
+  -- grouped (report: "the menus are a mess"): this step, this dungeon, the guides, the display;
+  -- stopping the guide last, on its own
   local items = {
-    { L.TR_M_PICK, function() if ns.ShowPicker then ns.ShowPicker() end end },
-    { L.TR_M_WINDOW, function() TR.OpenGuide(m and m.idx) end },
-    { L.TR_M_GO, function() if WLDTDB.arrow == false then WLDTDB.arrow = true end; if ns.PlacePoints then ns.PlacePoints() end end },
-    { L.TR_M_DONE, function() if m then TR.MarkDone(m.idx) end end },
-    { L.TR_M_SHARE, function() if ns.ShareQuests then ns.ShareQuests() end end },
+    { L.TR_M_GO, function() if WLDTDB.arrow == false then WLDTDB.arrow = true end; if ns.PlacePoints then ns.PlacePoints() end end, group = L.TR_G_STEP },
+    { L.TR_M_DONE, function() if m then TR.MarkDone(m.idx) end end, group = L.TR_G_STEP },
+    { L.TR_M_SHARE, function() if ns.ShareQuests then ns.ShareQuests() end end, group = L.TR_G_STEP },
   }
   local bst = m and m.st and m.st.bossStep and m.st
-  if bst and ns.AnnounceTactics then items[#items + 1] = { L.TR_M_TACTICS, function() ns.AnnounceTactics(bst) end } end
-  if dk and ns.ToggleBosses then items[#items + 1] = { L.TR_M_BOSSES, function() ns.ToggleBosses(dk) end } end
-  if dk and ns.OpenDungeonMap then items[#items + 1] = { L.TR_M_MAP, function() ns.OpenDungeonMap(dk) end } end
-  if dk and ns.ShowOverview then items[#items + 1] = { L.TR_M_OVERVIEW, function() ns.ShowOverview(dk) end } end
-  items[#items + 1] = { TR.Frameless() and L.TR_M_FRAMED or L.TR_M_FRAMELESS, function() TR.SetFrameless(not TR.Frameless()) end }
+  if bst and ns.AnnounceTactics then items[#items + 1] = { L.TR_M_TACTICS, function() ns.AnnounceTactics(bst) end, group = L.TR_G_STEP } end
+  if dk and ns.ShowOverview then items[#items + 1] = { L.TR_M_OVERVIEW, function() ns.ShowOverview(dk) end, group = L.TR_G_DUNGEON } end
+  if dk and ns.ToggleBosses then items[#items + 1] = { L.TR_M_BOSSES, function() ns.ToggleBosses(dk) end, group = L.TR_G_DUNGEON } end
+  if dk and ns.OpenDungeonMap then items[#items + 1] = { L.TR_M_MAP, function() ns.OpenDungeonMap(dk) end, group = L.TR_G_DUNGEON } end
+  items[#items + 1] = { L.TR_M_PICK, function() if ns.ShowPicker then ns.ShowPicker() end end, group = L.TR_G_GUIDES }
+  items[#items + 1] = { L.TR_M_WINDOW, function() TR.OpenGuide(m and m.idx) end, group = L.TR_G_GUIDES }
+  items[#items + 1] = { TR.Frameless() and L.TR_M_FRAMED or L.TR_M_FRAMELESS, function() TR.SetFrameless(not TR.Frameless()) end, group = L.TR_G_VIEW }
   items[#items + 1] = { L.TR_M_OPTIONS, function()
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.OpenOptions then WP.OpenOptions("dungeons") end
-  end }
-  items[#items + 1] = { L.TR_M_STOP, function() if ns.StopRoute then ns.StopRoute() end end, confirm = true }
-  items[#items + 1] = { L.TR_M_HIDE, function() TR.SetShown(false) end }
+  end, group = L.TR_G_VIEW }
+  items[#items + 1] = { L.TR_M_HIDE, function() TR.SetShown(false) end, group = L.TR_G_VIEW }
+  items[#items + 1] = { L.TR_M_STOP, function() if ns.StopRoute then ns.StopRoute() end end, confirm = true, group = "", danger = true }
   return items
 end
 function TR.ToggleMenu(anchor)
@@ -986,6 +1002,10 @@ function TR.ToggleMenu(anchor)
   end
   local items = MenuItems()
   local w = 220
+  -- the group labels (muted, small) and a gap between groups
+  menu.heads = menu.heads or {}
+  for _, h in ipairs(menu.heads) do h:Hide() end
+  local y, hn, lastGroup = 4, 0, nil
   for k, it in ipairs(items) do
     local r = menu.rows[k]
     if not r then
@@ -996,8 +1016,20 @@ function TR.ToggleMenu(anchor)
       r.text:SetJustifyH("LEFT"); r.text:SetWordWrap(false)
       menu.rows[k] = r
     end
-    r:ClearAllPoints(); r:SetPoint("TOPLEFT", 4, -4 - (k - 1) * 24); r:SetPoint("TOPRIGHT", -4, -4 - (k - 1) * 24)
-    r.text:SetText(it[1]); r.text:SetTextColor(T.fg[1], T.fg[2], T.fg[3])
+    if it.group ~= lastGroup then
+      if lastGroup ~= nil then y = y + 6 end
+      lastGroup = it.group
+      if it.group and it.group ~= "" then
+        hn = hn + 1
+        local h = menu.heads[hn] or ns.Text(menu, F.foot, T.muted); menu.heads[hn] = h
+        h:SetText(it.group); h:ClearAllPoints(); h:SetPoint("TOPLEFT", 14, -y - 2); h:Show()
+        y = y + 16
+      end
+    end
+    r:ClearAllPoints(); r:SetPoint("TOPLEFT", 4, -y); r:SetPoint("TOPRIGHT", -4, -y)
+    y = y + 24
+    local tc = it.danger and T.bad or T.fg
+    r.text:SetText(it[1]); r.text:SetTextColor(tc[1], tc[2], tc[3])
     r.armed = nil
     r:SetScript("OnClick", function(self)
       -- "Stop this guide": a second click confirms
@@ -1013,7 +1045,7 @@ function TR.ToggleMenu(anchor)
     r:Show()
   end
   for k = #items + 1, #menu.rows do menu.rows[k]:Hide() end
-  menu:SetSize(w, 8 + #items * 24)
+  menu:SetSize(w, y + 4)
   menu:ClearAllPoints()
   menu:SetPoint("TOPRIGHT", anchor or f, "BOTTOMRIGHT", 0, -2)
   menu:Show()

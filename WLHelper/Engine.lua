@@ -1641,7 +1641,7 @@ function ns.TargetMacroText(st, log)
   local m = { "/cleartarget" }
   local len = #m[1] + #tail + 2
   for _, nm in ipairs(names) do
-    local line = "/targetexact " .. nm
+    local line = "/targetexact " .. ns.ClientNpcName(nm)
     if len + #line + 1 > 255 then break end
     table.insert(m, line); len = len + #line + 1
   end

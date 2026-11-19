@@ -33,6 +33,17 @@ end
 local zf = ns.D.ZulFarrak
 if zf then table.insert(zf.q, MALLET) end
 
+-- Franclorn Forgewright is a ghost: only the dead see him (report: "you have to be dead, but the
+-- guide does not say it"; Wowhead comments). Said first, whatever the data's note was.
+do
+  local q = ns.Q[3801]
+  if q then
+    local en = "Franclorn is a ghost: you only see him and talk to him when you are dead. Die (the lava is fine), release, walk back as a ghost into Blackrock Mountain to the room on the way to Blackrock Depths and the Molten Core, talk to him, then resurrect at your body."
+    q.ne = en
+    ns.TR[en] = "Franclorn est un fantôme : on ne le voit et on ne lui parle qu'en étant mort. Meurs (la lave fait l'affaire), libère ton esprit, reviens en fantôme dans le Mont Rochenoire jusqu'à la salle sur le chemin des Profondeurs de Rochenoire et du Cœur du Magma, parle-lui, puis ressuscite à ton corps."
+  end
+end
+
 -- The Spectral Chalice needs Mining 230 (Smelt Dark Iron): a miner below it is not offered the quest
 if ns.Q[4083] then ns.Q[4083].profLv = 230 end
 

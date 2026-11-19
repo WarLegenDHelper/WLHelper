@@ -2,6 +2,17 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.172", date = "2026-11-19", items = {
+    { s = "add", fr = { "Noms des PNJ en français", "639 noms de PNJ et de monstres du guide s'affichent avec leur vrai nom français, celui du jeu (« Chef de guerre Goretooth » au lieu de « Warlord Goretooth »). Sur un client français, le bouton et la touche « Cibler » utilisent aussi le nom français : /targetexact ne trouvait pas les PNJ avec le nom anglais." }, en = { "French NPC names in the guide, and French names for targeting on a French client.", "" } },
+    { s = "add", fr = { "Vue moderne, bouton Cibler", "La barre d'actions (cibler le PNJ ou le monstre, utiliser l'objet de quête) s'affiche aussi au-dessus de la vue moderne quand la grande fenêtre est fermée." }, en = { "Modern view", "The target and quest item bar now shows above it too." } },
+    { s = "chg", fr = { "Vue moderne, menu rangé", "Le menu (roue dentée) est groupé en Étape, Ce donjon, Guides et Affichage. « Arrêter ce guide » est à part, en rouge." }, en = { "Modern view", "The menu is grouped; \"Stop this guide\" stands apart." } },
+    { s = "chg", fr = { "Textes d'étape plus clairs", "" }, en = { "", "" } },
+    { s = "chg", fr = { "", "le nom du PNJ ressort en blanc ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "« à ton niveau » devient « difficulté normale » ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "la ligne « partie 1 sur 1 de la suite » disparaît : elle ne disait rien." }, en = { "Clearer step texts", "The NPC stands out, \"normal difficulty\", no \"part 1 of 1\"." } },
+    { s = "fix", fr = { "Vue moderne, étape passée", "Quand tu regardes une autre étape que l'étape en cours, un bandeau orange « ÉTAPE PASSÉE » ou « ÉTAPE À VENIR » le dit. Une action déjà faite y est marquée « Déjà fait : ». Une étape regardée puis laissée de côté revient toute seule à l'étape en cours au bout de 2 minutes. Avant, on pouvait suivre une étape passée sans s'en rendre compte, et aller reprendre une quête déjà dans son journal." }, en = { "Modern view", "A past or coming step is clearly marked, done actions say so, and it goes back to the current step after 2 minutes." } },
+    { s = "fix", fr = { "Héritage Sombrefer (BRD)", "Le guide dit enfin que Franclorn Forgewright est un fantôme. Il faut être mort pour le voir et lui parler, dans la salle du Mont Rochenoire sur le chemin de BRD et du Cœur du Magma." }, en = { "Dark Iron Legacy", "Franclorn is a ghost, you must be dead to talk to him." } },
+  } },
   { v = "1.0.0-beta.171", date = "2026-11-19", items = {
     { s = "chg", fr = { "Taille du guide à part", "La taille des fenêtres ne rapetisse plus le guide. Le guide, sa vue moderne et le panneau des boss ont leur propre réglage, « Taille du guide (%) », de 70 à 150. Ça se règle aussi avec /wlh taille guide 110." }, en = { "The guide has its own size; the window size no longer shrinks it.", "" } },
     { s = "chg", fr = { "Tailles, plus de curseur", "On tape le nombre (60 à 150) puis Entrée, ou on clique sur - et +. Le curseur faisait changer la fenêtre de taille sous la souris, et la valeur partait dans tous les sens." }, en = { "Sizes are typed or stepped with - and +, no more slider.", "" } },
@@ -80,8 +91,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.158", date = "2026-11-18", items = {
     { s = "chg", fr = { "Trouver un groupe, plus clair", "Sur une fenêtre assez large, les filtres ne sont plus cachés dans une fenêtre qui s'ouvre par-dessus. Ils restent visibles dans une colonne à droite de la liste, comme dans LFG Forever, avec des titres de section en couleur (classes, niveau, langues, style de jeu, places libres). L'icône filtre masque ou réaffiche cette colonne. Sur une fenêtre étroite, rien ne change." }, en = { "Find a group", "On a wide window the filters stay visible in a column right of the list; the filter icon hides or shows it." } },
-  } },
-  { v = "1.0.0-beta.157", date = "2026-11-18", items = {
-    { s = "add", fr = { "Onglets WL Helper dans la fenêtre Recherche de groupe du jeu", "Sous les onglets de droite (et sous celui de LFG Forever), deux onglets WL Helper. Le logo ouvre « Trouver un groupe », l'enclume ouvre « Commandes d'artisanat ». Un clic ferme la fenêtre du jeu (hors combat) et ouvre la nôtre. Ces onglets ne touchent à rien dans la fenêtre du jeu." }, en = { "Two WL Helper tabs on the game's Group Finder (under LFG Forever's): Find a group and Crafting orders.", "" } },
   } },
 }
