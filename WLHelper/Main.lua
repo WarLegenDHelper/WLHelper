@@ -827,6 +827,11 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "share" then ns.ShareQuests()
   elseif cmd == "farm" or cmd == "stuff" or cmd == "gear" or cmd == "equipement" then
     if ns.GearPlanPrint then ns.GearPlanPrint() end
+  elseif (cmd == "taille" or cmd == "scale" or cmd == "size") and arg and arg:lower():find("^guide") then
+    local v = arg:match("([%+%-]?[%d%.]*)%s*$")
+    if v == "" then v = nil end
+    local set = ns.SetGuideScale and ns.SetGuideScale(v or ns.GuideScale())
+    if set then ns.Print(string.format(ns.Writs and ns.Writs.English and ns.Writs.English() and "Guide size: %d %%  (/wlh size guide 110)" or "Taille du guide : %d %%  (/wlh taille guide 110)", math.floor(set * 100 + 0.5))) end
   elseif cmd == "taille" or cmd == "scale" or cmd == "size" then
     -- "/wlh taille 90", "/wlh taille +", "/wlh taille -"
     local v = arg

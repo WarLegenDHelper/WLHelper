@@ -6,6 +6,22 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.171] — 2026-11-19
+
+### Modifié / Changed
+- **Taille du guide à part** : la taille des fenêtres ne rapetisse plus le guide. Le guide, sa vue moderne et le panneau des boss ont leur propre réglage, « Taille du guide (%) », de 70 à 150. Ça se règle aussi avec `/wlh taille guide 110`.
+  *The guide has its own size; the window size no longer shrinks it.*
+- **Tailles, plus de curseur** : on tape le nombre (60 à 150) puis Entrée, ou on clique sur - et +. Le curseur faisait changer la fenêtre de taille sous la souris, et la valeur partait dans tous les sens.
+  *Sizes are typed or stepped with - and +, no more slider.*
+- **Vue moderne, comme RestedXP** : un clic gauche sur une ligne passe à l'étape suivante, un clic droit revient à la précédente. Maj-clic marque toujours l'étape comme faite.
+  *Modern view: left click next step, right click previous step.*
+- **Choix de guide, plus de case minuscule** : un vrai bouton « + Ajouter » en haut à gauche de chaque carte, qui devient « Ajouté » quand le guide est dans la route.
+  *Guide picker: a "+ Add" button instead of the tiny box.*
+
+### Corrigé / Fixed
+- **Chaîne d'Onyxia (Horde)** : « Blood and Thunder » explique comment obtenir « Ordre du chef de guerre ». Il faut accepter la quête, reparler à Goretooth et répondre à toutes ses questions. Il donne alors l'objet « Warlord Goretooth's Command » : on clique dessus dans les sacs pour démarrer la quête. Source : Wowhead Forever, commentaires de joueurs.
+  *Onyxia chain: how to get Warlord's Command (answer Goretooth, then use his Command item).*
+
 ## [1.0.0-beta.170] — 2026-11-19
 
 ### Corrigé / Fixed

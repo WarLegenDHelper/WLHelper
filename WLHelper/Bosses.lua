@@ -2079,7 +2079,7 @@ local function Build()
   P:SetMovable(true)
   P:EnableMouse(true)
   P:Hide()
-  if ns.RegisterWindow then ns.RegisterWindow(P) end
+  if ns.RegisterWindow then ns.RegisterWindow(P, "guide") end
   local bg = ns.Tex(P, "BACKGROUND", T.bg); bg:SetAllPoints()
   ns.Outline(P, T.cardEdge)
   -- drag anywhere off the portraits: the panel leaves the guide and stays where you drop it

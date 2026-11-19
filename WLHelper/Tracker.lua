@@ -446,11 +446,13 @@ local function RowTip(self)
   ns.ShowTip(self, lines)
 end
 
-local function RowClick(self)
+-- like RestedXP (report): a left click on a row goes one step ahead, a right click one step back;
+-- Shift-click marks the row's step as done
+local function RowClick(self, btn)
   local a = self.action
   if not (a and a.i) then return end
-  -- the step shown here, in the modern view (the window only from the menu)
-  if IsShiftKeyDown and IsShiftKeyDown() then TR.MarkDone(a.i) else TR.browse = a.i; if ns.Refresh then ns.Refresh() end; TR.Refresh() end
+  if IsShiftKeyDown and IsShiftKeyDown() then TR.MarkDone(a.i); return end
+  TR.Browse(btn == "RightButton" and -1 or 1)
 end
 
 local function SetActIcon(tex, kind, dim)
@@ -472,7 +474,7 @@ end
 local function MakeRow(parent, iconSize, size, color)
   local b = CreateFrame("Button", nil, parent)
   b:SetWidth(W)
-  b:RegisterForClicks("LeftButtonUp")
+  b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   b.icon = b:CreateTexture(nil, "ARTWORK"); b.icon:SetSize(iconSize, iconSize)
   b.text = ns.Text(b, size, color)
   b.text:SetWidth(W - PAD * 2 - iconSize - GAP)
@@ -491,7 +493,7 @@ local function Build()
   if f then return f end
   f = CreateFrame("Frame", "WLDTTracker", UIParent)
   f.wlOwned = true
-  if ns.RegisterWindow then ns.RegisterWindow(f) end
+  if ns.RegisterWindow then ns.RegisterWindow(f, "guide") end
   f:SetSize(W, HEAD_H)
   f:SetFrameStrata("MEDIUM")
   f:SetClampedToScreen(true)

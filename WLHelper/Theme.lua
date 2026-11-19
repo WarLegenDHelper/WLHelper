@@ -858,7 +858,7 @@ function ns.Cols(w, minW, gap, maxCols, minPx)
   local n = Clamp(math.floor((w + gap) / (minW + gap)), 1, maxCols)
   local function ColW(k) return math.floor((w - (k - 1) * gap) / k) end
   if minPx then
-    local sc = ns.UIScale() * (ns.WindowScale and ns.WindowScale() or 1)
+    local sc = ns.UIScale() * (ns.WindowScale and ns.WindowScale() or 1)  -- the other windows' grids
     while n > 1 and ColW(n) * sc < minPx do n = n - 1 end
   end
   local colW = math.max(0, ColW(n))
@@ -1239,6 +1239,21 @@ function ns.WindowScale()
   if not v then return 1 end
   return math.max(SCALE_MIN, math.min(SCALE_MAX, v))
 end
+-- The guide (its window, the modern view, the boss panel) has its own size (report: "the ratio also
+-- shrinks the guide, it becomes tiny and everything sticks together"): WLDTDB.guideScale, 70 % to
+-- 150 %, 100 % by default whatever the other windows' size.
+local GUIDE_MIN, GUIDE_MAX = 0.7, 1.5
+ns.GUIDE_SCALE_MIN, ns.GUIDE_SCALE_MAX = GUIDE_MIN, GUIDE_MAX
+function ns.GuideScale()
+  local v = WLDTDB and tonumber(WLDTDB.guideScale)
+  if not v then return 1 end
+  return math.max(GUIDE_MIN, math.min(GUIDE_MAX, v))
+end
+local function ScaleOf(f)
+  if f and f.wlScaleKind == "guide" then return ns.GuideScale() end
+  return ns.WindowScale()
+end
+ns.ScaleOf = ScaleOf
 -- a new size: the window keeps its top-left corner where it is on screen (and its saved place follows)
 local function Rescale(f, s)
   local old = f:GetScale()
@@ -1262,19 +1277,33 @@ function ns.ScaleWindows()
     scaleWait:RegisterEvent("PLAYER_REGEN_ENABLED")
     return false
   end
-  local v = ns.WindowScale()
-  for _, f in ipairs(ns.windows) do pcall(Rescale, f, v) end
+  for _, f in ipairs(ns.windows) do pcall(Rescale, f, ScaleOf(f)) end
   return true
+end
+local function Step(v, cur, lo, hi)
+  if v == "+" then v = cur + 0.1 elseif v == "-" then v = cur - 0.1 end
+  v = tonumber(v)
+  if not v then return nil end
+  -- typed as a percent ("90") or a fraction ("0.9")
+  if v > 3 then v = v / 100 end
+  v = math.floor(v * 20 + 0.5) / 20
+  return math.max(lo, math.min(hi, v))
+end
+-- v: a fraction (0.9), a percent (90), or "+" / "-" (10 % more or less). -> the size set
+function ns.SetGuideScale(v)
+  WLDTDB = WLDTDB or {}
+  local s = Step(v, ns.GuideScale(), GUIDE_MIN, GUIDE_MAX)
+  if not s then return ns.GuideScale() end
+  if math.abs(s - 1) < 0.001 then WLDTDB.guideScale = nil else WLDTDB.guideScale = s end
+  ns.ScaleWindows()
+  return s
 end
 -- v: a fraction (0.9), or "+" / "-" (10 % more or less). -> the size set
 function ns.SetWindowScale(v)
   WLDTDB = WLDTDB or {}
   local cur = ns.WindowScale()
-  if v == "+" then v = cur + 0.1 elseif v == "-" then v = cur - 0.1 end
-  v = tonumber(v)
+  v = Step(v, cur, SCALE_MIN, SCALE_MAX)
   if not v then return cur end
-  v = math.floor(v * 20 + 0.5) / 20
-  v = math.max(SCALE_MIN, math.min(SCALE_MAX, v))
   if math.abs(v - 1) < 0.001 then WLDTDB.uiScale = nil else WLDTDB.uiScale = v end
   ns.ScaleWindows()
   return v
@@ -1322,13 +1351,15 @@ function ns.PerfRun(tag, fn, ...)
   return a, b
 end
 
-function ns.RegisterWindow(f)
+-- kind: "guide" for the guide's own frames (their own size, ns.GuideScale), nil for the others
+function ns.RegisterWindow(f, kind)
   if not f then return end
   f.wlOwned = true
+  if kind then f.wlScaleKind = kind end
   for _, w in ipairs(ns.windows) do if w == f then return end end
   table.insert(ns.windows, f)
   -- born at the size chosen (its saved place was saved at that size)
-  local v = ns.WindowScale()
+  local v = ScaleOf(f)
   if math.abs(v - 1) > 0.001 and not (InCombatLockdown and InCombatLockdown()) then pcall(f.SetScale, f, v) end
 end
 

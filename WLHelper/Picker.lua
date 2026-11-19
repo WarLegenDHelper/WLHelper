@@ -56,6 +56,7 @@ local BAND_PAD = 8      -- top and bottom padding of the bottom block
 local TOP_H = 36        -- the top row (tick box, Overview) and its shade
 local FADE_H = 28       -- the fade from the bottom block up into the picture
 local BAR_H = 2         -- the progress line along the bottom edge
+local CHK_W = 78        -- the "+ Ajouter" button, top left
 local ART_MIN = 16      -- the picture stays visible between the top row and the fade
 local HEADER = 44
 
@@ -430,16 +431,20 @@ local function MakeCard(parent)
   c.selEdge = ns.Outline(c, T.accent, 0, "OVERLAY")
   -- the box to tick to combine dungeons into one route, top left: empty, or filled accent with a
   -- white check when picked
+  -- a real button, not a tiny box (report: "you have to tick a tiny box, it is horrible"):
+  -- "+ Ajouter" on a dark plate, "Ajouté" on the accent once in the route
   c.chk = CreateFrame("Button", nil, c)
-  c.chk:SetSize(26, 26); c.chk:SetPoint("TOPLEFT", 4, -4)
+  c.chk:SetSize(CHK_W, 26); c.chk:SetPoint("TOPLEFT", 6, -6)
   c.chk:SetFrameLevel((c:GetFrameLevel() or 1) + 3)
-  c.chk.box = c.chk:CreateTexture(nil, "OVERLAY", nil, 0); c.chk.box:SetSize(18, 18); c.chk.box:SetPoint("CENTER")
+  c.chk.box = c.chk:CreateTexture(nil, "OVERLAY", nil, 0); c.chk.box:SetAllPoints()
   c.chk.box:SetColorTexture(0, 0, 0, 0.75)
   c.chk.edge = ns.Outline(c.chk, T.fg, 1, "OVERLAY")
-  c.selBox = c.chk:CreateTexture(nil, "OVERLAY", nil, 1); c.selBox:SetSize(18, 18); c.selBox:SetPoint("CENTER")
+  c.selBox = c.chk:CreateTexture(nil, "OVERLAY", nil, 1); c.selBox:SetAllPoints()
   c.selBox:SetColorTexture(T.accent[1], T.accent[2], T.accent[3], 1); c.selBox:Hide()
   c.selTick = c.chk:CreateTexture(nil, "OVERLAY", nil, 2); c.selTick:SetSize(12, 12)
-  ns.SetHDIcon(c.selTick, "check", T.fg); c.selTick:SetPoint("CENTER", c.selBox, "CENTER", 0, 0); c.selTick:Hide()
+  ns.SetHDIcon(c.selTick, "check", T.fg); c.selTick:SetPoint("LEFT", 8, 0); c.selTick:Hide()
+  c.chk.label = ns.Text(c.chk, ns.F.label, T.fg, false, "SHADOW"); c.chk.label:SetPoint("LEFT", 8, 0); c.chk.label:SetPoint("RIGHT", -6, 0)
+  c.chk.label:SetJustifyH("LEFT"); c.chk.label:SetText(L.PICK_ADD)
   c.chk:SetScript("OnClick", function(self)
     local k = c.dkey; if not k then return end
     local d = Draft()
@@ -457,7 +462,7 @@ local function MakeCard(parent)
   c.ov:SetPoint("TOPRIGHT", -6, -6)
   c.ov:SetFrameLevel((c:GetFrameLevel() or 1) + 3)
   c.doneMark = ns.Icon(c, "check", 14, "OVERLAY", T.ok); c.doneMark:SetPoint("RIGHT", c.ov, "LEFT", -4, 0)
-  c.cicon = c:CreateTexture(nil, "OVERLAY"); c.cicon:SetSize(20, 20); c.cicon:SetPoint("TOPLEFT", 36, -9)
+  c.cicon = c:CreateTexture(nil, "OVERLAY"); c.cicon:SetSize(20, 20); c.cicon:SetPoint("TOPLEFT", 6 + CHK_W + 6, -9)
   c.bigIcon = c:CreateTexture(nil, "ARTWORK", nil, 1); c.bigIcon:SetSize(40, 40); c.bigIcon:SetPoint("CENTER", 0, 8); c.bigIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92); c.bigIcon:Hide()
   c.dicon = c:CreateTexture(nil, "OVERLAY"); c.dicon:Hide()
   -- "Conseillé pour toi": an accent pill in the top row, right of the tick box (no mouse: the card
@@ -650,7 +655,7 @@ local function FillCard(c, k, sec, advised)
   -- top row: the tick box, a class icon, the advised pill; Overview at the right
   if advised then
     c.fitBadge:Set(L.PICK_FIT, T.accentSoft)
-    c.fitBadge:ClearAllPoints(); c.fitBadge:SetPoint("TOPLEFT", clsCard and (36 + 20 + 6) or 36, -9)
+    c.fitBadge:ClearAllPoints(); c.fitBadge:SetPoint("TOPLEFT", clsCard and (6 + CHK_W + 6 + 20 + 6) or (6 + CHK_W + 6), -9)
     c.fitBadge:Show()
   else c.fitBadge:Hide() end
   -- the bottom block: the name (up to 2 lines, the card's full width), the level line with the
@@ -714,7 +719,11 @@ local function FillCard(c, k, sec, advised)
   c.sel = sel
   c.selEdge(sel and T.accent or T.ok, (sel or Running(k)) and 1 or 0)
   c.selFill:SetShown(sel); c.selBox:SetShown(sel); c.selTick:SetShown(sel)
-  if c.chk then c.chk.box:SetShown(not sel); c.chk:Show() end
+  if c.chk then
+    c.chk.box:SetShown(not sel); c.chk:Show()
+    c.chk.label:ClearAllPoints(); c.chk.label:SetPoint("LEFT", sel and 24 or 8, 0); c.chk.label:SetPoint("RIGHT", -6, 0)
+    c.chk.label:SetText(sel and L.PICK_ADDED or L.PICK_ADD)
+  end
   -- later, below, no quest, coming soon: greyed; to do and done: the picture as it is
   c.art:SetDesaturated(later or sec == "noq" or sec == "upcoming")
   c.shade:SetColorTexture(0, 0, 0, (sec == "todo" or sec == "done" or sel) and 0.08 or 0.40)

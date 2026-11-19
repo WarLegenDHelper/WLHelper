@@ -21,6 +21,8 @@ local NOTES = {
              "Les Restes d'un paladin sont au début d'Uldaman, avant la grande salle. Juste après, ressors du donjon : Jarkal Mossmeld, à Kargath, traduit le journal et donne « Trouver les Gemmes et la Source d'énergie », dont les gemmes sont dans le donjon (Grimlok, Archaedas, une urne, une cache). L'instance reste comme tu l'as laissée si tu reviens dans la demi-heure environ." },
   [2318] = { "Leave Uldaman now, before the rest of the dungeon: Kargath is close. Jarkal's next quest needs gems from Grimlok and Archaedas; killed before you have it, they do not drop.",
              "Ressors d'Uldaman maintenant, avant la suite du donjon : Kargath est tout près. La quête suivante de Jarkal demande des gemmes de Grimlok et d'Archaedas ; tués avant de l'avoir, ils ne les donnent pas." },
+  [98325] = { "Accept this quest, then talk to Warlord Goretooth again and answer all his questions: he puts an item, Warlord Goretooth's Command, in your bags. Click it to start Warlord's Command. (Wowhead Forever, player comments.)",
+              "Accepte cette quête, puis reparle à Warlord Goretooth et réponds à toutes ses questions : il met un objet, Warlord Goretooth's Command, dans tes sacs. Clique dessus pour démarrer « Ordre du chef de guerre ». (Wowhead Forever, commentaires de joueurs.)" },
   [2933] = { "The Venom Bottle is an object lying in the Witherbark troll camps of the Hinterlands: right-click it to get the quest.",
              "La Venom Bottle est un objet posé dans les camps des trolls Witherbark des Hinterlands : clic droit dessus pour obtenir la quête." },
 }

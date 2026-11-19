@@ -203,6 +203,14 @@ ns.AddEnglish({
     ["Le texte posé sur le jeu, comme Polestar."] = "The text on the game, like Polestar.",
     ["Sans fond ni bordure, le texte posé sur le jeu avec une ombre, comme Polestar. Coupé : la carte sur fond sombre, comme RestedXP."] = "No backdrop or border, the text on the game with a shadow, like Polestar. Off: the card on a dark backdrop, like RestedXP.",
     ["Taille de toutes les fenêtres"] = "Size of every window",
+    ["Taille des fenêtres (%)"] = "Window size (%)",
+    ["Taille du guide (%)"] = "Guide size (%)",
+    ["10 % plus petit"] = "10 % smaller",
+    ["10 % plus grand"] = "10 % larger",
+    ["Le Comptoir, les groupes, la guilde, les réglages et les autres fenêtres. Tape un nombre de 60 à 150 puis Entrée, ou utilise - et +. Le guide a sa propre taille, juste en dessous. Aussi : /wlh taille 90."] =
+        "The Comptoir, groups, guild, settings and the other windows. Type a number from 60 to 150 then Enter, or use - and +. The guide has its own size, just below. Also: /wlh size 90.",
+    ["Le guide, sa vue moderne et le panneau des boss. De 70 à 150. Aussi : /wlh taille guide 110."] =
+        "The guide, its modern view and the boss panel. From 70 to 150. Also: /wlh size guide 110.",
     ["Le guide, le suivi, les fenêtres du Comptoir, des groupes, de la guilde et des réglages. La flèche du GPS garde sa taille (page GPS). Aussi : /wlh taille 90, /wlh taille +, /wlh taille -."] = "The guide, the tracker, the Comptoir, groups, guild and settings windows. The GPS arrow keeps its own size (GPS page). Also: /wlh size 90, /wlh size +, /wlh size -.",
     ["Opacité du fond"] = "Background opacity",
     ["%d %%"] = "%d%%",
@@ -977,31 +985,38 @@ function BUILD.general(p)
         -- Rebuild once the click has finished: this very control belongs to the old pages.
         C_Timer.After(0, function() if Rebuild then Rebuild() end end)
     end, true)
-    -- every window's size (the GPS arrow keeps its own): a row of the same card, no section of its own
-    do
-        local row = Row(p, L("Taille de toutes les fenêtres"), nil,
-            L("Le guide, le suivi, les fenêtres du Comptoir, des groupes, de la guilde et des réglages. La flèche du GPS garde sa taille (page GPS). Aussi : /wlh taille 90, /wlh taille +, /wlh taille -."), { wide = true })
+    -- two sizes, typed or stepped (report: "the ratio slider bugs badly when moved, let me type the
+    -- number"; "it also shrinks the guide"): the other windows, and the guide on its own. No slider:
+    -- the settings window changed size under the mouse while it was dragged.
+    local function SizeControl(row, get, set)
         local holder = CreateFrame("Frame", nil, row)
-        holder:SetSize(160 + 12 + 48, 20)
-        local function Get() return math.floor(((root.WindowScale and root.WindowScale()) or 1) * 100 + 0.5) end
-        local sl = S.Slider(holder, math.floor((root.WIN_SCALE_MIN or 0.6) * 100 + 0.5), math.floor((root.WIN_SCALE_MAX or 1.5) * 100 + 0.5), 5,
-            Get,
-            function(v)
-                -- applied once the slider rests: the settings window itself changes size under the mouse
-                scalePending = v / 100
-                if C_Timer and C_Timer.After then
-                    C_Timer.After(0.4, function()
-                        if scalePending and root.SetWindowScale then root.SetWindowScale(scalePending) end
-                        scalePending = nil
-                    end)
-                elseif root.SetWindowScale then root.SetWindowScale(v / 100) end
-            end,
-            function(v) return string.format(L("%d %%"), v) end, 160)
-        sl:SetPoint("LEFT")
-        sl.value:SetJustifyH("RIGHT")
-        function holder:Sync() sl:SetValue(Get()) end
-        holder.slider = sl
-        Place(p, row, holder)
+        holder:SetSize(28 + 6 + 56 + 6 + 28, 28)
+        local minus = S.Button(holder, "-", 28, 28, "secondary", function() set("-"); holder:Sync() end, function() return { L("10 % plus petit") } end)
+        minus:SetPoint("LEFT")
+        local eb = S.Input(holder, 56, { onEnter = function(text)
+            set(text); holder.eb:ClearFocus(); holder:Sync()
+        end })
+        eb:SetPoint("LEFT", minus, "RIGHT", 6, 0)
+        if eb.SetNumeric then eb:SetNumeric(true) end
+        if eb.SetMaxLetters then eb:SetMaxLetters(3) end
+        eb:SetJustifyH("CENTER")
+        eb:SetScript("OnEditFocusLost", function(self) self.focused = nil; holder:Sync() end)
+        local plus = S.Button(holder, "+", 28, 28, "secondary", function() set("+"); holder:Sync() end, function() return { L("10 % plus grand") } end)
+        plus:SetPoint("LEFT", eb, "RIGHT", 6, 0)
+        holder.eb = eb
+        function holder:Sync() if not eb:HasFocus() then eb:SetText(tostring(math.floor(get() * 100 + 0.5))) end end
+        holder:Sync()
+        return holder
+    end
+    do
+        local row = Row(p, L("Taille des fenêtres (%)"), nil,
+            L("Le Comptoir, les groupes, la guilde, les réglages et les autres fenêtres. Tape un nombre de 60 à 150 puis Entrée, ou utilise - et +. Le guide a sa propre taille, juste en dessous. Aussi : /wlh taille 90."), { wide = true })
+        Place(p, row, SizeControl(row, function() return (root.WindowScale and root.WindowScale()) or 1 end,
+            function(v) if root.SetWindowScale then root.SetWindowScale(v) end end))
+        local grow = Row(p, L("Taille du guide (%)"), nil,
+            L("Le guide, sa vue moderne et le panneau des boss. De 70 à 150. Aussi : /wlh taille guide 110."), { wide = true })
+        Place(p, grow, SizeControl(grow, function() return (root.GuideScale and root.GuideScale()) or 1 end,
+            function(v) if root.SetGuideScale then root.SetGuideScale(v) end end))
     end
 
     -- the font: the game's own (sure to show everywhere) or EllesmereUI's when it is installed

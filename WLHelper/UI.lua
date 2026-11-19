@@ -3146,7 +3146,7 @@ local function Build()
   f:HookScript("OnHide", function() if WLHelperTracker and WLHelperTracker.Refresh then pcall(WLHelperTracker.Refresh) end end)
   f:HookScript("OnHide", function() if not ns.quietHide then WLDTDB.hidden = true end end)
   ns.frame = f
-  if ns.RegisterWindow then ns.RegisterWindow(f) end
+  if ns.RegisterWindow then ns.RegisterWindow(f, "guide") end
   -- older saves kept a card height that capped the card for good: only the width is kept now
   if WLDTDB.size then WLDTDB.size[2] = nil; ns.Relayout(WLDTDB.size[1]) end
   -- Not in UISpecialFrames: the guide is followed while playing, Escape must not close it (the

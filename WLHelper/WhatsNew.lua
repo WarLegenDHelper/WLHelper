@@ -2,6 +2,13 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.171", date = "2026-11-19", items = {
+    { s = "chg", fr = { "Taille du guide à part", "La taille des fenêtres ne rapetisse plus le guide. Le guide, sa vue moderne et le panneau des boss ont leur propre réglage, « Taille du guide (%) », de 70 à 150. Ça se règle aussi avec /wlh taille guide 110." }, en = { "The guide has its own size; the window size no longer shrinks it.", "" } },
+    { s = "chg", fr = { "Tailles, plus de curseur", "On tape le nombre (60 à 150) puis Entrée, ou on clique sur - et +. Le curseur faisait changer la fenêtre de taille sous la souris, et la valeur partait dans tous les sens." }, en = { "Sizes are typed or stepped with - and +, no more slider.", "" } },
+    { s = "chg", fr = { "Vue moderne, comme RestedXP", "Un clic gauche sur une ligne passe à l'étape suivante, un clic droit revient à la précédente. Maj-clic marque toujours l'étape comme faite." }, en = { "Modern view", "Left click next step, right click previous step." } },
+    { s = "chg", fr = { "Choix de guide, plus de case minuscule", "Un vrai bouton « + Ajouter » en haut à gauche de chaque carte, qui devient « Ajouté » quand le guide est dans la route." }, en = { "Guide picker", "A \"+ Add\" button instead of the tiny box." } },
+    { s = "fix", fr = { "Chaîne d'Onyxia (Horde)", "« Blood and Thunder » explique comment obtenir « Ordre du chef de guerre ». Il faut accepter la quête, reparler à Goretooth et répondre à toutes ses questions. Il donne alors l'objet « Warlord Goretooth's Command » : on clique dessus dans les sacs pour démarrer la quête. Source : Wowhead Forever, commentaires de joueurs." }, en = { "Onyxia chain", "How to get Warlord's Command (answer Goretooth, then use his Command item)." } },
+  } },
   { v = "1.0.0-beta.170", date = "2026-11-19", items = {
     { s = "fix", fr = { "Guide de quêtes, depuis l'accueil et le hub", "Un clic ouvre maintenant le choix de tous les guides, même quand un guide est en cours. Avant, il rouvrait seulement le guide en cours." }, en = { "Quest guide (Home and Hub)", "A click opens the choice of every guide." } },
     { s = "fix", fr = { "Quêtes de métier, niveau requis", "Le guide vérifie maintenant le niveau du métier, plus seulement le métier. Le Calice spectral (BRD) demande Minage 230 : il n'est plus proposé à un mineur en dessous." }, en = { "Profession quests", "The skill level is checked too (The Spectral Chalice needs Mining 230)." } },
@@ -76,10 +83,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.157", date = "2026-11-18", items = {
     { s = "add", fr = { "Onglets WL Helper dans la fenêtre Recherche de groupe du jeu", "Sous les onglets de droite (et sous celui de LFG Forever), deux onglets WL Helper. Le logo ouvre « Trouver un groupe », l'enclume ouvre « Commandes d'artisanat ». Un clic ferme la fenêtre du jeu (hors combat) et ouvre la nôtre. Ces onglets ne touchent à rien dans la fenêtre du jeu." }, en = { "Two WL Helper tabs on the game's Group Finder (under LFG Forever's): Find a group and Crafting orders.", "" } },
-  } },
-  { v = "1.0.0-beta.156", date = "2026-11-18", items = {
-    { s = "fix", fr = { "Vue moderne, guide terminé", "La vue disparaissait à la fin d'un guide et on ne pouvait plus choisir de guide. Elle affiche maintenant « Guide terminé ! » avec le lien « Choisir un guide » (et la flèche ‹ pour revoir la dernière étape). Sans aucun guide chargé : « Aucun guide en cours » avec le même lien." }, en = { "Modern view", "A finished guide (or none loaded) shows a card with \"Pick a guide\" instead of vanishing." } },
-    { s = "fix", fr = { "Améliorations, bijoux", "Un bijou à +9 Endurance s'affichait « +125 % » face à Theka's Last Breath, parce que ce dernier ne vaut presque rien en stats (sa valeur est son effet « Utiliser : »). Face à un objet sans presque aucune stat, l'écart est donné en points (« Presque pareil », ou l'écart réel). La ligne « Remplace » nomme le bijou vraiment comparé, et une ligne rappelle que les effets « Utiliser : » ne sont pas comptés." }, en = { "Upgrades", "No huge percent next to an item with almost no stats; \"Replaces\" names the trinket really compared; a note that \"Use:\" effects are not counted." } },
-    { s = "fix", fr = { "Régénération de mana", "Pour les lanceurs de sorts (mage, démoniste, prêtre ombre...), 1 mana toutes les 5 s valait moins que 1 Intelligence, alors qu'elle rend plus de mana sur un combat. Elle vaut maintenant environ 1,6 fois le mana de l'Intelligence." }, en = { "Mana per 5 s for casters is worth about 1.6 times Intellect's mana (it was below Intellect).", "" } },
   } },
 }
