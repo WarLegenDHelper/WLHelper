@@ -472,12 +472,19 @@ local function MakeCard(parent)
   c.fitBadge.dark:SetColorTexture(0, 0, 0, 0.75)
   c.fitBadge:SetFrameLevel((c:GetFrameLevel() or 1) + 2)
   c.fitBadge:Hide()
+  -- a click on the picture picks the dungeon (or unpicks it), like "+ Ajouter" (report: "click the
+  -- dungeon's picture to select it, Overview at the top to see the overview"); the button at the
+  -- bottom then opens the overview of the picked ones. Right-click: the dungeon's overview.
   c:SetScript("OnClick", function(self, btn)
     if btn == "RightButton" then
       if ns.ShowOverview then ns.ShowOverview(self.dkey) else ns.OpenQuests(self.dkey) end
       return
     end
-    OpenOne(self.dkey)
+    local k = self.dkey; if not k then return end
+    local d = Draft()
+    d[k] = not d[k] or nil
+    PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
+    Render()
   end)
   -- a double-click is two clicks: the first already opened the overview
   c:SetScript("OnMouseDown", function(self) self.press:Show() end)

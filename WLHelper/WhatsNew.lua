@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.174", date = "2026-11-20", items = {
+    { s = "add", fr = { "Vue d'ensemble, Tout cocher / Tout décocher", "Un bouton en bas coche ou décoche d'un coup toutes les quêtes à faire. La route suit en une seule fois." }, en = { "Overview", "A \"Tick all / Untick all\" button." } },
+    { s = "chg", fr = { "Choix de guide, un clic sur l'image choisit le donjon", "Cliquer sur la carte choisit le donjon, ou le retire. Le bouton en bas ouvre ensuite la vue d'ensemble des donjons choisis. « Vue d'ensemble », en haut de la carte, montre les quêtes d'un donjon, et le clic droit aussi. « + Ajouter » marche toujours." }, en = { "Guide picker", "Clicking a card picks the dungeon; \"Overview\" at the top shows its quests." } },
+  } },
   { v = "1.0.0-beta.173", date = "2026-11-19", items = {
     { s = "chg", fr = { "Nouvel Accueil, une grande carte par activité", "Finie la grille de petites icônes. L'Accueil montre 6 cartes, rangées selon ce que tu veux faire :" }, en = { "", "" } },
     { s = "chg", fr = { "Progresser", "Guide de quêtes, Meilleur équipement, Améliorations, Passeport des clés, Tri du journal ;" }, en = { "", "" } },
@@ -95,8 +99,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.160", date = "2026-11-18", items = {
     { s = "fix", fr = { "Les boutons du guide ouvrent la vue moderne", "« Mettre à jour le guide » et « Retour au guide » (résumé des donjons, clés), la page d'accueil, le hub, les réglages et la proposition à l'entrée d'un donjon ouvraient la fenêtre classique au lieu de la vue moderne. Ils ouvrent maintenant la vue moderne quand c'est la vue par défaut. La fenêtre classique s'ouvre seulement par l'entrée « Fenêtre » du menu de la vue moderne (et pendant la visite guidée, qui la montre)." }, en = { "Guide buttons (update / back to the guide, home, hub, keys, settings, dungeon entry) open the modern view when it is the default; the window only from its menu.", "" } },
-  } },
-  { v = "1.0.0-beta.159", date = "2026-11-18", items = {
-    { s = "chg", fr = { "Vue moderne, le nom de la quête en titre", "Sur une étape à objectif (« Ramasser : Magenta Fungus Cap 1/12 »), le grand titre répétait la barre d'objectif et le nom de la quête restait noyé dans une ligne grise. Le titre est maintenant le nom de la quête, en doré. La barre dit quoi faire et combien, et la ligne grise ne répète plus le nom de la quête." }, en = { "Modern view", "On an objective step the title is the quest's name; the bar says what to do and how many." } },
   } },
 }

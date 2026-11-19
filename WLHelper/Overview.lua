@@ -36,7 +36,7 @@ local STR = {
     SUM_XP = "%s XP", SUM_XP_UNIT = "XP", SUM_SIZE = "Groupe de %d",
     SUM_CHAIN_LINE = "Chaîne de %d quêtes · %s XP en tout", SUM_CHAIN_HIGH = "monte au niv. %d",
     SUM_FACT_LV = "Quête niv. %d",
-    SUM_BAND_RED = "très dure", SUM_BAND_ORANGE = "dure", SUM_BAND_YELLOW = "difficulté normale", SUM_BAND_GREEN = "facile",
+    SUM_BAND_RED = "très dure", SUM_BAND_ORANGE = "dure", SUM_BAND_YELLOW = "difficulté normale", SUM_TICK_ALL = "Tout cocher", SUM_UNTICK_ALL = "Tout décocher", SUM_TICK_ALL_TT = "Coche ou décoche d'un coup toutes les quêtes à faire de cette vue d'ensemble.", SUM_BAND_GREEN = "facile",
     SUM_BAND_GREY = "grise, peu d'XP",
     SUM_GREY_OFF = "Décochée : quête grise facultative (peu d'XP)",
     SUM_BAND_RED_TT = "Très dure : 5 niveaux ou plus au-dessus de toi.",
@@ -125,7 +125,7 @@ local STR = {
     SUM_XP = "%s XP", SUM_XP_UNIT = "XP", SUM_SIZE = "Group of %d",
     SUM_CHAIN_LINE = "Chain of %d quests · %s XP in all", SUM_CHAIN_HIGH = "goes up to level %d",
     SUM_FACT_LV = "Level %d quest",
-    SUM_BAND_RED = "very hard", SUM_BAND_ORANGE = "hard", SUM_BAND_YELLOW = "normal difficulty", SUM_BAND_GREEN = "easy",
+    SUM_BAND_RED = "very hard", SUM_BAND_ORANGE = "hard", SUM_BAND_YELLOW = "normal difficulty", SUM_TICK_ALL = "Tick all", SUM_UNTICK_ALL = "Untick all", SUM_TICK_ALL_TT = "Ticks or unticks at once every quest still to do in this overview.", SUM_BAND_GREEN = "easy",
     SUM_BAND_GREY = "grey, little XP",
     SUM_GREY_OFF = "Unticked: grey optional quest (little XP)",
     SUM_BAND_RED_TT = "Very hard: 5 or more levels above you.",
@@ -2564,6 +2564,26 @@ local function Build()
   end, function() return { L.SUM_SHARE_ALL, L.SUM_SHARE_ALL_TT } end)
   f.shareAll:SetPoint("LEFT", 0, 0)
   f.shareAll:SetDisabledReason(L.SUM_SHARE_WHY)
+  -- every quest at once (report: "no button to tick all the quests"): "Tout cocher" while one
+  -- is left out, else "Tout décocher"; one rebuild for the whole batch
+  f.tickAll = S.Button(f.bar, L.SUM_TICK_ALL, 0, 28, "secondary", function()
+    local list = f.todoAll or {}
+    if #list == 0 then return end
+    local anyOff = false
+    for _, qid in ipairs(list) do if IsOff(qid) then anyOff = true break end end
+    local pick = ns.OffPick()
+    local inRoute = false
+    for _, qid in ipairs(list) do
+      WLDTDB.off[qid] = (not anyOff) and true or nil
+      pick[qid] = true
+      if RouteHas(qid) then inRoute = true end
+    end
+    f.changed = true
+    if PlaySound then PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856) end
+    if ns.route and ns.frame and (inRoute or anyOff) then RebuildRouteSoon() end
+    if ns.RenderPicker then ns.RenderPicker() end
+    Render()
+  end, function() return { f.tickAll:GetText(), L.SUM_TICK_ALL_TT } end)
 
   -- the summary follows the quest log, the level and the bags while it is open
   local ev = CreateFrame("Frame", nil, f)
@@ -2649,6 +2669,7 @@ Render = function()
   local route, acc, seenD, facts = Acc(), {}, {}, {}
   local nQuests, nTodo = 0, 0
   local shareList, shareSeen, seenTick = {}, {}, {}
+  local todoAll, todoSeen = {}, {}
   local function add(a, id)
     local fc = facts[id]
     if not fc then
@@ -2674,6 +2695,7 @@ Render = function()
       else
         nTodo = nTodo + 1
         todo[#todo + 1] = { qid = qid, inf = inf }
+        if not todoSeen[qid] then todoSeen[qid] = true; todoAll[#todoAll + 1] = qid end
       end
       if not IsOff(qid) and inf.st ~= "done" then
         sel[#sel + 1] = { qid = qid, dkey = dkey, st = inf.st }
@@ -3158,6 +3180,16 @@ Render = function()
   elseif runnable then f.closeBtn:SetPoint("RIGHT", f.runBtn, "LEFT", -8, 0)
   else f.closeBtn:SetPoint("RIGHT", f.bar, "RIGHT", 0, 0) end
   f.shareAll:SetShown(ctx.grouped and nTodo > 0)
+  f.todoAll = todoAll
+  do
+    local anyOff = false
+    for _, qid in ipairs(todoAll) do if IsOff(qid) then anyOff = true break end end
+    f.tickAll:SetText(anyOff and L.SUM_TICK_ALL or L.SUM_UNTICK_ALL)
+    f.tickAll:ClearAllPoints()
+    if f.shareAll:IsShown() then f.tickAll:SetPoint("LEFT", f.shareAll, "RIGHT", 8, 0)
+    else f.tickAll:SetPoint("LEFT", f.bar, "LEFT", 0, 0) end
+    f.tickAll:SetShown(#todoAll > 0)
+  end
   if f.shareAll:IsShown() then
     -- in combat the game blocks the share: « Après le combat », greyed
     local combat = ns.ShareInCombat and ns.ShareInCombat() or false

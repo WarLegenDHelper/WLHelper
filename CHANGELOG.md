@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.174] — 2026-11-20
+
+### Ajouté / Added
+- **Vue d'ensemble, Tout cocher / Tout décocher** : un bouton en bas coche ou décoche d'un coup toutes les quêtes à faire. La route suit en une seule fois.
+  *Overview: a "Tick all / Untick all" button.*
+
+### Modifié / Changed
+- **Choix de guide, un clic sur l'image choisit le donjon** : cliquer sur la carte choisit le donjon, ou le retire. Le bouton en bas ouvre ensuite la vue d'ensemble des donjons choisis. « Vue d'ensemble », en haut de la carte, montre les quêtes d'un donjon, et le clic droit aussi. « + Ajouter » marche toujours.
+  *Guide picker: clicking a card picks the dungeon; "Overview" at the top shows its quests.*
+
 ## [1.0.0-beta.173] — 2026-11-19
 
 ### Modifié / Changed
