@@ -10,14 +10,14 @@ local ADDON, ns = ...
 local ACC = { 0.808, 0.098, 0.094 }        -- WaR LegenD red #CE1918
 local T = {
   -- base neutrals
-  bg       = { 0.051, 0.055, 0.063, 0.97 }, -- #0D0E10 window backdrop
-  panel    = { 0.086, 0.090, 0.102, 0.96 }, -- #16171A inputs, dropdown lists, tooltips
-  line     = { 0.180, 0.192, 0.212, 1 },    -- #2E3136 rule under the header, input borders
-  trackOff = { 0.239, 0.255, 0.275, 1 },    -- #3D4146 switch off, scrollbar thumb
+  bg       = { 0.106, 0.118, 0.137, 0.97 }, -- #1B1E23 window backdrop (lifted: easier to read)
+  panel    = { 0.133, 0.149, 0.173, 0.97 }, -- #22262C inputs, dropdown lists, tooltips
+  line     = { 0.220, 0.239, 0.271, 1 },    -- #383D45 rule under the header, input borders
+  trackOff = { 0.290, 0.310, 0.341, 1 },    -- #4A4F57 switch off, scrollbar thumb
   fg       = { 0.941, 0.945, 0.953 },       -- #F0F1F3 main text, titles
-  text     = { 0.788, 0.800, 0.820 },       -- #C9CCD1 body sentences
-  muted    = { 0.604, 0.620, 0.651 },       -- #9A9EA6 meta, descriptions, icons at rest
-  faint    = { 0.420, 0.435, 0.463 },       -- #6B6F76 disabled, placeholders
+  text     = { 0.831, 0.843, 0.863 },       -- #D4D7DC body sentences
+  muted    = { 0.655, 0.675, 0.706 },       -- #A7ACB4 meta, descriptions, icons at rest
+  faint    = { 0.482, 0.502, 0.533 },       -- #7B8088 disabled, placeholders
   -- accent
   accent      = { ACC[1], ACC[2], ACC[3] }, -- #CE1918
   accentHover = { 0.878, 0.188, 0.180 },    -- #E0302E
@@ -33,13 +33,13 @@ local T = {
   silver = { 0.800, 0.820, 0.860 },         -- #CCD1DB rare mobs (frame and icon)
   head = { 0.902, 0.800, 0.502 },           -- = gold: block headings inside cards (ns.TyHeading)
   -- alpha layers (white or black over bg)
-  cardFill     = { 1, 1, 1, 0.030 },
-  cardEdge     = { 0, 0, 0, 0.70 },
-  divider      = { 1, 1, 1, 0.06 },
+  cardFill     = { 1, 1, 1, 0.045 },
+  cardEdge     = { 1, 1, 1, 0.09 },   -- a light edge: the cards stand out from the backdrop
+  divider      = { 1, 1, 1, 0.08 },
   hoverFill    = { 1, 1, 1, 0.05 },
   pressFill    = { 0, 0, 0, 0.35 },
   btnFill      = { 1, 1, 1, 0.04 },
-  btnEdge      = { 1, 1, 1, 0.22 },
+  btnEdge      = { 1, 1, 1, 0.26 },
   btnEdgeHover = { 1, 1, 1, 0.40 },
   selFill      = { ACC[1], ACC[2], ACC[3], 0.14 },
   tabFill      = { ACC[1], ACC[2], ACC[3], 0.12 },
@@ -60,10 +60,10 @@ T.brandSoft = T.accentSoft
 T.ready     = T.ok
 T.danger    = T.bad
 T.border    = T.cardEdge
-T.header    = { 0.051, 0.055, 0.063, 1 }       -- = bg, opaque: no title-bar colour of its own
-T.card      = { 0.079, 0.083, 0.091, 1 }       -- = cardFill over bg
-T.hover     = { 0.098, 0.102, 0.110, 1 }       -- = hoverFill over bg
-T.brandBg   = { 0.157, 0.061, 0.067, 1 }       -- = selFill over bg (never a solid red block)
+T.header    = { 0.106, 0.118, 0.137, 1 }       -- = bg, opaque: no title-bar colour of its own
+T.card      = { 0.146, 0.158, 0.176, 1 }       -- = cardFill over bg
+T.hover     = { 0.151, 0.162, 0.180, 1 }       -- = hoverFill over bg
+T.brandBg   = { 0.204, 0.115, 0.131, 1 }       -- = selFill over bg (never a solid red block)
 T.kind = { a = { 1.00, 0.80, 0.25 }, c = { 0.40, 0.72, 1.00 }, o = { 0.40, 0.72, 1.00 }, t = { 0.35, 0.90, 0.48 },
            h = { 0.95, 0.95, 0.95 }, i = { 0.80, 0.60, 1.00 } }
 

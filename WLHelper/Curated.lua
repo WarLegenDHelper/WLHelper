@@ -31,6 +31,23 @@ end
 local zf = ns.D.ZulFarrak
 if zf then table.insert(zf.q, MALLET) end
 
+-- Blackrock Depths: the Kargath quests whose work is in the Depths (the Dark Iron guards and
+-- officials, Overmaster Pyron at the door) count as the
+-- dungeon's own quests, as in Naowh's journal, instead of lead-ins done before.
+local brd = ns.D.BlackrockDepths
+if brd then
+  for _, id in ipairs({ 3906, 4081, 4082 }) do
+    local q = ns.Q[id]
+    if q and q.role ~= "main" then
+      q.role = "main"
+      local has = false
+      for _, x in ipairs(brd.q) do if x == id then has = true end end
+      if not has then table.insert(brd.q, id) end
+      if id ~= 3906 then for _, o in ipairs(q.o or {}) do if o.k == "kill" or o.k == "talk" then o.ins = true end end end
+    end
+  end
+end
+
 local isDone = ns.IsDone
 ns.IsDone = function(id)
   if id == MALLET then return ns.HasItem({ 9240, 9239 }) end

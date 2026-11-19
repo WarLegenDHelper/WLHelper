@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.165] — 2026-11-19
+
+### Modifié / Changed
+- **Choix de guide, cartes refaites** : l'image du donjon occupe toute la carte, comme dans le journal de Naowh. En bas, sur un fondu : le nom en plus grand, puis les niveaux (colorés selon ton niveau) et la zone, avec le compteur de quêtes à droite. Une fine barre de progression suit le bord du bas. La case pour combiner des donjons est passée en haut à gauche. Le nombre de quêtes en attente d'un prérequis est dans l'infobulle.
+  *Guide picker: picture-first cards with the name, level range, zone and quest count at the bottom.*
+- **Plus facile à lire** : fonds moins noirs, textes secondaires plus clairs, bords de cartes visibles. Ça touche toutes les fenêtres de l'addon.
+  *Easier to read: lighter backgrounds, brighter secondary text, visible card edges in every window.*
+- **Profondeurs de Rochenoire** : 3 quêtes de Kargath comptent maintenant comme quêtes du donjon (TUER À VUE : nains Sombrefer, TUER À VUE : officiers, Discordance des flammes). Leur travail se fait dans BRD, et Naowh les compte aussi.
+  *Blackrock Depths: 3 Kargath quests done inside now count as the dungeon's quests.*
+
 ## [1.0.0-beta.164] — 2026-11-19
 
 ### Ajouté / Added
