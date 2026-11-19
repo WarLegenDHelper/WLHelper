@@ -2,6 +2,14 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.168", date = "2026-11-19", items = {
+    { s = "chg", fr = { "Champs de bataille, fenêtre refaite pour être lisible", "" }, en = { "", "" } },
+    { s = "chg", fr = { "", "Elle s'ouvre depuis l'accueil et le hub (ligne « Champs de bataille », dans Guilde et groupes), en plus de /wlh pvp." }, en = { "", "" } },
+    { s = "chg", fr = { "", "Deux onglets : « Champs de bataille » et « Set PvP »." }, en = { "", "" } },
+    { s = "chg", fr = { "", "Chaque carte de champ de bataille montre le nom (avec une pastille « Bonus aujourd'hui » quand il l'est), ton rang en couleur avec sa barre et x / y, puis un seul chiffre fort : les victoires qu'il reste, avec les défaites et la source en petit. Le maître de guerre tient sur une ligne, avec « Y aller » à droite. Les niveaux et les autres villes sont dans l'infobulle." }, en = { "", "" } },
+    { s = "chg", fr = { "", "Le bonus de la semaine tient en une ligne. Un clic ouvre le calendrier du jeu." }, en = { "", "" } },
+    { s = "chg", fr = { "", "Le set PvP est un vrai tableau : emplacement, pièce dans sa couleur de qualité, honneur, marques et gain, avec l'infobulle de l'objet (Maj-clic pour le lien). En tête : ton honneur sur ce qu'il faut, tes marques par champ de bataille avec une barre, et le champ de bataille à faire d'abord. La quête Field of Honor est dans une carte repliable, avec ses 3 semaines et un bouton « Y aller »." }, en = { "Battlegrounds window redone for reading", "Home and Hub entry, two tabs, one strong number per battleground card, the PvP set as a table, Field of Honor folded." } },
+  } },
   { v = "1.0.0-beta.167", date = "2026-11-19", items = {
     { s = "chg", fr = { "Meilleur équipement, refait en tableau", "Une ligne par emplacement, groupée en Armure, Bijoux et Armes, avec deux lignes pour les anneaux et les bijoux. Chaque ligne donne ton BiS, le gain par rapport à ce que tu portes, sa provenance (boss · donjon, métier, quête, marchand) et le niveau requis en rouge s'il est au-dessus du tien. « N choix › » déplie les remplaçants. L'infobulle est celle de l'objet, et Maj-clic met son lien dans la discussion." }, en = { "", "" } },
     { s = "chg", fr = { "", "En haut : combien de BiS tu portes (« 1/16 portés »), une barre par emplacement, et les filtres Tout / À obtenir / Dans les sacs." }, en = { "", "" } },
@@ -68,11 +76,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.154", date = "2026-11-18", items = {
     { s = "add", fr = { "Vue moderne, des liens toujours visibles", "Sous la barre de progression, une rangée de petits liens **Guides · Vue d'ensemble · Boss · Carte · Partager**. Le choix d'un guide (avec ses cartes de donjons), la vue d'ensemble, le panneau des boss, la carte du donjon et le partage des quêtes sont à un clic, sans passer par le menu ni la fenêtre classique." }, en = { "Modern view", "Always-visible links under the progress bar: Guides (the dungeon picker), Overview, Bosses, Map, Share." } },
-  } },
-  { v = "1.0.0-beta.153", date = "2026-11-18", items = {
-    { s = "chg", fr = { "La vue moderne se suffit à elle-même", "" }, en = { "", "" } },
-    { s = "chg", fr = { "un clic gauche ne renvoie plus vers la fenêtre classique.", "Sur le titre, il ne fait rien (glisser pour déplacer). Sur une action de « Ensuite », il affiche son étape dans la vue moderne ;" }, en = { "", "" } },
-    { s = "chg", fr = { "toutes les étapes, dans la vue", "« ▸ Toutes les étapes » déplie la liste des étapes autour de celle affichée (faites ✓, en cours ▶). Un clic en affiche une, Maj-clic la marque faite ;" }, en = { "", "" } },
-    { s = "chg", fr = { "le menu", "Ajoute « Choisir un guide » et « Vue d'ensemble du donjon ». La fenêtre classique ne s'ouvre plus que depuis ce menu." }, en = { "The modern view stands on its own", "Left-clicks stay in it (a next action shows its step here), \"All the steps\" lists the route's steps inside it, and its menu has \"Pick a guide\" and the dungeon overview; the classic window only opens from the menu." } },
   } },
 }

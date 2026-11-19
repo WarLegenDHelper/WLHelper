@@ -1,8 +1,16 @@
--- Writs/Battlegrounds.lua: the battlegrounds view of the PvP guide ("/wlh pvp", "/wlh bg").
--- One workspace window (DESIGN 3.1, like Help): a card for this week's bonus battleground, one card
--- per battleground (its reputation, the points left to Exalted, how many games that still takes, the
--- nearest battlemaster with a GPS button), then the PvP set card (PvP.Lines(), Writs/PvP.lua).
---
+-- Writs/Battlegrounds.lua: the battlegrounds view of the PvP guide ("/wlh pvp", "/wlh bg", the Hub's
+-- "Champs de bataille" line under Guilde et groupes). One workspace window (DESIGN 3.1), two tabs:
+--  Champs de bataille  the week's bonus (one line, its source in the tooltip), then one card per
+--                      battleground: name + "Bonus aujourd'hui" pill; the standing (coloured) with
+--                      x / y and its bar; points to Exalted; ONE strong number (the wins left) with a
+--                      muted line (or the losses, and where the figure comes from); the battlemaster
+--                      on one line with "Y aller" at the right. Levels, other cities and sources sit
+--                      in the card's tooltip.
+--  Set PvP             honour held / honour the missing pieces cost, the marks per battleground with a
+--                      bar, the battleground to do first; the pieces as a table (slot | piece in its
+--                      quality colour | honour | marks | gain, the item tooltip, Shift-click links);
+--                      Field of Honor in a folded card; the seals and the price source in one line.
+--                      The data comes from WP.PvP.Data (Writs/PvP.lua).
 -- Facts and where they come from (checked 2026-11-19):
 --  * Forever has four battlegrounds: Warsong Gulch, Arathi Basin, Alterac Valley, Darkspear Islands
 --    (Wowhead Forever, guide "PvP Overview in Forever", with the level brackets below). A win gives 3
@@ -35,6 +43,7 @@ local WP = ns.WP
 local L = ns.L
 local S = ns.S
 local C = S.C
+local F = S.F
 
 local BG = {}
 WP.BG = BG
@@ -379,25 +388,105 @@ end
 
 -- ---------------------------------------------------------------- the card texts (tests read them)
 
--- { title, levels, stat = { label, done, total, count, sub }, estimate, source, master, others, unsure }
-function BG.CardText(key)
+ns.AddEnglish({
+    ["Clic : ouvrir les champs de bataille"] = "Click: open the battlegrounds",
+    ["Bonus aujourd'hui : %s"] = "Bonus today: %s",
+    ["Réputation, maîtres de guerre et ton set PvP"] = "Reputation, battlemasters and your PvP set",
+    ["Set PvP"] = "PvP set",
+    ["≈ 1 victoire"] = "≈ 1 win",
+    ["≈ %s victoires"] = "≈ %s wins",
+    ["≈ 1 défaite"] = "≈ 1 loss",
+    ["≈ %s défaites"] = "≈ %s losses",
+    ["ou 1 défaite"] = "or 1 loss",
+    ["ou %s défaites"] = "or %s losses",
+    ["estimation Classic"] = "Classic estimate",
+    ["mesuré sur 1 partie"] = "measured over 1 game",
+    ["mesuré sur %d parties"] = "measured over %d games",
+    ["Joue une partie pour l'estimer"] = "Play one game to estimate it",
+    ["Rien de plus à gagner"] = "Nothing more to earn",
+    ["%s jusqu'à Exalté"] = "%s to Exalted",
+    ["Niveaux : %s"] = "Levels: %s",
+    ["Calendrier du jeu"] = "Game calendar",
+    ["Clic : ouvrir le calendrier du jeu"] = "Click: open the game's calendar",
+    ["Honneur"] = "Honor",
+    ["Marques"] = "Marks",
+    ["Gain"] = "Gain",
+    ["Pièce"] = "Piece",
+    ["Emplacement"] = "Slot",
+    ["À toi"] = "Yours",
+    ["Tout ton set est à toi."] = "Your whole set is yours.",
+    ["Honneur : %s / %s"] = "Honor: %s / %s",
+    ["Il te manque %s honneur."] = "You still need %s honor.",
+    ["Tu as l'honneur pour tout le set."] = "You have the honor for the whole set.",
+    ["À faire d'abord : %s"] = "Do first: %s",
+    ["%d marques à gagner"] = "%d marks to earn",
+    ["Pièces du set"] = "Set pieces",
+    ["Autres choix : %s"] = "Other picks: %s",
+    ["Maj-clic : le lien dans la discussion"] = "Shift-click: the link in chat",
+    ["Quête hebdomadaire Field of Honor"] = "Weekly quest Field of Honor",
+    ["Clic : afficher ou cacher"] = "Click: show or hide",
+    ["Wizzik Dustfizz, Gadgetzan (Tanaris 51,8 27,2), dès le niveau 60."] = "Wizzik Dustfizz, Gadgetzan (Tanaris 51.8 27.2), from level 60.",
+    ["Semaine 1 : gagner 10 duels."] = "Week 1: win 10 duels.",
+    ["Semaine 2 : finir 3 parties au Goulet des Chanteguerres."] = "Week 2: finish 3 Warsong Gulch games.",
+    ["Semaine 3 : tuer 25 joueurs adverses au Goulet des Chanteguerres."] = "Week 3: kill 25 enemy players in Warsong Gulch.",
+    ["Chaque semaine : 300 honneur et 500 points de rang. Une semaine manquée se rattrape plus tard."] =
+        "Each week: 300 honor and 500 rank points. A missed week can be done later.",
+    ["Clic : la flèche du GPS t'emmène à Wizzik Dustfizz"] = "Click: the GPS arrow takes you to Wizzik Dustfizz",
+    ["Plus tard, un sceau « Emboldened » (%s à %s honneur, avec un rang PvP) rend une pièce épique : garde tes pièces bleues."] =
+        "Later, an \"Emboldened\" seal (%s to %s honor, with a PvP rank) makes a piece epic: keep your blue pieces.",
+    ["Prix lus sur Wowhead Forever (vendeuse Lady Palanseer)."] = "Prices read on Wowhead Forever (vendor Lady Palanseer).",
+    ["Pas de set PvP pour ta classe dans les données."] = "No PvP set for your class in the data.",
+})
+
+-- the standing's colour: red when hostile, orange unfriendly, gold neutral, green from friendly
+local function StandingColor(s)
+    if s <= 2 then return C.bad end
+    if s == 3 then return C.warn end
+    if s == 4 then return C.gold end
+    return C.ok
+end
+local function Plural(n, one, many) return n == 1 and L(one) or string.format(L(many), Int(n)) end
+
+-- Everything a battleground card shows:
+-- { title, levels, bonus, standing, standingColor, count ("x / y" in the standing), barDone, barTotal,
+--   toExalted, exalted, big, small, source (a sentence, for the tooltip), master, place, others,
+--   unsure }
+function BG.CardText(key, bonusKey)
     local b = BG.BY[key]
     local side = BG.Side()
-    local t = { title = L(b.name), levels = b.levels }
+    local t = { title = L(b.name), levels = b.levels, bonus = bonusKey == key }
     local r = BG.Rep(b.faction[side])
+    t.faction = r and r.name or nil
     if r then
         local s = BG.StandingOf(r.value)
         local lo, hi = STANDING_MIN[s], STANDING_MIN[s + 1]
-        local count = BG.StandingWord(s)
-        if hi then count = count .. "  " .. Int(r.value - lo) .. " / " .. Int(hi - lo) end
-        local fromNeutral = math.max(0, math.min(EXALTED, r.value))
-        local sub = r.value >= EXALTED and L("Exalté atteint.") or string.format(L("Encore %s points jusqu'à Exalté."), Int(EXALTED - r.value))
-        t.stat = { label = r.name or L(b.name), done = fromNeutral, total = EXALTED, count = count, sub = sub }
-        if r.value < EXALTED then
+        t.standing, t.standingColor = BG.StandingWord(s), StandingColor(s)
+        if hi then
+            t.count = Int(r.value - lo) .. " / " .. Int(hi - lo)
+            t.barDone, t.barTotal = r.value - lo, hi - lo
+        else
+            t.barDone, t.barTotal = 1, 1
+        end
+        t.exalted = r.value >= EXALTED
+        if t.exalted then
+            t.big, t.small = L("Exalté"), L("Rien de plus à gagner")
+        else
+            t.toExalted = string.format(L("%s jusqu'à Exalté"), Int(EXALTED - r.value))
             local wins, losses, p = BG.Estimate(key, r.value)
-            if wins and losses then t.estimate = string.format(L("Environ %d victoires ou %d défaites."), wins, losses)
-            elseif wins then t.estimate = string.format(L("Environ %d victoires."), wins)
-            elseif losses then t.estimate = string.format(L("Environ %d défaites."), losses) end
+            local src = p.src == "measured" and Plural(p.n, "mesuré sur 1 partie", "mesuré sur %d parties")
+                or p.src == "default" and L("estimation Classic") or nil
+            if wins then
+                t.big = Plural(wins, "≈ 1 victoire", "≈ %s victoires")
+                local parts = {}
+                if losses then parts[#parts + 1] = Plural(losses, "ou 1 défaite", "ou %s défaites") end
+                if src then parts[#parts + 1] = src end
+                t.small = table.concat(parts, " · ")
+            elseif losses then
+                t.big = Plural(losses, "≈ 1 défaite", "≈ %s défaites")
+                t.small = src
+            else
+                t.big, t.small = "?", L("Joue une partie pour l'estimer")
+            end
             if p.src == "measured" then
                 t.source = p.n == 1 and L("Mesuré sur ta dernière partie.") or string.format(L("Mesuré sur tes %d dernières parties."), p.n)
             elseif p.src == "default" then
@@ -407,13 +496,15 @@ function BG.CardText(key)
             end
         end
     else
-        t.stat = { label = L(b.name), done = 0, total = EXALTED, count = L("Pas encore rencontrée"),
-            sub = string.format(L("Encore %s points jusqu'à Exalté."), Int(EXALTED)) }
+        t.standing, t.standingColor = L("Pas encore rencontrée"), C.muted
+        t.barDone, t.barTotal = 0, 1
+        t.toExalted = string.format(L("%s jusqu'à Exalté"), Int(EXALTED))
+        t.big, t.small = "?", L("Joue une partie pour l'estimer")
         t.source = L("Joue une partie : WL Helper mesurera la réputation qu'elle rapporte.")
     end
     local m, others = BG.Master(key, side)
     if m then
-        t.master = string.format(L("Maître de guerre : %s, %s"), m[1], L(BG.CITY[m[2]][1]))
+        t.master, t.place = m[1], L(BG.CITY[m[2]][1])
         if others and #others > 0 then t.others = string.format(L("Aussi : %s"), table.concat(others, ", ")) end
         t.unsure = m[5] and L("Position des données du client, à confirmer en jeu.") or nil
     end
@@ -432,141 +523,455 @@ function BG.WeekText()
     return L("Aucun champ de bataille en bonus dans le calendrier du jeu pour les 7 prochains jours."), nil
 end
 
+-- the Home line: the bonus of today, else what the window holds
+function BG.HomeLine()
+    local found = BG.Bonus()
+    if found and found.days == 0 then return string.format(L("Bonus aujourd'hui : %s"), L(BG.BY[found.key].name)) end
+    return L("Réputation, maîtres de guerre et ton set PvP")
+end
+
 -- ---------------------------------------------------------------- the window
 
-local win, CW
-local PAD = 12
+local win
+local INSET, PAD = 16, 12
 local CARD_GRID = { minW = 300, gap = 12, rowGap = 12, maxCols = 2, minPx = 200, equal = true }
+local mode = "bg"
+local SLOT_W, ICON, ROW_H, HON_W, MARK_W, GAIN_W = 92, 20, 40, 84, 150, 64
 
-local function CardBase(parent)
+local function Tip(owner, lines) S.Tip(owner, lines) end
+local function Info(id)
+    if not GetItemInfo then return nil end
+    local ok, name, link = pcall(GetItemInfo, id)
+    if not ok then return nil end
+    return Plain(name), Plain(link)
+end
+local function Paint(fs, c) if c then fs:SetTextColor(c[1], c[2], c[3]) end end
+
+-- a battleground card: name and bonus pill; the standing, x / y and its bar; points to Exalted;
+-- the one strong number (games left) and its muted line; a rule; the battlemaster and "Y aller".
+local function BgCard(parent, key)
+    local c = CreateFrame("Frame", nil, parent)
+    c.wlOwned = true
+    c.key = key
+    S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
+    S.Border(c, C.cardEdge)
+    c:EnableMouse(true)
+    c.title = S.Text(c, F.title, C.fg); c.title:SetWordWrap(false); c.title:SetJustifyH("LEFT")
+    c.pill = S.Pill(c)
+    c.standing = S.Text(c, F.label, C.fg); c.standing:SetWordWrap(false); c.standing:SetJustifyH("LEFT")
+    c.count = S.Text(c, F.label, C.muted); c.count:SetWordWrap(false); c.count:SetJustifyH("RIGHT")
+    c.track = S.Solid(c, "ARTWORK", { 1, 1, 1, 0.08 })
+    c.fill = S.Solid(c, "OVERLAY", C.ok)
+    c.toEx = S.Text(c, F.meta, C.muted); c.toEx:SetWordWrap(false); c.toEx:SetJustifyH("LEFT")
+    c.big = S.Text(c, F.hero, C.fg); c.big:SetWordWrap(false); c.big:SetJustifyH("LEFT")
+    c.small = S.Text(c, F.meta, C.muted); c.small:SetJustifyH("LEFT")
+    c.rule = S.Solid(c, "ARTWORK", C.divider)
+    c.pin = c:CreateTexture(nil, "ARTWORK"); c.pin:SetSize(14, 14)
+    S.HDIcon(c.pin, "pin", C.muted)
+    c.master = S.Text(c, F.label, C.fg); c.master:SetWordWrap(false); c.master:SetJustifyH("LEFT")
+    c.go = S.Button(c, L("Y aller"), 0, 24, "secondary", function() BG.GoMaster(key) end,
+        { L("Y aller"), L("Clic : la flèche du GPS t'emmène au maître de guerre") })
+    c:SetScript("OnEnter", function(self)
+        local t = self.t
+        if not t then return end
+        local lines = { t.title, string.format(L("Niveaux : %s"), t.levels) }
+        if t.faction then lines[#lines + 1] = t.faction end
+        if t.source then lines[#lines + 1] = t.source end
+        if t.others then lines[#lines + 1] = t.others end
+        if t.unsure then lines[#lines + 1] = t.unsure end
+        Tip(self, lines)
+    end)
+    c:SetScript("OnLeave", S.HideTip)
+    function c:Fit(w)
+        local t = BG.CardText(self.key, win and win.bonus and win.bonus.days == 0 and win.bonus.key or nil)
+        self.t = t
+        local inner = w - 2 * PAD
+        local y = PAD
+        -- name, and the pill at the right
+        local pillW = 0
+        if t.bonus then
+            self.pill:Set(L("Bonus aujourd'hui"), C.ok, "star")
+            self.pill:ClearAllPoints(); self.pill:SetPoint("TOPRIGHT", -PAD, -(y + 1))
+            pillW = (self.pill:GetWidth() or 100) + 8
+        else self.pill:Hide() end
+        self.title:SetText(t.title)
+        self.title:ClearAllPoints(); self.title:SetPoint("TOPLEFT", PAD, -y); self.title:SetWidth(math.max(60, inner - pillW))
+        y = y + 22 + 8
+        -- the standing and its bar
+        self.standing:SetText(t.standing); Paint(self.standing, t.standingColor)
+        self.standing:ClearAllPoints(); self.standing:SetPoint("TOPLEFT", PAD, -y)
+        self.count:SetText(t.count or "")
+        self.count:ClearAllPoints(); self.count:SetPoint("TOPRIGHT", -PAD, -y)
+        self.standing:SetWidth(math.max(40, inner - (root.TextWidth(self.count) or 60) - 8))
+        y = y + 16 + 4
+        self.track:ClearAllPoints(); self.track:SetPoint("TOPLEFT", PAD, -y); self.track:SetSize(inner, 6)
+        local p = (t.barTotal or 0) > 0 and math.max(0, math.min(1, (t.barDone or 0) / t.barTotal)) or 0
+        local fc = t.standingColor or C.ok
+        self.fill:SetColorTexture(fc[1], fc[2], fc[3], 1)
+        self.fill:ClearAllPoints(); self.fill:SetPoint("TOPLEFT", PAD, -y)
+        self.fill:SetSize(math.max(1, math.floor(inner * p + 0.5)), 6); self.fill:SetShown(p > 0)
+        y = y + 6 + 4
+        self.toEx:SetText(t.toExalted or ""); self.toEx:SetShown(t.toExalted ~= nil)
+        self.toEx:ClearAllPoints(); self.toEx:SetPoint("TOPLEFT", PAD, -y); self.toEx:SetWidth(inner)
+        if t.toExalted then y = y + 14 end
+        y = y + 12
+        -- the one strong number
+        self.big:SetText(t.big or "?"); Paint(self.big, t.exalted and C.ok or C.fg)
+        self.big:ClearAllPoints(); self.big:SetPoint("TOPLEFT", PAD, -y); self.big:SetWidth(inner)
+        y = y + 24
+        self.small:SetText(t.small or "")
+        self.small:ClearAllPoints(); self.small:SetPoint("TOPLEFT", PAD, -y)
+        if t.small and t.small ~= "" then y = y + math.ceil(S.FitText(self.small, 2, inner, self)) end
+        y = y + 12
+        -- the battlemaster, the button at the right
+        self.rule:ClearAllPoints(); self.rule:SetPoint("TOPLEFT", PAD, -y); self.rule:SetSize(inner, 1)
+        y = y + 1 + 10
+        if t.master then
+            self.go:ClearAllPoints(); self.go:SetPoint("TOPRIGHT", -PAD, -y)
+            local goW = self.go:GetWidth() or 80
+            self.pin:ClearAllPoints(); self.pin:SetPoint("TOPLEFT", PAD, -(y + 5))
+            self.master:SetText(t.master .. "  |cff" .. string.format("%02x%02x%02x", C.muted[1] * 255, C.muted[2] * 255, C.muted[3] * 255) .. "· " .. t.place .. "|r")
+            self.master:ClearAllPoints(); self.master:SetPoint("TOPLEFT", PAD + 14 + 6, -(y + 5))
+            self.master:SetWidth(math.max(40, inner - 20 - goW - 8))
+            S.ClampLabel(self.master, t.master .. " · " .. t.place, self)
+            self.go:Show(); self.pin:Show(); self.master:Show()
+            y = y + 24
+        else
+            self.go:Hide(); self.pin:Hide(); self.master:Hide()
+        end
+        local h = math.ceil(y + PAD)
+        self:SetHeight(h)
+        return h
+    end
+    return c
+end
+
+-- the week's line: calendar icon, one sentence; where it comes from in the tooltip
+local function WeekCard(parent)
+    local c = CreateFrame("Button", nil, parent)
+    c.wlOwned = true
+    S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
+    S.Border(c, C.cardEdge)
+    c.icon = c:CreateTexture(nil, "ARTWORK"); c.icon:SetSize(16, 16); c.icon:SetPoint("LEFT", PAD, 0)
+    S.HDIcon(c.icon, "calendar", C.gold)
+    c.text = S.Text(c, F.body, C.fg); c.text:SetWordWrap(false); c.text:SetJustifyH("LEFT")
+    c.text:SetPoint("LEFT", PAD + 16 + 8, 0)
+    c:SetScript("OnEnter", function(self)
+        Tip(self, { L("Calendrier du jeu"),
+            L("Lu dans le calendrier du jeu (l'icône en haut à droite de la minicarte). Forever ne publie pas de rotation fixe."),
+            L("Une victoire donne 3 marques, une défaite 1. Les marques s'échangent aussi contre de la réputation."),
+            L("Clic : ouvrir le calendrier du jeu") })
+    end)
+    c:SetScript("OnLeave", S.HideTip)
+    c:SetScript("OnClick", function()
+        if ToggleCalendar then pcall(ToggleCalendar) end
+    end)
+    function c:Fit(w)
+        self.text:SetText(win and win.weekText or (BG.WeekText()))
+        self.text:SetWidth(w - (PAD + 24) - PAD)
+        S.ClampLabel(self.text, nil, self)
+        self:SetHeight(40)
+        return 40
+    end
+    return c
+end
+
+-- ---------------------------------------------------------------- the set tab
+
+local function MarkWord(id) return L((WP.PvP and WP.PvP.MARKS[id]) or "?") end
+
+local function MakeRow(parent)
+    local r = CreateFrame("Button", nil, parent)
+    r.wlOwned = true
+    r.bg = S.Solid(r, "BACKGROUND", C.cardFill); r.bg:SetAllPoints()
+    r.hl = S.Solid(r, "BORDER", C.hoverFill); r.hl:SetAllPoints(); r.hl:Hide()
+    r.slot = S.Text(r, F.label, C.muted); r.slot:SetJustifyH("LEFT"); r.slot:SetWordWrap(false)
+    r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:SetSize(ICON, ICON)
+    r.name = S.Text(r, F.label, C.fg); r.name:SetJustifyH("LEFT"); r.name:SetWordWrap(false)
+    r.honor = S.Text(r, F.label, C.fg); r.honor:SetJustifyH("RIGHT"); r.honor:SetWordWrap(false)
+    r.marks = S.Text(r, F.label, C.fg); r.marks:SetJustifyH("RIGHT"); r.marks:SetWordWrap(false)
+    r.gain = S.Text(r, F.label, C.ok); r.gain:SetJustifyH("RIGHT"); r.gain:SetWordWrap(false)
+    r:SetScript("OnEnter", function(self)
+        self.hl:Show()
+        if not self.itemID then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local ok = pcall(GameTooltip.SetItemByID, GameTooltip, self.itemID)
+        if not ok then GameTooltip:SetText(tostring(self.itemID)) end
+        if self.alts then GameTooltip:AddLine(self.alts, C.muted[1], C.muted[2], C.muted[3], true) end
+        GameTooltip:AddLine(L("Maj-clic : le lien dans la discussion"), C.hint[1], C.hint[2], C.hint[3], true)
+        GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function(self) self.hl:Hide(); GameTooltip:Hide() end)
+    r:SetScript("OnClick", function(self)
+        if self.itemID and IsModifiedClick and IsModifiedClick("CHATLINK") then
+            local _, link = Info(self.itemID)
+            if link and ChatEdit_InsertLink then ChatEdit_InsertLink(link) end
+        end
+    end)
+    return r
+end
+
+-- the table's head: the column names, muted, over the same columns as the rows
+local function MakeHead(parent)
+    local r = CreateFrame("Frame", nil, parent)
+    r.wlOwned = true
+    for _, k in ipairs({ "slot", "name", "honor", "marks", "gain" }) do
+        r[k] = S.Text(r, F.meta, C.muted); r[k]:SetWordWrap(false)
+    end
+    r.slot:SetJustifyH("LEFT"); r.name:SetJustifyH("LEFT")
+    r.honor:SetJustifyH("RIGHT"); r.marks:SetJustifyH("RIGHT"); r.gain:SetJustifyH("RIGHT")
+    return r
+end
+
+local function Columns(r, W)
+    local x = 8
+    r.slot:ClearAllPoints(); r.slot:SetPoint("LEFT", x, 0); r.slot:SetWidth(SLOT_W - 8)
+    x = x + SLOT_W
+    local right = 8
+    r.gain:ClearAllPoints(); r.gain:SetPoint("RIGHT", -right, 0); r.gain:SetWidth(GAIN_W); right = right + GAIN_W + 12
+    r.marks:ClearAllPoints(); r.marks:SetPoint("RIGHT", -right, 0); r.marks:SetWidth(MARK_W); right = right + MARK_W + 12
+    r.honor:ClearAllPoints(); r.honor:SetPoint("RIGHT", -right, 0); r.honor:SetWidth(HON_W); right = right + HON_W + 12
+    return x, math.max(60, W - x - right)
+end
+
+local function PaintRow(r, W, row, d)
+    r.itemID = row.id
+    r:SetSize(W, ROW_H)
+    local x, nameW = Columns(r, W)
+    r.slot:SetText(L(row.word))
+    r.icon:ClearAllPoints(); r.icon:SetPoint("LEFT", x, 0)
+    S.Painted(r.icon, S.ItemIcon(row.id))
+    local name = Info(row.id)
+    r.name:SetText(name or ("#" .. row.id))
+    Paint(r.name, S.QualityColor(row.id) or C.fg)
+    r.name:ClearAllPoints(); r.name:SetPoint("LEFT", x + ICON + 8, 0); r.name:SetWidth(nameW - ICON - 8)
+    r.honor:SetText(Int(row.honor))
+    r.marks:SetText(string.format("%d %s", row.marks, MarkWord(row.mark)))
+    if row.owned then
+        Paint(r.honor, C.muted); Paint(r.marks, C.muted)
+        r.gain:SetText(L("À toi")); Paint(r.gain, C.ok)
+    else
+        Paint(r.honor, d.honor >= row.honor and C.ok or C.fg)
+        Paint(r.marks, (d.have[row.mark] or 0) >= row.marks and C.ok or C.fg)
+        if row.pct then
+            local p = math.floor(row.pct + 0.5)
+            r.gain:SetText(string.format("%+d %%", p)); Paint(r.gain, p > 0 and C.ok or C.muted)
+        else r.gain:SetText("") end
+    end
+    local alts = {}
+    for _, o in ipairs(row.others or {}) do alts[#alts + 1] = Info(o) or ("#" .. o) end
+    r.alts = #alts > 0 and string.format(L("Autres choix : %s"), table.concat(alts, ", ")) or nil
+end
+
+-- Field of Honor, folded by default: one heading row (a click opens it), then its lines and a GPS button
+local FOH = { m = 1446, x = 51.8, y = 27.2 }
+local function FohCard(parent)
     local c = CreateFrame("Frame", nil, parent)
     c.wlOwned = true
     S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
     S.Border(c, C.cardEdge)
+    c.head = CreateFrame("Button", nil, c)
+    c.head:SetPoint("TOPLEFT"); c.head:SetPoint("TOPRIGHT"); c.head:SetHeight(40)
+    c.chev = c.head:CreateTexture(nil, "ARTWORK"); c.chev:SetSize(12, 12); c.chev:SetPoint("LEFT", PAD, 0)
+    c.label = S.Text(c.head, F.body, C.fg); c.label:SetWordWrap(false); c.label:SetPoint("LEFT", PAD + 12 + 8, 0)
+    c.label:SetText(L("Quête hebdomadaire Field of Honor"))
+    c.head:SetScript("OnEnter", function(self) Tip(self, { L("Quête hebdomadaire Field of Honor"), L("Clic : afficher ou cacher") }) end)
+    c.head:SetScript("OnLeave", S.HideTip)
+    c.head:SetScript("OnClick", function()
+        WLWritsDB = WLWritsDB or {}
+        WLWritsDB.bgFohOpen = not WLWritsDB.bgFohOpen or nil
+        if BG.Refresh then BG.Refresh() end
+    end)
     c.stack = root.TextStack(c)
-    return c
-end
-
-local function WeekCard(parent)
-    local c = CardBase(parent)
-    function c:Fit(width)
+    c.go = S.Button(c, L("Y aller"), 0, 24, "secondary", function()
+        if WP.GoTo and WP.GoTo.Go then WP.GoTo.Go({ kind = "npc", label = "Wizzik Dustfizz", map = FOH.m, x = FOH.x, y = FOH.y, gps = "Wizzik Dustfizz" }) end
+    end, { L("Y aller"), L("Clic : la flèche du GPS t'emmène à Wizzik Dustfizz") })
+    function c:Fit(w)
+        local open = WLWritsDB and WLWritsDB.bgFohOpen
+        S.HDIcon(self.chev, open and "chevron_down" or "chevron_right", C.muted)
         local stk = self.stack
-        stk:Begin(PAD, PAD, math.min(width - 2 * PAD, 480))
-        stk:Heading(L("Cette semaine"))
-        stk:Body(win and win.weekText or (BG.WeekText()))
-        stk:Muted(L("Lu dans le calendrier du jeu (l'icône en haut à droite de la minicarte). Forever ne publie pas de rotation fixe."))
-        stk:Muted(L("Une victoire donne 3 marques, une défaite 1. Les marques s'échangent aussi contre de la réputation."))
-        local h = math.ceil(PAD + stk:End() + PAD)
+        stk:Begin(PAD, 40, math.min(w - 2 * PAD, 480))
+        if open then
+            stk:Body(L("Wizzik Dustfizz, Gadgetzan (Tanaris 51,8 27,2), dès le niveau 60."))
+            stk:Bullets({ L("Semaine 1 : gagner 10 duels."), L("Semaine 2 : finir 3 parties au Goulet des Chanteguerres."),
+                L("Semaine 3 : tuer 25 joueurs adverses au Goulet des Chanteguerres.") })
+            stk:Muted(L("Chaque semaine : 300 honneur et 500 points de rang. Une semaine manquée se rattrape plus tard."))
+        end
+        local h = 40 + stk:End()
+        if open then
+            self.go:ClearAllPoints(); self.go:SetPoint("TOPLEFT", PAD, -(h + 8)); self.go:Show()
+            h = h + 8 + 24 + PAD
+        else self.go:Hide() end
+        h = math.ceil(h)
         self:SetHeight(h)
         return h
     end
     return c
 end
 
-local function BgCard(parent, key)
-    local c = CardBase(parent)
-    c.key = key
-    c.go = S.Button(c, L("Y aller"), 0, 28, "secondary", function() BG.GoMaster(key) end,
-        { L("Y aller"), L("Clic : la flèche du GPS t'emmène au maître de guerre") })
-    function c:Fit(width)
-        local t = BG.CardText(self.key)
-        local bonus = win and win.bonus
-        local stk = self.stack
-        stk:Begin(PAD, PAD, width - 2 * PAD)
-        stk:Heading(t.title)
-        if bonus and bonus.key == self.key and bonus.days == 0 then stk:Body(L("Bonus aujourd'hui")) end
-        stk:Fact(L("Niveaux"), t.levels)
-        stk:Stat(t.stat.label, t.stat.done, t.stat.total, { count = t.stat.count, sub = t.stat.sub })
-        stk:Body(t.estimate)
-        stk:Muted(t.source)
-        stk:Body(t.master)
-        stk:Muted(t.others)
-        stk:Muted(t.unsure)
-        local y = PAD + stk:End() + 12
-        self.go:ClearAllPoints(); self.go:SetPoint("TOPLEFT", PAD, -y)
-        self.go:SetShown(t.master ~= nil)
-        local h = math.ceil(y + (t.master and 28 or 0) + PAD)
-        self:SetHeight(h)
-        return h
-    end
-    return c
+-- ---------------------------------------------------------------- layout
+
+local pools = { rows = {}, heads = {} }
+local function Take(kind, maker)
+    local p = pools[kind]
+    p.n = (p.n or 0) + 1
+    local f = p[p.n]
+    if not f then f = maker(win.inner); p[p.n] = f end
+    f:Show()
+    return f
 end
 
-local function SetCard(parent)
-    local c = CardBase(parent)
-    function c:Fit(width)
-        local stk = self.stack
-        stk:Begin(PAD, PAD, math.min(width - 2 * PAD, 900))
-        stk:Heading(L("Ton set PvP"))
-        local lines = (WP.PvP and WP.PvP.Lines) and WP.PvP.Lines() or {}
-        stk:Bullets(lines)
-        local h = math.ceil(PAD + stk:End() + PAD)
-        self:SetHeight(h)
-        return h
-    end
-    return c
-end
-
-local function Dims()
+local function Width()
     local w = win and win:GetWidth()
-    if type(w) ~= "number" or Secret(w) or w < 400 then
-        w = (root.WinSize and root.WinSize("workspace")) or 924
-    end
-    CW = math.floor(w) - 32
-    return CW
+    if type(w) ~= "number" or Secret(w) or w < 400 then w = (root.WinSize and root.WinSize("workspace")) or 924 end
+    return math.floor(w) - 2 * INSET
 end
 
-local function Layout()
-    if not (win and win:IsShown()) then return end
-    Dims()
-    win.weekText, win.bonus = BG.WeekText()
+local function FillBG(W, y)
     local inner = win.inner
-    local y = 12
-    local function Place(f, h, gap)
-        f:ClearAllPoints()
-        f:SetPoint("TOPLEFT", inner, "TOPLEFT", 16, -y)
-        f:SetWidth(CW); f:SetHeight(h)
-        y = y + h + (gap or 0)
-    end
-    Place(win.week, win.week:Fit(CW), 12)
+    win.week:ClearAllPoints(); win.week:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -y); win.week:SetWidth(W)
+    y = y + win.week:Fit(W) + 12
     local g = win.grid
-    g:Begin(inner, 16, y, CW, CARD_GRID)
-    for _, card in ipairs(win.cards) do g:Add(card, function(f, w) return f:Fit(w) end) end
-    y = y + g:End() + 12
-    Place(win.set, win.set:Fit(CW), 0)
+    g:Begin(inner, INSET, y, W, CARD_GRID)
+    for _, card in ipairs(win.cards) do card:Show(); g:Add(card, function(f, w) return f:Fit(w) end) end
+    y = y + g:End()
+    return y
+end
+
+local function FillSet(W, y)
+    local inner = win.inner
+    local d = WP.PvP and WP.PvP.Data and WP.PvP.Data()
+    local s = win.setTop
+    s:ClearAllPoints(); s:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -y); s:SetWidth(W)
+    local stk = win.setStack
+    stk:Begin(0, 0, math.min(W, 480))
+    if not d then
+        stk:Body(L("Pas de set PvP pour ta classe dans les données."))
+        local h = stk:End(); s:SetHeight(h)
+        win.foh:Hide()
+        return y + h
+    end
+    -- the summary: honor held / honor the missing pieces cost; marks per battleground with a bar
+    win.honorBig:SetText(d.needH > 0 and string.format(L("Honneur : %s / %s"), Int(d.honor), Int(d.needH)) or L("Tout ton set est à toi."))
+    win.honorBig:ClearAllPoints(); win.honorBig:SetPoint("TOPLEFT", s, "TOPLEFT", 0, 0)
+    local top = 24
+    stk:Begin(0, top, math.min(W, 480))
+    if d.needH > 0 then
+        stk:Muted(d.honor >= d.needH and L("Tu as l'honneur pour tout le set.") or string.format(L("Il te manque %s honneur."), Int(d.needH - d.honor)))
+    end
+    local ids = {}
+    for id in pairs(d.needM) do ids[#ids + 1] = id end
+    table.sort(ids)
+    for _, id in ipairs(ids) do
+        local need, have = d.needM[id], d.have[id] or 0
+        stk:Stat(L(WP.PvP.MARKS[id]), math.min(have, need), need, { count = Int(have) .. " / " .. Int(need) })
+    end
+    if d.first then
+        stk:Gap(4)
+        stk:Body(string.format(L("À faire d'abord : %s"), L(WP.PvP.MARKS[d.first])) .. " (" .. string.format(L("%d marques à gagner"), d.firstN) .. ")")
+    end
+    local h = top + stk:End()
+    s:SetHeight(h)
+    y = y + h + 16
+    -- the table
+    local hd = Take("heads", function(p) return S.SectionHeader(p, "", 0, nil, nil, true) end)
+    hd:Set(L("Pièces du set"), #d.rows)
+    hd:ClearAllPoints(); hd:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -y); hd:SetWidth(W)
+    y = y + 24 + 6
+    local th = win.tableHead
+    th:ClearAllPoints(); th:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -y); th:SetSize(W, 18); th:Show()
+    Columns(th, W)
+    th.slot:SetText(L("Emplacement")); th.name:SetText(L("Pièce")); th.honor:SetText(L("Honneur"))
+    th.marks:SetText(L("Marques")); th.gain:SetText(L("Gain"))
+    th.name:ClearAllPoints(); th.name:SetPoint("LEFT", 8 + SLOT_W, 0)
+    y = y + 18 + 4
+    for _, row in ipairs(d.rows) do
+        local r = Take("rows", MakeRow)
+        PaintRow(r, W, row, d)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -y)
+        y = y + ROW_H + 2
+    end
+    y = y + 14
+    -- Field of Honor, folded; the seals and the source in one muted line
+    win.foh:Show()
+    win.foh:ClearAllPoints(); win.foh:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -y); win.foh:SetWidth(W)
+    y = y + win.foh:Fit(W) + 12
+    local lo, hi
+    for _, sl in ipairs(WP.PvP.SEALS or {}) do lo = math.min(lo or sl[2], sl[2]); hi = math.max(hi or sl[2], sl[2]) end
+    local note = (lo and string.format(L("Plus tard, un sceau « Emboldened » (%s à %s honneur, avec un rang PvP) rend une pièce épique : garde tes pièces bleues."), Int(lo), Int(hi)) or "")
+        .. " " .. L("Prix lus sur Wowhead Forever (vendeuse Lady Palanseer).")
+    win.note:SetText(note)
+    win.note:ClearAllPoints(); win.note:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -y)
+    y = y + math.ceil(S.FitText(win.note, 3, math.min(W, 640), inner))
+    return y
+end
+
+local function Fill()
+    if not (win and win:IsShown()) then return end
+    for _, p in pairs(pools) do
+        for i = 1, #p do p[i]:Hide() end
+        p.n = 0
+    end
+    win.weekText, win.bonus = BG.WeekText()
+    local W = Width()
+    local onBG = mode ~= "set"
+    win.week:SetShown(onBG)
+    for _, c in ipairs(win.cards) do c:SetShown(onBG) end
+    win.setTop:SetShown(not onBG); win.honorBig:SetShown(not onBG)
+    win.foh:SetShown(not onBG); win.note:SetShown(not onBG); win.tableHead:SetShown(false)
+    local y = 14
+    if onBG then y = FillBG(W, y) else y = FillSet(W, y) end
     local innerH = math.ceil(y)
+    win.lastH, win.rowsShown = innerH, pools.rows.n or 0
     win.scroll:SetContentHeight(innerH + 24)
     win:FitHeight(innerH)
+    if win.tabs and win.tabs.Paint then win.tabs:Paint() end
 end
-BG.Refresh = Layout
+BG.Refresh = Fill
+BG._Fill = Fill
 
 local function Build()
     local w0, h0 = root.WinSize("workspace")
-    win = S.Window("WLHelperBattlegrounds", w0 or 924, h0 or 614, L("Champs de bataille"),
-        L("Réputation, bonus de la semaine, maîtres de guerre"), WLWritsDB, "bgPos", { header = 44, size = "workspace" })
+    win = S.Window("WLHelperBattlegrounds", w0 or 924, h0 or 614, L("Champs de bataille"), nil, WLWritsDB, "bgPos",
+        { header = S.HEADER_H or 44, size = "workspace" })
+    local top = win:ContentTop()
+    win.tabs = S.Tabs(win, { { "bg", L("Champs de bataille") }, { "set", L("Set PvP") } },
+        function() return mode end, function(m) mode = m; if win.scroll.ScrollTo then win.scroll:ScrollTo(0, true) end; Fill() end)
+    win.tabs:SetPoint("TOPLEFT", 0, -top); win.tabs:SetPoint("TOPRIGHT", 0, -top)
     local sa = S.ScrollArea(win)
-    sa:SetPoint("TOPLEFT", win, "TOPLEFT", 0, -(win.headerH + 1))
+    sa:SetPoint("TOPLEFT", win, "TOPLEFT", 0, -(top + (S.TABS_H or 32) + 1))
     sa:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", 0, 0)
     win.scroll, win.inner = sa, sa.child
     win.week = WeekCard(win.inner)
     win.cards = {}
     for _, b in ipairs(BG.LIST) do win.cards[#win.cards + 1] = BgCard(win.inner, b.key) end
     win.grid = ns.Grid()
-    win.set = SetCard(win.inner)
-    win.OnResize = function() Layout() end
+    win.setTop = CreateFrame("Frame", nil, win.inner)
+    win.setStack = root.TextStack(win.setTop)
+    win.honorBig = S.Text(win.setTop, F.title, C.fg); win.honorBig:SetWordWrap(false); win.honorBig:SetJustifyH("LEFT")
+    win.tableHead = MakeHead(win.inner)
+    win.foh = FohCard(win.inner)
+    win.note = S.Text(win.inner, F.meta, C.muted); win.note:SetJustifyH("LEFT")
+    win.OnResize = function() Fill() end
     win:SetScript("OnShow", function()
-        Layout()
-        if C_Timer and C_Timer.After then C_Timer.After(0, function() if win:IsShown() then Layout() end end) end
+        Fill()
+        if C_Timer and C_Timer.After then C_Timer.After(0, function() if win:IsShown() then Fill() end end) end
     end)
+    win:Hide()
 end
 
-function BG.Toggle()
-    if win and win:IsShown() then win:Hide(); return end
+-- BG.Toggle([tab [, show]]): opens on that tab ("bg" | "set", or the last one); closes when open
+-- and neither a tab nor show is asked
+function BG.Toggle(m, show)
     if not win then Build() end
+    if m == "bg" or m == "set" then mode = m end
+    if win:IsShown() and not show and not m then win:Hide(); return end
     win:Show()
-    Layout()
+    if win.Raise then win:Raise() end
+    Fill()
 end
 function BG.Window() return win end
+function BG.Mode() return mode end
 
 -- ---------------------------------------------------------------- events
 
@@ -577,7 +982,7 @@ for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "UPDATE_B
 end
 ev:SetScript("OnEvent", function(_, e)
     if e == "CALENDAR_UPDATE_EVENT_LIST" or e == "UPDATE_FACTION" then
-        if win and win:IsShown() then Layout() end
+        if win and win:IsShown() then Fill() end
         return
     end
     local ok, err = pcall(BG.Track)

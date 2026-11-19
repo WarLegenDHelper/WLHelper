@@ -269,6 +269,37 @@ function PvP.Plan(cls)
     return plan
 end
 
+-- The set as data (the battlegrounds window draws it): { honor, have = { [mark] = n },
+-- rows = { { slot, word, id, honor, mark, marks, pct, owned, others = { ids } } } in slot order,
+-- needH, needM = { [mark] = n } (what the pieces not owned cost in all), first, firstN (the
+-- battleground with the most marks still missing) }. nil without a set for the class.
+PvP.SLOT_ORDER, PvP.SLOT_WORD = SLOT_ORDER, SLOT_WORD
+function PvP.Data(cls)
+    if not cls then local _, c = UnitClass("player"); cls = Plain(c) end
+    local plan = PvP.Plan(cls)
+    if not plan or not next(plan) then return nil end
+    local d = { honor = PvP.Honor(), have = {}, rows = {}, needH = 0, needM = {} }
+    for id in pairs(PvP.MARKS) do d.have[id] = PvP.Count(id) end
+    for _, slot in ipairs(SLOT_ORDER) do
+        local e = plan[slot]
+        if e then
+            local r = e.pick
+            local others = {}
+            for _, o in ipairs(e.others) do others[#others + 1] = o[1] end
+            local owned = PvP.Count(r[1]) > 0
+            d.rows[#d.rows + 1] = { slot = slot, word = SLOT_WORD[slot], id = r[1], honor = r[4], mark = r[5], marks = r[6],
+                pct = (e.pct and e.pct < 999) and e.pct or nil, owned = owned, others = others }
+            if not owned then d.needH = d.needH + r[4]; d.needM[r[5]] = (d.needM[r[5]] or 0) + r[6] end
+        end
+    end
+    local worst = 0
+    for id, n in pairs(d.needM) do
+        local m = n - (d.have[id] or 0)
+        if m > worst then d.first, d.firstN, worst = id, m, m end
+    end
+    return d
+end
+
 -- The lines "/wlh pvp" prints
 function PvP.Lines()
     local out = {}

@@ -6,6 +6,17 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.168] — 2026-11-19
+
+### Modifié / Changed
+- **Champs de bataille, fenêtre refaite pour être lisible** :
+  - Elle s'ouvre depuis l'accueil et le hub (ligne « Champs de bataille », dans Guilde et groupes), en plus de `/wlh pvp`.
+  - Deux onglets : « Champs de bataille » et « Set PvP ».
+  - Chaque carte de champ de bataille montre le nom (avec une pastille « Bonus aujourd'hui » quand il l'est), ton rang en couleur avec sa barre et x / y, puis un seul chiffre fort : les victoires qu'il reste, avec les défaites et la source en petit. Le maître de guerre tient sur une ligne, avec « Y aller » à droite. Les niveaux et les autres villes sont dans l'infobulle.
+  - Le bonus de la semaine tient en une ligne. Un clic ouvre le calendrier du jeu.
+  - Le set PvP est un vrai tableau : emplacement, pièce dans sa couleur de qualité, honneur, marques et gain, avec l'infobulle de l'objet (Maj-clic pour le lien). En tête : ton honneur sur ce qu'il faut, tes marques par champ de bataille avec une barre, et le champ de bataille à faire d'abord. La quête Field of Honor est dans une carte repliable, avec ses 3 semaines et un bouton « Y aller ».
+  *Battlegrounds window redone for reading: Home and Hub entry, two tabs, one strong number per battleground card, the PvP set as a table, Field of Honor folded.*
+
 ## [1.0.0-beta.167] — 2026-11-19
 
 ### Modifié / Changed

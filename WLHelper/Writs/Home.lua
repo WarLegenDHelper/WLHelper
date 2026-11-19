@@ -357,6 +357,7 @@ local CLICK_HINT = {
     writs = "Clic : ouvrir les Writs", favor = "Clic : voir les caisses", orders = "Clic : ouvrir les commandes",
     bags = "Clic : voir les objets à jeter", upgrades = "Clic : choisir ta spé et voir tes améliorations",
     guild = "Clic : ouvrir la guilde", events = "Clic : ouvrir Groupes",
+    pvp = "Clic : ouvrir les champs de bataille",
 }
 function WP.HubClickHint(key) return CLICK_HINT[key] and L(CLICK_HINT[key]) or nil end
 
@@ -1078,6 +1079,12 @@ local function Refresh()
             hint = L("Clic : choisir ta spé et voir tes améliorations") })
     else
         Put("upgrades", "Show2", { title = L("Améliorations"), line1 = L("Rien de mieux dans tes sacs"), hint = L("Clic : choisir ta spé et voir tes améliorations") })
+    end
+
+    -- battlegrounds: the bonus of the day, else what the window holds
+    if WP.BG and WP.BG.HomeLine then
+        local okB, bgLine = pcall(WP.BG.HomeLine)
+        Put("pvp", "Set", L("Champs de bataille"), okB and bgLine or "", L("Clic : ouvrir les champs de bataille"))
     end
 
     -- the tools: a dot when one has something to do now
