@@ -57,7 +57,7 @@ ns.AddEnglish({
     ["Le menu"] = "The menu",
     ["À gauche, l'Accueil puis chaque activité avec ses réglages. Bienvenue, juste dessous, reprend la mise en route."] = "On the left, Home, then each activity with its settings. Welcome, just below, goes through the setup again.",
     ["Tout ce qui s'ouvre"] = "Everything you can open",
-    ["Une ligne par fenêtre, rangées par activité. Un clic l'ouvre, un clic droit ouvre ses réglages."] = "One line per window, sorted by activity. Click to open it, right-click for its settings.",
+    ["Une carte par activité : où tu en es, un bouton pour continuer, puis ses fenêtres. Un clic ouvre, un clic droit ouvre les réglages."] = "One card per activity: where you stand, a button to carry on, then its windows. Click to open, right-click for settings.",
     ["Chercher un réglage"] = "Find a setting",
     ["Tape un mot, par exemple « flèche » : le réglage s'affiche et s'allume."] = "Type a word, \"arrow\" for example: the setting shows up and lights up.",
     ["Les gestes utiles pas à pas, avec le bon bouton qui s'allume. La visite se relance aussi d'ici."] = "Handy how-tos step by step, with the right button lit up. You can restart the tour from here too.",
@@ -168,7 +168,7 @@ local STEPS = {
               if Visible(r) then return r end
           end
       end,
-      title = "Tout ce qui s'ouvre", text = "Une ligne par fenêtre, rangées par activité. Un clic l'ouvre, un clic droit ouvre ses réglages." },
+      title = "Tout ce qui s'ouvre", text = "Une carte par activité : où tu en es, un bouton pour continuer, puis ses fenêtres. Un clic ouvre, un clic droit ouvre les réglages." },
     { id = "search", group = "start", win = Hub, open = OpenHubOn("home"),
       target = function() return WP.searchBox end,
       title = "Chercher un réglage", text = "Tape un mot, par exemple « flèche » : le réglage s'affiche et s'allume." },

@@ -839,6 +839,7 @@ end
 ns.GRID = {
   settings    = { minW = 320, gap = 12, rowGap = 0,  maxCols = 3, minPx = 200 },  -- rows in a settings card
   hubRows     = { minW = 280, gap = 12, rowGap = 6,  maxCols = 3, minPx = 200 },  -- Home lines
+  homeCards   = { minW = 320, gap = 16, rowGap = 16, maxCols = 3, minPx = 200 },  -- Home activity cards
   moduleTiles = { minW = 200, gap = 12, rowGap = 12, maxCols = 4, minPx = 200 },  -- General modules, Setup interests
   profTiles   = { minW = 150, gap = 8,  rowGap = 8,  maxCols = 3, minPx = 150 },  -- Orders professions
   cards       = { minW = 300, gap = 12, rowGap = 12, maxCols = 3, minPx = 200 },  -- Welcome, Help tasks, Keys, zones

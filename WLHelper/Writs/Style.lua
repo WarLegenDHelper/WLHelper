@@ -1147,12 +1147,24 @@ end
 -- r:Show2{ title, line1, line2, lineColor, pill, pillColor, hint, dot } (the old Home card's call),
 -- r:Set(name, state, hint, dot, reason) (the old tool tile's call), r:ShowOff(title),
 -- r:SetIcon(icon), r:SetOnRightClick(fn, hint). r.desc: what the window does (tooltip).
-function S.HubRow(parent, onClick)
+-- opts.compact: a line inside a Home activity card (beta.173): 30 px, no fill, no edge, no icon box
+-- (the card has the one icon), the name 13 fg at x=10 and the state 11 muted on the same line,
+-- right-aligned before the chevron; a 1 px divider on top (r.rule, hidden on the card's first line);
+-- r:Arrange(width) gives the name its width (at most 55 % of the line).
+S.HUBLINE_H = 30
+function S.HubRow(parent, onClick, opts)
+    local compact = opts and opts.compact and true or false
     local r = CreateFrame("Button", nil, parent)
     r.wlOwned = true
-    r:SetHeight(46)
-    r.bg = S.Solid(r, "BACKGROUND", T.cardFill); r.bg:SetAllPoints()
-    S.Border(r, T.cardEdge)
+    r.compact = compact
+    r:SetHeight(compact and S.HUBLINE_H or 46)
+    if not compact then
+        r.bg = S.Solid(r, "BACKGROUND", T.cardFill); r.bg:SetAllPoints()
+        S.Border(r, T.cardEdge)
+    else
+        r.rule = S.Rule(r)
+        r.rule:SetPoint("TOPLEFT", 10, 0); r.rule:SetPoint("TOPRIGHT", -10, 0)
+    end
     r.hl = S.Solid(r, "BORDER", T.hoverFill); r.hl:SetAllPoints(); r.hl:SetAlpha(0)
     r.press = S.Solid(r, "BORDER", T.pressFill); r.press:SetAllPoints(); r.press:Hide()
     r.iconFrame = CreateFrame("Frame", nil, r)
@@ -1177,6 +1189,23 @@ function S.HubRow(parent, onClick)
     r.offPill = S.Pill(r)
     r.offPill:SetPoint("RIGHT", -8, 0)
     r.offPill:Hide()
+    if compact then
+        r.iconFrame:Hide()
+        r.name:ClearAllPoints(); r.name:SetPoint("LEFT", 10, 0)
+        r.name:SetWordWrap(false)
+        r.stateText:ClearAllPoints(); r.stateText:SetPoint("LEFT", r.name, "RIGHT", 12, 0)
+        r.stateText:SetJustifyH("RIGHT"); r.stateText:SetWordWrap(false)
+    end
+    -- compact: the name keeps its own width (at most 55 % of the line), the state takes the rest
+    function r:Arrange(width)
+        if not self.compact then return end
+        local okW, w = pcall(self.GetWidth, self)
+        width = num(width) or (okW and num(w)) or 300
+        self.arrangeW = width
+        local tw = root.TextWidth and num(root.TextWidth(self.name)) or nil
+        local nameW = math.floor(math.min((tw or width * 0.45) + 2, width * 0.55))
+        self.name:SetWidth(math.max(40, nameW))
+    end
     function r:SetIcon(icon)
         self.iconSrc = icon
         self.icon:ClearAllPoints()
@@ -1189,6 +1218,7 @@ function S.HubRow(parent, onClick)
     local function TextRight()
         local right = 8 + 16 + 16          -- the chevron and the dot's place
         if r.offPill:IsShown() then right = 8 + (num(r.offPill:GetWidth()) or 40) + 8 end
+        if r.compact then r.stateText:SetPoint("RIGHT", -right, 0); r:Arrange(r.arrangeW); return end
         r.name:SetPoint("RIGHT", -right, 0); r.stateText:SetPoint("RIGHT", -right, 0)
     end
     local function Look(off)

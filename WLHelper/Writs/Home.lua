@@ -3,9 +3,12 @@
 -- From the top: "Où veux-tu aller ?" (a search field on WP.GoTo: Enter guides you to the first place);
 -- "now", only what a line cannot do (start the Writs tour, an event about to start, the city tour,
 -- a nearly full log, a running GPS; hidden when nothing waits); a line when a newer version exists;
--- then each activity of WP.HUB_GROUPS with its windows, 2 lines a row, 3 on a wide window
--- (ns.GRID.hubRows; S.HubRow: icon, name, where you stand; what the window does is in the tooltip;
--- a dot when it has something to do now; a right-click opens its settings); last, "Recharges"
+-- then one large card per activity of WP.HUB_GROUPS (beta.173, report: "too many small logos, PvP
+-- is hard to see"), 2 a line, 3 on a wide window (ns.GRID.homeCards): the activity's icon and name,
+-- one useful sentence (where the guide stands, the Writs to turn in...), one button that does it,
+-- then a compact line per window of the activity (S.HubRow compact: name, where you stand, a dot
+-- when it has something to do now, a right-click opens its settings; a card with one window shows
+-- no line, its button opens it); last, "Recharges"
 -- (WP.Cooldowns: one card per character with its profession cooldowns and the time left, ready in
 -- green, 2 or 3 cards a line; hidden when none is known). The lines never move. Opened by /wlh, a click on the minimap
 -- button and the "<" of every window.
@@ -141,6 +144,14 @@ ns.AddEnglish({
     ["Les gestes utiles, pas à pas"] = "Common tasks, step by step",
     ["Clic : ouvrir « Comment faire... ? »"] = "Click: open How do I...?",
     ["Module éteint"] = "Module off",
+    -- the activity cards (beta.173)
+    ["Ouvrir les champs de bataille"] = "Open battlegrounds",
+    ["Voir les commandes"] = "See orders",
+    ["Voir les groupes"] = "See groups",
+    ["Le guide de quêtes est éteint."] = "The quest guide is off.",
+    ["Allumer le guide"] = "Turn the guide on",
+    ["Rien à faire pour l'instant."] = "Nothing to do right now.",
+    ["Tous les guides"] = "Every guide",
     ["Clic : allumer le module"] = "Click: turn the module on",
     -- what each module does (home card tooltips, welcome window)
     ["Les quêtes de tes donjons dans le bon ordre, avec le GPS."] = "Your dungeon quests in the right order, with the GPS.",
@@ -183,13 +194,15 @@ ns.AddEnglish({
 })
 
 local GAP = 12             -- between blocks (search, now, the activities)
-local ROW_GAP = 6          -- between two rows of lines
--- the activity lines: ns.GRID.hubRows (280 at least, up to 3 a line: 2 at 668-724 px, 3 from 1112)
--- with Home's 16 px gutter between the columns, as before the grid
-local function RowsGrid()
-    local g = root.GRID and root.GRID.hubRows or {}
-    return { minW = g.minW or 280, gap = 16, rowGap = ROW_GAP, maxCols = g.maxCols or 3, minPx = g.minPx or 200 }
+-- the activity cards: ns.GRID.homeCards (320 at least, 2 a line from 656 px, 3 from 992), the same
+-- height on a line
+local function CardsGrid()
+    local g = root.GRID and root.GRID.homeCards or {}
+    return { minW = g.minW or 320, gap = g.gap or 16, rowGap = g.rowGap or 16, maxCols = g.maxCols or 3,
+        minPx = g.minPx or 200, equal = true }
 end
+local CARD_PAD = 16
+local LINE_H = 30          -- S.HUBLINE_H
 local SEARCH_ROWS = 3
 
 local function Version()
@@ -275,7 +288,8 @@ local cards = {}         -- one HubRow per WP.HUB entry, by key
 local tiles = {}         -- the rows of the smaller tools (city, keys, shared, triage), same frames
 local heads = {}         -- one section title per activity, by group key
 local CW, COL_W = 628, 306
-local rowGrids = {}      -- one ns.Grid per activity, kept between layouts
+local groupCards = {}    -- one activity card per WP.HUB_GROUPS key (heads[key] is the same frame)
+local cardGrid           -- the activity cards' ns.Grid
 local cdGrid             -- the cooldown cards' ns.Grid
 
 local function Close() if WP.CloseHub then WP.CloseHub() elseif win then win:Hide() end end
@@ -335,6 +349,24 @@ local function ToolIcons()
     }
     return TOOL_ICON
 end
+-- One icon per activity card, painted, 32 px: the only icons on Home (the lines have none). Each
+-- falls back on an HD glyph when the client lacks the painted one.
+local GROUP_ICON
+local function GroupIcon(key)
+    if not GROUP_ICON then
+        GROUP_ICON = {
+            quests = WP.MODULE_ICON.dungeons,
+            pvp = ToolIcon(ICONS .. "INV_Sword_27", "sword"),
+            items = ToolIcon(ICONS .. "INV_Misc_Coin_02", "coin"),
+            guild = WP.MODULE_ICON.guild,
+            travel = ToolIcon(ICONS .. "INV_Misc_Map02", "pin"),
+            feedback = { hd = "mail" },
+        }
+    end
+    return GROUP_ICON[key] or { hd = "dot" }
+end
+WP.HomeGroupIcon = GroupIcon
+
 -- WP.PaintModuleIcon(tex, icon): a painted path (white, cropped) or { hd, color } (an HD glyph in
 -- its colour). -> true when it drew an HD glyph (the caller insets it in its box)
 function WP.PaintModuleIcon(tex, icon)
@@ -391,6 +423,90 @@ local function BuildNow()
         return h
     end
     return t
+end
+
+-- One activity card (beta.173): the activity's painted icon 32 and its name (heading), one sentence
+-- on where you stand (body, up to 2 lines), a detail (meta, muted), one secondary button that does
+-- the useful thing now, then a compact line per window of the activity. Its height is the grid's.
+--   c:SetMain{ text, color, detail, label, fn, tip }   (label nil: no button)
+--   c:Fit(width) -> height
+local function BuildGroupCard(g)
+    local c = CreateFrame("Frame", nil, win.inner)
+    c.wlOwned = true
+    c.key = g.key
+    S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
+    S.Border(c, C.cardEdge)
+    c.iconFrame = CreateFrame("Frame", nil, c)
+    c.iconFrame:SetSize(32, 32)
+    S.Border(c.iconFrame, C.cardEdge)
+    c.icon = c.iconFrame:CreateTexture(nil, "ARTWORK")
+    if WP.PaintModuleIcon(c.icon, GroupIcon(g.key)) then c.icon:SetSize(20, 20); c.icon:SetPoint("CENTER")
+    else c.icon:SetAllPoints() end
+    c.title = S.Text(c, F.heading, C.fg)
+    c.title:SetJustifyH("LEFT"); c.title:SetWordWrap(false)
+    c.title:SetText(L(g.label))
+    c.label = c.title         -- a section header's name, for the callers that read heads[key].label
+    c.state = S.Text(c, F.body, C.fg)
+    c.state:SetJustifyH("LEFT"); c.state:SetJustifyV("TOP")
+    c.detail = S.Text(c, F.meta, C.muted)
+    c.detail:SetJustifyH("LEFT"); c.detail:SetJustifyV("TOP")
+    c.go = S.Button(c, "", 0, 28, "secondary", function(self, button)
+        if button == "RightButton" then
+            if c.onRight then c.onRight() end
+        elseif c.fn then c.fn() end
+    end)
+    c.go:SetScript("OnEnter", function(self) if c.tip then S.Tip(self, c.tip) end end)
+    c.go:SetScript("OnLeave", S.HideTip)
+    c.lines = {}
+    function c:SetMain(o)
+        o = o or {}
+        self.state:SetText(o.text or "")
+        self.state:SetShown(o.text ~= nil and o.text ~= "")
+        local col = o.color or C.fg
+        self.state:SetTextColor(col[1], col[2], col[3])
+        self.detail:SetText(o.detail or "")
+        self.detail:SetShown(o.detail ~= nil and o.detail ~= "")
+        self.fn, self.tip = o.fn, o.tip
+        if o.label then self.go:SetText(o.label); self.go:Show() else self.go:Hide() end
+    end
+    function c:Fit(width)
+        local pad = CARD_PAD
+        local textW = math.max(80, width - 2 * pad)
+        self.iconFrame:ClearAllPoints(); self.iconFrame:SetPoint("TOPLEFT", pad, -pad)
+        self.title:ClearAllPoints()
+        self.title:SetPoint("LEFT", self.iconFrame, "RIGHT", 12, 0)
+        self.title:SetWidth(math.max(40, textW - 44))
+        S.ClampLabel(self.title, nil, self)
+        local y = pad + 32 + 12
+        if self.state:IsShown() then
+            self.state:ClearAllPoints(); self.state:SetPoint("TOPLEFT", pad, -y)
+            y = y + (tonumber(S.FitText(self.state, 2, textW, self)) or 16)
+        end
+        if self.detail:IsShown() then
+            y = y + 4
+            self.detail:ClearAllPoints(); self.detail:SetPoint("TOPLEFT", pad, -y)
+            y = y + (tonumber(S.FitText(self.detail, 2, textW, self)) or 14)
+        end
+        if self.go:IsShown() then
+            y = y + 12
+            self.go:ClearAllPoints(); self.go:SetPoint("TOPLEFT", pad, -y)
+            y = y + 28
+        end
+        local n = 0
+        for _, r in ipairs(self.lines) do
+            if r:IsShown() then
+                if n == 0 then y = y + 12 end
+                n = n + 1
+                r:ClearAllPoints(); r:SetPoint("TOPLEFT", self, "TOPLEFT", 6, -y)
+                r:SetWidth(width - 12); r:Arrange(width - 12)
+                y = y + LINE_H
+            end
+        end
+        y = y + (n > 0 and 6 or pad)
+        self:SetHeight(y)
+        return y
+    end
+    return c
 end
 
 -- ---------------------------------------------------------------- "Où veux-tu aller ?"
@@ -590,33 +706,36 @@ Layout = function()
     if win.upd:IsShown() then
         local h = win.upd:Fit(CW); Place(win.upd, h); y = y + h + GAP
     end
-    -- the activities
+    -- the activities: one card each, in the order of WP.HUB_GROUPS (a card never moves)
     local first = true
+    cardGrid = cardGrid or root.Grid()
+    win.cardGrid = cardGrid
+    cardGrid:Begin(inner, 16, 12 + y, CW, CardsGrid())
+    local any = false
     for _, g in ipairs(WP.HUB_GROUPS or {}) do
-        local rows = {}
-        for _, e in ipairs(win.hubOrder or {}) do
-            local r = cards[e.key]
-            if e.group == g.key and r and r:IsShown() then rows[#rows + 1] = r end
-        end
-        local head = heads[g.key]
-        if head then head:SetShown(#rows > 0) end
-        if head and #rows > 0 then
-            if not first then y = y + GAP end
-            first = false
-            Place(head, 24); y = y + 24 + 8
-            -- the lines in the registry's order, left to right then the next line (a line never
-            -- moves to another activity)
-            local grid = rowGrids[g.key] or root.Grid()
-            rowGrids[g.key] = grid
-            grid:Begin(inner, 16, 12 + y, CW, RowsGrid())
-            for _, r in ipairs(rows) do
-                grid:Add(r, function(f) f:SetHeight(46); return 46 end)
+        local c = groupCards[g.key]
+        if c then
+            -- a card with one window: its button opens it, no line under it (unless switched off:
+            -- the line says so and turns it back on); a right-click on the button opens its settings
+            local shown = {}
+            for _, r in ipairs(c.lines) do if r.wantShown then shown[#shown + 1] = r end end
+            local single = #shown == 1 and not shown[1].off and c.go:IsShown()
+            for _, r in ipairs(c.lines) do r:SetShown(r.wantShown and not single and true or false) end
+            c.single = single
+            local only = shown[1]
+            c.onRight = (single and only.onRightClick) and function() only.onRightClick(only) end or nil
+            c.go:RegisterForClicks(c.onRight and "AnyUp" or "LeftButtonUp")
+            local on = #shown > 0
+            c:SetShown(on)
+            if on then
+                any = true
+                cardGrid:Add(c, function(f, w) return f:Fit(w) end)
             end
-            local gh, _, colW = grid:End()
-            COL_W = colW
-            y = y + gh
         end
     end
+    local gh, _, colW = cardGrid:End()
+    COL_W = colW
+    if any then y = y + gh; first = false end
     -- profession cooldowns on every character: one card per character, in the cards grid
     if win.cdHead and win.cdHead:IsShown() then
         if not first then y = y + GAP end
@@ -668,12 +787,11 @@ local function Build(p, width, hub)
     win = hub
     CW = math.floor((width or 660) - 32)
     COL_W = math.floor(((width or 660) - 32 - 16) / 2)
-    rowGrids, cdGrid = {}, nil
-    win.rowGrids = rowGrids
+    cardGrid, cdGrid = nil, nil
     win.scroll, win.inner = p.sa, p
     -- the Hub lays its pages out through p:Layout()
     function p:Layout() Layout(); return win.homeH end
-    cards, tiles, heads = {}, {}, {}
+    cards, tiles, heads, groupCards = {}, {}, {}, {}
     searchRes, searchState = {}, nil
     StopDist()
 
@@ -687,16 +805,18 @@ local function Build(p, width, hub)
     win.upd:Hide()
 
     for _, g in ipairs(WP.HUB_GROUPS or {}) do
-        local h = S.SectionHeader(win.inner, L(g.label), nil, nil, nil, true)
-        h:Hide()
-        heads[g.key] = h
+        local c = BuildGroupCard(g)
+        c:Hide()
+        groupCards[g.key], heads[g.key] = c, c
     end
     local order = {}
     for _, e in ipairs(WP.HUB and WP.HubEntries() or {}) do
         order[#order + 1] = e
-        local r = S.HubRow(win.inner, function()
+        local c = groupCards[e.group]
+        local r = S.HubRow(c or win.inner, function()
             if e.inHub then e.open() else Close(); e.open() end
-        end)
+        end, { compact = true })
+        if c then c.lines[#c.lines + 1] = r end
         r.key, r.module, r.entry = e.key, e.module, e
         r:SetIcon(WP.HubIcon(e))
         if e.module or e.key == "favor" then
@@ -713,7 +833,7 @@ local function Build(p, width, hub)
         if e.key == "city" or e.key == "keys" or e.key == "shared" or e.key == "triage" then tiles[e.key] = r end
     end
     win.hubOrder = order
-    win.cards, win.tiles, win.heads = cards, tiles, heads
+    win.cards, win.tiles, win.heads, win.groupCards = cards, tiles, heads, groupCards
 
     -- "Recharges": one block per character (its name, then a cooldown and its time left per line)
     win.cdHead = S.SectionHeader(win.inner, L("Recharges"), nil, nil, nil, true)
@@ -966,12 +1086,12 @@ local function Refresh()
     -- 3. the lines: state only, each fact said once on the page
 
     if dLabel and not dFinished then
-        Put("dungeons", "Show2", { title = L("Guide de quêtes"), line1 = dLabel,
+        Put("dungeons", "Show2", { title = L("Guide de quêtes"), line1 = L("Tous les guides"),
             line2 = (nextStep and nextStep ~= "") and string.format(L("Prochaine étape : %s"), nextStep) or nil,
-            pill = string.format(L("Étape %d sur %d"), cur or 1, total or 1), hint = L("Clic : tous les guides") })
+            hint = L("Clic : tous les guides") })
     elseif dLabel then
-        Put("dungeons", "Show2", { title = L("Guide de quêtes"), line1 = dLabel, line2 = L("Choisis ton prochain guide."),
-            pill = L("Terminée"), lineColor = C.ok, hint = L("Clic : choisir un guide") })
+        Put("dungeons", "Show2", { title = L("Guide de quêtes"), line1 = L("Tous les guides"), line2 = L("Choisis ton prochain guide."),
+            hint = L("Clic : choisir un guide") })
     else
         Put("dungeons", "Show2", { title = L("Guide de quêtes"), line1 = L("Aucun guide choisi"),
             line2 = L("Donjons, raids et quêtes de classe, depuis là où tu es."), hint = L("Clic : choisir un guide") })
@@ -1108,10 +1228,124 @@ local function Refresh()
     Put("triage", "Set", L("Tri du journal"), triLine, L("Clic : voir les quêtes à abandonner"),
         triDot, L("Ton journal de quêtes est presque plein."))
 
+    -- 4. the activity cards: one sentence on where you stand, one button that does it
+    local GC = groupCards
+    local function Main(key, o) if GC[key] then GC[key]:SetMain(o) end end
+    local function Away(fn) return function() Close(); fn() end end
+
+    -- Progresser: the guide you follow, and the button that takes you back to it
+    if not On("dungeons") then
+        Main("quests", { text = L("Le guide de quêtes est éteint."), color = C.muted, label = L("Allumer le guide"),
+            fn = function() WP.SetModule("dungeons", true); WP.RefreshHome() end })
+    elseif dLabel and not dFinished then
+        Main("quests", { text = string.format(L("%s, étape %d sur %d"), dLabel, cur or 1, total or 1),
+            detail = (nextStep and nextStep ~= "") and string.format(L("Prochaine étape : %s"), nextStep) or nil,
+            label = L("Reprendre le guide"), tip = { L("Reprendre le guide"), L("Clic : ouvrir le guide") },
+            fn = Away(function() if root.ShowGuide then root.ShowGuide() else OpenGuide() end end) })
+    elseif dLabel then
+        Main("quests", { text = string.format(L("%s, terminée"), dLabel), color = C.ok, detail = L("Choisis ton prochain guide."),
+            label = L("Choisir un guide"), tip = { L("Choisir un guide"), L("Clic : choisir parmi tous les guides") },
+            fn = Away(OpenGuide) })
+    else
+        Main("quests", { text = L("Aucun guide choisi"), detail = L("Donjons, raids et quêtes de classe, depuis là où tu es."),
+            label = L("Choisir un guide"), tip = { L("Choisir un guide"), L("Clic : choisir parmi tous les guides") },
+            fn = Away(OpenGuide) })
+    end
+
+    -- PvP: the battleground of the day, and where you stand in the guild's weekly ranking
+    if WP.BG and WP.BG.Toggle then
+        local okB, bgLine = pcall(WP.BG.HomeLine or function() return nil end)
+        local rank
+        if IsInGuild and IsInGuild() and WP.GuildRanking then
+            local pos
+            local okR, list = pcall(WP.GuildRanking, true)
+            for i, e in ipairs(okR and type(list) == "table" and list or {}) do if e.name == UnitName("player") then pos = i end end
+            rank = pos and (pos == 1 and L("Tu es 1er au classement PvP de la semaine") or string.format(L("Tu es %de au classement PvP de la semaine"), pos))
+                or L("Pas encore classé en PvP cette semaine")
+        end
+        Main("pvp", { text = okB and bgLine or nil, detail = rank, label = L("Ouvrir les champs de bataille"),
+            tip = { L("Champs de bataille"), L("Clic : ouvrir les champs de bataille") },
+            fn = Away(function() WP.BG.Toggle(nil, true) end) })
+    end
+
+    -- Argent et métiers: what waits first (Writs to turn in, orders, bags), else the reputation
+    local repLine
+    if need then
+        repLine = need > 0 and (need == 1 and string.format(L("Encore 1 point avant %s"), WP.Reaction(goal))
+            or string.format(L("Encore %s points avant %s"), Thousands(need), WP.Reaction(goal)))
+            or string.format(L("%s atteint"), WP.Reaction(goal))
+    end
+    if On("writs") and ready > 0 and nowKey ~= "writs" then
+        Main("items", { text = N(ready, "1 Writ prêt à rendre", "%d Writs prêts à rendre"), color = C.ok, detail = repLine,
+            label = L("Y aller"), tip = { L("Writs"), L("Clic : ouvrir les Writs") }, fn = function()
+                Close()
+                if WLWritsCharDB and WLWritsCharDB.gps then WP.GoNext() else WP.ToggleGPS() end
+            end })
+    elseif On("orders") and open > 0 and WP.ToggleOrders then
+        Main("items", { text = N(open, "1 commande à accepter", "%d commandes à accepter"), color = C.warn, detail = repLine,
+            label = L("Voir les commandes"), fn = Away(WP.ToggleOrders) })
+    elseif nBag > 0 and WP.Cleaner then
+        Main("items", { text = N(nBag, "1 objet de quête à jeter", "%d objets de quête à jeter"), color = C.warn, detail = repLine,
+            label = L("Nettoyer les sacs"), fn = Away(function() WP.Cleaner.Toggle() end) })
+    elseif On("writs") and WP.Open then
+        Main("items", { text = repLine or L("Faction pas encore vue"), color = repLine and C.fg or C.muted,
+            detail = repLine and (bag > 0 and N(bag, "1 enveloppe à ouvrir", "%d enveloppes à ouvrir") or L("Rien à rendre pour l'instant"))
+                or L("Parle à un PNJ de cette faction pour qu'elle apparaisse."),
+            label = L("Ouvrir les Writs"), fn = Away(function() WP.Open("writs") end) })
+    else
+        Main("items", { text = L("Rien à faire pour l'instant."), color = C.muted })
+    end
+
+    -- Guilde et groupes: the next event (the strip names one about to start), who is on
+    local inGuild = IsInGuild and IsInGuild() and WP.GuildRoster and true or false
+    local onlineLine
+    if inGuild then
+        local _, online = WP.GuildRoster(true)
+        onlineLine = N(online or 0, "1 membre en ligne", "%d membres en ligne")
+    end
+    local lfgLine = lfg > 0 and N(lfg, "1 joueur cherche un groupe", "%d joueurs cherchent un groupe") or nil
+    if On("events") and nextE and nowKey ~= "event" and WP.ToggleEvents then
+        Main("guild", { text = tostring(nextE.title) .. " · " .. WP.EventWhen(nextE.when), detail = lfgLine or onlineLine,
+            label = L("Voir l'événement"), fn = Away(WP.ToggleEvents) })
+    elseif inGuild and On("guild") and WP.ToggleGuild then
+        Main("guild", { text = onlineLine, detail = lfgLine or (nEvents > 0 and N(nEvents, "1 événement à venir", "%d événements à venir"))
+            or L("Aucun événement prévu"), label = L("Ouvrir la guilde"), fn = Away(WP.ToggleGuild) })
+    elseif On("events") and WP.ToggleEvents then
+        Main("guild", { text = inGuild and onlineLine or L("Tu n'es pas dans une guilde"), color = inGuild and C.fg or C.muted,
+            detail = lfgLine, label = L("Voir les groupes"), fn = Away(WP.ToggleEvents) })
+    else
+        Main("guild", { text = inGuild and onlineLine or L("Tu n'es pas dans une guilde"), color = C.muted })
+    end
+
+    -- Voyager: the GPS that runs, the city's errands, else Go to
+    local gpsOn = WP.GPS and WP.GPS.Active and WP.GPS.Active()
+    if gpsOn and nowKey ~= "gps" then
+        local dest = WP.GPS.DestName and WP.GPS.DestName()
+        Main("travel", { text = (type(dest) == "string" and dest ~= "") and string.format(L("Le GPS te guide vers %s."), dest) or L("Le GPS te guide."),
+            label = L("Arrêter le GPS"), fn = function() WP.StopGPS(); WP.RefreshHome() end })
+    elseif cityOpen > 0 and nowKey ~= "city" and CT and CT.Show then
+        Main("travel", { text = N(cityOpen, "1 chose à faire dans cette ville.", "%d choses à faire dans cette ville."),
+            label = L("Voir la tournée"), fn = Away(function() CT.Show() end) })
+    elseif WP.GoTo and WP.GoTo.Show then
+        Main("travel", { text = L("Un lieu, un PNJ, une ville : le GPS t'y mène"), label = L("Ouvrir « Aller à »"),
+            tip = { L("Aller à"), L("Clic : ouvrir « Aller à »") }, fn = function() OpenGoTo("") end })
+    else
+        Main("travel", { text = L("Ce qu'il y a à faire en arrivant dans une capitale"), color = C.muted })
+    end
+
+    -- Aide et retours: write to us; the reports received (the account that gets them) as a line
+    if WP.Feedback then
+        Main("feedback", { text = L("Un bug, une idée, une suggestion : sans compte"), color = C.muted, label = L("Nous écrire"),
+            tip = { L("Nous écrire"), L("Clic : écrire à l'équipe WL Helper") }, fn = Away(function() WP.Feedback("bug") end) })
+    else
+        Main("feedback", {})
+    end
+
     -- switched off: dimmed with "Éteint", a click turns it back on; every line keeps its place
     for _, e in ipairs(win.hubOrder or {}) do
         local r = cards[e.key]
         if r then
+            r.wantShown = true
             r:Show()
             if not WP.HubEntryOn(e) then
                 -- the city tour is not a module: its own words

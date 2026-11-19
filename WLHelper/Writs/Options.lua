@@ -48,6 +48,7 @@ ns.AddEnglish({
     ["Calcul, spé et affichage des améliorations."] = "How upgrades are judged, the spec and the display.",
     ["Version, crédits, contact et commandes du chat."] = "Version, credits, contact and chat commands.",
     ["Clic : afficher ces réglages"] = "Click: show these settings",
+    ["Le bonus du jour, les maîtres de guerre et ton set PvP."] = "Today's bonus, the battlemasters and your PvP set.",
     ["Ex. flèche"] = "E.g. arrow",
     ["Effacer la recherche"] = "Clear search",
     ["Aucun réglage pour « %s »"] = "No setting for \"%s\"",
@@ -786,12 +787,22 @@ local PAGES = {
     { key = "gps",      label = "GPS",           group = "travel", icon = { hd = root.ARROW },        desc = "Itinéraire, vols, téléportations et flèche." },
     { key = "comptoir", label = "Writs",         group = "items", icon = MI.writs or "Interface\\Icons\\INV_Letter_15", desc = "Remise des Writs, rappels, objectif et zones." },
     { key = "bags",     label = "Sacs",          group = "items", icon = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", desc = "Place dans les sacs et vente des objets gris." },
-    { key = "upgrades", label = "Améliorations", group = "items", icon = MI.upgrades or { hd = "arrow_up", color = T.ok }, desc = "Calcul, spé et affichage des améliorations." },
+    { key = "upgrades", label = "Améliorations", group = "quests", icon = MI.upgrades or { hd = "arrow_up", color = T.ok }, desc = "Calcul, spé et affichage des améliorations." },
     { key = "orders",   label = "Commandes",     group = "items", icon = MI.orders or "Interface\\Icons\\Trade_BlackSmithing", desc = "Les alertes des commandes : favoris, recettes surveillées, son." },
     { key = "guild",    label = "Guilde",        group = "guild", icon = MI.guild or "Interface\\Icons\\INV_BannerPVP_01", desc = "Ce que tu partages avec la guilde." },
     { key = "groups",   label = "Groupes",       group = "guild", icon = { hd = "group" },             desc = "Messages, chuchotements et notes de Trouver un groupe." },
     { key = "general",  label = "Général",       group = "settings", icon = { hd = "gear" },          desc = "Modules, clics, langue et fenêtres." },
     { key = "about",    label = "À propos",      group = "settings", icon = { hd = "info" },          desc = "Version, crédits, contact et commandes du chat." },
+}
+
+-- The windows of an activity that has no settings page, so the activity still shows in the nav
+-- (beta.173, report: "PvP is hard to see"): a click closes the Hub and opens the window.
+local NAV_LINKS = {
+    { key = "pvp", label = "Champs de bataille", group = "pvp", icon = { hd = "sword" },
+      desc = "Le bonus du jour, les maîtres de guerre et ton set PvP.",
+      hint = "Clic : ouvrir les champs de bataille",
+      available = function() return ns.WP.BG ~= nil and ns.WP.BG.Toggle ~= nil end,
+      open = function() if ns.WP.BG and ns.WP.BG.Toggle then ns.WP.BG.Toggle(nil, true) end end },
 }
 local PaintIcon = S.PaintIcon
 
@@ -2189,11 +2200,15 @@ local function BuildBody()
     local function Item(parent, def, y)
         local b = S.NavItem(parent, {
             key = def.key, label = L(def.label), icon = def.icon,
-            tip = { L(def.label), L(def.desc), def.key == "home" and L("Clic : ouvrir l'Accueil")
+            tip = { L(def.label), L(def.desc), def.hint and L(def.hint) or def.key == "home" and L("Clic : ouvrir l'Accueil")
                 or def.key == "welcome" and L("Clic : ouvrir la page Bienvenue") or L("Clic : afficher ces réglages") },
-            onClick = function(self) ns.WP.OpenHub(self.key) end,
+            -- a window link closes the Hub and opens its window; a page shows in the Hub
+            onClick = function(self)
+                if def.open then if win then win:Hide() end; def.open() else ns.WP.OpenHub(self.key) end
+            end,
             onHover = PaintNavLater,
         })
+        b.isLink = def.open ~= nil
         b:SetPoint("TOPLEFT", 8, y); b:SetPoint("TOPRIGHT", -8, y)
         body.tabs[#body.tabs + 1] = b
         return b
@@ -2207,6 +2222,15 @@ local function BuildBody()
         local g = def.group or "home"
         if not byGroup[g] then byGroup[g] = {}; order[#order + 1] = g end
         table.insert(byGroup[g], def)
+    end
+    -- the windows without a settings page, after the pages of their activity (NAV_LINKS)
+    for _, def in ipairs(NAV_LINKS) do
+        local okA, avail = pcall(def.available)
+        if okA and avail then
+            local g = def.group
+            if not byGroup[g] then byGroup[g] = {}; order[#order + 1] = g end
+            table.insert(byGroup[g], def)
+        end
     end
 
     -- bottom block: "Settings" and its pages, above the bottom row
@@ -2265,7 +2289,7 @@ local function BuildBody()
         end
     end
 
-    -- the pages, in the PAGES order (Home first). Home is built at once; a settings page only the
+    -- the pages, in the PAGES order (Home first). The nav links have no page. Home is built at once; a settings page only the
     -- first time it shows (the minimap click opens Home, and should not pay for every settings row),
     -- or all of them the first time the search box is used (its index needs every row).
     for _, def in ipairs(PAGES) do

@@ -2,6 +2,16 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.173", date = "2026-11-19", items = {
+    { s = "chg", fr = { "Nouvel Accueil, une grande carte par activité", "Finie la grille de petites icônes. L'Accueil montre 6 cartes, rangées selon ce que tu veux faire :" }, en = { "", "" } },
+    { s = "chg", fr = { "Progresser", "Guide de quêtes, Meilleur équipement, Améliorations, Passeport des clés, Tri du journal ;" }, en = { "", "" } },
+    { s = "chg", fr = { "PvP", "Les champs de bataille ;" }, en = { "", "" } },
+    { s = "chg", fr = { "Argent et métiers", "Writs, Faveur, Commandes, Sacs ;" }, en = { "", "" } },
+    { s = "chg", fr = { "Guilde et groupes", "Guilde, Groupes, Quêtes en commun ;" }, en = { "", "" } },
+    { s = "chg", fr = { "Voyager", "Aller à, Tournée en ville ;" }, en = { "", "" } },
+    { s = "chg", fr = { "Aide et retours", "Nous écrire, Rapports des joueurs. Chaque carte dit en une phrase où tu en es (« Guide BRD, étape 3 sur 133 », « 2 Writs prêts à rendre ») et a un bouton pour continuer. Les fenêtres du groupe sont listées dessous. Le clic droit ouvre toujours les réglages." }, en = { "New Home", "One large card per activity (Progress, PvP, Gold & crafting, Guild & groups, Travel, Help & feedback), each with where you stand and a button to carry on." } },
+    { s = "chg", fr = { "Menu de gauche, même organisation", "Les réglages sont rangés dans les mêmes groupes que l'Accueil. Le PvP y a sa propre ligne, qui ouvre la fenêtre Champs de bataille." }, en = { "The left menu uses the same groups, and PvP has its own line.", "" } },
+  } },
   { v = "1.0.0-beta.172", date = "2026-11-19", items = {
     { s = "add", fr = { "Noms des PNJ en français", "639 noms de PNJ et de monstres du guide s'affichent avec leur vrai nom français, celui du jeu (« Chef de guerre Goretooth » au lieu de « Warlord Goretooth »). Sur un client français, le bouton et la touche « Cibler » utilisent aussi le nom français : /targetexact ne trouvait pas les PNJ avec le nom anglais." }, en = { "French NPC names in the guide, and French names for targeting on a French client.", "" } },
     { s = "add", fr = { "Vue moderne, bouton Cibler", "La barre d'actions (cibler le PNJ ou le monstre, utiliser l'objet de quête) s'affiche aussi au-dessus de la vue moderne quand la grande fenêtre est fermée." }, en = { "Modern view", "The target and quest item bar now shows above it too." } },
@@ -88,8 +98,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.159", date = "2026-11-18", items = {
     { s = "chg", fr = { "Vue moderne, le nom de la quête en titre", "Sur une étape à objectif (« Ramasser : Magenta Fungus Cap 1/12 »), le grand titre répétait la barre d'objectif et le nom de la quête restait noyé dans une ligne grise. Le titre est maintenant le nom de la quête, en doré. La barre dit quoi faire et combien, et la ligne grise ne répète plus le nom de la quête." }, en = { "Modern view", "On an objective step the title is the quest's name; the bar says what to do and how many." } },
-  } },
-  { v = "1.0.0-beta.158", date = "2026-11-18", items = {
-    { s = "chg", fr = { "Trouver un groupe, plus clair", "Sur une fenêtre assez large, les filtres ne sont plus cachés dans une fenêtre qui s'ouvre par-dessus. Ils restent visibles dans une colonne à droite de la liste, comme dans LFG Forever, avec des titres de section en couleur (classes, niveau, langues, style de jeu, places libres). L'icône filtre masque ou réaffiche cette colonne. Sur une fenêtre étroite, rien ne change." }, en = { "Find a group", "On a wide window the filters stay visible in a column right of the list; the filter icon hides or shows it." } },
   } },
 }

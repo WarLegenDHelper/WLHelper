@@ -11,21 +11,25 @@ local ns = root.Writs
 local WP = ns.WP
 
 ns.AddEnglish({
-    ["Quêtes et donjons"] = "Quests & dungeons",
-    ["Déplacements"] = "Getting around",
-    ["Objets et métiers"] = "Items & crafting",
+    ["Progresser"] = "Progress",
+    ["PvP"] = "PvP",
+    ["Argent et métiers"] = "Gold & crafting",
     ["Guilde et groupes"] = "Guild & groups",
+    ["Voyager"] = "Travel",
+    ["Aide et retours"] = "Help & feedback",
 })
 
--- The activities, in the order of the nav, Home and the minimap menu. Labels are French keys.
+-- The activities, in the order of the nav, Home and the minimap menu, grouped by what a player
+-- wants to do (report: "the menu is badly organised, PvP is hard to see, too many small logos").
+-- Labels are French keys. The keys stay those of the Welcome page and its mini tours.
 WP.HUB_GROUPS = {
-    { key = "quests", label = "Quêtes et donjons" },
-    { key = "travel", label = "Déplacements" },
-    { key = "items", label = "Objets et métiers" },
+    { key = "quests", label = "Progresser" },
+    { key = "pvp", label = "PvP" },
+    { key = "items", label = "Argent et métiers" },
     { key = "guild", label = "Guilde et groupes" },
-    -- a bug, an idea, a suggestion, sent from here (report: "I see nothing here for the players' bug
-    -- reports"); the reports received, on the account that gets them
-    { key = "feedback", label = "Retours" },
+    { key = "travel", label = "Voyager" },
+    -- a bug, an idea, a suggestion, sent from here; the reports received, on the account that gets them
+    { key = "feedback", label = "Aide et retours" },
 }
 
 -- "Guide de quêtes" opens the choice of every guide (report: "it does not take me to all the
@@ -57,23 +61,21 @@ WP.HUB = {
     { key = "dungeons", group = "quests", label = "Guide de quêtes", icon = "dungeons", module = "dungeons",
       available = function() return root.ShowGuide ~= nil or root.ShowPicker ~= nil end,
       open = OpenGuide, settings = "dungeons" },
+    { key = "best", group = "quests", label = "Meilleur équipement", icon = { hd = "star" },
+      available = function() return Has("Best", "Toggle") end,
+      open = function() if WP.Best then WP.Best.Toggle() end end, settings = "upgrades" },
+    { key = "upgrades", group = "quests", label = "Améliorations", icon = "upgrades", module = "upgrades",
+      available = function() return true end,
+      open = function() if WP.OpenHub then WP.OpenHub("upgrades") end end, settings = "upgrades", inHub = true },
     { key = "keys", group = "quests", label = "Passeport des clés", icon = "keys", module = "keys",
       available = function() return Has("Keys") and Has("ToggleKeys") end,
       open = function() if WP.ToggleKeys then WP.ToggleKeys() end end, settings = "guild", anchor = "Partage" },
-    { key = "shared", group = "quests", label = "Quêtes en commun", icon = "shared", module = "guild",
-      available = function() return Has("Shared", "Show") end,
-      open = function() if WP.Shared then WP.Shared.Show() end end, settings = "guild", anchor = "Partage" },
     { key = "triage", group = "quests", label = "Tri du journal", icon = "triage", module = "triage",
       available = function() return Has("Triage", "Show") end,
       open = function() if WP.Triage then WP.Triage.Show() end end, settings = "dungeons", anchor = "Journal de quêtes" },
-    { key = "goto", group = "travel", label = "Aller à", icon = { hd = root.ARROW },
-      available = function() return Has("GoTo", "Show") end,
-      open = function() if WP.GoTo then WP.GoTo.Show("") end end, settings = "gps" },
-    { key = "city", group = "travel", label = "Tournée en ville", icon = "city",
-      isOn = function() local CT = WP.CityTour; return not (CT and CT.IsOn) or CT.IsOn() and true or false end,
-      turnOn = function() local CT = WP.CityTour; if CT and CT.SetOn then CT.SetOn(true) end end,
-      available = function() return Has("CityTour", "Show") end,
-      open = function() if WP.CityTour then WP.CityTour.Show() end end, settings = "gps", anchor = "En ville" },
+    { key = "pvp", group = "pvp", label = "Champs de bataille", icon = { hd = "sword" },
+      available = function() return Has("BG", "Toggle") end,
+      open = function() if WP.BG then WP.BG.Toggle(nil, true) end end },
     { key = "writs", group = "items", label = "Writs", icon = "writs", module = "writs",
       available = function() return Has("Open") end,
       open = function() WP.Open("writs") end, settings = "comptoir" },
@@ -86,21 +88,23 @@ WP.HUB = {
     { key = "bags", group = "items", label = "Sacs", icon = "bags", module = "bags",
       available = function() return Has("Cleaner") end,
       open = function() if WP.Cleaner then WP.Cleaner.Toggle() end end, settings = "bags" },
-    { key = "best", group = "items", label = "Meilleur équipement", icon = { hd = "star" },
-      available = function() return Has("Best", "Toggle") end,
-      open = function() if WP.Best then WP.Best.Toggle() end end, settings = "upgrades" },
-    { key = "upgrades", group = "items", label = "Améliorations", icon = "upgrades", module = "upgrades",
-      available = function() return true end,
-      open = function() if WP.OpenHub then WP.OpenHub("upgrades") end end, settings = "upgrades", inHub = true },
-    { key = "pvp", group = "guild", label = "Champs de bataille", icon = { hd = "sword" },
-      available = function() return Has("BG", "Toggle") end,
-      open = function() if WP.BG then WP.BG.Toggle(nil, true) end end },
     { key = "guild", group = "guild", label = "Guilde", icon = "guild", module = "guild",
       available = function() return Has("ToggleGuild") end,
       open = function() if WP.ToggleGuild then WP.ToggleGuild() end end, settings = "guild" },
     { key = "events", group = "guild", label = "Groupes", icon = "events", module = "events",
       available = function() return Has("ToggleEvents") end,
       open = function() if WP.ToggleEvents then WP.ToggleEvents() end end, settings = "groups" },
+    { key = "shared", group = "guild", label = "Quêtes en commun", icon = "shared", module = "guild",
+      available = function() return Has("Shared", "Show") end,
+      open = function() if WP.Shared then WP.Shared.Show() end end, settings = "guild", anchor = "Partage" },
+    { key = "goto", group = "travel", label = "Aller à", icon = { hd = root.ARROW },
+      available = function() return Has("GoTo", "Show") end,
+      open = function() if WP.GoTo then WP.GoTo.Show("") end end, settings = "gps" },
+    { key = "city", group = "travel", label = "Tournée en ville", icon = "city",
+      isOn = function() local CT = WP.CityTour; return not (CT and CT.IsOn) or CT.IsOn() and true or false end,
+      turnOn = function() local CT = WP.CityTour; if CT and CT.SetOn then CT.SetOn(true) end end,
+      available = function() return Has("CityTour", "Show") end,
+      open = function() if WP.CityTour then WP.CityTour.Show() end end, settings = "gps", anchor = "En ville" },
     { key = "feedback", group = "feedback", label = "Nous écrire", icon = { hd = "mail" },
       available = function() return Has("Feedback") end,
       open = function() if WP.Feedback then WP.Feedback("bug") end end, settings = "about" },
@@ -148,10 +152,10 @@ end
 -- The functions read WP.* when they run: nothing here needs the other files loaded.
 WP.WELCOME_GROUPS = {
     { key = "start", label = "Pour commencer" },
-    { key = "quests", label = "Quêtes et donjons" },
-    { key = "travel", label = "Déplacements" },
-    { key = "items", label = "Objets et métiers" },
+    { key = "quests", label = "Progresser" },
+    { key = "items", label = "Argent et métiers" },
     { key = "guild", label = "Guilde et groupes" },
+    { key = "travel", label = "Voyager" },
 }
 
 local function On(key) return not WP.ModuleOn or WP.ModuleOn(key) end

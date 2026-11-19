@@ -6,6 +6,22 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.173] — 2026-11-19
+
+### Modifié / Changed
+- **Nouvel Accueil, une grande carte par activité** : finie la grille de petites icônes. L'Accueil montre 6 cartes, rangées selon ce que tu veux faire :
+  - **Progresser** : guide de quêtes, Meilleur équipement, Améliorations, Passeport des clés, Tri du journal ;
+  - **PvP** : les champs de bataille ;
+  - **Argent et métiers** : Writs, Faveur, Commandes, Sacs ;
+  - **Guilde et groupes** : Guilde, Groupes, Quêtes en commun ;
+  - **Voyager** : Aller à, Tournée en ville ;
+  - **Aide et retours** : Nous écrire, Rapports des joueurs.
+
+  Chaque carte dit en une phrase où tu en es (« Guide BRD, étape 3 sur 133 », « 2 Writs prêts à rendre ») et a un bouton pour continuer. Les fenêtres du groupe sont listées dessous. Le clic droit ouvre toujours les réglages.
+  *New Home: one large card per activity (Progress, PvP, Gold & crafting, Guild & groups, Travel, Help & feedback), each with where you stand and a button to carry on.*
+- **Menu de gauche, même organisation** : les réglages sont rangés dans les mêmes groupes que l'Accueil. Le PvP y a sa propre ligne, qui ouvre la fenêtre Champs de bataille.
+  *The left menu uses the same groups, and PvP has its own line.*
+
 ## [1.0.0-beta.172] — 2026-11-19
 
 ### Ajouté / Added
