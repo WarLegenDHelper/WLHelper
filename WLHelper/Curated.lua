@@ -31,6 +31,9 @@ end
 local zf = ns.D.ZulFarrak
 if zf then table.insert(zf.q, MALLET) end
 
+-- The Spectral Chalice needs Mining 230 (Smelt Dark Iron): a miner below it is not offered the quest
+if ns.Q[4083] then ns.Q[4083].profLv = 230 end
+
 -- Scarlet Diversions: the objective had no spot, so the route went straight to the turn-in. The
 -- Scarlet camp is between Felstone Field and Dalson's Tears (Wowhead, quest text); the Flame in a
 -- Bottle comes from the box of incendiaries beside Derrington.

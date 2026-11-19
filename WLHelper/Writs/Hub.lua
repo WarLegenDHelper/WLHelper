@@ -28,8 +28,10 @@ WP.HUB_GROUPS = {
     { key = "feedback", label = "Retours" },
 }
 
+-- "Guide de quêtes" opens the choice of every guide (report: "it does not take me to all the
+-- guides"); the guide you follow is there with its outline, and its own window stays on screen
 local function OpenGuide()
-    if root.GuideStatus and root.GuideStatus() then root.ShowGuide() elseif root.ShowPicker then root.ShowPicker() end
+    if root.ShowPicker then root.ShowPicker() elseif root.ShowGuide then root.ShowGuide() end
 end
 local function Has(...)
     local t = WP

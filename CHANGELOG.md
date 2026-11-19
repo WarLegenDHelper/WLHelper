@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.170] — 2026-11-19
+
+### Corrigé / Fixed
+- **Guide de quêtes, depuis l'accueil et le hub** : un clic ouvre maintenant le choix de tous les guides, même quand un guide est en cours. Avant, il rouvrait seulement le guide en cours.
+  *Quest guide (Home and Hub): a click opens the choice of every guide.*
+- **Quêtes de métier, niveau requis** : le guide vérifie maintenant le niveau du métier, plus seulement le métier. Le Calice spectral (BRD) demande Minage 230 : il n'est plus proposé à un mineur en dessous.
+  *Profession quests: the skill level is checked too (The Spectral Chalice needs Mining 230).*
+- **Set PvP** (déjà dans la beta.169, oublié dans ses notes) : les pièces affichent leur nom au lieu d'un numéro, et le tableau a une colonne Endurance. L'ancienne colonne « Gain » s'appelle maintenant « DPS PvE », et son infobulle explique pourquoi une pièce PvP y perd.
+  *PvP set: piece names instead of numbers, a Stamina column, the PvE DPS column named as such.*
+
 ## [1.0.0-beta.169] — 2026-11-19
 
 ### Modifié / Changed

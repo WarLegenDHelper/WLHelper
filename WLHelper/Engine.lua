@@ -211,7 +211,11 @@ local PROF = { MINING = { "Mining", "Minage" }, BLACKSMITHING = { "Blacksmithing
 -- skill line ids (7th return of GetProfessionInfo)
 local PROF_LINE = { MINING = 186, BLACKSMITHING = 164, ENGINEERING = 202, LEATHERWORKING = 165, TAILORING = 197,
   ALCHEMY = 171, ENCHANTING = 333, HERBALISM = 182, SKINNING = 393 }
-function ns.HasProf(code)
+-- HasProf(code [, minLevel]): the character has that profession (at minLevel or more when given);
+-- second value: the skill read, nil when the client does not say it (then the level is not checked)
+local function Skill(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) and v or nil end
+local function LevelOK(rank, minLevel) return not minLevel or rank == nil or rank >= minLevel end
+function ns.HasProf(code, minLevel)
   -- Forever (modern engine): no skill list, professions come from GetProfessions
   if GetProfessions and GetProfessionInfo then
     local list = { pcall(GetProfessions) }
@@ -221,8 +225,11 @@ function ns.HasProf(code)
       for i = 2, 7 do
         local idx = list[i]
         if idx then
-          local ok, nm, _, _, _, _, line = pcall(GetProfessionInfo, idx)
-          if ok and (line == want or (nm and names and (nm == names[1] or nm == names[2]))) then return true end
+          local ok, nm, _, rank, _, _, _, line = pcall(GetProfessionInfo, idx)
+          if ok and (line == want or (nm and names and (nm == names[1] or nm == names[2]))) then
+            rank = Skill(rank)
+            return LevelOK(rank, minLevel), rank
+          end
         end
       end
       return false
@@ -232,8 +239,12 @@ function ns.HasProf(code)
   local names = PROF[code]
   if not names then return true end
   for i = 1, GetNumSkillLines() do
-    local nm, isHeader = GetSkillLineInfo(i)
-    if nm and not isHeader then for _, n in ipairs(names) do if nm == n then return true end end end
+    local nm, isHeader, _, rank = GetSkillLineInfo(i)
+    if nm and not isHeader then
+      for _, n in ipairs(names) do
+        if nm == n then rank = Skill(rank); return LevelOK(rank, minLevel), rank end
+      end
+    end
   end
   return false
 end
@@ -242,7 +253,7 @@ end
 function ns.Useful(q)
   if WLDTDB and WLDTDB.useful == false then return true end
   if q.rep then return false end
-  if q.prof and not ns.HasProf(q.prof) then return false end
+  if q.prof and not ns.HasProf(q.prof, q.profLv) then return false end
   return true
 end
 

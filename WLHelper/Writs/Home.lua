@@ -70,6 +70,7 @@ ns.AddEnglish({
     ["Donjons, raids et quêtes de classe, depuis là où tu es."] = "Dungeons, raids and class quests, from where you are.",
     ["Terminée"] = "Finished",
     ["Clic : ouvrir le guide"] = "Click: open the guide",
+    ["Clic : tous les guides"] = "Click: every guide",
     ["Clic : choisir un guide"] = "Click: pick a guide",
     ["Writs"] = "Writs",
     ["Encore 1 point avant %s"] = "1 more point to %s",
@@ -168,6 +169,7 @@ ns.AddEnglish({
     ["Aucun trajet GPS en cours."] = "No GPS route running.",
     ["Nous écrire"] = "Write to us",
     ["Clic : ouvrir le guide de quêtes"] = "Click: open the quest guide",
+    ["Clic : choisir parmi tous les guides"] = "Click: pick among every guide",
     ["Clic : arrêter le GPS"] = "Click: stop the GPS",
     -- T-80: my crafter status in the minimap menu
     ["Artisan : %s"] = "Crafter: %s",
@@ -260,7 +262,7 @@ local function OrdersOpen()
 end
 
 local function OpenGuide()
-    if DungeonState() then root.ShowGuide() else root.ShowPicker() end
+    if root.ShowPicker then root.ShowPicker() else root.ShowGuide() end
 end
 
 -- ---------------------------------------------------------------- the page
@@ -351,7 +353,7 @@ end
 
 -- What a click on each line does (the row's tooltip, the minimap menu).
 local CLICK_HINT = {
-    dungeons = "Clic : ouvrir le guide de quêtes", keys = "Clic : ouvrir le passeport des clés",
+    dungeons = "Clic : choisir parmi tous les guides", keys = "Clic : ouvrir le passeport des clés",
     shared = "Clic : voir les quêtes en commun", triage = "Clic : voir les quêtes à abandonner",
     ["goto"] = "Clic : ouvrir « Aller à »", city = "Clic : ouvrir la tournée en ville",
     writs = "Clic : ouvrir les Writs", favor = "Clic : voir les caisses", orders = "Clic : ouvrir les commandes",
@@ -966,7 +968,7 @@ local function Refresh()
     if dLabel and not dFinished then
         Put("dungeons", "Show2", { title = L("Guide de quêtes"), line1 = dLabel,
             line2 = (nextStep and nextStep ~= "") and string.format(L("Prochaine étape : %s"), nextStep) or nil,
-            pill = string.format(L("Étape %d sur %d"), cur or 1, total or 1), hint = L("Clic : ouvrir le guide") })
+            pill = string.format(L("Étape %d sur %d"), cur or 1, total or 1), hint = L("Clic : tous les guides") })
     elseif dLabel then
         Put("dungeons", "Show2", { title = L("Guide de quêtes"), line1 = dLabel, line2 = L("Choisis ton prochain guide."),
             pill = L("Terminée"), lineColor = C.ok, hint = L("Clic : choisir un guide") })
