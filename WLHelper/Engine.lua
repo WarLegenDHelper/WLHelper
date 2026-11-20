@@ -2316,7 +2316,7 @@ function ns.BossStepLoot(st)
         if ok and type(r) == "table" and r.up then up, text = true, r.text end
       end
       if up or bis then
-        out[#out + 1] = { id = it.id, name = name or ("#" .. tostring(it.id)), link = link, icon = icon, up = up, text = text, bis = bis }
+        out[#out + 1] = { id = it.id, name = name or ("#" .. tostring(it.id)), link = link, icon = icon, up = up, text = text, bis = bis, chance = it.chance }
       end
     end
   end

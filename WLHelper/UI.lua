@@ -338,6 +338,8 @@ function ns.BossLootText(st)
     local name = it.link or it.name or "?"
     local bis = ns.BisBadgeText(it.link or it.id, 12)
     if bis then name = name .. "  " .. bis end
+    -- how often it drops (Naowh's Dungeon Journal)
+    if it.chance then name = name .. Hex(T.muted) .. "  " .. string.format(L.LOOT_CHANCE, it.chance) .. "|r" end
     if it.up then
       lines[#lines + 1] = ic .. name .. "  " .. ARROW_UP .. Hex(T.ok) .. (it.text or "") .. "|r"
     elseif it.quest then

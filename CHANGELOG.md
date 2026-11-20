@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.179] — 2026-11-20
+
+### Ajouté / Added
+- **Le butin de chaque boss, dans tous les donjons** : à chaque étape de boss, le bloc « Butin » du guide montre ce qui t'intéresse sur ce boss : ton BiS (badge BiS ou 2e choix de Naowh), tes améliorations (avec le gain), les objets de quête. Le taux de drop est affiché à côté (« 30 % de chance »). Avant, ce bloc n'avait des données que pour les Mortemines. Le butin et les taux viennent du Dungeon Journal de Naowh, lu en direct quand il est installé : rien n'est copié.
+  *Every dungeon boss's loot that matters to you (BiS, upgrades) with its drop chance, in the guide's boss steps, read live from Naowh's Dungeon Journal.*
+- **Alerte quand ça tombe** : quand un objet est jeté aux dés ou que tu ouvres un butin, un objet BiS (ou 2e choix) pour ta spé, ou une amélioration, déclenche une alerte en haut de l'écran, une ligne dans la discussion et un son (« Ton BiS est tombé ! [Spritecaster Cape] »).
+  *A toast, a chat line and a sound when a BiS or an upgrade drops.*
+
 ## [1.0.0-beta.178] — 2026-11-20
 
 ### Modifié / Changed

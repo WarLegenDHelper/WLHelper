@@ -655,10 +655,41 @@ ns.BossQuestNeeds = QuestNeeds
 -- What a boss drops that matters to you: our own list (ns.BOSS_LOOT, gear) and the quest items it
 -- drops for a quest of your log that still needs them.
 -- -> { { id, name, quest = true|nil, qid } } (nil names: ask the game)
+-- Naowh's Dungeon Journal (NaowhForever_DungeonJournal, read live, nothing copied): every boss's
+-- loot with its drop chance, by our dungeon key and the boss's English name (or its NPC id).
+-- -> { { id, chance } } or nil
+function ns.JournalLoot(dkey, en, npcIds)
+  local n = rawget(_G, "NaowhForever")
+  local J = type(n) == "table" and n.Journal
+  if not (type(J) == "table" and type(J.Get) == "function") then return nil end
+  local ok, d = pcall(J.Get, dkey)
+  if not (ok and type(d) == "table" and type(d.wings) == "table") then return nil end
+  local want = {}
+  for _, id in ipairs(npcIds or {}) do want[id] = true end
+  for _, wing in ipairs(d.wings) do
+    for _, b in ipairs(type(wing.bosses) == "table" and wing.bosses or {}) do
+      if (en and (b.english == en or b.name == en)) or (b.npc and want[b.npc]) then
+        local out = {}
+        for i, id in ipairs(type(b.loot) == "table" and b.loot or {}) do
+          local c = type(b.chance) == "table" and tonumber(b.chance[i]) or nil
+          out[#out + 1] = { id = id, chance = (c and c > 0) and c or nil }
+        end
+        return out
+      end
+    end
+  end
+  return nil
+end
 function ns.BossLoot(dkey, en, npcIds)
   local out, seen = {}, {}
   local mine = ns.BOSS_LOOT and ns.BOSS_LOOT[dkey] and ns.BOSS_LOOT[dkey][en]
   for _, id in ipairs(mine or {}) do if not seen[id] then seen[id] = true; out[#out + 1] = { id = id } end end
+  -- every dungeon's boss loot, with its drop chance (report: "in BRD I don't even know my BiS, on which
+  -- boss, the drop rate")
+  local okJ, jl = pcall(ns.JournalLoot, dkey, en, npcIds or ns.BossNpcIds(dkey, en))
+  for _, x in ipairs(okJ and jl or {}) do
+    if not seen[x.id] then seen[x.id] = true; out[#out + 1] = { id = x.id, chance = x.chance } end
+  end
   local ids = npcIds or ns.BossNpcIds(dkey, en)
   if ids then
     local need = QuestNeeds()
@@ -3312,3 +3343,57 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
 end)
 ns.BossEvents = ev
 Baseline()
+
+-- ---------------------------------------------------------------- a BiS or an upgrade drops
+-- (report: "when it drops I don't even know if it was a BiS or a top 3 item"): on a loot roll or a
+-- loot window, each item Naowh ranks 1 or 2 for your spec, or that WL Helper Gear finds better than
+-- what you wear, gets a toast and a chat line. Once per item per minute. (A function of its own: the
+-- file's main chunk is at Lua's 200 locals.)
+;(function()
+  local said = {}
+  local function Plain(v) return v ~= nil and not (issecretvalue and issecretvalue(v)) and v or nil end
+  local function Judge(link)
+    link = Plain(link)
+    if type(link) ~= "string" then return nil end
+    local rank
+    if ns.BisBadge then local ok, r = pcall(ns.BisBadge, link); if ok and (r == 1 or r == 2) then rank = r end end
+    local up, text
+    local WP = ns.Writs and ns.Writs.WP
+    if WP and WP.UpgradeCheck then
+      local ok, u = pcall(WP.UpgradeCheck, link)
+      if ok and type(u) == "table" and u.up then up, text = true, u.text end
+    end
+    if not (rank or up) then return nil end
+    return rank, up, text
+  end
+  local function Tell(link)
+    local rank, up, text = Judge(link)
+    if not (rank or up) then return end
+    local id = tonumber(link:match("item:(%d+)")) or link
+    local now = GetTime and GetTime() or 0
+    if said[id] and now - said[id] < 60 then return end
+    said[id] = now
+    local head = rank == 1 and L.LOOT_DROP_BIS or rank == 2 and L.LOOT_DROP_ALT or L.LOOT_DROP_UP
+    local sub = link .. ((up and text) and ("  " .. ns.Hex(T.ok) .. text .. "|r") or "")
+    local S = ns.Writs and ns.Writs.S
+    if S and S.Toast then pcall(S.Toast, head, sub, rank and "success" or "info") end
+    ns.Print(head .. " " .. sub)
+    if PlaySound then pcall(PlaySound, SOUNDKIT and SOUNDKIT.RAID_WARNING or 8959) end
+  end
+  ns.LootJudge = Judge
+  local lf = CreateFrame("Frame")
+  for _, e in ipairs({ "START_LOOT_ROLL", "LOOT_OPENED" }) do pcall(lf.RegisterEvent, lf, e) end
+  lf:SetScript("OnEvent", function(_, e, a1)
+    if WLDTDB and WLDTDB.lootAlert == false then return end
+    if e == "START_LOOT_ROLL" then
+      local ok, link = pcall(GetLootRollItemLink, a1)
+      if ok then pcall(Tell, link) end
+    elseif e == "LOOT_OPENED" and GetNumLootItems and GetLootSlotLink then
+      local okN, n = pcall(GetNumLootItems)
+      for i = 1, (okN and tonumber(Plain(n)) or 0) do
+        local ok, link = pcall(GetLootSlotLink, i)
+        if ok then pcall(Tell, link) end
+      end
+    end
+  end)
+end)()
