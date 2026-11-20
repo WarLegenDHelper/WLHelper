@@ -307,6 +307,12 @@ function TR.OpenGuide(i)
   if i and ns.GoTo and ns.frame and ns.frame:IsShown() then ns.GoTo(i) end
 end
 
+-- the checklist before entering, in the guide window
+function TR.OpenReady()
+  if ns.ShowWindow then ns.ShowWindow() elseif ns.ShowGuide then ns.ShowGuide() end
+  if ns.GoReady then ns.GoReady() end
+end
+
 -- Shift-click: the step counts as done by hand (the guide's own manual mark).
 function TR.MarkDone(i)
   local st = ns.route and ns.route.steps and ns.route.steps[i]
@@ -357,6 +363,9 @@ local function Links(m)
   local out = {
     { (m and m.finished) and L.TR_M_PICK or L.TR_L_PICK, function() if ns.ShowPicker then ns.ShowPicker() end end },
   }
+  -- the checklist before entering (report: "people no longer find the checklist"): the guide window
+  -- opens on it, the modern view stays as it is
+  if dk and ns.GoReady then out[#out + 1] = { L.TR_L_READY, function() TR.OpenReady() end } end
   if dk and ns.ShowOverview then out[#out + 1] = { L.TR_L_OVERVIEW, function() ns.ShowOverview(dk) end } end
   if dk and ns.ToggleBosses then out[#out + 1] = { L.TR_L_BOSSES, function() ns.ToggleBosses(dk) end } end
   if dk and ns.OpenDungeonMap then out[#out + 1] = { L.TR_L_MAP, function() ns.OpenDungeonMap(dk) end } end
@@ -368,10 +377,11 @@ local function LinkBtn(k)
   if not b then
     b = CreateFrame("Button", nil, f)
     b:SetHeight(18)
-    b.text = ns.Text(b, F.meta, T.accentSoft)
+    -- quiet links (report: "everything is red at the bottom"): grey text, white on hover
+    b.text = ns.Text(b, F.meta, T.text)
     b.text:SetPoint("LEFT", 0, 0); b.text:SetWordWrap(false)
     b:SetScript("OnEnter", function(self) self.text:SetTextColor(T.fg[1], T.fg[2], T.fg[3]) end)
-    b:SetScript("OnLeave", function(self) local c = T.accentSoft; self.text:SetTextColor(c[1], c[2], c[3]) end)
+    b:SetScript("OnLeave", function(self) local c = T.text; self.text:SetTextColor(c[1], c[2], c[3]) end)
     b:SetScript("OnClick", function(self) if self.fn then pcall(self.fn) end; TR.Refresh() end)
     f.links[k] = b
   end
@@ -633,8 +643,10 @@ local function Build()
   -- the steps list: a toggle line, then up to 12 rows (made as needed)
   f.stepsToggle = CreateFrame("Button", nil, f)
   f.stepsToggle:SetHeight(20)
+  f.stepsToggle.icon = f.stepsToggle:CreateTexture(nil, "ARTWORK"); f.stepsToggle.icon:SetSize(12, 12)
+  f.stepsToggle.icon:SetPoint("LEFT", 0, 0)
   f.stepsToggle.text = ns.Text(f.stepsToggle, F.meta, T.muted)
-  f.stepsToggle.text:SetPoint("LEFT", 0, 0)
+  f.stepsToggle.text:SetPoint("LEFT", 16, 0)
   f.stepsToggle:SetScript("OnClick", function() WLDTDB.trackerSteps = not WLDTDB.trackerSteps or nil; TR.Refresh() end)
   f.stepRows = {}
   -- the guide's progress, at the bottom (Polestar's bar and percent)
@@ -887,6 +899,7 @@ local function Draw(m)
   y = y + 6
   local open = WLDTDB.trackerSteps and m.stepList
   f.stepsToggle.text:SetText(string.upper(open and L.TR_STEPS_HIDE or L.TR_STEPS_SHOW))
+  ns.SetHDIcon(f.stepsToggle.icon, open and "chevron_down" or "chevron_right", T.muted)
   if ns.Shadow then ns.Shadow(f.stepsToggle.text, f.frameless) end
   f.stepsToggle:ClearAllPoints(); f.stepsToggle:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -y); f.stepsToggle:SetWidth(W - PAD * 2)
   f.stepsToggle:Show()
@@ -976,6 +989,7 @@ local function MenuItems()
   }
   local bst = m and m.st and m.st.bossStep and m.st
   if bst and ns.AnnounceTactics then items[#items + 1] = { L.TR_M_TACTICS, function() ns.AnnounceTactics(bst) end, group = L.TR_G_STEP } end
+  if dk and ns.GoReady then items[#items + 1] = { L.TR_L_READY, function() TR.OpenReady() end, group = L.TR_G_DUNGEON } end
   if dk and ns.ShowOverview then items[#items + 1] = { L.TR_M_OVERVIEW, function() ns.ShowOverview(dk) end, group = L.TR_G_DUNGEON } end
   if dk and ns.ToggleBosses then items[#items + 1] = { L.TR_M_BOSSES, function() ns.ToggleBosses(dk) end, group = L.TR_G_DUNGEON } end
   if dk and ns.OpenDungeonMap then items[#items + 1] = { L.TR_M_MAP, function() ns.OpenDungeonMap(dk) end, group = L.TR_G_DUNGEON } end

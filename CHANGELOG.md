@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.180] — 2026-11-20
+
+### Corrigé / Fixed
+- **La check-list est de retour dans la vue moderne** : elle vérifie que tu as bien pris toutes les quêtes à prendre avant d'entrer, et la clé s'il en faut une. Elle n'était qu'en bas de la grande fenêtre du guide, que la vue moderne remplace par défaut, et plus personne ne la trouvait. Un lien « Check-list » est maintenant sous la vue moderne et dans son menu (Ce donjon). Il ouvre le guide directement sur elle.
+  *The checklist is back in the modern view: a link under it and in its menu.*
+- **Vue moderne, bas de cadre plus calme** : les liens du bas (Guides, Check-list, Vue d'ensemble, Boss, Carte, Partager) sont en gris clair, blancs au survol, au lieu d'être tous en rouge. Le carré devant « Toutes les étapes » était un caractère que la police du jeu n'affiche pas : c'est maintenant une vraie flèche.
+  *Modern view: quiet grey links instead of red; the square before "All the steps" is now an arrow icon.*
+
 ## [1.0.0-beta.179] — 2026-11-20
 
 ### Ajouté / Added
