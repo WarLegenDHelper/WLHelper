@@ -2,6 +2,12 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.182", date = "2026-11-20", items = {
+    { s = "chg", fr = { "La check-list dans la vue moderne", "Le lien « Check-list », sous la vue moderne et dans son menu, amène sur l'étape d'entrée du donjon dans la vue moderne elle-même, sans ouvrir la grande fenêtre. On y voit :" }, en = { "", "" } },
+    { s = "chg", fr = { "", "l'état (« Prêt pour Profondeurs de Rochenoire », « Pas encore prêt : 2 quêtes à prendre », « Quêtes prises, mais pas la clé ») ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "chaque quête à avoir prise avant d'entrer, marquée « Prise », « À prendre » ou « Facultative » ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "la clé, s'il en faut une. Comme pour les flèches, on revient tout seul à l'étape en cours." }, en = { "The checklist is shown in the modern view itself", "State, each quest (taken / to take / optional), the key." } },
+  } },
   { v = "1.0.0-beta.181", date = "2026-11-20", items = {
     { s = "fix", fr = { "Erreur « action bloquée » en combat avec la vue moderne", "») : la barre Cibler / objet de quête était accrochée à la vue moderne, ce qui la rendait protégée en combat. La vue ne pouvait plus changer de taille. La barre est maintenant placée sur l'écran, au même endroit." }, en = { "Modern view", "No more blocked-action error in combat (the target bar no longer anchors to it)." } },
   } },
@@ -85,11 +91,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "", "Chaque carte de champ de bataille montre le nom (avec une pastille « Bonus aujourd'hui » quand il l'est), ton rang en couleur avec sa barre et x / y, puis un seul chiffre fort : les victoires qu'il reste, avec les défaites et la source en petit. Le maître de guerre tient sur une ligne, avec « Y aller » à droite. Les niveaux et les autres villes sont dans l'infobulle." }, en = { "", "" } },
     { s = "chg", fr = { "", "Le bonus de la semaine tient en une ligne. Un clic ouvre le calendrier du jeu." }, en = { "", "" } },
     { s = "chg", fr = { "", "Le set PvP est un vrai tableau : emplacement, pièce dans sa couleur de qualité, honneur, marques et gain, avec l'infobulle de l'objet (Maj-clic pour le lien). En tête : ton honneur sur ce qu'il faut, tes marques par champ de bataille avec une barre, et le champ de bataille à faire d'abord. La quête Field of Honor est dans une carte repliable, avec ses 3 semaines et un bouton « Y aller »." }, en = { "Battlegrounds window redone for reading", "Home and Hub entry, two tabs, one strong number per battleground card, the PvP set as a table, Field of Honor folded." } },
-  } },
-  { v = "1.0.0-beta.167", date = "2026-11-19", items = {
-    { s = "chg", fr = { "Meilleur équipement, refait en tableau", "Une ligne par emplacement, groupée en Armure, Bijoux et Armes, avec deux lignes pour les anneaux et les bijoux. Chaque ligne donne ton BiS, le gain par rapport à ce que tu portes, sa provenance (boss · donjon, métier, quête, marchand) et le niveau requis en rouge s'il est au-dessus du tien. « N choix › » déplie les remplaçants. L'infobulle est celle de l'objet, et Maj-clic met son lien dans la discussion." }, en = { "", "" } },
-    { s = "chg", fr = { "", "En haut : combien de BiS tu portes (« 1/16 portés »), une barre par emplacement, et les filtres Tout / À obtenir / Dans les sacs." }, en = { "", "" } },
-    { s = "chg", fr = { "À faire ensuite", "Les 3 endroits qui te donnent le plus de pièces manquantes (donjon, métier, marchand), avec les boss concernés. Clic : ouvre le guide du donjon." }, en = { "Best gear, as a table per slot with gain, source and level; worn count, filters, and \"Next\": where the most missing pieces come from.", "" } },
-    { s = "fix", fr = { "Meilleur équipement", "Plus de pièces de l'autre faction (réputations et marchands Alliance pour un Horde, et inversement), plus de pièces de raid ou de boss de monde (Quatre Cavaliers, Taerar...) dans le pré-BiS, plus de doublons." }, en = { "Best gear", "No pieces of the other faction, no raid or world boss pieces in the pre-BiS, no duplicates." } },
   } },
 }

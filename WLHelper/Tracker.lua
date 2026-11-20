@@ -280,6 +280,31 @@ function TR.Model()
   -- travel hint (long trip, other continent) on the current step
   if st.travel == "TRAVEL_FAR" or st.travel == "TRAVEL_CONT" then m.travel = L[st.travel] end
   -- the next actions: the rest of this step, then the steps after it
+  -- the checklist before entering, on the dungeon's gate step (report: "do everything in the modern
+  -- view"): its state, then each quest to have taken (taken / to take / optional), then the key
+  if st and st.gate and st.checks and #st.checks > 0 and ns.GuideReadyState then
+    local okR, miss, total, keyMissing = pcall(ns.GuideReadyState, log, st)
+    if okR then
+      local dn = ns.DName(st.gate) or ""
+      local head, col
+      if miss == 0 and not keyMissing then head, col = L.CL_OK_H:format(dn), T.ok
+      elseif miss == 0 then head, col = L.CL_KEY_H, T.warn
+      else head, col = (miss == 1) and L.CL_MISS_H1 or L.CL_MISS_HN:format(miss), T.warn end
+      local lines = {}
+      for _, nd in ipairs(st.checks) do
+        local ok = ns.NodeOK(log, nd)
+        local opt = not ok and ns.GuideOptionalCheck and ns.GuideOptionalCheck(nd, st.gate)
+        local word, wc = L.TR_CL_TAKEN, T.ok
+        if not ok then word, wc = opt and L.TR_CL_OPT or L.TR_CL_TAKE, opt and T.muted or T.warn end
+        lines[#lines + 1] = Hex(wc) .. word .. "|r  " .. ((nd.q and ns.QName and ns.QName(nd.q)) or "?")
+      end
+      for _, k in ipairs(ns.KeyLines and ns.KeyLines(st.gate) or {}) do
+        local kc = (k[3] and not k[2]) and T.warn or T.text
+        lines[#lines + 1] = Hex(kc) .. k[1] .. "|r"
+      end
+      m.ready = { head = head, col = col, lines = lines }
+    end
+  end
   m.nexts = {}
   for k = curPos + 1, #acts do
     if #m.nexts >= MAX_NEXT then break end
@@ -307,10 +332,28 @@ function TR.OpenGuide(i)
   if i and ns.GoTo and ns.frame and ns.frame:IsShown() then ns.GoTo(i) end
 end
 
--- the checklist before entering, in the guide window
+-- the checklist before entering, here: the gate step of the dungeon on screen, else the next one
+-- ahead, else the first one (browsed like the arrows; back to the current step as usual)
 function TR.OpenReady()
-  if ns.ShowWindow then ns.ShowWindow() elseif ns.ShowGuide then ns.ShowGuide() end
-  if ns.GoReady then ns.GoReady() end
+  local steps = ns.route and ns.route.steps
+  if not steps then return end
+  local m = f and f.model
+  local idx = (m and (m.idx or m.curIdx)) or 1
+  local here = steps[idx]
+  local dk = here and ((ns.StepDungeon and ns.StepDungeon(here)) or here.gate or here.ins)
+  local first, ahead, target
+  for i, st in ipairs(steps) do
+    if st.gate then
+      first = first or i
+      if st.gate == dk then target = i break end
+      if not ahead and i >= idx then ahead = i end
+    end
+  end
+  target = target or ahead or first
+  if not target then ns.Print(L.NO_READY) return end
+  TR.browse = target
+  if ns.Refresh then ns.Refresh() end
+  TR.Refresh()
 end
 
 -- Shift-click: the step counts as done by hand (the guide's own manual mark).
@@ -865,6 +908,11 @@ local function Draw(m)
       if b.list then Put(table.concat(b.list, "\n"), F.label, T.text, 2)
       elseif b.body then Put(table.concat(b.body, "\n"), F.label, T.text, 2) end
     end
+  end
+  if m.ready then
+    Put(L.B_READY_T, F.meta, T.gold, 8, true)
+    Put(m.ready.head, F.body, m.ready.col, 2)
+    if #m.ready.lines > 0 then Put(table.concat(m.ready.lines, "\n"), F.label, T.text, 3) end
   end
   if m.tactic then Put(L.H_TACTIC, F.meta, T.gold, 8, true); Put(m.tactic, F.label, T.text, 2) end
   if m.loot then Put(L.H_LOOT, F.meta, T.gold, 8, true); Put(m.loot, F.label, T.text, 2) end

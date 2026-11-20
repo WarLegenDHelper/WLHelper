@@ -6,6 +6,17 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.182] — 2026-11-20
+
+### Modifié / Changed
+- **La check-list dans la vue moderne** (première étape pour tout passer sur la vue moderne) : le lien « Check-list », sous la vue moderne et dans son menu, amène sur l'étape d'entrée du donjon dans la vue moderne elle-même, sans ouvrir la grande fenêtre. On y voit :
+  - l'état (« Prêt pour Profondeurs de Rochenoire », « Pas encore prêt : 2 quêtes à prendre », « Quêtes prises, mais pas la clé ») ;
+  - chaque quête à avoir prise avant d'entrer, marquée « Prise », « À prendre » ou « Facultative » ;
+  - la clé, s'il en faut une.
+
+  Comme pour les flèches, on revient tout seul à l'étape en cours.
+  *The checklist is shown in the modern view itself: state, each quest (taken / to take / optional), the key.*
+
 ## [1.0.0-beta.181] — 2026-11-20
 
 ### Corrigé / Fixed

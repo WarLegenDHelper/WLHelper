@@ -496,6 +496,8 @@ local function ReadyState(log, st)
   return miss, total, keyMissing, opt
 end
 
+ns.GuideReadyState = function(log, st) return ReadyState(log, st) end
+
 -- The check-list step the "Check-list" button opens: the one of the dungeon on screen,
 -- else the next one ahead, else the first one.
 local function ReadyTarget()
