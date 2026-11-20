@@ -1449,10 +1449,6 @@ function BUILD.dungeons(p)
         end,
         L("Une petite fenêtre, guide fermé."),
         L("Une petite fenêtre avec l'action à faire, quand la fenêtre du guide est fermée."))
-    SwitchRow(p, L("Vue moderne par défaut"), function() return Guide().modernDefault ~= false end,
-        function(v) if v then Guide().modernDefault = nil else Guide().modernDefault = false end end,
-        L("Le guide s'ouvre dans la vue moderne."),
-        L("Lancer un guide ou ouvrir le guide affiche la vue moderne ; un clic sur son titre ouvre la fenêtre. Coupé : la fenêtre, comme avant."))
     SwitchRow(p, L("Vue moderne sans cadre"), function() return Guide().trackerFrameless ~= false end,
         function(v)
             local TR = _G.WLHelperTracker

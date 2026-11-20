@@ -7,6 +7,7 @@ local function DB()
   local db = WLDTDB
   db.sel = db.sel or {}; db.off = db.off or {}; db.manual = db.manual or {}
   if db.autoWay == nil then db.autoWay = true end
+  db.modernDefault = nil   -- beta.185: the modern view is the only view (the old switch is gone)
   if db.lang then ns.lang = db.lang end
   return db
 end
@@ -124,8 +125,7 @@ function ns.StartGuide(run)
   local f = ns.frame
   f.auto, f.view, f.sig = nil, nil, nil
   -- the modern view by default: the window does not flash up before it
-  local modern = ns.route and WLDTDB.modernDefault ~= false and WLHelperTracker and WLHelperTracker.Compact
-  if not modern then f:Show() end
+  -- the modern view only (beta.185): the window is never shown
   WLDTDB.hidden = false
   ns.Refresh(true)
   if ns.route then ns.Print(L.ROUTE_BUILT:format(#ns.route.steps, ns.route.label)) end
@@ -256,10 +256,10 @@ end
 function ns.ShowGuideView()
   local f = ns.frame
   local TR = WLHelperTracker
-  if WLDTDB.modernDefault ~= false and ns.route and #(ns.route.steps or {}) > 0 and TR and TR.Compact then
+  if ns.route and #(ns.route.steps or {}) > 0 and TR and TR.Compact then
     TR.Compact()
-  elseif f and not f:IsShown() then
-    f:Show()
+  elseif f and f:IsShown() then
+    f:Hide()
   end
   WLDTDB.hidden = false
 end

@@ -2,6 +2,13 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.185", date = "2026-11-20", items = {
+    { s = "chg", fr = { "Le guide n'a plus qu'une vue : la vue moderne.", "La grande fenêtre du guide ne s'ouvre plus, et tout ce qu'elle faisait passe par la vue moderne :" }, en = { "", "" } },
+    { s = "chg", fr = { "", "la check-list ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "les actions (recommencer la route, flèche GPS, raccourcis) ;" }, en = { "", "" } },
+    { s = "chg", fr = { "", "la vue d'ensemble, les boss, la carte, le partage. /wlh guide, le bouton de la minicarte, l'accueil et le hub ouvrent la vue moderne, ou le choix de guide quand aucun guide n'est en cours. Le réglage « Vue moderne par défaut » disparaît." }, en = { "The guide has one view now", "The modern view. The old window never opens." } },
+    { s = "fix", fr = { "WL Helper ne détourne plus les repères de Zygor", "Quand un de ces addons de guide est chargé, notre GPS ne suit plus les repères posés sur la carte, et WL Helper ne prend plus la commande /way. Tu peux remettre le suivi des repères dans les réglages du GPS (« Suivre les repères de la carte »)." }, en = { "WL Helper no longer takes over Zygor's or RestedXP's map pins and /way.", "" } },
+  } },
   { v = "1.0.0-beta.184", date = "2026-11-20", items = {
     { s = "add", fr = { "Meilleur équipement, où trouver le patron", "Une pièce fabriquée dit où trouver son patron et le niveau de métier qu'il faut (« Patron : chez Qia (Berceau-de-l'Hiver) · métier 215 », « Patron : lâché par Pyromancien de Brandefeu · métier 295 », « butin aléatoire dans le monde », une quête, ou ton maître de métier). L'information vient du module Métiers de Naowh, lu en direct." }, en = { "Best gear", "Where to find a crafted piece's pattern, and the skill it needs." } },
     { s = "fix", fr = { "Meilleur équipement, des noms au lieu de numéros", "Une pièce que le jeu n'avait pas encore chargée s'affichait avec son numéro (« 18727 »). La fenêtre demande maintenant l'objet au jeu et se redessine dès qu'il arrive." }, en = { "Best gear", "Item names instead of numbers." } },
@@ -79,10 +86,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "Vue moderne, comme RestedXP", "Un clic gauche sur une ligne passe à l'étape suivante, un clic droit revient à la précédente. Maj-clic marque toujours l'étape comme faite." }, en = { "Modern view", "Left click next step, right click previous step." } },
     { s = "chg", fr = { "Choix de guide, plus de case minuscule", "Un vrai bouton « + Ajouter » en haut à gauche de chaque carte, qui devient « Ajouté » quand le guide est dans la route." }, en = { "Guide picker", "A \"+ Add\" button instead of the tiny box." } },
     { s = "fix", fr = { "Chaîne d'Onyxia (Horde)", "« Blood and Thunder » explique comment obtenir « Ordre du chef de guerre ». Il faut accepter la quête, reparler à Goretooth et répondre à toutes ses questions. Il donne alors l'objet « Warlord Goretooth's Command » : on clique dessus dans les sacs pour démarrer la quête. Source : Wowhead Forever, commentaires de joueurs." }, en = { "Onyxia chain", "How to get Warlord's Command (answer Goretooth, then use his Command item)." } },
-  } },
-  { v = "1.0.0-beta.170", date = "2026-11-19", items = {
-    { s = "fix", fr = { "Guide de quêtes, depuis l'accueil et le hub", "Un clic ouvre maintenant le choix de tous les guides, même quand un guide est en cours. Avant, il rouvrait seulement le guide en cours." }, en = { "Quest guide (Home and Hub)", "A click opens the choice of every guide." } },
-    { s = "fix", fr = { "Quêtes de métier, niveau requis", "Le guide vérifie maintenant le niveau du métier, plus seulement le métier. Le Calice spectral (BRD) demande Minage 230 : il n'est plus proposé à un mineur en dessous." }, en = { "Profession quests", "The skill level is checked too (The Spectral Chalice needs Mining 230)." } },
-    { s = "fix", fr = { "Set PvP", "Les pièces affichent leur nom au lieu d'un numéro, et le tableau a une colonne Endurance. L'ancienne colonne « Gain » s'appelle maintenant « DPS PvE », et son infobulle explique pourquoi une pièce PvP y perd." }, en = { "PvP set", "Piece names instead of numbers, a Stamina column, the PvE DPS column named as such." } },
   } },
 }

@@ -459,7 +459,8 @@ local before   -- what /WAY did before we took it, given back if the player swit
 -- WLWritsDB.wayTake: nil = take /way only when it is free; true = take it anyway; false = never.
 function Way.WantsWay()
     local v = WLWritsDB and WLWritsDB.wayTake
-    if v == nil then return Way.OtherOwner() == nil end
+    -- free, and no other guide addon (Zygor, RestedXP) that may take it a little later
+    if v == nil then return Way.OtherOwner() == nil and Way.OtherGuide() == nil end
     return v and true or false
 end
 
@@ -516,7 +517,20 @@ local function PinNow()
     return { map = map, x = x, y = y }
 end
 local function Near(a, b) return a and b and a.map == b.map and math.abs(a.x - b.x) < 0.002 and math.abs(a.y - b.y) < 0.002 end
-function Way.FollowOn() return not (WLWritsDB and WLWritsDB.followMapPin == false) end
+-- Another guide addon drives the map pins (report: "I follow a Zygor guide and our addon hijacks
+-- every waypoint"): its pins are its own business, the GPS leaves them alone unless the player
+-- turned following on by hand (WLWritsDB.followMapPin == true).
+local GUIDE_ADDONS = { "ZGV", "RXPGuides", "RXP" }
+function Way.OtherGuide()
+    for _, g in ipairs(GUIDE_ADDONS) do if rawget(_G, g) ~= nil then return g end end
+    return nil
+end
+function Way.FollowOn()
+    local v = WLWritsDB and WLWritsDB.followMapPin
+    if v == false then return false end
+    if v == true then return true end
+    return Way.OtherGuide() == nil
+end
 function Way.SetFollow(on) if WLWritsDB then WLWritsDB.followMapPin = on and true or false end end
 function Way.OnMapPin()
     if not Way.FollowOn() then return end

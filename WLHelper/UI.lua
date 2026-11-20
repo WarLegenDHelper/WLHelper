@@ -4697,23 +4697,21 @@ local GuideOff
 -- Opens the guide (never closes it): the modern view when it is the default and a route runs
 -- (report: "lots of buttons like update guide send to the classic view instead of the modern one"),
 -- else the window. ns.ShowWindow: the window itself (the modern view's menu, the tour).
+-- beta.185: the modern view is the guide's only view (report: "drop the classic viewer, do
+-- everything in the modern one"). The window stays as the guide's engine (its steps, its view
+-- index) but is never shown: every way that opened it opens the modern view, or the guide picker
+-- when no guide runs.
 function ns.ShowGuide()
   if not f then return end
+  if GuideOff() then return end
   local TR = WLHelperTracker
-  if WLDTDB.modernDefault ~= false and ns.route and #(ns.route.steps or {}) > 0 and TR and TR.Compact then
-    if GuideOff() then return end
-    TR.Compact()
-    ns.Refresh()
+  if not (ns.route and #(ns.route.steps or {}) > 0) then
+    if ns.ShowPicker then ns.ShowPicker() end
     return
   end
-  if not f:IsShown() then ns.ToggleMain() end
+  if TR and TR.Compact then TR.Compact(); ns.Refresh() end
 end
-function ns.ShowWindow()
-  if not f or f:IsShown() or GuideOff() then return end
-  f:Show(); WLDTDB.hidden = false
-  f.sig = nil; ns.Refresh()
-  if ns.UpdateActionBar then ns.UpdateActionBar() end
-end
+ns.ShowWindow = function() return ns.ShowGuide() end
 
 GuideOff = function()
   local WP = ns.Writs and ns.Writs.WP
@@ -4735,7 +4733,7 @@ function ns.ToggleMain()
     ns.Refresh()
     return
   end
-  f:SetShown(not f:IsShown()); WLDTDB.hidden = not f:IsShown()
-  if WLDTDB.hidden then ns.SetArrow(nil) else f.sig = nil; ns.Refresh() end
-  if ns.UpdateActionBar then ns.UpdateActionBar() end
+  -- no guide running: the guide picker (the window is never shown)
+  if f:IsShown() then f:Hide() end
+  if ns.ShowPicker then ns.ShowPicker() end
 end

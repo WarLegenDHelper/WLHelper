@@ -6,6 +6,21 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.185] — 2026-11-20
+
+### Modifié / Changed
+- **Le guide n'a plus qu'une vue : la vue moderne.** La grande fenêtre du guide ne s'ouvre plus, et tout ce qu'elle faisait passe par la vue moderne :
+  - la check-list ;
+  - les actions (recommencer la route, flèche GPS, raccourcis) ;
+  - la vue d'ensemble, les boss, la carte, le partage.
+
+  `/wlh guide`, le bouton de la minicarte, l'accueil et le hub ouvrent la vue moderne, ou le choix de guide quand aucun guide n'est en cours. Le réglage « Vue moderne par défaut » disparaît.
+  *The guide has one view now: the modern view. The old window never opens.*
+
+### Corrigé / Fixed
+- **WL Helper ne détourne plus les repères de Zygor** (ni de RestedXP) : quand un de ces addons de guide est chargé, notre GPS ne suit plus les repères posés sur la carte, et WL Helper ne prend plus la commande `/way`. Tu peux remettre le suivi des repères dans les réglages du GPS (« Suivre les repères de la carte »).
+  *WL Helper no longer takes over Zygor's or RestedXP's map pins and /way.*
+
 ## [1.0.0-beta.184] — 2026-11-20
 
 ### Ajouté / Added
