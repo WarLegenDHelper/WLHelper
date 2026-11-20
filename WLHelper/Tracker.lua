@@ -1042,8 +1042,12 @@ local function MenuItems()
   if dk and ns.ToggleBosses then items[#items + 1] = { L.TR_M_BOSSES, function() ns.ToggleBosses(dk) end, group = L.TR_G_DUNGEON } end
   if dk and ns.OpenDungeonMap then items[#items + 1] = { L.TR_M_MAP, function() ns.OpenDungeonMap(dk) end, group = L.TR_G_DUNGEON } end
   items[#items + 1] = { L.TR_M_PICK, function() if ns.ShowPicker then ns.ShowPicker() end end, group = L.TR_G_GUIDES }
+  -- what was only in the guide window's Actions menu (report: "do everything in the modern view")
+  if ns.ResetRoute then items[#items + 1] = { L.M_RESTART, function() ns.ResetRoute() end, group = L.TR_G_GUIDES, confirm = true } end
   items[#items + 1] = { L.TR_M_WINDOW, function() TR.OpenGuide(m and m.idx) end, group = L.TR_G_GUIDES }
   items[#items + 1] = { TR.Frameless() and L.TR_M_FRAMED or L.TR_M_FRAMELESS, function() TR.SetFrameless(not TR.Frameless()) end, group = L.TR_G_VIEW }
+  if ns.ToggleArrow then items[#items + 1] = { L.M_ARROW, function() ns.ToggleArrow() end, group = L.TR_G_VIEW } end
+  if ns.OpenKeyBindings then items[#items + 1] = { L.M_KEYS, function() ns.OpenKeyBindings() end, group = L.TR_G_VIEW } end
   items[#items + 1] = { L.TR_M_OPTIONS, function()
     local WP = ns.Writs and ns.Writs.WP
     if WP and WP.OpenOptions then WP.OpenOptions("dungeons") end

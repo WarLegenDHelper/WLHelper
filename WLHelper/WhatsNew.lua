@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.183", date = "2026-11-20", items = {
+    { s = "chg", fr = { "Vue moderne, les dernières actions de la grande fenêtre", "Son menu (roue dentée) a maintenant « Recommencer la route » (dans Guides, avec confirmation), « Flèche GPS » et « Raccourcis clavier » (dans Affichage). Tout ce que faisait le menu Actions de la grande fenêtre se fait désormais depuis la vue moderne." }, en = { "Modern view menu", "Restart the route, GPS arrow on/off, key bindings." } },
+  } },
   { v = "1.0.0-beta.182", date = "2026-11-20", items = {
     { s = "chg", fr = { "La check-list dans la vue moderne", "Le lien « Check-list », sous la vue moderne et dans son menu, amène sur l'étape d'entrée du donjon dans la vue moderne elle-même, sans ouvrir la grande fenêtre. On y voit :" }, en = { "", "" } },
     { s = "chg", fr = { "", "l'état (« Prêt pour Profondeurs de Rochenoire », « Pas encore prêt : 2 quêtes à prendre », « Quêtes prises, mais pas la clé ») ;" }, en = { "", "" } },
@@ -83,13 +86,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "Champs de bataille, bonus du jour bien visible", "En haut de la fenêtre, une bannière sur toute la largeur donne le nom du champ de bataille en bonus en grand et en doré, avec une étoile, une ligne qui explique, et « Y aller » vers son maître de guerre. Sans bonus, une ligne discrète. La pastille reste sur la carte." }, en = { "Battlegrounds", "Today's bonus is now a full-width banner with the battleground's name, a short line and a \"Go there\" button." } },
     { s = "chg", fr = { "Fenêtre large", "Le tableau passe en colonnes (pièce, gain, provenance) au lieu d'une longue ligne étirée." }, en = { "Wide window", "The table uses columns." } },
     { s = "fix", fr = { "Onglet PvP 60", "Plus de pièces de rang de l'autre faction (Field Marshal, Knight-Captain... pour un Horde, et inversement)." }, en = { "PvP tab", "No rank pieces of the other faction." } },
-  } },
-  { v = "1.0.0-beta.168", date = "2026-11-19", items = {
-    { s = "chg", fr = { "Champs de bataille, fenêtre refaite pour être lisible", "" }, en = { "", "" } },
-    { s = "chg", fr = { "", "Elle s'ouvre depuis l'accueil et le hub (ligne « Champs de bataille », dans Guilde et groupes), en plus de /wlh pvp." }, en = { "", "" } },
-    { s = "chg", fr = { "", "Deux onglets : « Champs de bataille » et « Set PvP »." }, en = { "", "" } },
-    { s = "chg", fr = { "", "Chaque carte de champ de bataille montre le nom (avec une pastille « Bonus aujourd'hui » quand il l'est), ton rang en couleur avec sa barre et x / y, puis un seul chiffre fort : les victoires qu'il reste, avec les défaites et la source en petit. Le maître de guerre tient sur une ligne, avec « Y aller » à droite. Les niveaux et les autres villes sont dans l'infobulle." }, en = { "", "" } },
-    { s = "chg", fr = { "", "Le bonus de la semaine tient en une ligne. Un clic ouvre le calendrier du jeu." }, en = { "", "" } },
-    { s = "chg", fr = { "", "Le set PvP est un vrai tableau : emplacement, pièce dans sa couleur de qualité, honneur, marques et gain, avec l'infobulle de l'objet (Maj-clic pour le lien). En tête : ton honneur sur ce qu'il faut, tes marques par champ de bataille avec une barre, et le champ de bataille à faire d'abord. La quête Field of Honor est dans une carte repliable, avec ses 3 semaines et un bouton « Y aller »." }, en = { "Battlegrounds window redone for reading", "Home and Hub entry, two tabs, one strong number per battleground card, the PvP set as a table, Field of Honor folded." } },
   } },
 }

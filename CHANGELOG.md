@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.183] — 2026-11-20
+
+### Modifié / Changed
+- **Vue moderne, les dernières actions de la grande fenêtre** : son menu (roue dentée) a maintenant « Recommencer la route » (dans Guides, avec confirmation), « Flèche GPS » et « Raccourcis clavier » (dans Affichage). Tout ce que faisait le menu Actions de la grande fenêtre se fait désormais depuis la vue moderne.
+  *Modern view menu: restart the route, GPS arrow on/off, key bindings.*
+
 ## [1.0.0-beta.182] — 2026-11-20
 
 ### Modifié / Changed
