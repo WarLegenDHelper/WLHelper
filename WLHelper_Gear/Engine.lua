@@ -5,8 +5,8 @@
 -- version 3, see LICENSE.txt. Quest, drop, and recipe data comes from QuestieDB
 -- by the Questie team (https://github.com/Questie/Questie), also GPLv3.
 --
--- WL Helper Gear: this file is the scoring part of Geared Forever 1.1.1's Core.lua,
--- modified by WaR LegenD on 2026-11-15 and 2026-11-16 (see NOTICE.md). Still GPLv3.
+-- WL Helper Gear: this file is the scoring part of Geared Forever 1.2's Core.lua,
+-- modified by WaR LegenD on 2026-11-15, 2026-11-16 and 2026-11-20 (see NOTICE.md). Still GPLv3.
 -- Modifications copyright (C) 2026 WaR LegenD, GPLv3.
 --   * The window, tooltips, minimap button, slash commands, starred items, zone
 --     reminder and saved settings were removed: this is an engine with no UI.
@@ -91,7 +91,9 @@ end
 --   hit caps vs raid bosses: 8% melee and ranged, 17% spells (5% and 4% vs your own level)
 --   Agility and Intellect per 1% crit for each class, at level 30 and 60
 --   Strength and Agility to attack power for each class; 14 attack power = 1 weapon DPS
---   Agility gives armor (2 per point) and crit, but no dodge in WoW Forever
+--   Agility gives armor (2 per point), crit and dodge (20 per 1%; Rogue 14.5, Hunter 26)
+-- 1.2 (Nov 18): every number above checked against Wowhead Forever item tooltips, Icy Veins,
+-- Warcraft Tavern and Mobalytics. Where the guides disagree, the most common answer wins.
 -- Talents that turn one stat into another are counted for the spec that takes them
 -- (Mental Dexterity, Careful Aim, Champion of the Light, Spiritual Guidance, Bloom...).
 -- Physical specs score in attack power, casters in spell power, healers in healing,
@@ -101,7 +103,8 @@ end
 -- Agility and Intellect needed for 1% crit at level 30 and 60.
 local CONV = {
     WARRIOR = { agi = { 10.4, 20.0 }, strAP = 2, pct = 1.4 },
-    PALADIN = { agi = { 10.7, 19.8 }, int = { 31.9, 59.9 }, strAP = 2, pct = 1.35 },
+    -- Paladin Intellect: 54 per 1% at 60 (Icy Veins Holy Paladin, Warcraft Tavern: "Paladins requiring the least").
+    PALADIN = { agi = { 10.7, 19.8 }, int = { 28.8, 54.0 }, strAP = 2, pct = 1.35 },
     HUNTER  = { agi = { 24.0, 52.9 }, int = { 32.9, 60.6 }, strAP = 1, agiAP = 1, agiRAP = 2, pct = 2.0 },
     ROGUE   = { agi = { 13.0, 29.0 }, strAP = 1, agiAP = 1, pct = 1.05 },
     PRIEST  = { int = { 26.9, 59.5 } },
@@ -243,6 +246,8 @@ local TALENT_MODS = {
         },
     },
     HUNTER = {
+        -- WL Helper change (1.5.0): upstream 1.2 gives Beast Mastery Careful Aim too (intAP 1).
+        bm = { { names = { "Careful Aim", "Visée prudente" }, field = "intAP", full = 1 } },
         mm = {
             { names = { "Careful Aim", "Visée prudente" }, field = "intAP", full = 1 },
             { names = { "Mortal Shots", "Tirs mortels" }, field = "critBonus", full = 0.15 },
@@ -557,7 +562,9 @@ local function Physical(level, race, cls, o)
     -- Behind the target nothing can parry, so 1% expertise only removes 1% dodges: worth what
     -- 1% hit is worth before talents (Icy Veins: "getting past 6.5%" from behind). exp = "hit" does that.
     if o.exp == "hit" then
-        w.exp = pct * (o.hitMult or 1) / (1 - HitCap(level, false) / 100) / 10
+        -- expRel: the guides break the tie. Warriors, Ret, Enhancement and Feral: Hit > Expertise.
+        -- Rogues: Expertise > Hit (Icy Veins).
+        w.exp = pct * (o.hitMult or 1) / (1 - HitCap(level, false) / 100) / 10 * (o.expRel or 1)
     else
         w.exp = pct * (o.exp or 0.8) / 10
     end
@@ -593,7 +600,7 @@ local function Caster(level, race, cls, o)
     w.int = (critVal / PerPct(c.int, level) + manaVal + (o.intSP or 0)) * (1 + (o.intPct or 0))
     w.crit = critVal / 14
     local hitHave = HitHave(o, race, "spell")   -- WL Helper change: real hit
-    w.hit = pct * HitValue(level, true, hitHave) / 10
+    w.hit = pct * HitValue(level, true, hitHave) / 10 * (o.hitW or 1)
     w.haste = pct * (o.haste or 0.8) / 10
     w.spi = (o.spi or 0.1) * (race == "Human" and 1.1 or 1)
     -- WL Helper change (beta.156): 1 mana per 5 s is ~24 mana over a 2-minute fight, more than the
@@ -610,6 +617,10 @@ local function Caster(level, race, cls, o)
     ApplyLeveling(level, w, o.lvl)
     local wand = o.wand or 1.2
     if o.wand ~= 0 then wand = Blend(level, wand, math.max(wand, 2)) end
+    -- 1.2: level 60 values set to the guides' order, faded in from 50 like healers.
+    if o.at60 then
+        for k, v in pairs(o.at60) do w[k] = Blend(level, v, w[k] or 0) end
+    end
     local wt = W(w)
     wt.role, wt.mdmg = "caster", 0   -- WL Helper change (v2): for proc effects
     return 0, 0, wand, false, wt
@@ -635,6 +646,11 @@ local function Healer(level, race, cls, o)
     w.mp5 = o.mp5 or 0.9
     w.sta = LevelingSta(level, 0.1, 0.3)
     w.armor = o.armor
+    -- 1.2: level 60 order set to the guides' stat priority (o.at60). Below 50 the math above
+    -- counts in full; 50 to 60 it fades into the guide order, like the leveling fade.
+    if o.at60 then
+        for k, v in pairs(o.at60) do w[k] = Blend(level, v, w[k] or 0) end
+    end
     local wt = W(w)
     wt.role, wt.mdmg = "healer", 0   -- WL Helper change (v2): for proc effects
     return 0, 0, 1, false, wt
@@ -674,16 +690,18 @@ local function Tank(level, race, cls, o)
     w.armor = o.armor or 0.07
     -- Agility: 2 armor, dodge (about as much Agility per 1% as crit), plus a little threat from crit.
     w.agi = 2 * (o.armor or 0.07) + 0.15 + (c.agi and avoid / PerPct(c.agi, level) or 0)
-    w.def = avoid * 0.16 + 0.35                     -- 0.04% each to miss, dodge, parry, block + crit protection
+    w.def = (avoid * 0.16 + 0.35) * (o.defMult or 1)   -- 0.04% each to miss, dodge, parry, block + crit protection
     w.dodge = avoid / 12
     w.parry = avoid * 0.9 / 15
     w.block = avoid * (o.blockVal or 0.5) / 5
     w.bv = o.bv or 0.3
     w.str = o.str or 0.4
     w.ap = (o.str or 0.4) / 2
-    local pct = PhysPct(level) * 0.04               -- threat stats, in Stamina
+    -- Threat stats, in Stamina. o.threat: how much the spec's guides push threat (Icy Veins and
+    -- Mobalytics both put Expertise and Hit above Agility for Prot Warriors).
+    local pct = PhysPct(level) * 0.04 * (o.threat or 1)
     w.hit = pct * 1.5 * HitValue(level, false, HitHave(o, race, "melee")) / 10   -- WL Helper change: real hit
-    w.exp = pct * 1.5 / 10
+    w.exp = pct * (o.expW or 1.5) / 10
     w.crit = pct * 0.6 / 14
     w.haste = pct * 0.5 / 10
     w.sp, w.sdmg, w.holy = o.sp, o.sp, o.sp
@@ -709,7 +727,10 @@ local function Tank(level, race, cls, o)
             local cap = 5 * (level + 3) + 125
             local left = cap - have
             local crit = left > 0 and avoid * 0.16 * math.min(1, left / 10) or 0
-            w.def = avoid * share + crit
+            -- WL Helper change (1.5.0): upstream 1.2's defense multiplier (defMult, Protection
+            -- warrior and paladin) scales the avoidance part, as upstream; the crit-immunity
+            -- part below the cap is ours and stays whole.
+            w.def = avoid * share * (o.defMult or 1) + crit
             -- WL Helper change (v3): the weight is per defense skill point. Data.lua's def values
             -- are skill points ("+N Defense"), so no ratio here; LiveItem turns a client's
             -- defense rating into skill points instead.
@@ -726,34 +747,44 @@ end
 -- (KIND_NAME keys, as a damage multiplier).
 local SPECS = {
     WARRIOR = {
-        -- Weaponmaster: axes and polearms +5% crit, maces and staves ignore 15% armor. Impale +20% crit damage.
+        -- Weaponmaster: axes and polearms +5% crit, maces and staves ignore 15% armor, swords 5% chance of an
+        -- extra attack (Wowhead Forever talent calc, Nov 17). Impale +20% crit damage.
         { key = "arms", label = "Arms", weights = function(level, race)
-            return Physical(level, race, "WARRIOR", { critBonus = 1.1, mh = 1, rg = 0.03, slow = true, haste = 0.65, exp = "hit", hitMult = 0.85,
+            return Physical(level, race, "WARRIOR", { critBonus = 1.1, mh = 1, rg = 0.03, slow = true, haste = 0.65, exp = "hit", hitMult = 0.85, expRel = 0.97,
                 lvl = { sta = 1.3 },   -- leveling: Strength > Stamina > Agility
-                prefer = { [11] = 1.06, [16] = 1.06, [15] = 1.04, [20] = 1.04, [10] = 1.06, [14] = 1.04 } })
+                prefer = { [11] = 1.06, [16] = 1.06, [15] = 1.04, [20] = 1.04, [10] = 1.06, [14] = 1.04, [17] = 1.05, [18] = 1.05 } })
         end },
         -- Dual Wield Specialization +25% off-hand damage, Furious Precision +10% off-hand hit.
         -- Nov 3: Flurry is 30% attack speed after a crit and no longer needs Death Wish, so crit is worth more.
         { key = "fury", label = "Fury", weights = function(level, race)
-            return Physical(level, race, "WARRIOR", { mh = 1, oh = 0.62, rg = 0.03, slow = true, haste = 0.6, exp = "hit", hitMult = 0.8,
+            return Physical(level, race, "WARRIOR", { mh = 1, oh = 0.62, rg = 0.03, slow = true, haste = 0.6, exp = "hit", hitMult = 0.8, expRel = 0.97,
                 critBonus = 1.15, lvl = { sta = 1.3 } })
         end },
         -- Shield Slam scales with block value; Revenge with attack power. Anticipation +20 Defense.
         { key = "prot", label = "Protection", weights = function(level, race)
-            return Tank(level, race, "WARRIOR", { str = 0.45, bv = 0.45, blockVal = 0.6, armor = 0.07, mh = 2.5 })
+            -- 1.2: Stamina first (Icy Veins and Mobalytics). Defense under it (Mobalytics 2nd, Icy Veins
+            -- last). Expertise > Hit > Agility > Strength for threat (both guides).
+            return Tank(level, race, "WARRIOR", { str = 0.45, bv = 0.45, blockVal = 0.6, armor = 0.07, mh = 2.5,
+                threat = 5, expW = 1.75, defMult = 0.68 })
         end },
     },
     PALADIN = {
-        -- Spirit regen keeps going while casting (Reverence 30%); Divine Intellect +10%.
+        -- Spirit regen keeps going while casting (Reverence 30%, Wowhead Forever talent calc).
+        -- Divine Intellect +10% (Prot tree; Icy Veins' Holy build takes it).
         -- Nov 3: Holy Power raises critical healing by up to 50%, so crits heal for double.
         { key = "holy", label = "Holy", weights = function(level, race)
-            return Healer(level, race, "PALADIN", { crit = 2, regen = 0.45, intPct = 0.1, mp5 = 1, armor = 0.003 })
+            -- 1.2: at 60, Icy Veins' order: Healing > Intellect > Spirit > Mp5 > Crit.
+            return Healer(level, race, "PALADIN", { crit = 2, regen = 0.3, intPct = 0.1, mp5 = 1, armor = 0.003,
+                at60 = { int = 0.95, spi = 0.55, mp5 = 0.5, crit = 0.45, haste = 0.4 } })
         end },
-        -- Threat is mostly Holy damage (Righteous Fury, Holy Shield, Consecration, Holy Strike),
-        -- so spell power ranks under Stamina and Defense. Precision +3% hit, Toughness +10% item armor.
+        -- Threat is mostly Holy damage (Righteous Fury, Holy Shield, Consecration, Holy Strike).
+        -- Precision +3% hit, Toughness +10% item armor.
         { key = "prot", label = "Protection", weights = function(level, race)
-            -- Leveling (Warcraft Tavern): Spell Power > Stamina > Intellect > Strength.
-            return Tank(level, race, "PALADIN", { str = 0.35, bv = 0.4, blockVal = 0.7, armor = 0.077, hit = 3, sp = 0.5, int = 0.25, mh = 2,
+            -- Leveling (Warcraft Tavern, Mobalytics): Spell Power > Stamina > Intellect > Strength.
+            -- 1.2, level 60: Stamina > Defense > Spell Power > Intellect > Strength (Icy Veins), Spell Power
+            -- the main threat stat (Warcraft Tavern), "always take Hit and Block" (Mobalytics).
+            return Tank(level, race, "PALADIN", { str = 0.35, bv = 0.4, blockVal = 0.7, armor = 0.077, hit = 3, sp = 0.9, int = 0.55, mh = 2,
+                threat = 4, defMult = 0.76,
                 lvl = { sp = 1.2, sdmg = 1.2, holy = 1.2, sta = 1.0, int = 0.6, str = 0.4 } })
         end },
         -- Champion of the Light: 60% of Intellect as spell damage. Divine Strength +10% Strength.
@@ -764,8 +795,8 @@ local SPECS = {
             -- Spell power: Seal of Righteousness (up to 12% per swing), Judgement and Holy Strike (42.9% each,
             -- 10 sec cooldowns). MythicSim's Forever sim puts 1 spell power at about 2.2 attack power and
             -- haste above crit. Its high expertise came from parries; from behind it's dodge only (Nov 11).
-            return Physical(level, race, "PALADIN", { mh = 1.05, slow = true, strPct = 0.1, sp = 2.2, school = "holy", critBonus = 1.1,
-                intAP = 0.6 * 2.2, intPct = 0, int = 0.08, sta = 0.3, haste = 0.85, exp = "hit", hitMult = 0.85,
+            return Physical(level, race, "PALADIN", { mh = 1.05, slow = true, strPct = 0.1, sp = 2.1, school = "holy", critBonus = 1.1,
+                intAP = 0.6 * 2.2, intPct = 0, int = 0.08, sta = 0.3, haste = 0.85, exp = "hit", hitMult = 0.85, expRel = 0.97,
                 -- Leveling: Strength and Spell Power about even (Icy Veins: Spell Power "one of your most
                 -- effective stats"; Wowhead: "aim for both"), Stamina right after (Warcraft Tavern).
                 lvl = { sta = 1.3, sp = 1.8, sdmg = 1.8, holy = 1.8, int = 0.6 },
@@ -774,8 +805,9 @@ local SPECS = {
     },
     HUNTER = {
         { key = "bm", label = "Beast Mastery", weights = function(level, race)
-            -- Intellect: mana to keep shooting; Forever sims put it at about half of Agility.
-            return Physical(level, race, "HUNTER", { ranged = true, prefer = HUNTER_RANGED, mh = 0.15, oh = 0.07, rg = 1, int = 1.8, exp = 0.55, haste = 0.45,
+            -- Intellect: Careful Aim (Mobalytics' BM build takes it) gives 1 attack power per point, plus mana.
+            -- 1.2: was 1.8, above attack power; Icy Veins and Mobalytics both rank it under Agility.
+            return Physical(level, race, "HUNTER", { ranged = true, prefer = HUNTER_RANGED, mh = 0.15, oh = 0.07, rg = 1, intAP = 1, int = 0.2, exp = 0.55, haste = 0.45,
                 lvl = { int = 1.0, spi = 0.8, sta = 0.6 } })   -- leveling: Agility > AP > Crit > Int > Spirit > Stamina
         end },
         -- Careful Aim: attack power equal to 100% of Intellect. Mortal Shots +30% ranged crit damage.
@@ -783,7 +815,7 @@ local SPECS = {
             return Physical(level, race, "HUNTER", { ranged = true, prefer = HUNTER_RANGED, mh = 0.15, oh = 0.07, rg = 1.05, critBonus = 1.15,
                 intAP = 1, int = 0.4, haste = 0.66, exp = 0.45, lvl = { spi = 0.8, sta = 0.6 } })
         end },
-        -- Melee and ranged. Surefooted +3% hit, Lightning Reflexes +10% Agility, Predator's Edge +50% off-hand damage.
+        -- Melee and ranged. Surefooted +3% hit, Lightning Reflexes +15% Agility, Predator's Edge +50% off-hand damage.
         { key = "surv", label = "Survival", weights = function(level, race)
             local mh, oh, rg, slow, w = Physical(level, race, "HUNTER", { mh = 0.7, oh = 0.5, rg = 0.5, hit = 3,
                 agiPct = 0.15, critBonus = 1.15, int = 1.2, haste = 0.7, exp = 0.75,
@@ -798,29 +830,35 @@ local SPECS = {
         -- Mutilate needs a dagger in each hand.
         { key = "assa", label = "Assassination", weights = function(level, race)
             -- Nov 3: Mutilate 90% weapon damage per hand, Shank uses the off hand, Seal Fate 100%, Lethality 20%.
-            return Physical(level, race, "ROGUE", { mh = 1, oh = 0.8, critBonus = 1.15, haste = 0.75, exp = "hit", hitMult = 0.9,
+            return Physical(level, race, "ROGUE", { mh = 1, oh = 0.8, critBonus = 1.15, haste = 0.75, exp = "hit", hitMult = 0.9, expRel = 1.03,
                 prefer = { [25] = 1.25 } })
         end },
-        -- Hack and Slash: axes and swords get extra attacks, maces ignore armor. Precision +3% hit.
+        -- Hack and Slash: axes and swords 5% extra attacks, daggers and fist weapons +5% crit, maces ignore 15%
+        -- armor (Wowhead Forever talent calc, Nov 17). Precision +3% hit.
         { key = "combat", label = "Combat", weights = function(level, race)
-            return Physical(level, race, "ROGUE", { mh = 1, oh = 0.67, hit = 3, haste = 0.75, exp = "hit", hitMult = 0.9,   -- Shank
-                prefer = { [10] = 1.05, [17] = 1.05, [14] = 1.04, [23] = 1.02 } })
+            return Physical(level, race, "ROGUE", { mh = 1, oh = 0.67, hit = 3, haste = 0.75, exp = "hit", hitMult = 0.9, expRel = 1.03,   -- Shank
+                prefer = { [10] = 1.05, [17] = 1.05, [14] = 1.04, [23] = 1.05, [25] = 1.05 } })
         end },
         -- Ghostly Strike and Hemorrhage hit much harder with a dagger.
         { key = "sub", label = "Subtlety", weights = function(level, race)
             -- Nov 3: the dagger bonus on Ghostly Strike and Hemorrhage was cut; Shank uses the off hand.
-            return Physical(level, race, "ROGUE", { mh = 1, oh = 0.6, critBonus = 1.1, haste = 0.75, exp = "hit", hitMult = 0.9,
+            return Physical(level, race, "ROGUE", { mh = 1, oh = 0.6, critBonus = 1.1, haste = 0.75, exp = "hit", hitMult = 0.9, expRel = 1.03,
                 prefer = { [25] = 1.08 } })
         end },
     },
     PRIEST = {
         -- Mental Strength +10% Intellect; Meditation 50% regen while casting; Smite and Penance use spell damage.
         { key = "disc", label = "Discipline", weights = function(level, race)
-            return Healer(level, race, "PRIEST", { crit = 1.2, regen = 0.5, intPct = 0.1, sdmg = 0.15 })
+            -- 1.2, level 60: Healing > Mp5 > Spirit > Intellect > Crit (Icy Veins).
+            return Healer(level, race, "PRIEST", { crit = 1.2, regen = 0.5, intPct = 0.1, sdmg = 0.15,
+                at60 = { mp5 = 0.9, spi = 0.8, int = 0.75, crit = 0.5, haste = 0.4 } })
         end },
         -- Spiritual Guidance: healing equal to 25% of Spirit.
         { key = "holy", label = "Holy", weights = function(level, race)
-            return Healer(level, race, "PRIEST", { regen = 0.5, spiHeal = 0.25 })
+            -- 1.2, level 60: Healing first and Crit last on Icy Veins and Warcraft Tavern; they split on
+            -- Intellect vs Mp5, so those two sit close.
+            return Healer(level, race, "PRIEST", { regen = 0.5, spiHeal = 0.25,
+                at60 = { mp5 = 0.9, int = 0.88, spi = 0.8, crit = 0.5, haste = 0.4 } })
         end },
         -- Shadow Focus +5% hit; Dark Inspiration +15% Spirit; Spiritual Guidance 8% of Spirit as spell damage.
         { key = "shadow", label = "Shadow", weights = function(level, race)
@@ -834,7 +872,7 @@ local SPECS = {
         { key = "ele", label = "Elemental", weights = function(level, race)
             -- Nov 3: Lava Burst removed, Lightning Overload 30%: Nature matters more, Fire less.
             return Caster(level, race, "SHAMAN", { schools = { { "nature", 0.9 }, { "fire", 0.25 }, { "frost", 0.1 } },
-                crit = 2, mp5 = 0.4, spi = 0.05, wand = 0, haste = 0.7 })
+                crit = 2, mp5 = 0.4, spi = 0.05, wand = 0, haste = 0.7, hitW = 0.95 })   -- 1.2: Spell Power > Hit (Icy Veins)
         end },
         -- Mental Dexterity: attack power equal to 100% of Intellect. Mental Quickness: 30% of Intellect as
         -- spell damage. Ancestral Knowledge +10% Intellect. No dual wield in WoW Forever.
@@ -847,11 +885,14 @@ local SPECS = {
             -- for less until 60 (Nov 15, from player feedback: cloth caster gear ranked too high).
             local sp = Blend(level, 1.4, 0.8)
             return Physical(level, race, "SHAMAN", { mh = 1.1, slow = true, intAP = 1.0 + 0.3 * sp, intPct = 0.1,
-                sp = sp, school = "nature", haste = 0.9, exp = "hit", hitMult = 0.85, sta = 0.3 })
+                sp = sp, school = "nature", haste = 0.9, exp = "hit", hitMult = 0.85, expRel = 0.97, sta = 0.3 })
         end },
         -- Mindfulness 50% regen while casting; Tidal Focus.
         { key = "resto", label = "Restoration", weights = function(level, race)
-            return Healer(level, race, "SHAMAN", { crit = 1.1, regen = 0.5, mp5 = 1 })
+            -- 1.2, level 60: Healing > Crit > Intellect > Spirit > Mp5 (Icy Veins). Warcraft Tavern: Spirit
+            -- "highly sought after", crit good (HoTs crit, Water Shield), and Water Shield gives no mp5.
+            return Healer(level, race, "SHAMAN", { crit = 1.1, regen = 0.5, mp5 = 1,
+                at60 = { crit = 0.8, int = 0.75, spi = 0.65, mp5 = 0.5, haste = 0.4 } })
         end },
     },
     MAGE = {
@@ -860,10 +901,12 @@ local SPECS = {
         -- the couple of points their usual builds put there.
         { key = "arcane", label = "Arcane", weights = function(level, race)
             return Caster(level, race, "MAGE", { schools = { { "arcane", 1 }, { "fire", 0.15 }, { "frost", 0.15 } },
-                crit = 2, intSP = level >= 20 and 0.48 or 0, intPct = 0.1, mana = 0.8, hit = 2, haste = 0.75, lvlSpi = 0.5, lvlInt = 0.9 })
+                crit = 2, intSP = level >= 20 and 0.48 or 0, intPct = 0.1, mana = 0.8, hit = 2, haste = 0.75, lvlSpi = 0.5, lvlInt = 0.9,
+                at60 = { int = 0.55 } })   -- 1.2: Hit > Spell Power > Crit > Intellect (Icy Veins, Mobalytics)
         end },
         { key = "fire", label = "Fire", weights = function(level, race)
-            return Caster(level, race, "MAGE", { schools = { { "fire", 1 } }, crit = 2, hit = 2, haste = 0.8 })
+            return Caster(level, race, "MAGE", { schools = { { "fire", 1 } }, crit = 2, hit = 2, haste = 0.8,
+                at60 = { spi = 0.3 } })   -- 1.2: Spirit above Mp5 (Icy Veins: Mage Armor and Arcane Meditation keep it going)
         end },
         -- Ice Shards +100% Frost crit damage. Precision +6% hit.
         { key = "frost", label = "Frost", weights = function(level, race)
@@ -882,7 +925,7 @@ local SPECS = {
         { key = "demo", label = "Demonology", weights = function(level, race)
             -- Crit as valued by MythicSim's Forever sim of a Demonic Pact build.
             return Caster(level, race, "WARLOCK", { schools = { { "shadow", 1 }, { "fire", 0.35 } }, crit = 2, spi = 0.3, sta = 0.2, lvlSpi = 0.6,
-                haste = 0.77 })
+                haste = 0.65 })   -- 1.2: Crit > Haste (Icy Veins)
         end },
         -- Ruin +100% Destruction crit damage.
         { key = "destro", label = "Destruction", weights = function(level, race)
@@ -902,7 +945,7 @@ local SPECS = {
         -- Heart of the Wild +10% Strength in Cat Form.
         -- Natural Instinct +20% crit damage. Agility gives 1 attack power in Cat Form.
         { key = "feral", label = "Feral", weights = function(level, race)
-            return Physical(level, race, "DRUID", { mh = 1.1, strPct = 0.1, critBonus = 1.1, haste = 0.45, agiAP = 1, exp = "hit", hitMult = 0.85 })
+            return Physical(level, race, "DRUID", { mh = 1.1, strPct = 0.1, critBonus = 1.1, haste = 0.45, agiAP = 1, exp = "hit", hitMult = 1, expRel = 0.97 })   -- 1.2: Hit > Agility > Strength (Icy Veins)
         end },
         -- Heart of the Wild +20% Stamina in bear; Thick Hide and bear form armor.
         { key = "bear", label = "Feral Tank", weights = function(level, race)
@@ -911,7 +954,10 @@ local SPECS = {
         end },
         -- Living Spirit +15% Spirit; Bloom heals for 100% of Spirit; Reflection 50% regen while casting.
         { key = "resto", label = "Restoration", weights = function(level, race)
-            return Healer(level, race, "DRUID", { regen = 0.5, spiPct = 0.15, spiHeal = 0.5, intPct = 0.1 })
+            -- 1.2, level 60: Healing > Intellect > Spirit > Mp5 > Crit (Icy Veins; Mobalytics: Intellect and
+            -- Stamina first, then Healing, then Spirit and Mp5).
+            return Healer(level, race, "DRUID", { regen = 0.5, spiPct = 0.15, spiHeal = 0.5, intPct = 0.1,
+                at60 = { int = 0.9, spi = 0.85, mp5 = 0.7, crit = 0.45, haste = 0.4 } })
         end },
     },
 }
@@ -929,8 +975,10 @@ local CLASSES = {
       weapons = Set("10 11 12 13 14 15 16 17 18 20 23 25 26 28") },
     { token = "PALADIN", name = "Paladin", color = "f58cba", bit = 2, armor = 4, early = 3, shield = true, relic = 31,
       weapons = Set("10 11 14 15 16 17 18") },
+    -- No thrown (26): Auto Shot and Hunter shots need a bow, gun or crossbow, and a thrown
+    -- weapon in the ranged slot means no bow at all.
     { token = "HUNTER", name = "Hunter", color = "abd473", bit = 4, armor = 3, early = 2, dual = true,
-      weapons = Set("10 11 12 13 16 17 18 20 23 25 26 28") },
+      weapons = Set("10 11 12 13 16 17 18 20 23 25 28") },
     { token = "ROGUE", name = "Rogue", color = "fff569", bit = 8, armor = 2, dual = true,
       weapons = Set("10 12 13 14 17 23 25 26 28") },
     { token = "PRIEST", name = "Priest", color = "ffffff", bit = 16, armor = 1, weapons = Set("14 20 25 29") },
@@ -1524,7 +1572,8 @@ local function LiveItem(id, link)
     if known and not HasSuffix(link) then
         -- Forever can put the random suffix ("of Agility") somewhere else in the link, so
         -- also read it live when the list's copy has no stats or the name is longer.
-        local bare = true
+        -- Weapons with damage but no stats (Black Menace, Meteor Shard) aren't bare.
+        local bare = (known.dps or 0) == 0
         for k = 1, #known.st do if known.st[k] ~= 0 then bare = false break end end
         local linkName = type(link) == "string" and link:match("|h%[(.-)%]|h")
         -- WL Helper change (1.3.0): the list's names are English, so the name test only runs
@@ -1615,6 +1664,15 @@ local function LiveItem(id, link)
         if ratio and ratio > 0 and math.abs(ratio - 1) > 0.01 then item.st[STAT.def] = item.st[STAT.def] * ratio end
     end
     if known then
+        -- Same stats as the list's copy: it's the list's item after all, so keep its rank.
+        local same = true
+        for k = 1, #known.st do
+            if (item.st[k] or 0) ~= (known.st[k] or 0) and not (k == STAT.sp or k == STAT.heal or k == STAT.sdmg) then same = false break end
+        end
+        if same then
+            liveCache[link] = known
+            return known
+        end
         -- Keep what the list knows (level, speed, weapon type, hidden spell power) and use the
         -- link's stats on top.
         local merged = {}

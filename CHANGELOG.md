@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.178] — 2026-11-20
+
+### Modifié / Changed
+- **Pourcentages d'amélioration et Meilleur équipement à jour avec Geared Forever 1.2** : WL Helper Gear (1.5.0) reprend la nouvelle version de Nathan. Les poids de stats de chaque classe et spé ont été revérifiés avec les guides : au niveau 60, les soigneurs suivent l'ordre des guides (paladin Sacré, prêtres, chamans et druides Restauration), l'Intelligence du paladin compte un peu plus, l'expertise passe juste sous le toucher (au-dessus pour les voleurs), les tanks guerrier et paladin comptent plus la menace et un peu moins la défense, et la Maîtrise des bêtes compte l'Intelligence comme puissance d'attaque (Visée prudente, lue dans tes talents). Les chasseurs ne se voient plus proposer d'armes de jet. La liste des objets vient de la 1.2 (9 685 objets, nouvelles sources de quêtes).
+  *Gear scores updated to Geared Forever 1.2: stat weights rechecked for every spec (level 60 order for healers, Paladin Intellect, expertise vs hit, Protection threat and defense, Beast Mastery Careful Aim), no thrown weapons for hunters, 1.2 item and quest data.*
+
 ## [1.0.0-beta.177] — 2026-11-20
 
 ### Ajouté / Added

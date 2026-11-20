@@ -10,8 +10,8 @@
 --
 -- API (global table WLHelperGear)
 --
---   WLHelperGear.VERSION                      "1.4.0"
---   WLHelperGear.UPSTREAM                     "Geared Forever 1.1.1"
+--   WLHelperGear.VERSION                      "1.5.0"
+--   WLHelperGear.UPSTREAM                     "Geared Forever 1.2"
 --
 --   WLHelperGear.Spec() -> classToken, specKey, specName, auto
 --       Your class ("MAGE"), spec key ("frost"), spec name ("Frost") and whether the
@@ -117,8 +117,8 @@ local E = ns.engine
 local API = {}
 WLHelperGear = API
 
-API.VERSION = "1.4.0"
-API.UPSTREAM = "Geared Forever 1.1.1"
+API.VERSION = "1.5.0"
+API.UPSTREAM = "Geared Forever 1.2"
 
 local STAT_NAMES = {}
 for name, index in pairs(E.STAT) do STAT_NAMES[index] = name end

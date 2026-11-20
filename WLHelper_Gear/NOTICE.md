@@ -5,9 +5,9 @@ WaR LegenD on WoW Forever. It has no window, tooltip, slash command or chat mess
 of its own: WL Helper calls its public API (`WLHelperGear`, documented at the top of
 `Api.lua`).
 
-It is a modified version of **Geared Forever** by **Nathan**, version **1.1.1**
-(Geared Forever's `## Version: 1.1.1`, released 2026-11-16; the fork was first made
-from version 1.1), and is distributed under the same licence,
+It is a modified version of **Geared Forever** by **Nathan**, version **1.2**
+(Geared Forever's `## Version: 1.2`, released 2026-11-20; the fork was first made
+from version 1.1, then brought to 1.1.1 and 1.2), and is distributed under the same licence,
 the **GNU General Public License version 3** (full text in `LICENSE.txt`).
 
 WL Helper itself is a separate addon under its own licence (CC BY-NC-SA 4.0). It
@@ -18,24 +18,24 @@ section 5).
 ## Credits
 
 - **Geared Forever** by Nathan: stat weights, spec models, scoring, item list.
-  Copyright (C) 2026 Nathan, GPLv3. The unmodified original (version 1.1.1) is
+  Copyright (C) 2026 Nathan, GPLv3. The unmodified original (version 1.2) is
   distributed by its author Nathan as the `GearedForever` addon.
 - **ForeverDB**: item data from the WoW Forever launch client (1.60.1.70707), as
   compiled by Geared Forever (`Data.lua`).
 - **QuestieDB** by the Questie team and contributors (https://github.com/Questie/QuestieDB),
-  GPLv3: quest data (`QuestData.lua`), WoW Forever data set, commit 4dbb824 (as shipped
-  with Geared Forever 1.1.1).
+  GPLv3: quest data (`QuestData.lua`), WoW Forever data set, commit 48ce570 (as shipped
+  with Geared Forever 1.2).
 - **Wowhead Forever**: item stats, weapon damage and sources checked by Geared Forever.
 
 ## Modifications (GPLv3 section 5a)
 
 Changes 1 to 34 made by WaR LegenD on **2026-11-15**, starting from Geared Forever 1.1;
-changes 35 to 37 on **2026-11-16**, when Geared Forever 1.1.1 was ported (see the last
-section).
+changes 35 to 37 on **2026-11-16**, when Geared Forever 1.1.1 was ported, and changes 38
+to 41 on **2026-11-20**, when Geared Forever 1.2 was ported (see the last two sections).
 
 Files:
 
-- `Data.lua`, `QuestData.lua`: copied unchanged from Geared Forever 1.1.1, with one credit
+- `Data.lua`, `QuestData.lua`: copied unchanged from Geared Forever 1.2, with one credit
   line added at the top.
 - `Engine.lua`: the scoring part of Geared Forever's `Core.lua` (class and spec tables,
   stat weights, hit caps and curves, `Physical` / `Caster` / `Healer` / `Tank`,
@@ -220,5 +220,43 @@ Our changes for this port (marked "WL Helper change (1.3.0)"):
     `Weights()` returns `statsOnly` (`{ Thrown = true }` for hunters) and `prefer` holds only
     the damage multipliers.
 
+### Geared Forever 1.2 ported, version 1.5.0 (2026-11-20)
+
+Every change from Geared Forever 1.1.1 to 1.2 (2026-11-20) in its scoring and data was
+ported (checked against Geared Forever 1.2 itself: same item list, same weights for every
+spec at every level from 1 to 60 in neutral mode). Its window changes (search bar,
+Profession and Rarity filters, armor filter saved per class, items you own) are not, as this
+addon has none of those.
+
+Ported from Geared Forever 1.2 (Nathan's work, unchanged):
+
+- **Stat weights rechecked** against Wowhead Forever, Icy Veins, Warcraft Tavern and
+  Mobalytics: Paladin Intellect per 1% crit 28.8 / 54.0 (was 31.9 / 59.9); expertise next to
+  hit (`expRel`: 0.97 for warriors, Retribution, Enhancement and Feral, 1.03 for rogues);
+  Elemental spell hit 0.95 (`hitW`); Destruction haste 0.65; Feral hit 1.
+- **Level 60 stat order for healers and some casters** (`at60`, faded in from 50 to 60 like the
+  leveling weights): Holy paladin, Discipline and Holy priest, Restoration shaman and druid,
+  Arcane mage Intellect 0.55, Fire mage Spirit 0.3.
+- **Tanks**: Protection warrior threat 5, expertise 1.75, defense x0.68; Protection paladin
+  spell power 0.9, Intellect 0.55, threat 4, defense x0.76 (`threat`, `expW`, `defMult`).
+- **Specs**: Arms prefers swords a little (1.05, Weaponmaster's extra attacks), Combat fist
+  weapons 1.05 (was 1.02) and daggers 1.05, Retribution spell power 2.1, Beast Mastery Intellect as Careful Aim
+  attack power (intAP 1, Intellect 0.2, was 1.8).
+- **Hunters can't use thrown weapons** any more (Auto Shot needs a bow, gun or crossbow).
+- **Live items**: a weapon with damage but no stats is not read live as "bare", and an item read
+  live with the list's stats keeps the list's copy.
+- **Data**: `Data.lua` from 1.2 (9,685 items) and `QuestData.lua` from 1.2 (QuestieDB commit
+  48ce570).
+
+Our changes for this port (marked "WL Helper change (1.5.0)"):
+
+38. **Defense cap** (change 20): upstream's `defMult` scales the avoidance part of the defense
+    weight, as upstream; the crit-immunity part below the cap is not scaled.
+39. **Careful Aim for Beast Mastery** (talents read in game, change 4): 1.2 counts it for every
+    Beast Mastery hunter, so it is now looked up in the talent trees like for Marksmanship.
+40. **`at60` and talents**: from 50 the level 60 stat order fades in over the "talents you really
+    have" values (change 4) as it does over upstream's, so at 60 those stats are the guides'.
+41. **API**: `WLHelperGear.VERSION` is "1.5.0" and `UPSTREAM` "Geared Forever 1.2".
+
 With no talent data, no hit on the character and no enchant, and with
-`SetOptions({ neutral = true })`, the scores are the same as Geared Forever 1.1.1's.
+`SetOptions({ neutral = true })`, the scores are the same as Geared Forever 1.2's.
