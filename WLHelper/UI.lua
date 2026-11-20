@@ -4651,9 +4651,12 @@ function ns.UpdateActionBar()
   if #acts > 0 and host then
     abar:SetSize(labelW + math.min(#acts, AB_N) * (AB_S + 4), AB_S)
     abar:ClearAllPoints()
-    -- both frames may have their own size (scale): the bar sits on the host's top-left corner
-    abar:SetPoint("BOTTOMLEFT", host, "TOPLEFT", 0, 4)
+    -- the bar takes the host's size (scale) and sits on its top-left corner, placed on the screen
+    -- (UIParent), never anchored to the host: a secure bar anchored to the modern view made that
+    -- view protected, and its height could no longer change in combat (BugGrabber: "WLHelper tried
+    -- to call the protected function WLDTTracker:SetHeight()")
     abar:SetScale(host:GetScale() or 1)
+    abar:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", host:GetLeft(), host:GetTop() + 4)
     abar:Show()
   else abar:Hide(); abItemBtn = nil end
   ns.RefreshActionKeys()

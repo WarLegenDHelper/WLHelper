@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.181] — 2026-11-20
+
+### Corrigé / Fixed
+- **Erreur « action bloquée » en combat avec la vue moderne** (BugGrabber : « WLHelper tried to call the protected function WLDTTracker:SetHeight() ») : la barre Cibler / objet de quête était accrochée à la vue moderne, ce qui la rendait protégée en combat. La vue ne pouvait plus changer de taille. La barre est maintenant placée sur l'écran, au même endroit.
+  *Modern view: no more blocked-action error in combat (the target bar no longer anchors to it).*
+
 ## [1.0.0-beta.180] — 2026-11-20
 
 ### Corrigé / Fixed
