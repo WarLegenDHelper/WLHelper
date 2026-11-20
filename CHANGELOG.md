@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.184] — 2026-11-20
+
+### Ajouté / Added
+- **Meilleur équipement, où trouver le patron** : une pièce fabriquée dit où trouver son patron et le niveau de métier qu'il faut (« Patron : chez Qia (Berceau-de-l'Hiver) · métier 215 », « Patron : lâché par Pyromancien de Brandefeu · métier 295 », « butin aléatoire dans le monde », une quête, ou ton maître de métier). L'information vient du module Métiers de Naowh, lu en direct.
+  *Best gear: where to find a crafted piece's pattern, and the skill it needs.*
+
+### Corrigé / Fixed
+- **Meilleur équipement, des noms au lieu de numéros** : une pièce que le jeu n'avait pas encore chargée s'affichait avec son numéro (« 18727 »). La fenêtre demande maintenant l'objet au jeu et se redessine dès qu'il arrive.
+  *Best gear: item names instead of numbers.*
+- **« N choix » en gris** au lieu de rouge.
+  *"N picks" in grey, not red.*
+
 ## [1.0.0-beta.183] — 2026-11-20
 
 ### Modifié / Changed

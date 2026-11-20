@@ -2,6 +2,11 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.184", date = "2026-11-20", items = {
+    { s = "add", fr = { "Meilleur équipement, où trouver le patron", "Une pièce fabriquée dit où trouver son patron et le niveau de métier qu'il faut (« Patron : chez Qia (Berceau-de-l'Hiver) · métier 215 », « Patron : lâché par Pyromancien de Brandefeu · métier 295 », « butin aléatoire dans le monde », une quête, ou ton maître de métier). L'information vient du module Métiers de Naowh, lu en direct." }, en = { "Best gear", "Where to find a crafted piece's pattern, and the skill it needs." } },
+    { s = "fix", fr = { "Meilleur équipement, des noms au lieu de numéros", "Une pièce que le jeu n'avait pas encore chargée s'affichait avec son numéro (« 18727 »). La fenêtre demande maintenant l'objet au jeu et se redessine dès qu'il arrive." }, en = { "Best gear", "Item names instead of numbers." } },
+    { s = "fix", fr = { "« N choix » en gris", "Au lieu de rouge." }, en = { "\"N picks\" in grey, not red.", "" } },
+  } },
   { v = "1.0.0-beta.183", date = "2026-11-20", items = {
     { s = "chg", fr = { "Vue moderne, les dernières actions de la grande fenêtre", "Son menu (roue dentée) a maintenant « Recommencer la route » (dans Guides, avec confirmation), « Flèche GPS » et « Raccourcis clavier » (dans Affichage). Tout ce que faisait le menu Actions de la grande fenêtre se fait désormais depuis la vue moderne." }, en = { "Modern view menu", "Restart the route, GPS arrow on/off, key bindings." } },
   } },
@@ -79,12 +84,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Guide de quêtes, depuis l'accueil et le hub", "Un clic ouvre maintenant le choix de tous les guides, même quand un guide est en cours. Avant, il rouvrait seulement le guide en cours." }, en = { "Quest guide (Home and Hub)", "A click opens the choice of every guide." } },
     { s = "fix", fr = { "Quêtes de métier, niveau requis", "Le guide vérifie maintenant le niveau du métier, plus seulement le métier. Le Calice spectral (BRD) demande Minage 230 : il n'est plus proposé à un mineur en dessous." }, en = { "Profession quests", "The skill level is checked too (The Spectral Chalice needs Mining 230)." } },
     { s = "fix", fr = { "Set PvP", "Les pièces affichent leur nom au lieu d'un numéro, et le tableau a une colonne Endurance. L'ancienne colonne « Gain » s'appelle maintenant « DPS PvE », et son infobulle explique pourquoi une pièce PvP y perd." }, en = { "PvP set", "Piece names instead of numbers, a Stamina column, the PvE DPS column named as such." } },
-  } },
-  { v = "1.0.0-beta.169", date = "2026-11-19", items = {
-    { s = "chg", fr = { "Meilleur équipement, le BiS de Naowh en tête", "Si la BiS List de Naowh est installée, la première pièce de chaque emplacement des onglets Pré-BiS 60 et BiS 60 est celle de Naowh, marquée « BiS Naowh (simulé) ». C'est ton propre choix si tu as rempli « My BiS » chez Naowh, sinon son classement simulé (MythicSim). Le classement calculé de WL Helper Gear passe dessous, comme autre choix. Rien n'est copié : la liste est lue en direct dans l'addon de Naowh." }, en = { "Best gear", "With Naowh's BiS List installed, its simulated BiS comes first in each slot, ours under it." } },
-    { s = "chg", fr = { "Onglet PvP 60", "Chaque pièce dit ce qu'elle coûte. Pour le set d'honneur, c'est l'honneur et les marques (« 9 000 honneur + 15 marques Vallée d'Alterac »). Pour les pièces de rang, c'est le rang PvP requis (« Rang PvP 13 (Warlord) requis »). L'intro précise que le gain est calculé avec des poids PvE et ne compte pas l'endurance." }, en = { "PvP tab", "Honor and marks, or the PvP rank needed, for each piece." } },
-    { s = "chg", fr = { "Champs de bataille, bonus du jour bien visible", "En haut de la fenêtre, une bannière sur toute la largeur donne le nom du champ de bataille en bonus en grand et en doré, avec une étoile, une ligne qui explique, et « Y aller » vers son maître de guerre. Sans bonus, une ligne discrète. La pastille reste sur la carte." }, en = { "Battlegrounds", "Today's bonus is now a full-width banner with the battleground's name, a short line and a \"Go there\" button." } },
-    { s = "chg", fr = { "Fenêtre large", "Le tableau passe en colonnes (pièce, gain, provenance) au lieu d'une longue ligne étirée." }, en = { "Wide window", "The table uses columns." } },
-    { s = "fix", fr = { "Onglet PvP 60", "Plus de pièces de rang de l'autre faction (Field Marshal, Knight-Captain... pour un Horde, et inversement)." }, en = { "PvP tab", "No rank pieces of the other faction." } },
   } },
 }

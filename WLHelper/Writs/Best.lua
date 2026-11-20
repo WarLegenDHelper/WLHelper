@@ -240,6 +240,9 @@ ns.AddEnglish({
     ["Clic : ouvrir le guide de ce donjon"] = "Click: open this dungeon's guide",
     ["Maj-clic : le lien dans la discussion"] = "Shift-click: its link in the chat",
     ["BiS Naowh (simulé)"] = "Naowh BiS (simulated)",
+    ["Patron : %s"] = "Pattern: %s", ["chez %s"] = "from %s", ["lâché par %s"] = "dropped by %s",
+    ["butin aléatoire dans le monde"] = "a random world drop", ["quête « %s »"] = "quest \"%s\"",
+    ["chez ton maître de métier"] = "from your profession trainer", [" · métier %d"] = " · skill %d",
     ["En tête de ligne : le BiS de Naowh (simulations MythicSim) ; en dessous, le classement de WL Helper Gear pour tes stats."] =
         "First in each line: Naowh's BiS (MythicSim simulations); under it, WL Helper Gear's ranking for your stats.",
     ["Classement de WL Helper Gear pour ta spé et tes stats (poids de stats, pas de simulation). Installe la BiS List de Naowh pour avoir son BiS simulé en tête."] =
@@ -295,11 +298,18 @@ local function SpecName()
     return nil
 end
 
+local waiting = {}
 local function Info(id)
     if not GetItemInfo then return nil end
     local ok, name, link, _, _, minLevel = pcall(GetItemInfo, id)
     if not ok then return nil end
-    return Plain(name), Plain(link), tonumber(Plain(minLevel))
+    name = Plain(name)
+    if not name and id then
+        -- not loaded yet: asked, and the window draws again when it arrives (report: "why item IDs")
+        waiting[id] = true
+        if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
+    end
+    return name, Plain(link), tonumber(Plain(minLevel))
 end
 local function BagCount(id)
     local f = (C_Item and C_Item.GetItemCount) or GetItemCount
@@ -475,6 +485,61 @@ function Best.NaowhOverlay(list, mode, level)
     return used
 end
 
+-- ---------------------------------------------------------------- the pattern of a crafted piece
+-- (report: "for crafted pieces I need to see where the pattern is"): NaowhForever_Professions'
+-- recipe data (read live, nothing copied): a vendor (name and zone, your side first), the bosses
+-- that drop it, a random drop, a quest, the trainer. -> "Patron : Qia (Berceau-de-l'Hiver)" or nil
+local recipeOf
+local function ZoneName(m)
+    if not (C_Map and C_Map.GetMapInfo) then return nil end
+    local ok, info = pcall(C_Map.GetMapInfo, m)
+    return ok and type(info) == "table" and Plain(info.name) or nil
+end
+function Best.PatternText(itemID)
+    local n = rawget(_G, "NaowhForever")
+    local data = type(n) == "table" and n.RecipeData
+    if type(data) ~= "table" then return nil end
+    if not recipeOf then
+        recipeOf = {}
+        for _, prof in pairs(data) do
+            for _, r in ipairs(type(prof) == "table" and type(prof.recipes) == "table" and prof.recipes or {}) do
+                if r.item and not recipeOf[r.item] then recipeOf[r.item] = r end
+            end
+        end
+    end
+    local r = recipeOf[itemID]
+    if not r then return nil end
+    local side = UnitFactionGroup and Plain((UnitFactionGroup("player")))
+    local mine = side == "Horde" and "H" or side == "Alliance" and "A" or nil
+    local what
+    if r.source == "vendor" and type(r.vendors) == "table" then
+        local pick
+        for _, v in ipairs(r.vendors) do
+            if not pick or (mine and type(v[3]) == "string" and v[3]:find(mine, 1, true) and not (type(pick[3]) == "string" and pick[3]:find(mine, 1, true))) then pick = v end
+        end
+        if pick then
+            local z = pick[4] and ZoneName(pick[4])
+            what = string.format(L("chez %s"), (root.NpcName and root.NpcName(pick[2]) or pick[2])) .. (z and (" (" .. z .. ")") or "")
+        end
+    elseif r.source == "drop" and type(r.bosses) == "table" and #r.bosses > 0 then
+        local names = {}
+        for i = 1, math.min(2, #r.bosses) do
+            local b = r.bosses[i]
+            names[#names + 1] = root.NpcName and root.NpcName(b[1]) or b[1]
+        end
+        what = string.format(L("lâché par %s"), table.concat(names, ", ")) .. (#r.bosses > 2 and " +" .. (#r.bosses - 2) or "")
+    elseif r.source == "drop" then
+        what = L("butin aléatoire dans le monde")
+    elseif r.source == "quest" and type(r.quests) == "table" and r.quests[1] then
+        what = string.format(L("quête « %s »"), tostring(r.quests[1].name or "?"))
+    elseif r.source == "trainer" or r.source == "teacher" then
+        what = L("chez ton maître de métier")
+    end
+    if not what then return nil end
+    local lv = tonumber(r.skill)
+    return string.format(L("Patron : %s"), what) .. (lv and string.format(L(" · métier %d"), lv) or "")
+end
+
 local function PlaceTitle(e)
     if e.kind == "dungeon" then return e.dkey and root.DName and root.DName(e.dkey) or e.place end
     if e.kind == "quest" then return string.format(L("Quête : %s"), e.place) end
@@ -501,7 +566,7 @@ local function MakeRow(parent)
     r.src = S.Text(r, S.F.meta, C.muted); r.src:SetJustifyH("LEFT"); r.src:SetWordWrap(false)
     r.gain = S.Text(r, S.F.label, C.ok); r.gain:SetJustifyH("RIGHT"); r.gain:SetWordWrap(false)
     r.more = CreateFrame("Button", nil, r)
-    r.more.text = S.Text(r.more, S.F.meta, C.accentSoft or C.fg); r.more.text:SetPoint("RIGHT"); r.more.text:SetJustifyH("RIGHT")
+    r.more.text = S.Text(r.more, S.F.meta, C.muted); r.more.text:SetPoint("RIGHT"); r.more.text:SetJustifyH("RIGHT")
     r.more:SetScript("OnClick", function() if r.slotLabel then open[r.slotLabel] = not open[r.slotLabel] or nil; Best.Fill() end end)
     r.more:SetScript("OnEnter", function(self) S.Tip(self, { L("Clic : voir les autres choix") }) end)
     r.more:SetScript("OnLeave", S.HideTip)
@@ -566,6 +631,10 @@ local function PaintRow(r, W, it, slotLabel, state, nAlts, alt)
     r.name:SetWidth(nameW); r.name:ClearAllPoints()
     if wide then r.name:SetPoint("LEFT", x, 0) else r.name:SetPoint("TOPLEFT", x, alt and -4 or -6) end
     local src = it.source or ""
+    if type(it.raw) == "string" and it.raw:find("^Crafted") then
+        local okP, pt = pcall(Best.PatternText, it.id)
+        if okP and pt then src = src .. "  ·  " .. pt end
+    end
     if it.naowh and not alt then
         local g = C.gold
         src = string.format("|cff%02x%02x%02x%s|r", g[1] * 255, g[2] * 255, g[3] * 255, L("BiS Naowh (simulé)")) .. (src ~= "" and ("  ·  " .. src) or "")
@@ -796,6 +865,21 @@ function Best.Toggle(m, show)
     if win:IsShown() and not show and not m then win:Hide(); return end
     win:Show(); win:Raise()
     Fill(); win.tabs:Paint()
+end
+-- an item the window waited for arrived: one redraw (the many arriving at once make one)
+do
+    local ev = CreateFrame("Frame")
+    pcall(ev.RegisterEvent, ev, "GET_ITEM_INFO_RECEIVED")
+    local queued = false
+    ev:SetScript("OnEvent", function(_, _, id)
+        id = tonumber(Plain(id))
+        if not (id and waiting[id]) then return end
+        waiting[id] = nil
+        if queued or not (win and win:IsShown()) then return end
+        queued = true
+        local function go() queued = false; if win and win:IsShown() then Fill() end end
+        if C_Timer and C_Timer.After then C_Timer.After(0.3, go) else go() end
+    end)
 end
 -- for the offline tests
 Best._Slots, Best._Next = Slots, NextPlaces
