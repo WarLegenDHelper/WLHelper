@@ -766,8 +766,8 @@ local function LevelFact(qid, s)
   local lc = SW().LevelColor and SW().LevelColor(ql) or T.text
   seg[1] = Hex(lc) .. L.SUM_FACT_LV:format(ql) .. (bw and (" · " .. bw) or "") .. "|r"
   local r = num(q.r)
-  if s == "none" and r and r > plvl and HasL("SUM_NEED") then
-    seg[#seg + 1] = Hex(T.warn) .. L.SUM_NEED:format(r, plvl) .. "|r"
+  if s == "none" and r and r > plvl then
+    -- said on a line of its own (report: "it is not clear at all that I do not have the level")
   elseif s == "none" and r and r < ql and HasL("SUM_FROM") then
     seg[#seg + 1] = L.SUM_FROM:format(r)
   end
@@ -779,7 +779,7 @@ ns.GuideLevelFact = LevelFact
 local function NeedShown(qid, s)
   local q = ns.Q[qid]
   local r = q and num(q.r)
-  if not (r and s == "none" and HasL("SUM_NEED") and LevelFact(qid, s)) then return false end
+  if not (r and s == "none") then return false end
   local okL, plvl = pcall(function() return num(UnitLevel("player")) end)
   plvl = (okL and plvl) or 1
   return r > plvl
@@ -2161,7 +2161,7 @@ local function FocusModel(card, nd, log, dkey, st)
     else why[#why + 1] = Low(L.PRE) end
   elseif kind == "a" and ns.ChainState then
     local cs = ns.ChainState(nd.q)
-    if cs.total == 0 then why[#why + 1] = Low(L.CH_NONE)
+    if cs.total == 0 then -- "no prerequisite": nothing worth a word
     elseif cs.done >= cs.total then why[#why + 1] = Hex(T.ok) .. Low(L.CH_ALLDONE) .. "|r" .. mt
     else why[#why + 1] = Hex(T.warn) .. Low(L.ST_PRE:format(cs.done + 1, cs.total)) .. "|r" .. mt end
   end
@@ -2169,6 +2169,13 @@ local function FocusModel(card, nd, log, dkey, st)
   if #why > 0 then
     why[1] = Cap(why[1])
     M.why[1] = mt .. table.concat(why, SEP) .. "|r"
+  end
+  -- a quest you cannot take yet: said first, on its own line, in red
+  if kind == "a" and s == "none" then
+    local rq = num(q.r)
+    local okP, pl = pcall(function() return num(UnitLevel("player")) end)
+    pl = (okP and pl) or nil
+    if rq and pl and rq > pl then table.insert(M.why, 1, Hex(T.bad) .. L.CARD_TOO_LOW:format(rq, pl) .. "|r") end
   end
   -- every action done (the step waits on something else): the muted title and the WHY line only
   if ok then

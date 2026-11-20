@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.177] — 2026-11-20
+
+### Ajouté / Added
+- **Trouver un groupe, un clic suffit** : un clic sur la ligne d'un groupe envoie au chef un message tout prêt, avec ta classe, ton niveau, ton rôle, le donjon et les quêtes que tu peux partager (« Salut ! Mage niv. 53 (DPS), dispo pour Profondeurs de Rochenoire. J'ai les quêtes Le dernier élément, La révolte des machines +3 à partager. Tu as une place ? »). Maj-clic ouvre ce message dans la discussion pour le modifier avant de l'envoyer. Sur la ligne d'un joueur seul, le clic l'invite avec « Salut ! Tu veux faire Profondeurs de Rochenoire avec nous ? Je t'invite. ».
+  *Find a group: one click on a line sends a ready whisper (class, level, role, dungeon, quests to share); Shift-click to edit it; a lone player is invited with a question about the activity.*
+- **Filtre « Déjà dans le groupe »** : n'affiche que les groupes qui ont déjà un tank, un soigneur ou des DPS.
+  *Filter: groups that already have a tank or a healer.*
+
+### Modifié / Changed
+- **Niveau requis bien visible** : une quête que tu ne peux pas encore prendre le dit en rouge, sur sa propre ligne et en premier (« Pas encore pour toi : niveau 55 requis, tu es niveau 53. Passe cette étape (Maj-clic) et reviens plus tard. »). La mention inutile « aucun prérequis » disparaît.
+  *A quest you cannot take yet says so first, in red, on its own line.*
+
 ## [1.0.0-beta.176] — 2026-11-20
 
 ### Corrigé / Fixed

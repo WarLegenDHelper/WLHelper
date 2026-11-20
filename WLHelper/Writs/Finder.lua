@@ -124,6 +124,10 @@ ns.AddEnglish({
     ["Clic : ouvrir un chuchotement à %s"] = "Click: open a whisper to %s",
     ["Clic droit : plus d'actions"] = "Right-click: more actions",
     ["Double-clic : la même chose"] = "Double-click: the same",
+    ["Clic sur la ligne : la même chose"] = "Click the line: the same",
+    ["Maj-clic : modifier le message avant de l'envoyer"] = "Shift-click: edit the message before sending it",
+    ["Déjà dans le groupe"] = "Already in the group",
+    ["Le groupe a déjà ce rôle"] = "The group already has this role",
     ["Nom masqué par le jeu en donjon."] = "Name hidden by the game in dungeons.",
     ["Noter ce joueur"] = "Rate this player",
     ["Effacer la note"] = "Clear rating",
@@ -277,7 +281,7 @@ function F.DB()
 end
 local function DefaultFilters()
     return { kind = "all", roles = {}, classes = {}, excludeClasses = false, lvlMin = 0, lvlMax = 0, myLevel = true,
-        langs = {}, playstyle = 0, slots = {}, text = "" }
+        langs = {}, playstyle = 0, slots = {}, has = {}, text = "" }
 end
 F.DefaultFilters = DefaultFilters
 -- a filter table as read from the saved data: only what is valid is kept
@@ -288,6 +292,7 @@ function F.SanitizeFilters(t)
     for _, r in ipairs(ROLES) do
         if type(t.roles) == "table" and t.roles[r] == true then f.roles[r] = true end
         if type(t.slots) == "table" and t.slots[r] == true then f.slots[r] = true end
+        if type(t.has) == "table" and t.has[r] == true then f.has[r] = true end
     end
     if type(t.classes) == "table" then
         for c, v in pairs(t.classes) do if CLASS_SET[c] and v == true then f.classes[c] = true end end
@@ -1097,6 +1102,14 @@ function F.Pass(row, f)
         local free = { tank = 1 - row.counts.tank, heal = 1 - row.counts.heal, dps = 3 - row.counts.dps }
         for _, r in ipairs(ROLES) do if f.slots[r] and free[r] <= 0 then return false end end
     end
+    -- groups that already have the role (report: "a group with a healer already in it")
+    local has = f.has or {}
+    if has.tank or has.heal or has.dps then
+        if row.kind == "player" then return false end
+        local c = row.counts
+        if not c then return false end
+        for _, r in ipairs(ROLES) do if has[r] and (tonumber(c[r]) or 0) < 1 then return false end end
+    end
     if next(f.classes) then
         if row.kind == "player" then
             if row.cls and not f.classes[row.cls] then return false end
@@ -1207,9 +1220,9 @@ end
 
 -- the message templates (Settings > Groupes); the default follows the client's language
 local DEFAULT = {
-    ask = { fr = "Salut ! %class% niv. %level% (%role%), dispo pour %dungeon% si tu as une place.",
-        en = "Hi! Level %level% %class% (%role%), free for %dungeon% if you have a spot." },
-    invite = { fr = "Salut, je t'invite pour %dungeon%.", en = "Hi, inviting you for %dungeon%." },
+    ask = { fr = "Salut ! %class% niv. %level% (%role%), dispo pour %dungeon%.%share% Tu as une place ?",
+        en = "Hi! Level %level% %class% (%role%), free for %dungeon%.%share% Got a spot?" },
+    invite = { fr = "Salut ! Tu veux faire %dungeon% avec nous ? Je t'invite.", en = "Hi! Want to do %dungeon% with us? Inviting you." },
 }
 F.DEFAULT_TEMPLATES = DEFAULT
 local TEMPLATE_KEY = { ask = "finderAsk", invite = "finderInvite" }
@@ -1292,6 +1305,8 @@ function F.Fill(template, row)
         dungeon = DungeonText(row),
         quests = F.QuestsText(row),
     }
+    -- " J'ai les quêtes X, Y +2 à partager." (nothing when I have none of them)
+    vals.share = vals.quests ~= "" and string.format(fr == "fr" and " J'ai les quêtes %s à partager." or " I have %s to share.", vals.quests) or ""
     local out = tostring(template or ""):gsub("%%(%a+)%%", function(k)
         local v = vals[k]
         if v == nil then return nil end
@@ -1874,10 +1889,23 @@ local function ResultRow(parent)
         if not row then return end
         if button == "RightButton" then F.Menu(self, row.leader, row); return end
         -- alt-click invites a lone player (a group's leader is already in a group)
-        if IsAltKeyDown and IsAltKeyDown() and row.kind == "player" then F.Invite(row); F.Render() end
+        if IsAltKeyDown and IsAltKeyDown() and row.kind == "player" then F.Invite(row); F.Render(); return end
+        -- Shift-click on a group: the whisper box with the message, to change it before sending
+        if IsShiftKeyDown and IsShiftKeyDown() and row.kind ~= "player" then
+            local name = F.LiveName(row)
+            if name and ChatFrame_OpenChat then
+                ChatFrame_OpenChat("/w " .. name .. " " .. F.Fill(F.Template("ask"), row))
+                F.contacted[name] = Now()
+            end
+            return
+        end
+        -- a click on the line does the line's action (report: "click a line and it sends a whisper
+        -- with my class, my level, the quests I can share")
+        if self.act:IsShown() and self.act:IsEnabled() then F.Act(row); F.Render() end
 
     end)
-    r:SetScript("OnDoubleClick", function(self) if self.row and self.act:IsShown() then F.Act(self.row); F.Render() end end)
+    -- one click is enough now: a double-click must not ask twice
+    r:SetScript("OnDoubleClick", nil)
     r:SetScript("OnEnter", function(self)
         Hover(true)
         local row = self.row
@@ -1897,7 +1925,8 @@ local function ResultRow(parent)
         if (row.left or 0) > 0 then lines[#lines + 1] = { string.format(L("A quitté %d donjon(s) en cours avec toi."), row.left), C.warn[1], C.warn[2], C.warn[3] } end
         if self.act:IsShown() then
             for _, l in ipairs(ActionTip(row)) do lines[#lines + 1] = l end
-            lines[#lines + 1] = L("Double-clic : la même chose")
+            lines[#lines + 1] = L("Clic sur la ligne : la même chose")
+            if row.kind ~= "player" then lines[#lines + 1] = L("Maj-clic : modifier le message avant de l'envoyer") end
         elseif not row.self and not row.delisted and (F.Locked() or not row.leader) then
             lines[#lines + 1] = { L("En donjon, le jeu masque les noms : les actions reviennent à la sortie."), C.muted[1], C.muted[2], C.muted[3] }
         end
@@ -2226,6 +2255,11 @@ local function BuildFilters()
     fpop.slots = RoleToggles(fpop, function(r) return F.Filters().slots[r] end,
         function(r, v) F.Filters().slots[r] = v and true or nil; Changed() end,
         { { L("Tank"), L("Places libres") }, { L("Soigneur"), L("Places libres") }, { L("DPS"), L("Places libres") } })
+    -- roles the group already has
+    fpop.hasLabel = Label(L("Déjà dans le groupe"))
+    fpop.has = RoleToggles(fpop, function(r) local h = F.Filters().has; return h and h[r] end,
+        function(r, v) local fl = F.Filters(); fl.has = fl.has or {}; fl.has[r] = v and true or nil; Changed() end,
+        { { L("Tank"), L("Le groupe a déjà ce rôle") }, { L("Soigneur"), L("Le groupe a déjà ce rôle") }, { L("DPS"), L("Le groupe a déjà ce rôle") } })
     -- my filters, reset
     fpop.presets = S.Button(fpop, L("Mes filtres"), 0, 28, "secondary", function(self)
         self.popOwner = fpop
@@ -2280,6 +2314,8 @@ local function BuildFilters()
         Place(self.style, P, y); self.style:Update(); y = y + 28 + 12
         Place(self.slotLabel, P, y); y = y + FS.meta + 6
         Place(self.slots, P, y); self.slots:Update(); y = y + 28 + 12
+        Place(self.hasLabel, P, y); y = y + FS.meta + 6
+        Place(self.has, P, y); self.has:Update(); y = y + 28 + 12
         Place(self.presets, P, y); self.reset:ClearAllPoints(); self.reset:SetPoint("LEFT", self.presets, "RIGHT", 8, 0)
         y = y + 28 + P
         self:SetHeight(y)
