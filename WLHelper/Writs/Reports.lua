@@ -35,6 +35,7 @@ ns.AddEnglish({
     ["Bug"] = "Bug", ["Idée"] = "Idea", ["Erreur de quête"] = "Quest data error", ["Erreur Lua"] = "Lua error",
     ["nouveau"] = "new", ["Capture : "] = "Screenshot: ", ["Étape : "] = "Step: ",
     ["Envoi automatique des erreurs de WL Helper : %s"] = "Automatic sending of WL Helper's errors: %s",
+    ["Envoi automatique des mesures de mémoire : %s"] = "Automatic sending of the memory measures: %s",
     ["activé"] = "on",
     ["coupé"] = "off",
 })
@@ -308,7 +309,7 @@ end
 
 -- "/wlh bug <text>", "/wlh idee <text>", the form's Send. kind: "bug" | "idea" | "quest"; shot: the
 -- link of a screenshot the player put online (Discord, imgur...), or nil. -> the report, or nil
-local KINDS = { bug = true, idea = true, quest = true, error = true }
+local KINDS = { bug = true, idea = true, quest = true, error = true, mem = true }
 local seq = 0
 function R.New(kind, text, shot, quiet, extra)
     text = Str(text and (text:gsub("^%s+", ""):gsub("%s+$", "")))
@@ -423,6 +424,75 @@ function R.HookErrors()
     end, R)
 end
 
+-- ---------------------------------------------------------------- memory, measured at the players'
+-- (report: "the addon takes 110 MB: let my addon send reports, then we fix"). Once a day per
+-- character, after MEM_AFTER seconds of play (the GPS and the guide have been used by then): the
+-- memory of each part of WL Helper, whether its movement maps are loaded, the total of every
+-- addon, the five heaviest addons, and WL Helper's slowest timings (WLWritsDB.perf). A report of
+-- kind "mem", silent; "/wlh rapports memoire off" stops it. Nothing leaves the guild.
+local MEM_AFTER = 20 * 60
+local PARTS = { "WLHelper", "WLHelper_Gear", "WLHelper_Nav", "WLHelper_Nav_EK", "WLHelper_Nav_Kalimdor" }
+function R.AutoMemOn()
+    local d = DB()
+    return d ~= nil and d.autoMem ~= false
+end
+local function MB(kb) return string.format("%.1f", (kb or 0) / 1024) end
+function R.MemText()
+    local upd, get = rawget(_G, "UpdateAddOnMemoryUsage"), rawget(_G, "GetAddOnMemoryUsage")
+    if type(upd) ~= "function" or type(get) ~= "function" then return nil end
+    pcall(upd)
+    local A = C_AddOns
+    local loaded = (A and A.IsAddOnLoaded) or rawget(_G, "IsAddOnLoaded")
+    local count = (A and A.GetNumAddOns) or rawget(_G, "GetNumAddOns")
+    local info = (A and A.GetAddOnInfo) or rawget(_G, "GetAddOnInfo")
+    local ours, total, all = {}, 0, {}
+    for _, name in ipairs(PARTS) do
+        local label = name == "WLHelper" and "core" or (name:gsub("^WLHelper_", ""))
+        local okL, isL = pcall(loaded, name)
+        if okL and isL then
+            local okM, kb = pcall(get, name)
+            ours[#ours + 1] = label .. "=" .. ((okM and Num(kb)) and MB(kb) or "?")
+        else
+            ours[#ours + 1] = label .. "=-"
+        end
+    end
+    local okC, n = pcall(count)
+    for i = 1, (okC and Num(n) or 0) do
+        local okI, name = pcall(info, i)
+        name = okI and Str(name)
+        local okL, isL = pcall(loaded, i)
+        if name and okL and isL then
+            local okM, kb = pcall(get, i)
+            kb = okM and Num(kb) or 0
+            total = total + kb
+            all[#all + 1] = { name, kb }
+        end
+    end
+    table.sort(all, function(a, b) return a[2] > b[2] end)
+    local top = {}
+    for i = 1, math.min(5, #all) do top[i] = all[i][1] .. "=" .. MB(all[i][2]) end
+    local slow = {}
+    local perf = WLWritsDB and type(WLWritsDB.perf) == "table" and WLWritsDB.perf or {}
+    local list = {}
+    for tag, pf in pairs(perf) do if type(pf) == "table" and Num(pf.max) then list[#list + 1] = { tag, pf.max } end end
+    table.sort(list, function(a, b) return a[2] > b[2] end)
+    for i = 1, math.min(3, #list) do slow[i] = list[i][1] .. "=" .. list[i][2] .. "ms" end
+    local upMin = math.floor(((GetTime and GetTime()) or 0) / 60)
+    return string.format("MEM (MB) WLH %s | all addons %s (%d) | top %s | slowest %s | session %d min",
+        table.concat(ours, " "), MB(total), #all, table.concat(top, " "), #slow > 0 and table.concat(slow, " ") or "-", upMin)
+end
+function R.SendMem()
+    if not R.AutoMemOn() then return nil end
+    local d = DB()
+    if not d then return nil end
+    local day = date and date("%Y-%m-%d") or "?"
+    if d.memDay == day then return nil end
+    local text = R.MemText()
+    if not text then return nil end
+    d.memDay = day
+    return R.New("mem", text, nil, true)
+end
+
 -- ---------------------------------------------------------------- the inbox, in the game
 -- -> received, not read yet
 function R.Counts()
@@ -497,6 +567,12 @@ end
 function R.Command(arg)
     local d = DB()
     if not d then return end
+    local mm = arg and (arg:match("^m[eé]moire (%a+)$") or arg:match("^memory (%a+)$") or arg:match("^mem (%a+)$"))
+    if mm == "on" or mm == "off" then
+        if mm == "off" then d.autoMem = false else d.autoMem = nil end
+        WP.Print(string.format(L("Envoi automatique des mesures de mémoire : %s"), mm == "on" and L("activé") or L("coupé")))
+        return
+    end
     local e = arg and arg:match("^erreurs? (%a+)$") or (arg and arg:match("^errors? (%a+)$"))
     if e == "on" or e == "off" then
         if e == "off" then d.autoErr = false else d.autoErr = nil end
@@ -528,6 +604,8 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
         local Register = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
         if Register then pcall(Register, PREFIX) end
         pcall(R.HookErrors)
+        -- the day's memory report, after MEM_AFTER seconds of play
+        if C_Timer and C_Timer.After then C_Timer.After(MEM_AFTER, function() pcall(R.SendMem) end) end
         -- the roster, asked once: who is online (the guild master receives the reports)
         if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster) elseif GuildRoster then pcall(GuildRoster) end
         if C_Timer and C_Timer.After then

@@ -6,6 +6,16 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.189] — 2026-11-22
+
+### Ajouté / Added
+- **Mesures de mémoire envoyées automatiquement** : une fois par jour et par personnage, après 20 minutes de jeu, WL Helper envoie en silence au chef de guilde un rapport avec la mémoire de chacune de ses parties (le guide, WL Helper Gear, la navigation et ses cartes de déplacement), le total de tous les addons chargés, les 5 addons les plus lourds et ses opérations les plus lentes. Il passe par le même chemin que les rapports « Nous écrire » : la guilde seulement. Pour le couper : `/wlh rapports memoire off`.
+  *Once a day per character, a silent memory report goes to the guild master through the guild (`/wlh rapports memoire off` stops it).*
+
+### Corrigé / Fixed
+- **Notes de la beta.188** : la ligne « Champs de bataille, classement PvP de la guilde » n'apparaît plus qu'une fois, dans le changelog comme dans la fenêtre des nouveautés.
+  *The beta.188 notes no longer list the guild PvP ranking twice.*
+
 ## [1.0.0-beta.188] — 2026-11-22
 
 ### Ajouté / Added
@@ -17,8 +27,6 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
   *Quest guide: Dungeon Set 2 (T0.5), your class's whole chain from Deliana or Mokvar to Saving the Best for Last.*
 - **Hebdo : sac de l'Undermine** : nouvelle carte dans l'onglet Quêtes pour la quête hebdomadaire du niveau 60 (Pix Xizzix, Baie-du-Butin) : un objet du dernier boss de chaque aile de Hache-Tripes, contre un sac avec un objet en or de 10 à 100 pièces.
   *Weekly: a Quests tab card for the level 60 weekly quest (Pix Xizzix, Booty Bay): an item from the last boss of each Dire Maul wing for an Undermine Satchel.*
-- **Champs de bataille, classement PvP de la guilde** : un onglet « Guilde » liste les membres qui ont WL Helper, avec leur rang PvP (titre du jeu, points dans l'infobulle), l'honneur de la semaine et du jour, les victoires de la semaine et leur rang dans les 4 factions de champ de bataille. Tri par honneur de la semaine (par défaut), par rang ou par victoires. Ta ligne est en évidence. Les chiffres viennent du jeu de chacun, partagés sur le canal de la guilde.
-  *Battlegrounds: a Guild tab ranking the members with WL Helper by honor this week, rank or wins, with their battleground standings.*
 
 ## [1.0.0-beta.187] — 2026-11-22
 
