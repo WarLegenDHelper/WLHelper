@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.199] — 2026-11-22
+
+### Ajouté / Added
+- **Les quêtes d'introduction** : comparé à Naowh Dungeon Journal et ForeverDungeonJournal, il nous manquait des quêtes Horde qui mènent à une quête de donjon. Chacune a été vérifiée sur Wowhead WoW Forever (qui la donne, où elle mène, à quel niveau). Elles sont ajoutées comme une note sur la quête qu'elles annoncent, pas comme une étape (elles sont facultatives et allongeraient le trajet) : Tran'rek (Scarab Shells), Tabetha's Task pour les mages (Tiara of the Deep), Vivian Lagrave (Lost Thunderbrew Recipe), Yuka Screwspigot (Ribbly Screwspigot), Vivian Lagrave and the Darkstone Tablet (The Darkstone Tablet), Camp Mojache (Lethtendris's Web), et le début de la suite de voleur A Simple Request (The Azure Key).
+  *Horde breadcrumb quests found in Naowh's and ForeverDungeonJournal's lists, each checked on Wowhead WoW Forever, now appear as a note on the quest they lead to.*
+
 ## [1.0.0-beta.198] — 2026-11-22
 
 ### Modifié / Changed

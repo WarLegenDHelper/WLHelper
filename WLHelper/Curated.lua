@@ -1130,3 +1130,43 @@ do
     if q and not q.ne then q.ne = NEUTRAL end
   end
 end
+
+-- =====================================================================
+-- Quêtes d'introduction facultatives (breadcrumbs) : une note sur la quête qu'elles annoncent, pas
+-- une étape (elles allongeraient le trajet pour rien). Comparaison avec Naowh Dungeon Journal 1.4.5
+-- et ForeverDungeonJournal 2.1.3 (2026-11-22), chacune vérifiée sur sa page Wowhead WoW Forever
+-- (départ, arrivée, niveau, suite).
+-- =====================================================================
+local BREADCRUMBS = {
+  -- [quest it leads to] = { breadcrumb id, English note, French note }
+  [2865] = { 2864, "Optional: Krazek in Booty Bay gives \"Tran'rek\" (level 45), a short trip that leads here.",
+                   "Facultatif : Krazek, à Baie-du-Butin, donne « Tran'rek » (niveau 45), un petit voyage qui mène ici." },
+  [2846] = { 2861, "Mages only, optional: \"Tabetha's Task\" from a mage trainer (Deino in Orgrimmar, Anastasia Hartwell in Undercity) leads here.",
+                   "Mages seulement, facultatif : « Tabetha's Task », chez un maître des mages (Deino à Orgrimmar, Anastasia Hartwell à Fossoyeuse), mène ici." },
+  [4134] = { 4133, "Optional: Apothecary Zinge in Undercity's Apothecarium gives \"Vivian Lagrave\" (level 55), which leads here.",
+                   "Facultatif : l'apothicaire Zinge, à l'Apothicarium de Fossoyeuse, donne « Vivian Lagrave » (niveau 55), qui mène ici." },
+  [4136] = { 4324, "Optional: Yorba Screwspigot at Steamwheedle Port (Tanaris) gives \"Yuka Screwspigot\" (level 53), which leads here.",
+                   "Facultatif : Yorba Screwspigot, au port de Gentepression (Tanaris), donne « Yuka Screwspigot » (niveau 53), qui mène ici." },
+  [4768] = { 4769, "Optional: Apothecary Zinge in Undercity gives \"Vivian Lagrave and the Darkstone Tablet\" (level 60), which leads here.",
+                   "Facultatif : l'apothicaire Zinge, à Fossoyeuse, donne « Vivian Lagrave and the Darkstone Tablet » (niveau 60), qui mène ici." },
+  [7489] = { 7492, "Optional: \"Camp Mojache\" (Harbinger Balthazad in Undercity, Warcaller Gorlach in Orgrimmar or Bluff Runner Windstrider in Thunder Bluff) leads here.",
+                   "Facultatif : « Camp Mojache » (Harbinger Balthazad à Fossoyeuse, Warcaller Gorlach à Orgrimmar ou Bluff Runner Windstrider aux Pitons-du-Tonnerre) mène ici." },
+  [8236] = { 8233, "\"A Simple Request\" from a rogue trainer starts this chain at Ravenholdt Manor (Sealed Azure Bag, Encoded Fragments, then this one).",
+                   "« A Simple Request », chez un maître des voleurs, ouvre cette suite au manoir Ravenholdt (Sealed Azure Bag, Encoded Fragments, puis celle-ci)." },
+}
+for target, b in pairs(BREADCRUMBS) do
+  local q = ns.Q[target]
+  if q then
+    local old = q.ne
+    if old then
+      -- the note already there keeps its French (Texts_frFR.lua, loaded before this file)
+      local oldFR = ns.TR[old] or old
+      q.ne = old .. " " .. b[2]
+      ns.TR[q.ne] = oldFR .. " " .. b[3]
+    else
+      q.ne = b[2]
+      ns.TR[q.ne] = b[3]
+    end
+    q.crumb = b[1]
+  end
+end
