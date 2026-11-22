@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.203] — 2026-11-22
+
+### Ajouté / Added
+- **Rapport automatique des quêtes renumérotées** : quand le guide reconnaît par son titre une quête du journal dont le numéro nous est inconnu, il envoie tout seul un rapport discret à l'équipe WL Helper, une fois par numéro, pour qu'on l'ajoute aux données. An Earnest Proposition 84157 (vue chez un mage Horde) est déjà ajoutée.
+  *A renumbered quest recognised by its title is reported once, quietly, so its number goes into the data; An Earnest Proposition 84157 added.*
+
 ## [1.0.0-beta.202] — 2026-11-22
 
 ### Corrigé / Fixed

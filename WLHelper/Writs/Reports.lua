@@ -33,7 +33,7 @@ ns.AddEnglish({
     ["destination du GPS"] = "the GPS destination", ["ta cible : "] = "your target: ", ["la dernière erreur Lua"] = "the last Lua error",
     ["Rapports des joueurs"] = "Players' reports",
     ["Aucun rapport reçu pour l'instant. Ils arrivent ici quand un joueur utilise « Nous écrire »."] = "No report yet. They come here when a player uses \"Write to us\".",
-    ["Bug"] = "Bug", ["Idée"] = "Idea", ["Erreur de quête"] = "Quest data error", ["Erreur Lua"] = "Lua error",
+    ["Bug"] = "Bug", ["Idée"] = "Idea", ["Erreur de quête"] = "Quest data error", ["Erreur Lua"] = "Lua error", ["Quête renumérotée"] = "Renumbered quest",
     ["nouveau"] = "new", ["Capture : "] = "Screenshot: ", ["Étape : "] = "Step: ",
     ["Envoi automatique des erreurs de WL Helper : %s"] = "Automatic sending of WL Helper's errors: %s",
     ["Envoi automatique des mesures de mémoire : %s"] = "Automatic sending of the memory measures: %s",
@@ -328,7 +328,7 @@ end
 
 -- "/wlh bug <text>", "/wlh idee <text>", the form's Send. kind: "bug" | "idea" | "quest"; shot: the
 -- link of a screenshot the player put online (Discord, imgur...), or nil. -> the report, or nil
-local KINDS = { bug = true, idea = true, quest = true, error = true, mem = true, run = true }
+local KINDS = { bug = true, idea = true, quest = true, error = true, mem = true, run = true, newid = true }
 local seq = 0
 function R.New(kind, text, shot, quiet, extra)
     text = Str(text and (text:gsub("^%s+", ""):gsub("%s+$", "")))
@@ -532,8 +532,8 @@ function R.List()
     table.sort(out, function(a, b) return (tonumber(a.at) or 0) > (tonumber(b.at) or 0) end)
     return out
 end
-local KIND_LABEL = { bug = "Bug", idea = "Idée", quest = "Erreur de quête", error = "Erreur Lua" }
-local KIND_COLOR = { bug = "warn", idea = "info", quest = "gold", error = "bad" }
+local KIND_LABEL = { bug = "Bug", idea = "Idée", quest = "Erreur de quête", error = "Erreur Lua", newid = "Quête renumérotée" }
+local KIND_COLOR = { bug = "warn", idea = "info", quest = "gold", error = "bad", newid = "info" }
 local inboxWin
 function R.ShowInbox()
     local S, C, F = ns.S, ns.S.C, ns.S.F
@@ -787,4 +787,21 @@ do
         elseif e == "ENCOUNTER_END" then if Num(a5) == 1 then pcall(R.TrailBoss, a2) end
         elseif e == "BOSS_KILL" then pcall(R.TrailBoss, a2) end
     end)
+end
+
+-- ---------------------------------------------------------------- a quest Forever renumbered
+-- Curated.lua recognises a log quest whose number we do not know by its title (An Earnest
+-- Proposition 84157 for 8915) and calls this once per number: a quiet "newid" report, sent once per
+-- account, tells the team to add the number to the data (report: "make reports for these and fix
+-- them automatically").
+root.OnNewQuestId = function(qid, title, ids)
+    local d = DB()
+    if not d or type(qid) ~= "number" then return end
+    d.newIdSent = d.newIdSent or {}
+    if d.newIdSent[qid] then return end
+    d.newIdSent[qid] = true
+    local known = {}
+    for _, id in ipairs(ids or {}) do known[#known + 1] = tostring(id) end
+    R.New("newid", string.format("Forever quest %d \"%s\" = our %s", qid, tostring(title), table.concat(known, ",")), nil, true,
+        { qid = qid })
 end

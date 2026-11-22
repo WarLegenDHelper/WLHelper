@@ -467,12 +467,12 @@ do
 end
 
 -- Forever donne un nouveau numéro à certaines quêtes connues (la suite du set de donjon 2 :
--- 97411 An Earnest Proposition chez Mokvar, 97412, 97448 et 84163 à 84178 Just Compensation,
+-- 97411 et 84157 An Earnest Proposition chez Mokvar (84157 vu dans le journal d'un mage Horde), 97412, 97448 et 84163 à 84178 Just Compensation,
 -- 84179 Anthion's Parting Words, d'après NaowhForever). Une quête du journal dont le numéro nous
 -- est inconnu mais dont le titre est celui d'une de nos quêtes faisable par ce personnage (sa
 -- faction, sa classe, sa race) compte pour celle-ci : prise, prête à rendre, puis faite une fois
 -- rendue. Le numéro vu dans le journal est retenu (WLDTDB.newIds) pour reconnaître la quête rendue.
-ns.FOREVER_IDS = { [97411] = "An Earnest Proposition", [97412] = "Just Compensation", [97448] = "Just Compensation",
+ns.FOREVER_IDS = { [97411] = "An Earnest Proposition", [84157] = "An Earnest Proposition", [97412] = "Just Compensation", [97448] = "Just Compensation",
   [84179] = "Anthion's Parting Words" }
 for id = 84163, 84178 do ns.FOREVER_IDS[id] = "Just Compensation" end
 do
@@ -530,13 +530,17 @@ do
     end
     for _, x in ipairs(extra or {}) do
       local qid, e = x[1], x[2]
-      local hit = false
+      local hit
       for _, id in ipairs(Index()[e.title]) do
-        if not list[id] and Mine(id) then list[id] = e; hit = true end
+        if not list[id] and Mine(id) then list[id] = e; hit = hit or {}; hit[#hit + 1] = id end
       end
       if hit and type(WLDTDB) == "table" and not ns.FOREVER_IDS[qid] then
         WLDTDB.newIds = WLDTDB.newIds or {}
-        if WLDTDB.newIds[qid] ~= e.title then WLDTDB.newIds[qid] = e.title; newByName = nil end
+        if WLDTDB.newIds[qid] ~= e.title then
+          WLDTDB.newIds[qid] = e.title; newByName = nil
+          -- reported once to the WL Helper team (Writs/Reports.lua), so the number goes into the data
+          if ns.OnNewQuestId then pcall(ns.OnNewQuestId, qid, e.title, hit) end
+        end
       end
     end
     return list
