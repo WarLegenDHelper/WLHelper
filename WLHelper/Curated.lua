@@ -466,6 +466,83 @@ do
   end
 end
 
+-- Forever donne un nouveau numéro à certaines quêtes connues (la suite du set de donjon 2 :
+-- 97411 An Earnest Proposition chez Mokvar, 97412, 97448 et 84163 à 84178 Just Compensation,
+-- 84179 Anthion's Parting Words, d'après NaowhForever). Une quête du journal dont le numéro nous
+-- est inconnu mais dont le titre est celui d'une de nos quêtes faisable par ce personnage (sa
+-- faction, sa classe, sa race) compte pour celle-ci : prise, prête à rendre, puis faite une fois
+-- rendue. Le numéro vu dans le journal est retenu (WLDTDB.newIds) pour reconnaître la quête rendue.
+ns.FOREVER_IDS = { [97411] = "An Earnest Proposition", [97412] = "Just Compensation", [97448] = "Just Compensation",
+  [84179] = "Anthion's Parting Words" }
+for id = 84163, 84178 do ns.FOREVER_IDS[id] = "Just Compensation" end
+do
+  local byName, newByName
+  local function Index()
+    if byName then return byName end
+    byName = {}
+    for id, q in pairs(ns.Q) do
+      for _, name in ipairs({ q.n or false, q.nf or false }) do
+        if name then local l = byName[name] or {}; l[#l + 1] = id; byName[name] = l end
+      end
+    end
+    return byName
+  end
+  local function NewIds()
+    if newByName then return newByName end
+    newByName = {}
+    local function add(nid, name)
+      if type(nid) == "number" and type(name) == "string" and not ns.Q[nid] then
+        local l = newByName[name] or {}; l[#l + 1] = nid; newByName[name] = l
+      end
+    end
+    for nid, name in pairs(ns.FOREVER_IDS) do add(nid, name) end
+    if type(WLDTDB) == "table" and type(WLDTDB.newIds) == "table" then
+      for nid, name in pairs(WLDTDB.newIds) do if not ns.FOREVER_IDS[nid] then add(nid, name) end end
+    end
+    return newByName
+  end
+  local function Mine(id)
+    local q = ns.Q[id]
+    if not q then return false end
+    local cls = UnitClass and select(2, UnitClass("player"))
+    return ns.FactionOK(q.fa) and (not cls or ns.ClassOK(q.c, cls)) and ns.RaceOK(q.race)
+  end
+  local isDone3 = ns.IsDone
+  ns.IsDone = function(id)
+    if isDone3(id) then return true end
+    local q = ns.Q[id]
+    local l = q and q.n and NewIds()[q.n]
+    if not l then return false end
+    for _, nid in ipairs(l) do
+      if isDone3(nid) then return Mine(id) end
+    end
+    return false
+  end
+  local log3 = ns.LogEntries
+  ns.LogEntries = function()
+    local list = log3()
+    local extra
+    for qid, e in pairs(list) do
+      if not ns.Q[qid] and e.title and Index()[e.title] then
+        extra = extra or {}
+        extra[#extra + 1] = { qid, e }
+      end
+    end
+    for _, x in ipairs(extra or {}) do
+      local qid, e = x[1], x[2]
+      local hit = false
+      for _, id in ipairs(Index()[e.title]) do
+        if not list[id] and Mine(id) then list[id] = e; hit = true end
+      end
+      if hit and type(WLDTDB) == "table" and not ns.FOREVER_IDS[qid] then
+        WLDTDB.newIds = WLDTDB.newIds or {}
+        if WLDTDB.newIds[qid] ~= e.title then WLDTDB.newIds[qid] = e.title; newByName = nil end
+      end
+    end
+    return list
+  end
+end
+
 -- Traductions des indices d'objets (ajoutées après contrôle du mode français)
 ns.TR["Dropped by Moss Stalkers and Mist Creepers in the Skittering Dark, north-west of the Sepulcher (around 35, 12)"] = "Butin des Moss Stalkers et Mist Creepers dans le Skittering Dark, au nord-ouest du Sepulcher (vers 35, 12)"
 ns.TR["Rubbing of the tablet Fall of Gurubashi, in the troll ruins on the coast north of the Vile Reef (around 23, 12)"] = "Calque de la tablette Fall of Gurubashi, dans les ruines trolls sur la côte au nord du Vile Reef (vers 23, 12)"

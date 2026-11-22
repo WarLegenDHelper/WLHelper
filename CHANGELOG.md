@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.202] — 2026-11-22
+
+### Corrigé / Fixed
+- **Les quêtes que Forever a renumérotées** : quelques quêtes connues ont un nouveau numéro sur Forever, par exemple An Earnest Proposition chez Mokvar (97411) ou les Just Compensation du set de donjon 2. Le guide ne les voyait pas dans ton journal et disait toujours « Accepter ». Maintenant, une quête du journal au numéro inconnu mais au titre connu compte pour la nôtre, si ton personnage peut la faire (faction, classe, race) : prise, prête à rendre, puis faite une fois rendue. Le nouveau numéro est retenu pour la suite de la chaîne.
+  *Quests Forever renumbered (An Earnest Proposition 97411, Just Compensation…) are recognised by their title, so the guide sees them taken, ready and turned in.*
+
 ## [1.0.0-beta.201] — 2026-11-22
 
 ### Ajouté / Added
