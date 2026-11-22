@@ -6,6 +6,18 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.192] — 2026-11-22
+
+### Ajouté / Added
+- **Le parcours dans les rapports** : WL Helper note les quêtes prises et rendues (avec l'étape du guide à ce moment-là) et les boss tués en donjon, avec le temps depuis l'entrée. En sortant d'un donjon (après au moins 5 minutes dedans), il envoie en silence un rapport « parcours » : le donjon, sa durée, l'ordre des boss et les quêtes. Ça sert à vérifier l'ordre des guides avec de vraies parties. Par la guilde, à l'auteur seulement. Pour le couper : `/wlh rapports parcours off`.
+  *Quests taken and turned in (with the guide step) and boss kills with their time go in a silent "run" report when you leave a dungeon (`/wlh rapports parcours off` stops it).*
+
+### Corrigé / Fixed
+- **Clic sur l'étape en cours** : cliquer sur la carte de l'étape pouvait donner une erreur quand la ligne du lieu était cachée.
+  *Clicking the current step no longer errors when its place line is hidden.*
+- **Flèches sur les sacs** : avec beaucoup d'addons, le parcours de toutes les fenêtres du jeu dépassait le temps permis. Il se fait maintenant par petits morceaux.
+  *The bag arrows no longer hit "script ran too long" with many addons.*
+
 ## [1.0.0-beta.191] — 2026-11-22
 
 ### Corrigé / Fixed

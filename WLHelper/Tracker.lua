@@ -498,11 +498,12 @@ local function Feedback(b, content)
   b.hl, b.pr = hl, pr
   b:SetScript("OnMouseDown", function()
     pr:Show()
-    for _, r in ipairs(content) do r:SetPoint(r.p1, r.rel, r.p2, r.x, r.y - 1) end
+    -- only the regions Anchor placed (a hidden place line has no anchor yet)
+    for _, r in ipairs(content) do if r.y then r:SetPoint(r.p1, r.rel, r.p2, r.x, r.y - 1) end end
   end)
   b:SetScript("OnMouseUp", function()
     pr:Hide()
-    for _, r in ipairs(content) do r:SetPoint(r.p1, r.rel, r.p2, r.x, r.y) end
+    for _, r in ipairs(content) do if r.y then r:SetPoint(r.p1, r.rel, r.p2, r.x, r.y) end end
   end)
 end
 -- remembers a region's anchor so the press feedback can move it 1 px and back

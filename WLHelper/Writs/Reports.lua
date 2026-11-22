@@ -37,6 +37,7 @@ ns.AddEnglish({
     ["nouveau"] = "new", ["Capture : "] = "Screenshot: ", ["Étape : "] = "Step: ",
     ["Envoi automatique des erreurs de WL Helper : %s"] = "Automatic sending of WL Helper's errors: %s",
     ["Envoi automatique des mesures de mémoire : %s"] = "Automatic sending of the memory measures: %s",
+    ["Envoi automatique des parcours (quêtes et boss) : %s"] = "Automatic sending of the routes (quests and bosses): %s",
     ["activé"] = "on",
     ["coupé"] = "off",
 })
@@ -327,7 +328,7 @@ end
 
 -- "/wlh bug <text>", "/wlh idee <text>", the form's Send. kind: "bug" | "idea" | "quest"; shot: the
 -- link of a screenshot the player put online (Discord, imgur...), or nil. -> the report, or nil
-local KINDS = { bug = true, idea = true, quest = true, error = true, mem = true }
+local KINDS = { bug = true, idea = true, quest = true, error = true, mem = true, run = true }
 local seq = 0
 function R.New(kind, text, shot, quiet, extra)
     text = Str(text and (text:gsub("^%s+", ""):gsub("%s+$", "")))
@@ -585,6 +586,12 @@ end
 function R.Command(arg)
     local d = DB()
     if not d then return end
+    local pr = arg and (arg:match("^parcours (%a+)$") or arg:match("^route (%a+)$") or arg:match("^runs? (%a+)$"))
+    if pr == "on" or pr == "off" then
+        if pr == "off" then d.autoRun = false else d.autoRun = nil end
+        WP.Print(string.format(L("Envoi automatique des parcours (quêtes et boss) : %s"), pr == "on" and L("activé") or L("coupé")))
+        return
+    end
     local mm = arg and (arg:match("^m[eé]moire (%a+)$") or arg:match("^memory (%a+)$") or arg:match("^mem (%a+)$"))
     if mm == "on" or mm == "off" then
         if mm == "off" then d.autoMem = false else d.autoMem = nil end
@@ -661,3 +668,123 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
         R.OnMessage(a2, from)
     end
 end)
+
+-- ---------------------------------------------------------------- the route as players really play it
+-- (report: "put the quests in the reports, to confirm the order? the boss kills?"): a small journal
+-- per character (WLWritsCharDB.trail) of quests taken (+id) and turned in (=id), each with the guide's
+-- step at that moment (@s12), and of the bosses killed in an instance (their time since the entry).
+-- Leaving an instance sends one "run" report (the dungeon, its time, its boss order, the quests since
+-- the last report); outside, the quests go once TRAIL_FLUSH of them are waiting. Kind "run", silent;
+-- "/wlh rapports parcours off" stops it. Only game facts, inside the guild, to the author.
+local TRAIL_FLUSH = 30
+local TRAIL_MAX = 120
+local function TrailDB()
+    local c = WLWritsCharDB
+    if type(c) ~= "table" then return nil end
+    c.trail = type(c.trail) == "table" and c.trail or { ev = {} }
+    c.trail.ev = type(c.trail.ev) == "table" and c.trail.ev or {}
+    return c.trail
+end
+function R.AutoRunOn()
+    local d = DB()
+    return d ~= nil and d.autoRun ~= false
+end
+local function StepNow()
+    if not (root.route and root.route.steps and root.CurrentStepIndex and root.LogEntries) then return nil end
+    local ok, idx = pcall(root.CurrentStepIndex, root.LogEntries())
+    return ok and Num(idx) or nil
+end
+local function Push(e)
+    local tr = TrailDB()
+    if not tr then return end
+    tr.ev[#tr.ev + 1] = e
+    while #tr.ev > TRAIL_MAX do table.remove(tr.ev, 1) end
+end
+function R.TrailQuest(kind, qid)
+    qid = Num(qid)
+    if not (qid and R.AutoRunOn()) then return end
+    local s = StepNow()
+    Push({ k = kind, q = qid, s = s })
+    local tr = TrailDB()
+    if tr and not tr.inst and #tr.ev >= TRAIL_FLUSH then R.SendTrail(false) end
+end
+function R.TrailBoss(name)
+    name = Str(name)
+    local tr = TrailDB()
+    if not (name and tr and tr.inst and R.AutoRunOn()) then return end
+    local t = (time and time()) or 0
+    -- ENCOUNTER_END and BOSS_KILL both come for one kill: once
+    local last = tr.ev[#tr.ev]
+    if last and last.k == "b" and last.n == name:sub(1, 32) then return end
+    Push({ k = "b", n = name:sub(1, 32), m = math.floor((t - (tr.inst.at or t)) / 60) })
+end
+-- the report's text: "RUN Blackrock Depths 47m | bosses Gerstahn 3m, Roccor 6m | q +4083@s12 =4083@s14"
+function R.TrailText(run)
+    local tr = TrailDB()
+    if not tr then return nil end
+    local bosses, quests = {}, {}
+    for _, e in ipairs(tr.ev) do
+        if e.k == "b" then bosses[#bosses + 1] = e.n .. " " .. (e.m or 0) .. "m"
+        elseif e.k == "+" or e.k == "=" then quests[#quests + 1] = e.k .. e.q .. (e.s and ("@s" .. e.s) or "") end
+    end
+    if #bosses == 0 and #quests == 0 then return nil end
+    local head = run and string.format("RUN %s %dm", run.name or "?", math.floor((run.secs or 0) / 60)) or "ROUTE"
+    local text = head
+    if #bosses > 0 then text = text .. " | bosses " .. table.concat(bosses, ", ") end
+    if #quests > 0 then text = text .. " | q " .. table.concat(quests, " ") end
+    -- a report holds MAX_TEXT characters: the bosses first, then the most recent quests
+    if #text > MAX_TEXT then
+        local keep = {}
+        local room = MAX_TEXT - #head - (#bosses > 0 and (#(" | bosses " .. table.concat(bosses, ", "))) or 0) - 8
+        for i = #quests, 1, -1 do
+            local add = #quests[i] + 1
+            if room - add < 0 then break end
+            room = room - add
+            table.insert(keep, 1, quests[i])
+        end
+        text = head .. (#bosses > 0 and (" | bosses " .. table.concat(bosses, ", ")) or "") .. " | q .. " .. table.concat(keep, " ")
+        text = text:sub(1, MAX_TEXT)
+    end
+    return text
+end
+function R.SendTrail(run)
+    if not R.AutoRunOn() then return nil end
+    local text = R.TrailText(run)
+    local tr = TrailDB()
+    if tr then tr.ev = {} end
+    if not text then return nil end
+    return R.New("run", text, nil, true)
+end
+-- in and out of instances: the entry starts a run, the way out sends it
+function R.TrailZone()
+    local tr = TrailDB()
+    if not tr then return end
+    local inside, kind = false, nil
+    if IsInInstance then local ok, i, k = pcall(IsInInstance); inside, kind = ok and i == true, k end
+    if inside and (kind == "party" or kind == "raid") then
+        if not tr.inst then
+            local okN, name = pcall(GetInstanceInfo)
+            tr.inst = { at = (time and time()) or 0, name = okN and Str(name) or "?" }
+        end
+    elseif tr.inst then
+        local run = { name = tr.inst.name, secs = ((time and time()) or 0) - (tr.inst.at or 0) }
+        tr.inst = nil
+        -- a short visit (a wrong portal, a summon): no report, its events wait for the next one
+        if run.secs >= 300 then R.SendTrail(run) end
+    end
+end
+do
+    local tf = CreateFrame("Frame")
+    for _, e in ipairs({ "QUEST_ACCEPTED", "QUEST_TURNED_IN", "PLAYER_ENTERING_WORLD", "ENCOUNTER_END", "BOSS_KILL" }) do
+        pcall(tf.RegisterEvent, tf, e)
+    end
+    tf:SetScript("OnEvent", function(_, e, a1, a2, a3, a4, a5)
+        if e == "QUEST_ACCEPTED" then
+            -- (questLogIndex, questID) on older clients, (questID) on newer ones
+            pcall(R.TrailQuest, "+", Num(a2) or Num(a1))
+        elseif e == "QUEST_TURNED_IN" then pcall(R.TrailQuest, "=", a1)
+        elseif e == "PLAYER_ENTERING_WORLD" then pcall(R.TrailZone)
+        elseif e == "ENCOUNTER_END" then if Num(a5) == 1 then pcall(R.TrailBoss, a2) end
+        elseif e == "BOSS_KILL" then pcall(R.TrailBoss, a2) end
+    end)
+end

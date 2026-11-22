@@ -1019,11 +1019,20 @@ end
 -- container template (found by walking the frames once, then remembered)
 local known = setmetatable({}, { __mode = "k" })
 local walked = 0
+-- (report: "Upgrades.lua: script ran too long" with many addons) the walk goes WALK_STEP frames at
+-- a time and goes on at the next frame drawn, never the whole UI in one call
+local WALK_STEP = 400
+local walkAt
+local PaintSoon
 local function Walk()
-    if GetTime() - walked < 2 then return end
-    walked = GetTime()
-    local f = EnumerateFrames and EnumerateFrames()
-    while f do
+    if not walkAt then
+        if GetTime() - walked < 2 then return end
+        walked = GetTime()
+        walkAt = EnumerateFrames and EnumerateFrames()
+    end
+    local f, n = walkAt, 0
+    while f and n < WALK_STEP do
+        n = n + 1
         -- forbidden frames (protected Blizzard or other addons' secure ones) are never touched
         local okF, forbidden = pcall(function() return f.IsForbidden and f:IsForbidden() end)
         local okT, ot = false, nil
@@ -1035,6 +1044,9 @@ local function Walk()
         end
         f = EnumerateFrames(f)
     end
+    walkAt = f
+    -- not done: the next part, then the bags painted again with what was found
+    if f and PaintSoon then PaintSoon() end
 end
 local function PaintBags()
     if not Active() then
@@ -1049,7 +1061,7 @@ local function PaintBags()
     end
 end
 local paintQueued = false
-local function PaintSoon()
+function PaintSoon()
     if paintQueued then return end
     paintQueued = true
     C_Timer.After(0.2, function() paintQueued = false; PaintBags() end)
