@@ -1235,6 +1235,18 @@ local function RewardName(id)
     return questRewardNames and questRewardNames[id] or nil
 end
 
+-- WL Helper change (v5, report: "Gear takes 28 MB"): an item keeps only what is not a default. Its
+-- stats hold the non-zero ones (the zeros come from ZEROS), its other fields their default from
+-- ITEM_DEF (bind 0, kind 0, no weapon speed or DPS, every class, both factions, no flags). About
+-- 9,700 items: 20 MB down to about 11 MB, read exactly as before.
+local ZEROS = {}
+for k = 1, NUM_STATS do ZEROS[k] = 0 end
+local STAT_META = { __index = ZEROS }
+local ITEM_DEF = { bind = 0, kind = 0, spd = 0, dps = 0, cls = 0, fac = "" }
+local ITEM_META = { __index = ITEM_DEF }
+ns.ITEM_META = ITEM_META
+local function NZ(v) v = tonumber(v); if v and v ~= 0 then return v end return nil end
+
 function ns.Parse()
     if ns.items then return end
     -- WL Helper change (v4): keep the rewards by quest before QuestData.lua is freed.
@@ -1247,14 +1259,18 @@ function ns.Parse()
             guessed = true
             source = source:sub(2)
         end
-        local st = {}
-        for k = 1, NUM_STATS do st[k] = tonumber(f[12 + k]) or 0 end
-        items[i] = {
-            id = tonumber(f[1]), slot = tonumber(f[2]), lvl = tonumber(f[3]), est = f[4] == "1", noreq = f[5] == "1",
-            q = tonumber(f[6]), bind = tonumber(f[7]) or 0, kind = tonumber(f[8]) or 0, spd = tonumber(f[9]) or 0,
-            dps = tonumber(f[10]) or 0, cls = tonumber(f[11]) or 0, fac = f[12] or "", st = st, source = source,
-            guessed = guessed, name = f[42],
-        }
+        local st = setmetatable({}, STAT_META)
+        for k = 1, NUM_STATS do
+            local v = f[12 + k]
+            if v ~= "" and v ~= nil then v = tonumber(v); if v and v ~= 0 then st[k] = v end end
+        end
+        local fac = f[12]
+        items[i] = setmetatable({
+            id = tonumber(f[1]), slot = tonumber(f[2]), lvl = tonumber(f[3]), est = f[4] == "1" or nil, noreq = f[5] == "1" or nil,
+            q = tonumber(f[6]), bind = NZ(f[7]), kind = NZ(f[8]), spd = NZ(f[9]),
+            dps = NZ(f[10]), cls = NZ(f[11]), fac = (fac ~= "" and fac) or nil, st = st, source = source,
+            guessed = guessed or nil, name = f[42],
+        }, ITEM_META)
     end
     for _, item in ipairs(items) do
         item.cat = Category(item)
@@ -1264,8 +1280,8 @@ function ns.Parse()
         local linked = (ns.itemQuests and ns.itemQuests[item.id]) or (ns.itemSources and ns.itemSources[item.id])
             or (ns.itemRecipe and ns.itemRecipe[item.id])
         local src = item.source or ""
-        item.unknown = not linked and item.cat ~= "pvp"
-            and (item.guessed or src == "" or src:find("^Not listed") ~= nil)
+        item.unknown = (not linked and item.cat ~= "pvp"
+            and (item.guessed or src == "" or src:find("^Not listed") ~= nil)) or nil
         -- Rewards from one faction's quests only belong to that faction.
         local quests = item.fac == "" and ns.itemQuests and ns.itemQuests[item.id]
         if quests then
@@ -1562,7 +1578,7 @@ local function ExtraStats(known, live)
     return false
 end
 local function NoStatsButArmor(known)
-    for k = 2, #known.st do if known.st[k] ~= 0 then return false end end
+    for k = 2, NUM_STATS do if known.st[k] ~= 0 then return false end end
     return true
 end
 
@@ -1574,7 +1590,7 @@ local function LiveItem(id, link)
         -- also read it live when the list's copy has no stats or the name is longer.
         -- Weapons with damage but no stats (Black Menace, Meteor Shard) aren't bare.
         local bare = (known.dps or 0) == 0
-        for k = 1, #known.st do if known.st[k] ~= 0 then bare = false break end end
+        for k = 1, NUM_STATS do if known.st[k] ~= 0 then bare = false break end end
         local linkName = type(link) == "string" and link:match("|h%[(.-)%]|h")
         -- WL Helper change (1.3.0): the list's names are English, so the name test only runs
         -- on English clients; elsewhere (frFR) every name would differ and every item would
@@ -1666,7 +1682,7 @@ local function LiveItem(id, link)
     if known then
         -- Same stats as the list's copy: it's the list's item after all, so keep its rank.
         local same = true
-        for k = 1, #known.st do
+        for k = 1, NUM_STATS do
             if (item.st[k] or 0) ~= (known.st[k] or 0) and not (k == STAT.sp or k == STAT.heal or k == STAT.sdmg) then same = false break end
         end
         if same then
@@ -1675,10 +1691,10 @@ local function LiveItem(id, link)
         end
         -- Keep what the list knows (level, speed, weapon type, hidden spell power) and use the
         -- link's stats on top.
-        local merged = {}
+        local merged = setmetatable({}, getmetatable(known))
         for k, v in pairs(known) do merged[k] = v end
         merged.st = {}
-        for k = 1, #item.st do merged.st[k] = item.st[k] end
+        for k = 1, NUM_STATS do merged.st[k] = item.st[k] end
         for _, k in ipairs({ STAT.sp, STAT.heal, STAT.sdmg }) do
             merged.st[k] = math.max(merged.st[k] or 0, known.st[k] or 0)
         end
@@ -1887,7 +1903,7 @@ end
 local function WithEnchant(item, link)
     local ench = EnchantStats(link)
     if not ench then return item, nil end
-    local copy = {}
+    local copy = setmetatable({}, getmetatable(item))
     for k, v in pairs(item) do copy[k] = v end
     copy.st = {}
     for k = 1, NUM_STATS do copy.st[k] = (item.st[k] or 0) + ench.st[k] end
@@ -1986,7 +2002,7 @@ end
 -- item, notes. Same item back in neutral mode.
 local function Prepare(item, link)
     if opts.neutral or not item then return item, {} end
-    local copy = {}
+    local copy = setmetatable({}, getmetatable(item))
     for k, v in pairs(item) do copy[k] = v end
     copy.link = link
     local notes = {}

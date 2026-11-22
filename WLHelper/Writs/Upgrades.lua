@@ -84,6 +84,8 @@ ns.AddEnglish({
     ["Ignorer les armures plus légères que la mienne (dès le niv. 40)"] = "Ignore armor lighter than mine (from level 40)",
     ["Ni % ni flèche sur une armure plus légère."] = "No % or arrow on lighter armor.",
     ["Expliquer le pourcentage"] = "Explain the percent",
+    ["Liste BiS de Naowh : n°%d, mieux que ton objet (n°%d). À prendre."] = "Naowh's BiS list: #%d, better than yours (#%d). Take it.",
+    ["Liste BiS de Naowh : n°%d, moins bien que ton objet (n°%d). Garde le tien."] = "Naowh's BiS list: #%d, below yours (#%d). Keep yours.",
     ["Dès le niveau 40 : chaman et chasseur sans cuir ni tissu, guerrier et paladin sans mailles, cuir ni tissu, druide et voleur sans tissu. L'infobulle dit « Armure plus légère que la tienne »."] =
         "From level 40: shaman and hunter without leather or cloth, warrior and paladin without mail, leather or cloth, druid and rogue without cloth. The tooltip says \"Armor lighter than yours\".",
 })
@@ -348,7 +350,56 @@ end
 WP.UpgradeNaowhVerdict = NaowhVerdict
 
 -- { up = true/false, text = "+24%", n = gain } for the main spec
-local function CheckMain(link)
+-- ---------------------------------------------------------------- Naowh's BiS order decides
+-- (report: "our recommendations sometimes go hard against the BiS lists"). WL Helper Gear's score is
+-- right in most slots (about 80 % of Naowh's #1 picks are its favourite too), but it misses some
+-- items (Forever's own sets, the Mark of Fordring) and reads trinket effects badly. When the bag
+-- item and what it replaces are both in Naowh's ranked list for your spec (its level 60 sims, or your
+-- own "My BiS" list), the list's order decides the arrow; otherwise the score does. Weapons keep the
+-- score (main hand, off hand and two-handers do not compare one to one).
+local BIS_LOCS = {
+    INVTYPE_HEAD = true, INVTYPE_NECK = true, INVTYPE_SHOULDER = true, INVTYPE_CLOAK = true,
+    INVTYPE_CHEST = true, INVTYPE_ROBE = true, INVTYPE_WRIST = true, INVTYPE_HAND = true,
+    INVTYPE_WAIST = true, INVTYPE_LEGS = true, INVTYPE_FEET = true, INVTYPE_FINGER = true,
+    INVTYPE_TRINKET = true, INVTYPE_RANGED = true, INVTYPE_RANGEDRIGHT = true, INVTYPE_THROWN = true,
+    INVTYPE_RELIC = true,
+}
+local ORDERED = { sim = true, list = true }
+local bisMemo = {}
+local function LinkID(link) return type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil end
+-- "up" or "down", the bag item's rank, the replaced item's rank; nil when the list cannot say
+local function BisOrder(link)
+    local NB = WP.NaowhBiS
+    if type(link) ~= "string" or not (NB and NB.Rank and NB.Source and NB.Available and NB.Available()) then return nil end
+    local m = bisMemo[link]
+    if m ~= nil then if m then return m[1], m[2], m[3] end return nil end
+    local function Done(a, b, c) bisMemo[link] = a and { a, b, c } or false; return a, b, c end
+    local Instant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    local equipLoc = Instant and select(4, Instant(link))
+    if not (equipLoc and BIS_LOCS[equipLoc]) then return Done(nil) end
+    local slots = W.SLOTS[equipLoc]
+    if not slots then return Done(nil) end
+    local spec = W.Spec()
+    local okR, rc = pcall(NB.Rank, link, spec)
+    local okS, src = pcall(NB.Source, link, spec)
+    if not (okR and okS and type(rc) == "number" and ORDERED[src]) then return Done(nil) end
+    local id, worst = LinkID(link), nil
+    for _, s in ipairs(slots) do
+        local cur = GetInventoryItemLink("player", s)
+        -- an empty slot or the same item worn: the score says it (empty slot, unique item)
+        if not cur or LinkID(cur) == id then return Done(nil) end
+        local okW, rw = pcall(NB.Rank, cur, spec)
+        local okWS, ws = pcall(NB.Source, cur, spec)
+        -- a worn item out of the list: the list says nothing about it
+        if not (okW and okWS and type(rw) == "number" and ORDERED[ws]) then return Done(nil) end
+        if not worst or rw > worst then worst = rw end
+    end
+    if not worst or worst == rc then return Done(nil) end
+    return Done(rc < worst and "up" or "down", rc, worst)
+end
+WP.UpgradeBisOrder = BisOrder
+
+local function CheckMainRaw(link)
     if type(link) ~= "string" or not Active() then return NO end
     local c = cache[link]
     if c then return c end
@@ -398,6 +449,15 @@ local function CheckMain(link)
     elseif type(gain) == "number" and gain >= (WLWritsDB.upgradeMin or 1) then r = { up = true, text = gain >= 999 and "+999%" or ("+" .. math.floor(gain + 0.5) .. "%"), n = gain }
     else r = NO end
     cache[link] = r
+    return r
+end
+
+local function CheckMain(link)
+    local r = CheckMainRaw(link)
+    local ok, order = pcall(BisOrder, link)
+    if not ok or not order then return r end
+    if order == "down" and r.up and (r.n or 0) < 1000 then return NO end
+    if order == "up" and not r.up then return { up = true, text = "BiS", n = WLWritsDB.upgradeMin or 1, bis = true } end
     return r
 end
 
@@ -869,7 +929,7 @@ local function MultiLines(tip, link)
     if pct then InsteadOf(tip, link) end
 end
 
-local function TooltipLine(tip, link)
+local function TooltipLineInner(tip, link)
     if not (Active() and link) or WLWritsDB.upgradeTip == false then return end
     if MultiSpec() then return MultiLines(tip, link) end
     local main = W.Spec()
@@ -945,6 +1005,21 @@ local function TooltipLine(tip, link)
     -- no tip:Show() here: the game resizes the tooltip itself; calling it from an addon can taint it
     tip:AddDoubleLine(Tag(spec), text, T.fg[1], T.fg[2], T.fg[3], col[1], col[2], col[3])
     if pct then ExplainLine(tip, link, main, false, math.floor(gain + 0.5)); InsteadOf(tip, link) end
+end
+-- under our line: what Naowh's BiS list says, when it ranks both items (it decides the arrow)
+local function BisLine(tip, link)
+    if not (Active() and link) or WLWritsDB.upgradeTip == false then return end
+    local order, rc, rw = BisOrder(link)
+    if not order then return end
+    if order == "up" then
+        tip:AddLine(string.format(L("Liste BiS de Naowh : n°%d, mieux que ton objet (n°%d). À prendre."), rc, rw), GREEN[1], GREEN[2], GREEN[3], true)
+    else
+        tip:AddLine(string.format(L("Liste BiS de Naowh : n°%d, moins bien que ton objet (n°%d). Garde le tien."), rc, rw), GREY[1], GREY[2], GREY[3], true)
+    end
+end
+local function TooltipLine(tip, link)
+    TooltipLineInner(tip, link)
+    BisLine(tip, link)
 end
 WP.UpgradeTooltipLine = TooltipLine
 if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
@@ -1163,6 +1238,7 @@ end
 local queued = false
 local function Refresh()
     cache = {}
+    wipe(bisMemo)
     wipe(specCache)
     wipe(specByNaowh)
     wipe(explainCache)

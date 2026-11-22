@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.193] — 2026-11-22
+
+### Modifié / Changed
+- **Les flèches suivent la liste BiS** : quand l'objet de ton sac et celui que tu portes sont tous les deux dans la liste BiS de Naowh pour ta spé, c'est l'ordre de la liste qui décide de la flèche verte, plus le calcul de WL Helper. L'infobulle le dit : « Liste BiS de Naowh : n°2, mieux que ton objet (n°5). À prendre. » ou « ... moins bien que ton objet. Garde le tien. ». Si l'un des deux n'est pas dans la liste, rien ne change. Les armes gardent le calcul.
+  *When both the bag item and the worn one are in Naowh's BiS list for your spec, the list's order decides the arrow; the tooltip gives both ranks.*
+- **WL Helper Gear deux fois plus léger** : chaque objet ne garde plus que ses statistiques non nulles. La mémoire passe d'environ 20 Mo à 10 Mo, avec exactement les mêmes notes (vérifiées sur les 28 spés).
+  *WL Helper Gear keeps only each item's non-zero stats: about 20 MB down to 10 MB, same scores.*
+
 ## [1.0.0-beta.192] — 2026-11-22
 
 ### Ajouté / Added
