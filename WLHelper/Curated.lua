@@ -1121,6 +1121,9 @@ do
     local q = ns.Q[id]
     if q then q.rq = { 576, 4, "Timbermaw Hold" } end
   end
+  -- q96246p: the repeatable Blackmaw Pouches opens once the first one (97327) is turned in (report:
+  -- with "all quests" on, the guide offered the repeatable while the first was in the log)
+  if ns.Q[96246] then ns.Q[96246].after = 97327 end
   -- Rageroar's and Gorn's quests: the reputation they need
   for _, id in ipairs({ 92065, 86798, 86814, 87346 }) do
     local q = ns.Q[id]

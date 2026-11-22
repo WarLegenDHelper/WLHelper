@@ -46,9 +46,9 @@ end)
 Route({ "bis", "meilleur", "best" }, function(rest)
     if WP.Best then Run(WP.Best.Show, rest) end
 end)
--- the reputations of your list: the "Réputations" tab of the best gear window
+-- the reputations guide: its page of the WL Helper window (Writs/Reps.lua)
 Route({ "rep", "reps", "reputation", "reputations", "réputation", "réputations" }, function()
-    if WP.Best and WP.Best.Toggle then Run(WP.Best.Toggle, "rep", true) end
+    if WP.ShowReps then Run(WP.ShowReps) end
 end)
 -- the PvP guide: the battlegrounds window (Writs/Battlegrounds.lua, the set inside it);
 -- "/wlh pvp chat" prints the set in the chat as before

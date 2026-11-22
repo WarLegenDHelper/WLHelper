@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.198", date = "2026-11-22", items = {
+    { s = "chg", fr = { "Les réputations ont leur propre page", "Dans la fenêtre WL Helper, sous Progresser, au même niveau que les autres pages : le nombre de réputations, les pièces de ta liste qu'elles débloquent, puis une carte par faction avec ses quêtes. La ligne « Réputations » de l'accueil et /wlh rep ouvrent cette page. L'onglet Réputations quitte la fenêtre « Meilleur équipement », où il n'avait pas sa place." }, en = { "Reputations have their own page in the WL Helper window, under Progress; Home's \"Reputations\" line and /wlh rep open it, and the tab left the Best gear window.", "" } },
+  } },
   { v = "1.0.0-beta.197", date = "2026-11-22", items = {
     { s = "chg", fr = { "L'accueil a une section « Cette semaine »", "Deux cartes côte à côte, l'hebdo PvE et l'hebdo PvP, avec le temps restant avant la remise à zéro. L'hebdo PvE, c'est le sac de l'Undermine : où tu en es (à faire, en cours, faite), ce qu'il faut ramener des trois ailes de Hache-Tripes, où aller (Pix Xizzix, Baie-du-Butin), ce que ça rapporte (10 à 100 po), « Y aller » avec le GPS et « Voir le guide ». L'hebdo PvP donne le champ de bataille en bonus d'après le calendrier du jeu et son maître de guerre, la quête Field of Honor, ce que ça rapporte, ta place au classement de la guilde, « Y aller » et « Champs de bataille »." }, en = { "Home has a \"This week\" section", "The PvE weekly (Undermine Satchel: where you stand, what, where, reward, GPS and its guide) and the PvP weekly (bonus battleground, Field of Honor, reward, guild ranking), with the time left before the weekly reset." } },
     { s = "chg", fr = { "Un accueil mieux équilibré", "Les activités tiennent en deux lignes de deux cartes (Progresser, Argent et métiers, Guilde et groupes, Voyager), même sur une fenêtre large. La carte PvP, presque vide, laisse sa place à l'hebdo PvP. « Nous écrire » devient un bandeau fin en bas de la page." }, en = { "A more balanced Home", "The activities fit in two rows of two cards, the near-empty PvP card gives way to the PvP weekly, and \"Write to us\" becomes a thin strip at the bottom." } },
@@ -64,8 +67,5 @@ ns.WHATSNEW = {
     { s = "add", fr = { "Meilleur équipement, où trouver le patron", "Une pièce fabriquée dit où trouver son patron et le niveau de métier qu'il faut (« Patron : chez Qia (Berceau-de-l'Hiver) · métier 215 », « Patron : lâché par Pyromancien de Brandefeu · métier 295 », « butin aléatoire dans le monde », une quête, ou ton maître de métier). L'information vient du module Métiers de Naowh, lu en direct." }, en = { "Best gear", "Where to find a crafted piece's pattern, and the skill it needs." } },
     { s = "fix", fr = { "Meilleur équipement, des noms au lieu de numéros", "Une pièce que le jeu n'avait pas encore chargée s'affichait avec son numéro (« 18727 »). La fenêtre demande maintenant l'objet au jeu et se redessine dès qu'il arrive." }, en = { "Best gear", "Item names instead of numbers." } },
     { s = "fix", fr = { "« N choix » en gris", "Au lieu de rouge." }, en = { "\"N picks\" in grey, not red.", "" } },
-  } },
-  { v = "1.0.0-beta.183", date = "2026-11-20", items = {
-    { s = "chg", fr = { "Vue moderne, les dernières actions de la grande fenêtre", "Son menu (roue dentée) a maintenant « Recommencer la route » (dans Guides, avec confirmation), « Flèche GPS » et « Raccourcis clavier » (dans Affichage). Tout ce que faisait le menu Actions de la grande fenêtre se fait désormais depuis la vue moderne." }, en = { "Modern view menu", "Restart the route, GPS arrow on/off, key bindings." } },
   } },
 }

@@ -1,4 +1,5 @@
--- Writs/Reps.lua: "Réputations", a tab of the "Meilleur équipement" window (WP.Reps).
+-- Writs/Reps.lua: "Réputations", a page of the WL Helper window under Progresser (WP.Reps,
+-- WP.RepsPage; a tab of "Meilleur équipement" until beta.197).
 -- Every faction worth raising on Forever for your side (Naowh's journal: cities, Argent Dawn,
 -- Timbermaw, Thorium, Cenarion Circle, the battleground factions, Forever's own): what each
 -- standing unlocks (pieces, mounts, consumables and enchants, recipes), your standing and points
@@ -799,3 +800,80 @@ function R.Fill(child, W, take)
     return y, #list, pieces, journal, gear
 end
 R._PaintCard = PaintCard
+
+-- ---------------------------------------------------------------- the Hub page (beta.198)
+-- "Réputations" is its own page of the WL Helper window, under Progresser (report: "reputation in
+-- best gear makes no sense"): the count and the pieces of your list, the intro with its sources,
+-- then R.Fill's cards. Writs/Options.lua builds it (BUILD.reps); the Hub lays it out each time it
+-- shows, so the standings are read again then.
+local INSET = 16
+WP.RepsPage = {}
+local page
+function WP.RepsPage.Build(p, width)
+    page = p
+    p.repW = math.floor((width or 660) - 2 * INSET)
+    local F = S.F
+    p.repCount = S.Text(p, F.title, C.fg); p.repCount:SetJustifyH("LEFT")
+    p.repSub = S.Text(p, F.label, C.muted); p.repSub:SetJustifyH("LEFT")
+    p.repIntro = S.Text(p, F.label, C.text or C.fg); p.repIntro:SetJustifyH("LEFT"); p.repIntro:SetJustifyV("TOP")
+    p.repBox = CreateFrame("Frame", nil, p)
+    p.repEmpty = S.EmptyState(p, "star", L("Aucune réputation connue"),
+        L("Les paliers et les objets à rendre viennent du Journal de donjons de Naowh : active-le pour les voir ici."))
+    p.repEmpty:Hide()
+    p.repPools = { heads = {}, cards = {} }
+    local function Take(kind, maker)
+        local pool = p.repPools[kind]
+        pool.n = (pool.n or 0) + 1
+        local f = pool[pool.n]
+        if not f then f = maker(p.repBox); pool[pool.n] = f end
+        f:Show()
+        return f
+    end
+    function p:Layout()
+        local W = self.repW
+        for _, pool in pairs(self.repPools) do
+            for i = 1, #pool do pool[i]:Hide() end
+            pool.n = 0
+        end
+        local h, nf, np, journal = 0, 0, 0, false
+        local ok, a, b, c, d = pcall(R.Fill, self.repBox, W, Take)
+        if ok then h, nf, np, journal = a or 0, b or 0, c or 0, d
+        elseif geterrorhandler then geterrorhandler()(a) end
+        self.repShown = nf
+        self.repCount:SetText(nf == 1 and L("1 réputation") or string.format(L("%d réputations"), nf))
+        self.repSub:SetText(np == 1 and L("dont 1 pièce de ta liste") or string.format(L("dont %d pièces de ta liste"), np))
+        self.repIntro:SetText(L("Les réputations utiles sur Forever : ce que chaque rang débloque, ton rang, et le plus rapide pour les monter. En tête, celles qui débloquent une pièce de ta liste (pré-BiS, BiS, PvP).") .. "\n"
+            .. (journal and L("Points de base, sans bonus de race. Sources : les données de Naowh lues en direct (paliers, objets à rendre, quêtes) et Wowhead WoW Forever pour les monstres.")
+                or L("Les paliers et les objets à rendre viennent du Journal de donjons de Naowh : active-le pour les voir ici.")))
+        local y = 16
+        self.repCount:ClearAllPoints(); self.repCount:SetPoint("TOPLEFT", self, "TOPLEFT", INSET, -y)
+        y = y + S.F.title + 4
+        self.repSub:ClearAllPoints(); self.repSub:SetPoint("TOPLEFT", self, "TOPLEFT", INSET, -y)
+        y = y + S.F.label + 10
+        self.repIntro:ClearAllPoints(); self.repIntro:SetPoint("TOPLEFT", self, "TOPLEFT", INSET, -y)
+        y = y + (tonumber(S.FitText(self.repIntro, 0, math.min(W, 640), self)) or 28) + 16
+        self.repBox:ClearAllPoints(); self.repBox:SetPoint("TOPLEFT", self, "TOPLEFT", INSET, -y)
+        self.repBox:SetSize(W, math.max(1, h))
+        y = y + h
+        self.repEmpty:SetShown(nf == 0)
+        if nf == 0 then
+            self.repEmpty:ClearAllPoints(); self.repEmpty:SetPoint("TOP", self, "TOPLEFT", INSET + W / 2, -(y + 12))
+            if self.repEmpty.Fit then self.repEmpty:Fit() end
+            y = y + 160
+        end
+        y = math.ceil(y + 16)
+        self.contentH = y
+        if self.sa then self.sa:SetContentHeight(y) end
+        return y
+    end
+    p:Layout()
+end
+-- the Hub's content column got a new width
+function WP.RepsPage.SetWidth(width)
+    if page then page.repW = math.floor((width or 660) - 2 * INSET) end
+end
+
+-- WP.ShowReps(): the Réputations page of the WL Helper window (/wlh rep, Home, the nav)
+function WP.ShowReps()
+    if WP.OpenHub then WP.OpenHub("reps") end
+end

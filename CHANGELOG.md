@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.198] — 2026-11-22
+
+### Modifié / Changed
+- **Les réputations ont leur propre page** dans la fenêtre WL Helper, sous Progresser, au même niveau que les autres pages : le nombre de réputations, les pièces de ta liste qu'elles débloquent, puis une carte par faction avec ses quêtes. La ligne « Réputations » de l'accueil et `/wlh rep` ouvrent cette page. L'onglet Réputations quitte la fenêtre « Meilleur équipement », où il n'avait pas sa place.
+  *Reputations have their own page in the WL Helper window, under Progress; Home's "Reputations" line and /wlh rep open it, and the tab left the Best gear window.*
+
 ## [1.0.0-beta.197] — 2026-11-22
 
 ### Modifié / Changed

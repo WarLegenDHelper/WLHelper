@@ -253,6 +253,9 @@ end
 
 -- « quêtes utiles » : sans les répétables ni les quêtes d'un métier que tu n'as pas (réglage, activé par défaut)
 function ns.Useful(q)
+  -- a repeatable that opens once its first version is turned in (q.after): never before, even with
+  -- every quest on ("/wlh tout")
+  if q.after and not ns.IsDone(q.after) then return false end
   if WLDTDB and WLDTDB.useful == false then return true end
   if q.rep then return false end
   if q.prof and not ns.HasProf(q.prof, q.profLv) then return false end

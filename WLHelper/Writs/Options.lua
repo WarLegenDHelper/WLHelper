@@ -788,6 +788,8 @@ local PAGES = {
     { key = "comptoir", label = "Writs",         group = "items", icon = MI.writs or "Interface\\Icons\\INV_Letter_15", desc = "Remise des Writs, rappels, objectif et zones." },
     { key = "bags",     label = "Sacs",          group = "items", icon = MI.bags or "Interface\\Icons\\INV_Misc_Bag_08", desc = "Place dans les sacs et vente des objets gris." },
     { key = "upgrades", label = "Améliorations", group = "quests", icon = MI.upgrades or { hd = "arrow_up", color = T.ok }, desc = "Calcul, spé et affichage des améliorations." },
+    -- the reputations guide (Writs/Reps.lua, WP.RepsPage): a page of its own since beta.198
+    { key = "reps",     label = "Réputations",   group = "quests", icon = { hd = "flag" },            desc = "Ce que chaque réputation débloque, ton rang et le plus rapide pour la monter." },
     { key = "orders",   label = "Commandes",     group = "items", icon = MI.orders or "Interface\\Icons\\Trade_BlackSmithing", desc = "Les alertes des commandes : favoris, recettes surveillées, son." },
     { key = "guild",    label = "Guilde",        group = "guild", icon = MI.guild or "Interface\\Icons\\INV_BannerPVP_01", desc = "Ce que tu partages avec la guilde." },
     { key = "groups",   label = "Groupes",       group = "guild", icon = { hd = "group" },             desc = "Messages, chuchotements et notes de Trouver un groupe." },
@@ -798,11 +800,6 @@ local PAGES = {
 -- The windows of an activity that has no settings page, so the activity still shows in the nav
 -- (beta.173, report: "PvP is hard to see"): a click closes the Hub and opens the window.
 local NAV_LINKS = {
-    { key = "reps", label = "Réputations", group = "quests", icon = { hd = "flag" },
-      desc = "Ce que chaque réputation débloque, ton rang et le plus rapide pour la monter.",
-      hint = "Clic : ouvrir le guide des réputations",
-      available = function() return ns.WP.Reps ~= nil and ns.WP.Best ~= nil and ns.WP.Best.Toggle ~= nil end,
-      open = function() if ns.WP.Best and ns.WP.Best.Toggle then ns.WP.Best.Toggle("rep", true) end end },
     { key = "pvp", label = "Champs de bataille", group = "pvp", icon = { hd = "sword" },
       desc = "Le bonus du jour, les maîtres de guerre et ton set PvP.",
       hint = "Clic : ouvrir les champs de bataille",
@@ -855,6 +852,12 @@ local CommandTable   -- defined with the About page
 -- built again at the new width once the size stops changing (ApplyWidths).
 function BUILD.groups(p)
     if ns.WP.GroupsPage then ns.WP.GroupsPage.Build(p, CONTENT_W) end
+    p.builtW = CONTENT_W
+end
+
+-- the Réputations page: Writs/Reps.lua draws it (its own layout, read again each time it shows)
+function BUILD.reps(p)
+    if ns.WP.RepsPage then ns.WP.RepsPage.Build(p, CONTENT_W) end
     p.builtW = CONTENT_W
 end
 
