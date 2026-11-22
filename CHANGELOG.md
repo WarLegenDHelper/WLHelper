@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.196] — 2026-11-22
+
+### Corrigé / Fixed
+- **Plus de quête que tu ne peux pas prendre à cause de ta réputation** : une quête qui demande une réputation que tu n'as pas sort du trajet. Elle apparaît comme verrouillée, avec la raison (« réputation Timbermaw Hold requise : Neutre »), et revient dès que tu l'as. Ça concerne d'abord les quêtes de Blackmaw Hold en Azshara (Neutre avec Grumegueule), sauf The Legashi Threat qui se prend sans réputation. Une quête déjà dans ton journal reste dans le trajet.
+  *A quest that needs a reputation you do not have leaves the route, locked with the reason, and comes back once you have it (Blackmaw Hold's Azshara quests: Neutral with Timbermaw Hold).*
+
 ## [1.0.0-beta.195] — 2026-11-22
 
 ### Ajouté / Added

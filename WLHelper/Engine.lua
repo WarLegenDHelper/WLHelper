@@ -21,6 +21,7 @@ do
       INST_OFFER_TRACK = "Tu es dans %s : ouvre le guide pour l'ajouter à ta route.",
       LOCK_PRE = "il faut d'abord « %s » (%s)",
       LOCK_LVL = "niveau %d requis",
+      LOCK_REP = "réputation %s requise : %s",
       LOCK_HIGH = "la chaîne monte au niveau %d",
       LOCK_LONG = "chaîne longue : %d quêtes avant",
       LOCK_OTHERDG = "elle passe par %s",
@@ -41,6 +42,7 @@ do
       INST_OFFER_TRACK = "You are in %s: open the guide to add it to your route.",
       LOCK_PRE = "first needs \"%s\" (%s)",
       LOCK_LVL = "level %d required",
+      LOCK_REP = "%s reputation required: %s",
       LOCK_HIGH = "the chain goes up to level %d",
       LOCK_LONG = "long chain: %d quests before",
       LOCK_OTHERDG = "it goes through %s",
@@ -360,6 +362,29 @@ local function ChainWork(pq, dkey)
   end
   return w
 end
+-- A reputation the quest needs (q.rq = { factionID, standing 1-8 }, 4 = Neutral): true when the
+-- character has it or it cannot be read (report: "the guide offers The Twin Bears first, I am
+-- Unfriendly with Timbermaw and cannot take it")
+local function Standing(fid)
+  local CR = rawget(_G, "C_Reputation")
+  if CR and CR.GetFactionDataByID then
+    local ok, d = pcall(CR.GetFactionDataByID, fid)
+    if ok and type(d) == "table" and tonumber(d.reaction) then return tonumber(d.reaction) end
+  end
+  local GI = rawget(_G, "GetFactionInfoByID")
+  if GI then
+    local ok, _, _, standing = pcall(GI, fid)
+    if ok and tonumber(standing) then return tonumber(standing) end
+  end
+  return nil
+end
+ns.FactionStanding = Standing
+function ns.RepOK(q)
+  local rq = q and q.rq
+  if not rq then return true end
+  local s = Standing(rq[1])
+  return s == nil or s >= rq[2]
+end
 -- What is left of a main quest's chain for this character.
 -- -> { chain, left = { pid... }, first, need (r of the first left), top (highest l / r left),
 --      work, other (another dungeon on the way), started, bad (a link this character cannot do) }
@@ -374,12 +399,14 @@ function ns.ChainPlan(qid, cls, dkey)
   local log = ns.LogEntries()
   local onQ = CQL and CQL.IsOnQuest
   if log[qid] or (onQ and onQ(qid)) then plan.started = true end
+  if not ns.RepOK(q) then plan.rep = qid end
   for _, pid in ipairs(chain) do
     if not ns.IsDone(pid) then
       local pq = ns.Q[pid] or {}
       plan.left[#plan.left + 1] = pid
       if log[pid] or (onQ and onQ(pid)) then plan.started = true end
       if not plan.first then plan.first = pid; plan.need = pq.r or 0 end
+      if not plan.rep and not ns.RepOK(pq) then plan.rep = pid end
       local l = math.max(pq.l or 0, pq.r or 0)
       if l > plan.top then plan.top = l end
       local w = ChainWork(pq, dkey)
@@ -390,11 +417,13 @@ function ns.ChainPlan(qid, cls, dkey)
   end
   return plan
 end
--- Can the chain go into the route now? -> ok, cause ("lvl" | "high" | "long" | "bad")
+-- Can the chain go into the route now? -> ok, cause ("lvl" | "high" | "long" | "bad" | "rep")
 local function ChainOK(plan, lvl)
   if not plan then return true end
   if plan.bad then return false, "bad" end
-  if #plan.left == 0 or plan.started then return true end
+  if plan.started then return true end
+  if plan.rep then return false, "rep" end
+  if #plan.left == 0 then return true end
   if plan.need > lvl then return false, "lvl" end
   -- a chain no higher than the quest itself (an item that starts it, dropped in the same dungeon)
   -- does not lock it: the quest's own level is the Overview's call
@@ -432,6 +461,14 @@ function ns.LockedReason(qid, lvl, cls, dkey)
   local ok, cause = ChainOK(plan, lvl)
   if ok then return nil end
   if cause == "bad" then return L.LOCK_BAD, cause end
+  if cause == "rep" then
+    local rq = ns.Q[plan.rep].rq
+    local fname = rq[3] or ("#" .. rq[1])
+    local GFI = rawget(_G, "GetFactionInfoByID")
+    if GFI then local okN, n = pcall(GFI, rq[1]); if okN and type(n) == "string" and n ~= "" then fname = n end end
+    local sname = rawget(_G, "FACTION_STANDING_LABEL" .. rq[2]) or tostring(rq[2])
+    return L.LOCK_REP:format(fname, sname), cause, plan.rep
+  end
   local first = plan.first
   local txt = L.LOCK_PRE:format(ns.QName(first), GiverText(ns.Q[first]))
   local why

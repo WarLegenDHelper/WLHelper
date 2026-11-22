@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.196", date = "2026-11-22", items = {
+    { s = "fix", fr = { "Plus de quête que tu ne peux pas prendre à cause de ta réputation", "Une quête qui demande une réputation que tu n'as pas sort du trajet. Elle apparaît comme verrouillée, avec la raison (« réputation Timbermaw Hold requise : Neutre »), et revient dès que tu l'as. Ça concerne d'abord les quêtes de Blackmaw Hold en Azshara (Neutre avec Grumegueule), sauf The Legashi Threat qui se prend sans réputation. Une quête déjà dans ton journal reste dans le trajet." }, en = { "A quest that needs a reputation you do not have leaves the route, locked with the reason, and comes back once you have it (Blackmaw Hold's Azshara quests: Neutral with Timbermaw Hold).", "" } },
+  } },
   { v = "1.0.0-beta.195", date = "2026-11-22", items = {
     { s = "add", fr = { "Blackmaw Hold : le début de la chaîne et la réputation", "The Legashi Threat (Ekkal, en Azshara) commence tout et ne demande aucune réputation. Report to Rageroar et Missing Blackmaw Scouts (Horde) mènent ensuite à Korsa. Les quêtes de Gatekeeper Rageroar et de Gorn One Eye disent maintenant qu'il faut être Neutre avec Grumegueule. La note d'Ekkal explique le plus rapide pour y arriver : Legashi Horns, 5 cornes pour 100 de réputation. Lu sur Wowhead WoW Forever (pages des quêtes et guide de réputation Grumegueule)." }, en = { "Blackmaw Hold", "The Legashi Threat starts the chain with no reputation needed; Report to Rageroar and Missing Blackmaw Scouts lead to Korsa; Rageroar's and Gorn's quests say Neutral with Timbermaw Hold is needed, and how to get there fast (Legashi Horns)." } },
   } },
@@ -63,8 +66,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "", "l'état (« Prêt pour Profondeurs de Rochenoire », « Pas encore prêt : 2 quêtes à prendre », « Quêtes prises, mais pas la clé ») ;" }, en = { "", "" } },
     { s = "chg", fr = { "", "chaque quête à avoir prise avant d'entrer, marquée « Prise », « À prendre » ou « Facultative » ;" }, en = { "", "" } },
     { s = "chg", fr = { "", "la clé, s'il en faut une. Comme pour les flèches, on revient tout seul à l'étape en cours." }, en = { "The checklist is shown in the modern view itself", "State, each quest (taken / to take / optional), the key." } },
-  } },
-  { v = "1.0.0-beta.181", date = "2026-11-20", items = {
-    { s = "fix", fr = { "Erreur « action bloquée » en combat avec la vue moderne", "») : la barre Cibler / objet de quête était accrochée à la vue moderne, ce qui la rendait protégée en combat. La vue ne pouvait plus changer de taille. La barre est maintenant placée sur l'écran, au même endroit." }, en = { "Modern view", "No more blocked-action error in combat (the target bar no longer anchors to it)." } },
   } },
 }

@@ -1115,6 +1115,12 @@ do
   -- not linked to Blackmaw Reclamation's chain: three more quests would put it over the route's
   -- chain limit (Engine.lua CHAIN_MAX, meant for detours like Onyxia's attunement) and leave it out;
   -- they are quests of their own in the route
+  -- the quests that need Neutral with Timbermaw Hold (576): out of the route until then, locked
+  -- with the reason (Engine.lua ns.RepOK)
+  for _, id in ipairs({ 86752, 86791, 86777, 86792, 86796, 86797, 86798, 87346, 86814, 92065, 92066 }) do
+    local q = ns.Q[id]
+    if q then q.rq = { 576, 4, "Timbermaw Hold" } end
+  end
   -- Rageroar's and Gorn's quests: the reputation they need
   for _, id in ipairs({ 92065, 86798, 86814, 87346 }) do
     local q = ns.Q[id]
