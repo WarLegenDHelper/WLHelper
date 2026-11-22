@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.191", date = "2026-11-22", items = {
+    { s = "fix", fr = { "Sacs, « Libérer une place » ne jette plus ce qu'une quête demande", "Une quête de la Croisée demande des armes et des boucliers blancs, et le nettoyeur les jetait comme des objets inutiles. Un objet qu'un objectif de ton journal de quêtes demande (« Worn Shield : 1/5 ») reste maintenant dans tes sacs, qu'il soit blanc ou gris. La vente automatique des objets gris chez un marchand suit la même règle." }, en = { "Bags", "\"Free a slot\" and the grey item selling keep every item a quest of your log asks for." } },
+  } },
   { v = "1.0.0-beta.190", date = "2026-11-22", items = {
     { s = "fix", fr = { "Les rapports arrivent enfin chez l'auteur de WL Helper", "Les rapports (« Nous écrire », erreurs automatiques, quêtes introuvables, mesures de mémoire) partaient vers le chef de guilde, qui ne les recevait pas, et n'arrivaient donc nulle part. Ils vont maintenant au personnage de l'auteur de l'addon, dès qu'il est connecté en même temps que le joueur. En attendant, ils restent en attente chez le joueur. Les rapports déjà en attente partiront tout seuls." }, en = { "Reports now go to WL Helper's author (they were addressed to the guild master and never arrived).", "" } },
   } },
@@ -64,13 +67,5 @@ ns.WHATSNEW = {
     { s = "add", fr = { "Trouver un groupe, un clic suffit", "Un clic sur la ligne d'un groupe envoie au chef un message tout prêt, avec ta classe, ton niveau, ton rôle, le donjon et les quêtes que tu peux partager (« Salut ! Mage niv. 53 (DPS), dispo pour Profondeurs de Rochenoire. J'ai les quêtes Le dernier élément, La révolte des machines +3 à partager. Tu as une place ? »). Maj-clic ouvre ce message dans la discussion pour le modifier avant de l'envoyer. Sur la ligne d'un joueur seul, le clic l'invite avec « Salut ! Tu veux faire Profondeurs de Rochenoire avec nous ? Je t'invite. »." }, en = { "Find a group", "One click on a line sends a ready whisper (class, level, role, dungeon, quests to share); Shift-click to edit it; a lone player is invited with a question about the activity." } },
     { s = "add", fr = { "Filtre « Déjà dans le groupe »", "N'affiche que les groupes qui ont déjà un tank, un soigneur ou des DPS." }, en = { "Filter", "Groups that already have a tank or a healer." } },
     { s = "chg", fr = { "Niveau requis bien visible", "Une quête que tu ne peux pas encore prendre le dit en rouge, sur sa propre ligne et en premier (« Pas encore pour toi : niveau 55 requis, tu es niveau 53. Passe cette étape (Maj-clic) et reviens plus tard. »). La mention inutile « aucun prérequis » disparaît." }, en = { "A quest you cannot take yet says so first, in red, on its own line.", "" } },
-  } },
-  { v = "1.0.0-beta.176", date = "2026-11-20", items = {
-    { s = "fix", fr = { "Objectifs placés au mauvais endroit", "Vérification de tous les objectifs de donjon que les données plaçaient dehors, après « Le dernier élément ». 5 quêtes envoyaient au mauvais endroit :" }, en = { "", "" } },
-    { s = "fix", fr = { "Ordre du chef de guerre", "Les documents importants de Rochenoire étaient placés dans les Carmines. Ils sont dans le Pic Rochenoire inférieur." }, en = { "", "" } },
-    { s = "fix", fr = { "Sceau d'ascension (UBRS)", "Le sceau forgé était placé à Mille Pointes. Il s'obtient dans Rochenoire." }, en = { "", "" } },
-    { s = "fix", fr = { "Gnomeregan", "L'objet incrusté de crasse tombe des « Caverndeep », qui sont dans le donjon." }, en = { "", "" } },
-    { s = "fix", fr = { "Brassenoire", "Les saphirs d'Aku'Mai sont dans le donjon." }, en = { "", "" } },
-    { s = "fix", fr = { "Libram (Hache-Tripes)", "Le diamant noir parfait n'a plus de point fixe dans la vallée d'Alterac. Il s'achète à l'hôtel des ventes ou tombe en donjon. Les autres objectifs « dehors » sont justes : Uldaman, Maraudon, Razorfen et les Cavernes des lamentations ont de vraies zones à l'extérieur du donjon." }, en = { "Five dungeon objectives were placed outside or in the wrong zone; fixed.", "" } },
   } },
 }

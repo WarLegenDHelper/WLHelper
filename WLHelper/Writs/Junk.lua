@@ -62,8 +62,33 @@ local function IsJunk(id, quality)
     return true, sell
 end
 
+-- The items a quest of your log still asks for, by name (report: "a Crossroads quest wants white
+-- weapons and shields, and the bag cleaner threw them away"): each objective of the log ("Worn
+-- Shield: 1/5"), and our data's objectives for the quests in the log. { [name] = true }
+local function NeededNames()
+    local need = {}
+    local okL, log = pcall(root.LogEntries or function() return {} end)
+    for qid in pairs(okL and type(log) == "table" and log or {}) do
+        if C_QuestLog and C_QuestLog.GetQuestObjectives then
+            local ok, objs = pcall(C_QuestLog.GetQuestObjectives, qid)
+            for _, o in ipairs(ok and type(objs) == "table" and objs or {}) do
+                local txt = type(o.text) == "string" and not (issecretvalue and issecretvalue(o.text)) and o.text or nil
+                local name = txt and (txt:match("^(.-)%s*:%s*%d+%s*/%s*%d+") or txt:match("^%d+%s*/%s*%d+%s+(.+)$"))
+                if name and name ~= "" then need[name] = true end
+            end
+        end
+        local q = root.Q and root.Q[qid]
+        for _, o in ipairs(q and q.o or {}) do
+            if o.k == "item" and type(o.n) == "string" then need[o.n] = true end
+        end
+    end
+    return need
+end
+WP.JunkNeeded = NeededNames
+
 -- The cheapest junk stack: { bag, slot, id, name, value, count, link }
 local function Cheapest()
+    local need = NeededNames()
     local best
     for bag = 0, NumBags() do
         local n = C_Container.GetContainerNumSlots(bag) or 0
@@ -75,6 +100,13 @@ local function Cheapest()
                 if ok and info.quality == 1 and type(WP.UpgradeCheck) == "function" and type(info.hyperlink) == "string" then
                     local okU, u = pcall(WP.UpgradeCheck, info.hyperlink)
                     if okU and type(u) == "table" and u.up then ok = false end
+                end
+                -- an item a quest of your log asks for stays, white or grey
+                if ok then
+                    local nm = WP.ItemName and WP.ItemName(info.itemID)
+                    local GetInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+                    local okN, real = pcall(GetInfo, info.itemID)
+                    if (nm and need[nm]) or (okN and type(real) == "string" and need[real]) then ok = false end
                 end
                 if ok then
                     local value = (sell or 0) * (info.stackCount or 1)
@@ -192,11 +224,18 @@ end
 local function SellGreys()
     if WLWritsDB.sellGreys == false or OtherSeller() then return end
     local n, total = 0, 0
+    local need
     for bag = 0, NumBags() do
         for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
             local info = Info(bag, slot)
             if info and info.quality == 0 and not info.isLocked and not info.hasNoValue and n < 80 then
                 local ok, sell = IsJunk(info.itemID, 0)
+                if ok then
+                    need = need or NeededNames()
+                    local GetInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+                    local okN, real = pcall(GetInfo, info.itemID)
+                    if okN and type(real) == "string" and need[real] then ok = false end
+                end
                 if ok and (sell or 0) > 0 then
                     C_Container.UseContainerItem(bag, slot)
                     n, total = n + 1, total + sell * (info.stackCount or 1)

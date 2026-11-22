@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.191] — 2026-11-22
+
+### Corrigé / Fixed
+- **Sacs, « Libérer une place » ne jette plus ce qu'une quête demande** : une quête de la Croisée demande des armes et des boucliers blancs, et le nettoyeur les jetait comme des objets inutiles. Un objet qu'un objectif de ton journal de quêtes demande (« Worn Shield : 1/5 ») reste maintenant dans tes sacs, qu'il soit blanc ou gris. La vente automatique des objets gris chez un marchand suit la même règle.
+  *Bags: "Free a slot" and the grey item selling keep every item a quest of your log asks for.*
+
 ## [1.0.0-beta.190] — 2026-11-22
 
 ### Corrigé / Fixed
