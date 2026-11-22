@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.205] — 2026-11-22
+
+### Corrigé / Fixed
+- **Champs de bataille : plus d'erreur sur le bonus de la semaine** : le calendrier du jeu peut cacher le type d'un événement (valeur protégée), et la fenêtre PvP plantait en le lisant. Le type caché compte maintenant comme inconnu, et c'est le titre de l'événement qui dit si c'est un bonus de champ de bataille.
+  *Battlegrounds: no error when the calendar hides an event's type; the title decides.*
+
 ## [1.0.0-beta.204] — 2026-11-22
 
 ### Modifié / Changed

@@ -340,7 +340,10 @@ function BG.Bonus()
         seen = seen + n
         for i = 1, n do
             local e = Call(CC.GetDayEvent, off, day, i)
-            if type(e) == "table" and (e.calendarType == nil or e.calendarType == "HOLIDAY") then
+            -- calendarType can be a secret value (report: "attempt to compare field 'calendarType' (a
+            -- secret string value)"): read through Plain, a secret one counts as unknown (the title decides)
+            local ct = type(e) == "table" and Plain(e.calendarType) or nil
+            if type(e) == "table" and (ct == nil or ct == "HOLIDAY") then
                 local title = Plain(e.title)
                 local k = BG.KeyOfText(title)
                 if k then return { key = k, title = title, days = d } end
