@@ -3,7 +3,8 @@
 -- what it needs to be understood (version, client language, zone and position, the guide's step and
 -- dungeon, level and class, the last Lua error BugGrabber kept), keeps it in WLWritsDB.reports.out and
 -- sends it over the guild's addon channel (prefix WLHbug), cut in chunks.
--- The inbox: the guild master's characters (any character of an account where one logged in once),
+-- The inbox: the author's character (AUTHOR, any account it logs in on, since beta.190; the guild
+-- master before),
 -- or one turned on with "/wlh rapports on". It stores every report in WLWritsDB.reports.inbox (the
 -- account's saved variables, on disk at logout or /reload, where the addon's author reads them) and
 -- answers "A|id": the sender marks it delivered. An inbox says hello as it logs in and every 15
@@ -67,14 +68,20 @@ local function MeKey()
     return realm and (n .. "-" .. realm) or n
 end
 
--- this account receives the reports: a guild master logged in here once, or turned on by hand
+-- this account receives the reports: the author's character logged in here once, or turned on by hand
+-- The reports go to the addon's author (report: "I never received a report... I am not the guild
+-- master"): his character AUTHOR is the inbox by default, wherever it plays; any account can still be
+-- turned on by hand (/wlh rapports on). The guild master is no longer the default.
+local AUTHOR = "Alandir"
+local function IAmGuildMaster()
+    local me = Str(UnitName and UnitName("player"))
+    return me ~= nil and me == AUTHOR
+end
+R._IAmGuildMaster = IAmGuildMaster
 function R.IsInbox()
     local d = DB()
     if not d then return false end
-    if IsGuildLeader and IsInGuild and IsInGuild() then
-        local ok, gm = pcall(IsGuildLeader)
-        if ok and gm == true and d.inboxOn == nil then d.inboxOn = true end
-    end
+    if d.inboxOn == nil and IAmGuildMaster() then d.inboxOn = true end
     return d.inboxOn == true
 end
 function R.SetInbox(on)
@@ -277,10 +284,21 @@ end
 function R.Target()
     local d = DB()
     if not (d and IsInGuild and IsInGuild()) then return nil end
-    local on, gm = Online()
+    local on = Online()
     local box = Str(d.inboxName)
     if box and on[box] then return box end
-    return gm
+    if on[AUTHOR] then
+        -- the roster's full name (name-realm) when there is one, the whisper's own form
+        local short
+        for name in pairs(on) do
+            if name:match("^([^%-]+)") == AUTHOR then
+                if name:find("-", 1, true) then return name end
+                short = name
+            end
+        end
+        return short
+    end
+    return nil
 end
 
 local function SendReport(rec, target)
@@ -582,7 +600,7 @@ function R.Command(arg)
     if arg == "on" or arg == "off" then
         R.SetInbox(arg == "on")
         WP.Print(string.format(L("Boîte de réception des rapports : %s"), arg == "on" and L("activée") or L("coupée")))
-        if arg == "on" then Queue("H") end
+        if arg == "on" then if R.StartInbox then pcall(R.StartInbox) else Queue("H") end end
         return
     end
     if arg == "" or arg == nil then pcall(R.ShowInbox) end
@@ -598,7 +616,18 @@ pcall(f.RegisterEvent, f, "PLAYER_LOGIN")
 pcall(f.RegisterEvent, f, "CHAT_MSG_ADDON")
 pcall(f.RegisterEvent, f, "GUILD_ROSTER_UPDATE")
 local helloTicker
-local rosterTry = -1e9   -- the last time the roster was looked at for a guild master online
+local rosterTry = -1e9
+-- the inbox says hello (now, then every HELLO_EVERY), and its own reports that waited for an inbox
+-- (written before this account knew it was the inbox) go straight into it
+function R.StartInbox()
+    if helloTicker or not R.IsInbox() then return end
+    local d = DB()
+    for id, rec in pairs(d and d.out or {}) do
+        if not rec.delivered then d.inbox[id] = rec; rec.delivered = true end
+    end
+    Queue("H")
+    if C_Timer and C_Timer.NewTicker then helloTicker = C_Timer.NewTicker(HELLO_EVERY, function() Queue("H") end) end
+end   -- the last time the roster was looked at for a guild master online
 f:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
     if event == "PLAYER_LOGIN" then
         local Register = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
@@ -609,14 +638,11 @@ f:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
         -- the roster, asked once: who is online (the guild master receives the reports)
         if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster) elseif GuildRoster then pcall(GuildRoster) end
         if C_Timer and C_Timer.After then
-            C_Timer.After(20, function()
-                if R.IsInbox() then
-                    Queue("H")
-                    if C_Timer.NewTicker and not helloTicker then helloTicker = C_Timer.NewTicker(HELLO_EVERY, function() Queue("H") end) end
-                end
-            end)
+            C_Timer.After(20, function() pcall(R.StartInbox) end)
         end
     elseif event == "GUILD_ROSTER_UPDATE" then
+        -- the roster came: the guild master is known by its rank now (the login may have been too early)
+        if not helloTicker then pcall(R.StartInbox) end
         -- undelivered reports and the guild master online: sent, at most once every 10 minutes
         local now = GetTime and GetTime() or 0
         if now - rosterTry < 600 then return end

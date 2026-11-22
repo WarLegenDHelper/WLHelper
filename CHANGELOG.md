@@ -6,11 +6,17 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.190] — 2026-11-22
+
+### Corrigé / Fixed
+- **Les rapports arrivent enfin chez l'auteur de WL Helper** : les rapports (« Nous écrire », erreurs automatiques, quêtes introuvables, mesures de mémoire) partaient vers le chef de guilde, qui ne les recevait pas, et n'arrivaient donc nulle part. Ils vont maintenant au personnage de l'auteur de l'addon, dès qu'il est connecté en même temps que le joueur. En attendant, ils restent en attente chez le joueur. Les rapports déjà en attente partiront tout seuls.
+  *Reports now go to WL Helper's author (they were addressed to the guild master and never arrived).*
+
 ## [1.0.0-beta.189] — 2026-11-22
 
 ### Ajouté / Added
-- **Mesures de mémoire envoyées automatiquement** : une fois par jour et par personnage, après 20 minutes de jeu, WL Helper envoie en silence au chef de guilde un rapport avec la mémoire de chacune de ses parties (le guide, WL Helper Gear, la navigation et ses cartes de déplacement), le total de tous les addons chargés, les 5 addons les plus lourds et ses opérations les plus lentes. Il passe par le même chemin que les rapports « Nous écrire » : la guilde seulement. Pour le couper : `/wlh rapports memoire off`.
-  *Once a day per character, a silent memory report goes to the guild master through the guild (`/wlh rapports memoire off` stops it).*
+- **Mesures de mémoire envoyées automatiquement** : une fois par jour et par personnage, après 20 minutes de jeu, WL Helper envoie en silence un rapport à l'équipe WL Helper avec la mémoire de chacune de ses parties (le guide, WL Helper Gear, la navigation et ses cartes de déplacement), le total de tous les addons chargés, les 5 addons les plus lourds et ses opérations les plus lentes. Il passe par le même chemin que les rapports « Nous écrire » : la guilde seulement. Pour le couper : `/wlh rapports memoire off`.
+  *Once a day per character, a silent memory report goes to the WL Helper team through the guild (`/wlh rapports memoire off` stops it).*
 
 ### Corrigé / Fixed
 - **Notes de la beta.188** : la ligne « Champs de bataille, classement PvP de la guilde » n'apparaît plus qu'une fois, dans le changelog comme dans la fenêtre des nouveautés.

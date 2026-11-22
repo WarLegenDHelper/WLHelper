@@ -2,8 +2,11 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.190", date = "2026-11-22", items = {
+    { s = "fix", fr = { "Les rapports arrivent enfin chez l'auteur de WL Helper", "Les rapports (« Nous écrire », erreurs automatiques, quêtes introuvables, mesures de mémoire) partaient vers le chef de guilde, qui ne les recevait pas, et n'arrivaient donc nulle part. Ils vont maintenant au personnage de l'auteur de l'addon, dès qu'il est connecté en même temps que le joueur. En attendant, ils restent en attente chez le joueur. Les rapports déjà en attente partiront tout seuls." }, en = { "Reports now go to WL Helper's author (they were addressed to the guild master and never arrived).", "" } },
+  } },
   { v = "1.0.0-beta.189", date = "2026-11-22", items = {
-    { s = "add", fr = { "Mesures de mémoire envoyées automatiquement", "Une fois par jour et par personnage, après 20 minutes de jeu, WL Helper envoie en silence au chef de guilde un rapport avec la mémoire de chacune de ses parties (le guide, WL Helper Gear, la navigation et ses cartes de déplacement), le total de tous les addons chargés, les 5 addons les plus lourds et ses opérations les plus lentes. Il passe par le même chemin que les rapports « Nous écrire » : la guilde seulement. Pour le couper : /wlh rapports memoire off." }, en = { "Once a day per character, a silent memory report goes to the guild master through the guild (/wlh rapports memoire off stops it).", "" } },
+    { s = "add", fr = { "Mesures de mémoire envoyées automatiquement", "Une fois par jour et par personnage, après 20 minutes de jeu, WL Helper envoie en silence un rapport à l'équipe WL Helper avec la mémoire de chacune de ses parties (le guide, WL Helper Gear, la navigation et ses cartes de déplacement), le total de tous les addons chargés, les 5 addons les plus lourds et ses opérations les plus lentes. Il passe par le même chemin que les rapports « Nous écrire » : la guilde seulement. Pour le couper : /wlh rapports memoire off." }, en = { "Once a day per character, a silent memory report goes to the WL Helper team through the guild (/wlh rapports memoire off stops it).", "" } },
     { s = "fix", fr = { "Notes de la beta.188", "La ligne « Champs de bataille, classement PvP de la guilde » n'apparaît plus qu'une fois, dans le changelog comme dans la fenêtre des nouveautés." }, en = { "The beta.188 notes no longer list the guild PvP ranking twice.", "" } },
   } },
   { v = "1.0.0-beta.188", date = "2026-11-22", items = {
@@ -69,10 +72,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Gnomeregan", "L'objet incrusté de crasse tombe des « Caverndeep », qui sont dans le donjon." }, en = { "", "" } },
     { s = "fix", fr = { "Brassenoire", "Les saphirs d'Aku'Mai sont dans le donjon." }, en = { "", "" } },
     { s = "fix", fr = { "Libram (Hache-Tripes)", "Le diamant noir parfait n'a plus de point fixe dans la vallée d'Alterac. Il s'achète à l'hôtel des ventes ou tombe en donjon. Les autres objectifs « dehors » sont justes : Uldaman, Maraudon, Razorfen et les Cavernes des lamentations ont de vraies zones à l'extérieur du donjon." }, en = { "Five dungeon objectives were placed outside or in the wrong zone; fixed.", "" } },
-  } },
-  { v = "1.0.0-beta.175", date = "2026-11-20", items = {
-    { s = "fix", fr = { "Le dernier élément (BRD)", "L'objectif envoyait dans la Gorge des Vents brûlants, sur « Scald », où il n'y a rien pour cette quête. Les Essences des éléments tombent des élémentaires et des golems dans les Profondeurs de Rochenoire : l'étape est maintenant dans le donjon." }, en = { "The Last Element", "The Essences drop inside Blackrock Depths, no more trip to Searing Gorge." } },
-    { s = "fix", fr = { "Guide BRD qui envoyait à Stratholme", "« Le défi » (set de donjon 0.5, niveau 58, qui passe par Stratholme) ne fait plus partie du guide des Profondeurs de Rochenoire." }, en = { "The BRD guide no longer includes The Challenge (Dungeon Set 0.5) and its trip to Stratholme.", "" } },
-    { s = "fix", fr = { "Tout cocher", "Le bouton ne coche plus les quêtes trop hautes pour toi, celles dont la chaîne monte 5 niveaux ou plus au-dessus du tien." }, en = { "Tick all leaves out the quests too high for you.", "" } },
   } },
 }
