@@ -241,7 +241,8 @@ local CARDS = {
     edf = "La chaîne du set de donjon 2 de ta classe : Une proposition sérieuse chez Deliana (Forgefer) ou Mokvar (Orgrimmar), Une juste compensation, Anthion à Stratholme, Le défi aux Profondeurs de Rochenoire, Les adieux d'Anthion, l'amulette du seigneur Valthalak, puis Garder le meilleur pour la fin. Chaque quête d'amélioration prend des pièces du set de donjon 1 et donne leur version du set de donjon 2. Beaucoup de donjons en chemin : viens en groupe." },
   { key = "QG_Weekly", n = "Weekly: Undermine Satchel (gold)", nf = "Hebdo : sac de l'Undermine (or)",
     lvl = { 60, 60 }, loc = "Booty Bay, Dire Maul", locf = "Baie-du-Butin, Hache-Tripes",
-    icon = "Interface\\Icons\\INV_Misc_Bag_10_Black", q = { 96076 },
+    -- weekly: not listed in the Quêtes tab (a search still finds it); Home's "Cette semaine" shows it
+    icon = "Interface\\Icons\\INV_Misc_Bag_10_Black", q = { 96076 }, weekly = true,
     ed = "The level 60 weekly quest: an item from the last boss of each Dire Maul wing (Alzzin, Tortheldrin, King Gordok) for an Undermine Satchel, 10 to 100 gold. Comes back every week.",
     edf = "La quête hebdomadaire du niveau 60 : un objet du dernier boss de chaque aile de Hache-Tripes (Alzzin, Tortheldrin, le roi Gordok) contre un sac de l'Undermine, 10 à 100 pièces d'or. Elle revient chaque semaine." },
 }
@@ -249,7 +250,7 @@ ns.QGUIDES = {}
 for _, c in ipairs(CARDS) do
   if not ns.D[c.key] then
     ns.D[c.key] = { key = c.key, n = c.n, nf = c.nf, lvl = c.lvl, loc = c.loc, locf = c.locf, icon = c.icon,
-      ed = c.ed, cq = "QG", qg = true, q = c.q }
+      ed = c.ed, cq = "QG", qg = true, q = c.q, weekly = c.weekly }
     ns.TR[c.ed] = c.edf
     table.insert(ns.ORDER, c.key)
     ns.QGUIDES[#ns.QGUIDES + 1] = c.key

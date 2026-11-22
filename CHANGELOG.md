@@ -6,6 +6,22 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.197] — 2026-11-22
+
+### Modifié / Changed
+- **L'accueil a une section « Cette semaine »** : deux cartes côte à côte, l'hebdo PvE et l'hebdo PvP, avec le temps restant avant la remise à zéro. L'hebdo PvE, c'est le sac de l'Undermine : où tu en es (à faire, en cours, faite), ce qu'il faut ramener des trois ailes de Hache-Tripes, où aller (Pix Xizzix, Baie-du-Butin), ce que ça rapporte (10 à 100 po), « Y aller » avec le GPS et « Voir le guide ». L'hebdo PvP donne le champ de bataille en bonus d'après le calendrier du jeu et son maître de guerre, la quête Field of Honor, ce que ça rapporte, ta place au classement de la guilde, « Y aller » et « Champs de bataille ».
+  *Home has a "This week" section: the PvE weekly (Undermine Satchel: where you stand, what, where, reward, GPS and its guide) and the PvP weekly (bonus battleground, Field of Honor, reward, guild ranking), with the time left before the weekly reset.*
+- **Un accueil mieux équilibré** : les activités tiennent en deux lignes de deux cartes (Progresser, Argent et métiers, Guilde et groupes, Voyager), même sur une fenêtre large. La carte PvP, presque vide, laisse sa place à l'hebdo PvP. « Nous écrire » devient un bandeau fin en bas de la page.
+  *A more balanced Home: the activities fit in two rows of two cards, the near-empty PvP card gives way to the PvP weekly, and "Write to us" becomes a thin strip at the bottom.*
+- **L'hebdo n'est plus dans l'onglet Quêtes** du choix des guides : il est sur l'accueil. La recherche du choix des guides le trouve encore.
+  *The weekly left the guide picker's Quests tab (it is on Home now); the picker's search still finds it.*
+- **Le guide des réputations se trouve enfin** : une ligne « Réputations » dans la carte Progresser de l'accueil, et une entrée dans le menu de gauche sous Progresser. Les deux ouvrent directement l'onglet Réputations.
+  *The reputations guide is easy to find: a "Reputations" line in Home's Progress card and an entry under Progress in the left menu, both opening the Reputations tab.*
+
+### Ajouté / Added
+- **Réputations : la liste des quêtes** : la carte de chaque faction liste ses quêtes, cochées si elles sont faites, "en cours" si elles sont dans ton journal, avec le rang requis sinon. Pour l'instant Grumegueule (37 quêtes, d'après le guide de réputation de Wowhead WoW Forever).
+  *Each reputation card lists the faction's quests, ticked when done (Timbermaw Hold for now).*
+
 ## [1.0.0-beta.196] — 2026-11-22
 
 ### Corrigé / Fixed

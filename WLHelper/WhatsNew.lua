@@ -2,6 +2,13 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.197", date = "2026-11-22", items = {
+    { s = "chg", fr = { "L'accueil a une section « Cette semaine »", "Deux cartes côte à côte, l'hebdo PvE et l'hebdo PvP, avec le temps restant avant la remise à zéro. L'hebdo PvE, c'est le sac de l'Undermine : où tu en es (à faire, en cours, faite), ce qu'il faut ramener des trois ailes de Hache-Tripes, où aller (Pix Xizzix, Baie-du-Butin), ce que ça rapporte (10 à 100 po), « Y aller » avec le GPS et « Voir le guide ». L'hebdo PvP donne le champ de bataille en bonus d'après le calendrier du jeu et son maître de guerre, la quête Field of Honor, ce que ça rapporte, ta place au classement de la guilde, « Y aller » et « Champs de bataille »." }, en = { "Home has a \"This week\" section", "The PvE weekly (Undermine Satchel: where you stand, what, where, reward, GPS and its guide) and the PvP weekly (bonus battleground, Field of Honor, reward, guild ranking), with the time left before the weekly reset." } },
+    { s = "chg", fr = { "Un accueil mieux équilibré", "Les activités tiennent en deux lignes de deux cartes (Progresser, Argent et métiers, Guilde et groupes, Voyager), même sur une fenêtre large. La carte PvP, presque vide, laisse sa place à l'hebdo PvP. « Nous écrire » devient un bandeau fin en bas de la page." }, en = { "A more balanced Home", "The activities fit in two rows of two cards, the near-empty PvP card gives way to the PvP weekly, and \"Write to us\" becomes a thin strip at the bottom." } },
+    { s = "chg", fr = { "L'hebdo n'est plus dans l'onglet Quêtes", "Du choix des guides : il est sur l'accueil. La recherche du choix des guides le trouve encore." }, en = { "The weekly left the guide picker's Quests tab (it is on Home now); the picker's search still finds it.", "" } },
+    { s = "chg", fr = { "Le guide des réputations se trouve enfin", "Une ligne « Réputations » dans la carte Progresser de l'accueil, et une entrée dans le menu de gauche sous Progresser. Les deux ouvrent directement l'onglet Réputations." }, en = { "The reputations guide is easy to find", "A \"Reputations\" line in Home's Progress card and an entry under Progress in the left menu, both opening the Reputations tab." } },
+    { s = "add", fr = { "Réputations : la liste des quêtes", "La carte de chaque faction liste ses quêtes, cochées si elles sont faites, \"en cours\" si elles sont dans ton journal, avec le rang requis sinon. Pour l'instant Grumegueule (37 quêtes, d'après le guide de réputation de Wowhead WoW Forever)." }, en = { "Each reputation card lists the faction's quests, ticked when done (Timbermaw Hold for now).", "" } },
+  } },
   { v = "1.0.0-beta.196", date = "2026-11-22", items = {
     { s = "fix", fr = { "Plus de quête que tu ne peux pas prendre à cause de ta réputation", "Une quête qui demande une réputation que tu n'as pas sort du trajet. Elle apparaît comme verrouillée, avec la raison (« réputation Timbermaw Hold requise : Neutre »), et revient dès que tu l'as. Ça concerne d'abord les quêtes de Blackmaw Hold en Azshara (Neutre avec Grumegueule), sauf The Legashi Threat qui se prend sans réputation. Une quête déjà dans ton journal reste dans le trajet." }, en = { "A quest that needs a reputation you do not have leaves the route, locked with the reason, and comes back once you have it (Blackmaw Hold's Azshara quests: Neutral with Timbermaw Hold).", "" } },
   } },
@@ -60,11 +67,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.183", date = "2026-11-20", items = {
     { s = "chg", fr = { "Vue moderne, les dernières actions de la grande fenêtre", "Son menu (roue dentée) a maintenant « Recommencer la route » (dans Guides, avec confirmation), « Flèche GPS » et « Raccourcis clavier » (dans Affichage). Tout ce que faisait le menu Actions de la grande fenêtre se fait désormais depuis la vue moderne." }, en = { "Modern view menu", "Restart the route, GPS arrow on/off, key bindings." } },
-  } },
-  { v = "1.0.0-beta.182", date = "2026-11-20", items = {
-    { s = "chg", fr = { "La check-list dans la vue moderne", "Le lien « Check-list », sous la vue moderne et dans son menu, amène sur l'étape d'entrée du donjon dans la vue moderne elle-même, sans ouvrir la grande fenêtre. On y voit :" }, en = { "", "" } },
-    { s = "chg", fr = { "", "l'état (« Prêt pour Profondeurs de Rochenoire », « Pas encore prêt : 2 quêtes à prendre », « Quêtes prises, mais pas la clé ») ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "chaque quête à avoir prise avant d'entrer, marquée « Prise », « À prendre » ou « Facultative » ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "la clé, s'il en faut une. Comme pour les flèches, on revient tout seul à l'étape en cours." }, en = { "The checklist is shown in the modern view itself", "State, each quest (taken / to take / optional), the key." } },
   } },
 }

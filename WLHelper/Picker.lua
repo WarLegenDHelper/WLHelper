@@ -327,7 +327,8 @@ local function ClassMatch(d)
   return false
 end
 
-local function TabOf(d) return d.qg and "qg" or d.cq and "cls" or d.raid and "raid" or "dg" end
+-- a weekly card (QuestGuides.lua, weekly = true) sits in no tab: Home's "Cette semaine" shows it
+local function TabOf(d) return d.weekly and "weekly" or d.qg and "qg" or d.cq and "cls" or d.raid and "raid" or "dg" end
 local function CurTab() return WLDTDB.tab or "dg" end
 
 -- Search: lower case, accents dropped, so "zul farrak", "Mossmeld" or "geme" all find something.

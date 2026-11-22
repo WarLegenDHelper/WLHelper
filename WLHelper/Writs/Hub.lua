@@ -64,6 +64,11 @@ WP.HUB = {
     { key = "best", group = "quests", label = "Meilleur équipement", icon = { hd = "star" },
       available = function() return Has("Best", "Toggle") end,
       open = function() if WP.Best then WP.Best.Toggle() end end, settings = "upgrades" },
+    -- the reputations guide, the "Réputations" tab of Meilleur équipement (report: "I can't even
+    -- see where the reputations guide is")
+    { key = "reps", group = "quests", label = "Réputations", icon = { hd = "flag" },
+      available = function() return Has("Best", "Toggle") and Has("Reps") end,
+      open = function() if WP.Best then WP.Best.Toggle("rep", true) end end, settings = "upgrades" },
     { key = "upgrades", group = "quests", label = "Améliorations", icon = "upgrades", module = "upgrades",
       available = function() return true end,
       open = function() if WP.OpenHub then WP.OpenHub("upgrades") end end, settings = "upgrades", inHub = true },

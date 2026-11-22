@@ -798,6 +798,11 @@ local PAGES = {
 -- The windows of an activity that has no settings page, so the activity still shows in the nav
 -- (beta.173, report: "PvP is hard to see"): a click closes the Hub and opens the window.
 local NAV_LINKS = {
+    { key = "reps", label = "Réputations", group = "quests", icon = { hd = "flag" },
+      desc = "Ce que chaque réputation débloque, ton rang et le plus rapide pour la monter.",
+      hint = "Clic : ouvrir le guide des réputations",
+      available = function() return ns.WP.Reps ~= nil and ns.WP.Best ~= nil and ns.WP.Best.Toggle ~= nil end,
+      open = function() if ns.WP.Best and ns.WP.Best.Toggle then ns.WP.Best.Toggle("rep", true) end end },
     { key = "pvp", label = "Champs de bataille", group = "pvp", icon = { hd = "sword" },
       desc = "Le bonus du jour, les maîtres de guerre et ton set PvP.",
       hint = "Clic : ouvrir les champs de bataille",

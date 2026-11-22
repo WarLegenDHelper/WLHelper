@@ -868,6 +868,12 @@ end
 
 -- Field of Honor, folded by default: one heading row (a click opens it), then its lines and a GPS button
 local FOH = { m = 1446, x = 51.8, y = 27.2 }
+BG.FOH = FOH
+-- the GPS to Wizzik Dustfizz (Home's "Cette semaine" PvP card) -> true when the route started
+function BG.GoFoh()
+    if not (WP.GoTo and WP.GoTo.Go) then return false end
+    return WP.GoTo.Go({ kind = "npc", label = "Wizzik Dustfizz", detail = "Gadgetzan", map = FOH.m, x = FOH.x, y = FOH.y, gps = "Wizzik Dustfizz" })
+end
 local function FohCard(parent)
     local c = CreateFrame("Frame", nil, parent)
     c.wlOwned = true

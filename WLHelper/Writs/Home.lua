@@ -3,8 +3,13 @@
 -- From the top: "Où veux-tu aller ?" (a search field on WP.GoTo: Enter guides you to the first place);
 -- "now", only what a line cannot do (start the Writs tour, an event about to start, the city tour,
 -- a nearly full log, a running GPS; hidden when nothing waits); a line when a newer version exists;
+-- "Cette semaine" (beta.197): the weekly reset, then two cards side by side, the PvE weekly (the
+-- Undermine Satchel: where you stand, what, where, the reward, "Y aller" and its guide) and the PvP
+-- weekly (the battleground in bonus, Field of Honor, the reward, the guild ranking, "Y aller" and
+-- the battlegrounds window);
 -- then one large card per activity of WP.HUB_GROUPS (beta.173, report: "too many small logos, PvP
--- is hard to see"), 2 a line, 3 on a wide window (ns.GRID.homeCards): the activity's icon and name,
+-- is hard to see") but PvP (its weekly card) and "Aide et retours" (a thin strip at the very
+-- bottom), 2 a line (ns.GRID.homeCards): the activity's icon and name,
 -- one useful sentence (where the guide stands, the Writs to turn in...), one button that does it,
 -- then a compact line per window of the activity (S.HubRow compact: name, where you stand, a dot
 -- when it has something to do now, a right-click opens its settings; a card with one window shows
@@ -193,14 +198,71 @@ ns.AddEnglish({
     ["en donjon"] = "in a dungeon",
 })
 
+-- "Cette semaine" (beta.197, report: "the weeklies should be on the homepage, weekly PvE and weekly
+-- PvP, where to go and what there is this week; the homepage is not balanced any more")
+ns.AddEnglish({
+    ["Cette semaine"] = "This week",
+    ["remise à zéro dans %d j %d h"] = "resets in %d d %d h",
+    ["remise à zéro dans %d h"] = "resets in %d h",
+    ["remise à zéro dans moins d'une heure"] = "resets in less than an hour",
+    ["Hebdo PvE"] = "Weekly PvE",
+    ["Hebdo PvP"] = "Weekly PvP",
+    ["Sac de l'Undermine"] = "Undermine Satchel",
+    ["Quoi"] = "What",
+    ["Où"] = "Where",
+    ["Rapporte"] = "Reward",
+    ["Quête"] = "Quest",
+    ["À faire cette semaine"] = "To do this week",
+    ["Faite cette semaine"] = "Done this week",
+    ["Dès le niveau 60"] = "From level 60",
+    ["En cours : %d objet sur %d"] = "In progress: %d of %d items",
+    ["En cours : %d objets sur %d"] = "In progress: %d of %d items",
+    ["Les 3 objets sont là : rends la quête"] = "All 3 items found: turn the quest in",
+    ["Un objet du dernier boss de chaque aile de Hache-Tripes : Alzzin (Est), Tortheldrin (Ouest), le roi Gordok (Nord)."] =
+        "One item from the last boss of each Dire Maul wing: Alzzin (East), Tortheldrin (West), King Gordok (North).",
+    ["Pix Xizzix, Baie-du-Butin, puis Hache-Tripes"] = "Pix Xizzix, Booty Bay, then Dire Maul",
+    ["Baie-du-Butin"] = "Booty Bay",
+    ["Un sac de l'Undermine : un objet en or qui se vend 10 à 100 po"] = "An Undermine Satchel: a gold item that sells for 10 to 100 gold",
+    ["Voir le guide"] = "See the guide",
+    ["Clic : le guide de l'hebdo, étape par étape"] = "Click: the weekly's guide, step by step",
+    ["Clic : la flèche du GPS t'emmène à Pix Xizzix"] = "Click: the GPS arrow takes you to Pix Xizzix",
+    ["Champs de bataille"] = "Battlegrounds",
+    ["En bonus aujourd'hui"] = "Bonus today",
+    ["En bonus demain"] = "Bonus tomorrow",
+    ["En bonus dans %d jours"] = "Bonus in %d days",
+    ["Aucun bonus annoncé dans le calendrier du jeu"] = "No bonus announced in the game's calendar",
+    ["%s, %s"] = "%s, %s",
+    ["Field of Honor : Wizzik Dustfizz, Gadgetzan, dès le niveau 60"] = "Field of Honor: Wizzik Dustfizz, Gadgetzan, from level 60",
+    ["3 marques par victoire, 1 par défaite ; Field of Honor : 300 honneur et 500 points de rang"] =
+        "3 marks a win, 1 a loss; Field of Honor: 300 honor and 500 rank points",
+    ["Clic : la flèche du GPS t'emmène au maître de guerre"] = "Click: the GPS arrow takes you to the battlemaster",
+    ["Clic : la flèche du GPS t'emmène à Wizzik Dustfizz"] = "Click: the GPS arrow takes you to Wizzik Dustfizz",
+    -- the reputations guide (the "Réputations" tab of Meilleur équipement)
+    ["Ce que chaque réputation débloque, ton rang et le plus rapide pour la monter."] =
+        "What each reputation unlocks, your standing and the fastest way to raise it.",
+    ["Clic : ouvrir le guide des réputations"] = "Click: open the reputations guide",
+    ["Ce qu'elles débloquent et comment les monter"] = "What they unlock and how to raise them",
+})
+
 local GAP = 12             -- between blocks (search, now, the activities)
--- the activity cards: ns.GRID.homeCards (320 at least, 2 a line from 656 px, 3 from 992), the same
--- height on a line
+-- the activity cards: ns.GRID.homeCards (320 at least), 2 a line at most since beta.197 (four
+-- cards, two lines of two: the page stays balanced on a wide window), the same height on a line
 local function CardsGrid()
     local g = root.GRID and root.GRID.homeCards or {}
-    return { minW = g.minW or 320, gap = g.gap or 16, rowGap = g.rowGap or 16, maxCols = g.maxCols or 3,
+    return { minW = g.minW or 320, gap = g.gap or 16, rowGap = g.rowGap or 16, maxCols = 2,
         minPx = g.minPx or 200, equal = true }
 end
+-- the weekly cards: PvE and PvP side by side, one under the other on a narrow window
+local function WeekGrid()
+    local g = root.GRID and root.GRID.homeCards or {}
+    return { minW = 280, gap = g.gap or 16, rowGap = g.rowGap or 16, maxCols = 2, minPx = g.minPx or 200, equal = true }
+end
+-- the activities Home does not draw as a card: PvP is the "Cette semaine" PvP card, "Aide et
+-- retours" a thin strip at the bottom (its own layout, below)
+local HOME_SKIP = { pvp = true, feedback = true }
+-- the level 60 weekly (QuestGuides.lua, QG_Weekly): Pix Xizzix in Booty Bay
+local WEEKLY_Q, WEEKLY_GUIDE = 96076, "QG_Weekly"
+local PIX = { m = 1434, x = 28.5, y = 75.9 }
 local CARD_PAD = 16
 local LINE_H = 30          -- S.HUBLINE_H
 local SEARCH_ROWS = 3
@@ -391,7 +453,7 @@ local CLICK_HINT = {
     writs = "Clic : ouvrir les Writs", favor = "Clic : voir les caisses", orders = "Clic : ouvrir les commandes",
     bags = "Clic : voir les objets à jeter", upgrades = "Clic : choisir ta spé et voir tes améliorations",
     guild = "Clic : ouvrir la guilde", events = "Clic : ouvrir Groupes",
-    pvp = "Clic : ouvrir les champs de bataille",
+    pvp = "Clic : ouvrir les champs de bataille", reps = "Clic : ouvrir le guide des réputations",
 }
 function WP.HubClickHint(key) return CLICK_HINT[key] and L(CLICK_HINT[key]) or nil end
 
@@ -471,6 +533,27 @@ local function BuildGroupCard(g)
     end
     function c:Fit(width)
         local pad = CARD_PAD
+        -- a strip (Aide et retours, one window): icon, name and sentence on one band, the button
+        -- at the right
+        if self.slim and self.single then
+            local okW, bw = pcall(self.go.GetWidth, self.go)
+            bw = (self.go:IsShown() and okW and type(bw) == "number") and bw or 0
+            local x = pad + 32 + 12
+            local textW = math.max(80, width - x - pad - (bw > 0 and bw + 12 or 0))
+            self.title:ClearAllPoints(); self.title:SetPoint("TOPLEFT", x, -12)
+            self.title:SetWidth(textW); S.ClampLabel(self.title, nil, self)
+            local h = 18
+            if self.state:IsShown() then
+                self.state:ClearAllPoints(); self.state:SetPoint("TOPLEFT", x, -(12 + 20))
+                h = 20 + (tonumber(S.FitText(self.state, 2, textW, self)) or 14)
+            end
+            self.detail:Hide()
+            local H = math.ceil(math.max(32, h) + 24)
+            self.iconFrame:ClearAllPoints(); self.iconFrame:SetPoint("LEFT", pad, 0)
+            if self.go:IsShown() then self.go:ClearAllPoints(); self.go:SetPoint("RIGHT", -pad, 0) end
+            self:SetHeight(H)
+            return H
+        end
         local textW = math.max(80, width - 2 * pad)
         self.iconFrame:ClearAllPoints(); self.iconFrame:SetPoint("TOPLEFT", pad, -pad)
         self.title:ClearAllPoints()
@@ -503,6 +586,125 @@ local function BuildGroupCard(g)
             end
         end
         y = y + (n > 0 and 6 or pad)
+        self:SetHeight(y)
+        return y
+    end
+    return c
+end
+
+-- One "Cette semaine" card (beta.197): a kicker ("Hebdo PvE"), the painted icon 32 and the name,
+-- where you stand (coloured), then the facts (Quoi, Où, Rapporte...: a muted label column, the
+-- value wrapping), a muted detail, and two buttons: go there, open the full window or guide.
+--   w:Set{ icon, kicker, title, state, color, facts = { { label, value } }, detail,
+--          go = { label, fn, tip }, more = { label, fn, tip } }
+--   w:Fit(width) -> height
+local FACT_MAX = 4
+local function BuildWeekCard(key)
+    local c = CreateFrame("Frame", nil, win.inner)
+    c.wlOwned = true
+    c.key = key
+    S.Solid(c, "BACKGROUND", C.cardFill):SetAllPoints()
+    S.Border(c, C.cardEdge)
+    c.iconFrame = CreateFrame("Frame", nil, c)
+    c.iconFrame:SetSize(32, 32)
+    S.Border(c.iconFrame, C.cardEdge)
+    c.icon = c.iconFrame:CreateTexture(nil, "ARTWORK")
+    c.kicker = S.Text(c, F.meta, C.gold)
+    c.kicker:SetJustifyH("LEFT"); c.kicker:SetWordWrap(false)
+    c.title = S.Text(c, F.heading, C.fg)
+    c.title:SetJustifyH("LEFT"); c.title:SetWordWrap(false)
+    c.state = S.Text(c, F.body, C.fg)
+    c.state:SetJustifyH("LEFT"); c.state:SetJustifyV("TOP")
+    c.factL, c.factV = {}, {}
+    for i = 1, FACT_MAX do
+        c.factL[i] = S.Text(c, F.meta, C.muted)
+        c.factL[i]:SetJustifyH("LEFT"); c.factL[i]:SetWordWrap(false)
+        c.factV[i] = S.Text(c, F.meta, C.text or C.fg)
+        c.factV[i]:SetJustifyH("LEFT"); c.factV[i]:SetJustifyV("TOP")
+    end
+    c.detail = S.Text(c, F.meta, C.muted)
+    c.detail:SetJustifyH("LEFT"); c.detail:SetJustifyV("TOP")
+    local function Btn(field, kind)
+        local b = S.Button(c, "", 0, 28, kind, function() local o = c[field]; if o and o.fn then o.fn() end end)
+        b:SetScript("OnEnter", function(self) local o = c[field]; if o and o.tip then S.Tip(self, o.tip) end end)
+        b:SetScript("OnLeave", S.HideTip)
+        return b
+    end
+    c.goBtn = Btn("goO", "secondary")
+    c.moreBtn = Btn("moreO", "ghost")
+    c.nFacts = 0
+    function c:Set(o)
+        o = o or {}
+        if o.icon and o.icon ~= self.iconPath then
+            self.iconPath = o.icon
+            self.icon:ClearAllPoints()
+            if WP.PaintModuleIcon(self.icon, o.icon) then self.icon:SetSize(20, 20); self.icon:SetPoint("CENTER")
+            else self.icon:SetAllPoints() end
+        end
+        self.kicker:SetText(o.kicker or "")
+        self.title:SetText(o.title or "")
+        self.state:SetText(o.state or "")
+        self.state:SetShown(o.state ~= nil and o.state ~= "")
+        local col = o.color or C.fg
+        self.state:SetTextColor(col[1], col[2], col[3])
+        local facts = o.facts or {}
+        self.nFacts = math.min(#facts, FACT_MAX)
+        for i = 1, FACT_MAX do
+            local f = i <= self.nFacts and facts[i]
+            self.factL[i]:SetText(f and f[1] or ""); self.factV[i]:SetText(f and f[2] or "")
+            self.factL[i]:SetShown(f and true or false); self.factV[i]:SetShown(f and true or false)
+        end
+        self.detail:SetText(o.detail or "")
+        self.detail:SetShown(o.detail ~= nil and o.detail ~= "")
+        self.goO, self.moreO = o.go, o.more
+        if o.go then self.goBtn:SetText(o.go.label); self.goBtn:Show() else self.goBtn:Hide() end
+        if o.more then self.moreBtn:SetText(o.more.label); self.moreBtn:Show() else self.moreBtn:Hide() end
+    end
+    function c:Fit(width)
+        local pad = CARD_PAD
+        local textW = math.max(80, width - 2 * pad)
+        self.iconFrame:ClearAllPoints(); self.iconFrame:SetPoint("TOPLEFT", pad, -pad)
+        local x = pad + 32 + 12
+        self.kicker:ClearAllPoints(); self.kicker:SetPoint("TOPLEFT", x, -pad)
+        self.kicker:SetWidth(math.max(40, textW - 44)); S.ClampLabel(self.kicker, nil, self)
+        self.title:ClearAllPoints(); self.title:SetPoint("TOPLEFT", x, -(pad + 14))
+        self.title:SetWidth(math.max(40, textW - 44)); S.ClampLabel(self.title, nil, self)
+        local y = pad + 32 + 12
+        if self.state:IsShown() then
+            self.state:ClearAllPoints(); self.state:SetPoint("TOPLEFT", pad, -y)
+            y = y + (tonumber(S.FitText(self.state, 2, textW, self)) or 16)
+        end
+        -- the facts' labels in one column, as wide as the widest (a third of the card at most)
+        local lw = 0
+        for i = 1, self.nFacts do
+            local w = root.TextWidth and root.TextWidth(self.factL[i]) or 40
+            if type(w) == "number" and w > lw then lw = w end
+        end
+        lw = math.min(math.ceil(lw) + 8, math.floor(textW / 3))
+        for i = 1, self.nFacts do
+            y = y + 6
+            local fl, fv = self.factL[i], self.factV[i]
+            fl:ClearAllPoints(); fl:SetPoint("TOPLEFT", pad, -y); fl:SetWidth(lw)
+            fv:ClearAllPoints(); fv:SetPoint("TOPLEFT", pad + lw, -y)
+            y = y + math.max(14, tonumber(S.FitText(fv, 3, math.max(60, textW - lw), self)) or 14)
+        end
+        if self.detail:IsShown() then
+            y = y + 8
+            self.detail:ClearAllPoints(); self.detail:SetPoint("TOPLEFT", pad, -y)
+            y = y + (tonumber(S.FitText(self.detail, 2, textW, self)) or 14)
+        end
+        if self.goBtn:IsShown() or self.moreBtn:IsShown() then
+            y = y + 12
+            local bx = pad
+            if self.goBtn:IsShown() then
+                self.goBtn:ClearAllPoints(); self.goBtn:SetPoint("TOPLEFT", bx, -y)
+                local okW, bw = pcall(self.goBtn.GetWidth, self.goBtn)
+                bx = bx + ((okW and type(bw) == "number") and bw or 80) + 8
+            end
+            if self.moreBtn:IsShown() then self.moreBtn:ClearAllPoints(); self.moreBtn:SetPoint("TOPLEFT", bx, -y) end
+            y = y + 28
+        end
+        y = math.ceil(y + pad)
         self:SetHeight(y)
         return y
     end
@@ -706,6 +908,17 @@ Layout = function()
     if win.upd:IsShown() then
         local h = win.upd:Fit(CW); Place(win.upd, h); y = y + h + GAP
     end
+    -- this week: the PvE weekly and the PvP weekly, side by side
+    if win.weekHead and win.weekHead:IsShown() then
+        Place(win.weekHead, 24); y = y + 24 + 8
+        win.weekGrid = win.weekGrid or root.Grid()
+        win.weekGrid:Begin(inner, 16, 12 + y, CW, WeekGrid())
+        for _, w in ipairs(win.weekCards) do
+            if w:IsShown() then win.weekGrid:Add(w, function(f, wd) return f:Fit(wd) end) end
+        end
+        local wh = win.weekGrid:End()
+        y = y + wh + GAP + 8
+    end
     -- the activities: one card each, in the order of WP.HUB_GROUPS (a card never moves)
     local first = true
     cardGrid = cardGrid or root.Grid()
@@ -714,7 +927,10 @@ Layout = function()
     local any = false
     for _, g in ipairs(WP.HUB_GROUPS or {}) do
         local c = groupCards[g.key]
-        if c then
+        if c and HOME_SKIP[g.key] then
+            if c ~= groupCards.feedback then c:Hide() end
+            for _, r in ipairs(c.lines) do if c ~= groupCards.feedback then r:Hide() end end
+        elseif c then
             -- a card with one window: its button opens it, no line under it (unless switched off:
             -- the line says so and turns it back on); a right-click on the button opens its settings
             local shown = {}
@@ -743,6 +959,25 @@ Layout = function()
         Place(win.cdHead, 24); y = y + 24 + 8
         local h = LayoutCooldowns()
         Place(win.cdBox, math.max(1, h)); y = y + h
+    end
+    -- Aide et retours: a thin strip across the page (a card when the reports line shows too)
+    local fb = groupCards.feedback
+    if fb then
+        local shown = {}
+        for _, r in ipairs(fb.lines) do if r.wantShown then shown[#shown + 1] = r end end
+        local single = #shown == 1 and not shown[1].off and fb.go:IsShown()
+        for _, r in ipairs(fb.lines) do r:SetShown(r.wantShown and not single and true or false) end
+        fb.single, fb.slim = single, true
+        local only = shown[1]
+        fb.onRight = (single and only.onRightClick) and function() only.onRightClick(only) end or nil
+        fb.go:RegisterForClicks(fb.onRight and "AnyUp" or "LeftButtonUp")
+        fb:SetShown(#shown > 0)
+        if #shown > 0 then
+            if not first then y = y + GAP + 4 end
+            first = false
+            fb:ClearAllPoints(); fb:SetPoint("TOPLEFT", inner, "TOPLEFT", 16, -(12 + y)); fb:SetWidth(CW)
+            local h = fb:Fit(CW); y = y + h
+        end
     end
     y = math.ceil(y + 12)
     win.homeH = y
@@ -803,6 +1038,12 @@ local function Build(p, width, hub)
     win.now:Hide()
     win.upd = S.Banner(win.inner, "info", "")
     win.upd:Hide()
+
+    -- "Cette semaine": the PvE weekly and the PvP weekly
+    win.weekHead = S.SectionHeader(win.inner, L("Cette semaine"), nil, nil, nil, true)
+    win.weekGrid = nil
+    win.weekCards = { BuildWeekCard("pve"), BuildWeekCard("pvp") }
+    win.weekPvE, win.weekPvP = win.weekCards[1], win.weekCards[2]
 
     for _, g in ipairs(WP.HUB_GROUPS or {}) do
         local c = BuildGroupCard(g)
@@ -888,6 +1129,133 @@ local function KeyNeeded(K)
         end
     end
     return reason, any
+end
+
+-- ---------------------------------------------------------------- "Cette semaine"
+
+local function Call(f, ...)
+    if type(f) ~= "function" then return nil end
+    local ok, a, b = pcall(f, ...)
+    if ok then return a, b end
+    return nil
+end
+-- the weekly reset, in words ("remise à zéro dans 3 j 4 h"), nil when the game does not say
+local function ResetText()
+    local D = C_DateAndTime
+    local s = tonumber((Call(D and D.GetSecondsUntilWeeklyReset)))
+    if not s or s < 0 then return nil end
+    local d, h = math.floor(s / 86400), math.floor((s % 86400) / 3600)
+    if d > 0 then return string.format(L("remise à zéro dans %d j %d h"), d, h) end
+    if h > 0 then return string.format(L("remise à zéro dans %d h"), h) end
+    return L("remise à zéro dans moins d'une heure")
+end
+local function QuestDone(id)
+    local CQL = C_QuestLog
+    if CQL and CQL.IsQuestFlaggedCompleted then return Call(CQL.IsQuestFlaggedCompleted, id) and true or false end
+    return Call(IsQuestFlaggedCompleted, id) and true or false
+end
+-- -> the objectives done, their number, when the quest is in the log; nil otherwise
+local function QuestProgress(id)
+    local CQL = C_QuestLog
+    local idx = Call((CQL and CQL.GetLogIndexForQuestID) or GetQuestLogIndexByID, id)
+    if not (tonumber(idx) and idx > 0) then return nil end
+    local objs = CQL and Call(CQL.GetQuestObjectives, id)
+    local n, done = 0, 0
+    for _, o in ipairs(type(objs) == "table" and objs or {}) do
+        if type(o) == "table" then n = n + 1; if o.finished then done = done + 1 end end
+    end
+    return done, n
+end
+WP.HomeQuestDone, WP.HomeQuestProgress = QuestDone, QuestProgress   -- the offline tests
+
+-- the PvE weekly: In Demand - Ancient Elven Curiosities (QuestGuides.lua), the Undermine Satchel
+local function WeekPvE(Away)
+    local w = win.weekPvE
+    local q = root.Q and root.Q[WEEKLY_Q]
+    local s = q and q.s
+    local spot = { m = s and s.m or PIX.m, x = s and s.x or PIX.x, y = s and s.y or PIX.y }
+    local level = UnitLevel and UnitLevel("player") or 0
+    local state, color
+    local done, n = QuestProgress(WEEKLY_Q)
+    if QuestDone(WEEKLY_Q) then state, color = L("Faite cette semaine"), C.ok
+    elseif done then
+        if n > 0 and done >= n then state, color = L("Les 3 objets sont là : rends la quête"), C.ok
+        else state, color = string.format(L(done == 1 and "En cours : %d objet sur %d" or "En cours : %d objets sur %d"), done, n > 0 and n or 3), C.gold end
+    elseif level < 60 then state, color = L("Dès le niveau 60"), C.muted
+    else state, color = L("À faire cette semaine"), C.gold end
+    local guide = root.D and root.D[WEEKLY_GUIDE] and (root.ShowOverview or root.ShowSummary)
+    w:Set({ icon = "Interface\\Icons\\INV_Misc_Bag_10_Black", kicker = L("Hebdo PvE"), title = L("Sac de l'Undermine"),
+        state = state, color = color,
+        facts = {
+            { L("Quoi"), L("Un objet du dernier boss de chaque aile de Hache-Tripes : Alzzin (Est), Tortheldrin (Ouest), le roi Gordok (Nord).") },
+            { L("Où"), L("Pix Xizzix, Baie-du-Butin, puis Hache-Tripes") },
+            { L("Rapporte"), L("Un sac de l'Undermine : un objet en or qui se vend 10 à 100 po") },
+        },
+        go = (WP.GoTo and WP.GoTo.Go) and { label = L("Y aller"), tip = { L("Y aller"), L("Clic : la flèche du GPS t'emmène à Pix Xizzix") },
+            fn = function()
+                if WP.GoTo.Go({ kind = "npc", label = "Pix Xizzix", detail = L("Baie-du-Butin"), map = spot.m, x = spot.x, y = spot.y, gps = "Pix Xizzix" }) then Close() end
+            end } or nil,
+        more = guide and { label = L("Voir le guide"), tip = { L("Voir le guide"), L("Clic : le guide de l'hebdo, étape par étape") },
+            fn = Away(function()
+                if root.ShowOverview then root.ShowOverview(WEEKLY_GUIDE) else root.ShowSummary({ WEEKLY_GUIDE }) end
+            end) } or nil })
+    w:Show()
+end
+
+-- the PvP weekly: the battleground in bonus (the game's calendar), Field of Honor, the guild ranking
+local function WeekPvP(Away)
+    local w = win.weekPvP
+    local BG = WP.BG
+    if not (BG and BG.Toggle) then w:Hide(); return end
+    local found = BG.Bonus and Call(BG.Bonus)
+    found = type(found) == "table" and BG.BY and BG.BY[found.key] and found or nil
+    local title, state, color, where = L("Champs de bataille"), nil, C.muted, nil
+    if found then
+        title = L(BG.BY[found.key].name)
+        state = found.days == 0 and L("En bonus aujourd'hui") or found.days == 1 and L("En bonus demain")
+            or string.format(L("En bonus dans %d jours"), found.days)
+        color = C.gold
+        local m = BG.Master and Call(BG.Master, found.key)
+        if type(m) == "table" and BG.CITY and BG.CITY[m[2]] then where = string.format(L("%s, %s"), m[1], L(BG.CITY[m[2]][1])) end
+    else
+        state = L("Aucun bonus annoncé dans le calendrier du jeu")
+    end
+    local rank
+    if IsInGuild and IsInGuild() and WP.GuildRanking then
+        local pos
+        local list = Call(WP.GuildRanking, true)
+        for i, e in ipairs(type(list) == "table" and list or {}) do if e.name == UnitName("player") then pos = i end end
+        rank = pos and (pos == 1 and L("Tu es 1er au classement PvP de la semaine") or string.format(L("Tu es %de au classement PvP de la semaine"), pos))
+            or L("Pas encore classé en PvP cette semaine")
+    end
+    local facts = {}
+    if where then facts[#facts + 1] = { L("Où"), where } end
+    facts[#facts + 1] = { L("Quête"), L("Field of Honor : Wizzik Dustfizz, Gadgetzan, dès le niveau 60") }
+    facts[#facts + 1] = { L("Rapporte"), L("3 marques par victoire, 1 par défaite ; Field of Honor : 300 honneur et 500 points de rang") }
+    local go
+    if found and BG.GoMaster then
+        go = { label = L("Y aller"), tip = { L("Y aller"), L("Clic : la flèche du GPS t'emmène au maître de guerre") },
+            fn = function() if BG.GoMaster(found.key) then Close() end end }
+    elseif BG.GoFoh then
+        go = { label = L("Y aller"), tip = { L("Y aller"), L("Clic : la flèche du GPS t'emmène à Wizzik Dustfizz") },
+            fn = function() if BG.GoFoh() then Close() end end }
+    end
+    w:Set({ icon = GroupIcon("pvp"), kicker = L("Hebdo PvP"), title = title, state = state, color = color,
+        facts = facts, detail = rank, go = go,
+        more = { label = L("Champs de bataille"), tip = { L("Champs de bataille"), L("Clic : ouvrir les champs de bataille") },
+            fn = Away(function() BG.Toggle(nil, true) end) } })
+    w:Show()
+end
+
+local function RefreshWeek(Away)
+    if not (win and win.weekHead) then return end
+    win.weekHead:Set(L("Cette semaine"), ResetText())
+    local okE, errE = pcall(WeekPvE, Away)
+    if not okE then win.weekPvE:Hide() end
+    local okP = pcall(WeekPvP, Away)
+    if not okP then win.weekPvP:Hide() end
+    win.weekHead:SetShown(win.weekPvE:IsShown() or win.weekPvP:IsShown())
+    win.weekErr = not okE and errE or nil
 end
 
 -- a row's call, when the row exists (its files may not be loaded)
@@ -1209,6 +1577,8 @@ local function Refresh()
         Put("pvp", "Set", L("Champs de bataille"), okB and bgLine or "", L("Clic : ouvrir les champs de bataille"))
     end
 
+    Put("reps", "Set", L("Réputations"), L("Ce qu'elles débloquent et comment les monter"), L("Clic : ouvrir le guide des réputations"))
+
     -- the tools: a dot when one has something to do now
     Put("goto", "Set", L("Aller à"), L("Un lieu, un PNJ, une ville : le GPS t'y mène"), L("Clic : ouvrir « Aller à »"))
     local cityDot = cityOpen > 0 and not tourOn
@@ -1252,21 +1622,15 @@ local function Refresh()
             fn = Away(OpenGuide) })
     end
 
-    -- PvP: the battleground of the day, and where you stand in the guild's weekly ranking
+    -- PvP: no card of its own on Home any more (HOME_SKIP): "Cette semaine" has the PvP weekly
     if WP.BG and WP.BG.Toggle then
-        local okB, bgLine = pcall(WP.BG.HomeLine or function() return nil end)
-        local rank
-        if IsInGuild and IsInGuild() and WP.GuildRanking then
-            local pos
-            local okR, list = pcall(WP.GuildRanking, true)
-            for i, e in ipairs(okR and type(list) == "table" and list or {}) do if e.name == UnitName("player") then pos = i end end
-            rank = pos and (pos == 1 and L("Tu es 1er au classement PvP de la semaine") or string.format(L("Tu es %de au classement PvP de la semaine"), pos))
-                or L("Pas encore classé en PvP cette semaine")
-        end
-        Main("pvp", { text = okB and bgLine or nil, detail = rank, label = L("Ouvrir les champs de bataille"),
+        Main("pvp", { text = L("Réputation, maîtres de guerre et ton set PvP"), label = L("Ouvrir les champs de bataille"),
             tip = { L("Champs de bataille"), L("Clic : ouvrir les champs de bataille") },
             fn = Away(function() WP.BG.Toggle(nil, true) end) })
     end
+
+    -- Cette semaine: the reset, the PvE weekly, the PvP weekly
+    RefreshWeek(Away)
 
     -- Argent et métiers: what waits first (Writs to turn in, orders, bags), else the reputation
     local repLine

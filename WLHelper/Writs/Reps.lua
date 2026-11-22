@@ -23,6 +23,8 @@ WP.Reps = R
 
 ns.AddEnglish({
     ["Réputations"] = "Reputations",
+    ["répétable"] = "repeatable", ["faite"] = "done", ["en cours"] = "in progress", ["%s requis"] = "%s needed",
+    ["couturiers seulement"] = "tailors only", ["Quêtes (%d/%d faites)"] = "Quests (%d/%d done)",
     ["Haï"] = "Hated", ["Hostile"] = "Hostile", ["Inamical"] = "Unfriendly", ["Neutre"] = "Neutral",
     ["Amical"] = "Friendly", ["Honoré"] = "Honored", ["Révéré"] = "Revered", ["Exalté"] = "Exalted",
     ["Les réputations utiles sur Forever : ce que chaque rang débloque, ton rang, et le plus rapide pour les monter. En tête, celles qui débloquent une pièce de ta liste (pré-BiS, BiS, PvP)."] =
@@ -130,6 +132,55 @@ R.KILLS = {
     },
     [609] = {   -- Cenarion Circle
         { npc = 11881, name = "Twilight Geolord", rep = 1, upto = 6, map = 1451 },
+    },
+}
+
+-- ---------------------------------------------------------------- every quest of a faction
+-- (report: "for the reputation guides, being able to check the quests we did"). One line per quest
+-- of the faction, from Wowhead WoW Forever's reputation guide of that faction (read 2026-11-22):
+-- q = quest id, rep = points, need = standing to take it (4 Neutral, 5 Friendly, 8 Exalted),
+-- rpt = repeatable, who / map = the giver and its zone, side = "Horde" / "Alliance" for one side.
+-- The card ticks the quests done (IsQuestFlaggedCompleted), says "in progress" for those in the log
+-- and the standing still needed for the others.
+R.QUESTS = {
+    [576] = {   -- Timbermaw Hold: wowhead.com/forever/guide/reputation/timbermaw-hold-quests-quartermaster-rewards
+        { q = 8460, n = "Timbermaw Ally", rep = 150, who = "Grazle", map = 1448 },
+        { q = 8466, n = "Feathers for Grazle", rep = 50, rpt = true, who = "Grazle", map = 1448 },
+        { q = 8462, n = "Speak to Nafien", rep = 25, who = "Grazle", map = 1448 },
+        { q = 8461, n = "Deadwood of the North", rep = 150, who = "Nafien", map = 1448 },
+        { q = 8467, n = "Feathers for Nafien", rep = 50, rpt = true, who = "Nafien", map = 1448 },
+        { q = 8465, n = "Speak to Salfa", rep = 25, who = "Nafien", map = 1448 },
+        { q = 8464, n = "Winterfall Activity", rep = 150, who = "Salfa", map = 1452 },
+        { q = 8469, n = "Beads for Salfa", rep = 50, rpt = true, who = "Salfa", map = 1452 },
+        { q = 8470, n = "Deadwood Ritual Totem", rep = 150, need = 4, who = "Kernda", map = 1448 },
+        { q = 8471, n = "Winterfall Ritual Totem", rep = 150, need = 4, who = "Kernda", map = 1448 },
+        { q = 6031, n = "Runecloth", rep = 100, need = 5, who = "Meilosh", map = 1448 },
+        { q = 6032, n = "Sacred Cloth", rep = 100, need = 5, who = "Meilosh", map = 1448, prof = "Tailoring" },
+        { q = 86746, n = "The Legashi Threat", rep = 100, who = "Ekkal", map = 1447 },
+        { q = 86747, n = "Legashi Horns", rep = 100, rpt = true, who = "Ekkal", map = 1447 },
+        { q = 86752, n = "Report to Rageroar", rep = 100, need = 4, who = "Ekkal", map = 1447 },
+        { q = 86791, n = "Missing Blackmaw Scouts", rep = 25, need = 4, who = "Gatekeeper Rageroar", map = 1447, side = "Horde" },
+        { q = 86777, n = "Master Feardred", rep = 100, need = 4, who = "Korsa", map = 1447, side = "Horde" },
+        { q = 86792, n = "Thinning Their Forces", rep = 100, need = 4, who = "Korsa", map = 1447, side = "Horde" },
+        { q = 86796, n = "Later, Satyr", rep = 100, need = 4, who = "Graal", map = 1447, side = "Horde" },
+        { q = 86797, n = "Return to Rageroar", rep = 25, need = 4, who = "Korsa", map = 1447, side = "Horde" },
+        { q = 86798, n = "Timbermaw Reinforcements", rep = 50, need = 4, who = "Gatekeeper Rageroar", map = 1447 },
+        { q = 87346, n = "Chieftain Bloodmaw", rep = 100, need = 4, who = "Gorn One Eye", map = 1448 },
+        { q = 86814, n = "Blackmaw Counter-Offensive", rep = 150, need = 4, who = "Gorn One Eye", map = 1448 },
+        { q = 86927, n = "Running Firewater", rep = 100, need = 4, map = 1447 },
+        { q = 86799, n = "Encroaching Corruption", rep = 10, need = 4, map = 1447 },
+        { q = 86812, n = "Transmuted Tincture", rep = 100, need = 4, map = 1447 },
+        { q = 86813, n = "Potential Panacea", rep = 50, need = 4, map = 1447 },
+        { q = 86804, n = "An Unlikely Source", rep = 100, need = 4, map = 1447 },
+        { q = 86926, n = "Felfire Burn, Cauldron Bubble", rep = 100, need = 4, map = 1447 },
+        { q = 86925, n = "Toil and Trouble", rep = 100, need = 4, map = 1447 },
+        { q = 97327, n = "Blackmaw Pouches", rep = 150, who = "Ekkal", map = 1447 },
+        { q = 96246, n = "Blackmaw Pouches", rep = 100, rpt = true, who = "Ekkal", map = 1447 },
+        { q = 92069, n = "Claws That Rend, Tusks that Gore", rep = 150, who = "Ogtinc", map = 1447 },
+        { q = 92070, n = "A Lost Memento", rep = 100, who = "Unele", map = 1447 },
+        { q = 92066, n = "The Twin Bears", rep = 150, need = 4, who = "Lorekeeper Nok", map = 1447 },
+        { q = 92065, n = "Blackmaw Reclamation", rep = 150, need = 4, who = "Gatekeeper Rageroar", map = 1447 },
+        { q = 8481, n = "The Root of All Evil", rep = 500, need = 8, who = "Gorn One Eye", map = 1448 },
     },
 }
 
@@ -250,6 +301,38 @@ local function QuestDone(q)
     if not f then return false end
     local ok, d = pcall(f, q)
     return ok and Plain(d) == true
+end
+-- the quest list of a faction for the card: { lines, marks, done, total } or nil
+function R.QuestLines(fid, react)
+    local list = R.QUESTS[tonumber(fid)]
+    if not list then return nil end
+    local side = UnitFactionGroup and Plain((UnitFactionGroup("player"))) or nil
+    local log = root.LogEntries and root.LogEntries() or {}
+    local lines, marks, done, total = {}, {}, 0, 0
+    for _, e in ipairs(list) do
+        if not (e.side and side and e.side ~= side) then
+            local title = QuestTitle(e.q, e.n)
+            local who = e.who and (root.NpcName and root.NpcName(e.who) or e.who)
+            local where = ZoneName(e.map)
+            local at = who and (where and string.format(L("%s (%s)"), who, where) or who) or where
+            local parts = { title, "+" .. e.rep }
+            if e.rpt then parts[#parts + 1] = L("répétable") end
+            local isDone = not e.rpt and QuestDone(e.q)
+            if not e.rpt then total = total + 1; if isDone then done = done + 1 end end
+            local state
+            if isDone then state = L("faite")
+            elseif log[e.q] then state = L("en cours")
+            elseif e.need and react and react < e.need then state = string.format(L("%s requis"), R.StandingName(e.need))
+            end
+            if e.prof then parts[#parts + 1] = L("couturiers seulement") end
+            local text = table.concat(parts, " · ")
+            if at then text = text .. " — " .. at end
+            if state then text = text .. " (" .. state .. ")" end
+            lines[#lines + 1] = text
+            marks[#lines] = isDone and "check" or nil
+        end
+    end
+    return lines, marks, done, total
 end
 local function BagCount(id)
     local f = (C_Item and C_Item.GetItemCount) or GetItemCount
@@ -661,6 +744,13 @@ local function PaintCard(c, e, w)
             marks[i] = t.reached and "check" or nil
         end
         st:Bullets(lines, { marks = marks, size = 12 })
+    end
+    -- every quest of the faction, the ones done ticked
+    local fid = e.faction and tonumber(e.faction.id) or tonumber(e.id)
+    local ql, qm, qd, qt = R.QuestLines(fid, e.met and e.react or nil)
+    if ql and #ql > 0 then
+        st:Heading(string.format(L("Quêtes (%d/%d faites)"), qd, qt))
+        st:Bullets(ql, { marks = qm, size = 12 })
     end
     if e.met and e.missing > 0 and not e.unreleased then
         st:Heading(L("Le plus rapide"))
