@@ -192,7 +192,7 @@ local function Announce(channel)
     if not Send or not channel then return end
     if lastSent[channel] and GetTime() - lastSent[channel] < 60 then return end   -- once a minute at most
     lastSent[channel] = GetTime()
-    pcall(Send, PREFIX, "V:" .. Mine(), channel)
+    root.AddonSend(PREFIX, "V:" .. Mine(), channel, nil, Send)
 end
 local function GroupChannel()
     if IsInRaid and IsInRaid() then return "RAID" end

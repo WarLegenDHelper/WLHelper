@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.206] — 2026-11-22
+
+### Corrigé / Fixed
+- **Messages entre addons : un seul débit, celui du serveur.** Tous les échanges de WL Helper (rapports, synchronisation de groupe, guilde, clés, événements, bateaux, version...) passent maintenant par une seule file. Chaque type de message part 10 fois d'affilée au plus, puis une fois par seconde, et le tout reste sous 800 octets par seconde, comme les bibliothèques d'addons connues. Avant, un long rapport ou une synchronisation partaient plus vite que ce que le serveur accepte, et les morceaux en trop étaient perdus sans un mot. Un message que le jeu refuse parce qu'il va trop vite repart un peu plus tard.
+  *Addon messages: every WL Helper exchange now goes through one queue paced to the server's limits (10 per prefix at once, then one a second, 800 bytes a second overall); throttled messages are sent again instead of being lost.*
+
 ## [1.0.0-beta.205] — 2026-11-22
 
 ### Corrigé / Fixed

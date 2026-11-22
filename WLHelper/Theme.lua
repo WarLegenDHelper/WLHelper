@@ -1537,6 +1537,111 @@ function ns.AddonWhisper(prefix, msg, name)
   return (pcall(send, prefix, msg, "WHISPER", name)), nil
 end
 
+-- The one door for WL Helper's addon messages (every module, every prefix). The server allows each
+-- prefix a reserve of 10 messages that refills one a second, and drops the rest without a word; past
+-- that, too many bytes at once can cost the chat connection (ChatThrottleLib's own note). So: a
+-- message goes now when its prefix has a token and the shared byte budget allows it (800 bytes a
+-- second, 4000 at most saved up, as ChatThrottleLib), else it waits its turn; one the client refuses
+-- as throttled (result 3 or 8) waits 1.5 s and goes again, three times at most. fn: the module's own
+-- sender (tests watch it), else the game's. True when sent or queued.
+do
+  local BURST_MSG, BYTES_PER_S, BYTES_MAX, OVERHEAD = 10, 800, 4000, 40
+  local buckets, waiting = {}, {}
+  local bytes, bytesAt = BYTES_MAX, nil
+  local timerOn = false
+  local function Clock() local t = GetTime and GetTime(); return type(t) == "number" and t or 0 end
+  local function Refill(now)
+    bytesAt = bytesAt or now
+    if now > bytesAt then bytes = math.min(BYTES_MAX, bytes + (now - bytesAt) * BYTES_PER_S) end
+    bytesAt = now
+  end
+  local function Bucket(prefix, now)
+    local b = buckets[prefix]
+    if not b then b = { n = BURST_MSG, at = now }; buckets[prefix] = b end
+    if now > b.at then b.n = math.min(BURST_MSG, b.n + (now - b.at)) end
+    b.at = now
+    return b
+  end
+  local function Cost(m) return #m.msg + #m.prefix + OVERHEAD end
+  local Pump
+  local inPump = false
+  local stuckAt = nil   -- the clock of a pump that sent nothing: no new timer until time moves
+  -- a timer that fires at once (some stubs do) never re-enters the pump it was set from
+  local function Later(delay)
+    if timerOn or not (C_Timer and C_Timer.After) then return end
+    timerOn = true
+    C_Timer.After(delay, function() timerOn = false; if not inPump then Pump() end end)
+  end
+  -- one try: "wait" (no token, no bytes, or the client said throttled), else done
+  local function Try(m, now)
+    if m.notBefore and m.notBefore > now then return "wait" end
+    local b = Bucket(m.prefix, now)
+    Refill(now)
+    if b.n < 1 or bytes < Cost(m) then return "wait" end
+    local fn = m.fn or (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
+    if type(fn) ~= "function" then return "gone" end
+    b.n = b.n - 1; bytes = bytes - Cost(m)
+    local ok, r = pcall(fn, m.prefix, m.msg, m.chan, m.target)
+    if ok and (r == 3 or r == 8) and (m.tries or 0) < 3 then
+      m.tries = (m.tries or 0) + 1
+      b.n = 0
+      m.notBefore = now + 1.5
+      return "wait"
+    end
+    return "sent"
+  end
+  local function Delay(m, now)
+    if m.notBefore and m.notBefore > now then return m.notBefore - now end
+    local b = buckets[m.prefix]
+    return math.max(0.1, 1 - (b and b.n or 0), (Cost(m) - bytes) / BYTES_PER_S)
+  end
+  Pump = function()
+    inPump = true
+    local okP, err = pcall(function()
+    local now = Clock()
+    local i, soonest, held, moved = 1, nil, {}, false
+    while waiting[i] do
+      local m = waiting[i]
+      -- in order within a prefix: one that waits holds the rest of its prefix
+      local res = held[m.prefix] and "wait" or Try(m, now)
+      if res == "wait" then
+        held[m.prefix] = true
+        local d = Delay(m, now)
+        soonest = soonest and math.min(soonest, d) or d
+        i = i + 1
+      else
+        table.remove(waiting, i); moved = true
+      end
+    end
+    if moved or stuckAt ~= now then
+      stuckAt = (not moved) and now or nil
+      if #waiting > 0 then Later(soonest or 1) end
+    end
+    end)
+    inPump = false
+    if not okP then error(err, 0) end
+  end
+  function ns.AddonSend(prefix, msg, chan, target, fn)
+    if type(prefix) ~= "string" or type(msg) ~= "string" then return false end
+    local m = { prefix = prefix, msg = msg, chan = chan or "GUILD", target = target, fn = fn }
+    local behind = false
+    for _, w in ipairs(waiting) do if w.prefix == prefix then behind = true break end end
+    if not behind then
+      local now = Clock()
+      if Try(m, now) ~= "wait" then return true end
+      waiting[#waiting + 1] = m
+      Later(Delay(m, now))
+      return true
+    end
+    waiting[#waiting + 1] = m
+    Later(1)
+    return true
+  end
+  ns._AddonWaiting = function() return waiting end   -- tests
+  ns._AddonPump = function() Pump() end               -- tests
+  ns._AddonReset = function() buckets, waiting, bytes, bytesAt, timerOn, stuckAt = {}, {}, BYTES_MAX, nil, false, nil end
+end
+
 -- the game's "No player named '%s' is currently playing." as a pattern, built from its own string
 local notFound
 local function NotFoundPattern()

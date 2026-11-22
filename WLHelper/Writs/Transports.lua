@@ -330,7 +330,7 @@ share = function(id, anchor)
     local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
     if not send then return end
     sentAt[id] = c
-    pcall(send, PREFIX, string.format("S|%s|%d", id, math.floor(anchor + 0.5)), "GUILD")
+    root.AddonSend(PREFIX, string.format("S|%s|%d", id, math.floor(anchor + 0.5)), "GUILD", nil, send)
 end
 
 local function Short(n) return type(n) == "string" and (n:gsub("[%- ].*$", "")) or nil end
@@ -540,8 +540,8 @@ function T._AskAtDock(cont, wx, wy, docks)
     local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
     if not send then return false end
     askedAt = c
-    pcall(send, FT_PREFIX, FT_ASK, "YELL")
-    pcall(send, NAUT_PREFIX, NAUT_ASK, "YELL")
+    root.AddonSend(FT_PREFIX, FT_ASK, "YELL", nil, send)
+    root.AddonSend(NAUT_PREFIX, NAUT_ASK, "YELL", nil, send)
     return true
 end
 function T._ResetForeign() foreignAt, askedAt = {}, nil end

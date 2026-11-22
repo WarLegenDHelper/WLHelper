@@ -189,7 +189,7 @@ local seq = (Now() % 90000) + 1
 local lastSig, lastSent = nil, -1e9
 local queued = nil
 local function Send(msg)
-    if SendRaw and #msg < 255 then pcall(SendRaw, PREFIX, msg, "GUILD") end
+    if SendRaw and #msg < 255 then root.AddonSend(PREFIX, msg, "GUILD", nil, SendRaw) end
 end
 -- Sends my list when it changed (or when forced: an answer to "R", the first send of the session).
 local function SendList(force)

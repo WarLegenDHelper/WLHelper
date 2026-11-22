@@ -24,7 +24,7 @@ local function SendFn() return (C_ChatInfo and C_ChatInfo.SendAddonMessage) or S
 local function Send(prefix, msg, ch)
   if ch ~= "PARTY" and ch ~= "RAID" and ch ~= "INSTANCE_CHAT" then return end
   local fn = SendFn()
-  if fn then return fn(prefix, msg, ch) end
+  if fn then return ns.AddonSend(prefix, msg, ch, nil, fn) end
 end
 
 local function secret(v) return issecretvalue ~= nil and issecretvalue(v) end

@@ -100,7 +100,7 @@ local function Share(msg)
     if not (IsInGuild and IsInGuild()) then return end
     if WLWritsDB and WLWritsDB.qfactsShare == false then return end
     send = send or (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-    if send then pcall(send, PREFIX, msg, "GUILD") end
+    if send then root.AddonSend(PREFIX, msg, "GUILD", nil, send) end
 end
 do
     local Register = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix

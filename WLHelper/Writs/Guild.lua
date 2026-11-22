@@ -601,7 +601,7 @@ local function Share(force, onlyChange)
     local msgs, sig = Messages(e)
     if sig == lastSig and not wantReply and GetTime() - lastSent < 600 then return end
     lastSent, lastSig, wantReply = GetTime(), sig, false
-    for _, m in ipairs(msgs) do pcall(SendRaw, PREFIX, m, "GUILD") end
+    for _, m in ipairs(msgs) do root.AddonSend(PREFIX, m, "GUILD", nil, SendRaw) end
 end
 WP._GuildShare = Share   -- tests
 
@@ -618,7 +618,7 @@ local askedAt = 0
 local function Ask()
     if not (IsInGuild and IsInGuild() and SendRaw) or GetTime() - askedAt < 60 then return end
     askedAt = GetTime()
-    pcall(SendRaw, PREFIX, "R", "GUILD")
+    root.AddonSend(PREFIX, "R", "GUILD", nil, SendRaw)
 end
 
 -- a new "S" or "P" line keeps the places and K/D/A already known for that member

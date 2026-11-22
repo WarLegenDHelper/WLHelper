@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.206", date = "2026-11-22", items = {
+    { s = "fix", fr = { "Messages entre addons : un seul débit, celui du serveur.", "Tous les échanges de WL Helper (rapports, synchronisation de groupe, guilde, clés, événements, bateaux, version...) passent maintenant par une seule file. Chaque type de message part 10 fois d'affilée au plus, puis une fois par seconde, et le tout reste sous 800 octets par seconde, comme les bibliothèques d'addons connues. Avant, un long rapport ou une synchronisation partaient plus vite que ce que le serveur accepte, et les morceaux en trop étaient perdus sans un mot. Un message que le jeu refuse parce qu'il va trop vite repart un peu plus tard." }, en = { "Addon messages", "Every WL Helper exchange now goes through one queue paced to the server's limits (10 per prefix at once, then one a second, 800 bytes a second overall); throttled messages are sent again instead of being lost." } },
+  } },
   { v = "1.0.0-beta.205", date = "2026-11-22", items = {
     { s = "fix", fr = { "Champs de bataille : plus d'erreur sur le bonus de la semaine", "Le calendrier du jeu peut cacher le type d'un événement (valeur protégée), et la fenêtre PvP plantait en le lisant. Le type caché compte maintenant comme inconnu, et c'est le titre de l'événement qui dit si c'est un bonus de champ de bataille." }, en = { "Battlegrounds", "No error when the calendar hides an event's type; the title decides." } },
   } },
@@ -51,8 +54,5 @@ ns.WHATSNEW = {
     { s = "add", fr = { "Le parcours dans les rapports", "WL Helper note les quêtes prises et rendues (avec l'étape du guide à ce moment-là) et les boss tués en donjon, avec le temps depuis l'entrée. En sortant d'un donjon (après au moins 5 minutes dedans), il envoie en silence un rapport « parcours » : le donjon, sa durée, l'ordre des boss et les quêtes. Ça sert à vérifier l'ordre des guides avec de vraies parties. Par la guilde, à l'auteur seulement. Pour le couper : /wlh rapports parcours off." }, en = { "Quests taken and turned in (with the guide step) and boss kills with their time go in a silent \"run\" report when you leave a dungeon (/wlh rapports parcours off stops it).", "" } },
     { s = "fix", fr = { "Clic sur l'étape en cours", "Cliquer sur la carte de l'étape pouvait donner une erreur quand la ligne du lieu était cachée." }, en = { "Clicking the current step no longer errors when its place line is hidden.", "" } },
     { s = "fix", fr = { "Flèches sur les sacs", "Avec beaucoup d'addons, le parcours de toutes les fenêtres du jeu dépassait le temps permis. Il se fait maintenant par petits morceaux." }, en = { "The bag arrows no longer hit \"script ran too long\" with many addons.", "" } },
-  } },
-  { v = "1.0.0-beta.191", date = "2026-11-22", items = {
-    { s = "fix", fr = { "Sacs, « Libérer une place » ne jette plus ce qu'une quête demande", "Une quête de la Croisée demande des armes et des boucliers blancs, et le nettoyeur les jetait comme des objets inutiles. Un objet qu'un objectif de ton journal de quêtes demande (« Worn Shield : 1/5 ») reste maintenant dans tes sacs, qu'il soit blanc ou gris. La vente automatique des objets gris chez un marchand suit la même règle." }, en = { "Bags", "\"Free a slot\" and the grey item selling keep every item a quest of your log asks for." } },
   } },
 }

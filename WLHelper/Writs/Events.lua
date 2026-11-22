@@ -275,7 +275,7 @@ local outbox, pumping = {}, false
 local function Pump()
     local m = table.remove(outbox, 1)
     if not m then pumping = false; return end
-    if SendRaw then pcall(SendRaw, PREFIX, m, "GUILD") end
+    if SendRaw then root.AddonSend(PREFIX, m, "GUILD", nil, SendRaw) end
     C_Timer.After(1, Pump)
 end
 local OUTBOX_MAX = 100
@@ -1954,7 +1954,7 @@ ev:SetScript("OnEvent", function(_, e, prefix, msg, channel, sender)
         local d = DB()
         if d.lfg[Me()] then
             d.lfg[Me()] = nil
-            if SendRaw and IsInGuild and IsInGuild() then pcall(SendRaw, PREFIX, "N|x|||", "GUILD") end
+            if SendRaw and IsInGuild and IsInGuild() then root.AddonSend(PREFIX, "N|x|||", "GUILD", nil, SendRaw) end
         end
     elseif prefix == PREFIX and channel == "GUILD" and type(msg) == "string" and sender then
         -- my realm's members by name, another realm's as "Name-Realm"; a secret or odd name: dropped

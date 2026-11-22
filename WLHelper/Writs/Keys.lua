@@ -343,7 +343,7 @@ function K.SetShare(v)
     if v then K.Share(true); return end
     -- sharing off: tell the guild once that we have nothing, so the members' tabs drop our name
     -- now rather than after 90 days (every copy, old ones included, reads this line)
-    if IsInGuild and IsInGuild() and SendRaw then pcall(SendRaw, PREFIX, "H|1|0|0", "GUILD") end
+    if IsInGuild and IsInGuild() and SendRaw then root.AddonSend(PREFIX, "H|1|0|0", "GUILD", nil, SendRaw) end
 end
 
 local function Bit(id) return 2 ^ (id - 1) end
@@ -434,13 +434,13 @@ function K.Share(force)
         return
     end
     lastSent, lastMsg = GetTime(), msg
-    pcall(SendRaw, PREFIX, msg, "GUILD")
+    root.AddonSend(PREFIX, msg, "GUILD", nil, SendRaw)
 end
 local askedAt = -1000
 function K.Ask()
     if not (On() and IsInGuild and IsInGuild() and SendRaw) or GetTime() - askedAt < 60 then return end
     askedAt = GetTime()
-    pcall(SendRaw, PREFIX, "R", "GUILD")
+    root.AddonSend(PREFIX, "R", "GUILD", nil, SendRaw)
 end
 
 -- the guild's roster by name: { class, online } (empty until the game sent it)

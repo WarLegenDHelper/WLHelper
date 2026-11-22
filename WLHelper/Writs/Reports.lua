@@ -251,7 +251,7 @@ local queue, sending = {}, false
 local function Raw(msg, channel, target)
     local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
     if not send then return false end
-    return (pcall(send, PREFIX, msg, channel or "GUILD", target))
+    return root.AddonSend(PREFIX, msg, channel or "GUILD", target, send)
 end
 local function Pump()
     if #queue == 0 then sending = false; return end

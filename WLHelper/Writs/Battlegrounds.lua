@@ -976,7 +976,7 @@ do
 end
 local function SendPvp(msg)
     local f = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-    if f then return pcall(f, PVP_PREFIX, msg, "GUILD") end
+    if f then return true, root.AddonSend(PVP_PREFIX, msg, "GUILD", nil, f) end
 end
 local function Now() return time and time() or 0 end
 local function Short(n) return type(n) == "string" and (n:gsub("[%- ].*$", "")) or nil end
