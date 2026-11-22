@@ -912,9 +912,271 @@ local function FohCard(parent)
     return c
 end
 
+-- ---------------------------------------------------------------- the guild's PvP ranking (data)
+-- What each copy of WL Helper tells the guild about its player, read the way GuildSite reads it on
+-- this client (GuildSite/Profile.lua, an addon of the guild):
+--  * the Forever PvP rank: the renown of faction 2800, as the game's PvP tab shows it
+--    (C_MajorFactions.GetMajorFactionProgressionInfo: renownLevel, renownReputationEarned,
+--    renownLevelThreshold, currentWeekProgressiveMaxLevel); its title from the game's own strings
+--    (PVP_RANK_<n>_<side>). UnitPVPRank as a fallback where it answers;
+--  * honour this week: currency 1792's quantityEarnedThisWeek; today: what that currency (its total
+--    earned, else this week's) grew since the first reading of the day on this character;
+--  * battlegrounds played and won this week: the game's statistics 839 and 840 (lifetime counts),
+--    added up from one reading to the next since the weekly reset;
+--  * the four battleground factions of the player's side (BG.Rep).
+-- Prefix "WLHpvp", guild channel: "P|..." one line per player, "R" asks every copy to answer. A copy
+-- sends at most every 30 s; it answers an "R" after 2 to 8 s at random. Lines older than 14 days go.
+
+ns.AddEnglish({
+    ["Guilde"] = "Guild",
+    ["Classement PvP de la guilde"] = "Guild PvP ranking",
+    ["Rang"] = "Rank",
+    ["Honneur semaine"] = "Honor this week",
+    ["Aujourd'hui"] = "Today",
+    ["Victoires"] = "Wins",
+    ["Rang %d"] = "Rank %d",
+    ["Sans rang"] = "No rank",
+    ["%s (toi)"] = "%s (you)",
+    ["Goulet"] = "Warsong", ["Arathi"] = "Arathi", ["Alterac"] = "Alterac", ["Darkspear"] = "Darkspear",
+    ["Inam."] = "Unfr.", ["Hon."] = "Hon.", ["Rév."] = "Rev.", ["Exal."] = "Exalt.",
+    ["Trier par"] = "Sort by",
+    ["Seuls les membres qui ont WL Helper apparaissent. Les chiffres viennent de leur jeu, partagés sur le canal de la guilde."] =
+        "Only members with WL Helper show up. The numbers come from their own game, shared on the guild channel.",
+    ["Personne d'autre pour l'instant"] = "Nobody else yet",
+    ["Les membres qui ont WL Helper apparaîtront ici dès qu'ils seront connectés."] =
+        "Members with WL Helper will show up here as soon as they log in.",
+    ["Points de rang : %s / %s"] = "Rank points: %s / %s",
+    ["Rang maximum cette semaine : %d"] = "Highest rank this week: %d",
+    ["%d parties cette semaine, %d gagnées"] = "%d games this week, %d won",
+    ["Vu %s"] = "Seen %s",
+    ["à l'instant"] = "just now", ["il y a %d min"] = "%d min ago", ["il y a %d h"] = "%d h ago", ["il y a %d j"] = "%d days ago",
+    ["Honneur gagné cette semaine (le jeu le compte)."] = "Honor earned this week (as the game counts it).",
+    ["Aujourd'hui : l'honneur gagné depuis la première connexion du jour avec WL Helper."] =
+        "Today: the honor earned since the first login of the day with WL Helper.",
+    ["Victoires : les champs de bataille gagnés cette semaine, d'après les statistiques du jeu."] =
+        "Wins: the battlegrounds won this week, from the game's statistics.",
+})
+
+local RANK_FACTION = 2800
+local BG_PLAYED, BG_WON = 839, 840
+local PVP_PREFIX = "WLHpvp"
+local BOARD_DAYS = 14
+do
+    local Reg = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
+    if Reg then pcall(Reg, PVP_PREFIX) end
+end
+local function SendPvp(msg)
+    local f = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
+    if f then return pcall(f, PVP_PREFIX, msg, "GUILD") end
+end
+local function Now() return time and time() or 0 end
+local function Short(n) return type(n) == "string" and (n:gsub("[%- ].*$", "")) or nil end
+
+-- the week: the next weekly reset, to the hour (the same from one reading to the next)
+function BG.WeekKey()
+    local D = C_DateAndTime
+    if D and D.GetSecondsUntilWeeklyReset then
+        local s = tonumber(Plain((Call(D.GetSecondsUntilWeeklyReset))))
+        if s then return math.floor((Now() + s) / 3600 + 0.5) * 3600 end
+    end
+    return 0
+end
+
+-- the rank's title in the game's own words (side and sex of the player), nil when unknown
+local function RankTitle(rank, side, sex)
+    if not (GetText and type(rank) == "number" and rank > 0) then return nil end
+    local first = Enum and Enum.PvPRanks and Enum.PvPRanks.Rank_1 or 5
+    local t = Call(GetText, string.format("PVP_RANK_%d_%d", first + rank - 1, side == "Alliance" and 1 or 0), sex)
+    t = Plain(t)
+    return (type(t) == "string" and t ~= "") and t or nil
+end
+
+local function Statistic(id)
+    if not GetStatistic then return nil end
+    local v = Plain((Call(GetStatistic, id)))
+    if v == nil then return nil end
+    return tonumber((tostring(v):gsub("%D", ""))) or 0
+end
+
+-- this week's battlegrounds from the lifetime statistics: added up since the reset; a reading that
+-- goes back (statistics not loaded yet) is ignored, a jump of more than 10 games is not counted
+function BG.WeekGames()
+    local played, won = Statistic(BG_PLAYED), Statistic(BG_WON)
+    if not played then return nil end
+    WLWritsCharDB = WLWritsCharDB or {}
+    local wk = BG.WeekKey()
+    local st = WLWritsCharDB.pvpWeek
+    if type(st) ~= "table" or st.wk ~= wk then
+        st = { wk = wk, played = 0, won = 0, last = type(st) == "table" and st.last or nil }
+        WLWritsCharDB.pvpWeek = st
+    end
+    local last = st.last
+    local back = last and (played < (last.played or 0) or won < (last.won or 0))
+    if last and not back and played - (last.played or 0) <= 10 then
+        st.played = st.played + (played - (last.played or 0))
+        st.won = st.won + math.max(0, won - (last.won or 0))
+    end
+    if not back then st.last = { played = played, won = won } end
+    return st.played, st.won
+end
+
+-- honour this week (the game's count) and today (what it grew since the day's first reading)
+function BG.HonorNow()
+    local CI = C_CurrencyInfo
+    if not (CI and CI.GetCurrencyInfo) then return nil end
+    local info = Call(CI.GetCurrencyInfo, 1792)
+    if type(info) ~= "table" then return nil end
+    local week = tonumber(Plain(info.quantityEarnedThisWeek))
+    local total = tonumber(Plain(info.totalEarned))
+    local cur = (total and total > 0) and total or week
+    local today
+    if cur then
+        WLWritsCharDB = WLWritsCharDB or {}
+        local day = date and date("%Y%m%d") or "?"
+        local d = WLWritsCharDB.pvpDay
+        if type(d) ~= "table" or d.day ~= day or (tonumber(d.base) or 0) > cur then
+            d = { day = day, base = cur }; WLWritsCharDB.pvpDay = d
+        end
+        today = cur - d.base
+    end
+    return week, today
+end
+
+-- my own line: { name, cls, rank, title, pts, next, wmax, hw, ht, pw, ww, rep = { [key] = value }, wk, t }
+function BG.MyPvP()
+    local side = BG.Side()
+    local e = { name = Plain((Call(UnitName, "player"))) or "?", wk = BG.WeekKey(), t = Now(), rep = {} }
+    local _, cls = Call(UnitClass, "player")
+    e.cls = Plain(cls)
+    local MF = C_MajorFactions
+    if MF and MF.GetMajorFactionProgressionInfo then
+        local info = Call(MF.GetMajorFactionProgressionInfo, RANK_FACTION)
+        if type(info) == "table" and tonumber(Plain(info.renownLevel)) then
+            e.rank = tonumber(Plain(info.renownLevel))
+            e.pts = tonumber(Plain(info.renownReputationEarned))
+            e.next = tonumber(Plain(info.renownLevelThreshold))
+            e.wmax = tonumber(Plain(info.currentWeekProgressiveMaxLevel))
+        end
+    end
+    if not e.rank and UnitPVPRank then
+        local r = tonumber(Plain((Call(UnitPVPRank, "player"))))
+        if r and r >= 5 then e.rank = r - 4 end   -- Classic: 5 = rank 1
+    end
+    if e.rank then e.title = RankTitle(e.rank, side, Plain((Call(UnitSex, "player")))) end
+    e.hw, e.ht = BG.HonorNow()
+    e.pw, e.ww = BG.WeekGames()
+    for _, b in ipairs(BG.LIST) do
+        local r = BG.Rep(b.faction[side])
+        e.rep[b.key] = r and r.value or nil
+    end
+    return e
+end
+
+-- the line sent: "P|1|cls|rank|pts|next|wmax|hw|ht|pw|ww|wsg|ab|av|di|wk|title" (empty: unknown)
+local function F0(v) return v == nil and "" or tostring(math.floor(tonumber(v) or 0)) end
+function BG.PvpMsg(e)
+    local t = { "P", "1", e.cls or "", F0(e.rank), F0(e.pts), F0(e.next), F0(e.wmax), F0(e.hw), F0(e.ht), F0(e.pw), F0(e.ww) }
+    for _, b in ipairs(BG.LIST) do t[#t + 1] = F0(e.rep[b.key]) end
+    t[#t + 1] = F0(e.wk)
+    t[#t + 1] = (e.title or ""):gsub("|", "")
+    return table.concat(t, "|")
+end
+function BG.ParsePvp(msg)
+    if type(msg) ~= "string" or msg:sub(1, 2) ~= "P|" then return nil end
+    local f = {}
+    for part in (msg .. "|"):gmatch("([^|]*)|") do f[#f + 1] = part end
+    if f[2] ~= "1" or #f < 17 then return nil end
+    local function n(i) return tonumber(f[i]) end
+    local e = { cls = f[3] ~= "" and f[3] or nil, rank = n(4), pts = n(5), next = n(6), wmax = n(7),
+        hw = n(8), ht = n(9), pw = n(10), ww = n(11), rep = {}, wk = n(16) or 0, title = f[17] ~= "" and f[17] or nil }
+    for i, b in ipairs(BG.LIST) do e.rep[b.key] = n(11 + i) end
+    return e
+end
+
+local function Board()
+    WLWritsDB = WLWritsDB or {}
+    local b = WLWritsDB.pvpBoard
+    if type(b) ~= "table" then b = {}; WLWritsDB.pvpBoard = b end
+    return b
+end
+BG.Board = Board
+
+function BG.OnPvpMessage(msg, sender)
+    local who = Short(sender)
+    if not who or who == Short(Plain((Call(UnitName, "player"))) or "") then return end
+    if msg == "R" then BG.ReplyPvp(); return end
+    local e = BG.ParsePvp(msg)
+    if not e then return end
+    e.name, e.t = who, Now()
+    Board()[who] = e
+    if BG.Refresh and mode == "guild" and win and win:IsShown() then BG.Refresh() end
+end
+
+local lastSent, queued, replyQueued, askedAt = -100, false, false, -100
+local function Clock() return GetTime and GetTime() or 0 end
+function BG.SharePvp(force)
+    if not (IsInGuild and Call(IsInGuild)) then return false end
+    if not force and Clock() - lastSent < 30 then
+        if not queued and C_Timer and C_Timer.After then
+            queued = true
+            C_Timer.After(31 - (Clock() - lastSent), function() queued = false; BG.SharePvp(true) end)
+        end
+        return false
+    end
+    lastSent = Clock()
+    SendPvp(BG.PvpMsg(BG.MyPvP()))
+    return true
+end
+function BG.ReplyPvp()
+    if replyQueued then return end
+    replyQueued = true
+    local go = function() replyQueued = false; BG.SharePvp() end
+    if C_Timer and C_Timer.After then C_Timer.After(2 + math.random() * 6, go) else go() end
+end
+function BG.AskPvp()
+    if not (IsInGuild and Call(IsInGuild)) or Clock() - askedAt < 60 then return false end
+    askedAt = Clock()
+    SendPvp("R")
+    return true
+end
+
+-- the ranking: the board's lines from the last 14 days, me included, sorted by sort ("hw" default,
+-- "rank", "ww"); this week's figures of a line from an older week count as 0
+function BG.GuildRows(sort)
+    sort = sort or "hw"
+    local wk = BG.WeekKey()
+    local list, now = {}, Now()
+    local me = BG.MyPvP()
+    me.me = true
+    list[1] = me
+    for k, e in pairs(Board()) do
+        if type(e) == "table" and now - (tonumber(e.t) or 0) <= BOARD_DAYS * 86400 then
+            if k ~= me.name then
+                e.name = e.name or k
+                e.old = (tonumber(e.wk) or 0) ~= wk and wk ~= 0
+                list[#list + 1] = e
+            end
+        else
+            Board()[k] = nil
+        end
+    end
+    local function V(e, f) if e.old and (f == "hw" or f == "ht" or f == "ww" or f == "pw") then return 0 end return tonumber(e[f]) or -1 end
+    table.sort(list, function(a, b)
+        local x, y
+        if sort == "rank" then
+            x, y = V(a, "rank") * 1e6 + V(a, "pts"), V(b, "rank") * 1e6 + V(b, "pts")
+        else
+            x, y = V(a, sort), V(b, sort)
+        end
+        if x ~= y then return x > y end
+        return (a.name or "") < (b.name or "")
+    end)
+    return list
+end
+
 -- ---------------------------------------------------------------- layout
 
-local pools = { rows = {}, heads = {} }
+local pools = { rows = {}, heads = {}, guild = {} }
 local function Take(kind, maker)
     local p = pools[kind]
     p.n = (p.n or 0) + 1
@@ -1009,6 +1271,182 @@ local function FillSet(W, y)
     return y
 end
 
+-- ---------------------------------------------------------------- the guild tab
+-- One row per member: place | name in class colour ("(toi)" and a lit row for you) | rank title and
+-- its points | honour this week | today | wins | the four battleground standings (short words, in
+-- their colour; left out under 820 px, always in the row's tooltip). A segmented control sorts.
+local SHORT_WORD = { "Haï", "Hostile", "Inam.", "Neutre", "Amical", "Hon.", "Rév.", "Exal." }
+local G_PLACE, G_RANK, G_HON, G_TODAY, G_WINS, G_REP = 28, 150, 96, 80, 64, 64
+local REP_SHORT = { wsg = "Goulet", ab = "Arathi", av = "Alterac", di = "Darkspear" }
+
+local function Ago(t)
+    local s = math.max(0, Now() - (tonumber(t) or 0))
+    if s < 90 then return L("à l'instant") end
+    if s < 3600 then return string.format(L("il y a %d min"), math.floor(s / 60)) end
+    if s < 86400 then return string.format(L("il y a %d h"), math.floor(s / 3600)) end
+    return string.format(L("il y a %d j"), math.floor(s / 86400))
+end
+local function ClassColor(cls)
+    local c = cls and ((C_ClassColor and C_ClassColor.GetClassColor and Call(C_ClassColor.GetClassColor, cls))
+        or (RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls]))
+    if type(c) == "table" and c.r then return { c.r, c.g, c.b } end
+    return C.fg
+end
+local function RankText(e)
+    if not e.rank or e.rank <= 0 then return L("Sans rang") end
+    return e.title and (string.format(L("Rang %d"), e.rank) .. " · " .. e.title) or string.format(L("Rang %d"), e.rank)
+end
+local function WeekVal(e, f)
+    if e.old then return 0 end
+    return e[f]
+end
+
+local function GuildCols(r, W, withRep)
+    local x = 8
+    r.place:ClearAllPoints(); r.place:SetPoint("LEFT", x, 0); r.place:SetWidth(G_PLACE - 8)
+    x = x + G_PLACE
+    local right = 8
+    if withRep then
+        for i = #BG.LIST, 1, -1 do
+            local fs = r.reps[i]
+            fs:ClearAllPoints(); fs:SetPoint("RIGHT", -right, 0); fs:SetWidth(G_REP); fs:Show()
+            right = right + G_REP + 8
+        end
+    else
+        for i = 1, #BG.LIST do r.reps[i]:Hide() end
+    end
+    r.wins:ClearAllPoints(); r.wins:SetPoint("RIGHT", -right, 0); r.wins:SetWidth(G_WINS); right = right + G_WINS + 12
+    r.today:ClearAllPoints(); r.today:SetPoint("RIGHT", -right, 0); r.today:SetWidth(G_TODAY); right = right + G_TODAY + 12
+    r.hon:ClearAllPoints(); r.hon:SetPoint("RIGHT", -right, 0); r.hon:SetWidth(G_HON); right = right + G_HON + 12
+    r.rank:ClearAllPoints(); r.rank:SetPoint("RIGHT", -right, 0); r.rank:SetWidth(G_RANK); right = right + G_RANK + 12
+    local nameW = math.max(80, W - x - right)
+    r.name:ClearAllPoints(); r.name:SetPoint("LEFT", x, 0); r.name:SetWidth(nameW)
+end
+
+local function GuildTexts(r, font, color)
+    for _, k in ipairs({ "place", "name", "rank", "hon", "today", "wins" }) do
+        r[k] = S.Text(r, font, color); r[k]:SetWordWrap(false); r[k]:SetJustifyH("RIGHT")
+    end
+    r.place:SetJustifyH("LEFT"); r.name:SetJustifyH("LEFT"); r.rank:SetJustifyH("LEFT")
+    r.reps = {}
+    for i = 1, #BG.LIST do
+        r.reps[i] = S.Text(r, font, color); r.reps[i]:SetWordWrap(false); r.reps[i]:SetJustifyH("RIGHT")
+    end
+end
+
+local function MakeGuildHead(parent)
+    local r = CreateFrame("Frame", nil, parent)
+    r.wlOwned = true
+    GuildTexts(r, F.meta, C.muted)
+    r:EnableMouse(true)
+    r:SetScript("OnEnter", function(self)
+        Tip(self, { L("Classement PvP de la guilde"), L("Honneur gagné cette semaine (le jeu le compte)."),
+            L("Aujourd'hui : l'honneur gagné depuis la première connexion du jour avec WL Helper."),
+            L("Victoires : les champs de bataille gagnés cette semaine, d'après les statistiques du jeu."),
+            L("Seuls les membres qui ont WL Helper apparaissent. Les chiffres viennent de leur jeu, partagés sur le canal de la guilde.") })
+    end)
+    r:SetScript("OnLeave", S.HideTip)
+    return r
+end
+
+local function MakeGuildRow(parent)
+    local r = CreateFrame("Frame", nil, parent)
+    r.wlOwned = true
+    r.bg = S.Solid(r, "BACKGROUND", C.cardFill); r.bg:SetAllPoints()
+    r.sel = S.Solid(r, "BORDER", { C.accent[1], C.accent[2], C.accent[3], 0.14 }); r.sel:SetAllPoints(); r.sel:Hide()
+    r.hl = S.Solid(r, "BORDER", C.hoverFill); r.hl:SetAllPoints(); r.hl:Hide()
+    GuildTexts(r, F.label, C.fg)
+    r:EnableMouse(true)
+    r:SetScript("OnEnter", function(self)
+        self.hl:Show()
+        local e = self.e
+        if not e then return end
+        local lines = { e.name or "?", RankText(e) }
+        if e.pts and e.next and e.next > 0 then lines[#lines + 1] = string.format(L("Points de rang : %s / %s"), Int(e.pts), Int(e.next)) end
+        if e.wmax and e.wmax > 0 then lines[#lines + 1] = string.format(L("Rang maximum cette semaine : %d"), e.wmax) end
+        if WeekVal(e, "pw") then lines[#lines + 1] = string.format(L("%d parties cette semaine, %d gagnées"), WeekVal(e, "pw") or 0, WeekVal(e, "ww") or 0) end
+        for _, b in ipairs(BG.LIST) do
+            local v = e.rep and e.rep[b.key]
+            if v then
+                local s = BG.StandingOf(v)
+                lines[#lines + 1] = L(b.name) .. " : " .. BG.StandingWord(s)
+            end
+        end
+        if not e.me then lines[#lines + 1] = string.format(L("Vu %s"), Ago(e.t)) end
+        Tip(self, lines)
+    end)
+    r:SetScript("OnLeave", function(self) self.hl:Hide(); S.HideTip() end)
+    return r
+end
+
+local function Num0(v) return v and Int(v) or "—" end
+
+local function PaintGuildRow(r, W, e, i, withRep)
+    r.e = e
+    r:SetSize(W, 34)
+    GuildCols(r, W, withRep)
+    r.place:SetText(tostring(i)); Paint(r.place, C.muted)
+    r.name:SetText(e.me and string.format(L("%s (toi)"), e.name or "?") or (e.name or "?"))
+    Paint(r.name, ClassColor(e.cls))
+    r.sel:SetShown(e.me == true)
+    r.rank:SetText(RankText(e)); Paint(r.rank, (e.rank or 0) > 0 and C.fg or C.muted)
+    r.hon:SetText(Num0(WeekVal(e, "hw"))); Paint(r.hon, C.fg)
+    r.today:SetText(Num0(WeekVal(e, "ht"))); Paint(r.today, C.muted)
+    r.wins:SetText(Num0(WeekVal(e, "ww"))); Paint(r.wins, C.fg)
+    for k, b in ipairs(BG.LIST) do
+        local v = e.rep and e.rep[b.key]
+        if v then
+            local s = BG.StandingOf(v)
+            r.reps[k]:SetText(L(SHORT_WORD[s])); Paint(r.reps[k], StandingColor(s))
+        else
+            r.reps[k]:SetText("—"); Paint(r.reps[k], C.muted)
+        end
+    end
+end
+
+local function FillGuild(W, y)
+    local inner = win.inner
+    BG.AskPvp()
+    BG.SharePvp()
+    local sort = (WLWritsDB and WLWritsDB.bgGuildSort) or "hw"
+    local list = BG.GuildRows(sort)
+    -- the sort control at the right, the sentence at the left
+    local seg = win.guildSort
+    seg:ClearAllPoints(); seg:SetPoint("TOPRIGHT", inner, "TOPRIGHT", -INSET, -y); seg:Show()
+    if seg.Update then seg:Update() end
+    local segW = seg:GetWidth() or 300
+    win.guildIntro:ClearAllPoints(); win.guildIntro:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -(y + 2))
+    win.guildIntro:SetText(L("Seuls les membres qui ont WL Helper apparaissent. Les chiffres viennent de leur jeu, partagés sur le canal de la guilde."))
+    local ih = math.ceil(S.FitText(win.guildIntro, 2, math.max(160, math.min(W - segW - 16, 480)), inner))
+    win.guildIntro:Show()
+    y = y + math.max(28, ih) + 12
+    local withRep = W >= 820
+    local th = win.guildHead
+    th:ClearAllPoints(); th:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -y); th:SetSize(W, 18); th:Show()
+    GuildCols(th, W, withRep)
+    th.place:SetText("#"); th.name:SetText(L("Guilde")); th.rank:SetText(L("Rang")); th.hon:SetText(L("Honneur semaine"))
+    th.today:SetText(L("Aujourd'hui")); th.wins:SetText(L("Victoires"))
+    for k, b in ipairs(BG.LIST) do th.reps[k]:SetText(L(REP_SHORT[b.key])) end
+    y = y + 18 + 4
+    for i, e in ipairs(list) do
+        local r = Take("guild", MakeGuildRow)
+        PaintGuildRow(r, W, e, i, withRep)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", inner, "TOPLEFT", INSET, -y)
+        y = y + 34 + 2
+    end
+    win.guildShown = #list
+    if #list <= 1 then
+        y = y + 16
+        win.guildEmpty:Set("group", L("Personne d'autre pour l'instant"), L("Les membres qui ont WL Helper apparaîtront ici dès qu'ils seront connectés."))
+        win.guildEmpty:ClearAllPoints(); win.guildEmpty:SetPoint("TOP", inner, "TOPLEFT", INSET + W / 2, -y)
+        win.guildEmpty:Show()
+        y = y + (win.guildEmpty.blockH or 160)
+    else
+        win.guildEmpty:Hide()
+    end
+    return y
+end
+
 local function Fill()
     if not (win and win:IsShown()) then return end
     for _, p in pairs(pools) do
@@ -1017,13 +1455,15 @@ local function Fill()
     end
     win.weekText, win.bonus = BG.WeekText()
     local W = Width()
-    local onBG = mode ~= "set"
+    local onBG, onSet, onGuild = mode == "bg", mode == "set", mode == "guild"
     win.week:SetShown(onBG)
     for _, c in ipairs(win.cards) do c:SetShown(onBG) end
-    win.setTop:SetShown(not onBG); win.honorBig:SetShown(not onBG)
-    win.foh:SetShown(not onBG); win.note:SetShown(not onBG); win.tableHead:SetShown(false)
+    win.setTop:SetShown(onSet); win.honorBig:SetShown(onSet)
+    win.foh:SetShown(onSet); win.note:SetShown(onSet); win.tableHead:SetShown(false)
+    win.guildSort:SetShown(onGuild); win.guildIntro:SetShown(onGuild); win.guildHead:SetShown(onGuild)
+    win.guildEmpty:Hide()
     local y = 14
-    if onBG then y = FillBG(W, y) else y = FillSet(W, y) end
+    if onBG then y = FillBG(W, y) elseif onSet then y = FillSet(W, y) else y = FillGuild(W, y) end
     local innerH = math.ceil(y)
     win.lastH, win.rowsShown = innerH, pools.rows.n or 0
     win.scroll:SetContentHeight(innerH + 24)
@@ -1038,7 +1478,7 @@ local function Build()
     win = S.Window("WLHelperBattlegrounds", w0 or 924, h0 or 614, L("Champs de bataille"), nil, WLWritsDB, "bgPos",
         { header = S.HEADER_H or 44, size = "workspace" })
     local top = win:ContentTop()
-    win.tabs = S.Tabs(win, { { "bg", L("Champs de bataille") }, { "set", L("Set PvP") } },
+    win.tabs = S.Tabs(win, { { "bg", L("Champs de bataille") }, { "set", L("Set PvP") }, { "guild", L("Guilde") } },
         function() return mode end, function(m) mode = m; if win.scroll.ScrollTo then win.scroll:ScrollTo(0, true) end; Fill() end)
     win.tabs:SetPoint("TOPLEFT", 0, -top); win.tabs:SetPoint("TOPRIGHT", 0, -top)
     local sa = S.ScrollArea(win)
@@ -1055,6 +1495,12 @@ local function Build()
     win.tableHead = MakeHead(win.inner)
     win.foh = FohCard(win.inner)
     win.note = S.Text(win.inner, F.meta, C.muted); win.note:SetJustifyH("LEFT")
+    win.guildSort = S.Segmented(win.inner, { { "hw", L("Honneur semaine") }, { "rank", L("Rang") }, { "ww", L("Victoires") } },
+        function() return (WLWritsDB and WLWritsDB.bgGuildSort) or "hw" end,
+        function(v) WLWritsDB = WLWritsDB or {}; WLWritsDB.bgGuildSort = v; Fill() end, 28)
+    win.guildIntro = S.Text(win.inner, F.label, C.muted); win.guildIntro:SetJustifyH("LEFT")
+    win.guildHead = MakeGuildHead(win.inner)
+    win.guildEmpty = S.EmptyState(win.inner, "group", "", "")
     win.OnResize = function() Fill() end
     win:SetScript("OnShow", function()
         Fill()
@@ -1063,11 +1509,11 @@ local function Build()
     win:Hide()
 end
 
--- BG.Toggle([tab [, show]]): opens on that tab ("bg" | "set", or the last one); closes when open
+-- BG.Toggle([tab [, show]]): opens on that tab ("bg" | "set" | "guild", or the last one); closes when open
 -- and neither a tab nor show is asked
 function BG.Toggle(m, show)
     if not win then Build() end
-    if m == "bg" or m == "set" then mode = m end
+    if m == "bg" or m == "set" or m == "guild" then mode = m end
     if win:IsShown() and not show and not m then win:Hide(); return end
     win:Show()
     if win.Raise then win:Raise() end
@@ -1080,10 +1526,26 @@ function BG.Mode() return mode end
 
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "UPDATE_BATTLEFIELD_STATUS",
-    "UPDATE_BATTLEFIELD_SCORE", "PVP_MATCH_COMPLETE", "CALENDAR_UPDATE_EVENT_LIST", "UPDATE_FACTION", "GET_ITEM_INFO_RECEIVED" }) do
+    "UPDATE_BATTLEFIELD_SCORE", "PVP_MATCH_COMPLETE", "CALENDAR_UPDATE_EVENT_LIST", "UPDATE_FACTION", "GET_ITEM_INFO_RECEIVED", "CHAT_MSG_ADDON" }) do
     pcall(ev.RegisterEvent, ev, e)
 end
-ev:SetScript("OnEvent", function(_, e)
+local sharedAtLogin = false
+ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4)
+    if e == "CHAT_MSG_ADDON" then
+        if a1 == PVP_PREFIX and a3 == "GUILD" and type(a2) == "string" and not Secret(a2) and not Secret(a4) then
+            local ok, err = pcall(BG.OnPvpMessage, a2, a4)
+            if not ok and geterrorhandler then geterrorhandler()(err) end
+        end
+        return
+    end
+    if e == "PLAYER_ENTERING_WORLD" then
+        -- once after login (the guild and the statistics are read by then), then after each battleground
+        local first = not sharedAtLogin
+        sharedAtLogin = true
+        if C_Timer and C_Timer.After then
+            C_Timer.After(first and 25 or 5, function() if not BG.Current() then BG.SharePvp() end end)
+        end
+    end
     if e == "GET_ITEM_INFO_RECEIVED" then
         -- names and stats arrive one item at a time: one redraw a moment after the first one
         if win and win:IsShown() and mode == "set" and not BG._redraw then

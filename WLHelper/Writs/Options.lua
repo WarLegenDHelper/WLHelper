@@ -21,8 +21,8 @@ local T = S.C
 local F = root.F
 
 ns.AddEnglish({
-    ["La flèche suit un vrai chemin autour des collines et par les portes, pour tous les guides (WL Helper Nav). Sans lui, elle va tout droit."] =
-        "The arrow follows a real path around hills and through gates, for every guide (WL Helper Nav). Without it, it goes straight.",
+    ["La flèche suit un vrai chemin autour des collines et par les portes, pour tous les guides (WL Helper Nav). Sans lui, elle va tout droit. C'est la partie lourde de WL Helper : ses cartes de déplacement prennent de la mémoire une fois chargées (/wlh mem). Coupe-le si ton jeu en manque."] =
+        "The arrow follows a real path around hills and through doors, for every guide (WL Helper Nav). Without it, it goes straight. It is the heavy part of WL Helper: its movement maps take memory once loaded (/wlh mem). Turn it off if your game is short of it.",
     -- profession cooldowns (Writs page)
     ["Recharges de métier"] = "Profession cooldowns",
     ["Prix de revient (HV)"] = "Cost price (AH)",
@@ -1657,7 +1657,7 @@ function BUILD.gps(p)
     if GT and GT.WalkOn and GT.SetWalk then
         SwitchRow(p, L("Chemins à pied"), function() return GT.WalkOn() end, function(v) GT.SetWalk(v) end,
             L("La flèche contourne collines et murs."),
-            L("La flèche suit un vrai chemin autour des collines et par les portes, pour tous les guides (WL Helper Nav). Sans lui, elle va tout droit."))
+            L("La flèche suit un vrai chemin autour des collines et par les portes, pour tous les guides (WL Helper Nav). Sans lui, elle va tout droit. C'est la partie lourde de WL Helper : ses cartes de déplacement prennent de la mémoire une fois chargées (/wlh mem). Coupe-le si ton jeu en manque."))
     end
     local TR = ns.WP.Trail
     if TR and TR.MapOn and TR.SetMap then

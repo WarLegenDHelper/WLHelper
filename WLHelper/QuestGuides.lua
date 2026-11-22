@@ -81,7 +81,45 @@ if not ns.Q[5861] then ns.Q[5861]={nf="Trouver Myranda",n="Find Myranda",l=60,r=
 if not ns.Q[5862] then ns.Q[5862]={nf="Le subterfuge écarlate",n="Scarlet Subterfuge",l=60,r=52,fa="Both",d="QG_Fordring",role="pre",p={5861},s={m=1422,x=50.8,y=77.8,n="Myranda the Hag"},st="Myranda the Hag",f={m=1422,x=42,y=14.8,n="Highlord Taelan Fordring"},ft="Highlord Taelan Fordring",xp=6600} end
 if not ns.Q[5944] then ns.Q[5944]={nf="En rêves",n="In Dreams",l=60,r=52,fa="Both",d="QG_Fordring",role="main",noin=true,p={5862},s={m=1422,x=42.0,y=14.8,n="Highlord Taelan Fordring"},st="Highlord Taelan Fordring",f={m=1422,x=53.8,y=24.4,n="Lord Tirion Fordring"},ft="Lord Tirion Fordring",ri={"Mark of Fordring"},xp=9950} end
 
+-- ---------------------------------------------------------------- Dungeon Set 2 (Tier 0.5)
+-- Deliana (Ironforge) / Mokvar (Orgrimmar): An Earnest Proposition, the Ectoplasmic Distiller, Just
+-- Compensation, Anthion (Stratholme), The Challenge (Blackrock Depths), Anthion's Parting Words,
+-- Lord Valthalak's amulet, then Saving the Best for Last, one quest per class at each upgrade.
+-- Our data already has the chain up to Mea Culpa, Lord Valthalak (dungeon guides): those quests are
+-- kept as they are; only Return to Bodley, Back to the Beginning and Saving the Best for Last are new
+-- (NaowhForever givers and turn-ins, LibForeverData classes and items, Polestar_frFR names).
+-- The four "any of" steps of Valthalak's amulet are Curated.lua's ns.ANYOF.
+if not ns.Q[8996] then ns.Q[8996]={nf="Retourner voir Bodley",n="Return to Bodley",l=60,r=58,fa="Both",d="QG_T05",role="pre",p={8995},s={i=1,n="Spirit of Lord Valthalak"},st="Spirit of Lord Valthalak, Upper Blackrock Spire",f={m=1428,x=32.3,y=25.8,n="Bodley"},ft="Bodley",xp=660} end
+if not ns.Q[8997] then ns.Q[8997]={nf="Retour au commencement",tw=8998,n="Back to the Beginning",l=60,r=58,fa="Alliance",d="QG_T05",role="pre",p={8996},s={m=1428,x=32.3,y=25.8,n="Bodley"},st="Bodley",f={m=1455,x=42.4,y=53.2,n="Deliana"},ft="Deliana",xp=660} end
+if not ns.Q[8998] then ns.Q[8998]={nf="Retour au commencement",tw=8997,n="Back to the Beginning",l=60,r=58,fa="Horde",d="QG_T05",role="pre",p={8996},s={m=1428,x=32.3,y=25.8,n="Bodley"},st="Bodley",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=660} end
+if not ns.Q[8999] then ns.Q[8999]={nf="Garder le meilleur pour la fin",c="DRUID",n="Saving the Best for Last",l=60,r=58,fa="Alliance",d="QG_T05",role="main",p={8997},s={m=1455,x=43.7,y=52.4,n="Deliana"},st="Deliana",f={m=1455,x=42.4,y=53.2,n="Deliana"},ft="Deliana",xp=1650} end
+if not ns.Q[9000] then ns.Q[9000]={nf="Garder le meilleur pour la fin",c="HUNTER",n="Saving the Best for Last",l=60,r=58,fa="Alliance",d="QG_T05",role="main",p={8997},s={m=1455,x=43.7,y=52.4,n="Deliana"},st="Deliana",f={m=1455,x=42.4,y=53.2,n="Deliana"},ft="Deliana",xp=1650} end
+if not ns.Q[9001] then ns.Q[9001]={nf="Garder le meilleur pour la fin",c="MAGE",n="Saving the Best for Last",l=60,r=58,fa="Alliance",d="QG_T05",role="main",p={8997},s={m=1455,x=43.7,y=52.4,n="Deliana"},st="Deliana",f={m=1455,x=42.4,y=53.2,n="Deliana"},ft="Deliana",xp=1650} end
+if not ns.Q[9002] then ns.Q[9002]={nf="Garder le meilleur pour la fin",c="PALADIN",n="Saving the Best for Last",l=60,r=58,fa="Alliance",d="QG_T05",role="main",p={8997},s={m=1455,x=43.7,y=52.4,n="Deliana"},st="Deliana",f={m=1455,x=42.4,y=53.2,n="Deliana"},ft="Deliana",xp=1650} end
+if not ns.Q[9003] then ns.Q[9003]={nf="Garder le meilleur pour la fin",c="PRIEST",n="Saving the Best for Last",l=60,r=58,fa="Alliance",d="QG_T05",role="main",p={8997},s={m=1455,x=43.7,y=52.4,n="Deliana"},st="Deliana",f={m=1455,x=42.4,y=53.2,n="Deliana"},ft="Deliana",xp=1650} end
+if not ns.Q[9004] then ns.Q[9004]={nf="Garder le meilleur pour la fin",c="ROGUE",n="Saving the Best for Last",l=60,r=58,fa="Alliance",d="QG_T05",role="main",p={8997},s={m=1455,x=43.7,y=52.4,n="Deliana"},st="Deliana",f={m=1455,x=42.4,y=53.2,n="Deliana"},ft="Deliana",xp=1650} end
+if not ns.Q[9005] then ns.Q[9005]={nf="Garder le meilleur pour la fin",c="WARLOCK",n="Saving the Best for Last",l=60,r=58,fa="Alliance",d="QG_T05",role="main",p={8997},s={m=1455,x=43.7,y=52.4,n="Deliana"},st="Deliana",f={m=1455,x=42.4,y=53.2,n="Deliana"},ft="Deliana",xp=1650} end
+if not ns.Q[9006] then ns.Q[9006]={nf="Garder le meilleur pour la fin",c="WARRIOR",n="Saving the Best for Last",l=60,r=58,fa="Alliance",d="QG_T05",role="main",p={8997},s={m=1455,x=43.7,y=52.4,n="Deliana"},st="Deliana",f={m=1455,x=42.4,y=53.2,n="Deliana"},ft="Deliana",xp=1650} end
+if not ns.Q[9007] then ns.Q[9007]={nf="Garder le meilleur pour la fin",c="DRUID",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
+if not ns.Q[9008] then ns.Q[9008]={nf="Garder le meilleur pour la fin",c="HUNTER",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
+if not ns.Q[9009] then ns.Q[9009]={nf="Garder le meilleur pour la fin",c="PRIEST",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
+if not ns.Q[9010] then ns.Q[9010]={nf="Garder le meilleur pour la fin",c="ROGUE",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
+if not ns.Q[9011] then ns.Q[9011]={nf="Garder le meilleur pour la fin",c="SHAMAN",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
+if not ns.Q[9012] then ns.Q[9012]={nf="Garder le meilleur pour la fin",c="WARLOCK",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
+if not ns.Q[9013] then ns.Q[9013]={nf="Garder le meilleur pour la fin",c="WARRIOR",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
+if not ns.Q[9014] then ns.Q[9014]={nf="Garder le meilleur pour la fin",c="MAGE",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
+
+-- ---------------------------------------------------------------- the level 60 weekly: Undermine Satchel
+-- In Demand - Ancient Elven Curiosities (WoW Forever only), Pix Xizzix in Booty Bay: one item from
+-- the last boss of each Dire Maul wing, for an Undermine Satchel (a gold item worth 10 to 100 gold).
+-- Giver and items: NaowhForever DiscoveryData, Polestar Codex; the bosses: two player guides that
+-- agree (conquestcapped.com, kami-labs.fr, November 2026). A weekly quest: the game clears its
+-- "done" mark at the weekly reset, so the card comes back by itself.
+if not ns.Q[96076] then ns.Q[96076]={n="In Demand - Ancient Elven Curiosities",l=60,r=60,fa="Both",d="QG_Weekly",role="main",noin=true,s={m=1434,x=28.5,y=75.9,n="Pix Xizzix"},st="Pix Xizzix",f={m=1434,x=28.4,y=75.8,n="Pix Xizzix"},ft="Pix Xizzix",o={{k="item",n="Felvine Seed",c=1,ins=false,unk=false,ns=true,t={"Alzzin the Wildshaper"}},{k="item",n="Earthstone Diamond Pinky Ring",c=1,ins=false,unk=false,ns=true,t={"King Gordok"}},{k="item",n="Ancient Memento",c=1,ins=false,unk=false,ns=true,t={"Prince Tortheldrin"}}},ri={"Undermine Satchel"}} end
+
 local NOTES = {
+  [96076] = { "Once a week at level 60: one item from the last boss of each Dire Maul wing. Felvine Seed: Alzzin the Wildshaper (East). Ancient Memento: Prince Tortheldrin (West). Earthstone Diamond Pinky Ring: King Gordok (North). The Undermine Satchel holds a gold item worth 10, 20, 40 or 100 gold at a vendor (no published odds). The quest can be shared, each player turns it in.",
+              "Une fois par semaine au niveau 60 : un objet du dernier boss de chaque aile de Hache-Tripes. Felvine Seed : Alzzin le Modeleur (Est). Ancient Memento : le prince Tortheldrin (Ouest). Earthstone Diamond Pinky Ring : le roi Gordok (Nord). L'Undermine Satchel contient un objet en or qui se vend 10, 20, 40 ou 100 pièces d'or (chances non publiées). La quête se partage, chacun la rend." },
   [5542] = { "Start: Tirion Fordring, by his house at the western edge of the Eastern Plaguelands. Take his three quests together (Demon Dogs, Blood Tinged Skies, Carrion Grubbage).",
              "Départ : Tirion Fordring, près de sa maison à l'ouest des Maleterres de l'Est. Prends ses trois quêtes ensemble (Chiens-démons, Ciel couleur de sang, Larve putride)." },
   [5845] = { "The Symbol of Lost Honor is an object in the Eastern Plaguelands.",
@@ -123,6 +161,47 @@ do
       w = { m = 1423, x = 62.5, y = 26.8, n = "Symbol of Lost Honor" } } }
   end
 end
+local T05_NOTES = {
+  [8999] = { "Hand Deliana these two Dungeon Set 1 pieces: Wildheart Cowl and Wildheart Vest. You get Feralheart Cowl and Feralheart Vest.",
+           "Rends à Deliana ces deux pièces du set de donjon 1 : Coiffe du Coeur-sauvage et Gilet du Coeur-sauvage. Tu reçois : Capuche Cœur-Farouche et Gilet Cœur-Farouche." },
+  [9000] = { "Hand Deliana these two Dungeon Set 1 pieces: Beaststalker's Cap and Beaststalker's Tunic. You get Beastmaster's Cap and Beastmaster's Tunic.",
+           "Rends à Deliana ces deux pièces du set de donjon 1 : Coiffe de bestiaire et Tunique de bestiaire. Tu reçois : Coiffe de belluaire et Tunique de belluaire." },
+  [9001] = { "Hand Deliana these two Dungeon Set 1 pieces: Magister's Crown and Magister's Robes. You get Sorcerer's Crown and Sorcerer's Robes.",
+           "Rends à Deliana ces deux pièces du set de donjon 1 : Collerette de magistère et Robe de magistère. Tu reçois : Couronne du sorcier et Robe du sorcier." },
+  [9002] = { "Hand Deliana these two Dungeon Set 1 pieces: Lightforge Helm and Lightforge Breastplate. You get Soulforge Breastplate and Soulforge Helm.",
+           "Rends à Deliana ces deux pièces du set de donjon 1 : Casque de Sancteforge et Cuirasse de Sancteforge. Tu reçois : Cuirasse d'Âmeforge et Casque d'Âmeforge." },
+  [9003] = { "Hand Deliana these two Dungeon Set 1 pieces: Devout Crown and Devout Robe. You get Virtuous Crown and Virtuous Robe.",
+           "Rends à Deliana ces deux pièces du set de donjon 1 : Collerette de dévot et Robe de dévot. Tu reçois : Couronne vertueuse et Robe vertueuse." },
+  [9004] = { "Hand Deliana these two Dungeon Set 1 pieces: Shadowcraft Cap and Shadowcraft Tunic. You get Darkmantle Cap and Darkmantle Tunic.",
+           "Rends à Deliana ces deux pièces du set de donjon 1 : Cagoule Sombreruse et Tunique Sombreruse. Tu reçois : Coiffe Sombremante et Tunique Sombremante." },
+  [9005] = { "Hand Deliana these two Dungeon Set 1 pieces: Dreadmist Mask and Dreadmist Robe. You get Deathmist Mask and Deathmist Robe.",
+           "Rends à Deliana ces deux pièces du set de donjon 1 : Masque de Brume-funeste et Robe de Brume-funeste. Tu reçois : Masque Mortebrume et Robe Mortebrume." },
+  [9006] = { "Hand Deliana these two Dungeon Set 1 pieces: Helm of Valor and Breastplate of Valor. You get Breastplate of Heroism and Helm of Heroism.",
+           "Rends à Deliana ces deux pièces du set de donjon 1 : Casque de vaillance et Cuirasse de vaillance. Tu reçois : Cuirasse d'héroïsme et Casque d'héroïsme." },
+  [9007] = { "Hand Mokvar these two Dungeon Set 1 pieces: Wildheart Cowl and Wildheart Vest. You get Feralheart Cowl and Feralheart Vest.",
+           "Rends à Mokvar ces deux pièces du set de donjon 1 : Coiffe du Coeur-sauvage et Gilet du Coeur-sauvage. Tu reçois : Capuche Cœur-Farouche et Gilet Cœur-Farouche." },
+  [9008] = { "Hand Mokvar these two Dungeon Set 1 pieces: Beaststalker's Cap and Beaststalker's Tunic. You get Beastmaster's Cap and Beastmaster's Tunic.",
+           "Rends à Mokvar ces deux pièces du set de donjon 1 : Coiffe de bestiaire et Tunique de bestiaire. Tu reçois : Coiffe de belluaire et Tunique de belluaire." },
+  [9009] = { "Hand Mokvar these two Dungeon Set 1 pieces: Devout Crown and Devout Robe. You get Virtuous Crown and Virtuous Robe.",
+           "Rends à Mokvar ces deux pièces du set de donjon 1 : Collerette de dévot et Robe de dévot. Tu reçois : Couronne vertueuse et Robe vertueuse." },
+  [9010] = { "Hand Mokvar these two Dungeon Set 1 pieces: Shadowcraft Cap and Shadowcraft Tunic. You get Darkmantle Cap and Darkmantle Tunic.",
+           "Rends à Mokvar ces deux pièces du set de donjon 1 : Cagoule Sombreruse et Tunique Sombreruse. Tu reçois : Coiffe Sombremante et Tunique Sombremante." },
+  [9011] = { "Hand Mokvar these two Dungeon Set 1 pieces: Coif of Elements and Vest of Elements. You get Coif of The Five Thunders and Vest of The Five Thunders.",
+           "Rends à Mokvar ces deux pièces du set de donjon 1 : Coiffe des éléments et Haubergeon des éléments. Tu reçois : Coiffe des Cinq tonnerres et Gilet des Cinq tonnerres." },
+  [9012] = { "Hand Mokvar these two Dungeon Set 1 pieces: Dreadmist Mask and Dreadmist Robe. You get Deathmist Mask and Deathmist Robe.",
+           "Rends à Mokvar ces deux pièces du set de donjon 1 : Masque de Brume-funeste et Robe de Brume-funeste. Tu reçois : Masque Mortebrume et Robe Mortebrume." },
+  [9013] = { "Hand Mokvar these two Dungeon Set 1 pieces: Helm of Valor and Breastplate of Valor. You get Breastplate of Heroism and Helm of Heroism.",
+           "Rends à Mokvar ces deux pièces du set de donjon 1 : Casque de vaillance et Cuirasse de vaillance. Tu reçois : Cuirasse d'héroïsme et Casque d'héroïsme." },
+  [9014] = { "Hand Mokvar these two Dungeon Set 1 pieces: Magister's Crown and Magister's Robes. You get Sorcerer's Crown and Sorcerer's Robes.",
+           "Rends à Mokvar ces deux pièces du set de donjon 1 : Collerette de magistère et Robe de magistère. Tu reçois : Couronne du sorcier et Robe du sorcier." },
+  [8996] = { "Once Mea Culpa is done, the Spirit of Lord Valthalak gives this quest in Upper Blackrock Spire: take the Brazier of Beckoning back to Bodley, in Blackrock Mountain. You get the Brazier of Invocation and its manual.",
+             "Une fois Mea culpa, seigneur Valthalak rendue, l'esprit du seigneur Valthalak donne cette quête dans le Pic Rochenoire supérieur : rapporte le Brasero de signal à Bodley, dans le mont Rochenoire. Tu reçois le Brasero d'invocation et son mode d'emploi." },
+  [8997] = { "Bodley sends you back to Deliana, in Ironforge.",
+             "Bodley te renvoie à Deliana, à Forgefer." },
+  [8998] = { "Bodley sends you back to Mokvar, in Orgrimmar.",
+             "Bodley te renvoie à Mokvar, à Orgrimmar." },
+}
+for id, t in pairs(T05_NOTES) do NOTES[id] = t end
 for id, t in pairs(NOTES) do
   local q = ns.Q[id]
   if q then q.ne = t[1]; ns.TR[t[1]] = t[2] end
@@ -155,6 +234,16 @@ local CARDS = {
     icon = "Interface\\Icons\\INV_Jewelry_Talisman_07", q = { 5944 },
     ed = "Tirion Fordring's chain in the Plaguelands (11 quests, Stratholme on the way, a group for the end). Its last quest, In Dreams, rewards the Mark of Fordring: a neck Naowh's simulations rank first for many specs.",
     edf = "La chaîne de Tirion Fordring dans les Maleterres (11 quêtes, Stratholme en chemin, un groupe pour la fin). Sa dernière quête, En rêves, donne la Marque de Fordring : un collier que les simulations de Naowh classent premier pour beaucoup de spés." },
+  { key = "QG_T05", n = "Dungeon Set 2 (T0.5)", nf = "Set de donjon 2 (T0.5)",
+    lvl = { 58, 60 }, loc = "Ironforge or Orgrimmar, Stratholme, Blackrock Mountain", locf = "Forgefer ou Orgrimmar, Stratholme, mont Rochenoire",
+    icon = "Interface\Icons\INV_Chest_Plate03", q = { 8999, 9000, 9001, 9002, 9003, 9004, 9005, 9006, 9007, 9008, 9009, 9010, 9011, 9012, 9013, 9014 },
+    ed = "Your class's Dungeon Set 2 chain: An Earnest Proposition with Deliana (Ironforge) or Mokvar (Orgrimmar), Just Compensation, Anthion in Stratholme, The Challenge in Blackrock Depths, Anthion's Parting Words, Lord Valthalak's amulet, then Saving the Best for Last. Each upgrade quest takes Dungeon Set 1 pieces and gives their Dungeon Set 2 versions. Many dungeons on the way: bring a group.",
+    edf = "La chaîne du set de donjon 2 de ta classe : Une proposition sérieuse chez Deliana (Forgefer) ou Mokvar (Orgrimmar), Une juste compensation, Anthion à Stratholme, Le défi aux Profondeurs de Rochenoire, Les adieux d'Anthion, l'amulette du seigneur Valthalak, puis Garder le meilleur pour la fin. Chaque quête d'amélioration prend des pièces du set de donjon 1 et donne leur version du set de donjon 2. Beaucoup de donjons en chemin : viens en groupe." },
+  { key = "QG_Weekly", n = "Weekly: Undermine Satchel (gold)", nf = "Hebdo : sac de l'Undermine (or)",
+    lvl = { 60, 60 }, loc = "Booty Bay, Dire Maul", locf = "Baie-du-Butin, Hache-Tripes",
+    icon = "Interface\\Icons\\INV_Misc_Bag_10_Black", q = { 96076 },
+    ed = "The level 60 weekly quest: an item from the last boss of each Dire Maul wing (Alzzin, Tortheldrin, King Gordok) for an Undermine Satchel, 10 to 100 gold. Comes back every week.",
+    edf = "La quête hebdomadaire du niveau 60 : un objet du dernier boss de chaque aile de Hache-Tripes (Alzzin, Tortheldrin, le roi Gordok) contre un sac de l'Undermine, 10 à 100 pièces d'or. Elle revient chaque semaine." },
 }
 ns.QGUIDES = {}
 for _, c in ipairs(CARDS) do

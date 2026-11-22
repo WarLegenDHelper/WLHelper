@@ -827,6 +827,27 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "share" then ns.ShareQuests()
   elseif cmd == "farm" or cmd == "stuff" or cmd == "gear" or cmd == "equipement" then
     if ns.GearPlanPrint then ns.GearPlanPrint() end
+  elseif cmd == "mem" or cmd == "memoire" or cmd == "memory" then
+    -- each part of WL Helper and the memory it takes now (report: "the addon takes 110 MB")
+    local en = ns.Writs and ns.Writs.English and ns.Writs.English()
+    local A = C_AddOns
+    local upd = rawget(_G, "UpdateAddOnMemoryUsage")
+    local get = rawget(_G, "GetAddOnMemoryUsage")
+    local loaded = (A and A.IsAddOnLoaded) or rawget(_G, "IsAddOnLoaded")
+    if type(upd) == "function" then pcall(upd) end
+    local total = 0
+    for _, name in ipairs({ "WLHelper", "WLHelper_Gear", "WLHelper_Nav", "WLHelper_Nav_EK", "WLHelper_Nav_Kalimdor" }) do
+      local okL, isL = pcall(loaded, name)
+      if okL and isL then
+        local okM, kb = pcall(get, name)
+        kb = okM and tonumber(kb) or nil
+        if kb then total = total + kb end
+        ns.Print(string.format("%s : %s", name, kb and string.format("%.1f Mo", kb / 1024) or "?"))
+      else
+        ns.Print(string.format(en and "%s: not loaded" or "%s : pas chargé", name))
+      end
+    end
+    ns.Print(string.format(en and "Total: %.1f MB. The walking paths (Nav_EK, Nav_Kalimdor) are the heavy part: Settings > GPS > Walking paths turns them off." or "Total : %.1f Mo. Les chemins à pied (Nav_EK, Nav_Kalimdor) sont la partie lourde : Réglages > GPS > Chemins à pied les coupe.", total / 1024))
   elseif (cmd == "taille" or cmd == "scale" or cmd == "size") and arg and arg:lower():find("^guide") then
     local v = arg:match("([%+%-]?[%d%.]*)%s*$")
     if v == "" then v = nil end

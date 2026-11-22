@@ -6,6 +6,20 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.188] — 2026-11-22
+
+### Ajouté / Added
+- **Champs de bataille, classement PvP de la guilde** : un onglet « Guilde » liste les membres qui ont WL Helper, avec leur rang PvP (titre du jeu, points dans l'infobulle), l'honneur de la semaine et du jour, les victoires de la semaine et leur rang dans les 4 factions de champ de bataille. Tri par honneur de la semaine (par défaut), par rang ou par victoires. Ta ligne est en évidence. Les chiffres viennent du jeu de chacun, partagés sur le canal de la guilde.
+  *Battlegrounds: a Guild tab ranking the members with WL Helper by honor this week, rank or wins, with their battleground standings.*
+- **`/wlh mem`** : la mémoire prise par chaque partie de WL Helper (le guide, WL Helper Gear, la navigation et ses cartes de déplacement de chaque continent). La partie lourde, ce sont les cartes de déplacement des chemins à pied, chargées seulement quand le GPS dessine un chemin. Leur réglage (Réglages > GPS > Chemins à pied) le dit maintenant : coupé, elles ne sont jamais chargées.
+  *`/wlh mem` shows the memory each part of WL Helper takes; the walking paths setting says it is the heavy part.*
+- **Guide de quête « Set de donjon 2 (T0.5) »** (onglet Quêtes du choix de guide) : toute la chaîne du set de donjon 2 de ta classe, dans l'ordre. Elle part d'« Une proposition sérieuse » chez Deliana (Forgefer) ou Mokvar (Orgrimmar), puis passe par l'alambic ectoplasmique, « Une juste compensation », Anthion à Stratholme, « Le défi » aux Profondeurs de Rochenoire, « Les adieux d'Anthion », et l'amulette du seigneur Valthalak. Elle finit par « Garder le meilleur pour la fin ». La carte ne montre que les quêtes de ta classe et de ton camp. La dernière quête dit quelles pièces du set de donjon 1 rendre (tête et torse) et ce que tu reçois. Il faut un groupe pour les donjons. Les quêtes que les guides de donjon avaient déjà restent telles quelles. « Retourner voir Bodley », « Retour au commencement » et « Garder le meilleur pour la fin » sont nouvelles.
+  *Quest guide: Dungeon Set 2 (T0.5), your class's whole chain from Deliana or Mokvar to Saving the Best for Last.*
+- **Hebdo : sac de l'Undermine** : nouvelle carte dans l'onglet Quêtes pour la quête hebdomadaire du niveau 60 (Pix Xizzix, Baie-du-Butin) : un objet du dernier boss de chaque aile de Hache-Tripes, contre un sac avec un objet en or de 10 à 100 pièces.
+  *Weekly: a Quests tab card for the level 60 weekly quest (Pix Xizzix, Booty Bay): an item from the last boss of each Dire Maul wing for an Undermine Satchel.*
+- **Champs de bataille, classement PvP de la guilde** : un onglet « Guilde » liste les membres qui ont WL Helper, avec leur rang PvP (titre du jeu, points dans l'infobulle), l'honneur de la semaine et du jour, les victoires de la semaine et leur rang dans les 4 factions de champ de bataille. Tri par honneur de la semaine (par défaut), par rang ou par victoires. Ta ligne est en évidence. Les chiffres viennent du jeu de chacun, partagés sur le canal de la guilde.
+  *Battlegrounds: a Guild tab ranking the members with WL Helper by honor this week, rank or wins, with their battleground standings.*
+
 ## [1.0.0-beta.187] — 2026-11-22
 
 ### Ajouté / Added
