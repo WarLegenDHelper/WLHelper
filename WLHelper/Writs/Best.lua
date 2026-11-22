@@ -200,6 +200,8 @@ end
 function Best.Show(rest)
     rest = rest and tostring(rest) or ""
     local lvl = tonumber((rest:match("(%d+)")))
+    local low = rest:lower()
+    if (low:find("^rep") or low:find("^rép")) and Best.Toggle and ns.S and ns.S.Window then return Best.Toggle("rep", true) end
     if rest:lower():find("chat") or not (Best.Toggle and ns.S and ns.S.Window) then return Best.Print(lvl) end
     Best.Toggle(lvl and (lvl >= 60 and "pre" or "now") or nil, true)
 end
@@ -266,7 +268,7 @@ ns.AddEnglish({
 local S, C = ns.S, ns.S and ns.S.C
 local INSET = 16
 local SLOT_W, ICON, ROW_H, ALT_H = 92, 20, 40, 34
-local MODES = { { "now", "Pour ton niveau" }, { "pre", "Pré-BiS 60" }, { "bis", "BiS 60 (raids)" }, { "pvp", "PvP 60" } }
+local MODES = { { "now", "Pour ton niveau" }, { "pre", "Pré-BiS 60" }, { "bis", "BiS 60 (raids)" }, { "pvp", "PvP 60" }, { "rep", "Réputations" } }
 local INTRO = {
     pre = "Le pré-BiS : les meilleures pièces de niveau 60 hors raid et hors PvP (donjons, quêtes, métiers, réputations).",
     bis = "Le BiS au niveau 60, raids compris (Onyxia, Sommet d'Hyjal, Barrow Deeps : ils ouvrent sur Forever le 9 décembre 2026, leurs pièces arrivent dans la liste au fil des données).",
@@ -681,7 +683,8 @@ local function MakeNext(parent)
 end
 
 -- ---------------------------------------------------------------- fill
-local pools = { rows = {}, heads = {}, next = {} }
+local pools = { rows = {}, heads = {}, next = {}, cards = {} }
+function Best.ShownMode() return win and win:IsShown() and mode or nil end
 local function Take(kind, maker, parent)
     local p = pools[kind]
     p.n = (p.n or 0) + 1
@@ -696,6 +699,7 @@ local function Fill()
     local lvl = LevelOf(mode)
     local spec = SpecName()
     win.specText = spec and string.format(L("Ta spé : %s"), spec) or nil
+    if mode == "rep" then return Best.FillReps() end
     local introBase = mode == "now" and string.format(L("Les meilleures pièces à ton niveau (%d), raids exclus."), lvl) or L(INTRO[mode])
     local list, pending = Best.Rows(lvl, 4, mode)
     local okN, naowh = pcall(Best.NaowhOverlay, list, mode, lvl)
@@ -810,6 +814,36 @@ local function Fill()
 end
 Best.Fill = Fill
 
+-- the "Réputations" tab (Writs/Reps.lua): one card per faction of your list, no filter
+function Best.FillReps()
+    local W = math.floor((win:GetWidth() or 760) - 2 * INSET - 8)
+    local child = win.list.child
+    child:SetWidth(W)
+    for _, p in pairs(pools) do
+        for i = 1, #p do p[i]:Hide() end
+        p.n = 0
+    end
+    for _, t in ipairs(win.segs or {}) do t:Hide() end
+    local R = WP.Reps
+    local y, nf, np, journal, gear = 0, 0, 0, false, false
+    if R and R.Fill then
+        local ok, a, b, c, d, e = pcall(R.Fill, child, W, function(kind, maker) return Take(kind, maker, child) end)
+        if ok then y, nf, np, journal, gear = a or 0, b or 0, c or 0, d, e
+        elseif geterrorhandler then geterrorhandler()(a) end
+    end
+    win.count:SetText(nf == 1 and L("1 réputation") or string.format(L("%d réputations"), nf))
+    win.countSub:SetText(np == 1 and L("dont 1 pièce de ta liste") or string.format(L("dont %d pièces de ta liste"), np))
+    win.empty:Set("star", L("Aucune réputation connue"), L("Les paliers et les objets à rendre viennent du Journal de donjons de Naowh : active-le pour les voir ici."))
+    win.introText = L("Les réputations utiles sur Forever : ce que chaque rang débloque, ton rang, et le plus rapide pour les monter. En tête, celles qui débloquent une pièce de ta liste (pré-BiS, BiS, PvP).") .. "\n"
+        .. (journal and L("Points de base, sans bonus de race. Sources : les données de Naowh lues en direct (paliers, objets à rendre, quêtes) et Wowhead WoW Forever pour les monstres.")
+            or L("Les paliers et les objets à rendre viennent du Journal de donjons de Naowh : active-le pour les voir ici."))
+    win.empty:SetShown(nf == 0)
+    win.pending:Hide()
+    win.listH = y
+    win.shown = nf
+    win.Layout()
+end
+
 local function Build()
     local w0 = (root.WinSize and root.WinSize("workspace")) or 900
     win = S.Window("WLHelperBest", w0, 640, L("Meilleur équipement"), nil,
@@ -837,6 +871,7 @@ local function Build()
         win.count:ClearAllPoints(); win.count:SetPoint("TOPLEFT", INSET, -y)
         win.filter:SetWidth(300); win.filter:ClearAllPoints(); win.filter:SetPoint("TOPRIGHT", -INSET, -(y - 2))
         if win.filter.Update then win.filter:Update() end
+        win.filter:SetShown(mode ~= "rep")
         y = y + S.F.title + 4
         win.countSub:ClearAllPoints(); win.countSub:SetPoint("TOPLEFT", INSET, -y)
         y = y + S.F.label + 10

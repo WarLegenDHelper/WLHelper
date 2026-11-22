@@ -28,6 +28,7 @@ Numéros fixes : `T-NN`. Le CHANGELOG cite le ticket quand il le ferme.
 | T-30 | Carte du donjon (bouton de la fenêtre des boss) | beta.72 | Quelle carte s'ouvre ? |
 | T-31 | Images des raids | beta.72 | Les 3 cartes de raid ont-elles une image ? |
 | T-94 | Guide PvP, fenêtre Champs de bataille : réputation, parties restantes, maîtres de guerre, bonus du calendrier | beta.166 | Le bonus de la semaine apparaît-il (titre de l'événement du calendrier) ? La réputation gagnée s'affiche-t-elle dans le chat après une partie ? Le maître d'Arathi de Thunder Bluff est-il bien en 28.5 20.9 ? |
+| T-95 | Guide des réputations : onglet « Réputations » de Meilleur équipement (/wlh rep), toutes les factions de ton camp, rangs, récompenses, façons de monter sourcées | beta.187 | Les cartes s'affichent-elles avec tes vrais rangs ? Les noms d'objets arrivent-ils ? Le clic met-il le GPS sur l'intendant ? |
 | T-19 | Guide d'un donjon déjà fini (« Me guider dans le donjon ») | beta.69 | Entrée puis boss par boss sur Zul'Farrak |
 
 ## À faire

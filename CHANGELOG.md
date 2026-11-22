@@ -6,6 +6,17 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.187] — 2026-11-22
+
+### Ajouté / Added
+- **Guide des réputations**, nouvel onglet « Réputations » de la fenêtre Meilleur équipement (`/wlh rep`, ou `/wlh bis rep`). Il liste toutes les réputations de ton camp : les villes, l'Aube d'argent, les Grumegueules, la Confrérie du thorium, le Cercle cénarien, les factions des champs de bataille et celles propres à Forever. Pour chacune :
+  - ce que chaque rang débloque (pièces, montures, consommables, recettes), avec une coche sur les rangs que tu as déjà ;
+  - ton rang, tes points et ce qu'il te manque ;
+  - le plus rapide pour la monter, avec le nombre de fois à faire : objets à rendre (20 Pierres du Fléau de serviteur pour l'Aube d'argent : +25 par rendu, et combien tu en as déjà), quêtes répétables, quêtes pas encore faites, monstres.
+
+  En tête, sous « Pour ton équipement », les réputations qui débloquent une pièce de ta liste (pré-BiS, BiS, PvP), et le rang marqué « pour ton équipement ». Un clic sur une carte met le GPS sur l'intendant. Les paliers, les objets à rendre et les quêtes viennent des données de Naowh, lues en direct. Les points par monstre viennent des pages Wowhead WoW Forever (Grumegueules, Aube d'argent, Cercle cénarien pour l'instant). Une façon de monter sans chiffre sourcé n'est pas affichée avec un chiffre. Les factions qui ne sont pas encore ouvertes sur Forever (Zandalar, Hydraxiens, Progéniture de Nozdormu) sont en bas, avec leurs récompenses seulement.
+  *Reputation guide: a new "Reputations" tab in the Best gear window (/wlh rep) with every faction of your side, what each standing unlocks, your standing, and the fastest sourced way to raise it; those that unlock a piece of your list come first.*
+
 ## [1.0.0-beta.186] — 2026-11-22
 
 ### Ajouté / Added
