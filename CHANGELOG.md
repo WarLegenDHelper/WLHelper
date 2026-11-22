@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.194] — 2026-11-22
+
+### Ajouté / Added
+- **`/wlh gearscan`** : relève dans ton jeu les objets des listes BiS de Naowh que WL Helper Gear ne connaît pas (sets de Forever, Mark of Fordring, certains bijoux et armes). Il garde leurs statistiques, leur emplacement, leur niveau et les lignes de leur infobulle (effets « Utiliser » et « Chance quand vous touchez »). Fais `/reload` ensuite pour enregistrer. Ça sert à compléter WL Helper Gear avec les vraies valeurs du jeu. Rien n'est envoyé.
+  *`/wlh gearscan` reads in your game the BiS items WL Helper Gear does not list (stats, slot, level, tooltip lines), saved after a /reload, to complete Gear with the game's own values.*
+
 ## [1.0.0-beta.193] — 2026-11-22
 
 ### Modifié / Changed

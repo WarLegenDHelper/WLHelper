@@ -827,6 +827,9 @@ SlashCmdList.WLDUNGEONTOOL = function(msg)
   elseif cmd == "share" then ns.ShareQuests()
   elseif cmd == "farm" or cmd == "stuff" or cmd == "gear" or cmd == "equipement" then
     if ns.GearPlanPrint then ns.GearPlanPrint() end
+  elseif cmd == "gearscan" or cmd == "scangear" then
+    -- the BiS items WL Helper Gear does not list, read in the game (Writs/GearScan.lua)
+    if WP and WP.GearScan then WP.GearScan.Run() end
   elseif cmd == "mem" or cmd == "memoire" or cmd == "memory" then
     -- each part of WL Helper and the memory it takes now (report: "the addon takes 110 MB")
     local en = ns.Writs and ns.Writs.English and ns.Writs.English()

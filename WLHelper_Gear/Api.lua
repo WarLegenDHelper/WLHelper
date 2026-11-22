@@ -413,6 +413,15 @@ function API.Options()
 end
 
 -- WL Helper change (v4): the items a quest gives, and their English names.
+-- WL Helper change (1.5.1): true when the item is in the list (Data.lua), false when not (the
+-- game's stats are read on its link instead), nil for a bad id. For /wlh gearscan.
+function API.Listed(id)
+    id = tonumber(id)
+    if not id then return nil end
+    E.Parse()
+    return ns.byId[id] ~= nil
+end
+
 function API.QuestRewards(questID)
     local list = E.QuestRewards(questID)
     if not list then return nil end
