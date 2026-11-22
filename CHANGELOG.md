@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.201] — 2026-11-22
+
+### Ajouté / Added
+- **Voleurs : le Talisman of Kazdor** (Zul'Farrak, en solo, propre à Forever), avec toute la suite de Fahrad : Fool Me Twice, The Talisman of Kazdor, Best Laid Plans, One Last Drop et Biding Our Time. La dernière rapporte le Filcher's Cowl et la Rune of the Coterie. La quête du donjon explique la marche à suivre : les deux Vile Concoction dans le chaudron d'Antu'sul, la tombe qui brille, le Hollow Emblem sur la corniche, puis Nekrum assommé. La suite n'est proposée qu'après The Eye of Bhossca, la chaîne de voleur d'avant. Tout a été lu sur Wowhead WoW Forever.
+  *Rogues: The Talisman of Kazdor (Zul'Farrak, solo) and Fahrad's whole chain, offered once The Eye of Bhossca is done, with the walkthrough; read on Wowhead WoW Forever.*
+
 ## [1.0.0-beta.200] — 2026-11-22
 
 ### Ajouté / Added

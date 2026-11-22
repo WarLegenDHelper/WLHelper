@@ -1180,3 +1180,44 @@ for target, b in pairs(BREADCRUMBS) do
     q.crumb = b[1]
   end
 end
+
+-- =====================================================================
+-- Voleurs : la suite de Fahrad et le Talisman of Kazdor (Zul'Farrak, en solo), propre à Forever.
+-- Lu sur Wowhead WoW Forever (quest=80526, 80411, 80453, 80454, 80455, 2026-11-22) : départs,
+-- arrivées, coordonnées (Fahrad 84.4, 80.2 et Zan Shivsprocket 86, 80 à Ravenholdt ; la boîte aux
+-- lettres de Caius 47.1, 71.1 près de Pyrewood), niveaux, récompenses ; la marche à suivre dans
+-- Zul'Farrak d'après le commentaire le plus noté. Offerte seulement après The Eye of Bhossca (78676
+-- ou 78699), la chaîne de voleur d'avant (ns.Useful, q.after).
+-- =====================================================================
+do
+  local FAHRAD = { m = 1416, x = 84.4, y = 80.2, n = "Fahrad" }
+  local ZAN = { m = 1416, x = 86, y = 80, n = "Zan Shivsprocket" }
+  local DROP = { m = 1421, x = 47.1, y = 71.1, n = "Dead Drop" }
+  local RAV = "Fahrad, Ravenholdt Manor, Alterac Mountains (84.4, 80.2)"
+  local function Q(id, t)
+    if ns.Q[id] then return end
+    t.l, t.r, t.fa, t.c, t.d, t.ds = t.l or 50, t.r or 45, "Both", "ROGUE", "ZulFarrak", { "ZulFarrak" }
+    t.after = { 78676, 78699 }
+    ns.Q[id] = t
+    local zf = ns.D.ZulFarrak
+    if zf and zf.q then table.insert(zf.q, id) end
+  end
+  Q(80526, { n = "Fool Me Twice", role = "pre", s = FAHRAD, f = FAHRAD, st = RAV, ft = RAV,
+    oe = "Speak to Fahrad when you're ready to hear his plan.",
+    ne = "Rogues only, after The Horn of Xelthos and The Eye of Bhossca: at level 45 a letter from Fahrad (in a capital city) sends you back to Ravenholdt Manor." })
+  Q(80411, { n = "The Talisman of Kazdor", role = "main", p = { 80526 }, s = FAHRAD, f = FAHRAD, st = RAV, ft = RAV,
+    o = { { k = "item", n = "Talisman of Kazdor", c = 1, ins = true, unk = false } },
+    oe = "Find The Talisman of Kazdor inside of Zul'Farrak. Then, bring it to Fahrad at Ravenholdt Manor. You must complete the job alone.",
+    ne = "Alone. In the huts on the right before the long hallway, open the Clay Vessel for a Vile Concoction and throw it in the cauldron in front of Antu'sul; loot the bag by the cage. Take a second Vile Concoction from a hut of the pyramid courtyard, throw it in the same cauldron, loot the bag and wear the trinket. Click the glowing grave for the Blood Magic Essence. On the ledge above the pyramid huts (jump on it, follow the wall), the chest holds the Hollow Emblem: combine the two. Sap Nekrum Gutchewer on the pyramid and loot the chest.",
+    xp = 4700 })
+  Q(80453, { n = "Best Laid Plans", role = "main", p = { 80411 }, s = FAHRAD, f = ZAN, st = RAV, ft = "Zan Shivsprocket, basement of Ravenholdt Manor (86, 80)",
+    oe = "Bring the Talisman of Kazdor to Zan Shivsprocket in the basement of Ravenholdt Manor.", xp = 470 })
+  Q(80454, { n = "One Last Drop", role = "main", p = { 80453 }, s = ZAN, f = DROP, st = "Zan Shivsprocket, basement of Ravenholdt Manor (86, 80)",
+    ft = "Caius' dead drop, the cabin near Pyrewood Village, Silverpine Forest (47.1, 71.1)",
+    oe = "Take the Modified Talisman to Caius' dead drop near Pyrewood Village.", xp = 4700 })
+  Q(80455, { n = "Biding Our Time", role = "main", p = { 80454 }, s = DROP, f = FAHRAD,
+    st = "Caius' dead drop, near Pyrewood Village, Silverpine Forest (47.1, 71.1)", ft = RAV,
+    oe = "Report back to Fahrad at Ravenholdt Manor.", ri = { "Filcher's Cowl", "Rune of the Coterie" }, xp = 11800 })
+  ns.TR[ns.Q[80526].ne] = "Voleurs seulement, après The Horn of Xelthos et The Eye of Bhossca : au niveau 45, une lettre de Fahrad (dans une capitale) te renvoie au manoir Ravenholdt."
+  ns.TR[ns.Q[80411].ne] = "Seul. Dans les huttes à droite avant le long couloir, ouvre le Clay Vessel pour une Vile Concoction et jette-la dans le chaudron devant Antu'sul ; ramasse le sac près de la cage. Prends une deuxième Vile Concoction dans une hutte de la cour de la pyramide, jette-la dans le même chaudron, ramasse le sac et porte le bijou. Clique sur la tombe qui brille pour la Blood Magic Essence. Sur la corniche au-dessus des huttes de la pyramide (saute dessus, longe le mur), le coffre contient le Hollow Emblem : combine les deux. Assomme Nekrum Gutchewer sur la pyramide et pille le coffre."
+end
