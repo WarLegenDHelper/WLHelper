@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.204", date = "2026-11-22", items = {
+    { s = "chg", fr = { "La chaîne du set de donjon 2 sort des trajets de donjon", "An Earnest Proposition ouvre une suite de classe d'une vingtaine de quêtes (Silithus, Stratholme, Blackrock Depths, puis l'amulette de Valthalak dans l'un des quatre donjons). Ce n'est pas une quête de donjon. Même commencée, elle ne remplit plus le trajet de LBRS ou d'un autre donjon : l'aperçu la montre verrouillée comme chaîne longue. Coche-la pour la suivre. Quand seule l'étape du donjon reste à faire, elle revient d'elle-même." }, en = { "The Dungeon Set 2 class chain stays out of dungeon routes, even started, unless ticked by hand or down to the dungeon's own step.", "" } },
+  } },
   { v = "1.0.0-beta.203", date = "2026-11-22", items = {
     { s = "add", fr = { "Rapport automatique des quêtes renumérotées", "Quand le guide reconnaît par son titre une quête du journal dont le numéro nous est inconnu, il envoie tout seul un rapport discret à l'équipe WL Helper, une fois par numéro, pour qu'on l'ajoute aux données. An Earnest Proposition 84157 (vue chez un mage Horde) est déjà ajoutée." }, en = { "A renumbered quest recognised by its title is reported once, quietly, so its number goes into the data; An Earnest Proposition 84157 added.", "" } },
   } },
@@ -51,9 +54,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.190", date = "2026-11-22", items = {
     { s = "fix", fr = { "Les rapports arrivent enfin chez l'auteur de WL Helper", "Les rapports (« Nous écrire », erreurs automatiques, quêtes introuvables, mesures de mémoire) partaient vers le chef de guilde, qui ne les recevait pas, et n'arrivaient donc nulle part. Ils vont maintenant au personnage de l'auteur de l'addon, dès qu'il est connecté en même temps que le joueur. En attendant, ils restent en attente chez le joueur. Les rapports déjà en attente partiront tout seuls." }, en = { "Reports now go to WL Helper's author (they were addressed to the guild master and never arrived).", "" } },
-  } },
-  { v = "1.0.0-beta.189", date = "2026-11-22", items = {
-    { s = "add", fr = { "Mesures de mémoire envoyées automatiquement", "Une fois par jour et par personnage, après 20 minutes de jeu, WL Helper envoie en silence un rapport à l'équipe WL Helper avec la mémoire de chacune de ses parties (le guide, WL Helper Gear, la navigation et ses cartes de déplacement), le total de tous les addons chargés, les 5 addons les plus lourds et ses opérations les plus lentes. Il passe par le même chemin que les rapports « Nous écrire » : la guilde seulement. Pour le couper : /wlh rapports memoire off." }, en = { "Once a day per character, a silent memory report goes to the WL Helper team through the guild (/wlh rapports memoire off stops it).", "" } },
-    { s = "fix", fr = { "Notes de la beta.188", "La ligne « Champs de bataille, classement PvP de la guilde » n'apparaît plus qu'une fois, dans le changelog comme dans la fenêtre des nouveautés." }, en = { "The beta.188 notes no longer list the guild PvP ranking twice.", "" } },
   } },
 }

@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.204] — 2026-11-22
+
+### Modifié / Changed
+- **La chaîne du set de donjon 2 sort des trajets de donjon** : An Earnest Proposition ouvre une suite de classe d'une vingtaine de quêtes (Silithus, Stratholme, Blackrock Depths, puis l'amulette de Valthalak dans l'un des quatre donjons). Ce n'est pas une quête de donjon. Même commencée, elle ne remplit plus le trajet de LBRS ou d'un autre donjon : l'aperçu la montre verrouillée comme chaîne longue. Coche-la pour la suivre. Quand seule l'étape du donjon reste à faire, elle revient d'elle-même.
+  *The Dungeon Set 2 class chain stays out of dungeon routes, even started, unless ticked by hand or down to the dungeon's own step.*
+
 ## [1.0.0-beta.203] — 2026-11-22
 
 ### Ajouté / Added

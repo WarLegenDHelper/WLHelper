@@ -396,6 +396,14 @@ end
 -- What is left of a main quest's chain for this character.
 -- -> { chain, left = { pid... }, first, need (r of the first left), top (highest l / r left),
 --      work, other (another dungeon on the way), started, bad (a link this character cannot do) }
+-- The Dungeon Set 2 chain (An Earnest Proposition, one per class, then some 20 quests through
+-- Silithus, Stratholme, Blackrock Depths and one of four dungeons for Valthalak's amulet) is a class
+-- chain, not a dungeon's: even started, it stays out of a dungeon's route until its own quest there
+-- is next (report: "a very long class quest, not really a dungeon quest"); ticked by hand, it goes in.
+-- Forever's own numbers for it are recognised by title (Curated.lua).
+local DS2_START = {}
+for id = 8905, 8920 do DS2_START[id] = true end
+ns.DS2_START = DS2_START
 function ns.ChainPlan(qid, cls, dkey)
   local q = ns.Q[qid]
   if not q then return nil end
@@ -408,7 +416,9 @@ function ns.ChainPlan(qid, cls, dkey)
   local onQ = CQL and CQL.IsOnQuest
   if log[qid] or (onQ and onQ(qid)) then plan.started = true end
   if not ns.RepOK(q) then plan.rep = qid end
+  if DS2_START[qid] then plan.ds2 = true end
   for _, pid in ipairs(chain) do
+    if DS2_START[pid] then plan.ds2 = true end
     if not ns.IsDone(pid) then
       local pq = ns.Q[pid] or {}
       plan.left[#plan.left + 1] = pid
@@ -429,6 +439,7 @@ end
 local function ChainOK(plan, lvl)
   if not plan then return true end
   if plan.bad then return false, "bad" end
+  if plan.ds2 and #plan.left > 0 then return false, "long" end
   if plan.started then return true end
   if plan.rep then return false, "rep" end
   if #plan.left == 0 then return true end
