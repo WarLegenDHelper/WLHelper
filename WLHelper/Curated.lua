@@ -1151,6 +1151,16 @@ local BREADCRUMBS = {
                    "Facultatif : l'apothicaire Zinge, à Fossoyeuse, donne « Vivian Lagrave and the Darkstone Tablet » (niveau 60), qui mène ici." },
   [7489] = { 7492, "Optional: \"Camp Mojache\" (Harbinger Balthazad in Undercity, Warcaller Gorlach in Orgrimmar or Bluff Runner Windstrider in Thunder Bluff) leads here.",
                    "Facultatif : « Camp Mojache » (Harbinger Balthazad à Fossoyeuse, Warcaller Gorlach à Orgrimmar ou Bluff Runner Windstrider aux Pitons-du-Tonnerre) mène ici." },
+  -- class chains that start at the class trainer (Wowhead: a 4-quest series, not an optional
+  -- breadcrumb as ForeverDungeonJournal says)
+  [8425] = { 8417, "\"A Troubled Spirit\" from a warrior trainer starts this chain (Fallen Hero of the Horde, Swamp of Sorrows): Warrior Kinship, War on the Shadowsworn, then this one.",
+                   "« A Troubled Spirit », chez un maître des guerriers, ouvre cette suite (Fallen Hero of the Horde, marais des Chagrins) : Warrior Kinship, War on the Shadowsworn, puis celle-ci." },
+  [9053] = { 9063, "\"Torwa Pathfinder\" from a druid trainer starts this chain (Torwa, Un'Goro Crater): Bloodpetal Poison, Toxic Test, then this one.",
+                   "« Torwa Pathfinder », chez un maître des druides, ouvre cette suite (Torwa, cratère d'Un'Goro) : Bloodpetal Poison, Toxic Test, puis celle-ci." },
+  -- Ramstein: Wowhead says it needs "Duskwing, Oh How I Hate Thee..." (ForeverDungeonJournal links it
+  -- to The Champion of the Banshee Queen, which only sends you to Nathanos)
+  [6163] = { 5961, "Nathanos Blightcaller gives Ramstein once \"Duskwing, Oh How I Hate Thee...\" is done. Optional: \"The Champion of the Banshee Queen\" from Lady Sylvanas in Undercity sends you to him (Marris Stead, Eastern Plaguelands).",
+                   "Nathanos Blightcaller donne Ramstein une fois « Duskwing, Oh How I Hate Thee... » faite. Facultatif : « The Champion of the Banshee Queen », chez Lady Sylvanas à Fossoyeuse, t'envoie à lui (ferme des Marris, Maleterres de l'Est)." },
   [8236] = { 8233, "\"A Simple Request\" from a rogue trainer starts this chain at Ravenholdt Manor (Sealed Azure Bag, Encoded Fragments, then this one).",
                    "« A Simple Request », chez un maître des voleurs, ouvre cette suite au manoir Ravenholdt (Sealed Azure Bag, Encoded Fragments, puis celle-ci)." },
 }

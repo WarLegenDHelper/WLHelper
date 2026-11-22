@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.200", date = "2026-11-22", items = {
+    { s = "add", fr = { "Le début des suites de classe et Ramstein", "The Azure Key (voleur), Voodoo Feathers (guerrier) et A Better Ingredient (druide) disent maintenant où leur suite commence. C'est chez ton maître de classe : A Simple Request, A Troubled Spirit, Torwa Pathfinder. Ramstein dit qu'il faut d'abord « Duskwing, Oh How I Hate Thee... ». Tout a été vérifié sur Wowhead WoW Forever, qui corrige ForeverDungeonJournal sur deux points : les quêtes de classe ne sont pas facultatives, et Ramstein ne suit pas The Champion of the Banshee Queen." }, en = { "The rogue, warrior and druid chains say where they start (the class trainer), and Ramstein says it needs Duskwing first; checked on Wowhead WoW Forever.", "" } },
+  } },
   { v = "1.0.0-beta.199", date = "2026-11-22", items = {
     { s = "add", fr = { "Les quêtes d'introduction", "Comparé à Naowh Dungeon Journal et ForeverDungeonJournal, il nous manquait des quêtes Horde qui mènent à une quête de donjon. Chacune a été vérifiée sur Wowhead WoW Forever (qui la donne, où elle mène, à quel niveau). Elles sont ajoutées comme une note sur la quête qu'elles annoncent, pas comme une étape (elles sont facultatives et allongeraient le trajet) : Tran'rek (Scarab Shells), Tabetha's Task pour les mages (Tiara of the Deep), Vivian Lagrave (Lost Thunderbrew Recipe), Yuka Screwspigot (Ribbly Screwspigot), Vivian Lagrave and the Darkstone Tablet (The Darkstone Tablet), Camp Mojache (Lethtendris's Web), et le début de la suite de voleur A Simple Request (The Azure Key)." }, en = { "Horde breadcrumb quests found in Naowh's and ForeverDungeonJournal's lists, each checked on Wowhead WoW Forever, now appear as a note on the quest they lead to.", "" } },
   } },
@@ -59,12 +62,5 @@ ns.WHATSNEW = {
   { v = "1.0.0-beta.186", date = "2026-11-22", items = {
     { s = "add", fr = { "Guide de quête « Collier : Marque de Fordring »", "La chaîne de Tirion Fordring dans les Maleterres, 11 quêtes. Elle part de ses trois premières quêtes (Chiens-démons, Ciel couleur de sang, Larve putride), passe par Stratholme pour le tableau « De l'amour et de la famille », et finit par « En rêves » à Hearthglen. Il faut un groupe pour la fin. Sa récompense, la Marque de Fordring, est le collier que les simulations de Naowh classent premier pour 9 spés. Le Symbole de l'honneur perdu a maintenant sa position (Maleterres de l'Est)." }, en = { "Quest guide", "The Mark of Fordring chain (Tirion Fordring, Plaguelands), a neck ranked first for many specs." } },
     { s = "add", fr = { "« Cette quête n'existe pas sur Forever »", ", dans le menu de la vue moderne (groupe Étape) : la quête sort tout de suite de ta route, et un rapport avec son numéro part à l'équipe WL Helper par la guilde. Ça permet de nettoyer les guides à partir de ce que les joueurs trouvent en jeu." }, en = { "Modern view menu", "\"This quest is not on Forever\" takes it out of your route and reports it." } },
-  } },
-  { v = "1.0.0-beta.185", date = "2026-11-20", items = {
-    { s = "chg", fr = { "Le guide n'a plus qu'une vue : la vue moderne.", "La grande fenêtre du guide ne s'ouvre plus, et tout ce qu'elle faisait passe par la vue moderne :" }, en = { "", "" } },
-    { s = "chg", fr = { "", "la check-list ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "les actions (recommencer la route, flèche GPS, raccourcis) ;" }, en = { "", "" } },
-    { s = "chg", fr = { "", "la vue d'ensemble, les boss, la carte, le partage. /wlh guide, le bouton de la minicarte, l'accueil et le hub ouvrent la vue moderne, ou le choix de guide quand aucun guide n'est en cours. Le réglage « Vue moderne par défaut » disparaît." }, en = { "The guide has one view now", "The modern view. The old window never opens." } },
-    { s = "fix", fr = { "WL Helper ne détourne plus les repères de Zygor", "Quand un de ces addons de guide est chargé, notre GPS ne suit plus les repères posés sur la carte, et WL Helper ne prend plus la commande /way. Tu peux remettre le suivi des repères dans les réglages du GPS (« Suivre les repères de la carte »)." }, en = { "WL Helper no longer takes over Zygor's or RestedXP's map pins and /way.", "" } },
   } },
 }

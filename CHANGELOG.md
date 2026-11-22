@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.200] — 2026-11-22
+
+### Ajouté / Added
+- **Le début des suites de classe et Ramstein** : The Azure Key (voleur), Voodoo Feathers (guerrier) et A Better Ingredient (druide) disent maintenant où leur suite commence. C'est chez ton maître de classe : A Simple Request, A Troubled Spirit, Torwa Pathfinder. Ramstein dit qu'il faut d'abord « Duskwing, Oh How I Hate Thee... ». Tout a été vérifié sur Wowhead WoW Forever, qui corrige ForeverDungeonJournal sur deux points : les quêtes de classe ne sont pas facultatives, et Ramstein ne suit pas The Champion of the Banshee Queen.
+  *The rogue, warrior and druid chains say where they start (the class trainer), and Ramstein says it needs Duskwing first; checked on Wowhead WoW Forever.*
+
 ## [1.0.0-beta.199] — 2026-11-22
 
 ### Ajouté / Added
