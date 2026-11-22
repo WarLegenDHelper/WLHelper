@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.186", date = "2026-11-22", items = {
+    { s = "add", fr = { "Guide de quête « Collier : Marque de Fordring »", "La chaîne de Tirion Fordring dans les Maleterres, 11 quêtes. Elle part de ses trois premières quêtes (Chiens-démons, Ciel couleur de sang, Larve putride), passe par Stratholme pour le tableau « De l'amour et de la famille », et finit par « En rêves » à Hearthglen. Il faut un groupe pour la fin. Sa récompense, la Marque de Fordring, est le collier que les simulations de Naowh classent premier pour 9 spés. Le Symbole de l'honneur perdu a maintenant sa position (Maleterres de l'Est)." }, en = { "Quest guide", "The Mark of Fordring chain (Tirion Fordring, Plaguelands), a neck ranked first for many specs." } },
+    { s = "add", fr = { "« Cette quête n'existe pas sur Forever »", ", dans le menu de la vue moderne (groupe Étape) : la quête sort tout de suite de ta route, et un rapport avec son numéro part à l'équipe WL Helper par la guilde. Ça permet de nettoyer les guides à partir de ce que les joueurs trouvent en jeu." }, en = { "Modern view menu", "\"This quest is not on Forever\" takes it out of your route and reports it." } },
+  } },
   { v = "1.0.0-beta.185", date = "2026-11-20", items = {
     { s = "chg", fr = { "Le guide n'a plus qu'une vue : la vue moderne.", "La grande fenêtre du guide ne s'ouvre plus, et tout ce qu'elle faisait passe par la vue moderne :" }, en = { "", "" } },
     { s = "chg", fr = { "", "la check-list ;" }, en = { "", "" } },
@@ -79,12 +83,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "", "la ligne « partie 1 sur 1 de la suite » disparaît : elle ne disait rien." }, en = { "Clearer step texts", "The NPC stands out, \"normal difficulty\", no \"part 1 of 1\"." } },
     { s = "fix", fr = { "Vue moderne, étape passée", "Quand tu regardes une autre étape que l'étape en cours, un bandeau orange « ÉTAPE PASSÉE » ou « ÉTAPE À VENIR » le dit. Une action déjà faite y est marquée « Déjà fait : ». Une étape regardée puis laissée de côté revient toute seule à l'étape en cours au bout de 2 minutes. Avant, on pouvait suivre une étape passée sans s'en rendre compte, et aller reprendre une quête déjà dans son journal." }, en = { "Modern view", "A past or coming step is clearly marked, done actions say so, and it goes back to the current step after 2 minutes." } },
     { s = "fix", fr = { "Héritage Sombrefer (BRD)", "Le guide dit enfin que Franclorn Forgewright est un fantôme. Il faut être mort pour le voir et lui parler, dans la salle du Mont Rochenoire sur le chemin de BRD et du Cœur du Magma." }, en = { "Dark Iron Legacy", "Franclorn is a ghost, you must be dead to talk to him." } },
-  } },
-  { v = "1.0.0-beta.171", date = "2026-11-19", items = {
-    { s = "chg", fr = { "Taille du guide à part", "La taille des fenêtres ne rapetisse plus le guide. Le guide, sa vue moderne et le panneau des boss ont leur propre réglage, « Taille du guide (%) », de 70 à 150. Ça se règle aussi avec /wlh taille guide 110." }, en = { "The guide has its own size; the window size no longer shrinks it.", "" } },
-    { s = "chg", fr = { "Tailles, plus de curseur", "On tape le nombre (60 à 150) puis Entrée, ou on clique sur - et +. Le curseur faisait changer la fenêtre de taille sous la souris, et la valeur partait dans tous les sens." }, en = { "Sizes are typed or stepped with - and +, no more slider.", "" } },
-    { s = "chg", fr = { "Vue moderne, comme RestedXP", "Un clic gauche sur une ligne passe à l'étape suivante, un clic droit revient à la précédente. Maj-clic marque toujours l'étape comme faite." }, en = { "Modern view", "Left click next step, right click previous step." } },
-    { s = "chg", fr = { "Choix de guide, plus de case minuscule", "Un vrai bouton « + Ajouter » en haut à gauche de chaque carte, qui devient « Ajouté » quand le guide est dans la route." }, en = { "Guide picker", "A \"+ Add\" button instead of the tiny box." } },
-    { s = "fix", fr = { "Chaîne d'Onyxia (Horde)", "« Blood and Thunder » explique comment obtenir « Ordre du chef de guerre ». Il faut accepter la quête, reparler à Goretooth et répondre à toutes ses questions. Il donne alors l'objet « Warlord Goretooth's Command » : on clique dessus dans les sacs pour démarrer la quête. Source : Wowhead Forever, commentaires de joueurs." }, en = { "Onyxia chain", "How to get Warlord's Command (answer Goretooth, then use his Command item)." } },
   } },
 }

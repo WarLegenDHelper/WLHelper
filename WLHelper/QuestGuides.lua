@@ -62,7 +62,32 @@ ns.Q[98477]={n="Unstable Magic",l=60,r=48,fa="Horde",d="QG_Attractor",role="main
 ns.Q[96603]={n="Unstable Magic",l=60,r=48,fa="Alliance",d="QG_Attractor",role="main",noin=true,s={m=1416,x=14.2,y=60.0,n="Archmage Celindra"},st="Archmage Celindra",f={m=1416,x=14.2,y=60,n="Archmage Celindra"},ft="Archmage Celindra",req={{"Mote of Unstable Magic",10,MOTES}},oe="Bring 10 Motes of Unstable Magic to Archmage Celindra.",ri={"Elemental Attractor"},xp=8300}
 
 -- ---------------------------------------------------------------- notes (English, French)
+-- ---------------------------------------------------------------- Mark of Fordring (neck, BiS for many specs)
+-- Tirion Fordring's chain in the Plaguelands (Naowh's BiS: Mark of Fordring, rank 1 for 9 specs):
+-- Demon Dogs, Blood Tinged Skies, Carrion Grubbage -> Redemption -> ... -> In Dreams. Givers,
+-- turn-ins and objectives from NaowhForever DiscoveryData; the Symbol of Lost Honor's spot from
+-- LibForeverData's spawns; French names from the client (Polestar_frFR). The quests our data
+-- already has (the Stratholme: Living chain, up to Of Love and Family) are kept as they are: only
+-- Find Myranda, Scarlet Subterfuge and In Dreams are new.
+if not ns.Q[5542] then ns.Q[5542]={nf="Chiens-démons",n="Demon Dogs",l=56,r=52,fa="Both",d="QG_Fordring",role="pre",s={m=1423,x=5.0,y=35.5,n="Tirion Fordring"},st="Tirion Fordring",f={m=1423,x=7.4,y=43.4,n="Tirion Fordring"},ft="Tirion Fordring",o={{k="kill",n="Plaguehound Runt",c=20,ins=false,unk=false,ns=false,w={m=1423,x=17.1,y=61.8,n="Plaguehound Runt"},t={"Plaguehound Runt"}},{k="kill",n="Plaguehound",c=5,ins=false,unk=false,ns=false,w={m=1423,x=57.7,y=55.3,n="Plaguehound"},t={"Plaguehound"}},{k="kill",n="Frenzied Plaguehound",c=5,ins=false,unk=false,ns=false,w={m=1423,x=41.4,y=18.1,n="Frenzied Plaguehound"},t={"Frenzied Plaguehound"}}},xp=5800} end
+if not ns.Q[5543] then ns.Q[5543]={nf="Ciel couleur de sang",n="Blood Tinged Skies",l=56,r=52,fa="Both",d="QG_Fordring",role="pre",s={m=1423,x=5.0,y=35.5,n="Tirion Fordring"},st="Tirion Fordring",f={m=1423,x=7.4,y=43.4,n="Tirion Fordring"},ft="Tirion Fordring",o={{k="kill",n="Plaguebat",c=30,ins=false,unk=false,ns=false,w={m=1423,x=31.8,y=61.4,n="Plaguebat"},t={"Plaguebat"}}},xp=5800} end
+if not ns.Q[5544] then ns.Q[5544]={nf="Larve putride",n="Carrion Grubbage",l=56,r=52,fa="Both",d="QG_Fordring",role="pre",s={m=1423,x=5.0,y=35.5,n="Tirion Fordring"},st="Tirion Fordring",f={m=1423,x=7.4,y=43.4,n="Tirion Fordring"},ft="Tirion Fordring",o={{k="item",n="Slab of Carrion Worm Meat",c=15,ins=false,unk=false,ns=false,w={m=1423,x=30.2,y=58,n="Carrion Grub"},t={"Carrion Grub","Carrion Devourer"},src={{"Carrion Grub",100},{"Carrion Devourer",100}}}},xp=5800} end
+if not ns.Q[5742] then ns.Q[5742]={nf="Rédemption",n="Redemption",l=56,r=52,fa="Both",d="QG_Fordring",role="pre",p={5542,5543,5544},s={m=1423,x=5.0,y=35.5,n="Tirion Fordring"},st="Tirion Fordring",f={m=1423,x=7.4,y=43.4,n="Tirion Fordring"},ft="Tirion Fordring",o={{k="event",n="Tirion Fordring",c=1,ins=false,unk=false,ns=false,w={m=1423,x=5.1,y=35.4,n="Tirion Fordring"},t={"Tirion Fordring"}}},xp=580} end
+if not ns.Q[5781] then ns.Q[5781]={nf="Aux mémoires perdues",n="Of Forgotten Memories",l=57,r=52,fa="Both",d="QG_Fordring",role="pre",p={5742},s={m=1423,x=5.0,y=35.5,n="Tirion Fordring"},st="Tirion Fordring",f={m=1423,x=7.4,y=43.4,n="Tirion Fordring"},ft="Tirion Fordring",o={{k="item",n="Taelan's Hammer",c=1,ins=false,unk=false,ns=false,w={m=1423,x=23.4,y=73.5,n="Mercutio Filthgorger"},t={"Mercutio Filthgorger"},src={{"Mercutio Filthgorger",100}}}},xp=6000} end
+if not ns.Q[5845] then ns.Q[5845]={nf="De l'honneur perdu",n="Of Lost Honor",l=58,r=52,fa="Both",d="QG_Fordring",role="pre",p={5781},s={m=1423,x=5.0,y=35.5,n="Tirion Fordring"},st="Tirion Fordring",f={m=1423,x=7.4,y=43.4,n="Tirion Fordring"},ft="Tirion Fordring",o={{k="item",n="Symbol of Lost Honor",c=1,ins=false,unk=false,ns=false,w={m=1423,x=62.5,y=26.8,n="Symbol of Lost Honor"}}},xp=6200} end
+if not ns.Q[5846] then ns.Q[5846]={nf="L'amour et la famille",n="Of Love and Family",l=58,r=52,fa="Both",d="QG_Fordring",role="pre",p={5845},s={m=1423,x=5.0,y=35.5,n="Tirion Fordring"},st="Tirion Fordring",f={m=1422,x=65.4,y=75.4,n="Artist Renfray"},ft="Artist Renfray",xp=6200} end
+if not ns.Q[5848] then ns.Q[5848]={nf="De l'amour et de la famille",n="Of Love and Family",l=60,r=52,fa="Both",d="QG_Fordring",role="pre",p={5846},s={m=1422,x=65.8,y=75.4,n="Artist Renfray"},st="Artist Renfray",f={m=1423,x=7.4,y=43.4,n="Tirion Fordring"},ft="Tirion Fordring",o={{k="item",n="Of Love and Family",c=1,ins=false,unk=false,ns=true}},xp=6600} end
+if not ns.Q[5861] then ns.Q[5861]={nf="Trouver Myranda",n="Find Myranda",l=60,r=52,fa="Both",d="QG_Fordring",role="pre",p={5848},s={m=1423,x=5.0,y=35.5,n="Tirion Fordring"},st="Tirion Fordring",f={m=1422,x=50.8,y=77.8,n="Myranda the Hag"},ft="Myranda the Hag",xp=4950} end
+if not ns.Q[5862] then ns.Q[5862]={nf="Le subterfuge écarlate",n="Scarlet Subterfuge",l=60,r=52,fa="Both",d="QG_Fordring",role="pre",p={5861},s={m=1422,x=50.8,y=77.8,n="Myranda the Hag"},st="Myranda the Hag",f={m=1422,x=42,y=14.8,n="Highlord Taelan Fordring"},ft="Highlord Taelan Fordring",xp=6600} end
+if not ns.Q[5944] then ns.Q[5944]={nf="En rêves",n="In Dreams",l=60,r=52,fa="Both",d="QG_Fordring",role="main",noin=true,p={5862},s={m=1422,x=42.0,y=14.8,n="Highlord Taelan Fordring"},st="Highlord Taelan Fordring",f={m=1422,x=53.8,y=24.4,n="Lord Tirion Fordring"},ft="Lord Tirion Fordring",ri={"Mark of Fordring"},xp=9950} end
+
 local NOTES = {
+  [5542] = { "Start: Tirion Fordring, by his house at the western edge of the Eastern Plaguelands. Take his three quests together (Demon Dogs, Blood Tinged Skies, Carrion Grubbage).",
+             "Départ : Tirion Fordring, près de sa maison à l'ouest des Maleterres de l'Est. Prends ses trois quêtes ensemble (Chiens-démons, Ciel couleur de sang, Larve putride)." },
+  [5845] = { "The Symbol of Lost Honor is an object in the Eastern Plaguelands.",
+             "Le Symbole de l'honneur perdu est un objet dans les Maleterres de l'Est." },
+  [5944] = { "The last step happens in Hearthglen (Western Plaguelands), among Scarlet elites: bring a group. Its reward is the Mark of Fordring, a neck many specs rank first.",
+             "La dernière étape se passe à Hearthglen (Maleterres de l'Ouest), au milieu d'élites écarlates : viens en groupe. Sa récompense est la Marque de Fordring, un collier que beaucoup de spés classent premier." },
   [2784] = { "Start of the Horde side: the Fallen Hero of the Horde stands in the Swamp of Sorrows, by the road to the Blasted Lands. Alliance players start with Petty Squabbles in the Blasted Lands.",
              "Départ côté Horde : le Héros déchu de la Horde est dans le marais des Chagrins, au bord de la route des Terres foudroyées. L'Alliance commence par Querelles mesquines dans les Terres foudroyées." },
   [2681] = { "The servants are spread over the Blasted Lands.",
@@ -90,6 +115,14 @@ local NOTES = {
   [93269] = { "Take the mail back up to Sebelia: the Hyjal Postal Satchel (18 slots) is the reward.",
               "Remonte le courrier à Sebelia : la Sacoche de la poste d’Hyjal (18 places) est la récompense." },
 }
+-- the Symbol of Lost Honor's spot (LibForeverData spawn), on our existing quest when it has none
+do
+  local q = ns.Q[5845]
+  if q and not q.o then
+    q.o = { { k = "item", n = "Symbol of Lost Honor", c = 1, ins = false, unk = false, ns = false,
+      w = { m = 1423, x = 62.5, y = 26.8, n = "Symbol of Lost Honor" } } }
+  end
+end
 for id, t in pairs(NOTES) do
   local q = ns.Q[id]
   if q then q.ne = t[1]; ns.TR[t[1]] = t[2] end
@@ -117,6 +150,11 @@ local CARDS = {
     icon = "Interface\\Icons\\INV_Elemental_Primal_Mana", q = { 98477, 96603 },
     ed = "Unstable Magic, the Earthen Ring quest that gives the Elemental Attractor: with its buff on, elite spellcasters drop Motes of Unstable Magic. Ten of them complete the quest.",
     edf = "Unstable Magic, la quête du Cercle terrestre qui donne l'Attracteur élémentaire : avec son buff, les lanceurs de sorts élites lâchent des granules de magie instable. Il en faut dix." },
+  { key = "QG_Fordring", n = "Neck: Mark of Fordring", nf = "Collier : Marque de Fordring",
+    lvl = { 56, 60 }, loc = "Eastern and Western Plaguelands, Stratholme", locf = "Maleterres de l'Est et de l'Ouest, Stratholme",
+    icon = "Interface\\Icons\\INV_Jewelry_Talisman_07", q = { 5944 },
+    ed = "Tirion Fordring's chain in the Plaguelands (11 quests, Stratholme on the way, a group for the end). Its last quest, In Dreams, rewards the Mark of Fordring: a neck Naowh's simulations rank first for many specs.",
+    edf = "La chaîne de Tirion Fordring dans les Maleterres (11 quêtes, Stratholme en chemin, un groupe pour la fin). Sa dernière quête, En rêves, donne la Marque de Fordring : un collier que les simulations de Naowh classent premier pour beaucoup de spés." },
 }
 ns.QGUIDES = {}
 for _, c in ipairs(CARDS) do

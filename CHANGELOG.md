@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.186] — 2026-11-22
+
+### Ajouté / Added
+- **Guide de quête « Collier : Marque de Fordring »** (onglet Quêtes du choix de guide) : la chaîne de Tirion Fordring dans les Maleterres, 11 quêtes. Elle part de ses trois premières quêtes (Chiens-démons, Ciel couleur de sang, Larve putride), passe par Stratholme pour le tableau « De l'amour et de la famille », et finit par « En rêves » à Hearthglen. Il faut un groupe pour la fin. Sa récompense, la Marque de Fordring, est le collier que les simulations de Naowh classent premier pour 9 spés. Le Symbole de l'honneur perdu a maintenant sa position (Maleterres de l'Est).
+  *Quest guide: the Mark of Fordring chain (Tirion Fordring, Plaguelands), a neck ranked first for many specs.*
+- **« Cette quête n'existe pas sur Forever »**, dans le menu de la vue moderne (groupe Étape) : la quête sort tout de suite de ta route, et un rapport avec son numéro part à l'équipe WL Helper par la guilde. Ça permet de nettoyer les guides à partir de ce que les joueurs trouvent en jeu.
+  *Modern view menu: "This quest is not on Forever" takes it out of your route and reports it.*
+
 ## [1.0.0-beta.185] — 2026-11-20
 
 ### Modifié / Changed

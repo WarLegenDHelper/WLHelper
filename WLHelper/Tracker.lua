@@ -332,6 +332,22 @@ function TR.OpenGuide(i)
   if i and ns.GoTo and ns.frame and ns.frame:IsShown() then ns.GoTo(i) end
 end
 
+function TR.NoSuchQuest(qid)
+  if not qid then return end
+  WLDTDB.off = WLDTDB.off or {}
+  WLDTDB.off[qid] = true
+  if ns.OffPick then ns.OffPick()[qid] = true end
+  local name = (ns.QName and ns.QName(qid)) or tostring(qid)
+  local WP = ns.Writs and ns.Writs.WP
+  if WP and WP.Reports and WP.Reports.New then
+    pcall(WP.Reports.New, "quest", string.format("Quest not found on Forever: %s (%d)", name, qid), nil, true, { qid = qid })
+  end
+  ns.Print(L.TR_NOQUEST_DONE:format(name))
+  if ns.Recalc then ns.Recalc() end
+  TR.browse = nil
+  TR.Refresh()
+end
+
 -- the checklist before entering, here: the gate step of the dungeon on screen, else the next one
 -- ahead, else the first one (browsed like the arrows; back to the current step as usual)
 function TR.OpenReady()
@@ -1035,6 +1051,12 @@ local function MenuItems()
     { L.TR_M_DONE, function() if m then TR.MarkDone(m.idx) end end, group = L.TR_G_STEP },
     { L.TR_M_SHARE, function() if ns.ShareQuests then ns.ShareQuests() end end, group = L.TR_G_STEP },
   }
+  -- a quest that is not on Forever (report: "many of our quests do not exist, or not yet, on
+  -- Forever"): left out of the route at once, and a report to the guild with its id
+  local cq = m and m.cur and m.cur.node and m.cur.node.q
+  if cq and cq > 0 then
+    items[#items + 1] = { L.TR_M_NOQUEST, function() TR.NoSuchQuest(cq) end, group = L.TR_G_STEP, confirm = true }
+  end
   local bst = m and m.st and m.st.bossStep and m.st
   if bst and ns.AnnounceTactics then items[#items + 1] = { L.TR_M_TACTICS, function() ns.AnnounceTactics(bst) end, group = L.TR_G_STEP } end
   if dk and ns.GoReady then items[#items + 1] = { L.TR_L_READY, function() TR.OpenReady() end, group = L.TR_G_DUNGEON } end
