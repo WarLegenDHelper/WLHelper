@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.195", date = "2026-11-22", items = {
+    { s = "add", fr = { "Blackmaw Hold : le début de la chaîne et la réputation", "The Legashi Threat (Ekkal, en Azshara) commence tout et ne demande aucune réputation. Report to Rageroar et Missing Blackmaw Scouts (Horde) mènent ensuite à Korsa. Les quêtes de Gatekeeper Rageroar et de Gorn One Eye disent maintenant qu'il faut être Neutre avec Grumegueule. La note d'Ekkal explique le plus rapide pour y arriver : Legashi Horns, 5 cornes pour 100 de réputation. Lu sur Wowhead WoW Forever (pages des quêtes et guide de réputation Grumegueule)." }, en = { "Blackmaw Hold", "The Legashi Threat starts the chain with no reputation needed; Report to Rageroar and Missing Blackmaw Scouts lead to Korsa; Rageroar's and Gorn's quests say Neutral with Timbermaw Hold is needed, and how to get there fast (Legashi Horns)." } },
+  } },
   { v = "1.0.0-beta.194", date = "2026-11-22", items = {
     { s = "add", fr = { "/wlh gearscan", "Relève dans ton jeu les objets des listes BiS de Naowh que WL Helper Gear ne connaît pas (sets de Forever, Mark of Fordring, certains bijoux et armes). Il garde leurs statistiques, leur emplacement, leur niveau et les lignes de leur infobulle (effets « Utiliser » et « Chance quand vous touchez »). Fais /reload ensuite pour enregistrer. Ça sert à compléter WL Helper Gear avec les vraies valeurs du jeu. Rien n'est envoyé." }, en = { "/wlh gearscan reads in your game the BiS items WL Helper Gear does not list (stats, slot, level, tooltip lines), saved after a /reload, to complete Gear with the game's own values.", "" } },
   } },
@@ -63,9 +66,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.181", date = "2026-11-20", items = {
     { s = "fix", fr = { "Erreur « action bloquée » en combat avec la vue moderne", "») : la barre Cibler / objet de quête était accrochée à la vue moderne, ce qui la rendait protégée en combat. La vue ne pouvait plus changer de taille. La barre est maintenant placée sur l'écran, au même endroit." }, en = { "Modern view", "No more blocked-action error in combat (the target bar no longer anchors to it)." } },
-  } },
-  { v = "1.0.0-beta.180", date = "2026-11-20", items = {
-    { s = "fix", fr = { "La check-list est de retour dans la vue moderne", "Elle vérifie que tu as bien pris toutes les quêtes à prendre avant d'entrer, et la clé s'il en faut une. Elle n'était qu'en bas de la grande fenêtre du guide, que la vue moderne remplace par défaut, et plus personne ne la trouvait. Un lien « Check-list » est maintenant sous la vue moderne et dans son menu (Ce donjon). Il ouvre le guide directement sur elle." }, en = { "The checklist is back in the modern view", "A link under it and in its menu." } },
-    { s = "fix", fr = { "Vue moderne, bas de cadre plus calme", "Les liens du bas (Guides, Check-list, Vue d'ensemble, Boss, Carte, Partager) sont en gris clair, blancs au survol, au lieu d'être tous en rouge. Le carré devant « Toutes les étapes » était un caractère que la police du jeu n'affiche pas : c'est maintenant une vraie flèche." }, en = { "Modern view", "Quiet grey links instead of red; the square before \"All the steps\" is now an arrow icon." } },
   } },
 }

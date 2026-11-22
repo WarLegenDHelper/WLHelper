@@ -1070,3 +1070,54 @@ for qid, list in pairs(AREA_NOTES) do
     if o and o.area then o.area.note = t[1]; ns.TR[t[1]] = t[2] end
   end
 end
+
+-- =====================================================================
+-- Blackmaw Hold : le début de la chaîne et la réputation Grumegueule (Timbermaw Hold)
+-- (report: "I'm Unfriendly, how do I get the Blackmaw Hold quests"). Read on Wowhead WoW Forever
+-- (quest=86746, 86752, 86791, 86747, 92065 and its guide=35343 "Timbermaw Hold Reputation",
+-- 2026-11-22): The Legashi Threat from Ekkal starts it and needs no reputation; Gatekeeper
+-- Rageroar and the other Azshara quests need Neutral with Timbermaw Hold (the guide; one comment
+-- says Unfriendly was enough for Report to Rageroar, most say Neutral). Ekkal's Legashi Horns
+-- (repeatable, 5 Severed Legashi Horn = 100) is the quickest way to Neutral from there.
+-- =====================================================================
+do
+  local EKKAL = { m = 1447, x = 42, y = 38.9, n = "Ekkal" }
+  local RAGEROAR = { m = 1447, x = 42.4, y = 20.2, n = "Gatekeeper Rageroar" }
+  local KORSA = { m = 1447, x = 63, y = 23.3, n = "Korsa" }
+  local NEUTRAL = "Needs Timbermaw Hold reputation Neutral or better."
+  if not ns.Q[86746] then
+    ns.Q[86746] = { n = "The Legashi Threat", l = 53, r = 47, fa = "Both", d = "BlackmawHold", ds = { "BlackmawHold" }, role = "main",
+      s = EKKAL, f = EKKAL, st = "Ekkal, Ruins of Eldarath, Azshara (42.0, 38.9)", ft = "Ekkal, Ruins of Eldarath, Azshara (42.0, 38.9)",
+      o = { { k = "kill", n = "Legashi Satyr", c = 5, ins = false, unk = false },
+            { k = "kill", n = "Legashi Rogue", c = 5, ins = false, unk = false },
+            { k = "kill", n = "Legashi Hellcaller", c = 5, ins = false, unk = false } },
+      oe = "Kill 5 Legashi Satyr, 5 Legashi Rogues, and 5 Legashi Hellcallers for Ekkal at the Ruins of Eldarath.",
+      ne = "The first Blackmaw Hold quest, and it needs no Timbermaw reputation. The Legashi are in the ruins northeast of Ekkal. After it, Ekkal offers Legashi Horns again and again: 5 Severed Legashi Horn (they drop from the same satyrs) give 100 Timbermaw reputation, the quickest way to Neutral here. The other Blackmaw quests need Neutral.",
+      xp = 5250 }
+  end
+  if not ns.Q[86752] then
+    ns.Q[86752] = { n = "Report to Rageroar", l = 53, r = 47, fa = "Both", d = "BlackmawHold", ds = { "BlackmawHold" }, role = "main", p = { 86746 },
+      s = EKKAL, f = RAGEROAR, st = "Ekkal, Ruins of Eldarath, Azshara (42.0, 38.9)", ft = "Gatekeeper Rageroar, Ursolan, Azshara (42.4, 20.2)",
+      oe = "Speak with Gatekeeper Rageroar at Ursolan.",
+      ne = "Ekkal offers it once you are Neutral with Timbermaw Hold (Unfriendly: keep turning in Legashi Horns). Rageroar is at Ursolan, north of Ekkal.",
+      xp = 530 }
+  end
+  if not ns.Q[86791] then
+    ns.Q[86791] = { n = "Missing Blackmaw Scouts", l = 53, r = 47, fa = "Horde", d = "BlackmawHold", ds = { "BlackmawHold" }, role = "main", p = { 86752 },
+      s = RAGEROAR, f = KORSA, st = "Gatekeeper Rageroar, Ursolan, Azshara (42.4, 20.2)", ft = "Korsa, outside Legashi Stronghold, Azshara (63.0, 23.3)",
+      oe = "Find the Blackmaw scouting party near the Legashi camps east of Ursolan.",
+      ne = "Korsa and the scouts stand outside Legashi Stronghold, east of Ursolan. She then gives Master Feardred, Thinning Their Forces and Later, Satyr.",
+      xp = 530 }
+  end
+  ns.TR[ns.Q[86746].ne] = "La première quête de Blackmaw Hold, et elle ne demande aucune réputation Grumegueule. Les Legashi sont dans les ruines au nord-est d'Ekkal. Ensuite, Ekkal propose Legashi Horns à volonté : 5 Severed Legashi Horn (sur les mêmes satyres) donnent 100 de réputation Grumegueule, le plus rapide ici pour passer Neutre. Les autres quêtes de Blackmaw demandent Neutre."
+  ns.TR[ns.Q[86752].ne] = "Ekkal la donne une fois Neutre avec Grumegueule (Inamical : continue de rendre des Legashi Horns). Rageroar est à Ursolan, au nord d'Ekkal."
+  ns.TR[ns.Q[86791].ne] = "Korsa et les éclaireurs sont devant le bastion Legashi, à l'est d'Ursolan. Elle donne ensuite Master Feardred, Thinning Their Forces et Later, Satyr."
+  -- not linked to Blackmaw Reclamation's chain: three more quests would put it over the route's
+  -- chain limit (Engine.lua CHAIN_MAX, meant for detours like Onyxia's attunement) and leave it out;
+  -- they are quests of their own in the route
+  -- Rageroar's and Gorn's quests: the reputation they need
+  for _, id in ipairs({ 92065, 86798, 86814, 87346 }) do
+    local q = ns.Q[id]
+    if q and not q.ne then q.ne = NEUTRAL end
+  end
+end

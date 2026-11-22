@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.195] — 2026-11-22
+
+### Ajouté / Added
+- **Blackmaw Hold : le début de la chaîne et la réputation** : The Legashi Threat (Ekkal, en Azshara) commence tout et ne demande aucune réputation. Report to Rageroar et Missing Blackmaw Scouts (Horde) mènent ensuite à Korsa. Les quêtes de Gatekeeper Rageroar et de Gorn One Eye disent maintenant qu'il faut être Neutre avec Grumegueule. La note d'Ekkal explique le plus rapide pour y arriver : Legashi Horns, 5 cornes pour 100 de réputation. Lu sur Wowhead WoW Forever (pages des quêtes et guide de réputation Grumegueule).
+  *Blackmaw Hold: The Legashi Threat starts the chain with no reputation needed; Report to Rageroar and Missing Blackmaw Scouts lead to Korsa; Rageroar's and Gorn's quests say Neutral with Timbermaw Hold is needed, and how to get there fast (Legashi Horns).*
+
 ## [1.0.0-beta.194] — 2026-11-22
 
 ### Ajouté / Added
