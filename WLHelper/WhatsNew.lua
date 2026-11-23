@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.209", date = "2026-11-23", items = {
+    { s = "fix", fr = { "Flèche du guide coupée : plus de flèche « Repère sur la carte » qui revient quand même.", "Quand tu coupes la flèche du guide, il pose à la place le repère de carte du jeu. WL Helper le prenait pour un repère posé par toi et relançait une flèche dessus. Le guide ne fait donc plus réapparaître de flèche une fois que tu l'as coupée." }, en = { "Guide arrow switched off", "The guide's own map pin no longer starts a \"Map pin\" arrow." } },
+  } },
   { v = "1.0.0-beta.208", date = "2026-11-23", items = {
     { s = "fix", fr = { "T0.5 du mage : la ceinture et les gants s'achètent aussi.", "Just Compensation demande les Magister's Belt et Magister's Gloves. Comme les Bindings, ils sont liés quand équipés (vérifié sur Wowhead WoW Forever) : le guide te dit de les acheter à l'hôtel des ventes, ou de garder ceux d'un passage au pic Rochenoire ou à Scholomance, au lieu de t'envoyer dans un donjon pour eux." }, en = { "Mage Dungeon Set 2", "Just Compensation's Magister's Belt and Gloves are bind-on-equip (checked on Wowhead WoW Forever): buy them or keep them from a run, no dungeon run for them." } },
   } },
@@ -52,8 +55,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.195", date = "2026-11-22", items = {
     { s = "add", fr = { "Blackmaw Hold : le début de la chaîne et la réputation", "The Legashi Threat (Ekkal, en Azshara) commence tout et ne demande aucune réputation. Report to Rageroar et Missing Blackmaw Scouts (Horde) mènent ensuite à Korsa. Les quêtes de Gatekeeper Rageroar et de Gorn One Eye disent maintenant qu'il faut être Neutre avec Grumegueule. La note d'Ekkal explique le plus rapide pour y arriver : Legashi Horns, 5 cornes pour 100 de réputation. Lu sur Wowhead WoW Forever (pages des quêtes et guide de réputation Grumegueule)." }, en = { "Blackmaw Hold", "The Legashi Threat starts the chain with no reputation needed; Report to Rageroar and Missing Blackmaw Scouts lead to Korsa; Rageroar's and Gorn's quests say Neutral with Timbermaw Hold is needed, and how to get there fast (Legashi Horns)." } },
-  } },
-  { v = "1.0.0-beta.194", date = "2026-11-22", items = {
-    { s = "add", fr = { "/wlh gearscan", "Relève dans ton jeu les objets des listes BiS de Naowh que WL Helper Gear ne connaît pas (sets de Forever, Mark of Fordring, certains bijoux et armes). Il garde leurs statistiques, leur emplacement, leur niveau et les lignes de leur infobulle (effets « Utiliser » et « Chance quand vous touchez »). Fais /reload ensuite pour enregistrer. Ça sert à compléter WL Helper Gear avec les vraies valeurs du jeu. Rien n'est envoyé." }, en = { "/wlh gearscan reads in your game the BiS items WL Helper Gear does not list (stats, slot, level, tooltip lines), saved after a /reload, to complete Gear with the game's own values.", "" } },
   } },
 }

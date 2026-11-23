@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.209] — 2026-11-23
+
+### Corrigé / Fixed
+- **Flèche du guide coupée : plus de flèche « Repère sur la carte » qui revient quand même.** Quand tu coupes la flèche du guide, il pose à la place le repère de carte du jeu. WL Helper le prenait pour un repère posé par toi et relançait une flèche dessus. Le guide ne fait donc plus réapparaître de flèche une fois que tu l'as coupée.
+  *Guide arrow switched off: the guide's own map pin no longer starts a "Map pin" arrow.*
+
 ## [1.0.0-beta.208] — 2026-11-23
 
 ### Corrigé / Fixed

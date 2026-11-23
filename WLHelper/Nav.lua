@@ -32,6 +32,9 @@ local function Add(m, x, y, label, first)
   if not ownArrow and NF and NF.PlaceWaypoint and pcall(NF.PlaceWaypoint, label, m, x, y, nil) then return true end
   if C_Map and C_Map.SetUserWaypoint and UiMapPoint and (not C_Map.CanSetUserWaypointOnMap or C_Map.CanSetUserWaypointOnMap(m)) then
     C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(m, x / 100, y / 100))
+    -- our own pin: Writs/Way.lua's "follow map pins" must not take it for one the player placed and
+    -- start an arrow on it (report: the guide's arrow switched off, a "Map pin" arrow showed anyway)
+    ns.GuidePin = { map = m, x = x / 100, y = y / 100 }
     if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then C_SuperTrack.SetSuperTrackedUserWaypoint(not ownArrow) end
     return true
   end

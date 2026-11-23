@@ -543,6 +543,8 @@ function Way.OnMapPin()
         return
     end
     if Near(p, followed) or (pin and Near(p, pin)) then return end
+    -- the dungeon guide's own pin (Nav.lua, its arrow switched off): not the player's
+    if Near(p, root.GuidePin) then return end
     local WPn = WP.WorldPin
     if WPn and WPn.IsOurs then local ok, ours = pcall(WPn.IsOurs); if ok and ours then return end end
     local GPS = WP.GPS
