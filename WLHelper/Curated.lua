@@ -1333,4 +1333,18 @@ do
     end
   end
   ns.TR["Bind on equip: buy it at the auction house, or keep one from a Blackrock Spire run."] = "Lié quand équipé : achète-le à l'hôtel des ventes, ou garde celui d'un passage au pic Rochenoire."
+  -- Just Compensation (mage): Magister's Belt and Magister's Gloves are bind-on-equip too (Wowhead
+  -- Forever, item=16685 and 16684), random drops in Blackrock Spire and Scholomance. Same treatment.
+  -- The other classes' pieces are not checked yet, so they stay as they are.
+  local BOE = { ["Magister's Belt"] = "Bind on equip: buy it at the auction house, or keep one from a Blackrock Spire run.",
+                ["Magister's Gloves"] = "Bind on equip: buy them at the auction house, or keep a pair from a Scholomance run." }
+  for _, id in ipairs({ 8932, 8939 }) do
+    local q = ns.Q[id]
+    if q and q.n == "Just Compensation" then
+      for _, o in ipairs(q.o or {}) do
+        if o.k == "item" and BOE[o.n] then o.unk, o.ah, o.note = false, true, BOE[o.n] end
+      end
+    end
+  end
+  ns.TR["Bind on equip: buy them at the auction house, or keep a pair from a Scholomance run."] = "Liés quand équipés : achète-les à l'hôtel des ventes, ou garde ceux d'un passage à Scholomance."
 end

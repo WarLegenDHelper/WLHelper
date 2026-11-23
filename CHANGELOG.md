@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.208] — 2026-11-23
+
+### Corrigé / Fixed
+- **T0.5 du mage : la ceinture et les gants s'achètent aussi.** Just Compensation demande les Magister's Belt et Magister's Gloves. Comme les Bindings, ils sont liés quand équipés (vérifié sur Wowhead WoW Forever) : le guide te dit de les acheter à l'hôtel des ventes, ou de garder ceux d'un passage au pic Rochenoire ou à Scholomance, au lieu de t'envoyer dans un donjon pour eux.
+  *Mage Dungeon Set 2: Just Compensation's Magister's Belt and Gloves are bind-on-equip (checked on Wowhead WoW Forever): buy them or keep them from a run, no dungeon run for them.*
+
 ## [1.0.0-beta.207] — 2026-11-23
 
 ### Corrigé / Fixed

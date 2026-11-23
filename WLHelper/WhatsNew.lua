@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.208", date = "2026-11-23", items = {
+    { s = "fix", fr = { "T0.5 du mage : la ceinture et les gants s'achètent aussi.", "Just Compensation demande les Magister's Belt et Magister's Gloves. Comme les Bindings, ils sont liés quand équipés (vérifié sur Wowhead WoW Forever) : le guide te dit de les acheter à l'hôtel des ventes, ou de garder ceux d'un passage au pic Rochenoire ou à Scholomance, au lieu de t'envoyer dans un donjon pour eux." }, en = { "Mage Dungeon Set 2", "Just Compensation's Magister's Belt and Gloves are bind-on-equip (checked on Wowhead WoW Forever): buy them or keep them from a run, no dungeon run for them." } },
+  } },
   { v = "1.0.0-beta.207", date = "2026-11-23", items = {
     { s = "fix", fr = { "Set de donjon 2 (T0.5) : plus de Stratholme dès le départ.", "An Earnest Proposition demande une pièce du set de donjon 1, par exemple les Magister's Bindings pour un mage. Les données ne savaient pas où la trouver, alors le guide te faisait faire tout Stratholme avant même de rendre la quête. Cette pièce est liée quand équipée et tombe au pic Rochenoire : le guide te dit maintenant de l'acheter à l'hôtel des ventes ou de garder celle d'un passage au pic. La route commence par les échantillons, puis Mokvar." }, en = { "Dungeon Set 2", "An Earnest Proposition's Dungeon Set 1 piece is bind-on-equip (buy it or keep one from Blackrock Spire): the route no longer starts with a full Stratholme run." } },
     { s = "fix", fr = { "Quêtes renumérotées par Forever : les compteurs sont lus sous le bon numéro.", "Une quête que Forever a renumérotée, comme An Earnest Proposition (84157), voyait ses objectifs lus sous notre ancien numéro. Le jeu répondait alors n'importe quoi, et une étape passait pour faite alors que tu n'avais rien fait (les échantillons de Silithus, par exemple)." }, en = { "Renumbered quests", "Objectives are now read under the quest log's own number, so a step is no longer skipped as done." } },
@@ -52,9 +55,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.194", date = "2026-11-22", items = {
     { s = "add", fr = { "/wlh gearscan", "Relève dans ton jeu les objets des listes BiS de Naowh que WL Helper Gear ne connaît pas (sets de Forever, Mark of Fordring, certains bijoux et armes). Il garde leurs statistiques, leur emplacement, leur niveau et les lignes de leur infobulle (effets « Utiliser » et « Chance quand vous touchez »). Fais /reload ensuite pour enregistrer. Ça sert à compléter WL Helper Gear avec les vraies valeurs du jeu. Rien n'est envoyé." }, en = { "/wlh gearscan reads in your game the BiS items WL Helper Gear does not list (stats, slot, level, tooltip lines), saved after a /reload, to complete Gear with the game's own values.", "" } },
-  } },
-  { v = "1.0.0-beta.193", date = "2026-11-22", items = {
-    { s = "chg", fr = { "Les flèches suivent la liste BiS", "Quand l'objet de ton sac et celui que tu portes sont tous les deux dans la liste BiS de Naowh pour ta spé, c'est l'ordre de la liste qui décide de la flèche verte, plus le calcul de WL Helper. L'infobulle le dit : « Liste BiS de Naowh : n°2, mieux que ton objet (n°5). À prendre. » ou « ... moins bien que ton objet. Garde le tien. ». Si l'un des deux n'est pas dans la liste, rien ne change. Les armes gardent le calcul." }, en = { "When both the bag item and the worn one are in Naowh's BiS list for your spec, the list's order decides the arrow; the tooltip gives both ranks.", "" } },
-    { s = "chg", fr = { "WL Helper Gear deux fois plus léger", "Chaque objet ne garde plus que ses statistiques non nulles. La mémoire passe d'environ 20 Mo à 10 Mo, avec exactement les mêmes notes (vérifiées sur les 28 spés)." }, en = { "WL Helper Gear keeps only each item's non-zero stats", "About 20 MB down to 10 MB, same scores." } },
   } },
 }
