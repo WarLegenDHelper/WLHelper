@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.214] — 2026-11-23
+
+### Modifié / Changed
+- **Les objectifs de farm vont sur la zone bleue du jeu, avec un point fixe.** Le guide ne calcule plus ses propres zones de farm : elles ne collaient pas aux zones bleues de la carte et leur point te suivait à chaque pas. Le GPS va maintenant sur la zone de quête du jeu (la zone bleue), sinon sur le point de l'objectif dans nos données, et ce point ne bouge plus pendant que tu farmes. Les contours en pointillés et l'étiquette « Dans la zone » sont retirés.
+  *Farm objectives use the game's blue quest area as one fixed point, as other guides do: our own outlines and the spot that followed you are gone.*
+
 ## [1.0.0-beta.213] — 2026-11-23
 
 ### Corrigé / Fixed

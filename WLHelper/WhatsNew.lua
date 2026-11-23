@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.214", date = "2026-11-23", items = {
+    { s = "chg", fr = { "Les objectifs de farm vont sur la zone bleue du jeu, avec un point fixe.", "Le guide ne calcule plus ses propres zones de farm : elles ne collaient pas aux zones bleues de la carte et leur point te suivait à chaque pas. Le GPS va maintenant sur la zone de quête du jeu (la zone bleue), sinon sur le point de l'objectif dans nos données, et ce point ne bouge plus pendant que tu farmes. Les contours en pointillés et l'étiquette « Dans la zone » sont retirés." }, en = { "Farm objectives use the game's blue quest area as one fixed point, as other guides do: our own outlines and the spot that followed you are gone.", "" } },
+  } },
   { v = "1.0.0-beta.213", date = "2026-11-23", items = {
     { s = "fix", fr = { "Plus de repère toutes les secondes dans une zone de farm.", "Dans la zone, le point du guide suit tes pas : WL Helper redemandait un repère à Naowh Forever à chaque mouvement (« Waypoint for Unseen Servant » en boucle dans le chat) et le GPS le suivait comme un repère posé par toi. Le repère reste maintenant en place tant que tu restes à moins de 60 m, et le GPS ne le prend plus pour le tien." }, en = { "No more waypoint every second in a farm area", "The guide's map pin stays put while its spot moves less than 60 yards, and a pin placed through Naowh Forever is no longer followed as a \"Map pin\"." } },
   } },
@@ -48,8 +51,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.200", date = "2026-11-22", items = {
     { s = "add", fr = { "Le début des suites de classe et Ramstein", "The Azure Key (voleur), Voodoo Feathers (guerrier) et A Better Ingredient (druide) disent maintenant où leur suite commence. C'est chez ton maître de classe : A Simple Request, A Troubled Spirit, Torwa Pathfinder. Ramstein dit qu'il faut d'abord « Duskwing, Oh How I Hate Thee... ». Tout a été vérifié sur Wowhead WoW Forever, qui corrige ForeverDungeonJournal sur deux points : les quêtes de classe ne sont pas facultatives, et Ramstein ne suit pas The Champion of the Banshee Queen." }, en = { "The rogue, warrior and druid chains say where they start (the class trainer), and Ramstein says it needs Duskwing first; checked on Wowhead WoW Forever.", "" } },
-  } },
-  { v = "1.0.0-beta.199", date = "2026-11-22", items = {
-    { s = "add", fr = { "Les quêtes d'introduction", "Comparé à Naowh Dungeon Journal et ForeverDungeonJournal, il nous manquait des quêtes Horde qui mènent à une quête de donjon. Chacune a été vérifiée sur Wowhead WoW Forever (qui la donne, où elle mène, à quel niveau). Elles sont ajoutées comme une note sur la quête qu'elles annoncent, pas comme une étape (elles sont facultatives et allongeraient le trajet) : Tran'rek (Scarab Shells), Tabetha's Task pour les mages (Tiara of the Deep), Vivian Lagrave (Lost Thunderbrew Recipe), Yuka Screwspigot (Ribbly Screwspigot), Vivian Lagrave and the Darkstone Tablet (The Darkstone Tablet), Camp Mojache (Lethtendris's Web), et le début de la suite de voleur A Simple Request (The Azure Key)." }, en = { "Horde breadcrumb quests found in Naowh's and ForeverDungeonJournal's lists, each checked on Wowhead WoW Forever, now appear as a note on the quest they lead to.", "" } },
   } },
 }

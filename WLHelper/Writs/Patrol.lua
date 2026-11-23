@@ -718,8 +718,9 @@ end)
 -- several camps, a wide field; Engine.lua ns.AreaOf): each camp's outline as a dotted line in the
 -- objective colour, on the world map (on the walking path's frame logic: Trail.MapLevel - 2, under
 -- the patrol path) and on the minimap. Only the unfinished objectives of the step the guide is on
--- (frame.auto), cleared when that step changes or the guide closes. While one shows, the arrow's
--- spot follows you (root.AreaRefollow, UI.lua: picked again once you moved 30 yd), every second.
+-- (frame.auto), cleared when that step changes or the guide closes.
+-- Off since beta.214 (Zones.ON): our outlines did not match the game's blue quest areas, which the
+-- map already shows; the GPS goes to the game's quest area (UI.lua GamePOI), one fixed point.
 -- API: Zones.Active() -> nil | { { area, q, oi }, ... }; Zones.Update(); Zones.MapDots(map, view);
 -- Zones.MinimapDots(); Zones.RefreshMap(); Zones.RefreshMinimap(); Zones._Drawn() (for the tests).
 local Zones = {}
@@ -731,6 +732,7 @@ local ZONE_CAP = 300           -- dots at most on the world map, all camps toget
 
 local zActive, zKey
 function Zones.Active() return zActive end
+Zones.ON = false
 
 local function ZoneColor()
     local c = root.Tok and root.Tok.fg or { 0.941, 0.945, 0.953 }
@@ -738,6 +740,7 @@ local function ZoneColor()
 end
 
 local function ZCompute()
+    if not Zones.ON then return nil end
     local f, steps = root.frame, root.route and root.route.steps
     if type(f) ~= "table" or type(steps) ~= "table" then return nil end
     if root.GuideOn and not root.GuideOn() then return nil end
@@ -923,7 +926,6 @@ local function ZStart()
         zTicks = zTicks + 1
         if zTicks % CHECK_EVERY == 0 then
             ZUpdate()
-            if zActive and root.AreaRefollow then pcall(root.AreaRefollow) end
         end
         if not zActive then ZStop(); return end
         if MinimapOn() then pcall(Zones.RefreshMinimap) end

@@ -486,6 +486,8 @@ end
 -- ns.AreaAt) and you stand in that area (ns.AreaInside): the label says "Dans la zone" instead of a
 -- distance (the spot is only the nearest spawn; any spawn of the area will do).
 local function InZone(now)
+    -- off with the farm areas (beta.214): the label gives the distance to the game's quest area
+    if not WorldPin.AREAS then return false end
     local d = type(now) == "table" and now.dest
     if type(d) ~= "table" or LegTarget(now) ~= d then return false end
     local m, x, y = Num(d.map), Num(d.x), Num(d.y)

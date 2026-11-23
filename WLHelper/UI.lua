@@ -562,13 +562,10 @@ local function StepPoints(log, st, all)
   for _, n in ipairs(st.acts) do
     if n.loc and n.loc.m and (all or not ns.NodeOK(log, n)) then
       local x, y = n.loc.x, n.loc.y
-      -- an objective spread over an area (o.area): the spawn nearest to you in the nearest camp,
-      -- before the game's quest area (a ring round an island has its middle there, on dry land)
-      local a = n.kind == "o" and ns.AreaOf and ns.AreaOf(n)
-      local am, ax, ay
-      if a then am, ax, ay = ns.AreaFollow(a) end
-      if am == n.loc.m and ax then x, y = ax, ay
-      elseif n.kind == "o" then
+      -- an objective: the game's own quest area (the blue zone on the map), else its point in our
+      -- data; one fixed point, as other guides do (report: our farm areas did not match the blue
+      -- zones and their spot followed you, a new waypoint at every step)
+      if n.kind == "o" then
         local gx, gy = GamePOI(n.q, n.loc.m)
         if gx then x, y = gx, gy end
       end
@@ -1465,11 +1462,6 @@ ns.ArrowSource = ArrowSource
 -- an objective. -> m, x, y (nil when nothing places it)
 local function NodePoint(nd)
   if nd.loc and nd.loc.m then
-    local a = nd.kind == "o" and ns.AreaOf and ns.AreaOf(nd)
-    if a then
-      local am, ax, ay = ns.AreaFollow(a)
-      if am == nd.loc.m and ax then return am, ax, ay end
-    end
     if nd.kind == "o" then
       local gx, gy = GamePOI(nd.q, nd.loc.m)
       if gx then return nd.loc.m, gx, gy end
@@ -1488,32 +1480,6 @@ local function NodePoint(nd)
 end
 ns.NodePoint = NodePoint
 
--- An objective spread over an area: its spot is picked again once you moved 30 yd (ns.AreaFollow).
--- Asked every second while the current step has one (Writs/Patrol.lua, Zones): when the spot of a
--- line the arrow follows changed, the arrow goes to the new one (the whole step when the guide
--- places its points itself, else that line).
-local areaSeen = setmetatable({}, { __mode = "k" })
-function ns.AreaRefollow()
-  if not f or (ns.GuideOn and not ns.GuideOn()) then return false end
-  local st = Steps()[f.auto or 0]
-  if not (st and st.acts) then return false end
-  local log = ns.LogEntries()
-  local moved
-  for _, n in ipairs(st.acts) do
-    local a = ns.AreaOf and ns.AreaOf(n)
-    if a and not ns.NodeOK(log, n) then
-      local m, x, y = ns.AreaFollow(a)
-      if m then
-        local key, was = ns.PKey(m, x, y), areaSeen[a]
-        areaSeen[a] = key
-        if was and was ~= key and ns.active[was] then moved = moved or n end
-      end
-    end
-  end
-  if not moved then return false end
-  if WLDTDB.autoWay then f.sig = nil; ns.Refresh(true) else ns.SetOne(moved) end
-  return true
-end
 -- a click on the line (or its GPS button) leads somewhere: its own place, or the game's quest area
 function ns.NodeCanGo(nd)
   if not nd then return false end
