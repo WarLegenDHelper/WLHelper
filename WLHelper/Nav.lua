@@ -17,6 +17,23 @@ local function Clear()
   wipe(handles); wipe(ns.active)
 end
 
+-- The map pin the guide placed last (Naowh Forever's or the game's): { m, x, y, label }.
+-- In a farm area the spot is where you stand (Engine.lua ns.AreaPick), so it moves with every step:
+-- the pin stays where it is while the new spot is the same line within PIN_STICK yards of it and the
+-- pin is still on the map (report: "a waypoint every second in the zone", Naowh Forever printing
+-- "Waypoint for Unseen Servant" and the GPS following that "Map pin").
+local placed
+local PIN_STICK = 60
+local function PinStays(m, x, y, label)
+  if not (placed and placed[1] == m and placed[4] == label) then return false end
+  if placed[2] == x and placed[3] == y then return false end
+  if C_Map and C_Map.HasUserWaypoint and not C_Map.HasUserWaypoint() then return false end
+  local a, b = ns.World and ns.World(m, placed[2], placed[3], true), ns.World and ns.World(m, x, y, true)
+  if not (a and b and a[1] == b[1]) then return false end
+  return (a[2] - b[2]) ^ 2 + (a[3] - b[3]) ^ 2 <= PIN_STICK * PIN_STICK
+end
+ns._PinStays = PinStays
+
 local function Add(m, x, y, label, first)
   -- With WL Helper's own arrow on, the point is only a point (map, minimap): no second arrow from
   -- TomTom, Naowh Forever or the game's yellow world marker on top of ours.
@@ -28,10 +45,17 @@ local function Add(m, x, y, label, first)
     return true
   end
   if not first then return end
+  if PinStays(m, x, y, label) then return true end
   local NF = _G.NaowhForever
-  if not ownArrow and NF and NF.PlaceWaypoint and pcall(NF.PlaceWaypoint, label, m, x, y, nil) then return true end
+  if not ownArrow and NF and NF.PlaceWaypoint and pcall(NF.PlaceWaypoint, label, m, x, y, nil) then
+    -- Naowh Forever puts it on the game's map pin too: ours, not one the player placed
+    placed = { m, x, y, label }
+    ns.GuidePin = { map = m, x = x / 100, y = y / 100 }
+    return true
+  end
   if C_Map and C_Map.SetUserWaypoint and UiMapPoint and (not C_Map.CanSetUserWaypointOnMap or C_Map.CanSetUserWaypointOnMap(m)) then
     C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(m, x / 100, y / 100))
+    placed = { m, x, y, label }
     -- our own pin: Writs/Way.lua's "follow map pins" must not take it for one the player placed and
     -- start an arrow on it (report: the guide's arrow switched off, a "Map pin" arrow showed anyway)
     ns.GuidePin = { map = m, x = x / 100, y = y / 100 }

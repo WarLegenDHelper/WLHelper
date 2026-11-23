@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.213] — 2026-11-23
+
+### Corrigé / Fixed
+- **Plus de repère toutes les secondes dans une zone de farm.** Dans la zone, le point du guide suit tes pas : WL Helper redemandait un repère à Naowh Forever à chaque mouvement (« Waypoint for Unseen Servant » en boucle dans le chat) et le GPS le suivait comme un repère posé par toi. Le repère reste maintenant en place tant que tu restes à moins de 60 m, et le GPS ne le prend plus pour le tien.
+  *No more waypoint every second in a farm area: the guide's map pin stays put while its spot moves less than 60 yards, and a pin placed through Naowh Forever is no longer followed as a "Map pin".*
+
 ## [1.0.0-beta.212] — 2026-11-23
 
 ### Amélioré / Improved

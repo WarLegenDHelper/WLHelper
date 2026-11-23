@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.213", date = "2026-11-23", items = {
+    { s = "fix", fr = { "Plus de repère toutes les secondes dans une zone de farm.", "Dans la zone, le point du guide suit tes pas : WL Helper redemandait un repère à Naowh Forever à chaque mouvement (« Waypoint for Unseen Servant » en boucle dans le chat) et le GPS le suivait comme un repère posé par toi. Le repère reste maintenant en place tant que tu restes à moins de 60 m, et le GPS ne le prend plus pour le tien." }, en = { "No more waypoint every second in a farm area", "The guide's map pin stays put while its spot moves less than 60 yards, and a pin placed through Naowh Forever is no longer followed as a \"Map pin\"." } },
+  } },
   { v = "1.0.0-beta.212", date = "2026-11-23", items = {
     { s = "chg", fr = { "Unstable Magic se prend et se rend toute seule.", "La quête répétable des Mote of Unstable Magic (Nuara Tremorhoof pour la Horde, Archmage Celindra pour l'Alliance) est prise, rendue et reprise sans un clic, même si son guide n'est pas coché. Parle au PNJ avec tes Motes dans les sacs : ça tourne tant que tu en as assez. Ce sont les mêmes réglages que les quêtes du guide (Réglages > Quêtes et donjons > Quêtes du guide) ; garde Maj enfoncée pour le faire à la main." }, en = { "Unstable Magic (Mote of Unstable Magic) is taken and handed in by itself, again and again while you have the motes, with the guide quests' switches; hold Shift to do it by hand.", "" } },
   } },
@@ -48,9 +51,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.199", date = "2026-11-22", items = {
     { s = "add", fr = { "Les quêtes d'introduction", "Comparé à Naowh Dungeon Journal et ForeverDungeonJournal, il nous manquait des quêtes Horde qui mènent à une quête de donjon. Chacune a été vérifiée sur Wowhead WoW Forever (qui la donne, où elle mène, à quel niveau). Elles sont ajoutées comme une note sur la quête qu'elles annoncent, pas comme une étape (elles sont facultatives et allongeraient le trajet) : Tran'rek (Scarab Shells), Tabetha's Task pour les mages (Tiara of the Deep), Vivian Lagrave (Lost Thunderbrew Recipe), Yuka Screwspigot (Ribbly Screwspigot), Vivian Lagrave and the Darkstone Tablet (The Darkstone Tablet), Camp Mojache (Lethtendris's Web), et le début de la suite de voleur A Simple Request (The Azure Key)." }, en = { "Horde breadcrumb quests found in Naowh's and ForeverDungeonJournal's lists, each checked on Wowhead WoW Forever, now appear as a note on the quest they lead to.", "" } },
-  } },
-  { v = "1.0.0-beta.198", date = "2026-11-22", items = {
-    { s = "chg", fr = { "Les réputations ont leur propre page", "Dans la fenêtre WL Helper, sous Progresser, au même niveau que les autres pages : le nombre de réputations, les pièces de ta liste qu'elles débloquent, puis une carte par faction avec ses quêtes. La ligne « Réputations » de l'accueil et /wlh rep ouvrent cette page. L'onglet Réputations quitte la fenêtre « Meilleur équipement », où il n'avait pas sa place." }, en = { "Reputations have their own page in the WL Helper window, under Progress; Home's \"Reputations\" line and /wlh rep open it, and the tab left the Best gear window.", "" } },
-    { s = "fix", fr = { "Blackmaw Pouches répétable", "Avec « toutes les quêtes » activé (/wlh tout), le guide proposait la version répétable (96246) alors que la première (97327) était encore dans le journal. Une répétable attend maintenant que sa première version soit rendue." }, en = { "The repeatable Blackmaw Pouches waits until the first one is turned in, even with every quest on.", "" } },
   } },
 }
