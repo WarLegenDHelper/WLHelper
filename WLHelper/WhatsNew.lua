@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.210", date = "2026-11-23", items = {
+    { s = "fix", fr = { "La flèche ne vise plus un point quand tu es déjà au milieu des monstres.", "Les échantillons de venin de Silithus (T0.5, An Earnest Proposition) se farment maintenant sur une zone de six camps de scorpides, et non plus sur un seul point. Dans un camp, la flèche te dit « Dans la zone » ; ailleurs, elle t'envoie au camp le plus proche. Même chose pour quelques autres quêtes de farm : les chauves-souris et les chiens de la peste des Maleterres de l'Est, les Swamp Talkers du marais des Chagrins, les Azsharite Formations d'Azshara et les yétis d'Hivernale." }, en = { "Farming objectives", "Silithus Venom Samples and a few other kill or loot quests now use a zone of camps; in a camp the arrow says \"In the area\" instead of pointing at one spot." } },
+  } },
   { v = "1.0.0-beta.209", date = "2026-11-23", items = {
     { s = "fix", fr = { "Flèche du guide coupée : plus de flèche « Repère sur la carte » qui revient quand même.", "Quand tu coupes la flèche du guide, il pose à la place le repère de carte du jeu. WL Helper le prenait pour un repère posé par toi et relançait une flèche dessus. Le guide ne fait donc plus réapparaître de flèche une fois que tu l'as coupée." }, en = { "Guide arrow switched off", "The guide's own map pin no longer starts a \"Map pin\" arrow." } },
   } },
@@ -52,8 +55,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.196", date = "2026-11-22", items = {
     { s = "fix", fr = { "Plus de quête que tu ne peux pas prendre à cause de ta réputation", "Une quête qui demande une réputation que tu n'as pas sort du trajet. Elle apparaît comme verrouillée, avec la raison (« réputation Timbermaw Hold requise : Neutre »), et revient dès que tu l'as. Ça concerne d'abord les quêtes de Blackmaw Hold en Azshara (Neutre avec Grumegueule), sauf The Legashi Threat qui se prend sans réputation. Une quête déjà dans ton journal reste dans le trajet." }, en = { "A quest that needs a reputation you do not have leaves the route, locked with the reason, and comes back once you have it (Blackmaw Hold's Azshara quests: Neutral with Timbermaw Hold).", "" } },
-  } },
-  { v = "1.0.0-beta.195", date = "2026-11-22", items = {
-    { s = "add", fr = { "Blackmaw Hold : le début de la chaîne et la réputation", "The Legashi Threat (Ekkal, en Azshara) commence tout et ne demande aucune réputation. Report to Rageroar et Missing Blackmaw Scouts (Horde) mènent ensuite à Korsa. Les quêtes de Gatekeeper Rageroar et de Gorn One Eye disent maintenant qu'il faut être Neutre avec Grumegueule. La note d'Ekkal explique le plus rapide pour y arriver : Legashi Horns, 5 cornes pour 100 de réputation. Lu sur Wowhead WoW Forever (pages des quêtes et guide de réputation Grumegueule)." }, en = { "Blackmaw Hold", "The Legashi Threat starts the chain with no reputation needed; Report to Rageroar and Missing Blackmaw Scouts lead to Korsa; Rageroar's and Gorn's quests say Neutral with Timbermaw Hold is needed, and how to get there fast (Legashi Horns)." } },
   } },
 }

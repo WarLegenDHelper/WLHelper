@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.210] — 2026-11-23
+
+### Corrigé / Fixed
+- **La flèche ne vise plus un point quand tu es déjà au milieu des monstres.** Les échantillons de venin de Silithus (T0.5, An Earnest Proposition) se farment maintenant sur une zone de six camps de scorpides, et non plus sur un seul point. Dans un camp, la flèche te dit « Dans la zone » ; ailleurs, elle t'envoie au camp le plus proche. Même chose pour quelques autres quêtes de farm : les chauves-souris et les chiens de la peste des Maleterres de l'Est, les Swamp Talkers du marais des Chagrins, les Azsharite Formations d'Azshara et les yétis d'Hivernale.
+  *Farming objectives: Silithus Venom Samples and a few other kill or loot quests now use a zone of camps; in a camp the arrow says "In the area" instead of pointing at one spot.*
+
 ## [1.0.0-beta.209] — 2026-11-23
 
 ### Corrigé / Fixed
