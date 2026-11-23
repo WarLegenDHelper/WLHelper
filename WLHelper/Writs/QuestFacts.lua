@@ -321,9 +321,20 @@ local function OnAccepted(qid)
     local d = detail[qid]; detail[qid] = nil
     if d then QF.NoteGiver(qid, d[1], d[2], d[3], d[4], d[5], d[6]) end
     QF.NoteLevel(qid, QuestLevel(qid))
-    -- a listed prerequisite not done: the game did not need it
+    -- a listed prerequisite not done: the game did not need it. Not counted: another faction's or
+    -- class's twin (the route takes either), one done under a Forever number (root.IsDone knows
+    -- them), one still in the log (a chain that hands the next quest before the turn-in)
+    local Q = C_QuestLog
+    local cls = UnitClass and select(2, UnitClass("player"))
     for _, pid in ipairs(root.Q[qid].p or {}) do
-        if Done(pid) == false then QF.NoteNoPrereq(qid, pid) end
+        local pq = root.Q[pid]
+        local mine = pq and (not root.FactionOK or root.FactionOK(pq.fa))
+            and (not root.ClassOK or root.ClassOK(pq.c, cls))
+            and (not root.RaceOK or root.RaceOK(pq.race))
+        local done = Done(pid)
+        if done == false and root.IsDone and root.IsDone(pid) then done = true end
+        if done == false and Q and Q.IsOnQuest and Q.IsOnQuest(pid) then done = true end
+        if mine and done == false then QF.NoteNoPrereq(qid, pid) end
     end
 end
 local function OnComplete()

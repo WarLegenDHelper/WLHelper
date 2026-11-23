@@ -461,7 +461,12 @@ do
   local log2 = ns.LogEntries
   ns.LogEntries = function()
     local list = log2()
-    for a, b in pairs(ns.ALIAS) do if list[b] and not list[a] then list[a] = list[b] end end
+    for a, b in pairs(ns.ALIAS) do
+      if list[b] and not list[a] then
+        local c = {}; for k, v in pairs(list[b]) do c[k] = v end
+        c.real = c.real or b; list[a] = c
+      end
+    end
     return list
   end
 end
@@ -532,7 +537,12 @@ do
       local qid, e = x[1], x[2]
       local hit
       for _, id in ipairs(Index()[e.title]) do
-        if not list[id] and Mine(id) then list[id] = e; hit = hit or {}; hit[#hit + 1] = id end
+        if not list[id] and Mine(id) then
+          -- a copy that keeps the log's own number: the objectives are read under it (ns.ObjCount)
+          local c = {}; for k, v in pairs(e) do c[k] = v end
+          c.real = qid; list[id] = c
+          hit = hit or {}; hit[#hit + 1] = id
+        end
       end
       if hit and type(WLDTDB) == "table" and not ns.FOREVER_IDS[qid] then
         WLDTDB.newIds = WLDTDB.newIds or {}
@@ -1301,4 +1311,26 @@ do
     oe = "Report back to Fahrad at Ravenholdt Manor.", ri = { "Filcher's Cowl", "Rune of the Coterie" }, xp = 11800 })
   ns.TR[ns.Q[80526].ne] = "Voleurs seulement, après The Horn of Xelthos et The Eye of Bhossca : au niveau 45, une lettre de Fahrad (dans une capitale) te renvoie au manoir Ravenholdt."
   ns.TR[ns.Q[80411].ne] = "Seul. Dans les huttes à droite avant le long couloir, ouvre le Clay Vessel pour une Vile Concoction et jette-la dans le chaudron devant Antu'sul ; ramasse le sac près de la cage. Prends une deuxième Vile Concoction dans une hutte de la cour de la pyramide, jette-la dans le même chaudron, ramasse le sac et porte le bijou. Clique sur la tombe qui brille pour la Blood Magic Essence. Sur la corniche au-dessus des huttes de la pyramide (saute dessus, longe le mur), le coffre contient le Hollow Emblem : combine les deux. Assomme Nekrum Gutchewer sur la pyramide et pille le coffre."
+end
+
+-- =====================================================================
+-- An Earnest Proposition (8905-8920, plus Forever's own numbers): the Dungeon Set 1 piece it asks
+-- for (Magister's Bindings for a mage...) is bind-on-equip, dropped by Blackrock Spire's trash at a
+-- few percent: bought at the auction house or kept from a run, never a full Stratholme run. The
+-- data placed it nowhere (unk), so the route went into the quest's dungeon, Stratholme, for it
+-- (report: "why does the guide send me to Stratholme right away"). Now: no place, a note.
+-- =====================================================================
+do
+  for id = 8905, 8920 do
+    local q = ns.Q[id]
+    if q and q.n == "An Earnest Proposition" then
+      for _, o in ipairs(q.o or {}) do
+        if o.k == "item" and o.unk then
+          o.unk, o.ah = false, true
+          o.note = "Bind on equip: buy it at the auction house, or keep one from a Blackrock Spire run."
+        end
+      end
+    end
+  end
+  ns.TR["Bind on equip: buy it at the auction house, or keep one from a Blackrock Spire run."] = "Lié quand équipé : achète-le à l'hôtel des ventes, ou garde celui d'un passage au pic Rochenoire."
 end

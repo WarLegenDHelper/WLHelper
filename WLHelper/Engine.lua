@@ -707,7 +707,9 @@ local function MakeNodes(sel, cls)
     local nearAll = not isPre and OuterAllNear(q, q.od or home)
     for i, o in ipairs(q.o or {}) do
       local outerHere = o.outer and not isPre and not nearAll
-      local bg = o.w and (o.w.m == 1459 or o.w.m == 1460 or o.w.m == 1461)  -- butin de champ de bataille : pas un lieu de farm
+      -- butin de champ de bataille : pas un lieu de farm ; o.ah : un objet lié quand équipé qu'on achète
+      -- (la pièce du set de donjon 1 d'An Earnest Proposition) : pas un passage dans un donjon
+      local bg = o.ah or (o.w and (o.w.m == 1459 or o.w.m == 1460 or o.w.m == 1461))
       if o.w and o.k == "item" and o.src and not bg then
         -- composant d'artisanat / HV : la « meilleure » source n'a qu'un taux de butin anecdotique
         local best = 0
@@ -2008,7 +2010,8 @@ function ns.ObjCount(log, qid, o)
     return keep(fin and 1 or 0, 1, fin)
   end
   if CQL and CQL.GetQuestObjectives then
-    local ok, objs = pcall(CQL.GetQuestObjectives, qid)
+    -- a quest Forever renumbered is in the log under its own number (e.real): its counters too
+    local ok, objs = pcall(CQL.GetQuestObjectives, e.real or qid)
     if ok and type(objs) == "table" and #objs > 0 then
       local c = {}
       for _, x in ipairs(objs) do
@@ -2425,7 +2428,8 @@ function ns.GameObjectives(qid, log)
   local e = qid and log and log[qid]
   if not e then return out end
   if CQL and CQL.GetQuestObjectives then
-    local ok, objs = pcall(CQL.GetQuestObjectives, qid)
+    -- a quest Forever renumbered is in the log under its own number (e.real): its counters too
+    local ok, objs = pcall(CQL.GetQuestObjectives, e.real or qid)
     if ok and type(objs) == "table" then
       for _, x in ipairs(objs) do
         if type(x) == "table" and plainStr(x.text) and x.text ~= "" then

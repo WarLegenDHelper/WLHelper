@@ -54,12 +54,33 @@ local function IsSecret(v) return issecretvalue ~= nil and issecretvalue(v) == t
 local function Str(v) if type(v) == "string" and not IsSecret(v) and v ~= "" then return v end end
 local function Num(v) if type(v) == "number" and not IsSecret(v) and v == v then return v end end
 
+-- Old reports go, once a session, so the saved file never grows without end: here, one delivered
+-- 14 days ago (the inbox has it) or one that never found an inbox in 45 days; in an inbox, one
+-- received more than 60 days ago (read by then). Delivered ones are never sent again, so nothing
+-- comes back.
+local OUT_KEEP, LOST_KEEP, INBOX_KEEP = 14 * 86400, 45 * 86400, 60 * 86400
+local pruned = false
+local function Prune(r)
+    local now = (time and time()) or 0
+    if now <= 0 then return end
+    for id, rec in pairs(r.out) do
+        local at = type(rec) == "table" and tonumber(rec.at) or 0
+        if type(rec) ~= "table" or (rec.delivered and now - at > OUT_KEEP) or now - at > LOST_KEEP then r.out[id] = nil end
+    end
+    for id, rec in pairs(r.inbox) do
+        local at = type(rec) == "table" and (tonumber(rec.got) or tonumber(rec.at)) or 0
+        if type(rec) ~= "table" or now - at > INBOX_KEEP then r.inbox[id] = nil end
+    end
+end
+R._Prune = function(r) Prune(r) end   -- tests
+
 local function DB()
     if type(WLWritsDB) ~= "table" then return nil end
     local r = WLWritsDB.reports
     if type(r) ~= "table" then r = {}; WLWritsDB.reports = r end
     r.out = type(r.out) == "table" and r.out or {}
     r.inbox = type(r.inbox) == "table" and r.inbox or {}
+    if not pruned then pruned = true; Prune(r) end
     return r
 end
 

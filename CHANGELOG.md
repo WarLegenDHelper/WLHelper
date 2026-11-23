@@ -6,6 +6,20 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.207] — 2026-11-23
+
+### Corrigé / Fixed
+- **Set de donjon 2 (T0.5) : plus de Stratholme dès le départ.** An Earnest Proposition demande une pièce du set de donjon 1, par exemple les Magister's Bindings pour un mage. Les données ne savaient pas où la trouver, alors le guide te faisait faire tout Stratholme avant même de rendre la quête. Cette pièce est liée quand équipée et tombe au pic Rochenoire : le guide te dit maintenant de l'acheter à l'hôtel des ventes ou de garder celle d'un passage au pic. La route commence par les échantillons, puis Mokvar.
+  *Dungeon Set 2: An Earnest Proposition's Dungeon Set 1 piece is bind-on-equip (buy it or keep one from Blackrock Spire): the route no longer starts with a full Stratholme run.*
+- **Quêtes renumérotées par Forever : les compteurs sont lus sous le bon numéro.** Une quête que Forever a renumérotée, comme An Earnest Proposition (84157), voyait ses objectifs lus sous notre ancien numéro. Le jeu répondait alors n'importe quoi, et une étape passait pour faite alors que tu n'avais rien fait (les échantillons de Silithus, par exemple).
+  *Renumbered quests: objectives are now read under the quest log's own number, so a step is no longer skipped as done.*
+- **Corrigé grâce à vos relevés en jeu** (237 quêtes vues par la guilde, comparées au guide, puis vérifiées sur Wowhead WoW Forever) : le chef de guerre Goretooth, à Kargath, est en 3.1, 47.7 et non en 5.8, 47.4 ; Unstable Magic donne 14 550 XP, pas 8 300 ; la dernière quête de Scooty à Baie-du-Butin ne demande plus Rig Wars ; les deux Allegiance to the Old Gods ne demandent plus Trouble in the Deeps.
+  *From the guild's in-game quest records: Goretooth's position, Unstable Magic's XP, and three prerequisites the game does not need; checked on Wowhead WoW Forever.*
+- **Relevés de quêtes plus justes.** Un prérequis n'est plus noté « pas nécessaire » quand c'est celui de l'autre faction, quand tu l'as rendu sous un numéro propre à Forever, ou quand il est encore dans ton journal.
+  *Quest records: a faction twin, a renumbered quest or one still in the log is no longer noted as "not a prerequisite".*
+- **La sauvegarde ne grossit plus sans fin.** Les rapports déjà livrés partent après 14 jours, ceux qui n'ont jamais trouvé de destinataire après 45 jours, et ceux reçus dans une boîte de réception après 60 jours.
+  *Saved reports are pruned: delivered ones after 14 days, undelivered after 45, received ones after 60.*
+
 ## [1.0.0-beta.206] — 2026-11-22
 
 ### Corrigé / Fixed
