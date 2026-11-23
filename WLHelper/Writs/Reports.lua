@@ -516,7 +516,13 @@ function R.MemText()
     local list = {}
     for tag, pf in pairs(perf) do if type(pf) == "table" and Num(pf.max) then list[#list + 1] = { tag, pf.max } end end
     table.sort(list, function(a, b) return a[2] > b[2] end)
-    for i = 1, math.min(3, #list) do slow[i] = list[i][1] .. "=" .. list[i][2] .. "ms" end
+    -- the worst time and the usual one: "mapOpen=803.5ms (avg 63)". One slow opening (the first, a
+    -- loading screen) is not a slow map; the average says how it feels.
+    for i = 1, math.min(3, #list) do
+        local pf = perf[list[i][1]]
+        local avg = Num(pf.n) and pf.n > 0 and Num(pf.total) and math.floor(pf.total / pf.n + 0.5) or nil
+        slow[i] = list[i][1] .. "=" .. list[i][2] .. "ms" .. (avg and (" (avg " .. avg .. ")") or "")
+    end
     local upMin = math.floor(((GetTime and GetTime()) or 0) / 60)
     return string.format("MEM (MB) WLH %s | all addons %s (%d) | top %s | slowest %s | session %d min",
         table.concat(ours, " "), MB(total), #all, table.concat(top, " "), #slow > 0 and table.concat(slow, " ") or "-", upMin)

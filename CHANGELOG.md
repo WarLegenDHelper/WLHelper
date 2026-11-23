@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.211] — 2026-11-23
+
+### Corrigé / Fixed
+- **T0.5 du mage : la dernière quête dit quoi apporter.** Saving the Best for Last demande la Magister's Crown et les Magister's Robes (vérifié sur Wowhead WoW Forever). Les deux sont liées au ramassage : la couronne tombe sur Darkmaster Gandling à Scholomance (environ 12 %), la robe sur General Drakkisath au pic Rochenoire supérieur (environ 10 %). Le guide te dit de les garder de n'importe quel passage.
+  *Mage Dungeon Set 2: Saving the Best for Last now lists Magister's Crown (Darkmaster Gandling) and Magister's Robes (General Drakkisath), both bind on pickup.*
+- **Rapport de mémoire plus juste.** À côté du temps le plus lent, il donne maintenant la moyenne : une seule ouverture de carte lente, comme la première après un écran de chargement, ne fait plus croire que la carte est lente.
+  *Memory report: the average time is shown beside the slowest one.*
+
 ## [1.0.0-beta.210] — 2026-11-23
 
 ### Corrigé / Fixed

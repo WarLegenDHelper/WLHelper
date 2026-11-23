@@ -108,6 +108,22 @@ if not ns.Q[9011] then ns.Q[9011]={nf="Garder le meilleur pour la fin",c="SHAMAN
 if not ns.Q[9012] then ns.Q[9012]={nf="Garder le meilleur pour la fin",c="WARLOCK",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
 if not ns.Q[9013] then ns.Q[9013]={nf="Garder le meilleur pour la fin",c="WARRIOR",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
 if not ns.Q[9014] then ns.Q[9014]={nf="Garder le meilleur pour la fin",c="MAGE",n="Saving the Best for Last",l=60,r=58,fa="Horde",d="QG_T05",role="main",p={8998},s={m=1454,x=34.9,y=38.3,n="Mokvar"},st="Mokvar",f={m=1454,x=34.4,y=37.4,n="Mokvar"},ft="Mokvar",xp=1650} end
+-- Horde mage: Magister's Crown and Magister's Robes (Wowhead Forever quest=9014). Both bind on pickup:
+-- Darkmaster Gandling (Scholomance, 11.7 %) and General Drakkisath (Upper Blackrock Spire, 10.4 %),
+-- item=16686 and 16688. Kept from runs done meanwhile: no place of their own in the route (o.ah).
+do
+  local q = ns.Q[9014]
+  if q and q.c == "MAGE" and not q.o then
+    local CROWN = "Bind on pickup: Darkmaster Gandling drops it in Scholomance (about 12 %). Keep it from any run."
+    local ROBES = "Bind on pickup: General Drakkisath drops them in Upper Blackrock Spire (about 10 %). Keep them from any run."
+    q.o = { { k = "item", n = "Magister's Crown", c = 1, ins = false, unk = false, ah = true, t = { "Darkmaster Gandling" }, note = CROWN },
+            { k = "item", n = "Magister's Robes", c = 1, ins = false, unk = false, ah = true, t = { "General Drakkisath" }, note = ROBES } }
+    q.oe = "Give Mokvar your Magister's Crown and Magister's Robes."
+    ns.TR[CROWN] = "Lié au ramassage : Darkmaster Gandling le lâche à Scholomance (environ 12 %). Garde-le de n'importe quel passage."
+    ns.TR[ROBES] = "Liés au ramassage : General Drakkisath les lâche au pic Rochenoire supérieur (environ 10 %). Garde-les de n'importe quel passage."
+    ns.TR[q.oe] = "Donne à Mokvar ta Magister's Crown et tes Magister's Robes."
+  end
+end
 
 -- ---------------------------------------------------------------- the level 60 weekly: Undermine Satchel
 -- In Demand - Ancient Elven Curiosities (WoW Forever only), Pix Xizzix in Booty Bay: one item from

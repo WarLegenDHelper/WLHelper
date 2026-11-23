@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.211", date = "2026-11-23", items = {
+    { s = "fix", fr = { "T0.5 du mage : la dernière quête dit quoi apporter.", "Saving the Best for Last demande la Magister's Crown et les Magister's Robes (vérifié sur Wowhead WoW Forever). Les deux sont liées au ramassage : la couronne tombe sur Darkmaster Gandling à Scholomance (environ 12 %), la robe sur General Drakkisath au pic Rochenoire supérieur (environ 10 %). Le guide te dit de les garder de n'importe quel passage." }, en = { "Mage Dungeon Set 2", "Saving the Best for Last now lists Magister's Crown (Darkmaster Gandling) and Magister's Robes (General Drakkisath), both bind on pickup." } },
+    { s = "fix", fr = { "Rapport de mémoire plus juste.", "À côté du temps le plus lent, il donne maintenant la moyenne : une seule ouverture de carte lente, comme la première après un écran de chargement, ne fait plus croire que la carte est lente." }, en = { "Memory report", "The average time is shown beside the slowest one." } },
+  } },
   { v = "1.0.0-beta.210", date = "2026-11-23", items = {
     { s = "fix", fr = { "La flèche ne vise plus un point quand tu es déjà au milieu des monstres.", "Les échantillons de venin de Silithus (T0.5, An Earnest Proposition) se farment maintenant sur une zone de six camps de scorpides, et non plus sur un seul point. Dans un camp, la flèche te dit « Dans la zone » ; ailleurs, elle t'envoie au camp le plus proche. Même chose pour quelques autres quêtes de farm : les chauves-souris et les chiens de la peste des Maleterres de l'Est, les Swamp Talkers du marais des Chagrins, les Azsharite Formations d'Azshara et les yétis d'Hivernale." }, en = { "Farming objectives", "Silithus Venom Samples and a few other kill or loot quests now use a zone of camps; in a camp the arrow says \"In the area\" instead of pointing at one spot." } },
   } },
@@ -52,8 +56,5 @@ ns.WHATSNEW = {
     { s = "chg", fr = { "L'hebdo n'est plus dans l'onglet Quêtes", "Du choix des guides : il est sur l'accueil. La recherche du choix des guides le trouve encore." }, en = { "The weekly left the guide picker's Quests tab (it is on Home now); the picker's search still finds it.", "" } },
     { s = "chg", fr = { "Le guide des réputations se trouve enfin", "Une ligne « Réputations » dans la carte Progresser de l'accueil, et une entrée dans le menu de gauche sous Progresser. Les deux ouvrent directement l'onglet Réputations." }, en = { "The reputations guide is easy to find", "A \"Reputations\" line in Home's Progress card and an entry under Progress in the left menu, both opening the Reputations tab." } },
     { s = "add", fr = { "Réputations : la liste des quêtes", "La carte de chaque faction liste ses quêtes, cochées si elles sont faites, \"en cours\" si elles sont dans ton journal, avec le rang requis sinon. Pour l'instant Grumegueule (37 quêtes, d'après le guide de réputation de Wowhead WoW Forever)." }, en = { "Each reputation card lists the faction's quests, ticked when done (Timbermaw Hold for now).", "" } },
-  } },
-  { v = "1.0.0-beta.196", date = "2026-11-22", items = {
-    { s = "fix", fr = { "Plus de quête que tu ne peux pas prendre à cause de ta réputation", "Une quête qui demande une réputation que tu n'as pas sort du trajet. Elle apparaît comme verrouillée, avec la raison (« réputation Timbermaw Hold requise : Neutre »), et revient dès que tu l'as. Ça concerne d'abord les quêtes de Blackmaw Hold en Azshara (Neutre avec Grumegueule), sauf The Legashi Threat qui se prend sans réputation. Une quête déjà dans ton journal reste dans le trajet." }, en = { "A quest that needs a reputation you do not have leaves the route, locked with the reason, and comes back once you have it (Blackmaw Hold's Azshara quests: Neutral with Timbermaw Hold).", "" } },
   } },
 }
