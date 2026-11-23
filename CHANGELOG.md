@@ -6,6 +6,14 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.216] — 2026-11-23
+
+### Corrigé / Fixed
+- **Sacs dit quand LibForeverData est désactivé.** Sans cette bibliothèque, la fenêtre ne sait pas quelle quête utilise quel objet : elle ne liste plus rien et dit de l'activer dans la liste des addons, au lieu de proposer des objets au hasard.
+  *The Bags window says when LibForeverData is turned off instead of listing items it cannot judge.*
+- **Omokk's Head et Warosh's Scroll sont reliés à la quête Urok Doomhowl** (vérifié sur Wowhead Forever). Une fois la quête rendue, Sacs les propose.
+  *Omokk's Head and Warosh's Scroll are tied to "Urok Doomhowl": offered once it is turned in.*
+
 ## [1.0.0-beta.215] — 2026-11-23
 
 ### Corrigé / Fixed

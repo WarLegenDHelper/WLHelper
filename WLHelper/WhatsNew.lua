@@ -2,6 +2,10 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.216", date = "2026-11-23", items = {
+    { s = "fix", fr = { "Sacs dit quand LibForeverData est désactivé.", "Sans cette bibliothèque, la fenêtre ne sait pas quelle quête utilise quel objet : elle ne liste plus rien et dit de l'activer dans la liste des addons, au lieu de proposer des objets au hasard." }, en = { "The Bags window says when LibForeverData is turned off instead of listing items it cannot judge.", "" } },
+    { s = "fix", fr = { "Omokk's Head et Warosh's Scroll sont reliés à la quête Urok Doomhowl", ". Une fois la quête rendue, Sacs les propose." }, en = { "Omokk's Head and Warosh's Scroll are tied to \"Urok Doomhowl\": offered once it is turned in.", "" } },
+  } },
   { v = "1.0.0-beta.215", date = "2026-11-23", items = {
     { s = "fix", fr = { "Sacs ne propose plus de jeter un objet qu'aucune quête connue n'utilise.", "La liste « À détruire toi-même » mettait des objets que nos données ne savent pas relier à une quête : le Unadorned Seal of Ascension (la clé du pic Rochenoire supérieur), Omokk's Head et Warosh's Scroll (Urok Doomhowl), les Deadwood Tribal Beads (monnaie des furbolgs Barkskin). Ne pas les connaître ne veut pas dire qu'ils sont inutiles : ils ne sont plus listés. Seuls restent les objets d'une quête rendue, et ceux d'une quête d'une autre faction ou classe." }, en = { "The Bags window no longer lists items no known quest uses (the Upper Blackrock Spire seal, Omokk's Head, Warosh's Scroll, the Barkskin beads): unknown is not useless.", "" } },
   } },
@@ -48,8 +52,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.202", date = "2026-11-22", items = {
     { s = "fix", fr = { "Les quêtes que Forever a renumérotées", "Quelques quêtes connues ont un nouveau numéro sur Forever, par exemple An Earnest Proposition chez Mokvar (97411) ou les Just Compensation du set de donjon 2. Le guide ne les voyait pas dans ton journal et disait toujours « Accepter ». Maintenant, une quête du journal au numéro inconnu mais au titre connu compte pour la nôtre, si ton personnage peut la faire (faction, classe, race) : prise, prête à rendre, puis faite une fois rendue. Le nouveau numéro est retenu pour la suite de la chaîne." }, en = { "Quests Forever renumbered (An Earnest Proposition 97411, Just Compensation…) are recognised by their title, so the guide sees them taken, ready and turned in.", "" } },
-  } },
-  { v = "1.0.0-beta.201", date = "2026-11-22", items = {
-    { s = "add", fr = { "Voleurs : le Talisman of Kazdor", ", avec toute la suite de Fahrad : Fool Me Twice, The Talisman of Kazdor, Best Laid Plans, One Last Drop et Biding Our Time. La dernière rapporte le Filcher's Cowl et la Rune of the Coterie. La quête du donjon explique la marche à suivre : les deux Vile Concoction dans le chaudron d'Antu'sul, la tombe qui brille, le Hollow Emblem sur la corniche, puis Nekrum assommé. La suite n'est proposée qu'après The Eye of Bhossca, la chaîne de voleur d'avant. Tout a été lu sur Wowhead WoW Forever." }, en = { "Rogues", "The Talisman of Kazdor (Zul'Farrak, solo) and Fahrad's whole chain, offered once The Eye of Bhossca is done, with the walkthrough; read on Wowhead WoW Forever." } },
   } },
 }

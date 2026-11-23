@@ -17,6 +17,9 @@ ns.AddEnglish({
     ["Objet rare : le jeu demande une confirmation écrite"] = "Rare item: the game asks for a typed confirmation",
     ["Une quête de ton journal est inconnue : elle en a peut-être besoin"] = "A quest in your log is unknown: it may still need it",
     ["Seulement pour une quête d'une autre faction ou classe"] = "Only for a quest of another faction or class",
+    ["LibForeverData est désactivé"] = "LibForeverData is turned off",
+    ["Active LibForeverData dans la liste des addons (bouton AddOns de l'écran des personnages), puis recharge : sans ses données, Sacs ne sait pas quels objets ne servent plus."] =
+        "Turn LibForeverData on in the addon list (AddOns button on the character screen), then reload: without its data, Bags cannot tell which items are no longer needed.",
     ["Ces objets ne servent plus, mais le jeu les fait détruire à la main, depuis tes sacs."] =
         "These items are no longer needed, but the game has you destroy them by hand, from your bags.",
     ["Sacs"] = "Bags",
@@ -145,12 +148,17 @@ local KEEP = {
 
 -- needBy[itemID] = { { id, name, side, classes }, ... } quests whose objectives or steps use the
 -- item; starter[itemID] = true when a quest starts from it. Built once, on the first scan.
+-- Items the data does not tie to their quest, checked on Wowhead Forever: Omokk's Head (summons Urok
+-- Doomhowl with the Roughshod Pike) and Warosh's Scroll (given for "Urok Doomhowl").
+local LINKS = { [12534] = { 4867 }, [12730] = { 4867 } }
+
 local needBy, starter
 local function BuildIndex()
     if needBy then return end
-    needBy, starter = {}, {}
     local lib = Lib()
+    -- LibForeverData off: no index, asked again on the next scan (never an empty one kept for good)
     if not lib then return end
+    needBy, starter = {}, {}
     local ids = safe(lib.Ids, "quest") or {}
     for _, qid in ipairs(ids) do
         local q = safe(lib.Get, "quest", qid)
@@ -174,6 +182,16 @@ local function BuildIndex()
                 for _, st in ipairs(safe(lib.Steps, qid) or {}) do
                     if st.targetKind == "item" then add(st.target) end
                 end
+            end
+        end
+    end
+    for item, qids in pairs(LINKS) do
+        for _, qid in ipairs(qids) do
+            local q = safe(lib.Get, "quest", qid)
+            if q then
+                local list = needBy[item] or {}
+                needBy[item] = list
+                list[#list + 1] = { id = qid, name = q.name, side = q.side or 0, classes = q.classes or 0 }
             end
         end
     end
@@ -295,6 +313,7 @@ end
 local function French() return root.lang == "fr" or (GetLocale() == "frFR" and root.lang ~= "en") end
 
 local entries = {}          -- { id, name, count, quality, slots, reason, amber, manual }
+local noData = false        -- LibForeverData is off: the window says so instead of "clean"
 local userChecked = {}      -- itemID -> true/false once the player clicked its box
 local dirty = true
 
@@ -308,6 +327,12 @@ local function Scan()
         return entries
     end
     BuildIndex()
+    noData = not needBy
+    if noData then
+        -- without LibForeverData nothing tells a useless item from a key or a summon: list nothing
+        entries, dirty = {}, false
+        return entries
+    end
     local needIds, texts, readLog, unknownQuest = LogNeeds()
     -- Without LibForeverData or readable objectives we cannot be sure: nothing is checked by default.
     local unsure = not Lib() or not readLog
@@ -606,6 +631,14 @@ Refresh = function(rescan)
     for i = k + 1, #heads do heads[i]:Hide() end
     win.listH = y
     win.list:SetShown(#entries > 0)
+    if #entries == 0 then
+        if noData then
+            win.empty:Set("bag", L("LibForeverData est désactivé"),
+                L("Active LibForeverData dans la liste des addons (bouton AddOns de l'écran des personnages), puis recharge : sans ses données, Sacs ne sait pas quels objets ne servent plus."))
+        else
+            win.empty:Set("bag", L("Tes sacs sont propres"), L("Les objets de quête qui ne servent plus apparaîtront ici."))
+        end
+    end
     win.empty:SetShown(#entries == 0)
     win.UpdateFooter()
     win.Fit()
@@ -768,6 +801,7 @@ WP.Cleaner = {
     Hide = function() if win then win:Hide() end end,
     -- Every row the window lists, by hand ones included (for the tests).
     _Entries = function() if dirty then Scan() end return entries end,
+    _NoData = function() return noData end,
     -- How many items the window offers (for the home page and the minimap tooltip).
     Count = function()
         if not WP.ModuleOn("bags") then return 0 end
