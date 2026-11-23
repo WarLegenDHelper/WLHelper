@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.217", date = "2026-11-23", items = {
+    { s = "fix", fr = { "Le n°1 de ta liste BiS a son badge même si ton objet n'est pas dans la liste.", "Quand l'objet porté n'était pas classé par Naowh, notre score décidait seul et pouvait refuser le badge au meilleur objet de la liste (l'Arcanoweave Cloak chez le marchand, face à une Deep Woodlands Cloak). Le n°1 de la liste passe maintenant devant, et l'infobulle dit « Liste BiS de Naowh : n°1, ton objet n'y est pas »." }, en = { "The BiS list's #1 gets its arrow even when the worn item is not in the list (Arcanoweave Cloak over a Deep Woodlands Cloak).", "" } },
+  } },
   { v = "1.0.0-beta.216", date = "2026-11-23", items = {
     { s = "fix", fr = { "Sacs dit quand LibForeverData est désactivé.", "Sans cette bibliothèque, la fenêtre ne sait pas quelle quête utilise quel objet : elle ne liste plus rien et dit de l'activer dans la liste des addons, au lieu de proposer des objets au hasard." }, en = { "The Bags window says when LibForeverData is turned off instead of listing items it cannot judge.", "" } },
     { s = "fix", fr = { "Omokk's Head et Warosh's Scroll sont reliés à la quête Urok Doomhowl", ". Une fois la quête rendue, Sacs les propose." }, en = { "Omokk's Head and Warosh's Scroll are tied to \"Urok Doomhowl\": offered once it is turned in.", "" } },
@@ -49,8 +52,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.203", date = "2026-11-22", items = {
     { s = "add", fr = { "Rapport automatique des quêtes renumérotées", "Quand le guide reconnaît par son titre une quête du journal dont le numéro nous est inconnu, il envoie tout seul un rapport discret à l'équipe WL Helper, une fois par numéro, pour qu'on l'ajoute aux données. An Earnest Proposition 84157 (vue chez un mage Horde) est déjà ajoutée." }, en = { "A renumbered quest recognised by its title is reported once, quietly, so its number goes into the data; An Earnest Proposition 84157 added.", "" } },
-  } },
-  { v = "1.0.0-beta.202", date = "2026-11-22", items = {
-    { s = "fix", fr = { "Les quêtes que Forever a renumérotées", "Quelques quêtes connues ont un nouveau numéro sur Forever, par exemple An Earnest Proposition chez Mokvar (97411) ou les Just Compensation du set de donjon 2. Le guide ne les voyait pas dans ton journal et disait toujours « Accepter ». Maintenant, une quête du journal au numéro inconnu mais au titre connu compte pour la nôtre, si ton personnage peut la faire (faction, classe, race) : prise, prête à rendre, puis faite une fois rendue. Le nouveau numéro est retenu pour la suite de la chaîne." }, en = { "Quests Forever renumbered (An Earnest Proposition 97411, Just Compensation…) are recognised by their title, so the guide sees them taken, ready and turned in.", "" } },
   } },
 }

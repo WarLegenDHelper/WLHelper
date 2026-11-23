@@ -85,6 +85,7 @@ ns.AddEnglish({
     ["Ni % ni flèche sur une armure plus légère."] = "No % or arrow on lighter armor.",
     ["Expliquer le pourcentage"] = "Explain the percent",
     ["Liste BiS de Naowh : n°%d, mieux que ton objet (n°%d). À prendre."] = "Naowh's BiS list: #%d, better than yours (#%d). Take it.",
+    ["Liste BiS de Naowh : n°1, ton objet n'y est pas. À prendre."] = "Naowh's BiS list: #1, yours is not in it. Take it.",
     ["Liste BiS de Naowh : n°%d, moins bien que ton objet (n°%d). Garde le tien."] = "Naowh's BiS list: #%d, below yours (#%d). Keep yours.",
     ["Dès le niveau 40 : chaman et chasseur sans cuir ni tissu, guerrier et paladin sans mailles, cuir ni tissu, druide et voleur sans tissu. L'infobulle dit « Armure plus légère que la tienne »."] =
         "From level 40: shaman and hunter without leather or cloth, warrior and paladin without mail, leather or cloth, druid and rogue without cloth. The tooltip says \"Armor lighter than yours\".",
@@ -383,17 +384,22 @@ local function BisOrder(link)
     local okR, rc = pcall(NB.Rank, link, spec)
     local okS, src = pcall(NB.Source, link, spec)
     if not (okR and okS and type(rc) == "number" and ORDERED[src]) then return Done(nil) end
-    local id, worst = LinkID(link), nil
+    local id, worst, outside = LinkID(link), nil, false
     for _, s in ipairs(slots) do
         local cur = GetInventoryItemLink("player", s)
         -- an empty slot or the same item worn: the score says it (empty slot, unique item)
         if not cur or LinkID(cur) == id then return Done(nil) end
         local okW, rw = pcall(NB.Rank, cur, spec)
         local okWS, ws = pcall(NB.Source, cur, spec)
-        -- a worn item out of the list: the list says nothing about it
-        if not (okW and okWS and type(rw) == "number" and ORDERED[ws]) then return Done(nil) end
-        if not worst or rw > worst then worst = rw end
+        if not (okW and okWS and type(rw) == "number" and ORDERED[ws]) then
+            -- a worn item out of the list: the list says nothing about it, except that its #1 is
+            -- the best for the slot (report: Arcanoweave Cloak, #1 for frost mages, no "BiS" at the
+            -- vendor over a Deep Woodlands Cloak the list does not name)
+            if rc ~= 1 then return Done(nil) end
+            outside = true
+        elseif not worst or rw > worst then worst = rw end
     end
+    if outside then return Done("up", rc, nil) end
     if not worst or worst == rc then return Done(nil) end
     return Done(rc < worst and "up" or "down", rc, worst)
 end
@@ -1011,7 +1017,12 @@ local function BisLine(tip, link)
     if not (Active() and link) or WLWritsDB.upgradeTip == false then return end
     local order, rc, rw = BisOrder(link)
     if not order then return end
-    if order == "up" then
+    if order == "up" and not rw then
+        -- only when the list changes the verdict: the score already says "take it" otherwise
+        local okR, r = pcall(CheckMainRaw, link)
+        if okR and type(r) == "table" and r.up then return end
+        tip:AddLine(L("Liste BiS de Naowh : n°1, ton objet n'y est pas. À prendre."), GREEN[1], GREEN[2], GREEN[3], true)
+    elseif order == "up" then
         tip:AddLine(string.format(L("Liste BiS de Naowh : n°%d, mieux que ton objet (n°%d). À prendre."), rc, rw), GREEN[1], GREEN[2], GREEN[3], true)
     else
         tip:AddLine(string.format(L("Liste BiS de Naowh : n°%d, moins bien que ton objet (n°%d). Garde le tien."), rc, rw), GREY[1], GREY[2], GREY[3], true)

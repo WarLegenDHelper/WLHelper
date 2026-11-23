@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.217] — 2026-11-23
+
+### Corrigé / Fixed
+- **Le n°1 de ta liste BiS a son badge même si ton objet n'est pas dans la liste.** Quand l'objet porté n'était pas classé par Naowh, notre score décidait seul et pouvait refuser le badge au meilleur objet de la liste (l'Arcanoweave Cloak chez le marchand, face à une Deep Woodlands Cloak). Le n°1 de la liste passe maintenant devant, et l'infobulle dit « Liste BiS de Naowh : n°1, ton objet n'y est pas ».
+  *The BiS list's #1 gets its arrow even when the worn item is not in the list (Arcanoweave Cloak over a Deep Woodlands Cloak).*
+
 ## [1.0.0-beta.216] — 2026-11-23
 
 ### Corrigé / Fixed
