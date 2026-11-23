@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.212] — 2026-11-23
+
+### Amélioré / Improved
+- **Unstable Magic se prend et se rend toute seule.** La quête répétable des Mote of Unstable Magic (Nuara Tremorhoof pour la Horde, Archmage Celindra pour l'Alliance) est prise, rendue et reprise sans un clic, même si son guide n'est pas coché. Parle au PNJ avec tes Motes dans les sacs : ça tourne tant que tu en as assez. Ce sont les mêmes réglages que les quêtes du guide (Réglages > Quêtes et donjons > Quêtes du guide) ; garde Maj enfoncée pour le faire à la main.
+  *Unstable Magic (Mote of Unstable Magic) is taken and handed in by itself, again and again while you have the motes, with the guide quests' switches; hold Shift to do it by hand.*
+
 ## [1.0.0-beta.211] — 2026-11-23
 
 ### Corrigé / Fixed

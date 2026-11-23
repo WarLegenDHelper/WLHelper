@@ -92,6 +92,18 @@ local function InRoute(qid)
     return GQ.RouteSet()[qid] == true
 end
 GQ.InRoute = InRoute
+-- Repeatable hand-ins you farm, taken and handed in with the same switches even when their guide is
+-- not ticked (report: "make the Mote of Unstable Magic repeatable automatic, clicking is a pain"):
+-- Unstable Magic, Horde 98477 (Nuara Tremorhoof) and Alliance 96603 (Archmage Celindra). Their one
+-- reward has no choice; talking to the NPC with motes in the bags hands in, takes it again, and so
+-- on until the motes run out. Never shared with the group.
+local FARM = { [98477] = true, [96603] = true }
+GQ.FARM = FARM
+local function Auto(qid)
+    qid = Num(qid)
+    return qid ~= nil and (FARM[qid] == true or InRoute(qid))
+end
+GQ.Auto = Auto
 
 -- the route's quests by name (the NPC greeting of old quest givers lists titles only)
 local function RouteByTitle(title)
@@ -373,18 +385,18 @@ end
 -- ---------------------------------------------------------------- events
 local function OnDetail()
     local qid = Num(GetQuestID and GetQuestID()) or 0
-    if not On("questAutoAccept") or not InRoute(qid) or InLog(qid) then return end
+    if not On("questAutoAccept") or not Auto(qid) or InLog(qid) then return end
     Later(SameQuest(qid), function() if not InLog(qid) then AcceptQuest() end end)
 end
 local function OnProgress()
     local qid = Num(GetQuestID and GetQuestID()) or 0
-    if not On("questAutoTurnIn") or not InRoute(qid) or MoneyAsked() then return end
+    if not On("questAutoTurnIn") or not Auto(qid) or MoneyAsked() then return end
     if not (IsQuestCompletable and IsQuestCompletable()) then return end
     Later(SameQuest(qid), CompleteQuest)
 end
 local function OnComplete()
     local qid = Num(GetQuestID and GetQuestID()) or 0
-    if not On("questAutoTurnIn") or not InRoute(qid) or MoneyAsked() then return end
+    if not On("questAutoTurnIn") or not Auto(qid) or MoneyAsked() then return end
     Later(SameQuest(qid), function() TakeReward(qid) end)
 end
 local function GossipHas(list, qid)
@@ -398,7 +410,7 @@ local function OnGossip()
     if not G then return end
     if On("questAutoTurnIn") and G.GetActiveQuests then
         for _, q in ipairs(G.GetActiveQuests() or {}) do
-            if q.isComplete and InRoute(q.questID) then
+            if q.isComplete and Auto(q.questID) then
                 local id = q.questID
                 Later(GossipHas("GetActiveQuests", id), function() G.SelectActiveQuest(id) end)
                 return
@@ -407,7 +419,7 @@ local function OnGossip()
     end
     if On("questAutoAccept") and G.GetAvailableQuests then
         for _, q in ipairs(G.GetAvailableQuests() or {}) do
-            if InRoute(q.questID) then
+            if Auto(q.questID) then
                 local id = q.questID
                 Later(GossipHas("GetAvailableQuests", id), function() G.SelectAvailableQuest(id) end)
                 return
@@ -420,7 +432,7 @@ local function OnGreeting()
         for i = 1, GetNumActiveQuests() or 0 do
             local title, complete = GetActiveTitle(i)
             local qid = Num(GetActiveQuestID and GetActiveQuestID(i)) or RouteByTitle(title)
-            if complete and qid and InRoute(qid) then
+            if complete and qid and Auto(qid) then
                 Later(function() return GetActiveTitle(i) == title end, function() SelectActiveQuest(i) end)
                 return
             end
@@ -430,7 +442,7 @@ local function OnGreeting()
         for i = 1, GetNumAvailableQuests() or 0 do
             local title = GetAvailableTitle(i)
             local qid = GetAvailableQuestInfo and Num(select(5, GetAvailableQuestInfo(i))) or RouteByTitle(title)
-            if qid and InRoute(qid) then
+            if qid and Auto(qid) then
                 Later(function() return GetAvailableTitle(i) == title end, function() SelectAvailableQuest(i) end)
                 return
             end
