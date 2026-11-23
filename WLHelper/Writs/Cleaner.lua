@@ -3,6 +3,7 @@
 -- button. It never offers an item that starts a quest, an item an active quest asks for, the
 -- Craftsman's Writ envelopes and Coin Pouches, nor anything that is not a quest item. Items that
 -- LibForeverData says a quest you have not done yet still needs are listed in amber, unchecked.
+-- An item no quest in the data names is never listed: we cannot tell it is useless.
 -- Rare or better items are only listed: the game would ask for a typed confirmation.
 local ADDON, root = ...
 -- The Writs module of WL Helper keeps its own table inside the addon's namespace.
@@ -15,7 +16,7 @@ ns.AddEnglish({
     -- reasons under the "À détruire toi-même" header: they say why, not the header again
     ["Objet rare : le jeu demande une confirmation écrite"] = "Rare item: the game asks for a typed confirmation",
     ["Une quête de ton journal est inconnue : elle en a peut-être besoin"] = "A quest in your log is unknown: it may still need it",
-    ["Aucune quête rendue ne l'utilise : détruis-le seulement si tu es sûr"] = "No turned-in quest uses it: destroy it only if you are sure",
+    ["Seulement pour une quête d'une autre faction ou classe"] = "Only for a quest of another faction or class",
     ["Ces objets ne servent plus, mais le jeu les fait détruire à la main, depuis tes sacs."] =
         "These items are no longer needed, but the game has you destroy them by hand, from your bags.",
     ["Sacs"] = "Bags",
@@ -339,6 +340,11 @@ local function Scan()
                             e = nil                      -- a quest in your log uses it
                         elseif KEEP[id] then
                             e = nil                      -- to keep (the Zul'Farrak mallet...): not listed
+                        elseif not (needBy[id] and needBy[id][1]) then
+                            -- no quest in the data names it: unknown is not useless (report: the
+                            -- Unadorned Seal of Ascension, the Upper Blackrock Spire key, listed with
+                            -- Omokk's Head, Warosh's Scroll and the Barkskin furbolgs' beads); not listed
+                            e = nil
                         elseif e.quality >= MANUAL_QUALITY then
                             e.manual, e.reason = true, L("Objet rare : le jeu demande une confirmation écrite")
                         elseif usableCache[id] and not done then
@@ -355,12 +361,12 @@ local function Scan()
                                 e.reason = L("Quête déjà rendue")
                             end
                         else
-                            -- no data ties it to a quest you turned in: the game abandons a quest
-                            -- whose item is destroyed, so this one is only listed, never destroyed here
+                            -- only quests of another faction or class use it: listed, never destroyed
+                            -- here (the game abandons a quest whose item is destroyed)
                             e.manual = true
                             e.reason = unknownQuest
                                 and L("Une quête de ton journal est inconnue : elle en a peut-être besoin")
-                                or L("Aucune quête rendue ne l'utilise : détruis-le seulement si tu es sûr")
+                                or L("Seulement pour une quête d'une autre faction ou classe")
                         end
                         if e then
                             if unsure and not e.manual then e.amber = true end
@@ -760,6 +766,8 @@ WP.Cleaner = {
         win:Show()
     end,
     Hide = function() if win then win:Hide() end end,
+    -- Every row the window lists, by hand ones included (for the tests).
+    _Entries = function() if dirty then Scan() end return entries end,
     -- How many items the window offers (for the home page and the minimap tooltip).
     Count = function()
         if not WP.ModuleOn("bags") then return 0 end

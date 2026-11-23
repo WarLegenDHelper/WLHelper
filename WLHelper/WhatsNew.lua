@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.215", date = "2026-11-23", items = {
+    { s = "fix", fr = { "Sacs ne propose plus de jeter un objet qu'aucune quête connue n'utilise.", "La liste « À détruire toi-même » mettait des objets que nos données ne savent pas relier à une quête : le Unadorned Seal of Ascension (la clé du pic Rochenoire supérieur), Omokk's Head et Warosh's Scroll (Urok Doomhowl), les Deadwood Tribal Beads (monnaie des furbolgs Barkskin). Ne pas les connaître ne veut pas dire qu'ils sont inutiles : ils ne sont plus listés. Seuls restent les objets d'une quête rendue, et ceux d'une quête d'une autre faction ou classe." }, en = { "The Bags window no longer lists items no known quest uses (the Upper Blackrock Spire seal, Omokk's Head, Warosh's Scroll, the Barkskin beads): unknown is not useless.", "" } },
+  } },
   { v = "1.0.0-beta.214", date = "2026-11-23", items = {
     { s = "chg", fr = { "Les objectifs de farm vont sur la zone bleue du jeu, avec un point fixe.", "Le guide ne calcule plus ses propres zones de farm : elles ne collaient pas aux zones bleues de la carte et leur point te suivait à chaque pas. Le GPS va maintenant sur la zone de quête du jeu (la zone bleue), sinon sur le point de l'objectif dans nos données, et ce point ne bouge plus pendant que tu farmes. Les contours en pointillés et l'étiquette « Dans la zone » sont retirés." }, en = { "Farm objectives use the game's blue quest area as one fixed point, as other guides do: our own outlines and the spot that followed you are gone.", "" } },
   } },
@@ -48,8 +51,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.201", date = "2026-11-22", items = {
     { s = "add", fr = { "Voleurs : le Talisman of Kazdor", ", avec toute la suite de Fahrad : Fool Me Twice, The Talisman of Kazdor, Best Laid Plans, One Last Drop et Biding Our Time. La dernière rapporte le Filcher's Cowl et la Rune of the Coterie. La quête du donjon explique la marche à suivre : les deux Vile Concoction dans le chaudron d'Antu'sul, la tombe qui brille, le Hollow Emblem sur la corniche, puis Nekrum assommé. La suite n'est proposée qu'après The Eye of Bhossca, la chaîne de voleur d'avant. Tout a été lu sur Wowhead WoW Forever." }, en = { "Rogues", "The Talisman of Kazdor (Zul'Farrak, solo) and Fahrad's whole chain, offered once The Eye of Bhossca is done, with the walkthrough; read on Wowhead WoW Forever." } },
-  } },
-  { v = "1.0.0-beta.200", date = "2026-11-22", items = {
-    { s = "add", fr = { "Le début des suites de classe et Ramstein", "The Azure Key (voleur), Voodoo Feathers (guerrier) et A Better Ingredient (druide) disent maintenant où leur suite commence. C'est chez ton maître de classe : A Simple Request, A Troubled Spirit, Torwa Pathfinder. Ramstein dit qu'il faut d'abord « Duskwing, Oh How I Hate Thee... ». Tout a été vérifié sur Wowhead WoW Forever, qui corrige ForeverDungeonJournal sur deux points : les quêtes de classe ne sont pas facultatives, et Ramstein ne suit pas The Champion of the Banshee Queen." }, en = { "The rogue, warrior and druid chains say where they start (the class trainer), and Ramstein says it needs Duskwing first; checked on Wowhead WoW Forever.", "" } },
   } },
 }

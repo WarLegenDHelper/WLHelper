@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.215] — 2026-11-23
+
+### Corrigé / Fixed
+- **Sacs ne propose plus de jeter un objet qu'aucune quête connue n'utilise.** La liste « À détruire toi-même » mettait des objets que nos données ne savent pas relier à une quête : le Unadorned Seal of Ascension (la clé du pic Rochenoire supérieur), Omokk's Head et Warosh's Scroll (Urok Doomhowl), les Deadwood Tribal Beads (monnaie des furbolgs Barkskin). Ne pas les connaître ne veut pas dire qu'ils sont inutiles : ils ne sont plus listés. Seuls restent les objets d'une quête rendue, et ceux d'une quête d'une autre faction ou classe.
+  *The Bags window no longer lists items no known quest uses (the Upper Blackrock Spire seal, Omokk's Head, Warosh's Scroll, the Barkskin beads): unknown is not useless.*
+
 ## [1.0.0-beta.214] — 2026-11-23
 
 ### Modifié / Changed
