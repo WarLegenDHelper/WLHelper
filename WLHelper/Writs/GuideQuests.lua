@@ -94,10 +94,12 @@ end
 GQ.InRoute = InRoute
 -- Repeatable hand-ins you farm, taken and handed in with the same switches even when their guide is
 -- not ticked (report: "make the Mote of Unstable Magic repeatable automatic, clicking is a pain"):
--- Unstable Magic, Horde 98477 (Nuara Tremorhoof) and Alliance 96603 (Archmage Celindra). Their one
--- reward has no choice; talking to the NPC with motes in the bags hands in, takes it again, and so
--- on until the motes run out. Never shared with the group.
-local FARM = { [98477] = true, [96603] = true }
+-- Unstable Magic, Horde 98477 (Nuara Tremorhoof) and Alliance 96603 (Archmage Celindra), then its
+-- repeatable "More Unstable Magic", a quest of its own: Horde 98476, Alliance 96602 (report: "ça se
+-- rend pas auto", the gossip offering More Unstable Magic). Their one reward has no choice; talking
+-- to the NPC with motes in the bags hands in, takes it again, and so on until the motes run out.
+-- Never shared with the group.
+local FARM = { [98477] = true, [96603] = true, [98476] = true, [96602] = true }
 GQ.FARM = FARM
 local function Auto(qid)
     qid = Num(qid)

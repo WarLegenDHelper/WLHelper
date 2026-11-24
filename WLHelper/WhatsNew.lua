@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.218", date = "2026-11-24", items = {
+    { s = "fix", fr = { "La quête répétable des granules se rend toute seule.", "« More Unstable Magic » (Nuara Tremorhoof, Archmage Celindra) est une quête à part, avec son propre numéro : seule la première, « Unstable Magic », était prise et rendue automatiquement. Les deux le sont maintenant, tant que tu as des granules." }, en = { "The repeatable \"More Unstable Magic\" is taken and handed in automatically too, not only the first \"Unstable Magic\".", "" } },
+  } },
   { v = "1.0.0-beta.217", date = "2026-11-23", items = {
     { s = "fix", fr = { "Le n°1 de ta liste BiS a son badge même si ton objet n'est pas dans la liste.", "Quand l'objet porté n'était pas classé par Naowh, notre score décidait seul et pouvait refuser le badge au meilleur objet de la liste (l'Arcanoweave Cloak chez le marchand, face à une Deep Woodlands Cloak). Le n°1 de la liste passe maintenant devant, et l'infobulle dit « Liste BiS de Naowh : n°1, ton objet n'y est pas »." }, en = { "The BiS list's #1 gets its arrow even when the worn item is not in the list (Arcanoweave Cloak over a Deep Woodlands Cloak).", "" } },
   } },
@@ -49,8 +52,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.204", date = "2026-11-22", items = {
     { s = "chg", fr = { "La chaîne du set de donjon 2 sort des trajets de donjon", "An Earnest Proposition ouvre une suite de classe d'une vingtaine de quêtes (Silithus, Stratholme, Blackrock Depths, puis l'amulette de Valthalak dans l'un des quatre donjons). Ce n'est pas une quête de donjon. Même commencée, elle ne remplit plus le trajet de LBRS ou d'un autre donjon : l'aperçu la montre verrouillée comme chaîne longue. Coche-la pour la suivre. Quand seule l'étape du donjon reste à faire, elle revient d'elle-même." }, en = { "The Dungeon Set 2 class chain stays out of dungeon routes, even started, unless ticked by hand or down to the dungeon's own step.", "" } },
-  } },
-  { v = "1.0.0-beta.203", date = "2026-11-22", items = {
-    { s = "add", fr = { "Rapport automatique des quêtes renumérotées", "Quand le guide reconnaît par son titre une quête du journal dont le numéro nous est inconnu, il envoie tout seul un rapport discret à l'équipe WL Helper, une fois par numéro, pour qu'on l'ajoute aux données. An Earnest Proposition 84157 (vue chez un mage Horde) est déjà ajoutée." }, en = { "A renumbered quest recognised by its title is reported once, quietly, so its number goes into the data; An Earnest Proposition 84157 added.", "" } },
   } },
 }

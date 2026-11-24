@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.218] — 2026-11-24
+
+### Corrigé / Fixed
+- **La quête répétable des granules se rend toute seule.** « More Unstable Magic » (Nuara Tremorhoof, Archmage Celindra) est une quête à part, avec son propre numéro : seule la première, « Unstable Magic », était prise et rendue automatiquement. Les deux le sont maintenant, tant que tu as des granules.
+  *The repeatable "More Unstable Magic" is taken and handed in automatically too, not only the first "Unstable Magic".*
+
 ## [1.0.0-beta.217] — 2026-11-23
 
 ### Corrigé / Fixed
