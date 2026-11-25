@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.219] — 2026-11-25
+
+### Corrigé / Fixed
+- **Sacs : les objets de réputation ne sont plus proposés à la destruction.** Un objet qu'une quête répétable de ta faction demande encore et encore (les Pierres du Fléau de l'Aube d'argent, par exemple) n'apparaît plus dans la liste.
+  *Bags: items a repeatable quest of yours keeps asking for (the Argent Dawn's Scourgestones) are no longer listed to destroy.*
+
 ## [1.0.0-beta.218] — 2026-11-24
 
 ### Corrigé / Fixed

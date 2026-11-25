@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.219", date = "2026-11-25", items = {
+    { s = "fix", fr = { "Sacs : les objets de réputation ne sont plus proposés à la destruction.", "Un objet qu'une quête répétable de ta faction demande encore et encore (les Pierres du Fléau de l'Aube d'argent, par exemple) n'apparaît plus dans la liste." }, en = { "Bags", "Items a repeatable quest of yours keeps asking for (the Argent Dawn's Scourgestones) are no longer listed to destroy." } },
+  } },
   { v = "1.0.0-beta.218", date = "2026-11-24", items = {
     { s = "fix", fr = { "La quête répétable des granules se rend toute seule.", "« More Unstable Magic » (Nuara Tremorhoof, Archmage Celindra) est une quête à part, avec son propre numéro : seule la première, « Unstable Magic », était prise et rendue automatiquement. Les deux le sont maintenant, tant que tu as des granules." }, en = { "The repeatable \"More Unstable Magic\" is taken and handed in automatically too, not only the first \"Unstable Magic\".", "" } },
   } },
@@ -49,8 +52,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.205", date = "2026-11-22", items = {
     { s = "fix", fr = { "Champs de bataille : plus d'erreur sur le bonus de la semaine", "Le calendrier du jeu peut cacher le type d'un événement (valeur protégée), et la fenêtre PvP plantait en le lisant. Le type caché compte maintenant comme inconnu, et c'est le titre de l'événement qui dit si c'est un bonus de champ de bataille." }, en = { "Battlegrounds", "No error when the calendar hides an event's type; the title decides." } },
-  } },
-  { v = "1.0.0-beta.204", date = "2026-11-22", items = {
-    { s = "chg", fr = { "La chaîne du set de donjon 2 sort des trajets de donjon", "An Earnest Proposition ouvre une suite de classe d'une vingtaine de quêtes (Silithus, Stratholme, Blackrock Depths, puis l'amulette de Valthalak dans l'un des quatre donjons). Ce n'est pas une quête de donjon. Même commencée, elle ne remplit plus le trajet de LBRS ou d'un autre donjon : l'aperçu la montre verrouillée comme chaîne longue. Coche-la pour la suivre. Quand seule l'étape du donjon reste à faire, elle revient d'elle-même." }, en = { "The Dungeon Set 2 class chain stays out of dungeon routes, even started, unless ticked by hand or down to the dungeon's own step.", "" } },
   } },
 }

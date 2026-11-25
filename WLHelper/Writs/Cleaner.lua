@@ -169,7 +169,8 @@ local function BuildIndex()
                     seen[item] = true
                     local list = needBy[item]
                     if not list then list = {}; needBy[item] = list end
-                    list[#list + 1] = { id = qid, name = q.name, side = q.side or 0, classes = q.classes or 0 }
+                    list[#list + 1] = { id = qid, name = q.name, side = q.side or 0, classes = q.classes or 0,
+                                        repeatable = q.repeatable == true }
                 end
             end
             for _, o in ipairs(q.objectives or {}) do
@@ -355,14 +356,20 @@ local function Scan()
                         and not NamedIn(texts, name) and not TooltipStartsQuest(bag, slot, id) then
                         e = { id = id, name = name, count = info.stackCount or 1, slots = { { bag, slot } },
                               quality = info.quality or safe(C_Item.GetItemQualityByID, id) or 1 }
-                        local done, pending, active
+                        local done, pending, active, again
                         for _, q in ipairs(needBy[id] or {}) do
                             if OnQuest(q.id) then active = true; break
+                            elseif q.repeatable and Eligible(q) then again = true
                             elseif Completed(q.id) then done = done or q
                             elseif Eligible(q) then pending = true end
                         end
                         if active then
                             e = nil                      -- a quest in your log uses it
+                        elseif again then
+                            -- a repeatable quest of yours takes it again and again: reputation
+                            -- currency (report: the Argent Dawn's Invader's and Minion's Scourgestones
+                            -- offered "to destroy"); not listed
+                            e = nil
                         elseif KEEP[id] then
                             e = nil                      -- to keep (the Zul'Farrak mallet...): not listed
                         elseif not (needBy[id] and needBy[id][1]) then
