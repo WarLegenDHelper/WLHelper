@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.221] — 2026-11-25
+
+### Ajouté / Added
+- **Sacs : une catégorie « Anciennes quêtes (peu d'XP) ».** Les objets d'une quête grise pour toi que tu n'as jamais faite (Investigate the Alchemist Shop, The Corrupter...) y sont listés, décochés : coche ceux que tu ne feras jamais. Les objets qui lancent une quête grise y vont aussi ; ceux d'une quête de ton niveau restent gardés.
+  *Bags: a new "Old quests (little XP)" group lists, unticked, the items of grey quests you never did, and items that start one.*
+
 ## [1.0.0-beta.220] — 2026-11-25
 
 ### Corrigé / Fixed

@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.221", date = "2026-11-25", items = {
+    { s = "add", fr = { "Sacs : une catégorie « Anciennes quêtes (peu d'XP) ».", "Les objets d'une quête grise pour toi que tu n'as jamais faite (Investigate the Alchemist Shop, The Corrupter...) y sont listés, décochés : coche ceux que tu ne feras jamais. Les objets qui lancent une quête grise y vont aussi ; ceux d'une quête de ton niveau restent gardés." }, en = { "Bags", "A new \"Old quests (little XP)\" group lists, unticked, the items of grey quests you never did, and items that start one." } },
+  } },
   { v = "1.0.0-beta.220", date = "2026-11-25", items = {
     { s = "fix", fr = { "Sacs : un objet qu'une de tes quêtes pas encore faites demande n'est plus listé.", "Le Sceau d'ascension sans ornement (pour la clé du Pic Rochenoire supérieur) apparaissait sous « À vérifier » avec « Peut servir à une quête suivante » : il est maintenant gardé, sans être proposé." }, en = { "Bags", "An item a quest of yours not done yet needs (the Unadorned Seal of Ascension, for the Upper Blackrock Spire key) is no longer listed." } },
   } },
@@ -49,8 +52,5 @@ ns.WHATSNEW = {
     { s = "fix", fr = { "Corrigé grâce à vos relevés en jeu", "Le chef de guerre Goretooth, à Kargath, est en 3.1, 47.7 et non en 5.8, 47.4 ; Unstable Magic donne 14 550 XP, pas 8 300 ; la dernière quête de Scooty à Baie-du-Butin ne demande plus Rig Wars ; les deux Allegiance to the Old Gods ne demandent plus Trouble in the Deeps." }, en = { "From the guild's in-game quest records", "Goretooth's position, Unstable Magic's XP, and three prerequisites the game does not need; checked on Wowhead WoW Forever." } },
     { s = "fix", fr = { "Relevés de quêtes plus justes.", "Un prérequis n'est plus noté « pas nécessaire » quand c'est celui de l'autre faction, quand tu l'as rendu sous un numéro propre à Forever, ou quand il est encore dans ton journal." }, en = { "Quest records", "A faction twin, a renumbered quest or one still in the log is no longer noted as \"not a prerequisite\"." } },
     { s = "fix", fr = { "La sauvegarde ne grossit plus sans fin.", "Les rapports déjà livrés partent après 14 jours, ceux qui n'ont jamais trouvé de destinataire après 45 jours, et ceux reçus dans une boîte de réception après 60 jours." }, en = { "Saved reports are pruned", "Delivered ones after 14 days, undelivered after 45, received ones after 60." } },
-  } },
-  { v = "1.0.0-beta.206", date = "2026-11-22", items = {
-    { s = "fix", fr = { "Messages entre addons : un seul débit, celui du serveur.", "Tous les échanges de WL Helper (rapports, synchronisation de groupe, guilde, clés, événements, bateaux, version...) passent maintenant par une seule file. Chaque type de message part 10 fois d'affilée au plus, puis une fois par seconde, et le tout reste sous 800 octets par seconde, comme les bibliothèques d'addons connues. Avant, un long rapport ou une synchronisation partaient plus vite que ce que le serveur accepte, et les morceaux en trop étaient perdus sans un mot. Un message que le jeu refuse parce qu'il va trop vite repart un peu plus tard." }, en = { "Addon messages", "Every WL Helper exchange now goes through one queue paced to the server's limits (10 per prefix at once, then one a second, 800 bytes a second overall); throttled messages are sent again instead of being lost." } },
   } },
 }

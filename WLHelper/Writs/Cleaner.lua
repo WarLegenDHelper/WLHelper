@@ -32,6 +32,9 @@ ns.AddEnglish({
     ["Quête rendue : %s"] = "Quest turned in: %s",
     ["Sans risque"] = "Safe",
     ["À vérifier"] = "Check first",
+    ["Anciennes quêtes (peu d'XP)"] = "Old quests (little XP)",
+    ["Quête grise jamais faite (niv. %d) : %s"] = "Grey quest never done (level %d): %s",
+    ["Quête grise jamais faite (niv. %d)"] = "Grey quest never done (level %d)",
     ["À détruire toi-même"] = "Destroy by hand",
     ["Quête déjà rendue"] = "Quest already turned in",
     ["Détruire"] = "Destroy",
@@ -170,14 +173,14 @@ local function BuildIndex()
                     local list = needBy[item]
                     if not list then list = {}; needBy[item] = list end
                     list[#list + 1] = { id = qid, name = q.name, side = q.side or 0, classes = q.classes or 0,
-                                        repeatable = q.repeatable == true }
+                                        repeatable = q.repeatable == true, level = q.level }
                 end
             end
             for _, o in ipairs(q.objectives or {}) do
                 if o.kind == "item" then add(o.target) end
             end
             for _, s in ipairs(q.start or {}) do
-                if s.kind == "item" and s.id then starter[s.id] = true end
+                if s.kind == "item" and s.id then starter[s.id] = true; add(s.id) end
             end
             if lib.Steps then
                 for _, st in ipairs(safe(lib.Steps, qid) or {}) do
@@ -208,6 +211,17 @@ local function Eligible(q)
         if classID and bit.band(q.classes, 2 ^ (classID - 1)) == 0 then return false end
     end
     return true
+end
+
+-- A grey quest for you (the game's own rule: more levels below you than the green range), never
+-- done: little XP, most players never go back for it (report: "les trucs gris et anciens on peut les
+-- jeter non ?").
+local function Grey(q)
+    local lvl = UnitLevel and UnitLevel("player")
+    if type(q.level) ~= "number" or q.level <= 0 or type(lvl) ~= "number" then return false end
+    local range = GetQuestGreenRange and safe(GetQuestGreenRange) or 8
+    if type(range) ~= "number" then range = 8 end
+    return lvl - q.level > range
 end
 
 -- ---------------------------------------------------------------- quest log
@@ -320,7 +334,7 @@ local dirty = true
 
 local function NumBags() return NUM_BAG_SLOTS or 4 end
 -- 1 safe (checked), 2 check first (amber), 3 throw away yourself (grey)
-local function rank(e) return e.manual and 3 or e.amber and 2 or 1 end
+local function rank(e) return e.manual and 4 or e.old and 3 or e.amber and 2 or 1 end
 
 local function Scan()
     if not (C_Container and C_Container.GetContainerItemInfo and C_Item and C_Item.GetItemInfoInstant) then
@@ -352,16 +366,20 @@ local function Scan()
                     local _, _, _, _, _, classID = safe(C_Item.GetItemInfoInstant, id)
                     local questy = classID == QUEST_CLASS or qi.isQuestItem
                     local name = info.hyperlink and info.hyperlink:match("%[(.-)%]") or WP.ItemName(id)
-                    if questy and not qi.questID and not starter[id] and not needIds[id]
-                        and not NamedIn(texts, name) and not TooltipStartsQuest(bag, slot, id) then
+                    -- an item that starts a quest the data names is judged by that quest; one whose
+                    -- tooltip starts a quest the data does not know is never listed
+                    if questy and not qi.questID and not needIds[id]
+                        and not NamedIn(texts, name) and (starter[id] or not TooltipStartsQuest(bag, slot, id)) then
                         e = { id = id, name = name, count = info.stackCount or 1, slots = { { bag, slot } },
                               quality = info.quality or safe(C_Item.GetItemQualityByID, id) or 1 }
-                        local done, pending, active, again
+                        local done, pending, active, again, old
                         for _, q in ipairs(needBy[id] or {}) do
                             if OnQuest(q.id) then active = true; break
                             elseif q.repeatable and Eligible(q) then again = true
                             elseif Completed(q.id) then done = done or q
-                            elseif Eligible(q) then pending = true end
+                            elseif Eligible(q) then
+                                if Grey(q) then old = old or q else pending = true end
+                            end
                         end
                         if active then
                             e = nil                      -- a quest in your log uses it
@@ -384,6 +402,13 @@ local function Scan()
                             e = nil
                         elseif e.quality >= MANUAL_QUALITY then
                             e.manual, e.reason = true, L("Objet rare : le jeu demande une confirmation écrite")
+                        elseif old then
+                            -- only a grey quest you never did still wants it: its own group, unticked
+                            e.old, e.amber = true, true
+                            local title, loc = QuestTitle(old)
+                            e.reason = (loc or not French())
+                                and L("Quête grise jamais faite (niv. %d) : %s"):format(old.level, title)
+                                or L("Quête grise jamais faite (niv. %d)"):format(old.level)
                         elseif usableCache[id] and not done then
                             -- it does something when used: maybe a summon, a key, a teleport
                             e.amber, e.reason = true, L("Objet utilisable : lis son infobulle avant de le jeter")
@@ -486,7 +511,7 @@ local INSET = 16
 local LIST_W = 614 - 2 * INSET   -- the list width, read again by Dims() at every layout
 local rows = {}
 local heads = {}            -- section headers, pooled
-local RANK_TITLE = { "Sans risque", "À vérifier", "À détruire toi-même" }
+local RANK_TITLE = { "Sans risque", "À vérifier", "Anciennes quêtes (peu d'XP)", "À détruire toi-même" }
 
 local function num(v) return type(v) == "number" and not (root.IsSecret and root.IsSecret(v)) and v or nil end
 
@@ -610,7 +635,7 @@ Refresh = function(rescan)
     local kind = GetCursorInfo and GetCursorInfo()
     if kind ~= "item" and win.step then win.step:Hide() end
     Dims()
-    local count = { 0, 0, 0 }
+    local count = { 0, 0, 0, 0 }
     for _, e in ipairs(entries) do count[rank(e)] = count[rank(e)] + 1 end
     local child = win.list.child
     local y, lastRank, k = 0, nil, 0
