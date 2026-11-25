@@ -2,6 +2,9 @@
 -- Per version: v, date, items = { { s = "add"|"chg"|"fix", fr = { title, text }, en = { title, text } } }
 local _, ns = ...
 ns.WHATSNEW = {
+  { v = "1.0.0-beta.222", date = "2026-11-25", items = {
+    { s = "fix", fr = { "An Earnest Proposition sous son numéro Forever 84160.", "Forever lui donne un autre numéro pour certaines classes : il est maintenant connu d'avance, et la quête compte aussi une fois rendue (rapport envoyé depuis le jeu)." }, en = { "An Earnest Proposition under Forever's number 84160 is known in advance, and counts once turned in.", "" } },
+  } },
   { v = "1.0.0-beta.221", date = "2026-11-25", items = {
     { s = "add", fr = { "Sacs : une catégorie « Anciennes quêtes (peu d'XP) ».", "Les objets d'une quête grise pour toi que tu n'as jamais faite (Investigate the Alchemist Shop, The Corrupter...) y sont listés, décochés : coche ceux que tu ne feras jamais. Les objets qui lancent une quête grise y vont aussi ; ceux d'une quête de ton niveau restent gardés." }, en = { "Bags", "A new \"Old quests (little XP)\" group lists, unticked, the items of grey quests you never did, and items that start one." } },
   } },
@@ -45,12 +48,5 @@ ns.WHATSNEW = {
   } },
   { v = "1.0.0-beta.208", date = "2026-11-23", items = {
     { s = "fix", fr = { "T0.5 du mage : la ceinture et les gants s'achètent aussi.", "Just Compensation demande les Magister's Belt et Magister's Gloves. Comme les Bindings, ils sont liés quand équipés (vérifié sur Wowhead WoW Forever) : le guide te dit de les acheter à l'hôtel des ventes, ou de garder ceux d'un passage au pic Rochenoire ou à Scholomance, au lieu de t'envoyer dans un donjon pour eux." }, en = { "Mage Dungeon Set 2", "Just Compensation's Magister's Belt and Gloves are bind-on-equip (checked on Wowhead WoW Forever): buy them or keep them from a run, no dungeon run for them." } },
-  } },
-  { v = "1.0.0-beta.207", date = "2026-11-23", items = {
-    { s = "fix", fr = { "Set de donjon 2 (T0.5) : plus de Stratholme dès le départ.", "An Earnest Proposition demande une pièce du set de donjon 1, par exemple les Magister's Bindings pour un mage. Les données ne savaient pas où la trouver, alors le guide te faisait faire tout Stratholme avant même de rendre la quête. Cette pièce est liée quand équipée et tombe au pic Rochenoire : le guide te dit maintenant de l'acheter à l'hôtel des ventes ou de garder celle d'un passage au pic. La route commence par les échantillons, puis Mokvar." }, en = { "Dungeon Set 2", "An Earnest Proposition's Dungeon Set 1 piece is bind-on-equip (buy it or keep one from Blackrock Spire): the route no longer starts with a full Stratholme run." } },
-    { s = "fix", fr = { "Quêtes renumérotées par Forever : les compteurs sont lus sous le bon numéro.", "Une quête que Forever a renumérotée, comme An Earnest Proposition (84157), voyait ses objectifs lus sous notre ancien numéro. Le jeu répondait alors n'importe quoi, et une étape passait pour faite alors que tu n'avais rien fait (les échantillons de Silithus, par exemple)." }, en = { "Renumbered quests", "Objectives are now read under the quest log's own number, so a step is no longer skipped as done." } },
-    { s = "fix", fr = { "Corrigé grâce à vos relevés en jeu", "Le chef de guerre Goretooth, à Kargath, est en 3.1, 47.7 et non en 5.8, 47.4 ; Unstable Magic donne 14 550 XP, pas 8 300 ; la dernière quête de Scooty à Baie-du-Butin ne demande plus Rig Wars ; les deux Allegiance to the Old Gods ne demandent plus Trouble in the Deeps." }, en = { "From the guild's in-game quest records", "Goretooth's position, Unstable Magic's XP, and three prerequisites the game does not need; checked on Wowhead WoW Forever." } },
-    { s = "fix", fr = { "Relevés de quêtes plus justes.", "Un prérequis n'est plus noté « pas nécessaire » quand c'est celui de l'autre faction, quand tu l'as rendu sous un numéro propre à Forever, ou quand il est encore dans ton journal." }, en = { "Quest records", "A faction twin, a renumbered quest or one still in the log is no longer noted as \"not a prerequisite\"." } },
-    { s = "fix", fr = { "La sauvegarde ne grossit plus sans fin.", "Les rapports déjà livrés partent après 14 jours, ceux qui n'ont jamais trouvé de destinataire après 45 jours, et ceux reçus dans une boîte de réception après 60 jours." }, en = { "Saved reports are pruned", "Delivered ones after 14 days, undelivered after 45, received ones after 60." } },
   } },
 }

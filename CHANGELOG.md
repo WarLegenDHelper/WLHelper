@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.222] — 2026-11-25
+
+### Corrigé / Fixed
+- **An Earnest Proposition sous son numéro Forever 84160.** Forever lui donne un autre numéro pour certaines classes : il est maintenant connu d'avance, et la quête compte aussi une fois rendue (rapport envoyé depuis le jeu).
+  *An Earnest Proposition under Forever's number 84160 is known in advance, and counts once turned in.*
+
 ## [1.0.0-beta.221] — 2026-11-25
 
 ### Ajouté / Added
