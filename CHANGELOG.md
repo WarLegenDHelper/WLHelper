@@ -6,6 +6,12 @@ numéros : [SemVer](https://semver.org/lang/fr/) (voir « Versions » dans le RE
 
 ## [Unreleased]
 
+## [1.0.0-beta.220] — 2026-11-25
+
+### Corrigé / Fixed
+- **Sacs : un objet qu'une de tes quêtes pas encore faites demande n'est plus listé.** Le Sceau d'ascension sans ornement (pour la clé du Pic Rochenoire supérieur) apparaissait sous « À vérifier » avec « Peut servir à une quête suivante » : il est maintenant gardé, sans être proposé.
+  *Bags: an item a quest of yours not done yet needs (the Unadorned Seal of Ascension, for the Upper Blackrock Spire key) is no longer listed.*
+
 ## [1.0.0-beta.219] — 2026-11-25
 
 ### Corrigé / Fixed

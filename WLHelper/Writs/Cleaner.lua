@@ -2,7 +2,8 @@
 -- any more (quest turned in or abandoned) and lets you destroy them after a click on its confirm
 -- button. It never offers an item that starts a quest, an item an active quest asks for, the
 -- Craftsman's Writ envelopes and Coin Pouches, nor anything that is not a quest item. Items that
--- LibForeverData says a quest you have not done yet still needs are listed in amber, unchecked.
+-- LibForeverData says a quest of yours not done yet still needs are never listed (the Unadorned Seal
+-- of Ascension, the Upper Blackrock Spire key's).
 -- An item no quest in the data names is never listed: we cannot tell it is useless.
 -- Rare or better items are only listed: the game would ask for a typed confirmation.
 local ADDON, root = ...
@@ -29,7 +30,6 @@ ns.AddEnglish({
     ["Tes sacs sont propres"] = "Your bags are clean",
     ["Les objets de quête qui ne servent plus apparaîtront ici."] = "Quest items you no longer need will show up here.",
     ["Quête rendue : %s"] = "Quest turned in: %s",
-    ["Peut servir à une quête suivante"] = "May be needed for a later quest",
     ["Sans risque"] = "Safe",
     ["À vérifier"] = "Check first",
     ["À détruire toi-même"] = "Destroy by hand",
@@ -365,6 +365,11 @@ local function Scan()
                         end
                         if active then
                             e = nil                      -- a quest in your log uses it
+                        elseif pending then
+                            -- a quest of yours not done yet needs it: kept, not listed (report: the
+                            -- Unadorned Seal of Ascension, for the Upper Blackrock Spire key, under
+                            -- "Check first" with "May be needed for a later quest")
+                            e = nil
                         elseif again then
                             -- a repeatable quest of yours takes it again and again: reputation
                             -- currency (report: the Argent Dawn's Invader's and Minion's Scourgestones
@@ -382,8 +387,6 @@ local function Scan()
                         elseif usableCache[id] and not done then
                             -- it does something when used: maybe a summon, a key, a teleport
                             e.amber, e.reason = true, L("Objet utilisable : lis son infobulle avant de le jeter")
-                        elseif pending then
-                            e.amber, e.reason = true, L("Peut servir à une quête suivante")
                         elseif done then
                             -- an English title in a French sentence reads badly: just say it was done
                             local title, loc = QuestTitle(done)
